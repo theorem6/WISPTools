@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>LTE PCI Conflict Mapper</title>
+		<meta name="description" content="Advanced LTE Physical Cell Identity conflict detection and visualization tool powered by ArcGIS mapping and AI analysis" />
+		<meta name="keywords" content="LTE, PCI, Physical Cell Identity, conflict detection, ArcGIS, network optimization" />
+		
+		<!-- Open Graph Meta Tags -->
+		<meta property="og:title" content="LTE PCI Conflict Mapper" />
+		<meta property="og:description" content="Advanced LTE PCI conflict detection with interactive mapping and AI-powered recommendations" />
+		<meta property="og:type" content="website" />
+		
+		<!-- Fonts -->
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+		
+		<!-- ArcGIS CSS -->
+		<link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/light/main.css">
+		
+		<!-- Favicon -->
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" href="/favicon.png" />
+		
+		<!-- Security Headers -->
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; img-src 'self' data: https: blob:;">
+		
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover" class="bg-gradient-to-br from-blue-400 to-purple-600">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
