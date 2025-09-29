@@ -19,6 +19,9 @@ pnpm-lock.yaml
 .env.*
 !.env.example
 
+# GitHub templates
+getStart:*
+
 # IDE
 .vscode/*
 !.vscode/settings.json
