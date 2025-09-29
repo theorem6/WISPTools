@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to users' pci analysis data
+    match /pci_analyses/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow read/write access to cell data
+    match /cells/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow read/write access to conflict reports
+    match /conflict_reports/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow public read access to sample data
+    match /sample_data/{document} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
