@@ -16,7 +16,6 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.2.2",
-    "@sveltejs/adapter-firebase": "^0.4.3",
     "@sveltejs/kit": "^2.7.4",
     "@sveltejs/vite-plugin-svelte": "^4.0.4",
     "@types/eslint": "^8.56.15",

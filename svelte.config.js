@@ -1,14 +1,9 @@
-import adapter from '@sveltejs/adapter-firebase';
+import adapter from '@sveltejs/adapter-auto';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   kit: {
-    adapter: adapter({
-      firebaseProject: 'mapping-772cf',
-      functions: {
-        source: 'functions'
-      }
-    }),
+    adapter: adapter(),
     alias: {
       $lib: 'src/lib',
       $app: 'src/app'
