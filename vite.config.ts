@@ -4,6 +4,24 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [sveltekit()],
   optimizeDeps: {
-    exclude: ['@firebase/app']
+    exclude: ['@firebase/app', '@arcgis/core']
+  },
+  define: {
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      process: 'process/browser',
+    },
+  },
+  server: {
+    fs: {
+      allow: ['..']
+    }
+  },
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    sourcemap: true
   }
 });
