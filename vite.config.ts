@@ -22,7 +22,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: 'esbuild',
-    sourcemap: true
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   },
   ssr: {
     noExternal: ['@arcgis/core']
