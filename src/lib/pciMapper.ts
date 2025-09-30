@@ -8,6 +8,9 @@ export interface Cell {
   longitude: number;
   frequency: number;
   rsPower: number;
+  azimuth?: number; // Sector azimuth direction (0-359 degrees)
+  towerType?: '3-sector' | '4-sector'; // Tower configuration
+  technology?: 'LTE' | 'CBRS' | 'LTE+CBRS'; // Technology type
 }
 
 export interface PCIConflict {
@@ -28,6 +31,10 @@ export interface PCIConflictAnalysis {
 class PCIMapper {
   /**
    * Detect PCI conflicts based on LTE standards
+   * Supports:
+   * - Traditional 3-sector towers (120 degrees apart)
+   * - CBRS 4-sector towers (90 degrees apart)
+   * 
    * PCI conflicts occur when:
    * - CRS (Cell Reference Signal) collision: PCI % 3 = same
    * - PBCH (Physical Broadcast Channel) interference: PCI % 6 = same  
@@ -44,6 +51,22 @@ class PCIMapper {
         
         // Calculate distance between cells (in meters)
         const distance = this.calculateDistance(cell1, cell2);
+        
+        // Check if cells are on the same tower
+        const sameTower = cell1.eNodeB === cell2.eNodeB;
+        
+        // Skip conflict check if cells are on same tower but different sectors
+        // (this is normal for 3-sector/4-sector configurations)
+        if (sameTower && cell1.sector !== cell2.sector) {
+          // For same tower, check azimuth separation
+          const azimuthSeparation = this.calculateAzimuthSeparation(cell1, cell2);
+          const expectedSeparation = this.getExpectedAzimuthSeparation(cell1, cell2);
+          
+          // If sectors are properly separated, skip conflict check
+          if (Math.abs(azimuthSeparation - expectedSeparation) < 15) {
+            continue;
+          }
+        }
         
         // Check for different types of conflicts
         const conflictTypes = [
@@ -94,6 +117,55 @@ class PCIMapper {
   
   private toRadians(degrees: number): number {
     return degrees * (Math.PI / 180);
+  }
+  
+  /**
+   * Calculate azimuth separation between two cells
+   */
+  private calculateAzimuthSeparation(cell1: Cell, cell2: Cell): number {
+    const azimuth1 = cell1.azimuth || this.getDefaultAzimuth(cell1);
+    const azimuth2 = cell2.azimuth || this.getDefaultAzimuth(cell2);
+    
+    let separation = Math.abs(azimuth1 - azimuth2);
+    
+    // Handle wrap-around (e.g., 350° and 10° are actually 20° apart)
+    if (separation > 180) {
+      separation = 360 - separation;
+    }
+    
+    return separation;
+  }
+  
+  /**
+   * Get default azimuth based on sector number and tower type
+   */
+  private getDefaultAzimuth(cell: Cell): number {
+    const towerType = cell.towerType || '3-sector';
+    
+    if (towerType === '3-sector') {
+      // Traditional 3-sector: sectors at 0°, 120°, 240°
+      const sectorAzimuths = [0, 120, 240];
+      return sectorAzimuths[(cell.sector - 1) % 3] || 0;
+    } else {
+      // CBRS 4-sector: sectors at 0°, 90°, 180°, 270°
+      const sectorAzimuths = [0, 90, 180, 270];
+      return sectorAzimuths[(cell.sector - 1) % 4] || 0;
+    }
+  }
+  
+  /**
+   * Get expected azimuth separation for tower type
+   */
+  private getExpectedAzimuthSeparation(cell1: Cell, cell2: Cell): number {
+    const towerType = cell1.towerType || cell2.towerType || '3-sector';
+    
+    if (towerType === '3-sector') {
+      // Traditional LTE: 120° separation
+      return 120;
+    } else {
+      // CBRS: 90° separation
+      return 90;
+    }
   }
   
   /**
@@ -205,11 +277,27 @@ class PCIMapper {
     const highConflicts = conflicts.filter(c => c.severity === 'HIGH');
     
     if (criticalConflicts.length > 0) {
-      reviews.push(`URGENT: ${criticalConflicts.length} critical PCI conflicts detected requiring immediate attention.`);
+      recommendations.push(`URGENT: ${criticalConflicts.length} critical PCI conflicts detected requiring immediate attention.`);
     }
     
     if (highConflicts.length > 0) {
       recommendations.push(`${highConflicts.length} high-priority PCI conflicts should be resolved soon.`);
+    }
+    
+    // Tower configuration recommendations
+    const threeSectorCells = conflicts.filter(c => 
+      c.primaryCell.towerType === '3-sector' || c.conflictingCell.towerType === '3-sector'
+    );
+    const fourSectorCells = conflicts.filter(c => 
+      c.primaryCell.towerType === '4-sector' || c.conflictingCell.towerType === '4-sector'
+    );
+    
+    if (threeSectorCells.length > 0) {
+      recommendations.push(`${threeSectorCells.length} conflicts involve 3-sector towers (120° separation) - verify sector azimuths.`);
+    }
+    
+    if (fourSectorCells.length > 0) {
+      recommendations.push(`${fourSectorCells.length} conflicts involve CBRS 4-sector towers (90° separation) - verify sector alignment.`);
     }
     
     // Frequency-specific recommendations
@@ -230,6 +318,7 @@ class PCIMapper {
     }
     
     recommendations.push('Consider implementing automated PCI assignment algorithms.');
+    recommendations.push('For mixed 3-sector/4-sector deployments, use separate PCI pools.');
     recommendations.push('Regular PCI audits recommended to maintain optimal performance.');
     
     return recommendations;

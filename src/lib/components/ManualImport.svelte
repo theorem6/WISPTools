@@ -17,6 +17,9 @@
   let longitude = 0;
   let frequency = 2100;
   let rsPower = -85;
+  let azimuth = 0;
+  let towerType: '3-sector' | '4-sector' = '3-sector';
+  let technology: 'LTE' | 'CBRS' | 'LTE+CBRS' = 'LTE';
   
   let manualCells: Cell[] = [];
   
@@ -34,7 +37,10 @@
       latitude: latitude,
       longitude: longitude,
       frequency: frequency,
-      rsPower: rsPower
+      rsPower: rsPower,
+      azimuth: azimuth,
+      towerType: towerType,
+      technology: technology
     };
     
     manualCells = [...manualCells, newCell];
@@ -48,6 +54,8 @@
     longitude = 0;
     frequency = 2100;
     rsPower = -85;
+    azimuth = 0;
+    // Keep towerType and technology as they're likely the same for batch entry
   }
   
   function removeCell(index: number) {
@@ -91,7 +99,10 @@
             latitude: parseFloat(parts[4].trim()),
             longitude: parseFloat(parts[5].trim()),
             frequency: parseInt(parts[6].trim()),
-            rsPower: parseFloat(parts[7].trim())
+            rsPower: parseFloat(parts[7].trim()),
+            azimuth: parts[8] ? parseInt(parts[8].trim()) : undefined,
+            towerType: parts[9] ? parts[9].trim() as '3-sector' | '4-sector' : '3-sector',
+            technology: parts[10] ? parts[10].trim() as 'LTE' | 'CBRS' | 'LTE+CBRS' : 'LTE'
           });
         }
       }
@@ -103,10 +114,14 @@
   }
   
   function downloadCSVTemplate() {
-    const template = `Cell ID,eNodeB,Sector,PCI,Latitude,Longitude,Frequency,RS Power
-CELL001,1001,1,15,40.7128,-74.0060,2100,-85
-CELL002,1002,2,,40.7689,-73.9667,2100,-87
-CELL003,1003,3,21,40.7589,-73.9851,1800,-83`;
+    const template = `Cell ID,eNodeB,Sector,PCI,Latitude,Longitude,Frequency,RS Power,Azimuth,Tower Type,Technology
+CELL001,1001,1,15,40.7128,-74.0060,2100,-85,0,3-sector,LTE
+CELL002,1002,2,,40.7689,-73.9667,2100,-87,120,3-sector,LTE
+CELL003,1003,3,21,40.7589,-73.9851,1800,-83,240,3-sector,LTE
+CELL004,1004,1,,40.7282,-73.9942,3550,-89,0,4-sector,CBRS
+CELL005,1005,2,,40.7505,-73.9934,3550,-86,90,4-sector,CBRS
+CELL006,1006,3,,40.7614,-73.9776,3550,-88,180,4-sector,CBRS
+CELL007,1007,4,,40.7128,-74.0160,3550,-87,270,4-sector,CBRS`;
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -195,6 +210,28 @@ CELL003,1003,3,21,40.7589,-73.9851,1800,-83`;
             <div class="form-group">
               <label>RS Power (dBm)</label>
               <input type="number" bind:value={rsPower} placeholder="-85" />
+            </div>
+            
+            <div class="form-group">
+              <label>Azimuth (degrees)</label>
+              <input type="number" min="0" max="359" bind:value={azimuth} placeholder="0" />
+            </div>
+            
+            <div class="form-group">
+              <label>Tower Type</label>
+              <select bind:value={towerType}>
+                <option value="3-sector">3-Sector (120° LTE)</option>
+                <option value="4-sector">4-Sector (90° CBRS)</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Technology</label>
+              <select bind:value={technology}>
+                <option value="LTE">LTE</option>
+                <option value="CBRS">CBRS</option>
+                <option value="LTE+CBRS">LTE+CBRS</option>
+              </select>
             </div>
           </div>
           
@@ -396,9 +433,20 @@ CELL003,1003,3,21,40.7589,-73.9851,1800,-83`;
     font-size: 0.9rem;
   }
   
-  .form-group input:focus {
+  .form-group input:focus,
+  .form-group select:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 0;
+  }
+  
+  .form-group select {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
   }
   
   .add-button {
