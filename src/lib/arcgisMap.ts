@@ -31,9 +31,12 @@ export class PCIArcGISMapper {
   }
   
   private async initializeMap(containerId: string) {
+    // Check for dark mode
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    
     // Initialize the map
     this.map = new Map({
-      basemap: "streets-vector"
+      basemap: isDarkMode ? "dark-gray-vector" : "streets-vector"
     });
     
     // Create the map view
@@ -303,5 +306,13 @@ export class PCIArcGISMapper {
         layer.visible = layerState.visible;
       }
     });
+  }
+
+  /**
+   * Update map theme for dark mode
+   */
+  updateTheme(isDarkMode: boolean) {
+    const basemap = isDarkMode ? "dark-gray-vector" : "streets-vector";
+    this.map.basemap = basemap;
   }
 }

@@ -315,22 +315,24 @@
   
   .control-panel {
     width: 400px;
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--card-bg);
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-lg);
     backdrop-filter: blur(10px);
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
   }
   
   .panel-header {
     padding: 1.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--border-color);
   }
   
   .panel-header h2 {
     margin: 0 0 1rem 0;
-    color: #333;
+    color: var(--text-primary);
     font-size: 1.5rem;
   }
   
@@ -370,7 +372,7 @@
   
   .action-group h3 {
     margin: 0 0 1rem 0;
-    color: #333;
+    color: var(--text-primary);
     font-size: 1.1rem;
   }
   
@@ -403,13 +405,13 @@
   }
   
   .action-button.secondary {
-    background: #f8f9fa;
-    color: #333;
-    border: 1px solid #e9ecef;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
   
   .action-button.secondary:hover:not(:disabled) {
-    background: #e9ecef;
+    background: var(--hover-bg);
   }
   
   .stats-grid {
@@ -422,8 +424,9 @@
   .stat {
     text-align: center;
     padding: 1rem;
-    background: rgba(102, 126, 234, 0.1);
+    background: var(--bg-secondary);
     border-radius: 8px;
+    border: 1px solid var(--border-color);
   }
   
   .stat-value {
@@ -435,7 +438,7 @@
   
   .stat-label {
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -447,7 +450,7 @@
   .legend h4 {
     margin: 0 0 0.5rem 0;
     font-size: 0.9rem;
-    color: #333;
+    color: var(--text-primary);
   }
   
   .legend-item {
@@ -472,14 +475,19 @@
   .conflict-item {
     padding: 0.75rem;
     margin-bottom: 0.5rem;
-    background: #f8f9fa;
+    background: var(--bg-secondary);
     border-radius: 6px;
-    border-left: 3px solid #dee2e6;
+    border-left: 3px solid var(--border-color);
+    border: 1px solid var(--border-color);
   }
   
   .conflict-item.critical {
     border-left-color: #dc3545;
-    background: #fff5f5;
+    background: var(--bg-secondary);
+  }
+
+  [data-theme="dark"] .conflict-item.critical {
+    background: rgba(220, 53, 69, 0.1);
   }
   
   .conflict-header {
@@ -506,16 +514,18 @@
     display: flex;
     justify-content: space-between;
     font-size: 0.8rem;
-    color: #666;
+    color: var(--text-secondary);
   }
   
   .map-container {
     flex: 1;
-    background: white;
+    background: var(--card-bg);
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-lg);
     overflow: hidden;
     position: relative;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
   }
   
   .map-frame {
@@ -559,28 +569,29 @@
   }
   
   .gemini-analysis {
-    background: #f8f9fa;
+    background: var(--bg-secondary);
     padding: 1rem;
     border-radius: 8px;
     border-left: 4px solid #28a745;
+    border: 1px solid var(--border-color);
   }
   
   .analysis-text {
     white-space: pre-wrap;
     line-height: 1.6;
-    color: #333;
+    color: var(--text-primary);
   }
   
   .no-conflicts, .no-recommendations {
     text-align: center;
-    color: #666;
+    color: var(--text-secondary);
     font-style: italic;
     padding: 2rem;
   }
   
   .more-conflicts {
     text-align: center;
-    color: #666;
+    color: var(--text-secondary);
     font-size: 0.8rem;
     margin-top: 1rem;
   }
