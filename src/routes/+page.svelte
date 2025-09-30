@@ -88,39 +88,29 @@
         }
       }
       
-      // Get AI analysis from Gemini
-      await getGeminiAnalysis();
+      // Get Gemini analysis (now local fallback)
+      const analysisData = conflicts.map(c =>
+        `Conflict: ${c.primaryCell.id} (PCI: ${c.primaryCell.pci}) vs ${c.conflictingCell.id} (PCI: ${c.conflictingCell.pci}), Type: ${c.conflictType}, Severity: ${c.severity}, Distance: ${c.distance.toFixed(2)}m`
+      ).join('\n');
+      geminiAnalysis = await getGeminiAnalysis(analysisData);
       
     } catch (error) {
-      console.error('Analysis failed:', error);
+      console.error('Error during analysis:', error);
+      geminiAnalysis = 'Error during analysis. Please check console for details.';
     } finally {
       isLoading = false;
     }
   }
   
-  async function getGeminiAnalysis() {
-    if (!analysis) return;
-    
+  async function getGeminiAnalysis(analysisData: string): Promise<string> {
+    if (!analysisData) {
+      return "No conflicts to analyze.";
+    }
     try {
-      const prompt = `Analyze this LTE PCI conflict data and provide professional recommendations:
-      
-      Total Cells: ${analysis.totalCells}
-      Conflict Rate: ${analysis.conflictRate.toFixed(2)}%
-      Critical Conflicts: ${conflicts.filter(c => c.severity === 'CRITICAL').length}
-      High Priority Conflicts: ${conflicts.filter(c => c.severity === 'HIGH').length}
-      
-      Conflict Types:
-      - Mod3 Conflicts: ${conflicts.filter(c => c.conflictType === 'MOD3').length}
-      - Mod6 Conflicts: ${conflicts.filter(c => c.conflictType === 'MOD6').length}
-      - Mod12 Conflicts: ${conflicts.filter(c => c.conflictType === 'MOD12').length}
-      - Mod30 Conflicts: ${conflicts.filter(c => c.conflictType === 'MOD30').length}
-      
-      Please provide specific technical recommendations for resolving these PCI conflicts.`;
-      
-      geminiAnalysis = await geminiService.analyzePCIConflicts(prompt);
+      return await geminiService.analyzePCIConflicts(analysisData);
     } catch (error) {
       console.error('Gemini analysis failed:', error);
-      geminiAnalysis = 'AI analysis unavailable. Please check Gemini API configuration.';
+      return 'AI analysis unavailable. Please check Gemini API configuration.';
     }
   }
   
@@ -186,53 +176,37 @@
   }
   
   function exportData() {
-    const data = {
-      cells,
-      conflicts,
-      analysis,
-      timestamp: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pci-analysis-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-  
-  function setView(view: 'map' | 'analysis' | 'recommendations') {
-    currentView = view;
+    // This function is now handled by the ConflictReportExport component
+    // The component will automatically generate and allow download of reports
+    alert('Use the "Export Report" buttons in the Conflict Report Export section.');
   }
 </script>
 
 <div class="dashboard">
-  <!-- Control Panel -->
   <div class="control-panel">
     <div class="panel-header">
-      <h2>PCI Conflict Analyzer</h2>
+      <h2>📡 LTE PCI Mapper</h2>
       <div class="view-tabs">
         <button 
           class="tab-button" 
           class:active={currentView === 'map'}
-          on:click={() => setView('map')}
+          on:click={() => currentView = 'map'}
         >
-          Map View
+          🗺️ Map
         </button>
         <button 
           class="tab-button" 
           class:active={currentView === 'analysis'}
-          on:click={() => setView('analysis')}
+          on:click={() => currentView = 'analysis'}
         >
-          Analysis
+          📊 Analysis
         </button>
         <button 
           class="tab-button" 
           class:active={currentView === 'recommendations'}
-          on:click={() => setView('recommendations')}
+          on:click={() => currentView = 'recommendations'}
         >
-          AI Insights
+          💡 Recommendations
         </button>
       </div>
     </div>
@@ -240,133 +214,100 @@
     <div class="panel-content">
       <!-- Quick Actions -->
       <div class="action-group">
-        <h3>Quick Actions</h3>
+        <h3>⚡ Quick Actions</h3>
         <ManualImport on:import={handleManualImport} />
         
         <!-- Conflict Report Export -->
         <ConflictReportExport {cells} {conflicts} {recommendations} />
-        <button 
-          class="action-button primary" 
-          on:click={loadSampleData}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Loading...' : 'Load Sample Data'}
-        </button>
-        <button 
-          class="action-button secondary" 
-          on:click={performAnalysis}
-          disabled={isLoading || !cells.length}
-        >
-          Run Analysis
-        </button>
-        <button 
-          class="action-button primary optimize-button" 
-          on:click={optimizePCIAssignments}
-          disabled={isOptimizing || !conflicts.length}
-        >
-          {#if isOptimizing}
-            ⚙️ Optimizing...
-          {:else}
-            🎯 Auto-Optimize PCIs
-          {/if}
-        </button>
-        <button 
-          class="action-button secondary" 
-          on:click={clearMap}
-          disabled={!cells.length}
-        >
-          Clear Map
-        </button>
-        <button 
-          class="action-button secondary" 
-          on:click={exportData}
-
-          disabled={!analysis}
-        >
-          Export Data
-        </button>
+        
+        <div class="button-grid">
+          <button 
+            class="action-button primary" 
+            on:click={loadSampleData}
+            disabled={isLoading}
+          >
+            {isLoading ? '⏳ Loading...' : '📊 Load Sample Data'}
+          </button>
+          <button 
+            class="action-button secondary" 
+            on:click={performAnalysis}
+            disabled={isLoading || !cells.length}
+          >
+            🔍 Run Analysis
+          </button>
+          <button 
+            class="action-button success optimize-button" 
+            on:click={optimizePCIAssignments}
+            disabled={isOptimizing || !conflicts.length}
+          >
+            {#if isOptimizing}
+              ⚙️ Optimizing...
+            {:else}
+              🎯 Auto-Optimize PCIs
+            {/if}
+          </button>
+          <button 
+            class="action-button secondary" 
+            on:click={clearMap}
+            disabled={!cells.length}
+          >
+            🗑️ Clear Map
+          </button>
+        </div>
       </div>
-      
-      <!-- Map View -->
-      {#if currentView === 'map'}
-        <div class="map-info">
-          <h3>Network Overview</h3>
-          <div class="stats-grid">
-            <div class="stat">
-              <div class="stat-value">{cells.length}</div>
-              <div class="stat-label">Total Cells</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value">{conflicts.length}</div>
-              <div class="stat-label">Conflicts</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value">{analysis?.conflictRate?.toFixed(1) || '0.0'}%</div>
-              <div class="stat-label">Conflict Rate</div>
-            </div>
-          </div>
-          
-          <div class="legend">
-            <h4>Conflict Severity Legend</h4>
-            <div class="legend-item">
-              <div class="legend-color critical"></div>
-              <span>Critical</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color high"></div>
-              <span>High</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color medium"></div>
-              <span>Medium</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color low"></div>
-              <span>Low</span>
-            </div>
-          </div>
-        </div>
-      {/if}
-      
-      <!-- Analysis View -->
+
+      <!-- Analysis Results -->
       {#if currentView === 'analysis'}
-        <div class="analysis-content">
-          <h3>Detailed Analysis</h3>
-          
-          {#if conflicts.length > 0}
-            <div class="conflicts-list">
-              <h4>Detected Conflicts ({conflicts.length})</h4>
-              {#each conflicts.slice(0, 10) as conflict, i}
-                <div class="conflict-item" class:critical={conflict.severity === 'CRITICAL'}>
-                  <div class="conflict-header">
-                    <span class="severity-badge {conflict.severity.toLowerCase()}">{conflict.severity}</span>
-                    <span class="conflict-type">{conflict.conflictType}</span>
-                  </div>
-                  <div class="conflict-details">
-                    <span>{conflict.primaryCell.id} ↔ {conflict.conflictingCell.id}</span>
-                    <span>{conflict.distance.toFixed(0)}m distance</span>
-                  </div>
-                </div>
-              {/each}
-              
-              {#if conflicts.length > 10}
-                <p class="more-conflicts">... and {conflicts.length - 10} more conflicts</p>
-              {/if}
+        <div class="analysis-results card">
+          <h3>📈 Analysis Summary</h3>
+          {#if analysis}
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-value">{analysis.totalCells}</div>
+                <div class="stat-label">Total Cells</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{analysis.conflicts.length}</div>
+                <div class="stat-label">Conflicts</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{analysis.conflictRate.toFixed(2)}%</div>
+                <div class="stat-label">Conflict Rate</div>
+              </div>
             </div>
+            
+            <h4>🔍 Conflict Details</h4>
+            {#if analysis.conflicts.length > 0}
+              <div class="conflicts-list">
+                {#each analysis.conflicts as conflict}
+                  <div class="conflict-item" class:critical={conflict.severity === 'CRITICAL'}>
+                    <div class="conflict-header">
+                      <span class="cell-id">{conflict.primaryCell.id}</span>
+                      <span class="conflict-type">{conflict.conflictType}</span>
+                      <span class="severity" class:critical={conflict.severity === 'CRITICAL'}>{conflict.severity}</span>
+                    </div>
+                    <div class="conflict-details">
+                      vs {conflict.conflictingCell.id} at {conflict.distance.toFixed(2)}m
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <p class="no-conflicts">✅ No conflicts detected.</p>
+            {/if}
           {:else}
-            <p class="no-conflicts">No PCI conflicts detected in the network.</p>
+            <p>Run analysis to see results...</p>
           {/if}
         </div>
       {/if}
-      
-      <!-- Recommendations View -->
+
+      <!-- Recommendations -->
       {#if currentView === 'recommendations'}
-        <div class="recommendations-content">
-          <h3>AI-Powered Recommendations</h3>
-          
+        <div class="recommendations-section card">
+          <h3>💡 Recommendations</h3>
           {#if geminiAnalysis}
             <div class="gemini-analysis">
-              <div class="analysis-text">{geminiAnalysis}</div>
+              {@html geminiAnalysis.replace(/\n/g, '<br>')}
             </div>
           {:else if analysis?.recommendations}
             <div class="basic-recommendations">
@@ -384,24 +325,21 @@
       {/if}
     </div>
   </div>
-  
-  <!-- Map Container -->
-  <div class="map-container">
-    <div class="map-frame">
-      <div bind:this={mapContainer} class="arcgis-map"></div>
-      
-      {#if isLoading}
-        <div class="loading-overlay">
-          <div class="spinner"></div>
-          <p>Analyzing PCI conflicts...</p>
-        </div>
-      {/if}
-    </div>
-  </div>
 
-  <!-- PCI Optimization Results Panel -->
-  {#if optimizationResult}
-    <div class="optimization-panel">
+  <div class="map-container" bind:this={mapContainer} id="mapView">
+    {#if isLoading}
+      <div class="loading-overlay">
+        <div class="spinner"></div>
+        <p>🔍 Analyzing PCI conflicts...</p>
+      </div>
+    {/if}
+  </div>
+</div>
+
+<!-- PCI Optimization Results Panel -->
+{#if optimizationResult}
+  <div class="optimization-panel">
+    <div class="optimization-panel-content">
       <div class="optimization-header">
         <h2>🎯 PCI Optimization Results</h2>
         <button class="close-button" on:click={() => optimizationResult = null}>✕</button>
@@ -432,7 +370,7 @@
         </div>
 
         <div class="convergence-chart">
-          <h3>Optimization Convergence</h3>
+          <h3>📊 Optimization Convergence</h3>
           <div class="chart-container">
             {#each optimizationResult.convergenceHistory as iteration, index}
               <div class="chart-bar">
@@ -448,7 +386,7 @@
         </div>
 
         <div class="pci-changes">
-          <h3>PCI Changes ({optimizationResult.changes.length})</h3>
+          <h3>🔄 PCI Changes ({optimizationResult.changes.length})</h3>
           <div class="changes-list">
             {#each optimizationResult.changes.slice(0, 10) as change}
               <div class="change-item">
@@ -476,318 +414,378 @@
         </div>
       </div>
     </div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
   .dashboard {
     display: flex;
-    height: calc(100vh - 140px);
-    gap: 1rem;
-    padding: 1rem;
+    height: calc(100vh - 80px);
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg);
+    background: var(--bg-primary);
   }
   
   .control-panel {
-    width: 400px;
+    width: 420px;
     background: var(--card-bg);
-    border-radius: 12px;
-    box-shadow: var(--shadow-lg);
-    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
+    backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border-color);
-    transition: all 0.3s ease;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
   }
   
   .panel-header {
-    padding: 1.5rem;
+    padding: var(--spacing-xl);
+    background: var(--gradient-primary);
+    color: var(--text-inverse);
     border-bottom: 1px solid var(--border-color);
   }
   
   .panel-header h2 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.5rem;
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--text-inverse);
+    font-size: 1.6rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
   }
   
   .view-tabs {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--spacing-xs);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-xs);
   }
   
   .tab-button {
-    padding: 0.5rem 1rem;
+    padding: var(--spacing-sm) var(--spacing-md);
     border: none;
     background: transparent;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-  }
-  
-  .tab-button:hover {
-    background: rgba(102, 126, 234, 0.1);
-  }
-  
-  .tab-button.active {
-    background: #667eea;
-    color: white;
-  }
-  
-  .panel-content {
-    padding: 1.5rem;
-    flex: 1;
-    overflow-y: auto;
-  }
-  
-  .action-group {
-    margin-bottom: 2rem;
-  }
-  
-  .action-group h3 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.1rem;
-  }
-  
-  .action-button {
-    display: block;
-    width: 100%;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    border: none;
-    border-radius: 8px;
+    border-radius: var(--border-radius-sm);
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 500;
-    transition: all 0.2s ease;
+    color: rgba(255, 255, 255, 0.8);
+    transition: var(--transition);
   }
   
-  .action-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .tab-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-inverse);
   }
   
-  .action-button.primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+  .tab-button.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-inverse);
+    font-weight: 600;
   }
   
-  .action-button.primary:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  .panel-content {
+    padding: var(--spacing-xl);
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg-primary);
   }
   
-  .action-button.secondary {
+  .action-group {
+    margin-bottom: var(--spacing-2xl);
+    padding: var(--spacing-xl);
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
   }
   
-  .action-button.secondary:hover:not(:disabled) {
-    background: var(--hover-bg);
-  }
-  
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .stat {
-    text-align: center;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-  }
-  
-  .stat-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #667eea;
-    margin-bottom: 0.25rem;
-  }
-  
-  .stat-label {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .legend {
-    margin-top: 1rem;
-  }
-  
-  .legend h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.9rem;
+  .action-group h3 {
+    margin: 0 0 var(--spacing-lg) 0;
     color: var(--text-primary);
-  }
-  
-  .legend-item {
+    font-size: 1.3rem;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.8rem;
+    gap: var(--spacing-sm);
   }
   
-  .legend-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
+  .button-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
   }
   
-  .legend-color.critical { background: #dc3545; }
-  .legend-color.high { background: #fd7e14; }
-  .legend-color.medium { background: #ffc107; }
-  .legend-color.low { background: #17a2b8; }
-  
-  .conflict-item {
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    background: var(--bg-secondary);
-    border-radius: 6px;
-    border-left: 3px solid var(--border-color);
-    border: 1px solid var(--border-color);
-  }
-  
-  .conflict-item.critical {
-    border-left-color: #dc3545;
-    background: var(--bg-secondary);
+  .action-button {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    box-shadow: var(--shadow-sm);
   }
 
-  [data-theme="dark"] .conflict-item.critical {
-    background: rgba(220, 53, 69, 0.1);
+  .action-button.primary {
+    background: var(--primary-color);
+    color: var(--text-inverse);
   }
-  
-  .conflict-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
+
+  .action-button.primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
   }
-  
-  .severity-badge {
-    padding: 0.2rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  
-  .severity-badge.critical { background: #dc3545; color: white; }
-  .severity-badge.high { background: #fd7e14; color: white; }
-  .severity-badge.medium { background: #ffc107; color: black; }
-  .severity-badge.low { background: #17a2b8; color: white; }
-  
-  .conflict-details {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-  }
-  
-  .map-container {
-    flex: 1;
-    background: var(--card-bg);
-    border-radius: 12px;
-    box-shadow: var(--shadow-lg);
-    overflow: hidden;
-    position: relative;
+
+  .action-button.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
     border: 1px solid var(--border-color);
-    transition: all 0.3s ease;
   }
-  
-  .map-frame {
-    width: 100%;
-    height: 100%;
+
+  .action-button.secondary:hover:not(:disabled) {
+    background: var(--hover-bg);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .action-button.success {
+    background: var(--success-color);
+    color: var(--text-inverse);
+    border: 1px solid var(--success-color);
+  }
+
+  .action-button.success:hover:not(:disabled) {
+    background: var(--success-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .action-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .map-container {
+    flex-grow: 1;
     position: relative;
+    background: var(--bg-primary);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
   }
-  
-  .arcgis-map {
-    width: 100%;
-    height: 100%;
-  }
-  
+
   .loading-overlay {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    color: var(--text-inverse);
+    font-size: 1.2rem;
+    z-index: 50;
   }
-  
+
   .spinner {
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
     width: 40px;
     height: 40px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #667eea;
-    border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-md);
   }
-  
+
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
-  
-  .gemini-analysis {
-    background: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: 8px;
-    border-left: 4px solid #28a745;
+
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
   }
-  
-  .analysis-text {
-    white-space: pre-wrap;
-    line-height: 1.6;
+
+  .card h3 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-lg);
+    color: var(--text-primary);
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    text-align: center;
+    transition: var(--transition);
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .conflicts-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+  }
+
+  .conflict-item {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    transition: var(--transition);
+  }
+
+  .conflict-item:last-child {
+    border-bottom: none;
+  }
+
+  .conflict-item.critical {
+    background: var(--danger-light);
+    border-left: 4px solid var(--danger-color);
+  }
+
+  .conflict-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .cell-id {
+    font-weight: 600;
     color: var(--text-primary);
   }
-  
-  .no-conflicts, .no-recommendations {
-    text-align: center;
-    color: var(--text-secondary);
-    font-style: italic;
-    padding: 2rem;
-  }
-  
-  .more-conflicts {
-    text-align: center;
-    color: var(--text-secondary);
+
+  .conflict-type {
     font-size: 0.8rem;
-    margin-top: 1rem;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
   }
-  
+
+  .severity {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    background: var(--warning-light);
+    color: var(--warning-color);
+  }
+
+  .severity.critical {
+    background: var(--danger-light);
+    color: var(--danger-color);
+  }
+
+  .conflict-details {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .no-conflicts {
+    text-align: center;
+    color: var(--success-color);
+    font-weight: 600;
+    padding: var(--spacing-xl);
+  }
+
+  .gemini-analysis {
+    white-space: pre-wrap;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+
+  .no-recommendations {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: var(--spacing-lg);
+  }
+
   /* Optimization Panel Styles */
   .optimization-panel {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90%;
-    max-width: 800px;
-    max-height: 80vh;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+  }
+
+  .optimization-panel-content {
     background: var(--card-bg);
-    border: 2px solid var(--primary-color);
+    border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-xl);
-    z-index: 1000;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    backdrop-filter: blur(8px);
+    position: relative;
   }
 
   .optimization-header {
@@ -803,6 +801,7 @@
   .optimization-header h2 {
     margin: 0;
     font-size: 1.5rem;
+    font-weight: 600;
   }
 
   .close-button {
@@ -865,7 +864,7 @@
     font-size: 2rem;
     font-weight: bold;
     color: var(--primary-color);
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--spacing-sm);
   }
 
   .summary-card.success .card-value {
@@ -875,15 +874,18 @@
   .card-label {
     font-size: 0.9rem;
     color: var(--text-secondary);
+    font-weight: 500;
   }
 
   .convergence-chart {
-    margin-bottom: 2rem;
+    margin-bottom: var(--spacing-2xl);
   }
 
   .convergence-chart h3 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 var(--spacing-lg) 0;
     color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
   }
 
   .chart-container {
@@ -903,7 +905,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 0 0.25rem;
+    margin: 0 var(--spacing-xs);
   }
 
   .bar-fill {
@@ -917,16 +919,18 @@
   .bar-label {
     font-size: 0.75rem;
     color: var(--text-secondary);
-    margin-top: 0.25rem;
+    margin-top: var(--spacing-xs);
   }
 
   .pci-changes {
-    margin-bottom: 2rem;
+    margin-bottom: var(--spacing-2xl);
   }
 
   .pci-changes h3 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 var(--spacing-lg) 0;
     color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
   }
 
   .changes-list {
@@ -941,8 +945,8 @@
   .change-item {
     display: grid;
     grid-template-columns: 100px 120px 1fr;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
     border-bottom: 1px solid var(--border-color);
     align-items: center;
   }
@@ -951,8 +955,8 @@
     border-bottom: none;
   }
 
-  .cell-id {
-    font-weight: bold;
+  .change-item .cell-id {
+    font-weight: 600;
     color: var(--text-primary);
     font-size: 0.9rem;
   }
@@ -960,8 +964,9 @@
   .pci-change {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
     font-family: monospace;
+    font-size: 0.9rem;
   }
 
   .old-pci {
@@ -984,7 +989,7 @@
   }
 
   .more-changes {
-    padding: 0.75rem 1rem;
+    padding: var(--spacing-md) var(--spacing-lg);
     text-align: center;
     color: var(--text-secondary);
     font-style: italic;
@@ -1022,10 +1027,12 @@
     .dashboard {
       flex-direction: column;
       height: auto;
+      padding: var(--spacing-md);
     }
     
     .control-panel {
       width: 100%;
+      margin-bottom: var(--spacing-lg);
     }
     
     .map-container {
@@ -1033,13 +1040,20 @@
     }
 
     .optimization-panel {
-      width: 95%;
-      max-height: 90vh;
+      padding: var(--spacing-md);
+    }
+
+    .optimization-panel-content {
+      max-height: 95vh;
     }
 
     .change-item {
       grid-template-columns: 1fr;
-      gap: 0.5rem;
+      gap: var(--spacing-sm);
+    }
+
+    .button-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>

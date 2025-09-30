@@ -158,7 +158,7 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
   class="import-button" 
   on:click={() => showImportModal = true}
 >
-  📥 Manual Import
+  📥 Manual Import / CSV
 </button>
 
 {#if showImportModal}
@@ -343,19 +343,27 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
 
 <style>
   .import-button {
-    padding: 0.75rem 1.5rem;
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: white;
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--gradient-success);
+    color: var(--text-inverse);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
   }
   
   .import-button:hover {
+    background: var(--success-color);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    box-shadow: var(--shadow-md);
   }
   
   .modal-overlay {
