@@ -3,6 +3,7 @@
   import { PCIArcGISMapper } from '$lib/arcgisMap';
   import { pciMapper, type Cell } from '$lib/pciMapper';
   import { geminiService } from '$lib/geminiService';
+  import { pciOptimizer, type OptimizationResult } from '$lib/pciOptimizer';
   import ManualImport from '$lib/components/ManualImport.svelte';
   import ConflictReportExport from '$lib/components/ConflictReportExport.svelte';
   
@@ -18,6 +19,9 @@
   let currentView: 'map' | 'analysis' | 'recommendations' = 'map';
   let geminiAnalysis: string = '';
   let showAdvancedSettings = false;
+  let optimizationResult: OptimizationResult | null = null;
+  let isOptimizing = false;
+  let showOptimizationPanel = false;
   
   // Sample data for demonstration
   const sampleCells: Cell[] = [
@@ -120,6 +124,57 @@
     }
   }
   
+  async function optimizePCIAssignments() {
+    if (cells.length === 0) {
+      alert('No cells loaded. Please import cell data first.');
+      return;
+    }
+
+    if (conflicts.length === 0) {
+      alert('No conflicts detected. Network is already optimized.');
+      return;
+    }
+
+    isOptimizing = true;
+    showOptimizationPanel = true;
+
+    try {
+      // Run optimization
+      optimizationResult = pciOptimizer.optimizePCIAssignments(cells);
+
+      // Apply optimized PCIs
+      cells = optimizationResult.optimizedCells;
+
+      // Re-run analysis with optimized PCIs
+      await performAnalysis();
+
+      console.log('PCI optimization complete:', optimizationResult);
+    } catch (error) {
+      console.error('Optimization error:', error);
+      alert('Error during optimization. Check console for details.');
+    } finally {
+      isOptimizing = false;
+    }
+  }
+
+  function applyOptimization() {
+    if (!optimizationResult) return;
+
+    cells = optimizationResult.optimizedCells;
+    optimizationResult = null;
+    showOptimizationPanel = false;
+    performAnalysis();
+  }
+
+  function rejectOptimization() {
+    if (!optimizationResult) return;
+
+    cells = optimizationResult.originalCells;
+    optimizationResult = null;
+    showOptimizationPanel = false;
+    performAnalysis();
+  }
+
   function clearMap() {
     if (mapInstance) {
       mapInstance.clearMap();
@@ -203,6 +258,17 @@
           disabled={isLoading || !cells.length}
         >
           Run Analysis
+        </button>
+        <button 
+          class="action-button primary optimize-button" 
+          on:click={optimizePCIAssignments}
+          disabled={isOptimizing || !conflicts.length}
+        >
+          {#if isOptimizing}
+            ⚙️ Optimizing...
+          {:else}
+            🎯 Auto-Optimize PCIs
+          {/if}
         </button>
         <button 
           class="action-button secondary" 
@@ -332,6 +398,85 @@
       {/if}
     </div>
   </div>
+
+  <!-- PCI Optimization Results Panel -->
+  {#if optimizationResult}
+    <div class="optimization-panel">
+      <div class="optimization-header">
+        <h2>🎯 PCI Optimization Results</h2>
+        <button class="close-button" on:click={() => optimizationResult = null}>✕</button>
+      </div>
+      
+      <div class="optimization-content">
+        <div class="optimization-summary">
+          <div class="summary-card">
+            <div class="card-value">{optimizationResult.iterations}</div>
+            <div class="card-label">Iterations</div>
+          </div>
+          <div class="summary-card">
+            <div class="card-value">{optimizationResult.originalConflicts}</div>
+            <div class="card-label">Original Conflicts</div>
+          </div>
+          <div class="summary-card success">
+            <div class="card-value">{optimizationResult.finalConflicts}</div>
+            <div class="card-label">Final Conflicts</div>
+          </div>
+          <div class="summary-card success">
+            <div class="card-value">{optimizationResult.resolvedConflicts}</div>
+            <div class="card-label">Resolved</div>
+          </div>
+          <div class="summary-card success">
+            <div class="card-value">{optimizationResult.conflictReduction.toFixed(1)}%</div>
+            <div class="card-label">Reduction</div>
+          </div>
+        </div>
+
+        <div class="convergence-chart">
+          <h3>Optimization Convergence</h3>
+          <div class="chart-container">
+            {#each optimizationResult.convergenceHistory as iteration, index}
+              <div class="chart-bar">
+                <div 
+                  class="bar-fill" 
+                  style="height: {(iteration.conflictCount / optimizationResult.originalConflicts) * 100}%"
+                  title="Iteration {iteration.iteration}: {iteration.conflictCount} conflicts"
+                ></div>
+                <div class="bar-label">I{iteration.iteration}</div>
+              </div>
+            {/each}
+          </div>
+        </div>
+
+        <div class="pci-changes">
+          <h3>PCI Changes ({optimizationResult.changes.length})</h3>
+          <div class="changes-list">
+            {#each optimizationResult.changes.slice(0, 10) as change}
+              <div class="change-item">
+                <span class="cell-id">{change.cellId}</span>
+                <span class="pci-change">
+                  <span class="old-pci">{change.oldPCI}</span>
+                  <span class="arrow">→</span>
+                  <span class="new-pci">{change.newPCI}</span>
+                </span>
+                <span class="change-reason">{change.reason}</span>
+              </div>
+            {/each}
+            {#if optimizationResult.changes.length > 10}
+              <div class="more-changes">
+                +{optimizationResult.changes.length - 10} more changes...
+              </div>
+            {/if}
+          </div>
+        </div>
+
+        <div class="optimization-actions">
+          <p class="optimization-note">
+            ✅ Optimization has been automatically applied. The map shows the optimized PCI assignments.
+          </p>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -625,6 +770,233 @@
     margin-top: 1rem;
   }
   
+  /* Optimization Panel Styles */
+  .optimization-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    background: var(--card-bg);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .optimization-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: var(--gradient-primary);
+    color: white;
+  }
+
+  .optimization-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .close-button {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+  }
+
+  .close-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .optimization-content {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .optimization-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .summary-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .summary-card.success {
+    background: rgba(40, 167, 69, 0.1);
+    border-color: var(--success-color);
+  }
+
+  .card-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+  }
+
+  .summary-card.success .card-value {
+    color: var(--success-color);
+  }
+
+  .card-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .convergence-chart {
+    margin-bottom: 2rem;
+  }
+
+  .convergence-chart h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+  }
+
+  .chart-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 150px;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+  }
+
+  .chart-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 0.25rem;
+  }
+
+  .bar-fill {
+    width: 100%;
+    background: linear-gradient(to top, var(--primary-color), var(--success-color));
+    border-radius: 4px 4px 0 0;
+    transition: height 0.3s ease;
+    min-height: 4px;
+  }
+
+  .bar-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+  }
+
+  .pci-changes {
+    margin-bottom: 2rem;
+  }
+
+  .pci-changes h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+  }
+
+  .changes-list {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .change-item {
+    display: grid;
+    grid-template-columns: 100px 120px 1fr;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+  }
+
+  .change-item:last-child {
+    border-bottom: none;
+  }
+
+  .cell-id {
+    font-weight: bold;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .pci-change {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: monospace;
+  }
+
+  .old-pci {
+    color: var(--danger-color);
+    font-weight: bold;
+  }
+
+  .arrow {
+    color: var(--text-secondary);
+  }
+
+  .new-pci {
+    color: var(--success-color);
+    font-weight: bold;
+  }
+
+  .change-reason {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .more-changes {
+    padding: 0.75rem 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.9rem;
+  }
+
+  .optimization-actions {
+    text-align: center;
+  }
+
+  .optimization-note {
+    background: rgba(40, 167, 69, 0.1);
+    border: 1px solid var(--success-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .optimize-button {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+  }
+
+  .optimize-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #20c997 0%, #28a745 100%) !important;
+  }
+
   @media (max-width: 768px) {
     .dashboard {
       flex-direction: column;
@@ -637,6 +1009,16 @@
     
     .map-container {
       height: 400px;
+    }
+
+    .optimization-panel {
+      width: 95%;
+      max-height: 90vh;
+    }
+
+    .change-item {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
     }
   }
 </style>
