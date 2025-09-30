@@ -154,23 +154,30 @@
         <section class="section">
           <h3>Actions</h3>
           <div class="button-group">
-            <ManualImport on:import={handleManualImport} />
+            <div class="component-wrapper">
+              <ManualImport on:import={handleManualImport} />
+            </div>
             <button class="btn btn-primary" on:click={loadSampleData} disabled={isLoading}>
-              Load Sample
+              📊 Load Sample
             </button>
             <button class="btn btn-success" on:click={optimizePCIAssignments} disabled={isOptimizing || !conflicts.length}>
-              {isOptimizing ? 'Optimizing...' : 'Optimize PCIs'}
+              {isOptimizing ? '⚙️ Optimizing...' : '🎯 Optimize PCIs'}
+            </button>
+            <button class="btn btn-secondary" on:click={performAnalysis} disabled={isLoading || !cells.length}>
+              🔍 Analyze
             </button>
             <button class="btn btn-secondary" on:click={clearMap} disabled={!cells.length}>
-              Clear Map
+              🗑️ Clear Map
             </button>
           </div>
         </section>
 
         <!-- Export -->
         <section class="section">
-          <h3>Export</h3>
-          <ConflictReportExport {cells} {conflicts} {recommendations} />
+          <h3>Export Reports</h3>
+          <div class="component-wrapper">
+            <ConflictReportExport {cells} {conflicts} {recommendations} />
+          </div>
         </section>
 
         <!-- Conflicts -->
@@ -592,6 +599,44 @@
   }
 
   /* Responsive */
+  /* Component Wrapper */
+  .component-wrapper {
+    width: 100%;
+  }
+
+  .component-wrapper :global(.import-button) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .component-wrapper :global(.export-panel) {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .component-wrapper :global(.export-panel h3) {
+    display: none;
+  }
+
+  .component-wrapper :global(.export-button),
+  .component-wrapper :global(.generate-button) {
+    width: 100%;
+    margin: 0;
+  }
+
+  .component-wrapper :global(.export-actions) {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .component-wrapper :global(.report-details),
+  .component-wrapper :global(.conflict-breakdown) {
+    display: none;
+  }
+
   @media (max-width: 768px) {
     .sidebar {
       position: fixed;
