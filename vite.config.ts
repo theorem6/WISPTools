@@ -22,6 +22,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: 'esbuild',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'arcgis': ['@arcgis/core'],
+        },
+      },
+    },
   }
 });
