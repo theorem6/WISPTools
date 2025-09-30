@@ -4,7 +4,7 @@ import { browser } from '$app/environment';
 
 export class GeminiService {
   private apiKey: string = PUBLIC_GEMINI_API_KEY;
-  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
   /**
    * Analyze PCI conflicts using Gemini AI

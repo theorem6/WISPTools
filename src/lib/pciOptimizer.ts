@@ -72,8 +72,14 @@ export class PCIOptimizer {
       console.log(`Iteration ${iteration}: ${conflictCount} conflicts (${conflicts.filter(c => c.severity === 'CRITICAL').length} critical)`);
 
       // Check for convergence
-      if (conflictCount === 0 || conflictCount >= previousConflictCount) {
-        console.log(`Converged after ${iteration} iterations`);
+      if (conflictCount === 0) {
+        console.log(`All conflicts resolved after ${iteration} iterations`);
+        break;
+      }
+      
+      // Only stop if no improvement for 2 consecutive iterations
+      if (iteration > 1 && conflictCount >= previousConflictCount) {
+        console.log(`Converged after ${iteration} iterations (no improvement)`);
         break;
       }
 
@@ -119,39 +125,64 @@ export class PCIOptimizer {
       return severityOrder[b.severity] - severityOrder[a.severity];
     });
 
-    // Track cells that have been modified in this iteration
-    const modifiedCellIds = new Set<string>();
+      // Track cells that have been modified in this iteration
+      const modifiedCellIds = new Set<string>();
+      let changesThisIteration = 0;
 
-    for (const conflict of sortedConflicts) {
-      // Choose which cell to reassign (prefer lower signal strength or conflicting cell)
-      const cellToReassign = this.selectCellForReassignment(conflict);
-      
-      // Skip if already modified in this iteration
-      if (modifiedCellIds.has(cellToReassign.id)) {
-        continue;
-      }
-
-      // Find the cell in the array
-      const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
-      if (cellIndex === -1) continue;
-
-      // Find a conflict-free PCI
-      const newPCI = this.findOptimalPCI(cells, cellToReassign, conflict);
-      
-      if (newPCI !== cellToReassign.pci) {
-        const oldPCI = cellToReassign.pci;
-        cells[cellIndex].pci = newPCI;
+      for (const conflict of sortedConflicts) {
+        // Choose which cell to reassign (prefer lower signal strength or conflicting cell)
+        const cellToReassign = this.selectCellForReassignment(conflict);
         
-        changes.push({
-          cellId: cellToReassign.id,
-          oldPCI,
-          newPCI,
-          reason: `Resolved ${conflict.conflictType} conflict with ${conflict.primaryCell.id === cellToReassign.id ? conflict.conflictingCell.id : conflict.primaryCell.id}`
-        });
+        // Skip if already modified in this iteration
+        if (modifiedCellIds.has(cellToReassign.id)) {
+          continue;
+        }
 
-        modifiedCellIds.add(cellToReassign.id);
+        // Find the cell in the array
+        const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
+        if (cellIndex === -1) continue;
+
+        // Find a conflict-free PCI
+        const newPCI = this.findOptimalPCI(cells, cellToReassign, conflict);
+        
+        if (newPCI !== cellToReassign.pci) {
+          const oldPCI = cellToReassign.pci;
+          cells[cellIndex].pci = newPCI;
+          
+          changes.push({
+            cellId: cellToReassign.id,
+            oldPCI,
+            newPCI,
+            reason: `Resolved ${conflict.conflictType} conflict with ${conflict.primaryCell.id === cellToReassign.id ? conflict.conflictingCell.id : conflict.primaryCell.id}`
+          });
+
+          modifiedCellIds.add(cellToReassign.id);
+          changesThisIteration++;
+        }
       }
-    }
+
+      // If no changes were made this iteration, force at least one change
+      if (changesThisIteration === 0 && sortedConflicts.length > 0) {
+        const firstConflict = sortedConflicts[0];
+        const cellToReassign = this.selectCellForReassignment(firstConflict);
+        const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
+        
+        if (cellIndex !== -1) {
+          // Force a PCI change by picking a different PCI
+          const newPCI = (cellToReassign.pci + 3) % 504; // Simple increment strategy
+          const oldPCI = cellToReassign.pci;
+          cells[cellIndex].pci = newPCI;
+          
+          changes.push({
+            cellId: cellToReassign.id,
+            oldPCI,
+            newPCI,
+            reason: `Forced reassignment for ${firstConflict.conflictType} conflict`
+          });
+          
+          console.log(`Forced PCI change: ${cellToReassign.id} ${oldPCI} → ${newPCI}`);
+        }
+      }
 
     return changes;
   }
@@ -235,7 +266,7 @@ export class PCIOptimizer {
   /**
    * Find cells that are neighbors (within range) of the target cell
    */
-  private findNeighborCells(cells: Cell[], targetCell: Cell, maxDistance: number = 5000): Cell[] {
+  private findNeighborCells(cells: Cell[], targetCell: Cell, maxDistance: number = 10000): Cell[] {
     return cells.filter(cell => {
       if (cell.id === targetCell.id) return false;
       
@@ -249,37 +280,67 @@ export class PCIOptimizer {
    */
   private generateCandidatePCIs(targetCell: Cell, usedPCIs: Set<number>): number[] {
     const candidates: number[] = [];
+    const currentPCI = targetCell.pci;
     
-    // Strategy 1: Try PCIs in the same mod3 group but different mod6
-    const currentMod3 = targetCell.pci % 3;
-    for (let i = currentMod3; i <= this.PCI_MAX; i += 3) {
-      if (!usedPCIs.has(i)) {
-        candidates.push(i);
-      }
-    }
-
-    // Strategy 2: Try completely different mod3 groups
+    // Strategy 1: Try PCIs in different mod3 groups (most important for LTE)
     for (let mod3 = 0; mod3 < 3; mod3++) {
-      if (mod3 === currentMod3) continue;
+      const currentMod3 = currentPCI % 3;
+      if (mod3 === currentMod3) continue; // Skip current mod3 group
       
-      for (let i = mod3; i <= this.PCI_MAX; i += 3) {
-        if (!usedPCIs.has(i) && candidates.length < 50) {
-          candidates.push(i);
+      // Add several PCIs from each mod3 group
+      for (let i = 0; i < 10; i++) {
+        const candidate = mod3 + (i * 3);
+        if (candidate <= this.PCI_MAX && !usedPCIs.has(candidate)) {
+          candidates.push(candidate);
         }
       }
     }
 
-    // Strategy 3: If still no candidates, try all available PCIs
-    if (candidates.length === 0) {
-      for (let i = this.PCI_MIN; i <= this.PCI_MAX; i++) {
-        if (!usedPCIs.has(i)) {
-          candidates.push(i);
-          if (candidates.length >= 50) break;
-        }
+    // Strategy 2: Try PCIs with different mod6 values in current mod3
+    const currentMod3 = currentPCI % 3;
+    const currentMod6 = currentPCI % 6;
+    for (let mod6 = 0; mod6 < 6; mod6 += 3) { // Only check mod3-aligned mod6 values
+      if (mod6 === currentMod6) continue;
+      const candidate = currentMod3 + mod6;
+      if (candidate <= this.PCI_MAX && !usedPCIs.has(candidate)) {
+        candidates.push(candidate);
       }
     }
 
-    return candidates;
+    // Strategy 3: Random sampling of available PCIs
+    const availablePCIs = [];
+    for (let i = this.PCI_MIN; i <= this.PCI_MAX; i++) {
+      if (!usedPCIs.has(i)) {
+        availablePCIs.push(i);
+      }
+    }
+    
+    // Add random samples
+    const sampleSize = Math.min(20, availablePCIs.length);
+    for (let i = 0; i < sampleSize; i++) {
+      const randomIndex = Math.floor(Math.random() * availablePCIs.length);
+      const candidate = availablePCIs[randomIndex];
+      if (!candidates.includes(candidate)) {
+        candidates.push(candidate);
+      }
+    }
+
+    // Strategy 4: Sequential exploration around current PCI
+    for (let offset = 1; offset <= 50; offset++) {
+      const candidate1 = (currentPCI + offset) % 504;
+      const candidate2 = (currentPCI - offset + 504) % 504;
+      
+      if (!usedPCIs.has(candidate1) && !candidates.includes(candidate1)) {
+        candidates.push(candidate1);
+      }
+      if (!usedPCIs.has(candidate2) && !candidates.includes(candidate2)) {
+        candidates.push(candidate2);
+      }
+      
+      if (candidates.length >= 50) break;
+    }
+
+    return candidates.slice(0, 50); // Limit to 50 candidates
   }
 
   /**
