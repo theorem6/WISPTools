@@ -540,8 +540,8 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(4px);
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
     z-index: 1000;
     display: flex;
     align-items: center;
@@ -561,10 +561,11 @@
     width: 100%;
     max-width: 600px;
     max-height: 90vh;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     display: flex;
     flex-direction: column;
     animation: slideUp 0.3s;
+    border: 1px solid var(--border-color);
   }
 
   @keyframes slideUp {
