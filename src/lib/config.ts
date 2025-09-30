@@ -1,18 +1,29 @@
 // Environment Configuration for LTE PCI Mapper
 import { browser } from '$app/environment';
+import { 
+  PUBLIC_FIREBASE_API_KEY,
+  PUBLIC_FIREBASE_AUTH_DOMAIN,
+  PUBLIC_FIREBASE_PROJECT_ID,
+  PUBLIC_FIREBASE_STORAGE_BUCKET,
+  PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  PUBLIC_FIREBASE_APP_ID,
+  PUBLIC_FIREBASE_MEASUREMENT_ID,
+  PUBLIC_ARCGIS_API_KEY,
+  PUBLIC_GEMINI_API_KEY
+} from '$env/static/public';
 
 export const config = {
   firebase: {
-    apiKey: "AIzaSyDb5KthFS4DY4hZ_B8jsA3uxEsu6snQqWA",
-    authDomain: "mapping-772cf.firebaseapp.com",
-    projectId: "mapping-772cf",
-    storageBucket: "mapping-772cf.firebasestorage.app",
-    messagingSenderId: "483370858924",
-    appId: "1:483370858924:web:b4890ced5af95e3153e209",
-    measurementId: "G-2T2D6CWTTV"
+    apiKey: PUBLIC_FIREBASE_API_KEY,
+    authDomain: PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: PUBLIC_FIREBASE_APP_ID,
+    measurementId: PUBLIC_FIREBASE_MEASUREMENT_ID
   },
   arcgis: {
-    apiKey: "AAPT85fOqywZsicJupSmVSCGrjWNNjURUpnE--wnh6GZUreHU00VSEoRGgbf0JZjKYEmLnUXJw8E5r8Nz55eqYvvfcecdjs2BjpjcShOZgei0o-Myxttbl5f1qu9-AfdJaw4w3ugB4-uH6dh9v0PNN--vklICR-vCwt8YjMxw7CBrsZ5vxsZjo_jp31mV5hlMSSxQMJsKtFh0ltDrN4YwuK_8ZLmHMdIp5w9_jZrqJVlC2I.AT2_12sjSDHZ",
+    apiKey: PUBLIC_ARCGIS_API_KEY,
     tileServers: {
       street: "streets-vector",
       satellite: "satellite",
@@ -21,9 +32,9 @@ export const config = {
     }
   },
   gemini: {
-    apiKey: "AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg",
-    apiUrl: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
-    maxTokens: 2048,
+    apiKey: PUBLIC_GEMINI_API_KEY,
+    apiUrl: "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+    maxTokens: 300,
     temperature: 0.3
   },
   app: {
@@ -91,30 +102,6 @@ export const config = {
 
 // Environment-aware configuration
 export const getConfig = () => {
-  if (browser) {
-    // Browser-side environment variables
-    return {
-      ...config,
-      firebase: {
-        apiKey: import.meta.env.VITE_FIREBASE_API_KEY || config.firebase.apiKey,
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || config.firebase.authDomain,
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || config.firebase.projectId,
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || config.firebase.storageBucket,
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || config.firebase.messagingSenderId,
-        appId: import.meta.env.VITE_FIREBASE_APP_ID || config.firebase.appId,
-        measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || config.firebase.measurementId
-      },
-      arcgis: {
-        ...config.arcgis,
-        apiKey: import.meta.env.VITE_ARCGIS_API_KEY || config.arcgis.apiKey
-      },
-      gemini: {
-        ...config.gemini,
-        apiKey: import.meta.env.VITE_GEMINI_API_KEY || config.gemini.apiKey
-      }
-    };
-  }
-  
   return config;
 };
 

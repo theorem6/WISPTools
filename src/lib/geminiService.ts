@@ -1,6 +1,8 @@
 // Simplified Gemini AI Service for PCI Conflict Analysis
+import { PUBLIC_GEMINI_API_KEY } from '$env/static/public';
+
 export class GeminiService {
-  private apiKey: string = "AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg";
+  private apiKey: string = PUBLIC_GEMINI_API_KEY;
   private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
   
   /**

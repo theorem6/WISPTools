@@ -2,15 +2,24 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { 
+  PUBLIC_FIREBASE_API_KEY,
+  PUBLIC_FIREBASE_AUTH_DOMAIN,
+  PUBLIC_FIREBASE_PROJECT_ID,
+  PUBLIC_FIREBASE_STORAGE_BUCKET,
+  PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  PUBLIC_FIREBASE_APP_ID,
+  PUBLIC_FIREBASE_MEASUREMENT_ID
+} from '$env/static/public';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDb5KthFS4DY4hZ_B8jsA3uxEsu6snQqWA",
-  authDomain: "mapping-772cf.firebaseapp.com",
-  projectId: "mapping-772cf",
-  storageBucket: "mapping-772cf.firebasestorage.app",
-  messagingSenderId: "483370858924",
-  appId: "1:483370858924:web:b4890ced5af95e3153e209",
-  measurementId: "G-2T2D6CWTTV"
+  apiKey: PUBLIC_FIREBASE_API_KEY,
+  authDomain: PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: PUBLIC_FIREBASE_APP_ID,
+  measurementId: PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

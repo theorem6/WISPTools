@@ -1,5 +1,9 @@
 # 🔑 Environment Variables Setup
 
+## ✅ All Files Now Use .env Variables
+
+All hardcoded API keys have been removed. The app now uses environment variables from `.env` file.
+
 ## Create .env File
 
 Create a file named `.env` in the root of your project with this content:
