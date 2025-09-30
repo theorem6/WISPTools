@@ -39,10 +39,6 @@
     "@arcgis/map-components": "^4.32.0",
     "@arcgis/map-components-react": "^4.32.0",
     "@arcgis/webpack-plugin": "^4.32.0",
-    "@firebase/app": "^1.1.1",
-    "@firebase/auth": "^1.7.2",
-    "@firebase/firestore": "^5.3.1",
-    "@firebase/storage": "^1.0.0",
     "firebase": "^11.1.0",
     "svelte-arcgis": "^1.0.3"
   },
@@ -54,5 +50,11 @@
     "@arcgis/core": {
       "typescript": "^5.7.2"
     }
+  },
+  "resolutions": {
+    "@firebase/app": "^1.1.1",
+    "@firebase/auth": "^1.7.2",
+    "@firebase/firestore": "^5.3.1",
+    "@firebase/storage": "^1.0.0"
   }
 }
