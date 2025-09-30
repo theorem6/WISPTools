@@ -1,13 +1,4 @@
-import Map from "@arcgis/core/Map";
-import MapView from "@arcgis/core/views/MapView";
-import FeatureLayer from "@arcgis/core/layers/FeatureLayer";
-import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer";
-import Graphic from "@arcgis/core/Graphic";
-import Point from "@arcgis/core/geometry/Point";
-import SimpleMarkerSymbol from "@arcgis/core/symbols/SimpleMarkerSymbol";
-import SimpleRenderer from "@arcgis/core/renderers/SimpleRenderer";
-import Color from "@arcgis/core/Color";
-import * as geometryEngine from "@arcgis/core/geometry/geometryEngine";
+import { browser } from '$app/environment';
 
 export interface MapCell {
   id: string;
@@ -21,16 +12,29 @@ export interface MapCell {
 }
 
 export class PCIArcGISMapper {
-  private map: Map;
-  private mapView: MapView;
-  private cellLayer: GraphicsLayer;
-  private conflictLayer: GraphicsLayer;
+  private map: any;
+  private mapView: any;
+  private cellLayer: any;
+  private conflictLayer: any;
   
   constructor(containerId: string) {
     this.initializeMap(containerId);
   }
   
   private async initializeMap(containerId: string) {
+    if (!browser) return;
+
+    // Dynamically import ArcGIS modules
+    const [
+      { default: Map },
+      { default: MapView },
+      { default: GraphicsLayer }
+    ] = await Promise.all([
+      import('@arcgis/core/Map.js'),
+      import('@arcgis/core/views/MapView.js'),
+      import('@arcgis/core/layers/GraphicsLayer.js')
+    ]);
+
     // Check for dark mode
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
     
@@ -63,30 +67,39 @@ export class PCIArcGISMapper {
   /**
    * Render cells on the map with PCI information
    */
-  renderCells(cells: MapCell[]) {
+  async renderCells(cells: MapCell[]) {
+    if (!browser || !this.cellLayer) return;
+
+    // Dynamically import required modules
+    const [
+      { default: Point },
+      { default: Graphic }
+    ] = await Promise.all([
+      import('@arcgis/core/geometry/Point.js'),
+      import('@arcgis/core/Graphic.js')
+    ]);
+
     // Clear existing graphics
     this.cellLayer.removeAll();
     
-    cells.forEach(cell => {
+    cells.forEach((cell: MapCell) => {
       const point = new Point({
         longitude: cell.longitude,
         latitude: cell.latitude,
         spatialReference: { wkid: 4326 }
       });
       
-      // Color code cells by PCI value
-      const symbol = new SimpleMarkerSymbol({
-        color: this.getPCIColor(cell.pci),
-        size: 12,
-        outline: {
-         	color: [1, 1, 1, 1],
-         	width: 2
-        }
-      });
-      
       const graphic = new Graphic({
         geometry: point,
-        symbol: symbol,
+        symbol: {
+          type: "simple-marker",
+          color: this.getPCIColorArray(cell.pci),
+          size: 12,
+          outline: {
+            color: [255, 255, 255, 1],
+            width: 2
+          }
+        },
         attributes: {
           CellId: cell.id,
           eNodeB: cell.eNodeB,
@@ -155,32 +168,55 @@ export class PCIArcGISMapper {
   }
   
   /**
-   * Get color for PCI value visualization
+   * Get color for PCI value visualization as array
    */
-  private getPCIColor(pci: number): Color {
+  private getPCIColorArray(pci: number): number[] {
     // Color scheme based on PCI modulo for better visualization
     const hue = (pci % 30) * 12; // Spread across color spectrum
-    const saturation = 0.8;
-    const lightness = 0.5;
     
-    return Color.fromHSL(hue, saturation, lightness);
+    // Convert HSL to RGB
+    const h = hue / 360;
+    const s = 0.8;
+    const l = 0.5;
+    
+    let r, g, b;
+    if (s === 0) {
+      r = g = b = l;
+    } else {
+      const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255];
   }
   
   /**
-   * Get color for conflict severity
+   * Get color for conflict severity as array
    */
-  private getConflictColor(severity: string): Color {
+  private getConflictColorArray(severity: string): number[] {
     switch (severity) {
       case 'CRITICAL':
-        return new Color([256, 0, 0, 1]); // Red
+        return [255, 0, 0, 255]; // Red
       case 'HIGH':
-        return new Color([256, 128, 0, 1]); // Orange
+        return [255, 128, 0, 255]; // Orange
       case 'MEDIUM':
-        return new Color([256, 256, 0, 1]); // Yellow
+        return [255, 255, 0, 255]; // Yellow
       case 'LOW':
-        return new Color([0, 256, 256, 1]); // Cyan
+        return [0, 255, 255, 255]; // Cyan
       default:
-        return new Color([128, 128, 128, 1]); // Gray
+        return [128, 128, 128, 255]; // Gray
     }
   }
   
@@ -205,16 +241,18 @@ export class PCIArcGISMapper {
   /**
    * Highlight cells involved in conflicts
    */
-  private highlightConflictingCells(primary: MapCell, conflicting: MapCell, severity: string) {
-    const symbols = [
-      new SimpleMarkerSymbol({
-        color: this.getConflictColor(severity),
-        size: 16,
-        outline: { color: [1, 1, 1, 1], width: 3 }
-      })
-    ];
+  private async highlightConflictingCells(primary: MapCell, conflicting: MapCell, severity: string) {
+    if (!browser) return;
+
+    const [
+      { default: Point },
+      { default: Graphic }
+    ] = await Promise.all([
+      import('@arcgis/core/geometry/Point.js'),
+      import('@arcgis/core/Graphic.js')
+    ]);
     
-    [primary, conflicting].forEach(cell => {
+    [primary, conflicting].forEach((cell: MapCell) => {
       const point = new Point({
         longitude: cell.longitude,
         latitude: cell.latitude,
@@ -223,7 +261,12 @@ export class PCIArcGISMapper {
       
       const graphic = new Graphic({
         geometry: point,
-        symbol: symbols[0],
+        symbol: {
+          type: "simple-marker",
+          color: this.getConflictColorArray(severity),
+          size: 16,
+          outline: { color: [255, 255, 255, 255], width: 3 }
+        },
         attributes: { 
           ...cell, 
           conflictHighlight: true,
@@ -239,19 +282,17 @@ export class PCIArcGISMapper {
    * Fit map view to show all cells
    */
   private fitViewToCells(cells: MapCell[]) {
-    const points = cells.map(cell => 
-      new Point({
-        longitude: cell.longitude,
-        latitude: cell.latitude,
-        spatialReference: { wkid: 4326 }
-      })
-    );
-    
-    const extent = geometryEngine.union(points) as Point;
-    this.mapView.goTo({
-      target: points,
-      zoom: 12
-    });
+    if (this.mapView && cells.length > 0) {
+      const center = {
+        longitude: cells.reduce((sum, cell) => sum + cell.longitude, 0) / cells.length,
+        latitude: cells.reduce((sum, cell) => sum + cell.latitude, 0) / cells.length
+      };
+      
+      this.mapView.goTo({
+        center: [center.longitude, center.latitude],
+        zoom: 12
+      });
+    }
   }
   
   /**
