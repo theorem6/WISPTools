@@ -21,6 +21,12 @@
   let towerType: '3-sector' | '4-sector' = '3-sector';
   let technology: 'LTE' | 'CBRS' | 'LTE+CBRS' = 'LTE';
   
+  // LTE Frequency Parameters
+  let earfcn = 0;
+  let channelBandwidth: 1.4 | 3 | 5 | 10 | 15 | 20 = 20;
+  let dlEarfcn = 0;
+  let ulEarfcn = 0;
+  
   let manualCells: Cell[] = [];
   
   function addManualCell() {
@@ -40,7 +46,12 @@
       rsPower: rsPower,
       azimuth: azimuth || undefined, // Allow undefined for auto-calculate
       towerType: towerType,
-      technology: technology
+      technology: technology,
+      earfcn: earfcn || undefined,
+      centerFreq: frequency, // Use frequency as center frequency
+      channelBandwidth: channelBandwidth,
+      dlEarfcn: dlEarfcn || undefined,
+      ulEarfcn: ulEarfcn || undefined
     };
     
     manualCells = [...manualCells, newCell];
@@ -55,7 +66,10 @@
     frequency = 2100;
     rsPower = -85;
     azimuth = 0;
-    // Keep towerType and technology as they're likely the same for batch entry
+    earfcn = 0;
+    dlEarfcn = 0;
+    ulEarfcn = 0;
+    // Keep towerType, technology, and channelBandwidth as they're likely the same for batch entry
   }
   
   function removeCell(index: number) {
@@ -102,7 +116,11 @@
             rsPower: parseFloat(parts[7].trim()),
             azimuth: parts[8] && parts[8].trim() ? parseInt(parts[8].trim()) : undefined,
             towerType: parts[9] ? parts[9].trim() as '3-sector' | '4-sector' : '3-sector',
-            technology: parts[10] ? parts[10].trim() as 'LTE' | 'CBRS' | 'LTE+CBRS' : 'LTE'
+            technology: parts[10] ? parts[10].trim() as 'LTE' | 'CBRS' | 'LTE+CBRS' : 'LTE',
+            earfcn: parts[11] && parts[11].trim() ? parseInt(parts[11].trim()) : undefined,
+            channelBandwidth: parts[12] && parts[12].trim() ? parseFloat(parts[12].trim()) as 1.4 | 3 | 5 | 10 | 15 | 20 : 20,
+            dlEarfcn: parts[13] && parts[13].trim() ? parseInt(parts[13].trim()) : undefined,
+            ulEarfcn: parts[14] && parts[14].trim() ? parseInt(parts[14].trim()) : undefined
           });
         }
       }
@@ -114,14 +132,17 @@
   }
   
   function downloadCSVTemplate() {
-    const template = `Cell ID,eNodeB,Sector,PCI,Latitude,Longitude,Frequency,RS Power,Azimuth,Tower Type,Technology
-CELL001,1001,1,15,40.7128,-74.0060,2100,-85,0,3-sector,LTE
-CELL002,1002,2,,40.7689,-73.9667,2100,-87,120,3-sector,LTE
-CELL003,1003,3,21,40.7589,-73.9851,1800,-83,240,3-sector,LTE
-CELL004,1004,1,,40.7282,-73.9942,3550,-89,0,4-sector,CBRS
-CELL005,1005,2,,40.7505,-73.9934,3550,-86,90,4-sector,CBRS
-CELL006,1006,3,,40.7614,-73.9776,3550,-88,180,4-sector,CBRS
-CELL007,1007,4,,40.7128,-74.0160,3550,-87,270,4-sector,CBRS`;
+    const template = `Cell ID,eNodeB,Sector,PCI,Latitude,Longitude,Frequency,RS Power,Azimuth,Tower Type,Technology,EARFCN,Channel Bandwidth,DL EARFCN,UL EARFCN
+CELL001,1001,1,15,40.7128,-74.0060,2100,-85,0,3-sector,LTE,1950,20,1950,1850
+CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850
+CELL003,1001,3,21,40.7128,-74.0060,2100,-83,240,3-sector,LTE,1950,20,1950,1850
+CELL004,1002,1,,40.7689,-73.9667,2100,-89,0,3-sector,LTE,1950,20,1950,1850
+CELL005,1002,2,,40.7689,-73.9667,2100,-86,120,3-sector,LTE,1950,20,1950,1850
+CELL006,1002,3,,40.7689,-73.9667,2100,-88,240,3-sector,LTE,1950,20,1950,1850
+CELL007,1003,1,,40.7589,-73.9851,3550,-85,0,4-sector,CBRS,55650,20,55650,55650
+CELL008,1003,2,,40.7589,-73.9851,3550,-87,90,4-sector,CBRS,55650,20,55650,55650
+CELL009,1003,3,,40.7589,-73.9851,3550,-83,180,4-sector,CBRS,55650,20,55650,55650
+CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650`;
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -239,6 +260,38 @@ CELL007,1007,4,,40.7128,-74.0160,3550,-87,270,4-sector,CBRS`;
                 <option value="CBRS">CBRS</option>
                 <option value="LTE+CBRS">LTE+CBRS</option>
               </select>
+            </div>
+            
+            <!-- LTE Frequency Parameters -->
+            <h4>LTE Frequency Parameters</h4>
+            <div class="form-group">
+              <label>EARFCN (Primary)</label>
+              <input type="number" bind:value={earfcn} placeholder="e.g., 1950" />
+              <small class="help-text">E-UTRA Absolute Radio Frequency Channel Number</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Channel Bandwidth (MHz)</label>
+              <select bind:value={channelBandwidth}>
+                <option value={1.4}>1.4 MHz</option>
+                <option value={3}>3 MHz</option>
+                <option value={5}>5 MHz</option>
+                <option value={10}>10 MHz</option>
+                <option value={15}>15 MHz</option>
+                <option value={20}>20 MHz</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>DL EARFCN (Optional)</label>
+              <input type="number" bind:value={dlEarfcn} placeholder="Downlink EARFCN" />
+              <small class="help-text">Leave blank to use primary EARFCN</small>
+            </div>
+            
+            <div class="form-group">
+              <label>UL EARFCN (Optional)</label>
+              <input type="number" bind:value={ulEarfcn} placeholder="Uplink EARFCN" />
+              <small class="help-text">Leave blank to use primary EARFCN</small>
             </div>
           </div>
           
