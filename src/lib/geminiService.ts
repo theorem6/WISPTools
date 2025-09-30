@@ -1,7 +1,7 @@
 // Simplified Gemini AI Service for PCI Conflict Analysis
 export class GeminiService {
   private apiKey: string = "AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg";
-  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
+  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
   
   /**
    * Simplified PCI conflict analysis (lightweight)
