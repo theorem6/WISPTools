@@ -3,6 +3,7 @@
   import { PCIArcGISMapper } from '$lib/arcgisMap';
   import { pciMapper, type Cell } from '$lib/pciMapper';
   import { geminiService } from '$lib/geminiService';
+  import ManualImport from '$lib/components/ManualImport.svelte';
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -38,6 +39,23 @@
   
   function loadSampleData() {
     cells = [...sampleCells];
+    performAnalysis();
+  }
+  
+  function handleManualImport(event: CustomEvent) {
+    const importedCells = event.detail.cells;
+    
+    // Auto-assign PCIs for cells with PCI = -1
+    const cellsWithPCI = importedCells.map((cell: Cell) => {
+      if (cell.pci === -1) {
+        // Auto-assign conflict-free PCI
+        const suggestedPCIs = pciMapper.suggestPCI([...cells, ...importedCells.filter((c: Cell) => c.pci !== -1)]);
+        return { ...cell, pci: suggestedPCIs[0] || Math.floor(Math.random() * 504) };
+      }
+      return cell;
+    });
+    
+    cells = [...cells, ...cellsWithPCI];
     performAnalysis();
   }
   
@@ -161,6 +179,7 @@
       <!-- Quick Actions -->
       <div class="action-group">
         <h3>Quick Actions</h3>
+        <ManualImport on:import={handleManualImport} />
         <button 
           class="action-button primary" 
           on:click={loadSampleData}

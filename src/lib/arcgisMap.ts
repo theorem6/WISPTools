@@ -122,11 +122,17 @@ export class PCIArcGISMapper {
   /**
    * Render PCI conflicts on the map
    */
-  renderConflicts(conflicts: any[]) {
+  async renderConflicts(conflicts: any[]) {
+    if (!browser || !this.conflictLayer) return;
+
+    const [{ default: Graphic }] = await Promise.all([
+      import('@arcgis/core/Graphic.js')
+    ]);
+
     // Clear existing conflict graphics
     this.conflictLayer.removeAll();
     
-    conflicts.forEach(conflict => {
+    for (const conflict of conflicts) {
       const primaryCell = conflict.primaryCell;
       const conflictingCell = conflict.conflictingCell;
       
@@ -140,7 +146,7 @@ export class PCIArcGISMapper {
         spatialReference: { wkid: 4326 }
       };
       
-      const color = this.getConflictColor(conflict.severity);
+      const color = this.getConflictColorArray(conflict.severity);
       const symbol = {
         type: "simple-line",
         color: color,
@@ -163,8 +169,8 @@ export class PCIArcGISMapper {
       this.conflictLayer.add(graphic);
       
       // Highlight conflicting cells
-      this.highlightConflictingCells(primaryCell, conflictingCell, conflict.severity);
-    });
+      await this.highlightConflictingCells(primaryCell, conflictingCell, conflict.severity);
+    }
   }
   
   /**
@@ -299,7 +305,9 @@ export class PCIArcGISMapper {
    * Add interactive popup for cell information
    */
   enableCellPopup() {
-    this.mapView.popup.defaultPopupTemplateEnabled = true;
+    if (this.mapView && this.mapView.popup) {
+      this.mapView.popup.defaultPopupTemplateEnabled = true;
+    }
   }
   
   /**
