@@ -29,8 +29,8 @@
 
 <style>
 	:global(html) {
-		font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+		background: var(--bg-primary);
 		min-height: 100vh;
 		margin: 0;
 		padding: 0;
@@ -39,16 +39,17 @@
 	.app-container {
 		min-height: 100vh;
 		width: 100%;
+		background: var(--bg-primary);
 	}
 	
 	.app-header {
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--card-bg);
 		backdrop-filter: blur(10px);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-		padding: 1rem 2rem;
-		color: white;
-		box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-		transition: all 0.3s ease;
+		border-bottom: 1px solid var(--border-color);
+		padding: var(--spacing-lg) var(--spacing-xl);
+		color: var(--text-primary);
+		box-shadow: var(--shadow-md);
+		transition: var(--transition);
 	}
 
 	.header-content {
@@ -71,26 +72,16 @@
 	
 	.app-header h1 {
 		margin: 0;
-		font-size: 2.5rem;
-		font-weight: 700;
-		text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+		font-size: 2rem;
+		font-weight: 600;
+		color: var(--text-primary);
 	}
 	
 	.app-header p {
-		margin: 0.5rem 0 0 0;
-		font-size: 1.1rem;
-		opacity: 0.9;
-		font-weight: 300;
-	}
-
-	/* Dark mode header styles */
-	[data-theme="dark"] .app-header {
-		background: rgba(0, 0, 0, 0.3);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-	}
-
-	[data-theme="dark"] .app-header h1 {
-		text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+		margin: var(--spacing-sm) 0 0 0;
+		font-size: 1rem;
+		color: var(--text-secondary);
+		font-weight: 400;
 	}
 
 	@media (max-width: 768px) {

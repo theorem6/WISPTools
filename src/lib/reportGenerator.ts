@@ -147,7 +147,7 @@ export class ReportGenerator {
         .severity-critical { color: #dc3545; font-weight: bold; }
         .severity-high { color: #fd7e14; font-weight: bold; }
         .severity-medium { color: #ffc107; font-weight: bold; }
-        .severity-low { color: #28a745; font-weight: bold; }
+        .severity-low { color: #10b981; font-weight: bold; }
         .recommendations { margin-top: 30px; }
         .recommendations ul { padding-left: 20px; }
         .recommendations li { margin-bottom: 8px; }

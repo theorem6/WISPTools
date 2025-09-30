@@ -82,9 +82,9 @@ export const config = {
   ui: {
     animationDuration: 200,
     colors: {
-      primary: '#667eea',
-      secondary: '#764ba2',
-      success: '#28a745',
+      primary: '#3b82f6',
+      secondary: '#64748b',
+      success: '#10b981',
       warning: '#ffc107',
       danger: '#dc3545',
       info: '#17a2b8',
