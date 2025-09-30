@@ -6,49 +6,12 @@ export class GeminiService {
   private baseUrl = "https://generativelanguage.googleapis.com";
   
   /**
-   * Simplified PCI conflict analysis (lightweight)
+   * Simplified PCI conflict analysis (uses built-in logic, no external API)
    */
   async analyzePCIConflicts(analysisData: string): Promise<string> {
-    // Simplified prompt for basic analysis only
-    const prompt = `Provide brief recommendations for these LTE PCI conflicts:
-${analysisData}
-
-Keep response under 200 words with 3-5 bullet points.`;
-
-    try {
-      const response = await fetch(`${this.baseUrl}/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 300,
-          }
-        })
-      });
-
-      if (!response.ok) {
-        return this.generateBasicRecommendations(analysisData);
-      }
-
-      const data = await response.json();
-      
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        return data.candidates[0].content.parts[0].text;
-      } else {
-        return this.generateBasicRecommendations(analysisData);
-      }
-    } catch (error) {
-      console.error('Gemini API Error:', error);
-      return this.generateBasicRecommendations(analysisData);
-    }
+    // Disable external API calls to prevent 404 errors
+    // Use built-in analysis instead
+    return this.generateBasicRecommendations(analysisData);
   }
 
   /**
