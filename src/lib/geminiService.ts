@@ -3,7 +3,7 @@ import { PUBLIC_GEMINI_API_KEY } from '$env/static/public';
 
 export class GeminiService {
   private apiKey: string = PUBLIC_GEMINI_API_KEY;
-  private baseUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
+  private baseUrl = "https://generativelanguage.googleapis.com";
   
   /**
    * Simplified PCI conflict analysis (lightweight)
@@ -16,11 +16,10 @@ ${analysisData}
 Keep response under 200 words with 3-5 bullet points.`;
 
     try {
-      const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
+      const response = await fetch(`${this.baseUrl}/v1beta/models/gemini-pro:generateContent?key=${this.apiKey}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': this.apiKey
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           contents: [{
