@@ -38,7 +38,7 @@
       longitude: longitude,
       frequency: frequency,
       rsPower: rsPower,
-      azimuth: azimuth,
+      azimuth: azimuth || undefined, // Allow undefined for auto-calculate
       towerType: towerType,
       technology: technology
     };
@@ -100,7 +100,7 @@
             longitude: parseFloat(parts[5].trim()),
             frequency: parseInt(parts[6].trim()),
             rsPower: parseFloat(parts[7].trim()),
-            azimuth: parts[8] ? parseInt(parts[8].trim()) : undefined,
+            azimuth: parts[8] && parts[8].trim() ? parseInt(parts[8].trim()) : undefined,
             towerType: parts[9] ? parts[9].trim() as '3-sector' | '4-sector' : '3-sector',
             technology: parts[10] ? parts[10].trim() as 'LTE' | 'CBRS' | 'LTE+CBRS' : 'LTE'
           });
@@ -213,8 +213,15 @@ CELL007,1007,4,,40.7128,-74.0160,3550,-87,270,4-sector,CBRS`;
             </div>
             
             <div class="form-group">
-              <label>Azimuth (degrees)</label>
-              <input type="number" min="0" max="359" bind:value={azimuth} placeholder="0" />
+              <label>Azimuth (degrees) - Leave blank for auto-calculate</label>
+              <input type="number" min="0" max="359" bind:value={azimuth} placeholder="Auto-calculate" />
+              <small class="help-text">
+                {#if towerType === '3-sector'}
+                  Auto: 0°, 120°, 240° (based on sector 1,2,3)
+                {:else}
+                  Auto: 0°, 90°, 180°, 270° (based on sector 1,2,3,4)
+                {/if}
+              </small>
             </div>
             
             <div class="form-group">
@@ -447,6 +454,14 @@ CELL007,1007,4,,40.7128,-74.0160,3550,-87,270,4-sector,CBRS`;
     color: var(--text-primary);
     font-size: 0.9rem;
     cursor: pointer;
+  }
+  
+  .help-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-style: italic;
   }
   
   .add-button {
