@@ -96,14 +96,4 @@
   .dark-mode-toggle:hover .icon {
     transform: scale(1.1);
   }
-
-  /* Dark mode specific styles */
-  [data-theme="dark"] .dark-mode-toggle {
-    background: var(--bg-tertiary);
-    border-color: var(--border-color);
-  }
-
-  [data-theme="dark"] .dark-mode-toggle:hover {
-    background: var(--hover-bg);
-  }
 </style>

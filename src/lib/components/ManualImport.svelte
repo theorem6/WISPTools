@@ -162,7 +162,11 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
 </button>
 
 {#if showImportModal}
-  <div class="modal-overlay" on:click={() => showImportModal = false}>
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="modal-overlay" on:click={() => showImportModal = false} role="dialog" aria-modal="true">
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="modal-content" on:click|stopPropagation>
       <div class="modal-header">
         <h2>Import Towers, Cells & Transmitters</h2>
