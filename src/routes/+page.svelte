@@ -19,6 +19,7 @@
   let geminiAnalysis: string = '';
   let optimizationResult: OptimizationResult | null = null;
   let isOptimizing = false;
+  let showSidebar = true;
   
   // Sample data
   const sampleCells: Cell[] = [
@@ -119,93 +120,88 @@
   }
 </script>
 
-<!-- Modern Card-Based Layout -->
-<div class="app-layout">
-  <!-- Top Stats Dashboard -->
-  <div class="stats-dashboard">
-    <div class="stat-card">
-      <div class="stat-icon">📡</div>
-      <div class="stat-info">
-        <div class="stat-value">{cells.length}</div>
-        <div class="stat-label">Total Cells</div>
+<div class="app-container">
+  <!-- Top Toolbar -->
+  <div class="toolbar">
+    <button class="toggle-btn" on:click={() => showSidebar = !showSidebar}>
+      {showSidebar ? '◀' : '▶'} Menu
+    </button>
+    <div class="stats-inline">
+      <div class="stat-badge">
+        <span class="badge-label">Cells</span>
+        <span class="badge-value">{cells.length}</span>
       </div>
-    </div>
-    <div class="stat-card" class:warning={conflicts.length > 0}>
-      <div class="stat-icon">⚠️</div>
-      <div class="stat-info">
-        <div class="stat-value">{conflicts.length}</div>
-        <div class="stat-label">Conflicts</div>
+      <div class="stat-badge warning">
+        <span class="badge-label">Conflicts</span>
+        <span class="badge-value">{conflicts.length}</span>
       </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon">📊</div>
-      <div class="stat-info">
-        <div class="stat-value">{analysis ? `${analysis.conflictRate.toFixed(1)}%` : '0%'}</div>
-        <div class="stat-label">Conflict Rate</div>
+      <div class="stat-badge">
+        <span class="badge-label">Rate</span>
+        <span class="badge-value">{analysis ? `${analysis.conflictRate.toFixed(1)}%` : '0%'}</span>
       </div>
-    </div>
-    <div class="stat-card" class:critical={conflicts.filter(c => c.severity === 'CRITICAL').length > 0}>
-      <div class="stat-icon">🔴</div>
-      <div class="stat-info">
-        <div class="stat-value">{conflicts.filter(c => c.severity === 'CRITICAL').length}</div>
-        <div class="stat-label">Critical</div>
+      <div class="stat-badge danger">
+        <span class="badge-label">Critical</span>
+        <span class="badge-value">{conflicts.filter(c => c.severity === 'CRITICAL').length}</span>
       </div>
     </div>
   </div>
 
-  <!-- Main Grid Layout -->
-  <div class="content-grid">
-    <!-- Left Panel - Actions & Controls -->
-    <div class="left-panel">
-      <div class="panel-card">
-        <h3>⚡ Actions</h3>
-        <div class="action-buttons">
-          <ManualImport on:import={handleManualImport} />
-          <button class="btn btn-primary" on:click={loadSampleData} disabled={isLoading}>
-            📊 Load Sample
-          </button>
-          <button class="btn btn-success" on:click={optimizePCIAssignments} disabled={isOptimizing || !conflicts.length}>
-            {isOptimizing ? '⚙️ Optimizing...' : '🎯 Optimize PCIs'}
-          </button>
-          <button class="btn btn-secondary" on:click={clearMap} disabled={!cells.length}>
-            🗑️ Clear
-          </button>
-        </div>
-      </div>
-
-      <div class="panel-card">
-        <h3>📤 Export</h3>
-        <ConflictReportExport {cells} {conflicts} {recommendations} />
-      </div>
-
-      {#if analysis}
-        <div class="panel-card">
-          <h3>📊 Summary</h3>
-          <div class="summary-list">
-            <div class="summary-item">
-              <span>Total Cells</span>
-              <strong>{analysis.totalCells}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Conflicts</span>
-              <strong>{analysis.conflicts.length}</strong>
-            </div>
-            <div class="summary-item">
-              <span>Critical</span>
-              <strong class="critical">{conflicts.filter(c => c.severity === 'CRITICAL').length}</strong>
-            </div>
-            <div class="summary-item">
-              <span>High</span>
-              <strong class="high">{conflicts.filter(c => c.severity === 'HIGH').length}</strong>
-            </div>
+  <div class="main-layout">
+    <!-- Collapsible Sidebar -->
+    {#if showSidebar}
+      <aside class="sidebar">
+        <!-- Actions -->
+        <section class="section">
+          <h3>Actions</h3>
+          <div class="button-group">
+            <ManualImport on:import={handleManualImport} />
+            <button class="btn btn-primary" on:click={loadSampleData} disabled={isLoading}>
+              Load Sample
+            </button>
+            <button class="btn btn-success" on:click={optimizePCIAssignments} disabled={isOptimizing || !conflicts.length}>
+              {isOptimizing ? 'Optimizing...' : 'Optimize PCIs'}
+            </button>
+            <button class="btn btn-secondary" on:click={clearMap} disabled={!cells.length}>
+              Clear Map
+            </button>
           </div>
-        </div>
-      {/if}
-    </div>
+        </section>
 
-    <!-- Center - Map -->
-    <div class="map-panel">
-      <div class="map-container" bind:this={mapContainer}>
+        <!-- Export -->
+        <section class="section">
+          <h3>Export</h3>
+          <ConflictReportExport {cells} {conflicts} {recommendations} />
+        </section>
+
+        <!-- Conflicts -->
+        {#if conflicts.length > 0}
+          <section class="section">
+            <h3>Conflicts ({conflicts.length})</h3>
+            <div class="conflict-list">
+              {#each conflicts.slice(0, 5) as conflict}
+                <div class="conflict-item" class:critical={conflict.severity === 'CRITICAL'}>
+                  <div class="conflict-row">
+                    <span class="conflict-cells">{conflict.primaryCell.id} ↔ {conflict.conflictingCell.id}</span>
+                    <span class="conflict-badge {conflict.severity.toLowerCase()}">{conflict.severity}</span>
+                  </div>
+                  <div class="conflict-info">
+                    <span>{conflict.conflictType}</span>
+                    <span>{conflict.distance.toFixed(0)}m</span>
+                  </div>
+                </div>
+              {/each}
+              {#if conflicts.length > 5}
+                <div class="more-link">+{conflicts.length - 5} more conflicts...</div>
+              {/if}
+            </div>
+          </section>
+        {/if}
+      </aside>
+    {/if}
+
+    <!-- Map Area -->
+    <main class="map-area">
+      <div class="map-wrapper" bind:this={mapContainer}>
         {#if isLoading}
           <div class="loading-overlay">
             <div class="spinner"></div>
@@ -213,71 +209,35 @@
           </div>
         {/if}
       </div>
-    </div>
-
-    <!-- Right Panel - Analysis -->
-    <div class="right-panel">
-      {#if conflicts.length > 0}
-        <div class="panel-card">
-          <h3>⚠️ Conflicts</h3>
-          <div class="conflicts-list">
-            {#each conflicts.slice(0, 10) as conflict}
-              <div class="conflict-card" class:critical={conflict.severity === 'CRITICAL'}>
-                <div class="conflict-header">
-                  <span class="cell-id">{conflict.primaryCell.id}</span>
-                  <span class="severity-badge {conflict.severity.toLowerCase()}">{conflict.severity}</span>
-                </div>
-                <div class="conflict-details">
-                  <span>vs {conflict.conflictingCell.id}</span>
-                  <span>{conflict.distance.toFixed(0)}m</span>
-                </div>
-                <div class="conflict-type">{conflict.conflictType}</div>
-              </div>
-            {/each}
-            {#if conflicts.length > 10}
-              <div class="more-conflicts">+{conflicts.length - 10} more...</div>
-            {/if}
-          </div>
-        </div>
-      {/if}
-
-      {#if geminiAnalysis}
-        <div class="panel-card">
-          <h3>💡 AI Recommendations</h3>
-          <div class="ai-analysis">
-            {@html geminiAnalysis.replace(/\n/g, '<br>')}
-          </div>
-        </div>
-      {/if}
-    </div>
+    </main>
   </div>
 </div>
 
-<!-- Optimization Results Modal -->
+<!-- Optimization Modal -->
 {#if optimizationResult}
-  <div class="modal-overlay">
-    <div class="modal-content">
+  <div class="modal-backdrop" on:click={() => optimizationResult = null} role="dialog" aria-modal="true">
+    <div class="modal" on:click|stopPropagation>
       <div class="modal-header">
-        <h2>🎯 Optimization Results</h2>
+        <h2>Optimization Complete</h2>
         <button class="close-btn" on:click={() => optimizationResult = null}>✕</button>
       </div>
-      <div class="modal-body">
-        <div class="results-grid">
-          <div class="result-card">
-            <div class="result-value">{optimizationResult.resolvedConflicts}</div>
-            <div class="result-label">Resolved</div>
+      <div class="modal-content">
+        <div class="result-grid">
+          <div class="result-item">
+            <div class="result-number">{optimizationResult.resolvedConflicts}</div>
+            <div class="result-text">Conflicts Resolved</div>
           </div>
-          <div class="result-card">
-            <div class="result-value">{optimizationResult.conflictReduction.toFixed(0)}%</div>
-            <div class="result-label">Reduction</div>
+          <div class="result-item">
+            <div class="result-number">{optimizationResult.conflictReduction.toFixed(0)}%</div>
+            <div class="result-text">Reduction</div>
           </div>
-          <div class="result-card">
-            <div class="result-value">{optimizationResult.iterations}</div>
-            <div class="result-label">Iterations</div>
+          <div class="result-item">
+            <div class="result-number">{optimizationResult.iterations}</div>
+            <div class="result-text">Iterations</div>
           </div>
         </div>
-        <div class="success-message">
-          ✅ Optimization applied successfully!
+        <div class="success-box">
+          ✓ Optimization has been applied to the map
         </div>
       </div>
     </div>
@@ -285,113 +245,121 @@
 {/if}
 
 <style>
-  .app-layout {
+  .app-container {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-lg);
-    padding: var(--spacing-lg);
     height: calc(100vh - 100px);
     background: var(--bg-primary);
   }
 
-  /* Stats Dashboard */
-  .stats-dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-lg);
-  }
-
-  .stat-card {
-    background: var(--card-bg);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-lg);
+  /* Toolbar */
+  .toolbar {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    box-shadow: var(--shadow-md);
-    border: 2px solid var(--border-color);
-    transition: var(--transition);
+    gap: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
   }
 
-  .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+  .toggle-btn {
+    padding: 0.5rem 1rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
   }
 
-  .stat-card.warning {
+  .stats-inline {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+  }
+
+  .stat-badge.warning {
+    background: var(--warning-light);
     border-color: var(--warning-color);
   }
 
-  .stat-card.critical {
+  .stat-badge.danger {
+    background: var(--danger-light);
     border-color: var(--danger-color);
   }
 
-  .stat-icon {
-    font-size: 2.5rem;
-  }
-
-  .stat-info {
-    flex: 1;
-  }
-
-  .stat-value {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--text-primary);
-    line-height: 1;
-  }
-
-  .stat-label {
-    font-size: 0.9rem;
+  .badge-label {
+    font-size: 0.75rem;
     color: var(--text-secondary);
-    margin-top: var(--spacing-xs);
+    font-weight: 500;
   }
 
-  /* Content Grid */
-  .content-grid {
-    display: grid;
-    grid-template-columns: 300px 1fr 300px;
-    gap: var(--spacing-lg);
+  .badge-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  /* Main Layout */
+  .main-layout {
+    display: flex;
     flex: 1;
     min-height: 0;
   }
 
-  /* Panels */
-  .left-panel, .right-panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-    overflow-y: auto;
-  }
-
-  .panel-card {
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
     background: var(--card-bg);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-xl);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
-  }
-
-  .panel-card h3 {
-    margin: 0 0 var(--spacing-lg) 0;
-    font-size: 1.2rem;
-    color: var(--text-primary);
-  }
-
-  /* Action Buttons */
-  .action-buttons {
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .section {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+
+  .section h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .btn {
-    padding: var(--spacing-md);
+    padding: 0.6rem 1rem;
     border: none;
-    border-radius: var(--border-radius);
+    border-radius: 6px;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
-    transition: var(--transition);
+    transition: all 0.2s;
     text-align: center;
   }
 
@@ -408,11 +376,12 @@
   .btn-secondary {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
 
   .btn:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
   }
 
   .btn:disabled {
@@ -420,29 +389,105 @@
     cursor: not-allowed;
   }
 
-  /* Map */
-  .map-panel {
-    position: relative;
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
+  /* Conflict List */
+  .conflict-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  .map-container {
+  .conflict-item {
+    padding: 0.75rem;
+    background: var(--card-bg);
+    border-radius: 6px;
+    border-left: 3px solid var(--warning-color);
+  }
+
+  .conflict-item.critical {
+    border-left-color: var(--danger-color);
+    background: var(--danger-light);
+  }
+
+  .conflict-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+
+  .conflict-cells {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .conflict-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .conflict-badge.critical {
+    background: var(--danger-color);
+    color: white;
+  }
+
+  .conflict-badge.high {
+    background: var(--warning-color);
+    color: white;
+  }
+
+  .conflict-badge.medium {
+    background: var(--info-color);
+    color: white;
+  }
+
+  .conflict-badge.low {
+    background: var(--success-color);
+    color: white;
+  }
+
+  .conflict-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .more-link {
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--primary-color);
+    font-weight: 500;
+  }
+
+  /* Map Area */
+  .map-area {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+  }
+
+  .map-wrapper {
     width: 100%;
     height: 100%;
-    background: var(--card-bg);
+    background: var(--bg-secondary);
   }
 
   .loading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     color: white;
+    font-size: 1.1rem;
+    z-index: 10;
   }
 
   .spinner {
@@ -451,129 +496,35 @@
     border: 4px solid rgba(255,255,255,0.3);
     border-top-color: white;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 
-  /* Conflicts List */
-  .conflicts-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    max-height: 500px;
-    overflow-y: auto;
-  }
-
-  .conflict-card {
-    padding: var(--spacing-md);
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius-sm);
-    border-left: 4px solid var(--warning-color);
-  }
-
-  .conflict-card.critical {
-    border-left-color: var(--danger-color);
-    background: var(--danger-light);
-  }
-
-  .conflict-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-xs);
-  }
-
-  .cell-id {
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .severity-badge {
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .severity-badge.critical {
-    background: var(--danger-color);
-    color: white;
-  }
-
-  .severity-badge.high {
-    background: var(--warning-color);
-    color: white;
-  }
-
-  .conflict-details {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
-
-  .conflict-type {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: var(--spacing-xs);
-  }
-
-  /* Summary */
-  .summary-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-  }
-
-  .summary-item {
-    display: flex;
-    justify-content: space-between;
-    padding: var(--spacing-sm);
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius-sm);
-  }
-
-  .summary-item strong.critical {
-    color: var(--danger-color);
-  }
-
-  .summary-item strong.high {
-    color: var(--warning-color);
-  }
-
-  /* AI Analysis */
-  .ai-analysis {
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: var(--text-secondary);
-    max-height: 400px;
-    overflow-y: auto;
-  }
-
   /* Modal */
-  .modal-overlay {
+  .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.75);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    z-index: 1000;
   }
 
-  .modal-content {
+  .modal {
     background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
+    border-radius: 12px;
     width: 90%;
-    max-width: 600px;
+    max-width: 500px;
     box-shadow: var(--shadow-xl);
   }
 
   .modal-header {
-    padding: var(--spacing-xl);
+    padding: 1.25rem 1.5rem;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
@@ -582,6 +533,8 @@
 
   .modal-header h2 {
     margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
   }
 
   .close-btn {
@@ -590,55 +543,67 @@
     font-size: 1.5rem;
     cursor: pointer;
     color: var(--text-secondary);
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .modal-body {
-    padding: var(--spacing-xl);
+  .modal-content {
+    padding: 1.5rem;
   }
 
-  .results-grid {
+  .result-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-xl);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
   }
 
-  .result-card {
+  .result-item {
     text-align: center;
-    padding: var(--spacing-lg);
+    padding: 1rem;
     background: var(--bg-secondary);
-    border-radius: var(--border-radius);
+    border-radius: 8px;
   }
 
-  .result-value {
-    font-size: 2.5rem;
-    font-weight: bold;
+  .result-number {
+    font-size: 2rem;
+    font-weight: 700;
     color: var(--success-color);
+    line-height: 1;
   }
 
-  .result-label {
+  .result-text {
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    margin-top: var(--spacing-sm);
+    margin-top: 0.5rem;
   }
 
-  .success-message {
-    padding: var(--spacing-lg);
+  .success-box {
+    padding: 1rem;
     background: var(--success-light);
-    border-radius: var(--border-radius);
+    border-radius: 8px;
     text-align: center;
     font-weight: 600;
     color: var(--text-primary);
   }
 
   /* Responsive */
-  @media (max-width: 1200px) {
-    .content-grid {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr auto;
+  @media (max-width: 768px) {
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      z-index: 100;
+      box-shadow: var(--shadow-xl);
     }
 
-    .right-panel {
-      max-height: 400px;
+    .stats-inline {
+      overflow-x: auto;
     }
   }
 </style>
