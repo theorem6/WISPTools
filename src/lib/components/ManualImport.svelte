@@ -364,7 +364,8 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -373,13 +374,14 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
   
   .modal-content {
     background: var(--card-bg);
-    border-radius: 12px;
-    max-width: 800px;
+    border-radius: var(--border-radius-lg);
+    max-width: 900px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-xl);
     border: 1px solid var(--border-color);
+    backdrop-filter: blur(8px);
   }
   
   .modal-header {
