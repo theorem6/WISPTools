@@ -296,11 +296,11 @@
     width: 90%;
     max-width: 1400px;
     z-index: 100;
-    background: rgba(255,255,255,0.98);
+    background: var(--card-bg);
     backdrop-filter: blur(16px);
     border-radius: 12px;
     padding: 0.5rem 1rem;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    box-shadow: var(--shadow-lg);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -309,13 +309,8 @@
     transition: all var(--transition);
   }
 
-  [data-theme="dark"] .topbar {
-    background: rgba(30,41,59,0.98);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-  }
-
   .topbar:hover {
-    box-shadow: 0 6px 32px rgba(0,0,0,0.12);
+    box-shadow: var(--shadow-xl);
   }
 
   /* Brand Section */
@@ -334,7 +329,7 @@
   .brand-text {
     font-size: 0.9rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
     white-space: nowrap;
   }
 
@@ -358,13 +353,13 @@
   .stat-value {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
     line-height: 1;
   }
 
   .stat-label {
     font-size: 0.65rem;
-    color: var(--text-secondary);
+    color: var(--text-secondary) !important;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -373,11 +368,11 @@
   }
 
   .stat-item.warning .stat-value {
-    color: var(--warning-color);
+    color: var(--warning-color) !important;
   }
 
   .stat-item.danger .stat-value {
-    color: var(--danger-color);
+    color: var(--danger-color) !important;
   }
 
   .stat-divider {
