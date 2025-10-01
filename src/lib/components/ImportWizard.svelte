@@ -376,8 +376,9 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
+    padding: 3rem 2rem;
     animation: fadeIn 0.2s;
+    overflow-y: auto;
   }
 
   @keyframes fadeIn {
@@ -390,12 +391,13 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     border-radius: var(--border-radius-xl);
     width: 100%;
     max-width: 700px;
-    max-height: 90vh;
+    max-height: 80vh;
     box-shadow: var(--shadow-2xl);
     border: 1px solid var(--border-color);
     animation: slideUp 0.3s;
     display: flex;
     flex-direction: column;
+    margin: auto;
   }
 
   @keyframes slideUp {
