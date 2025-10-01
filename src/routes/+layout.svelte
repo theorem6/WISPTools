@@ -4,7 +4,7 @@
 	import { themeManager } from '$lib/stores/themeStore';
 	
 	// Import centralized theme CSS
-	import '../../styles/theme.css';
+	import '../styles/theme.css';
 
 	onMount(() => {
 		// Theme manager is auto-initialized
