@@ -20,8 +20,8 @@
     uiActions
   } from '$lib/stores/appState';
   
-  // Modal components
-  import ActionsModal from '$lib/components/ActionsModal.svelte';
+  // Components
+  import ActionsDropdown from '$lib/components/ActionsDropdown.svelte';
   import AnalysisModal from '$lib/components/AnalysisModal.svelte';
   import ConflictsModal from '$lib/components/ConflictsModal.svelte';
   import RecommendationsModal from '$lib/components/RecommendationsModal.svelte';
@@ -170,14 +170,20 @@
       </div>
     </div>
     <div class="topbar-right">
+      <ActionsDropdown 
+        cells={$cellsStore.items}
+        conflicts={$conflictsStore.items}
+        recommendations={$analysisStore.recommendations}
+        isOptimizing={$optimizationStore.isOptimizing}
+        hasData={$hasData}
+        hasConflicts={$hasConflicts}
+        on:import={handleManualImport}
+        on:loadSample={loadSampleData}
+        on:clearMap={clearMap}
+        on:runAnalysis={performAnalysis}
+        on:optimize={optimizePCIAssignments}
+      />
       <ThemeSwitcher />
-      <button class="icon-btn" on:click={() => uiActions.openModal('showActionsModal')} title="Actions">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="1"></circle>
-          <circle cx="12" cy="5" r="1"></circle>
-          <circle cx="12" cy="19" r="1"></circle>
-        </svg>
-      </button>
       <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="Analysis">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -202,30 +208,7 @@
     </div>
   </nav>
 
-  <!-- Quick Action FAB -->
-  <button class="fab" on:click={() => uiActions.openModal('showActionsModal')}>
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="12" y1="5" x2="12" y2="19"></line>
-      <line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
-  </button>
-
   <!-- Modular Components - Isolated and reusable -->
-  <ActionsModal 
-    show={$uiStore.showActionsModal}
-    cells={$cellsStore.items}
-    conflicts={$conflictsStore.items}
-    recommendations={$analysisStore.recommendations}
-    isOptimizing={$optimizationStore.isOptimizing}
-    hasData={$hasData}
-    hasConflicts={$hasConflicts}
-    on:close={() => uiActions.closeModal('showActionsModal')}
-    on:import={handleManualImport}
-    on:loadSample={loadSampleData}
-    on:clearMap={clearMap}
-    on:runAnalysis={performAnalysis}
-    on:optimize={optimizePCIAssignments}
-  />
   
   <AnalysisModal 
     show={$uiStore.showAnalysisModal}
@@ -372,7 +355,8 @@
 
   .topbar-right {
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .icon-btn {
@@ -393,31 +377,6 @@
     background: var(--hover-bg);
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
-  }
-
-  /* FAB */
-  .fab {
-    position: absolute;
-    bottom: 2rem;
-    right: 2rem;
-    z-index: 100;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    transition: all 0.3s;
-  }
-
-  .fab:hover {
-    transform: scale(1.1) translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
   }
 
   /* Responsive */
