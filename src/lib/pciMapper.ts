@@ -39,6 +39,69 @@ export interface PCIConflictAnalysis {
 
 class PCIMapper {
   /**
+   * Calculate maximum propagation distance based on frequency
+   * Lower frequencies propagate farther than higher frequencies
+   * 
+   * Typical cell ranges:
+   * - 700-900 MHz (Low Band): 10-30km radius (rural/suburban)
+   * - 1700-2100 MHz (Mid Band): 3-10km radius (suburban/urban)
+   * - 2300-2600 MHz (Mid Band): 2-5km radius (urban)
+   * - 3300-3800 MHz (CBRS/C-Band): 1-3km radius (dense urban)
+   * - 24+ GHz (mmWave): 100-500m radius (ultra-dense urban)
+   */
+  private getMaxPropagationDistance(frequency: number): number {
+    // Frequency in MHz
+    if (frequency < 1000) {
+      // Low band (600-900 MHz) - excellent propagation
+      return 30000; // 30km
+    } else if (frequency < 1500) {
+      // Lower mid band (1400-1500 MHz) - good propagation
+      return 15000; // 15km
+    } else if (frequency < 2200) {
+      // Mid band (1700-2100 MHz) - moderate propagation
+      return 10000; // 10km
+    } else if (frequency < 2700) {
+      // Upper mid band (2300-2600 MHz) - moderate-low propagation
+      return 5000; // 5km
+    } else if (frequency < 4000) {
+      // CBRS/C-Band (3300-3800 MHz) - limited propagation
+      return 3000; // 3km
+    } else if (frequency < 6000) {
+      // Upper bands (4-6 GHz) - short range
+      return 2000; // 2km
+    } else {
+      // mmWave and higher - very short range
+      return 500; // 500m
+    }
+  }
+
+  /**
+   * Determine if two cells can potentially interfere based on:
+   * 1. Physical distance between cells
+   * 2. Maximum propagation range for their frequencies
+   * 
+   * Cells are considered in separate networks if they're beyond
+   * the maximum propagation distance of BOTH cells
+   */
+  private canCellsInterfere(cell1: Cell, cell2: Cell, distance: number): boolean {
+    const freq1 = cell1.centerFreq || cell1.frequency;
+    const freq2 = cell2.centerFreq || cell2.frequency;
+    
+    // Get max propagation for each cell
+    const maxRange1 = this.getMaxPropagationDistance(freq1);
+    const maxRange2 = this.getMaxPropagationDistance(freq2);
+    
+    // Use the larger of the two ranges (conservative approach)
+    // Cells can interfere if distance is within the propagation range
+    const effectiveRange = Math.max(maxRange1, maxRange2);
+    
+    // Add 20% buffer for edge cases (signal can extend beyond typical range)
+    const bufferRange = effectiveRange * 1.2;
+    
+    return distance <= bufferRange;
+  }
+
+  /**
    * LTE EARFCN to Frequency conversion utilities
    */
   private earfcnToFrequency(earfcn: number, isUplink: boolean = false): number {
@@ -130,6 +193,12 @@ class PCIMapper {
         
         // Calculate distance between cells (in meters)
         const distance = this.calculateDistance(cell1, cell2);
+        
+        // Check if cells can interfere based on frequency propagation
+        // Cells beyond max propagation range are considered separate networks
+        if (!this.canCellsInterfere(cell1, cell2, distance)) {
+          continue; // Skip - cells are in separate networks (too far apart)
+        }
         
         // Check if cells are on the same tower
         const sameTower = cell1.eNodeB === cell2.eNodeB;
@@ -396,7 +465,8 @@ class PCIMapper {
     const recommendations: string[] = [];
     
     if (conflicts.length === 0) {
-      recommendations.push('No PCI conflicts detected. Network configuration is optimal.');
+      recommendations.push('✓ No PCI conflicts detected. Network configuration is optimal.');
+      recommendations.push('Note: Analysis uses frequency-based propagation models to identify separate networks.');
       return recommendations;
     }
     
@@ -410,6 +480,9 @@ class PCIMapper {
     if (highConflicts.length > 0) {
       recommendations.push(`${highConflicts.length} high-priority PCI conflicts should be resolved soon.`);
     }
+    
+    // Add propagation-aware note
+    recommendations.push('⚡ Smart Network Analysis: Cells beyond maximum propagation range are treated as separate networks.');
     
     // Tower configuration recommendations
     const threeSectorCells = conflicts.filter(c => 
@@ -448,7 +521,44 @@ class PCIMapper {
     recommendations.push('For mixed 3-sector/4-sector deployments, use separate PCI pools.');
     recommendations.push('Regular PCI audits recommended to maintain optimal performance.');
     
+    // Add frequency band information
+    const lowBandCells = conflicts.filter(c => {
+      const freq1 = c.primaryCell.centerFreq || c.primaryCell.frequency;
+      const freq2 = c.conflictingCell.centerFreq || c.conflictingCell.frequency;
+      return freq1 < 1000 || freq2 < 1000;
+    });
+    
+    const midBandCells = conflicts.filter(c => {
+      const freq1 = c.primaryCell.centerFreq || c.primaryCell.frequency;
+      const freq2 = c.conflictingCell.centerFreq || c.conflictingCell.frequency;
+      return (freq1 >= 1700 && freq1 <= 2600) || (freq2 >= 1700 && freq2 <= 2600);
+    });
+    
+    const cBandCells = conflicts.filter(c => {
+      const freq1 = c.primaryCell.centerFreq || c.primaryCell.frequency;
+      const freq2 = c.conflictingCell.centerFreq || c.conflictingCell.frequency;
+      return (freq1 >= 3300 && freq1 <= 3800) || (freq2 >= 3300 && freq2 <= 3800);
+    });
+    
+    if (lowBandCells.length > 0) {
+      recommendations.push(`📡 ${lowBandCells.length} conflicts in low-band (600-900MHz) - propagation range: up to 30km`);
+    }
+    if (midBandCells.length > 0) {
+      recommendations.push(`📡 ${midBandCells.length} conflicts in mid-band (1700-2600MHz) - propagation range: 3-10km`);
+    }
+    if (cBandCells.length > 0) {
+      recommendations.push(`📡 ${cBandCells.length} conflicts in CBRS/C-Band (3300-3800MHz) - propagation range: 1-3km`);
+    }
+    
     return recommendations;
+  }
+
+  /**
+   * Get propagation range for a cell (public method for external use)
+   */
+  getPropagationRange(cell: Cell): number {
+    const freq = cell.centerFreq || cell.frequency;
+    return this.getMaxPropagationDistance(freq);
   }
 }
 
