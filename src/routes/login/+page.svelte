@@ -183,7 +183,21 @@
           {/if}
         </p>
         
-        {#if error}
+        <!-- Firebase Setup Notice -->
+        {#if error && error.includes('Bad Request')}
+          <div class="setup-notice">
+            <h4>⚙️ Firebase Setup Required</h4>
+            <p>To enable authentication, please:</p>
+            <ol>
+              <li>Go to <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
+              <li>Navigate to Authentication → Sign-in method</li>
+              <li>Enable "Email/Password" provider</li>
+              <li>Optionally enable "Google" provider</li>
+              <li>Refresh this page</li>
+            </ol>
+            <p class="note"><strong>For testing:</strong> You can create a test account after enabling Email/Password authentication.</p>
+          </div>
+        {:else if error}
           <div class="error-message">{error}</div>
         {/if}
         
@@ -459,6 +473,51 @@
     color: var(--text-primary);
     margin-bottom: 1.5rem;
     font-size: 0.9rem;
+  }
+
+  .setup-notice {
+    padding: 1.5rem;
+    background: var(--info-light);
+    border-left: 4px solid var(--info-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 1.5rem;
+  }
+
+  .setup-notice h4 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.125rem;
+  }
+
+  .setup-notice p {
+    margin: 0 0 0.75rem 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+  }
+
+  .setup-notice ol {
+    margin: 0.75rem 0;
+    padding-left: 1.5rem;
+    color: var(--text-primary);
+  }
+
+  .setup-notice li {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .setup-notice a {
+    color: var(--primary-color);
+    text-decoration: underline;
+    font-weight: 500;
+  }
+
+  .setup-notice .note {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
   }
 
   .reset-info {

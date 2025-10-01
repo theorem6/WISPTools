@@ -207,27 +207,41 @@ export class AuthService {
    */
   private getAuthErrorMessage(error: any): string {
     const code = error?.code || '';
+    const message = error?.message || '';
+    
+    // Check if Firebase auth is not enabled
+    if (message.includes('ADMIN_ONLY_OPERATION') || 
+        message.includes('auth provider is disabled') ||
+        code === 'auth/operation-not-allowed') {
+      return 'Firebase Authentication not enabled. Please enable Email/Password provider in Firebase Console.';
+    }
     
     switch (code) {
       case 'auth/email-already-in-use':
         return 'Email address is already in use';
       case 'auth/invalid-email':
         return 'Invalid email address';
-      case 'auth/operation-not-allowed':
-        return 'Operation not allowed';
+      case 'auth/invalid-credential':
+        return 'Invalid credentials. Please check your email and password.';
       case 'auth/weak-password':
         return 'Password is too weak. Use at least 6 characters';
       case 'auth/user-disabled':
         return 'User account has been disabled';
       case 'auth/user-not-found':
-        return 'No account found with this email';
+        return 'No account found with this email. Please sign up first.';
       case 'auth/wrong-password':
         return 'Incorrect password';
       case 'auth/popup-closed-by-user':
         return 'Sign in cancelled';
       case 'auth/network-request-failed':
         return 'Network error. Please check your connection';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Please try again later.';
       default:
+        // Return generic message with hint about Firebase setup
+        if (message.includes('400')) {
+          return 'Bad Request - Firebase Authentication may not be properly configured. Check Firebase Console.';
+        }
         return error?.message || 'Authentication error occurred';
     }
   }
