@@ -1,0 +1,397 @@
+/**
+ * Centralized Theme System
+ * 
+ * This file contains all CSS custom properties (variables) for theming.
+ * It supports light and dark modes with automatic system preference detection.
+ * 
+ * Usage:
+ * - Light mode: default or [data-theme="light"]
+ * - Dark mode: [data-theme="dark"]
+ */
+
+/* ============================================================================
+   Base Theme Variables (Light Mode Default)
+   ========================================================================= */
+
+:root {
+  /* ========================================================================
+     Color Palette - Primary Colors
+     ====================================================================== */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #1e3a8a;
+
+  /* ========================================================================
+     Color Palette - Semantic Colors
+     ====================================================================== */
+  --success-50: #f0fdf4;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+
+  --warning-50: #fffbeb;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+
+  --danger-50: #fef2f2;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+
+  --info-50: #f0f9ff;
+  --info-500: #06b6d4;
+  --info-600: #0891b2;
+  --info-700: #0e7490;
+
+  /* ========================================================================
+     Light Mode Theme
+     ====================================================================== */
+  
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #ffffff;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+  
+  /* Surface Colors */
+  --surface-primary: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-hover: #f1f5f9;
+  --surface-active: #e2e8f0;
+  
+  /* Card Colors */
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --card-shadow: rgba(0, 0, 0, 0.1);
+  
+  /* Text Colors */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --text-disabled: #cbd5e1;
+  --text-inverse: #ffffff;
+  --text-link: #2563eb;
+  --text-link-hover: #1d4ed8;
+  
+  /* Border Colors */
+  --border-color: #e2e8f0;
+  --border-hover: #cbd5e1;
+  --border-focus: #3b82f6;
+  --border-error: #ef4444;
+  
+  /* Input Colors */
+  --input-bg: #ffffff;
+  --input-border: #e2e8f0;
+  --input-focus: #3b82f6;
+  --input-placeholder: #94a3b8;
+  
+  /* Button Colors */
+  --button-primary-bg: #3b82f6;
+  --button-primary-hover: #2563eb;
+  --button-primary-active: #1d4ed8;
+  --button-primary-text: #ffffff;
+  
+  --button-secondary-bg: #f1f5f9;
+  --button-secondary-hover: #e2e8f0;
+  --button-secondary-active: #cbd5e1;
+  --button-secondary-text: #0f172a;
+  
+  /* Hover States */
+  --hover-bg: #f1f5f9;
+  --hover-overlay: rgba(0, 0, 0, 0.05);
+  
+  /* Focus States */
+  --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  --focus-ring-color: rgba(59, 130, 246, 0.3);
+  
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Semantic Colors - Light Mode */
+  --primary-color: var(--primary-600);
+  --primary-light: var(--primary-100);
+  --primary-dark: var(--primary-700);
+  
+  --success-color: var(--success-600);
+  --success-light: var(--success-50);
+  --success-dark: var(--success-700);
+  
+  --warning-color: var(--warning-600);
+  --warning-light: var(--warning-50);
+  --warning-dark: var(--warning-700);
+  
+  --danger-color: var(--danger-600);
+  --danger-light: var(--danger-50);
+  --danger-dark: var(--danger-700);
+  
+  --info-color: var(--info-600);
+  --info-light: var(--info-50);
+  --info-dark: var(--info-700);
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  
+  /* ========================================================================
+     Layout & Spacing
+     ====================================================================== */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  
+  /* ========================================================================
+     Typography
+     ====================================================================== */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* ========================================================================
+     Border Radius
+     ====================================================================== */
+  --border-radius-sm: 0.25rem;
+  --border-radius: 0.5rem;
+  --border-radius-md: 0.75rem;
+  --border-radius-lg: 1rem;
+  --border-radius-xl: 1.5rem;
+  --border-radius-2xl: 2rem;
+  --border-radius-full: 9999px;
+  
+  /* ========================================================================
+     Transitions
+     ====================================================================== */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ========================================================================
+     Z-Index Scale
+     ====================================================================== */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* ============================================================================
+   Dark Mode Theme
+   ========================================================================= */
+
+[data-theme="dark"] {
+  /* Background Colors */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-elevated: #1e293b;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  
+  /* Surface Colors */
+  --surface-primary: #1e293b;
+  --surface-secondary: #334155;
+  --surface-hover: #475569;
+  --surface-active: #64748b;
+  
+  /* Card Colors */
+  --card-bg: #1e293b;
+  --card-border: #334155;
+  --card-shadow: rgba(0, 0, 0, 0.3);
+  
+  /* Text Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-disabled: #64748b;
+  --text-inverse: #0f172a;
+  --text-link: #60a5fa;
+  --text-link-hover: #93c5fd;
+  
+  /* Border Colors */
+  --border-color: #334155;
+  --border-hover: #475569;
+  --border-focus: #60a5fa;
+  --border-error: #f87171;
+  
+  /* Input Colors */
+  --input-bg: #1e293b;
+  --input-border: #334155;
+  --input-focus: #60a5fa;
+  --input-placeholder: #64748b;
+  
+  /* Button Colors */
+  --button-primary-bg: #3b82f6;
+  --button-primary-hover: #60a5fa;
+  --button-primary-active: #93c5fd;
+  --button-primary-text: #ffffff;
+  
+  --button-secondary-bg: #334155;
+  --button-secondary-hover: #475569;
+  --button-secondary-active: #64748b;
+  --button-secondary-text: #f8fafc;
+  
+  /* Hover States */
+  --hover-bg: #334155;
+  --hover-overlay: rgba(255, 255, 255, 0.05);
+  
+  /* Focus States */
+  --focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.3);
+  --focus-ring-color: rgba(96, 165, 250, 0.3);
+  
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  
+  /* Semantic Colors - Dark Mode */
+  --primary-color: var(--primary-500);
+  --primary-light: var(--primary-900);
+  --primary-dark: var(--primary-300);
+  
+  --success-color: var(--success-500);
+  --success-light: rgba(34, 197, 94, 0.1);
+  --success-dark: var(--success-300);
+  
+  --warning-color: var(--warning-500);
+  --warning-light: rgba(245, 158, 11, 0.1);
+  --warning-dark: var(--warning-300);
+  
+  --danger-color: var(--danger-500);
+  --danger-light: rgba(239, 68, 68, 0.1);
+  --danger-dark: var(--danger-300);
+  
+  --info-color: var(--info-500);
+  --info-light: rgba(6, 182, 212, 0.1);
+  --info-dark: var(--info-300);
+  
+  /* Gradients - adjusted for dark mode */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* ============================================================================
+   Smooth Theme Transitions
+   ========================================================================= */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: light dark;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+html {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Prevent flash of unstyled content during theme switch */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: none !important;
+}
+
+/* ============================================================================
+   Utility Classes
+   ========================================================================= */
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--primary-color);
+  color: var(--text-inverse);
+}
+
+/* Focus visible (keyboard navigation) */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================================================
+   Print Styles
+   ========================================================================= */
+
+@media print {
+  :root {
+    --bg-primary: #ffffff;
+    --text-primary: #000000;
+  }
+}
+
+/* ============================================================================
+   Reduced Motion
+   ========================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
