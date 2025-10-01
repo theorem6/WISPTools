@@ -156,18 +156,17 @@
                   <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
                 <div class="banner-content">
-                  <strong>Firestore Index Required</strong>
-                  <p>To save and load networks, you need to create a Firestore index.</p>
+                  <strong>🔍 Firestore Index Required (One-Time Setup)</strong>
+                  <p>Click the link below to automatically create the required index in Firebase Console:</p>
                   <div class="banner-actions">
                     <a 
-                      href="https://console.firebase.google.com/project/petersonmappingapp/firestore/databases/mapping1/indexes" 
+                      href="https://console.firebase.google.com/v1/r/project/petersonmappingapp/firestore/databases/mapping1/indexes?create_composite=ClJwcm9qZWN0cy9wZXRlcnNvbm1hcHBpbmdhcHAvZGF0YWJhc2VzL21hcHBpbmcxL2NvbGxlY3Rpb25Hcm91cHMvbmV0d29ya3MvaW5kZXhlcy9fEAEaCwoHb3duZXJJZBABGg0KCXVwZGF0ZWRBdBACGgwKCF9fbmFtZV9fEAI" 
                       target="_blank" 
                       class="banner-link"
                     >
-                      Open Firebase Console →
+                      ✨ Create Index (Auto-configured) →
                     </a>
-                    <span class="banner-or">or run:</span>
-                    <code>firebase deploy --only firestore:indexes</code>
+                    <p class="banner-note">The index will take 2-5 minutes to build. Refresh this page after it's complete.</p>
                   </div>
                 </div>
               </div>
@@ -469,6 +468,13 @@
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--text-primary);
+  }
+
+  .banner-note {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0.75rem 0 0 0;
+    font-style: italic;
   }
 
   .spinner-small {
