@@ -26,6 +26,16 @@
     dispatch(action);
     showDropdown = false;
   }
+
+  function openImportModal() {
+    showImportModal = true;
+    showDropdown = false;
+  }
+
+  function openExportModal() {
+    showExportModal = true;
+    showDropdown = false;
+  }
   
   function handleClickOutside(event: MouseEvent) {
     const target = event.target as HTMLElement;
@@ -61,7 +71,7 @@
     <div class="dropdown-menu">
       <div class="dropdown-section">
         <div class="section-label">Data</div>
-        <button class="dropdown-item" on:click={() => showImportModal = true}>
+        <button class="dropdown-item" on:click={openImportModal}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
@@ -117,7 +127,7 @@
 
       <div class="dropdown-section">
         <div class="section-label">Export</div>
-        <button class="dropdown-item" on:click={() => showExportModal = true} disabled={!hasData}>
+        <button class="dropdown-item" on:click={openExportModal} disabled={!hasData}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="17 8 12 3 7 8"></polyline>
@@ -130,21 +140,22 @@
   {/if}
 </div>
 
-<!-- Import Modal (compact) -->
+<!-- Import Modal - ManualImport has its own modal styling -->
 {#if showImportModal}
-  <div class="compact-modal-overlay" on:click={() => showImportModal = false}>
-    <div class="compact-modal" on:click|stopPropagation>
-      <ManualImport on:import={(e) => { dispatch('import', e.detail); showImportModal = false; }} />
-    </div>
-  </div>
+  <ManualImport on:import={(e) => { dispatch('import', e.detail); showImportModal = false; }} />
 {/if}
 
-<!-- Export Modal (compact) -->
+<!-- Export Modal -->
 {#if showExportModal}
-  <div class="compact-modal-overlay" on:click={() => showExportModal = false}>
-    <div class="compact-modal" on:click|stopPropagation>
-      <ConflictReportExport {cells} {conflicts} {recommendations} />
-      <button class="close-modal-btn" on:click={() => showExportModal = false}>Close</button>
+  <div class="export-modal-overlay" on:click={() => showExportModal = false}>
+    <div class="export-modal" on:click|stopPropagation>
+      <div class="export-modal-header">
+        <h3>Export Reports</h3>
+        <button class="close-btn" on:click={() => showExportModal = false}>×</button>
+      </div>
+      <div class="export-modal-body">
+        <ConflictReportExport {cells} {conflicts} {recommendations} />
+      </div>
     </div>
   </div>
 {/if}
@@ -263,13 +274,13 @@
     margin: 0.5rem 0;
   }
 
-  /* Compact modals */
-  .compact-modal-overlay {
+  /* Export Modal - Centered on screen */
+  .export-modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
-    z-index: var(--z-modal-backdrop);
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -282,15 +293,18 @@
     to { opacity: 1; }
   }
 
-  .compact-modal {
+  .export-modal {
     background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
+    border-radius: var(--border-radius-xl);
     max-width: 600px;
     width: 100%;
-    max-height: 80vh;
-    overflow-y: auto;
+    max-height: 85vh;
+    overflow: hidden;
     box-shadow: var(--shadow-2xl);
+    border: 1px solid var(--border-color);
     animation: slideUp var(--transition);
+    display: flex;
+    flex-direction: column;
   }
 
   @keyframes slideUp {
@@ -304,21 +318,45 @@
     }
   }
 
-  .close-modal-btn {
-    width: 100%;
-    padding: 0.75rem;
-    margin-top: 1rem;
-    border: none;
-    border-radius: var(--border-radius);
-    background: var(--bg-secondary);
+  .export-modal-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .export-modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
     color: var(--text-primary);
-    font-weight: var(--font-weight-medium);
+  }
+
+  .close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 1.5rem;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all var(--transition);
   }
 
-  .close-modal-btn:hover {
-    background: var(--hover-bg);
+  .close-btn:hover {
+    background: var(--danger-light);
+    color: var(--danger-color);
+  }
+
+  .export-modal-body {
+    padding: 2rem;
+    overflow-y: auto;
+    max-height: calc(85vh - 80px);
   }
 </style>
 
