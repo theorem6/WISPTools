@@ -29,7 +29,6 @@
   import OptimizationResultModal from '$lib/components/OptimizationResultModal.svelte';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import UserProfile from '$lib/components/UserProfile.svelte';
-  import AuthModal from '$lib/components/AuthModal.svelte';
   import NetworkManager from '$lib/components/NetworkManager.svelte';
   import NetworkSelector from '$lib/components/NetworkSelector.svelte';
   
@@ -40,7 +39,6 @@
   
   // Local state for modals
   let showImportWizard = false;
-  let showAuthModal = false;
   let showNetworkManager = false;
   
   let mapContainer: HTMLDivElement;
@@ -77,15 +75,28 @@
   ];
   
   // ========================================================================
-  // Lifecycle - Initialize map and handle auth/network loading
+  // Auth Guard - Redirect to login if not authenticated
   // ========================================================================
   
+  import { goto } from '$app/navigation';
+  
   onMount(() => {
+    // Check authentication and redirect if needed
+    if (!$authStore.isLoading && !$isAuthenticated) {
+      goto('/login');
+      return;
+    }
+    
     if (mapContainer) {
       mapInstance = new PCIArcGISMapper(mapContainer);
       mapInstance.enableCellPopup();
     }
   });
+  
+  // Redirect if user logs out
+  $: if (!$authStore.isLoading && !$isAuthenticated) {
+    goto('/login');
+  }
   
   // Load user's networks when authenticated
   $: if ($isAuthenticated && $currentUser) {
@@ -95,9 +106,6 @@
   // Sync current network cells with cell store
   $: if ($activeNetwork) {
     syncNetworkCells($activeNetwork);
-  } else if (!$isAuthenticated) {
-    // Load sample data if not logged in
-    loadSampleData();
   }
   
   async function loadUserNetworks() {
@@ -223,6 +231,7 @@
   }
 </script>
 
+{#if $isAuthenticated}
 <!-- Full Screen Map -->
 <div class="app">
   <!-- Map Background -->
@@ -284,7 +293,6 @@
         on:optimize={optimizePCIAssignments}
       />
       <UserProfile 
-        on:signIn={() => showAuthModal = true}
         on:networks={() => showNetworkManager = true}
       />
       <ThemeSwitcher />
@@ -313,11 +321,6 @@
   </nav>
 
   <!-- Modular Components - Isolated and reusable -->
-  <AuthModal 
-    show={showAuthModal}
-    on:close={() => showAuthModal = false}
-  />
-  
   <NetworkManager 
     show={showNetworkManager}
     on:close={() => showNetworkManager = false}
@@ -356,6 +359,13 @@
     on:close={() => uiActions.closeModal('showOptimizationResultModal')}
   />
 </div>
+{:else}
+  <!-- Loading state while checking auth -->
+  <div class="auth-loading">
+    <div class="spinner"></div>
+    <p>Loading...</p>
+  </div>
+{/if}
 
 <style>
   /* App Container */
@@ -398,6 +408,32 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .auth-loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+  }
+
+  .auth-loading .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  .auth-loading p {
+    color: var(--text-secondary);
+    font-size: 1rem;
   }
 
   /* Compact Floating Top Bar */

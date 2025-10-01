@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import { authStore, currentUser, isAuthenticated } from '../stores/authStore';
   import { authService } from '../services/authService';
   
@@ -33,11 +34,6 @@
     }
   });
   
-  function handleSignIn() {
-    dispatch('signIn');
-    showDropdown = false;
-  }
-  
   function handleNetworks() {
     dispatch('networks');
     showDropdown = false;
@@ -46,6 +42,7 @@
   async function handleSignOut() {
     showDropdown = false;
     await authService.signOut();
+    goto('/login');
   }
   
   function getInitials(name: string | undefined, email: string): string {
@@ -97,10 +94,6 @@
         </button>
       </div>
     {/if}
-  {:else}
-    <button class="sign-in-btn" on:click={handleSignIn}>
-      Sign In
-    </button>
   {/if}
 </div>
 
