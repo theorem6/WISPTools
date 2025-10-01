@@ -28,9 +28,20 @@
   import RecommendationsModal from '$lib/components/RecommendationsModal.svelte';
   import OptimizationResultModal from '$lib/components/OptimizationResultModal.svelte';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import UserProfile from '$lib/components/UserProfile.svelte';
+  import AuthModal from '$lib/components/AuthModal.svelte';
+  import NetworkManager from '$lib/components/NetworkManager.svelte';
+  import NetworkSelector from '$lib/components/NetworkSelector.svelte';
   
-  // Local state for import wizard
+  // Auth and Network stores
+  import { authStore, currentUser, isAuthenticated } from '$lib/stores/authStore';
+  import { networkStore, currentNetwork as activeNetwork } from '$lib/stores/networkStore';
+  import { networkService } from '$lib/services/networkService';
+  
+  // Local state for modals
   let showImportWizard = false;
+  let showAuthModal = false;
+  let showNetworkManager = false;
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -66,16 +77,68 @@
   ];
   
   // ========================================================================
-  // Lifecycle - Initialize map and load sample data
+  // Lifecycle - Initialize map and handle auth/network loading
   // ========================================================================
   
   onMount(() => {
     if (mapContainer) {
       mapInstance = new PCIArcGISMapper(mapContainer);
       mapInstance.enableCellPopup();
-      loadSampleData();
     }
   });
+  
+  // Load user's networks when authenticated
+  $: if ($isAuthenticated && $currentUser) {
+    loadUserNetworks();
+  }
+  
+  // Sync current network cells with cell store
+  $: if ($activeNetwork) {
+    syncNetworkCells($activeNetwork);
+  } else if (!$isAuthenticated) {
+    // Load sample data if not logged in
+    loadSampleData();
+  }
+  
+  async function loadUserNetworks() {
+    if (!$currentUser) return;
+    
+    networkStore.setLoading(true);
+    const result = await networkService.getUserNetworks($currentUser.uid);
+    
+    if (result.success && result.data) {
+      networkStore.setNetworks(result.data);
+      
+      // If no current network, select the first one
+      if (!$activeNetwork && result.data.length > 0) {
+        networkStore.setCurrentNetwork(result.data[0]);
+      }
+    } else {
+      console.error('Failed to load networks:', result.error);
+    }
+    
+    networkStore.setLoading(false);
+  }
+  
+  async function syncNetworkCells(network: any) {
+    if (network.cells && network.cells.length > 0) {
+      const result = await pciService.loadCells(network.cells);
+      if (result.success) {
+        await performAnalysis();
+      }
+    } else {
+      // Empty network
+      pciService.clearCells();
+    }
+  }
+  
+  async function saveCurrentNetwork() {
+    if (!$activeNetwork || !$isAuthenticated) return;
+    
+    const cells = $cellsStore.items;
+    await networkService.updateNetworkCells($activeNetwork.id, cells);
+    networkStore.updateCurrentNetworkCells(cells);
+  }
   
   // ========================================================================
   // Event Handlers - Delegated to service layer
@@ -93,6 +156,7 @@
     const result = await pciService.addCells(importedCells);
     if (result.success) {
       await performAnalysis();
+      await saveCurrentNetwork(); // Auto-save to network
     }
   }
   
@@ -123,6 +187,7 @@
     if (result.success) {
       updateMapVisualization();
       uiActions.openModal('showOptimizationResultModal');
+      await saveCurrentNetwork(); // Auto-save optimized network
     }
   }
 
@@ -178,7 +243,13 @@
         <circle cx="12" cy="10" r="3"></circle>
       </svg>
       <span class="brand-text">LTE PCI Mapper</span>
+      
+      {#if $isAuthenticated}
+        <div class="network-selector-container">
+          <NetworkSelector on:manage={() => showNetworkManager = true} />
         </div>
+      {/if}
+    </div>
 
     <div class="topbar-stats">
       <div class="stat-item">
@@ -212,6 +283,10 @@
         on:runAnalysis={performAnalysis}
         on:optimize={optimizePCIAssignments}
       />
+      <UserProfile 
+        on:signIn={() => showAuthModal = true}
+        on:networks={() => showNetworkManager = true}
+      />
       <ThemeSwitcher />
       <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="Analysis">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -238,6 +313,18 @@
   </nav>
 
   <!-- Modular Components - Isolated and reusable -->
+  <AuthModal 
+    show={showAuthModal}
+    on:close={() => showAuthModal = false}
+  />
+  
+  <NetworkManager 
+    show={showNetworkManager}
+    on:close={() => showNetworkManager = false}
+    on:networkCreated={() => {}}
+    on:networkSelected={() => {}}
+  />
+  
   <ImportWizard 
     show={showImportWizard}
     on:import={handleManualImport}
@@ -343,7 +430,7 @@
   .topbar-brand {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     flex-shrink: 0;
   }
 
@@ -357,6 +444,14 @@
     font-weight: 700;
     color: var(--text-primary) !important;
     white-space: nowrap;
+  }
+
+  .network-selector-container {
+    display: flex;
+    align-items: center;
+    padding-left: 0.75rem;
+    margin-left: 0.75rem;
+    border-left: 1px solid var(--border-color);
   }
 
   /* Stats Section */
@@ -460,6 +555,11 @@
 
     .brand-text {
       display: none;
+    }
+
+    .network-selector-container {
+      margin-left: 0.5rem;
+      padding-left: 0.5rem;
     }
 
     .topbar-stats {
