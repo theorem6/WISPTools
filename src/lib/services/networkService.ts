@@ -103,10 +103,10 @@ export class NetworkService {
     }
 
     try {
+      // Simple query without orderBy to avoid composite index requirement
       const q = query(
         collection(db, this.COLLECTION_NAME),
-        where('ownerId', '==', userId),
-        orderBy('updatedAt', 'desc')
+        where('ownerId', '==', userId)
       );
 
       const querySnapshot = await getDocs(q);
@@ -115,6 +115,9 @@ export class NetworkService {
       querySnapshot.forEach((doc) => {
         networks.push(this.fromFirestoreDoc(doc.id, doc.data()));
       });
+
+      // Sort locally by updatedAt (descending)
+      networks.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
       return { success: true, data: networks };
     } catch (error: any) {
@@ -216,11 +219,11 @@ export class NetworkService {
     }
 
     try {
+      // Simple query without orderBy to avoid composite index requirement
       const q = query(
         collection(db, this.COLLECTION_NAME),
         where('ownerId', '==', userId),
-        where('market', '==', market),
-        orderBy('updatedAt', 'desc')
+        where('market', '==', market)
       );
 
       const querySnapshot = await getDocs(q);
@@ -229,6 +232,9 @@ export class NetworkService {
       querySnapshot.forEach((doc) => {
         networks.push(this.fromFirestoreDoc(doc.id, doc.data()));
       });
+
+      // Sort locally by updatedAt (descending)
+      networks.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
       return { success: true, data: networks };
     } catch (error: any) {
