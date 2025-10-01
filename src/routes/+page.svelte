@@ -138,7 +138,7 @@
   }
 </script>
 
-<!-- Full Screen Map with Floating UI -->
+<!-- Full Screen Map -->
 <div class="app">
   <!-- Map Background -->
   <div class="map-fullscreen" bind:this={mapContainer}>
@@ -150,26 +150,34 @@
     {/if}
   </div>
 
-  <!-- Floating Top Bar -->
+  <!-- Compact Floating Top Bar -->
   <nav class="topbar">
-    <div class="topbar-left">
-      <h1 class="logo">LTE PCI Mapper</h1>
-      <div class="stats-chips">
-        <div class="chip">
-          <span class="chip-label">Cells</span>
-          <span class="chip-value">{$cellCount}</span>
-        </div>
-        <div class="chip chip-warning">
-          <span class="chip-label">Conflicts</span>
-          <span class="chip-value">{$conflictCount}</span>
-        </div>
-        <div class="chip chip-danger">
-          <span class="chip-label">Critical</span>
-          <span class="chip-value">{$criticalConflictCount}</span>
-        </div>
+    <div class="topbar-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="brand-icon">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </svg>
+      <span class="brand-text">LTE PCI Mapper</span>
+    </div>
+
+    <div class="topbar-stats">
+      <div class="stat-item">
+        <span class="stat-value">{$cellCount}</span>
+        <span class="stat-label">Cells</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item warning">
+        <span class="stat-value">{$conflictCount}</span>
+        <span class="stat-label">Conflicts</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item danger">
+        <span class="stat-value">{$criticalConflictCount}</span>
+        <span class="stat-label">Critical</span>
       </div>
     </div>
-    <div class="topbar-right">
+
+    <div class="topbar-actions">
       <ActionsDropdown 
         cells={$cellsStore.items}
         conflicts={$conflictsStore.items}
@@ -185,21 +193,21 @@
       />
       <ThemeSwitcher />
       <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="Analysis">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="20" x2="18" y2="10"></line>
           <line x1="12" y1="20" x2="12" y2="4"></line>
           <line x1="6" y1="20" x2="6" y2="14"></line>
         </svg>
       </button>
       <button class="icon-btn" on:click={() => uiActions.openModal('showConflictsModal')} title="Conflicts">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
           <line x1="12" y1="9" x2="12" y2="13"></line>
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
       </button>
       <button class="icon-btn" on:click={() => uiActions.openModal('showRecommendationsModal')} title="Recommendations">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"></circle>
           <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -241,7 +249,7 @@
   .app {
     position: relative;
     width: 100%;
-    height: calc(100vh - 100px);
+    height: 100vh;
     overflow: hidden;
     background: var(--bg-primary);
   }
@@ -279,90 +287,115 @@
     to { transform: rotate(360deg); }
   }
 
-  /* Floating Top Bar */
+  /* Compact Floating Top Bar */
   .topbar {
     position: absolute;
-    top: 1rem;
+    top: 10px;
     left: 1rem;
     right: 1rem;
     z-index: 100;
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(12px);
-    border-radius: 16px;
-    padding: 1rem 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    background: rgba(255,255,255,0.98);
+    backdrop-filter: blur(16px);
+    border-radius: 12px;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
     display: flex;
     justify-content: space-between;
     align-items: center;
     border: 1px solid var(--border-color);
+    height: 48px;
+    transition: all var(--transition);
   }
 
   [data-theme="dark"] .topbar {
-    background: rgba(30,41,59,0.95);
+    background: rgba(30,41,59,0.98);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   }
 
-  .topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
+  .topbar:hover {
+    box-shadow: 0 6px 32px rgba(0,0,0,0.12);
   }
 
-  .logo {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .stats-chips {
-    display: flex;
-    gap: 0.75rem;
-  }
-
-  .chip {
+  /* Brand Section */
+  .topbar-brand {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: var(--bg-secondary);
-    border-radius: 24px;
-    border: 1px solid var(--border-color);
+    flex-shrink: 0;
   }
 
-  .chip-warning {
-    background: var(--warning-light);
-    border-color: var(--warning-color);
+  .brand-icon {
+    color: var(--primary-color);
+    flex-shrink: 0;
   }
 
-  .chip-danger {
-    background: var(--danger-light);
-    border-color: var(--danger-color);
+  .brand-text {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
   }
 
-  .chip-label {
-    font-size: 0.75rem;
+  /* Stats Section */
+  .topbar-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    justify-content: center;
+    padding: 0 1rem;
+  }
+
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
     color: var(--text-secondary);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    line-height: 1;
+    margin-top: 2px;
   }
 
-  .chip-value {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--text-primary);
+  .stat-item.warning .stat-value {
+    color: var(--warning-color);
   }
 
-  .topbar-right {
+  .stat-item.danger .stat-value {
+    color: var(--danger-color);
+  }
+
+  .stat-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+  }
+
+  /* Actions Section */
+  .topbar-actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    flex-shrink: 0;
   }
 
   .icon-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
     border: 1px solid var(--border-color);
     background: var(--card-bg);
     color: var(--text-primary);
@@ -375,27 +408,77 @@
 
   .icon-btn:hover {
     background: var(--hover-bg);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
   }
 
   /* Responsive */
+  @media (max-width: 1024px) {
+    .topbar-stats {
+      gap: 0.5rem;
+      padding: 0 0.5rem;
+    }
+
+    .stat-label {
+      display: none;
+    }
+
+    .stat-value {
+      font-size: 0.95rem;
+    }
+  }
+
   @media (max-width: 768px) {
     .topbar {
-      flex-direction: column;
-      gap: 1rem;
-      padding: 1rem;
+      height: auto;
+      padding: 0.5rem;
+      gap: 0.5rem;
     }
 
-    .topbar-left {
-      flex-direction: column;
-      gap: 0.75rem;
-      width: 100%;
+    .brand-text {
+      display: none;
     }
 
-    .stats-chips {
+    .topbar-stats {
+      gap: 0.5rem;
+      padding: 0;
+    }
+
+    .stat-divider {
+      height: 20px;
+    }
+
+    .topbar-actions {
+      gap: 0.25rem;
+    }
+
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .topbar {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .topbar-brand {
+      order: 1;
+    }
+
+    .topbar-stats {
+      order: 3;
       width: 100%;
-      justify-content: space-between;
+      justify-content: space-around;
+      padding: 0.25rem 0;
+      border-top: 1px solid var(--border-color);
+      margin-top: 0.25rem;
+    }
+
+    .topbar-actions {
+      order: 2;
     }
   }
 </style>
