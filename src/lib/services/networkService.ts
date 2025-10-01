@@ -246,9 +246,10 @@ export class NetworkService {
 
   /**
    * Convert Network to Firestore document
+   * Note: Firestore doesn't support undefined values, so we filter them out
    */
   private toFirestoreDoc(network: Network): any {
-    return {
+    const doc: any = {
       name: network.name,
       market: network.market,
       description: network.description || '',
@@ -259,8 +260,23 @@ export class NetworkService {
       ownerEmail: network.ownerEmail,
       isShared: network.isShared || false,
       tags: network.tags || [],
-      metadata: network.metadata || {}
     };
+
+    // Only include metadata if it has actual values (no undefined)
+    if (network.metadata) {
+      const metadata: any = {};
+      if (network.metadata.region) metadata.region = network.metadata.region;
+      if (network.metadata.operator) metadata.operator = network.metadata.operator;
+      if (network.metadata.deploymentPhase) metadata.deploymentPhase = network.metadata.deploymentPhase;
+      if (network.metadata.notes) metadata.notes = network.metadata.notes;
+      
+      // Only add metadata if it has at least one field
+      if (Object.keys(metadata).length > 0) {
+        doc.metadata = metadata;
+      }
+    }
+
+    return doc;
   }
 
   /**
