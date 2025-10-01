@@ -268,6 +268,22 @@ export class NetworkService {
       tags: network.tags || [],
     };
 
+    // Add location (filter out undefined values)
+    if (network.location) {
+      const location: any = {
+        latitude: network.location.latitude,
+        longitude: network.location.longitude
+      };
+      
+      if (network.location.address) location.address = network.location.address;
+      if (network.location.city) location.city = network.location.city;
+      if (network.location.state) location.state = network.location.state;
+      if (network.location.country) location.country = network.location.country;
+      if (network.location.zoom) location.zoom = network.location.zoom;
+      
+      doc.location = location;
+    }
+
     // Only include metadata if it has actual values (no undefined)
     if (network.metadata) {
       const metadata: any = {};
@@ -293,6 +309,11 @@ export class NetworkService {
       id,
       name: data.name,
       market: data.market,
+      location: data.location || {
+        latitude: 40.7128,
+        longitude: -74.0060,
+        zoom: 12
+      },
       description: data.description,
       cells: data.cells || [],
       createdAt: data.createdAt?.toDate() || new Date(),

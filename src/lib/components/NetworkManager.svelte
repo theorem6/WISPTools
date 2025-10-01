@@ -20,6 +20,16 @@
   let networkRegion = '';
   let networkOperator = '';
   
+  // Location fields
+  let locationMode: 'address' | 'coordinates' = 'address';
+  let address = '';
+  let city = '';
+  let state = '';
+  let country = 'USA';
+  let latitude = 40.7128;
+  let longitude = -74.0060;
+  let zoom = 12;
+  
   function handleClose() {
     view = 'list';
     resetForm();
@@ -32,6 +42,14 @@
     networkDescription = '';
     networkRegion = '';
     networkOperator = '';
+    address = '';
+    city = '';
+    state = '';
+    country = 'USA';
+    latitude = 40.7128;
+    longitude = -74.0060;
+    zoom = 12;
+    locationMode = 'address';
     error = '';
   }
   
@@ -50,6 +68,17 @@
       return;
     }
     
+    // Validate location
+    if (locationMode === 'address' && !city) {
+      error = 'City is required';
+      return;
+    }
+    
+    if (locationMode === 'coordinates' && (!latitude || !longitude)) {
+      error = 'Coordinates are required';
+      return;
+    }
+    
     if (!$currentUser) {
       error = 'You must be logged in to create a network';
       return;
@@ -61,6 +90,15 @@
     const createData: CreateNetworkDTO = {
       name: networkName,
       market: networkMarket,
+      location: {
+        address: locationMode === 'address' ? address : undefined,
+        city: locationMode === 'address' ? city : undefined,
+        state: locationMode === 'address' ? state : undefined,
+        country: locationMode === 'address' ? country : undefined,
+        latitude,
+        longitude,
+        zoom
+      },
       description: networkDescription,
       tags: [],
       metadata: {
@@ -267,6 +305,120 @@
                 rows="3"
                 disabled={isCreating}
               ></textarea>
+            </div>
+            
+            <div class="location-section">
+              <h4>📍 Network Location *</h4>
+              <div class="location-mode-toggle">
+                <button 
+                  type="button"
+                  class="mode-btn" 
+                  class:active={locationMode === 'address'}
+                  on:click={() => locationMode = 'address'}
+                  disabled={isCreating}
+                >
+                  Address
+                </button>
+                <button 
+                  type="button"
+                  class="mode-btn" 
+                  class:active={locationMode === 'coordinates'}
+                  on:click={() => locationMode = 'coordinates'}
+                  disabled={isCreating}
+                >
+                  Coordinates
+                </button>
+              </div>
+              
+              {#if locationMode === 'address'}
+                <div class="form-group">
+                  <label for="city">City *</label>
+                  <input 
+                    type="text" 
+                    id="city"
+                    bind:value={city} 
+                    placeholder="New York"
+                    required
+                    disabled={isCreating}
+                  />
+                </div>
+                
+                <div class="location-grid">
+                  <div class="form-group">
+                    <label for="state">State</label>
+                    <input 
+                      type="text" 
+                      id="state"
+                      bind:value={state} 
+                      placeholder="NY"
+                      disabled={isCreating}
+                    />
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="country">Country</label>
+                    <input 
+                      type="text" 
+                      id="country"
+                      bind:value={country} 
+                      placeholder="USA"
+                      disabled={isCreating}
+                    />
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="address">Full Address (Optional)</label>
+                  <input 
+                    type="text" 
+                    id="address"
+                    bind:value={address} 
+                    placeholder="123 Main St, New York, NY"
+                    disabled={isCreating}
+                  />
+                </div>
+              {/if}
+              
+              <div class="location-grid">
+                <div class="form-group">
+                  <label for="latitude">Latitude *</label>
+                  <input 
+                    type="number" 
+                    id="latitude"
+                    step="0.000001"
+                    bind:value={latitude} 
+                    placeholder="40.7128"
+                    required
+                    disabled={isCreating}
+                  />
+                </div>
+                
+                <div class="form-group">
+                  <label for="longitude">Longitude *</label>
+                  <input 
+                    type="number" 
+                    id="longitude"
+                    step="0.000001"
+                    bind:value={longitude} 
+                    placeholder="-74.0060"
+                    required
+                    disabled={isCreating}
+                  />
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="zoom">Default Zoom Level</label>
+                <input 
+                  type="range" 
+                  id="zoom"
+                  min="8"
+                  max="16"
+                  bind:value={zoom} 
+                  disabled={isCreating}
+                />
+                <span class="zoom-value">Zoom: {zoom}</span>
+              </div>
             </div>
             
             <div class="form-actions">
@@ -680,6 +832,73 @@
   .form-group textarea:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .location-section {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: var(--surface-secondary);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--border-color);
+  }
+
+  .location-section h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .location-mode-toggle {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .mode-btn:hover:not(:disabled) {
+    background: var(--hover-bg);
+  }
+
+  .mode-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+  }
+
+  .mode-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .location-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .zoom-value {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  input[type="range"] {
+    width: 100%;
   }
 
   .form-actions {

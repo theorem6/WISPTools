@@ -138,14 +138,36 @@
   }
   
   async function syncNetworkCells(network: any) {
+    // Center map on network location
+    if (mapInstance && network.location) {
+      centerMapOnNetwork(network);
+    }
+    
     if (network.cells && network.cells.length > 0) {
       const result = await pciService.loadCells(network.cells);
       if (result.success) {
         await performAnalysis();
       }
     } else {
-      // Empty network
+      // Empty network - just center on location
       pciService.clearCells();
+    }
+  }
+  
+  function centerMapOnNetwork(network: any) {
+    if (!mapInstance || !network.location) return;
+    
+    const location = network.location;
+    const targetZoom = location.zoom || 12;
+    
+    // Center map on network location
+    if (mapInstance.mapView) {
+      mapInstance.mapView.goTo({
+        center: [location.longitude, location.latitude],
+        zoom: targetZoom
+      }).catch((error: any) => {
+        console.warn('Map centering failed:', error);
+      });
     }
   }
   

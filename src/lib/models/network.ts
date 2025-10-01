@@ -1,10 +1,21 @@
 // Network Data Model
 import type { Cell } from '../pciMapper';
 
+export interface NetworkLocation {
+  address?: string;            // Full address
+  city?: string;               // City name
+  state?: string;              // State/Province
+  country?: string;            // Country
+  latitude: number;            // Center latitude for map
+  longitude: number;           // Center longitude for map
+  zoom?: number;               // Default zoom level for this network
+}
+
 export interface Network {
   id: string;
   name: string;
   market: string;              // Geographic market (e.g., "New York Metro", "Los Angeles")
+  location: NetworkLocation;   // Geographic location (REQUIRED)
   description?: string;
   cells: Cell[];
   createdAt: Date;
@@ -46,6 +57,7 @@ export interface UserProfile {
 export interface CreateNetworkDTO {
   name: string;
   market: string;
+  location: NetworkLocation;   // REQUIRED
   description?: string;
   tags?: string[];
   metadata?: Network['metadata'];
@@ -66,6 +78,7 @@ export function createNetwork(
     id: generateNetworkId(),
     name: data.name,
     market: data.market,
+    location: data.location,
     description: data.description,
     cells: [],
     createdAt: now,
