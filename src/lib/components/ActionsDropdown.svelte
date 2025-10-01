@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import ManualImport from './ManualImport.svelte';
+  import ImportWizard from './ImportWizard.svelte';
   import ConflictReportExport from './ConflictReportExport.svelte';
   import type { Cell, PCIConflict } from '../pciMapper';
   
@@ -140,9 +140,13 @@
   {/if}
 </div>
 
-<!-- Import Modal - ManualImport has its own modal styling -->
+<!-- Import Wizard Modal -->
 {#if showImportModal}
-  <ManualImport on:import={(e) => { dispatch('import', e.detail); showImportModal = false; }} />
+  <ImportWizard 
+    show={showImportModal}
+    on:import={(e) => { dispatch('import', e.detail); showImportModal = false; }} 
+    on:close={() => showImportModal = false}
+  />
 {/if}
 
 <!-- Export Modal -->
