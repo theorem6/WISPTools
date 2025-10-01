@@ -1,25 +1,54 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to users' pci analysis data
-    match /pci_analyses/{document} {
-      allow read, write: if request.auth != null;
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
     
-    // Allow read/write access to cell data
-    match /cells/{document} {
-      allow read, write: if request.auth != null;
+    // Helper function to check if user owns the resource
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
     }
     
-    // Allow read/write access to conflict reports
-    match /conflict_reports/{document} {
-      allow read, write: if request.auth != null;
+    // Networks collection
+    match /networks/{networkId} {
+      // Allow read if user is the owner
+      allow read: if isOwner(resource.data.ownerId);
+      
+      // Allow create if user is authenticated and sets themselves as owner
+      allow create: if isAuthenticated() 
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.resource.data.ownerEmail == request.auth.token.email;
+      
+      // Allow update if user is the owner
+      allow update: if isOwner(resource.data.ownerId)
+                    && request.resource.data.ownerId == resource.data.ownerId; // Don't allow changing owner
+      
+      // Allow delete if user is the owner
+      allow delete: if isOwner(resource.data.ownerId);
+      
+      // Cells subcollection within a network
+      match /cells/{cellId} {
+        // Allow read if user owns the parent network
+        allow read: if isOwner(get(/databases/$(database)/documents/networks/$(networkId)).data.ownerId);
+        
+        // Allow write if user owns the parent network
+        allow write: if isOwner(get(/databases/$(database)/documents/networks/$(networkId)).data.ownerId);
+      }
     }
     
-    // Allow public read access to sample data
-    match /sample_data/{document} {
-      allow read: if true;
-      allow write: if request.auth != null;
+    // User profiles (optional - for future use)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
