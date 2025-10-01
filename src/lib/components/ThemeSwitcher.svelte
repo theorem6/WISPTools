@@ -1,6 +1,7 @@
 <script lang="ts">
   import { themeStore, type ThemeMode } from '$lib/stores/themeStore';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
 
   let mounted = false;
   let showDropdown = false;
@@ -26,11 +27,20 @@
     }
   }
 
-  $: if (mounted && showDropdown) {
-    document.addEventListener('click', handleClickOutside);
-  } else {
-    document.removeEventListener('click', handleClickOutside);
+  // Handle click outside with proper browser guards
+  $: if (browser && mounted) {
+    if (showDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    } else {
+      document.removeEventListener('click', handleClickOutside);
+    }
   }
+
+  onDestroy(() => {
+    if (browser) {
+      document.removeEventListener('click', handleClickOutside);
+    }
+  });
 </script>
 
 <div class="theme-switcher">
