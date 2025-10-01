@@ -1,7 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import ImportWizard from './ImportWizard.svelte';
   import ConflictReportExport from './ConflictReportExport.svelte';
   import type { Cell, PCIConflict } from '../pciMapper';
   
@@ -13,7 +12,6 @@
   export let hasConflicts = false;
   
   let showDropdown = false;
-  let showImportModal = false;
   let showExportModal = false;
   
   const dispatch = createEventDispatcher();
@@ -28,7 +26,7 @@
   }
 
   function openImportModal() {
-    showImportModal = true;
+    dispatch('openImport');
     showDropdown = false;
   }
 
@@ -139,15 +137,6 @@
     </div>
   {/if}
 </div>
-
-<!-- Import Wizard Modal -->
-{#if showImportModal}
-  <ImportWizard 
-    show={showImportModal}
-    on:import={(e) => { dispatch('import', e.detail); showImportModal = false; }} 
-    on:close={() => showImportModal = false}
-  />
-{/if}
 
 <!-- Export Modal -->
 {#if showExportModal}

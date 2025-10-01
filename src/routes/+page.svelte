@@ -22,11 +22,15 @@
   
   // Components
   import ActionsDropdown from '$lib/components/ActionsDropdown.svelte';
+  import ImportWizard from '$lib/components/ImportWizard.svelte';
   import AnalysisModal from '$lib/components/AnalysisModal.svelte';
   import ConflictsModal from '$lib/components/ConflictsModal.svelte';
   import RecommendationsModal from '$lib/components/RecommendationsModal.svelte';
   import OptimizationResultModal from '$lib/components/OptimizationResultModal.svelte';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  
+  // Local state for import wizard
+  let showImportWizard = false;
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -201,6 +205,7 @@
         isOptimizing={$optimizationStore.isOptimizing}
         hasData={$hasData}
         hasConflicts={$hasConflicts}
+        on:openImport={() => showImportWizard = true}
         on:import={handleManualImport}
         on:loadSample={loadSampleData}
         on:clearMap={clearMap}
@@ -233,6 +238,11 @@
   </nav>
 
   <!-- Modular Components - Isolated and reusable -->
+  <ImportWizard 
+    show={showImportWizard}
+    on:import={handleManualImport}
+    on:close={() => showImportWizard = false}
+  />
   
   <AnalysisModal 
     show={$uiStore.showAnalysisModal}

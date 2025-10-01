@@ -372,7 +372,7 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     inset: 0;
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(8px);
-    z-index: 2000;
+    z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
