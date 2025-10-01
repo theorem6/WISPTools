@@ -20,15 +20,13 @@
   let networkRegion = '';
   let networkOperator = '';
   
-  // Location fields
-  let locationMode: 'address' | 'coordinates' = 'address';
-  let address = '';
-  let city = '';
-  let state = '';
-  let country = 'USA';
-  let latitude = 40.7128;
-  let longitude = -74.0060;
+  // Smart location search
+  let locationSearch = '';
+  let latitude = 0;
+  let longitude = 0;
   let zoom = 12;
+  let locationParsed = false;
+  let locationDisplayName = '';
   
   function handleClose() {
     view = 'list';
@@ -42,15 +40,74 @@
     networkDescription = '';
     networkRegion = '';
     networkOperator = '';
-    address = '';
-    city = '';
-    state = '';
-    country = 'USA';
-    latitude = 40.7128;
-    longitude = -74.0060;
+    locationSearch = '';
+    latitude = 0;
+    longitude = 0;
     zoom = 12;
-    locationMode = 'address';
+    locationParsed = false;
+    locationDisplayName = '';
     error = '';
+  }
+  
+  /**
+   * Smart location parser - handles multiple formats:
+   * - Coordinates: "40.7128, -74.0060" or "40.7128,-74.0060"
+   * - City: "New York"
+   * - City, State: "New York, NY"
+   * - City, State, Country: "New York, NY, USA"
+   * - Full address: "123 Main St, New York, NY"
+   */
+  async function parseLocation() {
+    if (!locationSearch.trim()) {
+      error = 'Please enter a location';
+      return;
+    }
+    
+    const input = locationSearch.trim();
+    
+    // Try to parse as coordinates first (format: lat, lng)
+    const coordMatch = input.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (coordMatch) {
+      latitude = parseFloat(coordMatch[1]);
+      longitude = parseFloat(coordMatch[2]);
+      
+      if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+        locationParsed = true;
+        locationDisplayName = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        error = '';
+        return;
+      }
+    }
+    
+    // Use ArcGIS geocoding service for addresses/cities/states
+    try {
+      const response = await fetch(
+        `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?` +
+        `singleLine=${encodeURIComponent(input)}` +
+        `&f=json` +
+        `&maxLocations=1`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Geocoding service unavailable');
+      }
+      
+      const data = await response.json();
+      
+      if (data.candidates && data.candidates.length > 0) {
+        const candidate = data.candidates[0];
+        latitude = candidate.location.y;
+        longitude = candidate.location.x;
+        locationDisplayName = candidate.address;
+        locationParsed = true;
+        error = '';
+      } else {
+        error = 'Location not found. Try: "New York, NY" or "40.7128, -74.0060"';
+      }
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      error = 'Failed to geocode location. Try entering coordinates directly (lat, lng)';
+    }
   }
   
   function showCreateView() {
@@ -69,13 +126,8 @@
     }
     
     // Validate location
-    if (locationMode === 'address' && !city) {
-      error = 'City is required';
-      return;
-    }
-    
-    if (locationMode === 'coordinates' && (!latitude || !longitude)) {
-      error = 'Coordinates are required';
+    if (!locationParsed || !latitude || !longitude) {
+      error = 'Please search for a valid location first';
       return;
     }
     
@@ -91,10 +143,7 @@
       name: networkName,
       market: networkMarket,
       location: {
-        address: locationMode === 'address' ? address : undefined,
-        city: locationMode === 'address' ? city : undefined,
-        state: locationMode === 'address' ? state : undefined,
-        country: locationMode === 'address' ? country : undefined,
+        address: locationDisplayName,
         latitude,
         longitude,
         zoom
@@ -309,116 +358,63 @@
             
             <div class="location-section">
               <h4>📍 Network Location *</h4>
-              <div class="location-mode-toggle">
+              <p class="location-help">Enter a city, address, or coordinates (e.g., "New York, NY" or "40.7128, -74.0060")</p>
+              
+              <div class="location-search-group">
+                <input 
+                  type="text" 
+                  id="locationSearch"
+                  bind:value={locationSearch} 
+                  placeholder="New York, NY  or  40.7128, -74.0060"
+                  disabled={isCreating}
+                  on:keydown={(e) => e.key === 'Enter' && parseLocation()}
+                  class="location-search-input"
+                />
                 <button 
                   type="button"
-                  class="mode-btn" 
-                  class:active={locationMode === 'address'}
-                  on:click={() => locationMode = 'address'}
-                  disabled={isCreating}
+                  class="search-btn" 
+                  on:click={parseLocation}
+                  disabled={isCreating || !locationSearch.trim()}
                 >
-                  Address
-                </button>
-                <button 
-                  type="button"
-                  class="mode-btn" 
-                  class:active={locationMode === 'coordinates'}
-                  on:click={() => locationMode = 'coordinates'}
-                  disabled={isCreating}
-                >
-                  Coordinates
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.35-4.35"></path>
+                  </svg>
+                  Search
                 </button>
               </div>
               
-              {#if locationMode === 'address'}
-                <div class="form-group">
-                  <label for="city">City *</label>
-                  <input 
-                    type="text" 
-                    id="city"
-                    bind:value={city} 
-                    placeholder="New York"
-                    required
-                    disabled={isCreating}
-                  />
-                </div>
-                
-                <div class="location-grid">
-                  <div class="form-group">
-                    <label for="state">State</label>
-                    <input 
-                      type="text" 
-                      id="state"
-                      bind:value={state} 
-                      placeholder="NY"
-                      disabled={isCreating}
-                    />
+              {#if locationParsed}
+                <div class="location-result">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="success-icon">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <div class="result-text">
+                    <strong>{locationDisplayName}</strong>
+                    <span class="coords">{latitude.toFixed(6)}, {longitude.toFixed(6)}</span>
                   </div>
-                  
-                  <div class="form-group">
-                    <label for="country">Country</label>
-                    <input 
-                      type="text" 
-                      id="country"
-                      bind:value={country} 
-                      placeholder="USA"
-                      disabled={isCreating}
-                    />
-                  </div>
+                  <button 
+                    type="button"
+                    class="clear-location-btn" 
+                    on:click={() => { locationParsed = false; locationSearch = ''; }}
+                  >
+                    ×
+                  </button>
                 </div>
                 
                 <div class="form-group">
-                  <label for="address">Full Address (Optional)</label>
+                  <label for="zoom">Map Zoom Level</label>
                   <input 
-                    type="text" 
-                    id="address"
-                    bind:value={address} 
-                    placeholder="123 Main St, New York, NY"
+                    type="range" 
+                    id="zoom"
+                    min="8"
+                    max="16"
+                    bind:value={zoom} 
                     disabled={isCreating}
                   />
+                  <span class="zoom-value">Zoom: {zoom}</span>
                 </div>
               {/if}
-              
-              <div class="location-grid">
-                <div class="form-group">
-                  <label for="latitude">Latitude *</label>
-                  <input 
-                    type="number" 
-                    id="latitude"
-                    step="0.000001"
-                    bind:value={latitude} 
-                    placeholder="40.7128"
-                    required
-                    disabled={isCreating}
-                  />
-                </div>
-                
-                <div class="form-group">
-                  <label for="longitude">Longitude *</label>
-                  <input 
-                    type="number" 
-                    id="longitude"
-                    step="0.000001"
-                    bind:value={longitude} 
-                    placeholder="-74.0060"
-                    required
-                    disabled={isCreating}
-                  />
-                </div>
-              </div>
-              
-              <div class="form-group">
-                <label for="zoom">Default Zoom Level</label>
-                <input 
-                  type="range" 
-                  id="zoom"
-                  min="8"
-                  max="16"
-                  bind:value={zoom} 
-                  disabled={isCreating}
-                />
-                <span class="zoom-value">Zoom: {zoom}</span>
-              </div>
             </div>
             
             <div class="form-actions">
@@ -843,50 +839,116 @@
   }
 
   .location-section h4 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.5rem 0;
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
   }
 
-  .location-mode-toggle {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
+  .location-help {
+    margin: 0 0 1rem 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
   }
 
-  .mode-btn {
+  .location-search-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .location-search-input {
     flex: 1;
-    padding: 0.625rem;
+    padding: 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    background: var(--card-bg);
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 1rem;
     transition: all var(--transition);
   }
 
-  .mode-btn:hover:not(:disabled) {
-    background: var(--hover-bg);
+  .location-search-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: var(--focus-ring);
   }
 
-  .mode-btn.active {
+  .search-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border: none;
+    border-radius: var(--border-radius);
     background: var(--primary-color);
     color: white;
-    border-color: var(--primary-color);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
   }
 
-  .mode-btn:disabled {
+  .search-btn:hover:not(:disabled) {
+    background: var(--button-primary-hover);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .search-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
 
-  .location-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+  .location-result {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--success-light);
+    border: 1px solid var(--success-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+  }
+
+  .success-icon {
+    color: var(--success-color);
+    flex-shrink: 0;
+  }
+
+  .result-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .result-text strong {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+  }
+
+  .coords {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .clear-location-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .clear-location-btn:hover {
+    background: var(--danger-light);
+    color: var(--danger-color);
   }
 
   .zoom-value {
