@@ -1,11 +1,14 @@
 <script lang="ts">
-	import DarkModeToggle from '$lib/components/DarkModeToggle.svelte';
+	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import { onMount } from 'svelte';
-	import { darkModeManager } from '$lib/darkMode';
+	import { themeManager } from '$lib/stores/themeStore';
+	
+	// Import centralized theme CSS
+	import '../../styles/theme.css';
 
 	onMount(() => {
-		// Initialize dark mode manager
-		darkModeManager;
+		// Theme manager is auto-initialized
+		themeManager;
 	});
 </script>
 
@@ -18,7 +21,7 @@
 					<p>Advanced LTE Physical Cell Identity conflict detection and visualization</p>
 				</div>
 				<div class="header-controls">
-					<DarkModeToggle />
+					<ThemeSwitcher />
 				</div>
 			</div>
 		</header>

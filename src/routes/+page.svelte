@@ -26,6 +26,7 @@
   import ConflictsModal from '$lib/components/ConflictsModal.svelte';
   import RecommendationsModal from '$lib/components/RecommendationsModal.svelte';
   import OptimizationResultModal from '$lib/components/OptimizationResultModal.svelte';
+  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -169,6 +170,7 @@
       </div>
     </div>
     <div class="topbar-right">
+      <ThemeSwitcher />
       <button class="icon-btn" on:click={() => uiActions.openModal('showActionsModal')} title="Actions">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="1"></circle>
