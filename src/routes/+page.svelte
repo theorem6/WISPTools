@@ -123,6 +123,15 @@
       }
     } else {
       console.error('Failed to load networks:', result.error);
+      
+      // If index error, show helpful message but don't block the app
+      if (result.error?.includes('index')) {
+        console.warn('⚠️  Firestore index not created yet. Networks will load after you create the index.');
+        console.warn('📋 Click the link in the error above to auto-create the index in Firebase Console.');
+        
+        // Set empty networks array so app still works
+        networkStore.setNetworks([]);
+      }
     }
     
     networkStore.setLoading(false);

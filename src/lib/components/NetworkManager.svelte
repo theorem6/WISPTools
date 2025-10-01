@@ -148,6 +148,29 @@
                 <p>Loading networks...</p>
               </div>
             {:else if $allNetworks.length === 0}
+              <!-- Show index setup notice if needed -->
+              <div class="setup-banner">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div class="banner-content">
+                  <strong>Firestore Index Required</strong>
+                  <p>To save and load networks, you need to create a Firestore index.</p>
+                  <div class="banner-actions">
+                    <a 
+                      href="https://console.firebase.google.com/project/petersonmappingapp/firestore/databases/mapping1/indexes" 
+                      target="_blank" 
+                      class="banner-link"
+                    >
+                      Open Firebase Console →
+                    </a>
+                    <span class="banner-or">or run:</span>
+                    <code>firebase deploy --only firestore:indexes</code>
+                  </div>
+                </div>
+              </div>
               <div class="empty-state">
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -372,6 +395,80 @@
     align-items: center;
     padding: 3rem;
     color: var(--text-secondary);
+  }
+
+  .setup-banner {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--warning-light);
+    border: 1px solid var(--warning-color);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 2rem;
+  }
+
+  .setup-banner svg {
+    color: var(--warning-color);
+    flex-shrink: 0;
+  }
+
+  .banner-content {
+    flex: 1;
+  }
+
+  .banner-content strong {
+    display: block;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .banner-content p {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin: 0 0 1rem 0;
+  }
+
+  .banner-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .banner-link {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--warning-color);
+    color: white;
+    border-radius: var(--border-radius);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all var(--transition);
+    align-self: flex-start;
+  }
+
+  .banner-link:hover {
+    background: var(--warning-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .banner-or {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .banner-actions code {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-primary);
   }
 
   .spinner-small {
