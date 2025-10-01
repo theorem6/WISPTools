@@ -130,6 +130,7 @@
   .modal-body {
     padding: 2rem;
     overflow-y: auto;
+    color: var(--text-primary);
   }
 
   .modal-body.scrollable {
@@ -144,7 +145,7 @@
 
   .conflict-row {
     padding: 1rem 1.25rem;
-    background: var(--bg-secondary);
+    background: var(--surface-secondary);
     border-radius: 12px;
     border-left: 4px solid var(--border-color);
     display: flex;
@@ -155,10 +156,13 @@
   .conflict-row.critical {
     border-left-color: var(--danger-color);
     background: var(--danger-light);
+    color: var(--text-primary);
   }
 
   .conflict-row.high {
     border-left-color: var(--warning-color);
+    background: var(--warning-light);
+    color: var(--text-primary);
   }
 
   .conflict-cells {
@@ -213,6 +217,11 @@
   .empty-state {
     text-align: center;
     padding: 3rem;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+  }
+
+  .empty-state p {
     color: var(--text-secondary);
   }
 </style>

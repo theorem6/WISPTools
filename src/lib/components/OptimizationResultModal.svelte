@@ -124,6 +124,7 @@
   .modal-body {
     padding: 2rem;
     overflow-y: auto;
+    color: var(--text-primary);
   }
 
   .success-banner {
@@ -155,8 +156,9 @@
   .result-item {
     text-align: center;
     padding: 1.5rem;
-    background: var(--bg-secondary);
+    background: var(--surface-secondary);
     border-radius: 12px;
+    border: 1px solid var(--border-color);
   }
 
   .result-value {
@@ -170,6 +172,7 @@
     font-size: 0.875rem;
     color: var(--text-secondary);
     margin-top: 0.5rem;
+    font-weight: var(--font-weight-medium);
   }
 
   @media (max-width: 768px) {

@@ -119,6 +119,27 @@
   .recommendations {
     line-height: 1.8;
     color: var(--text-primary);
+    font-size: var(--font-size-base);
+  }
+
+  /* Ensure all injected HTML elements inherit proper colors */
+  .recommendations :global(*) {
+    color: inherit;
+  }
+
+  .recommendations :global(strong),
+  .recommendations :global(b) {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .recommendations :global(h1),
+  .recommendations :global(h2),
+  .recommendations :global(h3),
+  .recommendations :global(h4) {
+    color: var(--text-primary);
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
   }
 </style>
 
