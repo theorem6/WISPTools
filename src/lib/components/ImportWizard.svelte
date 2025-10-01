@@ -81,8 +81,157 @@
         }
       }
       
-      dispatch('import', { cells: imported });
-      handleClose();
+      if (imported.length > 0) {
+        dispatch('import', { cells: imported });
+        handleClose();
+      } else {
+        alert('No valid cell data found in CSV file');
+      }
+    };
+    
+    reader.readAsText(file);
+  }
+
+  function handleKMLUpload() {
+    if (!kmlFile || kmlFile.length === 0) return;
+    
+    const file = kmlFile[0];
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const imported: Cell[] = [];
+      
+      try {
+        // Parse KML/XML
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, 'text/xml');
+        
+        // Check for parsing errors
+        const parseError = xmlDoc.querySelector('parsererror');
+        if (parseError) {
+          alert('Invalid KML file format');
+          return;
+        }
+        
+        // Extract Placemarks
+        const placemarks = xmlDoc.querySelectorAll('Placemark');
+        
+        placemarks.forEach((placemark, index) => {
+          // Get name
+          const nameElement = placemark.querySelector('name');
+          const name = nameElement?.textContent?.trim() || `CELL${String(index + 1).padStart(3, '0')}`;
+          
+          // Get coordinates
+          const coordsElement = placemark.querySelector('coordinates');
+          if (!coordsElement) return;
+          
+          const coords = coordsElement.textContent?.trim().split(/[\s,]+/);
+          if (!coords || coords.length < 2) return;
+          
+          const longitude = parseFloat(coords[0]);
+          const latitude = parseFloat(coords[1]);
+          
+          if (isNaN(latitude) || isNaN(longitude)) return;
+          
+          // Get extended data (if available)
+          const extendedData = placemark.querySelector('ExtendedData');
+          let pci = -1;
+          let eNodeB = 1000 + index;
+          let sector = 1;
+          let frequency = 2100;
+          let rsPower = -85;
+          let azimuth: number | undefined = undefined;
+          let towerType: '3-sector' | '4-sector' = '3-sector';
+          let technology: 'LTE' | 'CBRS' | 'LTE+CBRS' = 'LTE';
+          
+          if (extendedData) {
+            // Try to extract custom data fields
+            const dataElements = extendedData.querySelectorAll('Data');
+            dataElements.forEach(dataEl => {
+              const dataName = dataEl.getAttribute('name')?.toLowerCase();
+              const value = dataEl.querySelector('value')?.textContent?.trim();
+              
+              if (!dataName || !value) return;
+              
+              switch (dataName) {
+                case 'pci':
+                  pci = parseInt(value) || -1;
+                  break;
+                case 'enodeb':
+                  eNodeB = parseInt(value) || eNodeB;
+                  break;
+                case 'sector':
+                  sector = parseInt(value) || 1;
+                  break;
+                case 'frequency':
+                  frequency = parseInt(value) || 2100;
+                  break;
+                case 'rspower':
+                case 'rssi':
+                  rsPower = parseFloat(value) || -85;
+                  break;
+                case 'azimuth':
+                  azimuth = parseInt(value);
+                  break;
+                case 'towertype':
+                  if (value === '3-sector' || value === '4-sector') {
+                    towerType = value;
+                  }
+                  break;
+                case 'technology':
+                case 'tech':
+                  if (value === 'LTE' || value === 'CBRS' || value === 'LTE+CBRS') {
+                    technology = value;
+                  }
+                  break;
+              }
+            });
+          }
+          
+          // Also check description for data
+          const description = placemark.querySelector('description')?.textContent || '';
+          if (description) {
+            const pciMatch = description.match(/PCI[:\s]+(\d+)/i);
+            if (pciMatch) pci = parseInt(pciMatch[1]);
+            
+            const eNodeBMatch = description.match(/eNodeB[:\s]+(\d+)/i);
+            if (eNodeBMatch) eNodeB = parseInt(eNodeBMatch[1]);
+            
+            const sectorMatch = description.match(/Sector[:\s]+(\d+)/i);
+            if (sectorMatch) sector = parseInt(sectorMatch[1]);
+          }
+          
+          imported.push({
+            id: name,
+            eNodeB,
+            sector,
+            pci,
+            latitude,
+            longitude,
+            frequency,
+            rsPower,
+            azimuth,
+            towerType,
+            technology,
+            earfcn: frequency === 3550 ? 55650 : 1950,
+            centerFreq: frequency,
+            channelBandwidth: 20,
+            dlEarfcn: frequency === 3550 ? 55650 : 1950,
+            ulEarfcn: frequency === 3550 ? 55650 : 1850
+          });
+        });
+        
+        if (imported.length > 0) {
+          dispatch('import', { cells: imported });
+          handleClose();
+        } else {
+          alert('No placemarks with coordinates found in KML file');
+        }
+      } catch (error) {
+        console.error('KML parsing error:', error);
+        alert('Error parsing KML file. Please check the file format.');
+      }
     };
     
     reader.readAsText(file);
@@ -98,6 +247,46 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     const a = document.createElement('a');
     a.href = url;
     a.download = 'pci-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadKMLTemplate() {
+    const template = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>LTE Cell Towers</name>
+    <Placemark>
+      <name>CELL001</name>
+      <description>
+        eNodeB: 1001
+        Sector: 1
+        PCI: 15
+        Frequency: 2100
+        RS Power: -85
+      </description>
+      <ExtendedData>
+        <Data name="PCI"><value>15</value></Data>
+        <Data name="eNodeB"><value>1001</value></Data>
+        <Data name="Sector"><value>1</value></Data>
+        <Data name="Frequency"><value>2100</value></Data>
+        <Data name="RSPower"><value>-85</value></Data>
+        <Data name="Azimuth"><value>0</value></Data>
+        <Data name="TowerType"><value>3-sector</value></Data>
+        <Data name="Technology"><value>LTE</value></Data>
+      </ExtendedData>
+      <Point>
+        <coordinates>-74.0060,40.7128,0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>`;
+    
+    const blob = new Blob([template], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pci-import-template.kml';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -257,6 +446,7 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
                 type="file" 
                 accept=".kml,.kmz" 
                 bind:files={kmlFile}
+                on:change={handleKMLUpload}
                 id="kml-upload"
               />
               <label for="kml-upload" class="upload-label">
@@ -268,8 +458,12 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
               </label>
             </div>
             
+            <button class="template-btn" on:click={downloadKMLTemplate}>
+              📥 Download KML Template
+            </button>
+            
             <div class="info-box">
-              <strong>Note:</strong> KML import will extract location data and cell parameters from placemarks.
+              <strong>Supported Data:</strong> The KML parser will extract coordinates, name, and cell parameters from ExtendedData or description fields (PCI, eNodeB, Sector, Frequency, etc.).
             </div>
           </div>
         {:else if importMethod === 'manual'}
