@@ -291,8 +291,10 @@
   .topbar {
     position: absolute;
     top: 10px;
-    left: 1rem;
-    right: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 1400px;
     z-index: 100;
     background: rgba(255,255,255,0.98);
     backdrop-filter: blur(16px);
