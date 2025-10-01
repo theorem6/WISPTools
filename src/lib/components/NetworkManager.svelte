@@ -162,7 +162,9 @@
             {:else}
               <div class="network-grid">
                 {#each $allNetworks as network}
-                  <button 
+                  <!-- svelte-ignore a11y-click-events-have-key-events -->
+                  <!-- svelte-ignore a11y-no-static-element-interactions -->
+                  <div 
                     class="network-card" 
                     class:active={$currentNetwork?.id === network.id}
                     on:click={() => handleSelectNetwork(network.id)}
@@ -195,7 +197,7 @@
                       <span class="stat-dot">•</span>
                       <span class="stat-date">{formatDate(network.updatedAt)}</span>
                     </div>
-                  </button>
+                  </div>
                 {/each}
               </div>
               
