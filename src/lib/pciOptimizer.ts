@@ -223,18 +223,37 @@ export class PCIOptimizer {
         const distance = this.calculateDistance(targetCell, neighbor);
         const azimuthDiff = this.calculateAzimuthDifference(targetCell, neighbor);
         const isColocated = this.areCellsColocated(targetCell, neighbor);
+        const sectorOverlap = this.calculateSectorOverlap(targetCell, neighbor);
+        const sectorsOverlapping = this.doSectorsOverlap(targetCell, neighbor);
         
         // Azimuth-aware conflict penalties
         // Sectors facing each other are more likely to interfere
         const azimuthFactor = this.calculateAzimuthInterferenceFactor(azimuthDiff);
         
-        // Check for mod conflicts with azimuth weighting
-        if (candidatePCI % 3 === neighbor.pci % 3) {
-          score -= 100 * azimuthFactor; // Heavier penalty if sectors face each other
+        // CRITICAL: Overlapping sectors with same PCI - extremely high penalty
+        if (sectorsOverlapping) {
+          const overlapFactor = sectorOverlap * 2; // Amplify overlap effect
+          
+          if (candidatePCI === neighbor.pci) {
+            score -= 500 * overlapFactor; // CRITICAL: Same PCI in overlapping sectors
+          }
+          if (candidatePCI % 3 === neighbor.pci % 3) {
+            score -= 150 * overlapFactor; // Very heavy penalty for mod3 in overlap
+          }
+          if (candidatePCI % 6 === neighbor.pci % 6) {
+            score -= 80 * overlapFactor;
+          }
+        } else {
+          // Normal azimuth-aware penalties for non-overlapping sectors
+          if (candidatePCI % 3 === neighbor.pci % 3) {
+            score -= 100 * azimuthFactor; // Heavier penalty if sectors face each other
+          }
+          if (candidatePCI % 6 === neighbor.pci % 6) {
+            score -= 50 * azimuthFactor;
+          }
         }
-        if (candidatePCI % 6 === neighbor.pci % 6) {
-          score -= 50 * azimuthFactor;
-        }
+        
+        // Standard mod penalties (always apply)
         if (candidatePCI % 12 === neighbor.pci % 12) {
           score -= 25 * azimuthFactor;
         }
@@ -251,13 +270,18 @@ export class PCIOptimizer {
           }
         }
 
-        // Bonus for distance separation (reduced if not facing each other)
-        const distanceBonus = this.calculateDistanceBonus(distance) * (1 - azimuthFactor * 0.5);
+        // Bonus for distance separation (reduced if overlapping or facing)
+        const distanceBonus = this.calculateDistanceBonus(distance) * (1 - Math.max(sectorOverlap, azimuthFactor * 0.5));
         score += distanceBonus;
         
         // Bonus for back-to-back sectors (facing away from each other)
-        if (azimuthDiff > 135 && azimuthDiff < 225) {
+        if (azimuthDiff > 135 && azimuthDiff < 225 && !sectorsOverlapping) {
           score += 20; // Sectors pointing away from each other can share mod3
+        }
+        
+        // Bonus for no overlap at all
+        if (sectorOverlap === 0) {
+          score += 10; // Non-overlapping sectors are preferable
         }
       }
 
@@ -317,6 +341,60 @@ export class PCIOptimizer {
     else {
       return 0.2;
     }
+  }
+  
+  /**
+   * Check if two sectors have overlapping coverage areas
+   * Based on azimuth and typical 65° sector beamwidth
+   */
+  private doSectorsOverlap(cell1: Cell, cell2: Cell): boolean {
+    const azimuth1 = (cell1 as any).azimuth || 0;
+    const azimuth2 = (cell2 as any).azimuth || 0;
+    const sectorWidth = 65; // Typical 3dB beamwidth
+    
+    // Calculate sector coverage ranges
+    const sector1Start = (azimuth1 - sectorWidth / 2 + 360) % 360;
+    const sector1End = (azimuth1 + sectorWidth / 2) % 360;
+    const sector2Start = (azimuth2 - sectorWidth / 2 + 360) % 360;
+    const sector2End = (azimuth2 + sectorWidth / 2) % 360;
+    
+    // Helper function to check if angle is within sector range
+    const isInRange = (angle: number, start: number, end: number): boolean => {
+      if (start <= end) {
+        return angle >= start && angle <= end;
+      } else {
+        // Handle wrap-around (e.g., sector from 350° to 10°)
+        return angle >= start || angle <= end;
+      }
+    };
+    
+    // Check if sectors overlap
+    return (
+      isInRange(azimuth1, sector2Start, sector2End) ||
+      isInRange(azimuth2, sector1Start, sector1End) ||
+      isInRange(sector1Start, sector2Start, sector2End) ||
+      isInRange(sector1End, sector2Start, sector2End)
+    );
+  }
+  
+  /**
+   * Calculate overlap percentage between two sectors
+   * Returns 0-1, where 1 means complete overlap
+   */
+  private calculateSectorOverlap(cell1: Cell, cell2: Cell): number {
+    const azimuthDiff = this.calculateAzimuthDifference(cell1, cell2);
+    const sectorWidth = 65;
+    
+    // Calculate overlap based on azimuth difference
+    if (azimuthDiff >= sectorWidth) {
+      return 0; // No overlap
+    }
+    
+    // Overlap percentage: more overlap = higher value
+    const overlapDegrees = sectorWidth - azimuthDiff;
+    const overlapPercentage = overlapDegrees / sectorWidth;
+    
+    return Math.max(0, Math.min(1, overlapPercentage));
   }
   
   /**

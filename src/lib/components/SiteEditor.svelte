@@ -49,12 +49,26 @@
   
   function addSector() {
     const sectorNumber = editedSite.sectors.length + 1;
-    const azimuth = (sectorNumber - 1) * (360 / 3); // Default 3-sector layout
+    // Smart azimuth suggestion based on existing sectors
+    let suggestedAzimuth = 0;
+    
+    if (editedSite.sectors.length === 0) {
+      suggestedAzimuth = 0; // First sector: North
+    } else if (editedSite.sectors.length === 1) {
+      suggestedAzimuth = 120; // Second sector: SE (3-sector default)
+    } else if (editedSite.sectors.length === 2) {
+      suggestedAzimuth = 240; // Third sector: SW (3-sector default)
+    } else if (editedSite.sectors.length === 3) {
+      suggestedAzimuth = 90; // Fourth sector: E (4-sector)
+    } else {
+      // For additional sectors, find the largest gap
+      suggestedAzimuth = findLargestAzimuthGap(editedSite.sectors);
+    }
     
     const newSector: Sector = {
       id: `${editedSite.id}-SEC${sectorNumber}`,
       sectorNumber,
-      azimuth,
+      azimuth: suggestedAzimuth,
       pci: 0,
       channels: [
         {
@@ -71,6 +85,28 @@
     
     editedSite.sectors = [...editedSite.sectors, newSector];
     selectedSectorIndex = editedSite.sectors.length - 1;
+  }
+  
+  // Find the largest gap between azimuths for smart sector placement
+  function findLargestAzimuthGap(sectors: Sector[]): number {
+    if (sectors.length === 0) return 0;
+    
+    const azimuths = sectors.map(s => s.azimuth).sort((a, b) => a - b);
+    let largestGap = 0;
+    let gapMidpoint = 0;
+    
+    for (let i = 0; i < azimuths.length; i++) {
+      const current = azimuths[i];
+      const next = azimuths[(i + 1) % azimuths.length];
+      const gap = next > current ? next - current : (360 - current) + next;
+      
+      if (gap > largestGap) {
+        largestGap = gap;
+        gapMidpoint = (current + gap / 2) % 360;
+      }
+    }
+    
+    return Math.round(gapMidpoint);
   }
   
   function removeSector(index: number) {
@@ -248,16 +284,44 @@
                   </div>
                   
                   <div class="sector-details">
-                    <div class="form-row">
-                      <div class="form-group-sm">
-                        <label>Azimuth (°)</label>
+                    <!-- Prominent Azimuth Control -->
+                    <div class="azimuth-control">
+                      <label class="azimuth-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                        </svg>
+                        Azimuth Direction
+                      </label>
+                      <div class="azimuth-input-group">
+                        <input 
+                          type="range" 
+                          bind:value={sector.azimuth}
+                          min="0"
+                          max="359"
+                          class="azimuth-slider"
+                        />
                         <input 
                           type="number" 
                           bind:value={sector.azimuth}
                           min="0"
                           max="359"
+                          class="azimuth-number"
                         />
+                        <span class="azimuth-compass">
+                          {#if sector.azimuth >= 337.5 || sector.azimuth < 22.5}N
+                          {:else if sector.azimuth >= 22.5 && sector.azimuth < 67.5}NE
+                          {:else if sector.azimuth >= 67.5 && sector.azimuth < 112.5}E
+                          {:else if sector.azimuth >= 112.5 && sector.azimuth < 157.5}SE
+                          {:else if sector.azimuth >= 157.5 && sector.azimuth < 202.5}S
+                          {:else if sector.azimuth >= 202.5 && sector.azimuth < 247.5}SW
+                          {:else if sector.azimuth >= 247.5 && sector.azimuth < 292.5}W
+                          {:else if sector.azimuth >= 292.5 && sector.azimuth < 337.5}NW
+                          {/if}
+                        </span>
                       </div>
+                    </div>
+                    
+                    <div class="form-row">
                       
                       <div class="form-group-sm">
                         <label>PCI</label>
@@ -645,6 +709,93 @@
     flex-direction: column;
     gap: 1rem;
     padding: 1.25rem;
+  }
+
+  .azimuth-control {
+    padding: 1rem;
+    background: var(--surface-secondary);
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 0.5rem;
+  }
+
+  .azimuth-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+  }
+
+  .azimuth-input-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .azimuth-slider {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, 
+      hsl(0, 70%, 60%),    /* 0° - Red (N) */
+      hsl(60, 70%, 60%),   /* 90° - Yellow (E) */
+      hsl(120, 70%, 60%),  /* 180° - Green (S) */
+      hsl(240, 70%, 60%),  /* 270° - Blue (W) */
+      hsl(360, 70%, 60%)   /* 360° - Red (N) */
+    );
+    outline: none;
+    cursor: pointer;
+  }
+
+  .azimuth-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 3px solid white;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+  }
+
+  .azimuth-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 3px solid white;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+  }
+
+  .azimuth-number {
+    width: 80px;
+    padding: 0.5rem;
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .azimuth-compass {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: var(--shadow-md);
   }
 
   .form-row {
