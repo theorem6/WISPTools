@@ -344,25 +344,25 @@ export class PCIArcGISMapper {
     this.onMapRightClickCallback = callback;
     
     if (this.mapView) {
-      this.mapView.on('click', async (event: any) => {
-        // Check if right-click (button 2)
-        if (event.button === 2) {
-          event.stopPropagation();
+      // Use the container's native contextmenu event for right-click
+      const container = this.mapView.container;
+      
+      if (container) {
+        container.addEventListener('contextmenu', (e: MouseEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
           
-          // Get the map coordinates
-          const point = this.mapView.toMap({ x: event.x, y: event.y });
+          // Get screen coordinates
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          
+          // Convert screen coordinates to map coordinates
+          const point = this.mapView.toMap({ x, y });
           
           if (point && this.onMapRightClickCallback) {
             this.onMapRightClickCallback(point.latitude, point.longitude);
           }
-        }
-      });
-      
-      // Disable default context menu on the map container
-      const container = this.mapView.container;
-      if (container) {
-        container.addEventListener('contextmenu', (e: Event) => {
-          e.preventDefault();
         });
       }
     }
