@@ -86,7 +86,7 @@
   
   import { goto } from '$app/navigation';
   
-  onMount(() => {
+  onMount(async () => {
     // Check authentication and redirect if needed
     if (!$authStore.isLoading && !$isAuthenticated) {
       goto('/login');
@@ -94,7 +94,14 @@
     }
     
     if (mapContainer) {
+      console.log('Page: Creating map instance');
       mapInstance = new PCIArcGISMapper(mapContainer);
+      
+      // Wait for the map to fully initialize
+      console.log('Page: Waiting for map initialization...');
+      await mapInstance.waitForInit();
+      console.log('Page: Map initialized, attaching event handlers');
+      
       mapInstance.enableCellPopup();
       
       // Enable cell click to open editor
@@ -103,9 +110,13 @@
       });
       
       // Enable right-click to create new cell
+      console.log('Page: Attaching right-click handler');
       mapInstance.onMapRightClick((latitude, longitude) => {
+        console.log('Page: Right-click callback triggered', latitude, longitude);
         handleMapRightClick(latitude, longitude);
       });
+      
+      console.log('Page: All event handlers attached');
     }
   });
   

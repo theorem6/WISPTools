@@ -18,9 +18,16 @@ export class PCIArcGISMapper {
   private conflictLayer: any;
   private onCellClickCallback: ((cellId: string) => void) | null = null;
   private onMapRightClickCallback: ((latitude: number, longitude: number) => void) | null = null;
+  private isInitialized = false;
+  private initPromise: Promise<void>;
   
   constructor(containerId: string) {
-    this.initializeMap(containerId);
+    this.initPromise = this.initializeMap(containerId);
+  }
+  
+  async waitForInit() {
+    await this.initPromise;
+    return this.isInitialized;
   }
   
   private async initializeMap(containerId: string) {
@@ -64,6 +71,11 @@ export class PCIArcGISMapper {
     
     this.map.add(this.cellLayer);
     this.map.add(this.conflictLayer);
+    
+    // Wait for the view to be ready before allowing interactions
+    await this.mapView.when();
+    this.isInitialized = true;
+    console.log('PCIArcGISMapper: Map initialized and ready');
   }
   
   /**
@@ -343,12 +355,17 @@ export class PCIArcGISMapper {
   onMapRightClick(callback: (latitude: number, longitude: number) => void) {
     this.onMapRightClickCallback = callback;
     
+    console.log('PCIArcGISMapper: onMapRightClick called, mapView exists:', !!this.mapView);
+    
     if (this.mapView) {
       // Use the container's native contextmenu event for right-click
       const container = this.mapView.container;
       
+      console.log('PCIArcGISMapper: Container exists:', !!container);
+      
       if (container) {
         container.addEventListener('contextmenu', (e: MouseEvent) => {
+          console.log('PCIArcGISMapper: Right-click detected!', e.clientX, e.clientY);
           e.preventDefault();
           e.stopPropagation();
           
@@ -360,11 +377,17 @@ export class PCIArcGISMapper {
           // Convert screen coordinates to map coordinates
           const point = this.mapView.toMap({ x, y });
           
+          console.log('PCIArcGISMapper: Map point:', point?.latitude, point?.longitude);
+          
           if (point && this.onMapRightClickCallback) {
+            console.log('PCIArcGISMapper: Calling callback with coordinates');
             this.onMapRightClickCallback(point.latitude, point.longitude);
           }
         });
+        console.log('PCIArcGISMapper: Right-click listener attached successfully');
       }
+    } else {
+      console.warn('PCIArcGISMapper: MapView not initialized yet, cannot attach right-click listener');
     }
   }
   
