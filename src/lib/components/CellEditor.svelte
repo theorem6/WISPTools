@@ -225,8 +225,17 @@
   function handleSmartInput() {
     const value = parseFloat(smartInputValue);
     if (!isNaN(value) && value >= 0) {
+      let earfcnToAdd = 0;
+      
       if (selectedBand === 'auto') {
-        detectAndConvert(value);
+        // Auto-detect and determine EARFCN
+        if (value >= 600 && value <= 4000) {
+          // It's a frequency - convert to EARFCN
+          earfcnToAdd = frequencyToEarfcn(value);
+        } else if (value >= 0 && value < 70001) {
+          // It's an EARFCN
+          earfcnToAdd = value;
+        }
       } else {
         // Use selected band for conversion
         const band = bandOptions.find(b => b.value === selectedBand);
@@ -236,20 +245,26 @@
             const [minFreq, maxFreq] = band.freqRange;
             const [minEarfcn, maxEarfcn] = band.earfcnRange;
             if (value >= minFreq && value <= maxFreq) {
-              const earfcn = Math.round(minEarfcn + ((value - minFreq) / 0.1));
-              editedCell.dlEarfcn = earfcn;
-              handleDlEarfcnChange();
+              earfcnToAdd = Math.round(minEarfcn + ((value - minFreq) / 0.1));
             } else {
-              console.warn('Frequency out of range for selected band');
-              detectAndConvert(value);
+              console.warn('Frequency out of range for selected band, using auto-detect');
+              earfcnToAdd = frequencyToEarfcn(value);
             }
           } else {
             // It's an EARFCN
-            editedCell.dlEarfcn = value;
-            handleDlEarfcnChange();
+            earfcnToAdd = value;
           }
         }
       }
+      
+      // Add to additional EARFCNs list if valid and not duplicate
+      if (earfcnToAdd > 0 && !additionalEarfcns.includes(earfcnToAdd)) {
+        additionalEarfcns = [...additionalEarfcns, earfcnToAdd];
+        console.log('Added EARFCN to list:', earfcnToAdd);
+      } else if (additionalEarfcns.includes(earfcnToAdd)) {
+        console.warn('EARFCN already in list:', earfcnToAdd);
+      }
+      
       smartInputValue = ''; // Clear after processing
     }
   }
@@ -370,8 +385,8 @@
           
           <!-- Smart Frequency/EARFCN Input -->
           <div class="smart-input-section">
-            <label for="smartInput">🎯 Quick Entry: Frequency or EARFCN</label>
-            <p class="smart-help">Enter a frequency (e.g., 2100, 3550) or EARFCN (e.g., 1950, 55240)</p>
+            <label for="smartInput">🎯 Quick Add: Frequency or EARFCN</label>
+            <p class="smart-help">Add frequencies or EARFCNs to the list below (e.g., 2100, 3550, 1950, 55240)</p>
             
             <!-- Band Selector -->
             <div class="band-selector-group">
@@ -400,10 +415,10 @@
                 disabled={!smartInputValue}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9 11 12 14 22 4"></polyline>
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                Convert
+                Add to List
               </button>
             </div>
             
@@ -940,4 +955,5 @@
     margin: 1.5rem 0;
   }
 </style>
+
 
