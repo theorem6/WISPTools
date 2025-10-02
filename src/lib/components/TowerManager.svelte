@@ -363,6 +363,10 @@
                               <span class="value">{sector.azimuth}°</span>
                             </div>
                             <div class="sector-row">
+                              <span class="label">Height AGL:</span>
+                              <span class="value">{sector.heightAGL || 100} ft</span>
+                            </div>
+                            <div class="sector-row">
                               <span class="label">Frequency:</span>
                               <span class="value">{sector.frequency} MHz</span>
                             </div>

@@ -42,6 +42,7 @@ export interface Sector {
   sectorNumber: number;    // Sector number (1, 2, 3, etc.)
   azimuth: number;         // Direction in degrees (0-359) - ONLY sectors have azimuths
   beamwidth: number;       // Horizontal beamwidth in degrees (typically 33, 65, 78, 90, 120)
+  heightAGL: number;       // Height above ground level in feet
   pci: number;             // Physical Cell ID (0-503)
   channels: Channel[];     // Multiple EARFCNs per sector
   rsPower: number;         // Reference signal power (dBm)
@@ -105,6 +106,7 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
       sectorNumber: legacyCell.sector,
       azimuth: legacyCell.azimuth || 0,
       beamwidth: (legacyCell as any).beamwidth || 65, // Use sector beamwidth if available
+      heightAGL: (legacyCell as any).heightAGL || 100, // Default 100 feet if not specified
       pci: legacyCell.pci,
       channels: [
         {
@@ -152,7 +154,8 @@ export function convertCellSiteToLegacy(sites: CellSite[]): LegacyCell[] {
           channelBandwidth: primaryChannel.channelBandwidth,
           dlEarfcn: primaryChannel.dlEarfcn,
           ulEarfcn: primaryChannel.ulEarfcn,
-          ...(sector.beamwidth && { beamwidth: sector.beamwidth }) // Include beamwidth
+          beamwidth: sector.beamwidth, // Include beamwidth
+          heightAGL: sector.heightAGL // Include height above ground level
         } as any);
       }
     }

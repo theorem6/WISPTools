@@ -51,6 +51,7 @@ A **Sector** is an individual transmitter/antenna mounted on a cell site, pointi
 - `sectorNumber` - Sector number (1, 2, 3, etc.)
 - `azimuth` - Direction in degrees (0-359°) - **ONLY sectors have azimuths**
 - `beamwidth` - Horizontal beamwidth (33°, 65°, 78°, 90°, 120°)
+- `heightAGL` - Height above ground level in feet (e.g., 100, 150, 200)
 - `pci` - Physical Cell ID (0-503)
 - `rsPower` - Reference signal power (dBm)
 - `technology` - LTE, CBRS, or 5G

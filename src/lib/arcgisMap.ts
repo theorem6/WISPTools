@@ -47,9 +47,9 @@ export class PCIArcGISMapper {
     // Check for dark mode
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
     
-    // Initialize the map
+    // Initialize the map with topographic basemap
     this.map = new Map({
-      basemap: isDarkMode ? "dark-gray-vector" : "streets-vector"
+      basemap: isDarkMode ? "dark-gray-vector" : "topo-vector"
     });
     
     // Create the map view
@@ -550,7 +550,7 @@ export class PCIArcGISMapper {
    * Update map theme for dark mode
    */
   updateTheme(isDarkMode: boolean) {
-    const basemap = isDarkMode ? "dark-gray-vector" : "streets-vector";
+    const basemap = isDarkMode ? "dark-gray-vector" : "topo-vector";
     this.map.basemap = basemap;
   }
 }

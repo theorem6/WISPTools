@@ -81,6 +81,7 @@
       sectorNumber,
       azimuth: suggestedAzimuth,
       beamwidth: 65, // Default 65° beamwidth (typical for macro cells)
+      heightAGL: 100, // Default 100 feet above ground level
       pci: 0,
       channels: [
         {
@@ -371,6 +372,29 @@
                           <option value={120}>120° (Ultra Wide - Omni-like)</option>
                         </select>
                         <span class="beamwidth-visual">{sector.beamwidth}°</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Height AGL Control -->
+                    <div class="height-control">
+                      <label class="height-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="12" y1="20" x2="12" y2="4"></line>
+                          <polyline points="8 8 12 4 16 8"></polyline>
+                          <polyline points="8 16 12 20 16 16"></polyline>
+                        </svg>
+                        Height Above Ground Level
+                      </label>
+                      <div class="height-input-group">
+                        <input 
+                          type="number" 
+                          bind:value={sector.heightAGL}
+                          min="0"
+                          max="2000"
+                          step="1"
+                          class="height-input"
+                        />
+                        <span class="height-unit">feet</span>
                       </div>
                     </div>
                     
@@ -893,6 +917,60 @@
     font-size: 0.875rem;
     font-weight: 700;
     min-width: 50px;
+    text-align: center;
+  }
+
+  /* Height AGL Control */
+  .height-control {
+    margin-bottom: 1.25rem;
+  }
+
+  .height-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+  }
+
+  .height-label svg {
+    color: var(--info-color);
+  }
+
+  .height-input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .height-input {
+    flex: 1;
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .height-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: var(--focus-ring);
+  }
+
+  .height-unit {
+    padding: 0.625rem 0.875rem;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 60px;
     text-align: center;
   }
 
