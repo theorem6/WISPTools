@@ -98,6 +98,9 @@
     editedSite.sectors = [...editedSite.sectors, newSector];
     selectedSectorIndex = editedSite.sectors.length - 1;
     
+    // Force Svelte reactivity by reassigning the entire object
+    editedSite = { ...editedSite, sectors: editedSite.sectors };
+    
     console.log('SiteEditor: Added sector. New count:', editedSite.sectors.length);
   }
   
@@ -129,6 +132,10 @@
     if (selectedSectorIndex === index) {
       selectedSectorIndex = null;
     }
+    
+    // Force Svelte reactivity by reassigning the entire object
+    editedSite = { ...editedSite, sectors: editedSite.sectors };
+    
     console.log('SiteEditor: Removed sector. New count:', editedSite.sectors.length);
   }
   
@@ -143,13 +150,17 @@
     };
     
     sector.channels = [...sector.channels, newChannel];
-    editedSite.sectors = [...editedSite.sectors]; // Trigger reactivity
+    editedSite.sectors = [...editedSite.sectors];
+    // Force Svelte reactivity
+    editedSite = { ...editedSite, sectors: editedSite.sectors };
   }
   
   function removeChannel(sectorIndex: number, channelIndex: number) {
     const sector = editedSite.sectors[sectorIndex];
     sector.channels = sector.channels.filter((_, i) => i !== channelIndex);
-    editedSite.sectors = [...editedSite.sectors]; // Trigger reactivity
+    editedSite.sectors = [...editedSite.sectors];
+    // Force Svelte reactivity
+    editedSite = { ...editedSite, sectors: editedSite.sectors };
   }
   
   function setPrimaryChannel(sectorIndex: number, channelIndex: number) {
@@ -157,7 +168,9 @@
     sector.channels.forEach((ch, i) => {
       ch.isPrimary = i === channelIndex;
     });
-    editedSite.sectors = [...editedSite.sectors]; // Trigger reactivity
+    editedSite.sectors = [...editedSite.sectors];
+    // Force Svelte reactivity
+    editedSite = { ...editedSite, sectors: editedSite.sectors };
   }
   
   function handleBackdropClick(e: MouseEvent) {
