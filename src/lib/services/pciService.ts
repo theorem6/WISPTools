@@ -1,7 +1,8 @@
 // PCI Service - Business logic facade layer
 // Isolates business operations from UI components
 import { pciMapper, type Cell, type PCIConflict, type PCIConflictAnalysis } from '../pciMapper';
-import { pciOptimizer, type OptimizationResult } from '../pciOptimizer';
+import { simplePCIOptimizer } from '../pciOptimizerSimple'; // SIMPLE optimizer that WORKS
+import type { OptimizationResult } from '../pciOptimizer';
 import { geminiService } from '../geminiService';
 import { 
   cellsActions, 
@@ -234,9 +235,9 @@ export class PCIService {
       
       optimizationActions.setOptimizing(true);
       
-      // Run optimization
-      console.log(`[PCIService] Starting optimization with ${cells.length} cells`);
-      const result = await pciOptimizer.optimizePCIAssignments(cells, true); // Enable LOS checking
+      // Run optimization with SIMPLE optimizer
+      console.log(`[PCIService] Starting SIMPLE optimization with ${cells.length} cells`);
+      const result = await simplePCIOptimizer.optimizePCIAssignments(cells, true); // Enable LOS checking
       
       console.log(`[PCIService] Optimization complete. Changes: ${result.changes.length}`);
       console.log(`[PCIService] Updating cells store with ${result.optimizedCells.length} optimized cells`);
