@@ -34,6 +34,7 @@
   import CellEditor from '$lib/components/CellEditor.svelte';
   import SiteEditor from '$lib/components/SiteEditor.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
+  import TowerManager from '$lib/components/TowerManager.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -48,6 +49,7 @@
   let showCellEditor = false;
   let showSiteEditor = false;
   let showContextMenu = false;
+  let showTowerManager = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let selectedCell: Cell | null = null;
@@ -434,6 +436,14 @@
     newCellLatitude = undefined;
     newCellLongitude = undefined;
   }
+  
+  async function handleTowersChanged() {
+    // Re-analyze after tower changes
+    await performAnalysis();
+    
+    // Auto-save to network
+    await saveCurrentNetwork();
+  }
 </script>
 
 {#if $isAuthenticated}
@@ -509,6 +519,13 @@
         on:networks={() => showNetworkManager = true}
       />
       <ThemeSwitcher />
+      <button class="icon-btn" on:click={() => showTowerManager = true} title="Tower Management">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </button>
       <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="Analysis">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -615,7 +632,13 @@
     on:deleteSector={handleContextMenuDeleteSector}
     on:close={() => showContextMenu = false}
   />
-            </div>
+  
+  <TowerManager 
+    show={showTowerManager}
+    on:towersChanged={handleTowersChanged}
+    on:close={() => showTowerManager = false}
+  />
+        </div>
           {:else}
   <!-- Loading state while checking auth -->
   <div class="auth-loading">
