@@ -178,9 +178,9 @@
   }
   
   async function syncNetworkCells(network: any) {
-    // Center map on network location
+    // Wait for map to be ready before centering
     if (mapInstance && network.location) {
-      centerMapOnNetwork(network);
+      await centerMapOnNetwork(network);
     }
     
     if (network.cells && network.cells.length > 0) {
@@ -194,20 +194,34 @@
     }
   }
   
-  function centerMapOnNetwork(network: any) {
+  async function centerMapOnNetwork(network: any) {
     if (!mapInstance || !network.location) return;
+    
+    // Wait for map to be fully initialized
+    try {
+      await mapInstance.waitForInit();
+    } catch (error) {
+      console.warn('Map not ready for centering:', error);
+      return;
+    }
     
     const location = network.location;
     const targetZoom = location.zoom || 12;
     
     // Center map on network location
-    if (mapInstance.mapView) {
-      mapInstance.mapView.goTo({
-        center: [location.longitude, location.latitude],
-        zoom: targetZoom
-      }).catch((error: any) => {
+    if (mapInstance.mapView && mapInstance.mapView.ready) {
+      try {
+        await mapInstance.mapView.goTo({
+          center: [location.longitude, location.latitude],
+          zoom: targetZoom
+        }, {
+          animate: true,
+          duration: 1000
+        });
+        console.log('Map centered on network location:', location.latitude, location.longitude);
+      } catch (error: any) {
         console.warn('Map centering failed:', error);
-      });
+      }
     }
   }
   
