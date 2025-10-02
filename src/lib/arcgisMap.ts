@@ -413,13 +413,18 @@ export class PCIArcGISMapper {
   }
   
   /**
-   * Enable cell click events
+   * Enable cell click events (left-click only)
    */
   onCellClick(callback: (cellId: string) => void) {
     this.onCellClickCallback = callback;
     
     if (this.mapView) {
       this.mapView.on('click', async (event: any) => {
+        // Only respond to left-clicks (button 0), ignore right-clicks (button 2)
+        if (event.button !== 0) {
+          return;
+        }
+        
         const response = await this.mapView.hitTest(event);
         
         if (response.results.length > 0) {
