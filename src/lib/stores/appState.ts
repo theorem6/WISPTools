@@ -116,6 +116,21 @@ export const criticalConflictCount: Readable<number> = derived(
   ($conflictsStore) => $conflictsStore.items.filter(c => c.severity === 'CRITICAL').length
 );
 
+export const highConflictCount: Readable<number> = derived(
+  conflictsStore,
+  ($conflictsStore) => $conflictsStore.items.filter(c => c.severity === 'HIGH').length
+);
+
+export const mediumConflictCount: Readable<number> = derived(
+  conflictsStore,
+  ($conflictsStore) => $conflictsStore.items.filter(c => c.severity === 'MEDIUM').length
+);
+
+export const lowConflictCount: Readable<number> = derived(
+  conflictsStore,
+  ($conflictsStore) => $conflictsStore.items.filter(c => c.severity === 'LOW').length
+);
+
 export const hasData: Readable<boolean> = derived(
   cellsStore,
   ($cellsStore) => $cellsStore.items.length > 0

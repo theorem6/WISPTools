@@ -14,6 +14,9 @@
     cellCount,
     conflictCount,
     criticalConflictCount,
+    highConflictCount,
+    mediumConflictCount,
+    lowConflictCount,
     hasData,
     hasConflicts,
     isAnyLoading,
@@ -524,17 +527,32 @@
       <div class="stat-item">
         <span class="stat-value">{$cellCount}</span>
         <span class="stat-label">Cells</span>
-        </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item warning">
-        <span class="stat-value">{$conflictCount}</span>
-        <span class="stat-label">Conflicts</span>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-item danger">
+      <div class="stat-item {$conflictCount > 0 ? 'warning' : ''}">
+        <span class="stat-value">{$conflictCount}</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item {$criticalConflictCount > 0 ? 'danger' : 'success'}">
         <span class="stat-value">{$criticalConflictCount}</span>
         <span class="stat-label">Critical</span>
-    </div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item {$highConflictCount > 0 ? 'warning' : ''}">
+        <span class="stat-value">{$highConflictCount}</span>
+        <span class="stat-label">High</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item {$mediumConflictCount > 0 ? 'info' : ''}">
+        <span class="stat-value">{$mediumConflictCount}</span>
+        <span class="stat-label">Medium</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-value">{$lowConflictCount}</span>
+        <span class="stat-label">Low</span>
+      </div>
     </div>
 
     <div class="topbar-actions">

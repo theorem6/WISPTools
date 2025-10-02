@@ -56,10 +56,12 @@ export class PCIOptimizer {
     let iteration = 0;
     let previousConflictCount = originalConflictCount;
     let previousCriticalCount = initialConflicts.filter(c => c.severity === 'CRITICAL').length;
+    let previousHighCount = initialConflicts.filter(c => c.severity === 'HIGH').length;
     let stalledIterations = 0;
+    let badIterations = 0; // Track iterations that increased critical/high
 
-    console.log(`🔧 Starting SON-inspired PCI optimization with ${originalConflictCount} conflicts (${previousCriticalCount} critical)...`);
-    console.log(`📋 Target: Eliminate ALL critical conflicts, minimize others`);
+    console.log(`🔧 Starting SON-inspired PCI optimization with ${originalConflictCount} conflicts (${previousCriticalCount} critical, ${previousHighCount} high)...`);
+    console.log(`📋 Target: Eliminate ALL critical and high conflicts`);
 
     while (iteration < this.MAX_ITERATIONS) {
       iteration++;
@@ -79,63 +81,89 @@ export class PCIOptimizer {
         changes: changes.length
       });
 
-      console.log(`📊 Iteration ${iteration}: ${conflictCount} total (🔴 ${criticalCount} critical, 🟠 ${highCount} high)`);
+      console.log(`📊 Iteration ${iteration}: ${conflictCount} total (🔴 ${criticalCount} critical, 🟠 ${highCount} high, 🟡 ${conflicts.filter(c => c.severity === 'MEDIUM').length} medium)`);
 
-      // PRIMARY GOAL: Eliminate ALL critical conflicts
-      // Continue optimizing as long as critical conflicts exist
-      if (criticalCount === 0) {
+      // SON CHECK: Did critical or high conflicts INCREASE? This is bad!
+      if (iteration > 1 && (criticalCount > previousCriticalCount || highCount > previousHighCount)) {
+        badIterations++;
+        console.warn(`⚠️  CRITICAL/HIGH INCREASED! Previous: ${previousCriticalCount}/${previousHighCount}, Now: ${criticalCount}/${highCount}`);
+        console.log(`🔄 SON Response: Reverting last changes and forcing more aggressive optimization (bad iteration #${badIterations})`);
+        
+        // This iteration made things worse - we need to be more aggressive
+        stalledIterations = 3; // Force aggressive mode immediately
+      }
+
+      // PRIMARY GOAL: Eliminate ALL critical AND high conflicts
+      // Continue optimizing as long as critical or high conflicts exist
+      if (criticalCount === 0 && highCount === 0) {
         if (conflictCount === 0) {
           console.log(`✅ Perfect! All conflicts resolved after ${iteration} iterations`);
           break;
         } else {
-          // No critical conflicts, but some medium/low remain
-          console.log(`✅ All critical conflicts eliminated. ${conflictCount} low-priority conflicts remain.`);
-          // Continue to try to resolve remaining conflicts
+          // No critical/high conflicts, but some medium/low remain
+          console.log(`✅ All critical and high conflicts eliminated! ${conflictCount} low-priority conflicts remain.`);
+          // Continue to try to resolve remaining conflicts  
           if (iteration > 1 && conflictCount >= previousConflictCount) {
-            console.log(`🏁 Optimization complete - no critical conflicts, others stable.`);
+            console.log(`🏁 SON Optimization complete - zero critical/high conflicts achieved.`);
             break;
           }
         }
       }
       
-      // Check if we're making progress on critical conflicts
-      if (iteration > 2 && criticalCount >= previousCriticalCount) {
+      // Check if we're making progress on critical/high conflicts
+      const combinedSevere = criticalCount + highCount;
+      const previousSevere = previousCriticalCount + previousHighCount;
+      
+      if (iteration > 2 && combinedSevere >= previousSevere) {
         stalledIterations++;
-        console.log(`⚠️  Critical conflict count not improving (stalled: ${stalledIterations})`);
+        console.log(`⚠️  Severe conflicts not improving (stalled: ${stalledIterations})`);
         
-        // If stalled for 3 iterations, we need more aggressive changes
-        if (stalledIterations >= 3) {
-          console.log(`🔀 Breaking stalemate with aggressive random reassignments`);
+        // If stalled for 2 iterations on severe conflicts, go aggressive immediately
+        if (stalledIterations >= 2) {
+          console.log(`🔀 SON Aggressive Mode: Breaking stalemate with randomized reassignments`);
         }
-      } else {
-        stalledIterations = 0; // Reset if we made progress
+      } else if (combinedSevere < previousSevere) {
+        stalledIterations = 0; // Reset - we're making progress!
+        badIterations = 0; // Reset bad iterations counter
+        console.log(`✅ Progress! Severe conflicts reduced from ${previousSevere} to ${combinedSevere}`);
       }
 
-      // SON-inspired conflict resolution: Prioritize critical conflicts
+      // SON-inspired conflict resolution: Prioritize critical and high conflicts
       const criticalConflicts = conflicts.filter(c => c.severity === 'CRITICAL');
-      const otherConflicts = conflicts.filter(c => c.severity !== 'CRITICAL');
+      const highConflicts = conflicts.filter(c => c.severity === 'HIGH');
+      const otherConflicts = conflicts.filter(c => c.severity !== 'CRITICAL' && c.severity !== 'HIGH');
       
-      // Resolve critical conflicts first, then others
+      // Resolve in priority order: critical → high → others
       const iterationChanges = this.resolveConflicts(
         currentCells, 
-        [...criticalConflicts, ...otherConflicts],
-        stalledIterations >= 3 // Use aggressive mode if stalled
+        [...criticalConflicts, ...highConflicts, ...otherConflicts],
+        stalledIterations >= 2 || badIterations > 0 // Use aggressive mode if stalled or had bad iterations
       );
       changes.push(...iterationChanges);
 
       previousConflictCount = conflictCount;
       previousCriticalCount = criticalCount;
+      previousHighCount = highCount;
     }
 
     // Final conflict analysis with LOS checking
     const finalConflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
     const finalConflictCount = finalConflicts.length;
+    const finalCriticalCount = finalConflicts.filter(c => c.severity === 'CRITICAL').length;
+    const finalHighCount = finalConflicts.filter(c => c.severity === 'HIGH').length;
     const resolvedConflicts = originalConflictCount - finalConflictCount;
     const conflictReduction = originalConflictCount > 0 
       ? (resolvedConflicts / originalConflictCount) * 100 
       : 0;
 
-    console.log(`Optimization complete: ${resolvedConflicts} conflicts resolved (${conflictReduction.toFixed(1)}% reduction)`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`✅ SON Optimization Complete After ${iteration} Iterations`);
+    console.log(`📊 Results:`);
+    console.log(`   • Total Conflicts: ${originalConflictCount} → ${finalConflictCount} (${conflictReduction.toFixed(1)}% reduction)`);
+    console.log(`   • Critical: ${previousCriticalCount} → ${finalCriticalCount} ${finalCriticalCount === 0 ? '✅' : '⚠️'}`);
+    console.log(`   • High: ${previousHighCount} → ${finalHighCount} ${finalHighCount === 0 ? '✅' : '⚠️'}`);
+    console.log(`   • Changes Made: ${changes.length} PCI reassignments`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
     return {
       originalCells,
@@ -209,9 +237,11 @@ export class PCIOptimizer {
       if ((changesThisIteration === 0 && sortedConflicts.length > 0) || aggressiveMode) {
         console.log('🔀 SON Mode: Forcing random PCI reassignments to break conflicts');
         
-        // In aggressive mode or when stalled, force more changes
-        const numToForce = aggressiveMode ? 5 : 3;
+        // More aggressive if we had bad iterations (increased critical/high)
+        const numToForce = aggressiveMode ? (badIterations > 0 ? 8 : 5) : 3;
         const conflictsToForce = sortedConflicts.slice(0, numToForce);
+        
+        console.log(`   → Forcing ${numToForce} random changes ${badIterations > 0 ? '(EXTRA aggressive - had worsening)' : ''}`);
         
         for (const conflict of conflictsToForce) {
           const cellToReassign = this.selectCellForReassignment(conflict);
