@@ -32,6 +32,9 @@
   import NetworkManager from '$lib/components/NetworkManager.svelte';
   import NetworkSelector from '$lib/components/NetworkSelector.svelte';
   import CellEditor from '$lib/components/CellEditor.svelte';
+  import SiteEditor from '$lib/components/SiteEditor.svelte';
+  import type { CellSite } from '$lib/models/cellSite';
+  import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
   // Auth and Network stores
   import { authStore, currentUser, isAuthenticated } from '$lib/stores/authStore';
@@ -42,8 +45,11 @@
   let showImportWizard = false;
   let showNetworkManager = false;
   let showCellEditor = false;
+  let showSiteEditor = false;
   let selectedCell: Cell | null = null;
+  let selectedSite: CellSite | null = null;
   let isCreatingNewCell = false;
+  let isCreatingNewSite = false;
   let newCellLatitude: number | undefined = undefined;
   let newCellLongitude: number | undefined = undefined;
   
@@ -302,12 +308,12 @@
   }
   
   function handleMapRightClick(latitude: number, longitude: number) {
-    // Open cell editor in "create new" mode
-    selectedCell = null;
-    isCreatingNewCell = true;
+    // Open SITE editor in "create new" mode (proper data model)
+    selectedSite = null;
+    isCreatingNewSite = true;
     newCellLatitude = latitude;
     newCellLongitude = longitude;
-    showCellEditor = true;
+    showSiteEditor = true;
   }
   
   async function handleCellSave(event: CustomEvent) {
@@ -326,7 +332,7 @@
     }
     
     // Re-analyze conflicts with updated cell
-    await performAnalysis();
+      await performAnalysis();
     
     // Auto-save to network
     await saveCurrentNetwork();
@@ -335,6 +341,45 @@
     showCellEditor = false;
     selectedCell = null;
     isCreatingNewCell = false;
+    newCellLatitude = undefined;
+    newCellLongitude = undefined;
+  }
+  
+  async function handleSiteSave(event: CustomEvent) {
+    const savedSite = event.detail as CellSite;
+    
+    console.log('Site saved:', savedSite);
+    
+    // Convert site to legacy cell format for analysis
+    const legacyCells = convertCellSiteToLegacy([savedSite]);
+    
+    if (isCreatingNewSite) {
+      // Add all sectors from the new site to store
+      const cells = [...$cellsStore.items, ...legacyCells];
+      cellsStore.set({ items: cells });
+      console.log(`Added ${legacyCells.length} sectors from new site`);
+    } else {
+      // Update existing site's sectors
+      // Remove old sectors from this site, add new ones
+      const siteId = savedSite.id;
+      const cells = [
+        ...$cellsStore.items.filter(c => !c.id.startsWith(siteId)),
+        ...legacyCells
+      ];
+      cellsStore.set({ items: cells });
+      console.log(`Updated site with ${legacyCells.length} sectors`);
+    }
+    
+    // Re-analyze conflicts
+    await performAnalysis();
+    
+    // Auto-save to network
+    await saveCurrentNetwork();
+    
+    // Reset state
+    showSiteEditor = false;
+    selectedSite = null;
+    isCreatingNewSite = false;
     newCellLatitude = undefined;
     newCellLongitude = undefined;
   }
@@ -491,7 +536,23 @@
       newCellLongitude = undefined;
     }}
   />
-            </div>
+  
+  <SiteEditor 
+    site={selectedSite}
+    isOpen={showSiteEditor}
+    isNewSite={isCreatingNewSite}
+    initialLatitude={newCellLatitude}
+    initialLongitude={newCellLongitude}
+    on:save={handleSiteSave}
+    on:close={() => { 
+      showSiteEditor = false; 
+      selectedSite = null; 
+      isCreatingNewSite = false;
+      newCellLatitude = undefined;
+      newCellLongitude = undefined;
+    }}
+  />
+        </div>
           {:else}
   <!-- Loading state while checking auth -->
   <div class="auth-loading">

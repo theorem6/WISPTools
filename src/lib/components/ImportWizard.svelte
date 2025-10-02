@@ -1,6 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { Cell } from '../pciMapper';
+  import SiteEditor from './SiteEditor.svelte';
+  import type { CellSite } from '$lib/models/cellSite';
+  import { convertCellSiteToLegacy } from '$lib/models/cellSite';
   
   export let show = false;
   
@@ -9,6 +12,10 @@
   let importMethod: 'csv' | 'kml' | 'manual' | null = null;
   let csvFile: FileList | null = null;
   let kmlFile: FileList | null = null;
+  
+  // Site editor for manual import
+  let showSiteEditorInWizard = false;
+  let manualSites: CellSite[] = [];
   
   // Manual entry fields
   let cellId = '';
@@ -32,6 +39,7 @@
   function handleClose() {
     importMethod = null;
     manualCells = [];
+    manualSites = [];
     dispatch('close');
   }
   
@@ -42,6 +50,31 @@
   function goBack() {
     importMethod = null;
     manualCells = [];
+    manualSites = [];
+  }
+  
+  function handleManualSiteSave(event: CustomEvent) {
+    const site = event.detail as CellSite;
+    manualSites = [...manualSites, site];
+    showSiteEditorInWizard = false;
+    console.log('Site added to manual import:', site);
+  }
+  
+  function removeSiteFromImport(index: number) {
+    manualSites = manualSites.filter((_, i) => i !== index);
+  }
+  
+  function importManualSites() {
+    if (manualSites.length === 0) {
+      alert('Please add at least one cell site');
+      return;
+    }
+    
+    // Convert all sites to legacy cell format
+    const cells = manualSites.flatMap(site => convertCellSiteToLegacy([site]));
+    
+    dispatch('import', { cells });
+    handleClose();
   }
   
   function handleCSVUpload() {
@@ -467,90 +500,70 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
             </div>
           </div>
         {:else if importMethod === 'manual'}
-          <!-- Step 2: Manual Entry -->
+          <!-- Step 2: Manual Site Entry -->
           <div class="import-content">
             <button class="back-btn" on:click={goBack}>← Back</button>
             
-            <h3>✏️ Manual Entry</h3>
+            <h3>✏️ Manual Site Entry</h3>
+            <p class="method-description">Add cell sites with sectors and channels</p>
             
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Cell ID *</label>
-                <input type="text" bind:value={cellId} placeholder="CELL001" />
-              </div>
-              
-              <div class="form-group">
-                <label>eNodeB</label>
-                <input type="number" bind:value={eNodeB} placeholder="1001" />
-              </div>
-              
-              <div class="form-group">
-                <label>Sector</label>
-                <input type="number" bind:value={sector} min="1" max="4" />
-              </div>
-              
-              <div class="form-group">
-                <label>PCI (blank = auto)</label>
-                <input type="text" bind:value={pci} placeholder="Auto" />
-              </div>
-              
-              <div class="form-group">
-                <label>Latitude *</label>
-                <input type="number" step="0.000001" bind:value={latitude} placeholder="40.7128" />
-              </div>
-              
-              <div class="form-group">
-                <label>Longitude *</label>
-                <input type="number" step="0.000001" bind:value={longitude} placeholder="-74.0060" />
-              </div>
-              
-              <div class="form-group">
-                <label>Frequency (MHz)</label>
-                <input type="number" bind:value={frequency} placeholder="2100" />
-              </div>
-              
-              <div class="form-group">
-                <label>RS Power (dBm)</label>
-                <input type="number" bind:value={rsPower} placeholder="-85" />
-              </div>
-              
-              <div class="form-group">
-                <label>Tower Type</label>
-                <select bind:value={towerType}>
-                  <option value="3-sector">3-Sector (120°)</option>
-                  <option value="4-sector">4-Sector (90°)</option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label>Technology</label>
-                <select bind:value={technology}>
-                  <option value="LTE">LTE</option>
-                  <option value="CBRS">CBRS</option>
-                  <option value="LTE+CBRS">LTE+CBRS</option>
-                </select>
-              </div>
+            <!-- Add Site Button -->
+            <div class="manual-add-section">
+              <button 
+                type="button"
+                class="add-site-btn-large" 
+                on:click={() => showSiteEditorInWizard = true}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                Add Cell Site
+              </button>
+              <p class="add-hint">Each site can have multiple sectors with different azimuths and EARFCNs</p>
             </div>
             
-            <button class="add-btn" on:click={addManualCell}>
-              ➕ Add Cell to List
-            </button>
-            
-            {#if manualCells.length > 0}
-              <div class="cell-preview">
-                <h4>Cells to Import ({manualCells.length})</h4>
-                <div class="cell-list">
-                  {#each manualCells as cell, i}
-                    <div class="cell-item">
-                      <span class="cell-name">{cell.id}</span>
-                      <span class="cell-info">eNB: {cell.eNodeB}, Sector: {cell.sector}, PCI: {cell.pci === -1 ? 'Auto' : cell.pci}</span>
-                      <button class="remove-btn" on:click={() => removeCell(i)}>×</button>
+            <!-- Sites List -->
+            {#if manualSites.length > 0}
+              <div class="sites-list">
+                <h4>Added Sites ({manualSites.length})</h4>
+                {#each manualSites as site, index}
+                  <div class="site-preview">
+                    <div class="site-preview-header">
+                      <strong>{site.name}</strong>
+                      <span class="site-preview-meta">eNodeB {site.eNodeB} • {site.sectors.length} Sector{site.sectors.length !== 1 ? 's' : ''}</span>
                     </div>
-                  {/each}
-                </div>
-                <button class="import-btn" on:click={importManualCells}>
-                  Import {manualCells.length} Cell{manualCells.length !== 1 ? 's' : ''}
+                    <div class="sector-summary">
+                      {#each site.sectors as sector}
+                        <span class="sector-badge">
+                          Sec {sector.sectorNumber}: {sector.azimuth}° | PCI {sector.pci} | {sector.channels.length} Ch
+                        </span>
+                      {/each}
+                    </div>
+                    <button 
+                      type="button"
+                      class="remove-site-btn" 
+                      on:click={() => removeSiteFromImport(index)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                {/each}
+              </div>
+              
+              <div class="manual-actions">
+                <button class="import-btn" on:click={importManualSites}>
+                  ✅ Import {manualSites.length} Site{manualSites.length !== 1 ? 's' : ''}
                 </button>
+              </div>
+            {:else}
+              <div class="empty-state">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <p>No sites added yet</p>
+                <p class="empty-hint">Click "Add Cell Site" to configure your first site</p>
               </div>
             {/if}
           </div>
@@ -559,6 +572,15 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     </div>
   </div>
 {/if}
+
+<!-- Nested Site Editor for Manual Import -->
+<SiteEditor 
+  site={null}
+  isOpen={showSiteEditorInWizard}
+  isNewSite={true}
+  on:save={handleManualSiteSave}
+  on:close={() => showSiteEditorInWizard = false}
+/>
 
 <style>
   .wizard-overlay {
@@ -929,6 +951,146 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     background: var(--success-dark);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
+  }
+
+  .manual-add-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    background: var(--surface-secondary);
+    border: 2px dashed var(--primary-color);
+    border-radius: var(--border-radius-lg);
+  }
+
+  .add-site-btn-large {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2.5rem;
+    border: none;
+    border-radius: var(--border-radius-lg);
+    background: var(--primary-color);
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition);
+    box-shadow: var(--shadow-md);
+  }
+
+  .add-site-btn-large:hover {
+    background: var(--button-primary-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .add-hint {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .sites-list {
+    margin-top: 1.5rem;
+  }
+
+  .sites-list h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .site-preview {
+    padding: 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 1rem;
+  }
+
+  .site-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .site-preview-header strong {
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .site-preview-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .sector-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .sector-badge {
+    padding: 0.375rem 0.75rem;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    border-radius: var(--border-radius);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .remove-site-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius);
+    background: var(--danger-light);
+    color: var(--danger-color);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .remove-site-btn:hover {
+    background: var(--danger-color);
+    color: white;
+  }
+
+  .manual-actions {
+    margin-top: 1.5rem;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .empty-state svg {
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .empty-state p {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+  }
+
+  .empty-hint {
+    font-size: 0.875rem !important;
+    font-style: italic;
   }
 
   @media (max-width: 768px) {
