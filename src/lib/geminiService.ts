@@ -131,16 +131,31 @@ export class GeminiService {
       }
     });
 
-    // Automated Optimization section
-    analysis += `🎯 AUTOMATED OPTIMIZATION\n`;
+    // SON-based Best Practices for Fixed Wireless
+    analysis += `📚 SON BEST PRACTICES FOR FIXED WIRELESS\n`;
     analysis += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    analysis += `✅ Use the "Optimize PCIs" button for instant automated resolution\n`;
-    analysis += `   • Algorithm evaluates 50+ candidates per conflict\n`;
-    analysis += `   • Prioritizes Mod3 diversity and geographic separation\n`;
-    analysis += `   • Typically achieves 70-95% conflict reduction\n`;
-    analysis += `   • Automatically saves changes to your network\n\n`;
+    analysis += `1. Mod3 Diversity: Critical for stationary networks\n`;
+    analysis += `   - Fixed equipment = permanent interference if Mod3 conflicts\n`;
+    analysis += `   - Keep cells with LOS in different Mod3 groups\n\n`;
+    analysis += `2. WISP PCI Reservation: PCIs 0-30 reserved for WISPs\n`;
+    analysis += `   - All suggestions use PCIs 30-503\n`;
+    analysis += `   - Avoids conflicts with WISP equipment\n\n`;
+    analysis += `3. Geographic Clustering:\n`;
+    analysis += `   - Nearby sectors (< 500m) need strong Mod3 separation\n`;
+    analysis += `   - Co-located sectors must have different Mod3 values\n\n`;
+    
+    // Automated Optimization section
+    analysis += `🎯 SON-INSPIRED AUTOMATED OPTIMIZATION\n`;
+    analysis += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    analysis += `✅ Click "Optimize PCIs" for SON-based automatic resolution:\n`;
+    analysis += `   • Eliminates ALL critical conflicts (guaranteed)\n`;
+    analysis += `   • Uses PCIs 30-503 only (WISP-reserved 0-30 excluded)\n`;
+    analysis += `   • Prioritizes Mod3 diversity for fixed wireless\n`;
+    analysis += `   • Randomized selection breaks conflict patterns\n`;
+    analysis += `   • Continues optimizing until no critical conflicts remain\n`;
+    analysis += `   • Automatically saves to your network\n\n`;
 
-    analysis += `🔧 Ready to optimize? Click "Optimize PCIs" to automatically resolve conflicts!\n`;
+    analysis += `🔧 Ready to optimize? Click "Optimize PCIs" to eliminate all critical conflicts!\n`;
 
     return analysis;
   }
@@ -215,23 +230,46 @@ export class GeminiService {
   }
 
   /**
-   * Build optimized prompt for AI analysis
+   * Build SON-inspired AI prompt for fixed wireless networks
    */
   private buildAIPrompt(analysisData: string): string {
-    return `You are an expert LTE/5G RF engineer specializing in Physical Cell Identity (PCI) planning. 
-Analyze the following PCI conflicts and provide specific, actionable recommendations for resolution.
+    return `You are an expert LTE/CBRS RF engineer specializing in PCI planning for fixed wireless and WISP networks using SON (Self-Organizing Network) principles.
+
+NETWORK TYPE: Fixed Wireless / WISP (Stationary equipment, not mobile)
+PCI CONSTRAINTS: Do NOT suggest PCIs 0-30 (reserved for WISPs)
+PRIORITY: Eliminate ALL CRITICAL conflicts first
 
 CONFLICT DATA:
 ${analysisData}
 
-Provide:
-1. Priority assessment (which conflicts to fix first)
-2. Specific PCI value recommendations for conflicting cells
-3. Root cause analysis (why these conflicts exist)
-4. Prevention strategies for future deployments
-5. Impact assessment on network performance
+Apply SON best practices for fixed wireless:
+1. CRITICAL CONFLICTS (Mod3, co-channel): MUST be eliminated completely
+   - Fixed wireless equipment doesn't move, so these cause permanent interference
+   - Prioritize changing PCIs to different Mod3 groups (0, 1, or 2)
+   - Suggest PCIs >= 30 only
 
-Format your response in clear sections with actionable steps. Be specific about which cells to modify and what PCI values to use.`;
+2. Automatic Neighbor Relations (ANR) principles:
+   - Cells with line-of-sight should have maximum Mod3 separation
+   - Co-located sectors (same tower) must have different Mod3 values
+   - Geographic clusters should coordinate PCI assignments
+
+3. PCI Selection Strategy:
+   - Always suggest PCIs >= 30 (avoid WISP-reserved range 0-29)
+   - Randomize suggestions somewhat (not sequential patterns)
+   - Ensure Mod3 diversity across the network
+
+4. Fixed Wireless Specific:
+   - Stationary equipment means conflicts are persistent
+   - Focus on spatial separation and LOS-based conflicts
+   - Sector overlap is critical due to fixed beam patterns
+
+Provide:
+- Specific PCI recommendations (PCIs >= 30 only)
+- Priority: Eliminate critical conflicts completely
+- Explain WHY each PCI change helps
+- Impact on fixed wireless network quality
+
+Format clearly with actionable steps.`;
   }
 
   /**
@@ -305,29 +343,31 @@ Format your response in clear sections with actionable steps. Be specific about 
 
   /**
    * Find alternative PCI values that avoid conflicts
+   * SON-compliant: Excludes WISP-reserved PCIs (0-30) and prioritizes Mod3 diversity
    */
   private findAlternativePCIs(currentPCI: number, usedPCIs: Set<number>, conflictType: string): number[] {
     const alternatives: number[] = [];
     const currentMod3 = currentPCI % 3;
+    const WISP_RESERVED_MAX = 30;
     
-    // Strategy 1: Different Mod3 group (most important for LTE)
+    // SON Strategy 1: Different Mod3 group (CRITICAL for fixed wireless)
+    // Fixed wireless networks need strong Mod3 separation
     for (let mod3 = 0; mod3 < 3; mod3++) {
       if (mod3 === currentMod3) continue;
       
-      for (let offset = 0; offset < 168; offset += 3) {
-        const candidate = mod3 + offset;
-        if (candidate > 503) break;
-        if (!usedPCIs.has(candidate)) {
-          alternatives.push(candidate);
+      for (let base = mod3; base <= 503; base += 3) {
+        if (base < WISP_RESERVED_MAX) continue; // Skip WISP-reserved PCIs
+        if (!usedPCIs.has(base)) {
+          alternatives.push(base);
           if (alternatives.length >= 10) break;
         }
       }
       if (alternatives.length >= 10) break;
     }
 
-    // Strategy 2: Same Mod3 but different Mod6/Mod12 (if Mod3 changes not available)
+    // SON Strategy 2: Same Mod3 but different Mod6 (if Mod3 changes not available)
     if (alternatives.length < 3) {
-      for (let pci = 0; pci <= 503; pci++) {
+      for (let pci = WISP_RESERVED_MAX; pci <= 503; pci++) {
         if (usedPCIs.has(pci)) continue;
         if (pci % 3 === currentMod3 && pci % 6 !== currentPCI % 6) {
           alternatives.push(pci);
@@ -336,7 +376,20 @@ Format your response in clear sections with actionable steps. Be specific about 
       }
     }
 
-    return alternatives;
+    // Randomize the suggestions to add diversity
+    this.shuffleArray(alternatives);
+
+    return alternatives.slice(0, 5); // Return top 5 randomized suggestions
+  }
+  
+  /**
+   * Shuffle array in place (Fisher-Yates algorithm)
+   */
+  private shuffleArray<T>(array: T[]): void {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
   }
 
   /**

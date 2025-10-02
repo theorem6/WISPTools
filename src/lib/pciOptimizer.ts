@@ -29,10 +29,15 @@ export interface IterationHistory {
 }
 
 export class PCIOptimizer {
-  private readonly MAX_ITERATIONS = 10;
-  private readonly PCI_MIN = 0;
+  private readonly MAX_ITERATIONS = 20; // Increased for thorough optimization
+  private readonly PCI_MIN = 30; // Reserve 0-29 for WISPs
   private readonly PCI_MAX = 503;
-  private readonly CONVERGENCE_THRESHOLD = 0; // Stop when no conflicts remain
+  private readonly CONVERGENCE_THRESHOLD_CRITICAL = 0; // Must eliminate ALL critical conflicts
+  private readonly CONVERGENCE_THRESHOLD_ALL = 0; // Stop when no conflicts remain
+  
+  // SON-inspired configuration for fixed wireless networks
+  private readonly WISP_RESERVED_PCIS = { min: 0, max: 29 }; // WISPs use lower PCIs
+  private readonly FIXED_WIRELESS_PRIORITY = true; // Optimize for stationary networks
 
   /**
    * Optimize PCI assignments to minimize conflicts with LOS awareness
@@ -50,8 +55,11 @@ export class PCIOptimizer {
 
     let iteration = 0;
     let previousConflictCount = originalConflictCount;
+    let previousCriticalCount = initialConflicts.filter(c => c.severity === 'CRITICAL').length;
+    let stalledIterations = 0;
 
-    console.log(`Starting PCI optimization with ${originalConflictCount} conflicts...`);
+    console.log(`🔧 Starting SON-inspired PCI optimization with ${originalConflictCount} conflicts (${previousCriticalCount} critical)...`);
+    console.log(`📋 Target: Eliminate ALL critical conflicts, minimize others`);
 
     while (iteration < this.MAX_ITERATIONS) {
       iteration++;
@@ -59,35 +67,64 @@ export class PCIOptimizer {
       // Detect current conflicts with LOS checking
       const conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
       const conflictCount = conflicts.length;
+      const criticalCount = conflicts.filter(c => c.severity === 'CRITICAL').length;
+      const highCount = conflicts.filter(c => c.severity === 'HIGH').length;
       
       // Track iteration history
       convergenceHistory.push({
         iteration,
         conflictCount,
-        criticalCount: conflicts.filter(c => c.severity === 'CRITICAL').length,
-        highCount: conflicts.filter(c => c.severity === 'HIGH').length,
+        criticalCount,
+        highCount,
         changes: changes.length
       });
 
-      console.log(`Iteration ${iteration}: ${conflictCount} conflicts (${conflicts.filter(c => c.severity === 'CRITICAL').length} critical)`);
+      console.log(`📊 Iteration ${iteration}: ${conflictCount} total (🔴 ${criticalCount} critical, 🟠 ${highCount} high)`);
 
-      // Check for convergence
-      if (conflictCount === 0) {
-        console.log(`All conflicts resolved after ${iteration} iterations`);
-        break;
+      // PRIMARY GOAL: Eliminate ALL critical conflicts
+      // Continue optimizing as long as critical conflicts exist
+      if (criticalCount === 0) {
+        if (conflictCount === 0) {
+          console.log(`✅ Perfect! All conflicts resolved after ${iteration} iterations`);
+          break;
+        } else {
+          // No critical conflicts, but some medium/low remain
+          console.log(`✅ All critical conflicts eliminated. ${conflictCount} low-priority conflicts remain.`);
+          // Continue to try to resolve remaining conflicts
+          if (iteration > 1 && conflictCount >= previousConflictCount) {
+            console.log(`🏁 Optimization complete - no critical conflicts, others stable.`);
+            break;
+          }
+        }
       }
       
-      // Only stop if no improvement for 2 consecutive iterations
-      if (iteration > 1 && conflictCount >= previousConflictCount) {
-        console.log(`Converged after ${iteration} iterations (no improvement)`);
-        break;
+      // Check if we're making progress on critical conflicts
+      if (iteration > 2 && criticalCount >= previousCriticalCount) {
+        stalledIterations++;
+        console.log(`⚠️  Critical conflict count not improving (stalled: ${stalledIterations})`);
+        
+        // If stalled for 3 iterations, we need more aggressive changes
+        if (stalledIterations >= 3) {
+          console.log(`🔀 Breaking stalemate with aggressive random reassignments`);
+        }
+      } else {
+        stalledIterations = 0; // Reset if we made progress
       }
 
-      // Resolve conflicts for this iteration
-      const iterationChanges = this.resolveConflicts(currentCells, conflicts);
+      // SON-inspired conflict resolution: Prioritize critical conflicts
+      const criticalConflicts = conflicts.filter(c => c.severity === 'CRITICAL');
+      const otherConflicts = conflicts.filter(c => c.severity !== 'CRITICAL');
+      
+      // Resolve critical conflicts first, then others
+      const iterationChanges = this.resolveConflicts(
+        currentCells, 
+        [...criticalConflicts, ...otherConflicts],
+        stalledIterations >= 3 // Use aggressive mode if stalled
+      );
       changes.push(...iterationChanges);
 
       previousConflictCount = conflictCount;
+      previousCriticalCount = criticalCount;
     }
 
     // Final conflict analysis with LOS checking
@@ -115,14 +152,21 @@ export class PCIOptimizer {
 
   /**
    * Resolve conflicts for a single iteration
+   * SON-inspired: Prioritize critical conflicts and use intelligent PCI selection
    */
-  private resolveConflicts(cells: Cell[], conflicts: PCIConflict[]): PCIChange[] {
+  private resolveConflicts(cells: Cell[], conflicts: PCIConflict[], aggressiveMode = false): PCIChange[] {
     const changes: PCIChange[] = [];
     
-    // Sort conflicts by severity (resolve critical first)
+    // SON Algorithm: Sort conflicts by severity and distance
+    // Critical conflicts at close range are highest priority
     const sortedConflicts = [...conflicts].sort((a, b) => {
       const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
-      return severityOrder[b.severity] - severityOrder[a.severity];
+      const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
+      
+      if (severityDiff !== 0) return severityDiff;
+      
+      // Same severity: closer conflicts are higher priority
+      return a.distance - b.distance;
     });
 
       // Track cells that have been modified in this iteration
@@ -161,21 +205,22 @@ export class PCIOptimizer {
         }
       }
 
-      // If no changes were made this iteration, force random changes to break stalemate
-      if (changesThisIteration === 0 && sortedConflicts.length > 0) {
-        console.log('No changes made - forcing random PCI reassignments to break conflicts');
+      // SON-inspired stalemate breaking: Force aggressive changes if needed
+      if ((changesThisIteration === 0 && sortedConflicts.length > 0) || aggressiveMode) {
+        console.log('🔀 SON Mode: Forcing random PCI reassignments to break conflicts');
         
-        // Force changes for up to 3 conflicting cells with random PCIs
-        const conflictsToForce = sortedConflicts.slice(0, 3);
+        // In aggressive mode or when stalled, force more changes
+        const numToForce = aggressiveMode ? 5 : 3;
+        const conflictsToForce = sortedConflicts.slice(0, numToForce);
         
         for (const conflict of conflictsToForce) {
           const cellToReassign = this.selectCellForReassignment(conflict);
           const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
           
           if (cellIndex !== -1 && !modifiedCellIds.has(cellToReassign.id)) {
-            // Use randomized PCI selection from available pool
+            // Use SON-inspired randomized PCI selection
             const usedPCIs = new Set(cells.map(c => c.pci));
-            const newPCI = this.selectRandomAvailablePCI(cellToReassign.pci, usedPCIs);
+            const newPCI = this.selectSONRandomPCI(cellToReassign.pci, usedPCIs);
             const oldPCI = cellToReassign.pci;
             
             cells[cellIndex].pci = newPCI;
@@ -184,13 +229,13 @@ export class PCIOptimizer {
               cellId: cellToReassign.id,
               oldPCI,
               newPCI,
-              reason: `Random reassignment to break ${conflict.conflictType} conflict with ${conflict.primaryCell.id === cellToReassign.id ? conflict.conflictingCell.id : conflict.primaryCell.id}`
+              reason: `SON random reassignment to eliminate ${conflict.severity} ${conflict.conflictType} conflict`
             });
             
             modifiedCellIds.add(cellToReassign.id);
             changesThisIteration++;
             
-            console.log(`Forced random PCI change: ${cellToReassign.id} ${oldPCI} → ${newPCI}`);
+            console.log(`🎲 SON random change: ${cellToReassign.id} ${oldPCI} → ${newPCI} (Mod3: ${oldPCI % 3} → ${newPCI % 3})`);
           }
         }
       }
@@ -214,51 +259,61 @@ export class PCIOptimizer {
   }
   
   /**
-   * Select a random available PCI from a different Mod3 group
-   * This helps break difficult conflicts by providing diversity
+   * SON-inspired random PCI selection for fixed wireless networks
+   * Excludes WISP-reserved PCIs (0-30) and prioritizes Mod3 diversity
+   * Uses randomization to break conflict patterns
    */
-  private selectRandomAvailablePCI(currentPCI: number, usedPCIs: Set<number>): number {
+  private selectSONRandomPCI(currentPCI: number, usedPCIs: Set<number>): number {
     const currentMod3 = currentPCI % 3;
     const availablePCIs: number[] = [];
     
-    // First try: Different Mod3 group (best for avoiding CRS conflicts)
+    // SON Priority 1: Different Mod3 group (CRITICAL for fixed wireless CRS conflicts)
+    // Fixed wireless networks have stationary equipment, so Mod3 conflicts are most severe
     for (let mod3 = 0; mod3 < 3; mod3++) {
       if (mod3 === currentMod3) continue; // Skip current Mod3
       
       for (let base = mod3; base <= this.PCI_MAX; base += 3) {
+        if (base < this.PCI_MIN) continue; // Skip WISP-reserved PCIs (0-30)
         if (!usedPCIs.has(base)) {
           availablePCIs.push(base);
         }
       }
     }
     
-    // If no different Mod3 available, try same Mod3 but different Mod6
+    // SON Priority 2: Same Mod3 but different Mod6 (for PBCH conflicts)
     if (availablePCIs.length === 0) {
       const currentMod6 = currentPCI % 6;
-      for (let pci = 0; pci <= this.PCI_MAX; pci++) {
+      for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
         if (!usedPCIs.has(pci) && pci % 3 === currentMod3 && pci % 6 !== currentMod6) {
           availablePCIs.push(pci);
         }
       }
     }
     
-    // If still no options, use any available PCI
+    // SON Priority 3: Any available PCI (excluding WISP range)
     if (availablePCIs.length === 0) {
-      for (let pci = 0; pci <= this.PCI_MAX; pci++) {
+      for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
         if (!usedPCIs.has(pci)) {
           availablePCIs.push(pci);
         }
       }
     }
     
-    // Return random selection from available PCIs
+    // SON Randomization: Select randomly from available pool
     if (availablePCIs.length > 0) {
       const randomIndex = Math.floor(Math.random() * availablePCIs.length);
       return availablePCIs[randomIndex];
     }
     
-    // Last resort: increment by 3 to at least change Mod3
-    return (currentPCI + 3) % 504;
+    // Last resort: Find any PCI >= 30 that's not heavily used
+    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
+      if (pci % 3 !== currentMod3) { // At least change Mod3
+        return pci;
+      }
+    }
+    
+    // Absolute last resort
+    return Math.max(this.PCI_MIN, (currentPCI + 3) % 504);
   }
 
   /**
@@ -511,37 +566,39 @@ export class PCIOptimizer {
 
   /**
    * Generate candidate PCIs for optimization
+   * SON-inspired: Excludes WISP-reserved PCIs (0-30) and uses intelligent selection
    */
   private generateCandidatePCIs(targetCell: Cell, usedPCIs: Set<number>): number[] {
     const candidates: number[] = [];
     const currentPCI = targetCell.pci;
     
-    // Strategy 1: Try PCIs in different mod3 groups (most important for LTE)
+    // SON Strategy 1: Different Mod3 groups (highest priority for fixed wireless)
+    // For stationary networks, Mod3 diversity is critical to avoid CRS conflicts
     for (let mod3 = 0; mod3 < 3; mod3++) {
       const currentMod3 = currentPCI % 3;
       if (mod3 === currentMod3) continue; // Skip current mod3 group
       
-      // Add several PCIs from each mod3 group
-      for (let i = 0; i < 10; i++) {
-        const candidate = mod3 + (i * 3);
-        if (candidate <= this.PCI_MAX && !usedPCIs.has(candidate)) {
-          candidates.push(candidate);
+      // Start from PCI_MIN (30) to avoid WISP-reserved range
+      for (let base = mod3; base <= this.PCI_MAX; base += 3) {
+        if (base < this.PCI_MIN) continue; // Skip WISP-reserved PCIs (0-30)
+        if (!usedPCIs.has(base)) {
+          candidates.push(base);
+          if (candidates.length >= 30) break; // Enough candidates from this mod3
         }
       }
     }
 
-    // Strategy 2: Try PCIs with different mod6 values in current mod3
+    // SON Strategy 2: Same Mod3 but different Mod6 (secondary priority)
     const currentMod3 = currentPCI % 3;
     const currentMod6 = currentPCI % 6;
-    for (let mod6 = 0; mod6 < 6; mod6 += 3) { // Only check mod3-aligned mod6 values
-      if (mod6 === currentMod6) continue;
-      const candidate = currentMod3 + mod6;
-      if (candidate <= this.PCI_MAX && !usedPCIs.has(candidate)) {
-        candidates.push(candidate);
+    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci += 3) {
+      if (pci % 3 === currentMod3 && pci % 6 !== currentMod6 && !usedPCIs.has(pci)) {
+        candidates.push(pci);
       }
     }
 
-    // Strategy 3: Random sampling of available PCIs
+    // SON Strategy 3: Geographic-based random sampling
+    // For fixed wireless: sample from full available range for diversity
     const availablePCIs = [];
     for (let i = this.PCI_MIN; i <= this.PCI_MAX; i++) {
       if (!usedPCIs.has(i)) {
@@ -549,8 +606,8 @@ export class PCIOptimizer {
       }
     }
     
-    // Add random samples
-    const sampleSize = Math.min(20, availablePCIs.length);
+    // Add randomized samples for diversity (SON uses randomization to avoid patterns)
+    const sampleSize = Math.min(30, availablePCIs.length);
     for (let i = 0; i < sampleSize; i++) {
       const randomIndex = Math.floor(Math.random() * availablePCIs.length);
       const candidate = availablePCIs[randomIndex];
