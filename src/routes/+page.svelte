@@ -53,31 +53,31 @@
   // Realistic Sample Data with Intentional Conflicts
   // These PCIs are deliberately chosen to create conflicts that CAN be resolved
   const sampleCells: Cell[] = [
-    // Tower 1 - Manhattan Midtown (3-sector with MOD3 conflicts)
-    { id: 'CELL001', eNodeB: 1001, sector: 1, pci: 15, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -75, azimuth: 0, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL002', eNodeB: 1001, sector: 2, pci: 16, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -77, azimuth: 120, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL003', eNodeB: 1001, sector: 3, pci: 17, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -76, azimuth: 240, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    // Tower 1 - Manhattan Midtown (3-sector)
+    { id: 'CELL001', eNodeB: 1001, sector: 1, pci: 15, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -75, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL002', eNodeB: 1001, sector: 2, pci: 16, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -77, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL003', eNodeB: 1001, sector: 3, pci: 17, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -76, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
     
     // Tower 2 - Near Tower 1 with INTENTIONAL MOD3 conflicts (500m away)
-    { id: 'CELL004', eNodeB: 1002, sector: 1, pci: 18, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -78, azimuth: 0, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL005', eNodeB: 1002, sector: 2, pci: 19, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -80, azimuth: 120, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL006', eNodeB: 1002, sector: 3, pci: 20, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -79, azimuth: 240, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL004', eNodeB: 1002, sector: 1, pci: 18, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -78, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL005', eNodeB: 1002, sector: 2, pci: 19, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -80, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL006', eNodeB: 1002, sector: 3, pci: 20, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -79, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
     
     // Tower 3 - Chelsea with MOD6 conflicts (700m from Tower 1)
-    { id: 'CELL007', eNodeB: 1003, sector: 1, pci: 21, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -82, azimuth: 0, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL008', eNodeB: 1003, sector: 2, pci: 15, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -81, azimuth: 120, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL009', eNodeB: 1003, sector: 3, pci: 27, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -83, azimuth: 240, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL007', eNodeB: 1003, sector: 1, pci: 21, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -82, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL008', eNodeB: 1003, sector: 2, pci: 15, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -81, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL009', eNodeB: 1003, sector: 3, pci: 27, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -83, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
     
     // Tower 4 - Greenwich Village with more conflicts (800m south)
-    { id: 'CELL010', eNodeB: 1004, sector: 1, pci: 18, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -85, azimuth: 0, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL011', eNodeB: 1004, sector: 2, pci: 24, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -84, azimuth: 120, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
-    { id: 'CELL012', eNodeB: 1004, sector: 3, pci: 21, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -86, azimuth: 240, towerType: '3-sector', technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL010', eNodeB: 1004, sector: 1, pci: 18, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -85, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL011', eNodeB: 1004, sector: 2, pci: 24, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -84, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL012', eNodeB: 1004, sector: 3, pci: 21, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -86, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
     
     // Tower 5 - CBRS 4-sector in Midtown East (different frequency, fewer conflicts)
-    { id: 'CELL013', eNodeB: 1005, sector: 1, pci: 100, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -70, azimuth: 0, towerType: '4-sector', technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
-    { id: 'CELL014', eNodeB: 1005, sector: 2, pci: 103, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -72, azimuth: 90, towerType: '4-sector', technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
-    { id: 'CELL015', eNodeB: 1005, sector: 3, pci: 106, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -71, azimuth: 180, towerType: '4-sector', technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
-    { id: 'CELL016', eNodeB: 1005, sector: 4, pci: 109, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -73, azimuth: 270, towerType: '4-sector', technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 }
+    { id: 'CELL013', eNodeB: 1005, sector: 1, pci: 100, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -70, azimuth: 0, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
+    { id: 'CELL014', eNodeB: 1005, sector: 2, pci: 103, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -72, azimuth: 90, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
+    { id: 'CELL015', eNodeB: 1005, sector: 3, pci: 106, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -71, azimuth: 180, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
+    { id: 'CELL016', eNodeB: 1005, sector: 4, pci: 109, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -73, azimuth: 270, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 }
   ];
   
   // ========================================================================
@@ -258,7 +258,7 @@
   }
 
   function clearMap() {
-    if (mapInstance) {
+      if (mapInstance) {
       mapInstance.clearMap();
     }
     pciService.clearCells();
@@ -275,14 +275,14 @@
     const conflicts = $conflictsStore.items;
     
     if (cells.length > 0) {
-      mapInstance.renderCells(cells);
+        mapInstance.renderCells(cells);
     }
     
-    if (conflicts.length > 0) {
-      mapInstance.renderConflicts(conflicts);
-    }
-  }
-  
+        if (conflicts.length > 0) {
+          mapInstance.renderConflicts(conflicts);
+        }
+      }
+      
   // Reactive statement to update map when store changes
   $: if (mapInstance && $cellsStore.items.length > 0) {
     updateMapVisualization();
@@ -375,7 +375,7 @@
           <NetworkSelector on:manage={() => showNetworkManager = true} />
         </div>
       {/if}
-    </div>
+        </div>
 
     <div class="topbar-stats">
       <div class="stat-item">
@@ -386,12 +386,12 @@
       <div class="stat-item warning">
         <span class="stat-value">{$conflictCount}</span>
         <span class="stat-label">Conflicts</span>
-        </div>
+      </div>
       <div class="stat-divider"></div>
       <div class="stat-item danger">
         <span class="stat-value">{$criticalConflictCount}</span>
         <span class="stat-label">Critical</span>
-      </div>
+    </div>
     </div>
 
     <div class="topbar-actions">

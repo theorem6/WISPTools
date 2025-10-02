@@ -103,14 +103,42 @@ export class PCIArcGISMapper {
         spatialReference: { wkid: 4326 }
       });
       
+      // Create a sector cone instead of a simple marker
+      const azimuth = (cell as any).azimuth || 0;
+      const sectorWidth = 65; // degrees (typical cell sector width)
+      const sectorRadius = 0.005; // ~500m in degrees
+      
+      // Calculate sector polygon points
+      const startAngle = azimuth - sectorWidth / 2;
+      const endAngle = azimuth + sectorWidth / 2;
+      const rings = [[
+        [cell.longitude, cell.latitude], // Center point
+      ]];
+      
+      // Add arc points
+      for (let angle = startAngle; angle <= endAngle; angle += 5) {
+        const radians = (angle * Math.PI) / 180;
+        const x = cell.longitude + sectorRadius * Math.sin(radians);
+        const y = cell.latitude + sectorRadius * Math.cos(radians);
+        rings[0].push([x, y]);
+      }
+      
+      // Close the polygon
+      rings[0].push([cell.longitude, cell.latitude]);
+      
+      const sectorPolygon = {
+        type: "polygon",
+        rings: rings,
+        spatialReference: { wkid: 4326 }
+      };
+      
       const graphic = new Graphic({
-        geometry: point,
+        geometry: sectorPolygon,
         symbol: {
-          type: "simple-marker",
-          color: this.getPCIColorArray(cell.pci),
-          size: 12,
+          type: "simple-fill",
+          color: [...this.getPCIColorArray(cell.pci), 0.6], // Semi-transparent
           outline: {
-            color: [255, 255, 255, 1],
+            color: this.getPCIColorArray(cell.pci),
             width: 2
           }
         },

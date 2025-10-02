@@ -203,7 +203,7 @@ export class PCIOptimizer {
   }
 
   /**
-   * Find an optimal PCI that minimizes conflicts
+   * Find an optimal PCI that minimizes conflicts considering azimuth and spatial relationships
    */
   private findOptimalPCI(cells: Cell[], targetCell: Cell, currentConflict: PCIConflict): number {
     const neighborCells = this.findNeighborCells(cells, targetCell);
@@ -221,28 +221,43 @@ export class PCIOptimizer {
       // Test this PCI against all neighbor cells
       for (const neighbor of neighborCells) {
         const distance = this.calculateDistance(targetCell, neighbor);
+        const azimuthDiff = this.calculateAzimuthDifference(targetCell, neighbor);
+        const isColocated = this.areCellsColocated(targetCell, neighbor);
         
-        // Check for mod conflicts
+        // Azimuth-aware conflict penalties
+        // Sectors facing each other are more likely to interfere
+        const azimuthFactor = this.calculateAzimuthInterferenceFactor(azimuthDiff);
+        
+        // Check for mod conflicts with azimuth weighting
         if (candidatePCI % 3 === neighbor.pci % 3) {
-          score -= 100; // Heavy penalty for Mod3 conflicts
+          score -= 100 * azimuthFactor; // Heavier penalty if sectors face each other
         }
         if (candidatePCI % 6 === neighbor.pci % 6) {
-          score -= 50; // Medium penalty for Mod6 conflicts
+          score -= 50 * azimuthFactor;
         }
         if (candidatePCI % 12 === neighbor.pci % 12) {
-          score -= 25; // Lower penalty for Mod12 conflicts
+          score -= 25 * azimuthFactor;
         }
         if (candidatePCI % 30 === neighbor.pci % 30) {
-          score -= 10; // Lowest penalty for Mod30 conflicts
+          score -= 10 * azimuthFactor;
         }
 
-        // Bonus for distance separation
-        if (distance > 2000) {
-          score += 5;
-        } else if (distance > 1000) {
-          score += 3;
-        } else if (distance > 500) {
-          score += 1;
+        // Co-located cells (same tower) should have distinct mod3 values
+        if (isColocated) {
+          if (candidatePCI % 3 === neighbor.pci % 3) {
+            score -= 200; // Very heavy penalty for co-located mod3 conflicts
+          } else {
+            score += 50; // Bonus for different mod3 on same tower
+          }
+        }
+
+        // Bonus for distance separation (reduced if not facing each other)
+        const distanceBonus = this.calculateDistanceBonus(distance) * (1 - azimuthFactor * 0.5);
+        score += distanceBonus;
+        
+        // Bonus for back-to-back sectors (facing away from each other)
+        if (azimuthDiff > 135 && azimuthDiff < 225) {
+          score += 20; // Sectors pointing away from each other can share mod3
         }
       }
 
@@ -261,6 +276,67 @@ export class PCIOptimizer {
     }
 
     return bestPCI;
+  }
+  
+  /**
+   * Calculate azimuth difference between two cells
+   */
+  private calculateAzimuthDifference(cell1: Cell, cell2: Cell): number {
+    const azimuth1 = (cell1 as any).azimuth || 0;
+    const azimuth2 = (cell2 as any).azimuth || 0;
+    
+    // Calculate absolute difference
+    let diff = Math.abs(azimuth1 - azimuth2);
+    
+    // Handle wrap-around (e.g., 350° and 10° are only 20° apart)
+    if (diff > 180) {
+      diff = 360 - diff;
+    }
+    
+    return diff;
+  }
+  
+  /**
+   * Calculate how much two sectors interfere based on their azimuth relationship
+   * Returns 0-1, where 1 means maximum interference (facing each other)
+   */
+  private calculateAzimuthInterferenceFactor(azimuthDiff: number): number {
+    // Sectors facing each other (0-45°) have maximum interference
+    if (azimuthDiff < 45) {
+      return 1.0;
+    }
+    // Moderate interference (45-90°)
+    else if (azimuthDiff < 90) {
+      return 0.7;
+    }
+    // Low interference (90-135°)
+    else if (azimuthDiff < 135) {
+      return 0.4;
+    }
+    // Back-to-back sectors (135-180°) have minimal interference
+    else {
+      return 0.2;
+    }
+  }
+  
+  /**
+   * Check if two cells are co-located (same tower)
+   */
+  private areCellsColocated(cell1: Cell, cell2: Cell): boolean {
+    const distance = this.calculateDistance(cell1, cell2);
+    // Cells within 50 meters are considered co-located
+    return distance < 50 && cell1.eNodeB === cell2.eNodeB;
+  }
+  
+  /**
+   * Calculate distance bonus based on separation
+   */
+  private calculateDistanceBonus(distance: number): number {
+    if (distance > 5000) return 10;
+    if (distance > 2000) return 5;
+    if (distance > 1000) return 3;
+    if (distance > 500) return 1;
+    return 0;
   }
 
   /**

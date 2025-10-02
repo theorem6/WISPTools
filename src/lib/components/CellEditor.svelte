@@ -30,7 +30,6 @@
         frequency: 2100,
         rsPower: -75,
         azimuth: 0,
-        towerType: '3-sector',
         technology: 'LTE',
         earfcn: 1950,
         centerFreq: 2100,
@@ -366,15 +365,9 @@
                 min="0"
                 max="359"
                 placeholder="0-359"
+                required
               />
-            </div>
-            
-            <div class="form-group">
-              <label for="towerType">Tower Type</label>
-              <select id="towerType" bind:value={editedCell.towerType}>
-                <option value="3-sector">3-Sector</option>
-                <option value="4-sector">4-Sector</option>
-              </select>
+              <span class="helper-text">Direction the antenna is pointing (0° = North)</span>
             </div>
           </div>
         </section>
