@@ -174,6 +174,35 @@
     editedCell.frequency = editedCell.centerFreq; // Legacy field
     editedCell.ulEarfcn = calculateUlEarfcn(dlEarfcn);
   }
+  
+  // Smart detection: determine if input is frequency or EARFCN
+  function detectAndConvert(value: number) {
+    // Heuristic: frequencies are typically 600-4000 MHz, EARFCNs are 0-70000
+    // If value is between 600-4000, treat as frequency
+    // If value is between 0-599 or 4000-70000, treat as EARFCN
+    
+    if (value >= 600 && value <= 4000) {
+      // Likely a frequency in MHz
+      console.log('Detected frequency:', value, 'MHz');
+      editedCell.centerFreq = value;
+      handleCenterFreqChange();
+    } else if (value >= 0 && value < 70001) {
+      // Likely an EARFCN
+      console.log('Detected EARFCN:', value);
+      editedCell.dlEarfcn = value;
+      handleDlEarfcnChange();
+    }
+  }
+  
+  // Handle smart input field
+  let smartInputValue = '';
+  function handleSmartInput() {
+    const value = parseFloat(smartInputValue);
+    if (!isNaN(value) && value >= 0) {
+      detectAndConvert(value);
+      smartInputValue = ''; // Clear after processing
+    }
+  }
 </script>
 
 {#if isOpen}
@@ -288,6 +317,37 @@
         <!-- RF Parameters Section -->
         <section class="editor-section">
           <h3>RF Parameters</h3>
+          
+          <!-- Smart Frequency/EARFCN Input -->
+          <div class="smart-input-section">
+            <label for="smartInput">🎯 Quick Entry: Frequency or EARFCN</label>
+            <p class="smart-help">Enter a frequency (e.g., 2100, 3550) or EARFCN (e.g., 1950, 55240) - it will auto-detect!</p>
+            <div class="smart-input-group">
+              <input 
+                type="number" 
+                id="smartInput"
+                bind:value={smartInputValue}
+                placeholder="2100 or 1950 or 55240..."
+                on:keydown={(e) => e.key === 'Enter' && handleSmartInput()}
+                class="smart-input"
+              />
+              <button 
+                type="button"
+                class="smart-btn" 
+                on:click={handleSmartInput}
+                disabled={!smartInputValue}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 11 12 14 22 4"></polyline>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                Auto-Fill
+              </button>
+            </div>
+          </div>
+          
+          <div class="divider"></div>
+          
           <div class="form-grid">
             <div class="form-group">
               <label for="dlEarfcn">DL EARFCN</label>
@@ -683,6 +743,91 @@
   .save-btn:hover {
     background: var(--button-primary-hover);
     box-shadow: var(--shadow-sm);
+  }
+
+  /* Smart Input Section */
+  .smart-input-section {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--success-light) 100%);
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius-lg);
+  }
+
+  .smart-input-section label {
+    display: block;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+  }
+
+  .smart-help {
+    margin: 0 0 1rem 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .smart-input-group {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .smart-input {
+    flex: 1;
+    padding: 0.875rem;
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background: white;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: all var(--transition);
+  }
+
+  .smart-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px var(--primary-light);
+  }
+
+  .smart-input::placeholder {
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  .smart-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius);
+    background: var(--primary-color);
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+
+  .smart-btn:hover:not(:disabled) {
+    background: var(--button-primary-hover);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .smart-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border-color), transparent);
+    margin: 1.5rem 0;
   }
 </style>
 
