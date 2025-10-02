@@ -352,59 +352,139 @@ export class SimplePCIOptimizer {
   }
   
   /**
-   * Pick a random PCI that's good (simple, effective logic)
+   * Pick a PCI following WISP hierarchy:
+   * 1. MUST avoid MOD3 conflicts on same channel
+   * 2. Should avoid MOD30 conflicts on same channel
+   * 3. Allow N=1 reuse on different channels
    */
   private pickRandomGoodPCI(cell: Cell, allCells: Cell[], usedPCIs: Set<number>, extraRandom = false): number {
     const currentMod3 = cell.pci % 3;
+    const currentEarfcn = cell.earfcn || cell.frequency;
     
-    // Find nearby cells (within 5km) - these are the ones that matter
+    // Find nearby cells (within 10km) - these are the ones that matter
     const nearbyCells = allCells.filter(c => {
       if (c.id === cell.id) return false;
       const dist = this.distance(cell.latitude, cell.longitude, c.latitude, c.longitude);
-      return dist < 5000; // 5km radius
+      return dist < 10000; // 10km radius
     });
     
+    // CRITICAL: Get cells on SAME CHANNEL (same EARFCN)
+    const sameChannelCells = nearbyCells.filter(c => {
+      const cEarfcn = c.earfcn || c.frequency;
+      return Math.abs(cEarfcn - currentEarfcn) < 1; // Same channel
+    });
+    
+    // Get forbidden PCIs and Mod values for SAME CHANNEL
+    const sameChannelPCIs = new Set(sameChannelCells.map(c => c.pci));
+    const sameChannelMod3s = new Set(sameChannelCells.map(c => c.pci % 3)); // MUST avoid
+    const sameChannelMod30s = new Set(sameChannelCells.map(c => c.pci % 30)); // SHOULD avoid
+    
+    // Get nearby PCIs on different channels (less restrictive)
     const nearbyPCIs = new Set(nearbyCells.map(c => c.pci));
     const nearbyMod3s = new Set(nearbyCells.map(c => c.pci % 3));
     
-    // STEP 1: Try to find PCIs with different Mod3 from ALL nearby cells
-    const availableMod3Groups = [0, 1, 2].filter(mod3 => !nearbyMod3s.has(mod3));
+    // STEP 1: PRIORITY - Avoid same-channel MOD3 conflicts (CRITICAL)
+    // Find PCIs that have different MOD3 from same-channel cells AND different MOD30
+    const sameChannelSafeMod3Groups = [0, 1, 2].filter(mod3 => !sameChannelMod3s.has(mod3));
     
-    if (availableMod3Groups.length > 0) {
-      // Pick a random Mod3 group that's not used nearby
-      const randomMod3 = availableMod3Groups[Math.floor(Math.random() * availableMod3Groups.length)];
-      
-      // Collect all available PCIs in this Mod3 group
+    if (sameChannelSafeMod3Groups.length > 0) {
       const candidates = [];
-      for (let pci = randomMod3; pci <= this.PCI_MAX; pci += 3) {
-        if (pci >= this.PCI_MIN && !nearbyPCIs.has(pci)) {
+      
+      for (const safeMod3 of sameChannelSafeMod3Groups) {
+        for (let pci = safeMod3; pci <= this.PCI_MAX; pci += 3) {
+          if (pci < this.PCI_MIN) continue;
+          
+          const pciMod30 = pci % 30;
+          
+          // CRITICAL: Must not match same-channel MOD3
+          if (sameChannelMod3s.has(pci % 3)) continue;
+          
+          // HIGH PRIORITY: Should not match same-channel MOD30 (PSS/SSS)
+          if (sameChannelMod30s.has(pciMod30)) continue;
+          
+          // Avoid using exact same PCI as same-channel cells
+          if (sameChannelPCIs.has(pci)) continue;
+          
+          // Avoid if nearby cells on ANY channel use it (less restrictive)
+          if (!extraRandom && nearbyPCIs.has(pci)) continue;
+          
           candidates.push(pci);
         }
       }
       
       if (candidates.length > 0) {
-        // Pick RANDOM from candidates (not first!)
         const randomPCI = candidates[Math.floor(Math.random() * candidates.length)];
-        console.log(`      → Strategy: Different Mod3 (${randomMod3}) - picked ${randomPCI} from ${candidates.length} options`);
+        console.log(`      → OPTIMAL: No same-channel MOD3/MOD30 conflict - picked ${randomPCI} (${candidates.length} options)`);
         return randomPCI;
       }
     }
     
-    // STEP 2: If can't get different Mod3, at least get different PCI
-    const availablePCIs = [];
-    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
-      if (!nearbyPCIs.has(pci) && pci % 3 !== currentMod3) {
-        availablePCIs.push(pci);
+    // STEP 2: Relax MOD30 constraint if needed, but KEEP MOD3 constraint for same channel
+    if (sameChannelSafeMod3Groups.length > 0) {
+      const candidates = [];
+      
+      for (const safeMod3 of sameChannelSafeMod3Groups) {
+        for (let pci = safeMod3; pci <= this.PCI_MAX; pci += 3) {
+          if (pci < this.PCI_MIN) continue;
+          
+          // CRITICAL: Still must not match same-channel MOD3
+          if (sameChannelMod3s.has(pci % 3)) continue;
+          
+          // Allow MOD30 match now (less optimal but acceptable)
+          // Avoid exact PCI match on same channel
+          if (sameChannelPCIs.has(pci)) continue;
+          
+          candidates.push(pci);
+        }
+      }
+      
+      if (candidates.length > 0) {
+        const randomPCI = candidates[Math.floor(Math.random() * candidates.length)];
+        console.log(`      → GOOD: No same-channel MOD3 conflict (MOD30 may exist) - picked ${randomPCI}`);
+        return randomPCI;
       }
     }
     
-    if (availablePCIs.length > 0) {
-      const randomPCI = availablePCIs[Math.floor(Math.random() * availablePCIs.length)];
-      console.log(`      → Strategy: Different PCI, any Mod3 - picked ${randomPCI}`);
+    // STEP 3: Try different channels with different MOD3 from all nearby
+    const availableMod3Groups = [0, 1, 2].filter(mod3 => !nearbyMod3s.has(mod3));
+    
+    if (availableMod3Groups.length > 0) {
+      const candidates = [];
+      for (const mod3 of availableMod3Groups) {
+        for (let pci = mod3; pci <= this.PCI_MAX; pci += 3) {
+          if (pci < this.PCI_MIN) continue;
+          if (!nearbyPCIs.has(pci)) {
+            candidates.push(pci);
+          }
+        }
+      }
+      
+      if (candidates.length > 0) {
+        const randomPCI = candidates[Math.floor(Math.random() * candidates.length)];
+        console.log(`      → ACCEPTABLE: Different MOD3 from all nearby - picked ${randomPCI}`);
+        return randomPCI;
+      }
+    }
+    
+    // STEP 4: At least avoid same-channel conflicts (critical constraint)
+    const candidates = [];
+    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
+      // MUST not match same-channel MOD3 (critical rule)
+      if (sameChannelMod3s.has(pci % 3)) continue;
+      
+      // Avoid exact same-channel PCI match
+      if (sameChannelPCIs.has(pci)) continue;
+      
+      candidates.push(pci);
+    }
+    
+    if (candidates.length > 0) {
+      const randomPCI = candidates[Math.floor(Math.random() * candidates.length)];
+      console.log(`      → MINIMUM: No same-channel MOD3 - picked ${randomPCI}`);
       return randomPCI;
     }
     
-    // STEP 3: Last resort - pick ANY PCI >= 30 that's not used
+    // STEP 5: Last resort - any PCI >= 30 that's not globally used
     const anyAvailable = [];
     for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
       if (!usedPCIs.has(pci)) {
@@ -414,13 +494,13 @@ export class SimplePCIOptimizer {
     
     if (anyAvailable.length > 0) {
       const randomPCI = anyAvailable[Math.floor(Math.random() * anyAvailable.length)];
-      console.log(`      → Strategy: Any unused PCI - picked ${randomPCI}`);
+      console.warn(`      → ⚠️  LAST RESORT: Any unused PCI - picked ${randomPCI}`);
       return randomPCI;
     }
     
-    // STEP 4: Absolute last resort - random PCI >= 30
+    // STEP 6: Absolute last resort - random PCI >= 30
     const randomPCI = Math.floor(Math.random() * (this.PCI_MAX - this.PCI_MIN + 1)) + this.PCI_MIN;
-    console.log(`      → Strategy: Random fallback - picked ${randomPCI}`);
+    console.error(`      → ❌ FORCED: Random fallback - picked ${randomPCI} (may cause conflicts)`);
     return randomPCI;
   }
   

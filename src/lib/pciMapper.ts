@@ -427,7 +427,10 @@ class PCIMapper {
   }
   
   /**
-   * Calculate conflict severity based on conflict type, distance, and signal power
+   * Calculate conflict severity based on WISP hierarchy:
+   * 1. Same channel PCI MUST not have MOD3 conflicts (CRITICAL)
+   * 2. Avoid Modulus 30 on same channels (HIGH - PSS/SSS collision)
+   * 3. Allow N=1 reuse but reduce PSS/SSS conflicts
    */
   private calculateSeverity(
     conflictType: PCIConflict['conflictType'], 
@@ -438,51 +441,81 @@ class PCIMapper {
   ): PCIConflict['severity'] {
     const signalDifference = Math.abs(rsPower1 - rsPower2);
     
-    // Define severity thresholds
+    // HIERARCHY RULE 1: Same channel MOD3 conflicts are ALWAYS CRITICAL
+    if (frequencyOverlap && conflictType === 'MOD3') {
+      // MOD3 on same channel causes CRS (Cell Reference Signal) collision
+      // This MUST be avoided - highest priority
+      if (distance < 5000) { // Within 5km
+        return 'CRITICAL';
+      } else if (distance < 10000) { // 5-10km
+        return 'HIGH';
+      }
+      return 'MEDIUM';
+    }
+    
+    // HIERARCHY RULE 2: Same channel MOD30 conflicts are HIGH priority
+    if (frequencyOverlap && conflictType === 'MOD30') {
+      // MOD30 on same channel causes PSS/SSS (synchronization signal) collision
+      // Should be avoided, but less critical than MOD3
+      if (distance < 3000 && signalDifference < 6) {
+        return 'HIGH'; // Not CRITICAL, but important to fix
+      } else if (distance < 8000) {
+        return 'MEDIUM';
+      }
+      return 'LOW';
+    }
+    
+    // HIERARCHY RULE 3: Same channel, same PCI (co-channel interference)
+    if (frequencyOverlap && conflictType === 'FREQUENCY') {
+      // This is N=1 reuse territory - can be allowed if far enough apart
+      if (distance < 2000) {
+        return 'CRITICAL'; // Too close for N=1 reuse
+      } else if (distance < 5000) {
+        return 'HIGH';
+      } else if (distance < 10000) {
+        return 'MEDIUM'; // N=1 reuse acceptable at this distance
+      }
+      return 'LOW'; // Far enough for N=1 reuse
+    }
+    
+    // Different channels have relaxed rules (interference is lower)
     const thresholds = {
-      FREQUENCY: {
-        critical: 1000,
-        high: 2000,
-        medium: 5000
-      },
       ADJACENT_CHANNEL: {
         critical: 500,
         high: 1000,
         medium: 2000
       },
       MOD3: { 
-        critical: 500, 
-        high: 1000, 
+        critical: 300,  // Less critical on different channels
+        high: 800, 
         medium: 2000 
       },
       MOD6: { 
-        critical: 300, 
-        high: 700, 
+        critical: 200, 
+        high: 600, 
         medium: 1500 
       },
       MOD12: { 
-        critical: 200, 
-        high: 500, 
+        critical: 150, 
+        high: 400, 
         medium: 1000 
       },
       MOD30: { 
-        critical: 100, 
+        critical: 100,  // PSS/SSS reuse less critical on different channels
         high: 300, 
-        medium: 600 
+        medium: 800 
       }
     };
     
     const threshold = thresholds[conflictType];
+    if (!threshold) return 'LOW';
     
-    // Frequency overlap increases severity
-    const frequencyMultiplier = frequencyOverlap ? 0.5 : 1.0;
-    const adjustedDistance = distance * frequencyMultiplier;
-    
-    if (adjustedDistance < threshold.critical && signalDifference < 6) {
+    // For different channels, use standard thresholds
+    if (distance < threshold.critical && signalDifference < 6) {
       return 'CRITICAL';
-    } else if (adjustedDistance < threshold.high && signalDifference < 9) {
+    } else if (distance < threshold.high && signalDifference < 9) {
       return 'HIGH';
-    } else if (adjustedDistance < threshold.medium && signalDifference < 12) {
+    } else if (distance < threshold.medium && signalDifference < 12) {
       return 'MEDIUM';
     }
     
