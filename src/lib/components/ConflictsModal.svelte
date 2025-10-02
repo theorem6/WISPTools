@@ -37,6 +37,13 @@
                   <span class="badge {conflict.severity.toLowerCase()}">{conflict.severity}</span>
                   <span class="type">{conflict.conflictType}</span>
                   <span class="distance">{conflict.distance.toFixed(0)}m</span>
+                  {#if conflict.losChecked}
+                    {#if conflict.terrainBlocked}
+                      <span class="los-badge blocked" title="Terrain blocks line of sight">🗻 No LOS</span>
+                    {:else if conflict.hasLineOfSight}
+                      <span class="los-badge clear" title="Clear line of sight">👁️ LOS</span>
+                    {/if}
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -212,6 +219,24 @@
   .type, .distance {
     font-size: 0.875rem;
     color: var(--text-secondary);
+  }
+
+  .los-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius);
+    white-space: nowrap;
+  }
+
+  .los-badge.blocked {
+    background: var(--success-light);
+    color: var(--success-color);
+  }
+
+  .los-badge.clear {
+    background: var(--warning-light);
+    color: var(--warning-color);
   }
 
   .empty-state {

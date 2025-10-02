@@ -35,17 +35,17 @@ export class PCIOptimizer {
   private readonly CONVERGENCE_THRESHOLD = 0; // Stop when no conflicts remain
 
   /**
-   * Optimize PCI assignments to minimize conflicts
+   * Optimize PCI assignments to minimize conflicts with LOS awareness
    */
-  optimizePCIAssignments(cells: Cell[]): OptimizationResult {
+  async optimizePCIAssignments(cells: Cell[], checkLOS: boolean = true): Promise<OptimizationResult> {
     const originalCells = JSON.parse(JSON.stringify(cells)) as Cell[];
     let currentCells = JSON.parse(JSON.stringify(cells)) as Cell[];
     
     const changes: PCIChange[] = [];
     const convergenceHistory: IterationHistory[] = [];
     
-    // Initial conflict analysis
-    const initialConflicts = pciMapper.detectConflicts(currentCells);
+    // Initial conflict analysis with LOS checking
+    const initialConflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
     const originalConflictCount = initialConflicts.length;
 
     let iteration = 0;
@@ -56,8 +56,8 @@ export class PCIOptimizer {
     while (iteration < this.MAX_ITERATIONS) {
       iteration++;
       
-      // Detect current conflicts
-      const conflicts = pciMapper.detectConflicts(currentCells);
+      // Detect current conflicts with LOS checking
+      const conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
       const conflictCount = conflicts.length;
       
       // Track iteration history
@@ -90,8 +90,8 @@ export class PCIOptimizer {
       previousConflictCount = conflictCount;
     }
 
-    // Final conflict analysis
-    const finalConflicts = pciMapper.detectConflicts(currentCells);
+    // Final conflict analysis with LOS checking
+    const finalConflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
     const finalConflictCount = finalConflicts.length;
     const resolvedConflicts = originalConflictCount - finalConflictCount;
     const conflictReduction = originalConflictCount > 0 

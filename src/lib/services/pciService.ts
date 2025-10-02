@@ -146,7 +146,7 @@ export class PCIService {
       analysisActions.setLoading(true);
       
       // Detect conflicts
-      const analysis = pciMapper.analyzeConflicts(cells);
+      const analysis = await pciMapper.analyzeConflicts(cells, true); // Enable LOS checking
       const conflicts = analysis.conflicts;
       
       // Update conflicts store
@@ -216,13 +216,13 @@ export class PCIService {
       optimizationActions.setOptimizing(true);
       
       // Run optimization
-      const result = pciOptimizer.optimizePCIAssignments(cells);
+      const result = await pciOptimizer.optimizePCIAssignments(cells, true); // Enable LOS checking
       
       // Update stores
       optimizationActions.setResult(result);
       cellsActions.set(result.optimizedCells);
       
-      // Re-run analysis with optimized cells
+      // Re-run analysis with optimized cells (with LOS)
       await this.performAnalysis(result.optimizedCells);
       
       return { success: true, data: result };

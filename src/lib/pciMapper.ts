@@ -12,6 +12,8 @@
 // This flat format simplifies conflict detection by representing each sector
 // as an independent "cell" record with inherited tower coordinates.
 
+import { losService, type LOSResult } from './services/losService';
+
 export interface Cell {
   id: string;                  // Sector ID (inherits from Cell Site)
   eNodeB: number;              // Cell Site eNodeB ID
@@ -22,6 +24,8 @@ export interface Cell {
   frequency: number;           // Primary frequency in MHz (from Channel)
   rsPower: number;             // Reference signal power (Sector property)
   azimuth?: number;            // Sector azimuth direction (0-359 degrees) - SECTOR property
+  beamwidth?: number;          // Sector beamwidth (33-120 degrees) - SECTOR property
+  heightAGL?: number;          // Height above ground level in feet - SECTOR property
   towerType?: '3-sector' | '4-sector'; // Cell Site configuration
   technology?: 'LTE' | 'CBRS' | 'LTE+CBRS'; // Sector technology
   
@@ -41,6 +45,9 @@ export interface PCIConflict {
   distance: number; // in meters
   frequencyOverlap?: boolean; // Whether cells operate on overlapping frequencies
   channelSeparation?: number; // Channel separation in MHz
+  hasLineOfSight?: boolean; // Whether sectors have terrain-based LOS
+  terrainBlocked?: boolean; // Whether terrain blocks the signal path
+  losChecked?: boolean; // Whether LOS analysis was performed
 }
 
 export interface PCIConflictAnalysis {
@@ -182,11 +189,12 @@ class PCIMapper {
   }
 
   /**
-   * Detect PCI conflicts based on LTE standards
+   * Detect PCI conflicts based on LTE standards with Line of Sight analysis
    * Supports:
    * - Traditional 3-sector towers (120 degrees apart)
    * - CBRS 4-sector towers (90 degrees apart)
    * - Frequency-based conflicts (co-channel, adjacent channel)
+   * - Terrain-based line of sight checking (reduces conflicts when blocked)
    * 
    * PCI conflicts occur when:
    * - CRS (Cell Reference Signal) collision: PCI % 3 = same
@@ -195,8 +203,13 @@ class PCIMapper {
    * - PRS interference: PCI % 30 = same
    * - Co-channel frequency overlap with same PCI
    * - Adjacent channel interference with conflicting PCI
+   * 
+   * LOS Integration:
+   * - Checks if sectors have line of sight using ArcGIS elevation data
+   * - Reduces conflict severity when terrain blocks the signal path
+   * - Considers sector azimuth, beamwidth, and height AGL
    */
-  detectConflicts(cells: Cell[]): PCIConflict[] {
+  async detectConflicts(cells: Cell[], checkLOS: boolean = true): Promise<PCIConflict[]> {
     const conflicts: PCIConflict[] = [];
     
     for (let i = 0; i < cells.length; i++) {
@@ -267,10 +280,43 @@ class PCIMapper {
             }
           }
         }
+        // Check line of sight if enabled and sectors have required data
+        let losResult: LOSResult | null = null;
+        if (checkLOS && cell1.azimuth !== undefined && cell2.azimuth !== undefined) {
+          try {
+            losResult = await losService.checkLineOfSight(
+              cell1.latitude,
+              cell1.longitude,
+              cell1.heightAGL || 100,
+              cell1.azimuth,
+              cell1.beamwidth || 65,
+              cell2.latitude,
+              cell2.longitude,
+              cell2.heightAGL || 100,
+              cell2.azimuth,
+              cell2.beamwidth || 65
+            );
+          } catch (error) {
+            console.warn('LOS check failed, assuming LOS exists:', error);
+            losResult = null;
+          }
+        }
         
         for (const conflictType of conflictTypes) {
           if (conflictType.check(cell1.pci, cell2.pci)) {
-            const severity = this.calculateSeverity(conflictType.type, distance, cell1.rsPower, cell2.rsPower, frequencyInfo.overlap);
+            // Calculate base severity
+            let severity = this.calculateSeverity(
+              conflictType.type, 
+              distance, 
+              cell1.rsPower, 
+              cell2.rsPower, 
+              frequencyInfo.overlap
+            );
+            
+            // Reduce severity if no line of sight (terrain blocks signal)
+            if (losResult && !losResult.hasLineOfSight) {
+              severity = this.reduceSeverityForNoLOS(severity);
+            }
             
             conflicts.push({
               primaryCell: cell1,
@@ -279,7 +325,10 @@ class PCIMapper {
               severity,
               distance,
               frequencyOverlap: frequencyInfo.overlap,
-              channelSeparation: frequencyInfo.separation
+              channelSeparation: frequencyInfo.separation,
+              hasLineOfSight: losResult?.hasLineOfSight,
+              terrainBlocked: losResult?.terrainBlocked,
+              losChecked: losResult !== null
             });
           }
         }
@@ -360,6 +409,21 @@ class PCIMapper {
       // CBRS: 90° separation
       return 90;
     }
+  }
+  
+  /**
+   * Reduce conflict severity when there's no line of sight
+   * Terrain blocking significantly reduces interference
+   */
+  private reduceSeverityForNoLOS(severity: PCIConflict['severity']): PCIConflict['severity'] {
+    const severityMap: Record<PCIConflict['severity'], PCIConflict['severity']> = {
+      'CRITICAL': 'HIGH',     // Critical becomes High (still important but not critical)
+      'HIGH': 'MEDIUM',       // High becomes Medium
+      'MEDIUM': 'LOW',        // Medium becomes Low
+      'LOW': 'LOW'            // Low stays Low (minimal impact)
+    };
+    
+    return severityMap[severity];
   }
   
   /**
@@ -458,10 +522,10 @@ class PCIMapper {
   }
   
   /**
-   * Perform comprehensive PCI conflict analysis
+   * Perform comprehensive PCI conflict analysis with optional LOS checking
    */
-  analyzeConflicts(cells: Cell[]): PCIConflictAnalysis {
-    const conflicts = this.detectConflicts(cells);
+  async analyzeConflicts(cells: Cell[], checkLOS: boolean = true): Promise<PCIConflictAnalysis> {
+    const conflicts = await this.detectConflicts(cells, checkLOS);
     const conflictRate = cells.length > 0 ? (conflicts.length / cells.length) * 100 : 0;
     
     const recommendations = this.generateRecommendations(conflicts);
@@ -479,12 +543,17 @@ class PCIMapper {
     
     if (conflicts.length === 0) {
       recommendations.push('✓ No PCI conflicts detected. Network configuration is optimal.');
-      recommendations.push('Note: Analysis uses frequency-based propagation models to identify separate networks.');
+      recommendations.push('Note: Analysis uses frequency-based propagation models and terrain-based LOS to identify conflicts.');
       return recommendations;
     }
     
     const criticalConflicts = conflicts.filter(c => c.severity === 'CRITICAL');
     const highConflicts = conflicts.filter(c => c.severity === 'HIGH');
+    
+    // Check LOS statistics
+    const losCheckedConflicts = conflicts.filter(c => c.losChecked);
+    const blockedConflicts = conflicts.filter(c => c.terrainBlocked);
+    const losConflicts = conflicts.filter(c => c.losChecked && c.hasLineOfSight);
     
     if (criticalConflicts.length > 0) {
       recommendations.push(`URGENT: ${criticalConflicts.length} critical PCI conflicts detected requiring immediate attention.`);
@@ -492,6 +561,21 @@ class PCIMapper {
     
     if (highConflicts.length > 0) {
       recommendations.push(`${highConflicts.length} high-priority PCI conflicts should be resolved soon.`);
+    }
+    
+    // Add LOS analysis recommendations
+    if (losCheckedConflicts.length > 0) {
+      recommendations.push(`🗻 Terrain Analysis: ${losCheckedConflicts.length} conflicts checked for line-of-sight.`);
+      
+      if (blockedConflicts.length > 0) {
+        recommendations.push(`✓ ${blockedConflicts.length} conflicts have terrain blocking - reduced severity due to natural RF shielding.`);
+      }
+      
+      if (losConflicts.length > 0 && blockedConflicts.length > 0) {
+        recommendations.push(`⚠️ ${losConflicts.length} conflicts have clear line of sight - these are highest priority.`);
+      }
+    } else {
+      recommendations.push('Note: Enable sector azimuth/height data for terrain-based LOS analysis.');
     }
     
     // Add propagation-aware note
