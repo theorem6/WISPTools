@@ -345,18 +345,19 @@ export class PCIOptimizer {
   
   /**
    * Check if two sectors have overlapping coverage areas
-   * Based on azimuth and typical 65° sector beamwidth
+   * Based on azimuth and sector-specific beamwidth
    */
   private doSectorsOverlap(cell1: Cell, cell2: Cell): boolean {
     const azimuth1 = (cell1 as any).azimuth || 0;
     const azimuth2 = (cell2 as any).azimuth || 0;
-    const sectorWidth = 65; // Typical 3dB beamwidth
+    const beamwidth1 = (cell1 as any).beamwidth || 65;
+    const beamwidth2 = (cell2 as any).beamwidth || 65;
     
-    // Calculate sector coverage ranges
-    const sector1Start = (azimuth1 - sectorWidth / 2 + 360) % 360;
-    const sector1End = (azimuth1 + sectorWidth / 2) % 360;
-    const sector2Start = (azimuth2 - sectorWidth / 2 + 360) % 360;
-    const sector2End = (azimuth2 + sectorWidth / 2) % 360;
+    // Calculate sector coverage ranges using sector-specific beamwidths
+    const sector1Start = (azimuth1 - beamwidth1 / 2 + 360) % 360;
+    const sector1End = (azimuth1 + beamwidth1 / 2) % 360;
+    const sector2Start = (azimuth2 - beamwidth2 / 2 + 360) % 360;
+    const sector2End = (azimuth2 + beamwidth2 / 2) % 360;
     
     // Helper function to check if angle is within sector range
     const isInRange = (angle: number, start: number, end: number): boolean => {
@@ -383,16 +384,20 @@ export class PCIOptimizer {
    */
   private calculateSectorOverlap(cell1: Cell, cell2: Cell): number {
     const azimuthDiff = this.calculateAzimuthDifference(cell1, cell2);
-    const sectorWidth = 65;
+    const beamwidth1 = (cell1 as any).beamwidth || 65;
+    const beamwidth2 = (cell2 as any).beamwidth || 65;
+    
+    // Use the average beamwidth for overlap calculation
+    const avgBeamwidth = (beamwidth1 + beamwidth2) / 2;
     
     // Calculate overlap based on azimuth difference
-    if (azimuthDiff >= sectorWidth) {
+    if (azimuthDiff >= avgBeamwidth) {
       return 0; // No overlap
     }
     
     // Overlap percentage: more overlap = higher value
-    const overlapDegrees = sectorWidth - azimuthDiff;
-    const overlapPercentage = overlapDegrees / sectorWidth;
+    const overlapDegrees = avgBeamwidth - azimuthDiff;
+    const overlapPercentage = overlapDegrees / avgBeamwidth;
     
     return Math.max(0, Math.min(1, overlapPercentage));
   }

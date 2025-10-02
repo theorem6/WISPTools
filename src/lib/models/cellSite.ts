@@ -20,6 +20,7 @@ export interface Sector {
   id: string;              // Unique sector ID (e.g., "SITE001-SEC1")
   sectorNumber: number;    // Sector number (1, 2, 3, etc.)
   azimuth: number;         // Direction in degrees (0-359)
+  beamwidth: number;       // Horizontal beamwidth in degrees (typically 60-90)
   pci: number;             // Physical Cell ID (0-503)
   channels: Channel[];     // Multiple EARFCNs per sector
   rsPower: number;         // Reference signal power (dBm)
@@ -82,6 +83,7 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
       id: legacyCell.id,
       sectorNumber: legacyCell.sector,
       azimuth: legacyCell.azimuth || 0,
+      beamwidth: (legacyCell as any).beamwidth || 65, // Use sector beamwidth if available
       pci: legacyCell.pci,
       channels: [
         {
@@ -118,8 +120,8 @@ export function convertCellSiteToLegacy(sites: CellSite[]): LegacyCell[] {
           eNodeB: site.eNodeB,
           sector: sector.sectorNumber,
           pci: sector.pci,
-          latitude: site.latitude,
-          longitude: site.longitude,
+          latitude: site.latitude, // All sectors share the site's GPS coordinate
+          longitude: site.longitude, // All sectors share the site's GPS coordinate
           frequency: primaryChannel.centerFreq,
           rsPower: sector.rsPower,
           azimuth: sector.azimuth,
@@ -128,8 +130,9 @@ export function convertCellSiteToLegacy(sites: CellSite[]): LegacyCell[] {
           centerFreq: primaryChannel.centerFreq,
           channelBandwidth: primaryChannel.channelBandwidth,
           dlEarfcn: primaryChannel.dlEarfcn,
-          ulEarfcn: primaryChannel.ulEarfcn
-        });
+          ulEarfcn: primaryChannel.ulEarfcn,
+          ...(sector.beamwidth && { beamwidth: sector.beamwidth }) // Include beamwidth
+        } as any);
       }
     }
   }

@@ -105,7 +105,7 @@ export class PCIArcGISMapper {
       
       // Create a sector cone instead of a simple marker
       const azimuth = (cell as any).azimuth || 0;
-      const sectorWidth = 65; // degrees (typical cell sector width)
+      const sectorWidth = (cell as any).beamwidth || 65; // Use sector-specific beamwidth
       const sectorRadius = 0.005; // ~500m in degrees
       
       // Calculate sector polygon points

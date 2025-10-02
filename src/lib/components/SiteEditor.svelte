@@ -69,6 +69,7 @@
       id: `${editedSite.id}-SEC${sectorNumber}`,
       sectorNumber,
       azimuth: suggestedAzimuth,
+      beamwidth: 65, // Default 65° beamwidth (typical for macro cells)
       pci: 0,
       channels: [
         {
@@ -321,8 +322,27 @@
                       </div>
                     </div>
                     
+                    <!-- Beamwidth Control -->
+                    <div class="beamwidth-control">
+                      <label class="beamwidth-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 2L2 7v10c0 5.5 3.84 7.66 10 9 6.16-1.34 10-3.5 10-9V7l-10-5z"></path>
+                        </svg>
+                        Beamwidth (Coverage Angle)
+                      </label>
+                      <div class="beamwidth-selector">
+                        <select bind:value={sector.beamwidth} class="beamwidth-select">
+                          <option value={33}>33° (Narrow - Directional)</option>
+                          <option value={65}>65° (Standard - Macro)</option>
+                          <option value={78}>78° (Wide - Coverage)</option>
+                          <option value={90}>90° (Very Wide - Small Cell)</option>
+                          <option value={120}>120° (Ultra Wide - Omni-like)</option>
+                        </select>
+                        <span class="beamwidth-visual">{sector.beamwidth}°</span>
+                      </div>
+                    </div>
+                    
                     <div class="form-row">
-                      
                       <div class="form-group-sm">
                         <label>PCI</label>
                         <input 
@@ -796,6 +816,52 @@
     font-size: 1rem;
     font-weight: 700;
     box-shadow: var(--shadow-md);
+  }
+
+  .beamwidth-control {
+    padding: 0.875rem;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 0.75rem;
+  }
+
+  .beamwidth-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .beamwidth-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .beamwidth-select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .beamwidth-visual {
+    padding: 0.5rem 0.75rem;
+    background: var(--info-light);
+    color: var(--primary-color);
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: center;
   }
 
   .form-row {
