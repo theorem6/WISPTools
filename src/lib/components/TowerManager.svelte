@@ -5,6 +5,7 @@
   import { convertLegacyToCellSite, convertCellSiteToLegacy, type CellSite } from '../models/cellSite';
   import type { Cell } from '../pciMapper';
   import SiteEditor from './SiteEditor.svelte';
+  import ImportWizard from './ImportWizard.svelte';
   
   export let show = false;
   
@@ -82,10 +83,27 @@
     dispatch('close');
   }
   
+  let showImportWizard = false;
+  
   function handleAddTower() {
-    selectedSite = null;
-    isCreatingNewSite = true;
-    showSiteEditor = true;
+    // Show import wizard instead of directly opening site editor
+    showImportWizard = true;
+  }
+  
+  function handleImport(event: CustomEvent) {
+    const importedCells = event.detail.cells;
+    
+    // Add imported cells to the store (cast to any to handle Cell/LegacyCell compatibility)
+    const cells = [...$cellsStore.items, ...importedCells] as any;
+    cellsStore.set({ 
+      items: cells,
+      isLoading: false,
+      error: null
+    });
+    
+    // Close import wizard and notify parent
+    showImportWizard = false;
+    dispatch('towersChanged');
   }
   
   function handleEditTower(tower: Tower) {
@@ -125,8 +143,8 @@
     const legacyCells = convertCellSiteToLegacy([savedSite]);
     
     if (isCreatingNewSite) {
-      // Add new site
-      const cells = [...$cellsStore.items, ...legacyCells];
+      // Add new site (cast to any to handle Cell/LegacyCell compatibility)
+      const cells = [...$cellsStore.items, ...legacyCells] as any;
       cellsStore.set({ 
         items: cells,
         isLoading: false,
@@ -138,7 +156,7 @@
       const cells = [
         ...$cellsStore.items.filter(c => !c.id.startsWith(siteId)),
         ...legacyCells
-      ];
+      ] as any;
       cellsStore.set({ 
         items: cells,
         isLoading: false,
@@ -253,7 +271,7 @@
               <div class="tower-card" class:expanded={expandedTowerId === tower.eNodeB.toString()}>
                 <!-- svelte-ignore a11y-click-events-have-key-events -->
                 <!-- svelte-ignore a11y-no-static-element-interactions -->
-                <div class="tower-card-header" on:click={() => toggleExpand(tower.eNodeB.toString())}>
+                <div class="tower-card-header" on:click={() => toggleExpand(tower.eNodeB)}>
                   <div class="tower-info">
                     <div class="tower-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -309,7 +327,7 @@
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                       </svg>
                     </button>
-                    <button class="expand-btn" on:click|stopPropagation={() => toggleExpand(tower.eNodeB.toString())}>
+                    <button class="expand-btn" on:click|stopPropagation={() => toggleExpand(tower.eNodeB)}>
                       <svg 
                         width="16" 
                         height="16" 
@@ -386,6 +404,13 @@
     selectedSite = null; 
     isCreatingNewSite = false;
   }}
+/>
+
+<!-- Import Wizard Modal -->
+<ImportWizard 
+  show={showImportWizard}
+  on:import={handleImport}
+  on:close={() => showImportWizard = false}
 />
 
 <style>

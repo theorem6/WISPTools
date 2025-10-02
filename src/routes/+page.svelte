@@ -339,6 +339,11 @@
     showSiteEditor = true;
   }
   
+  function handleContextMenuImport() {
+    showContextMenu = false;
+    showImportWizard = true;
+  }
+  
   function handleContextMenuEditSector() {
     showContextMenu = false;
     const cell = $cellsStore.items.find(c => c.id === contextMenuCellId);
@@ -628,6 +633,7 @@
     hasSelectedCell={!!contextMenuCellId}
     cellId={contextMenuCellId}
     on:addSite={handleContextMenuAddSite}
+    on:import={handleContextMenuImport}
     on:editSector={handleContextMenuEditSector}
     on:deleteSector={handleContextMenuDeleteSector}
     on:close={() => showContextMenu = false}
