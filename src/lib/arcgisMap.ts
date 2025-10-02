@@ -16,6 +16,7 @@ export class PCIArcGISMapper {
   private mapView: any;
   private cellLayer: any;
   private conflictLayer: any;
+  private onCellClickCallback: ((cellId: string) => void) | null = null;
   
   constructor(containerId: string) {
     this.initializeMap(containerId);
@@ -307,6 +308,31 @@ export class PCIArcGISMapper {
   enableCellPopup() {
     if (this.mapView && this.mapView.popup) {
       this.mapView.popup.defaultPopupTemplateEnabled = true;
+    }
+  }
+  
+  /**
+   * Enable cell click events
+   */
+  onCellClick(callback: (cellId: string) => void) {
+    this.onCellClickCallback = callback;
+    
+    if (this.mapView) {
+      this.mapView.on('click', async (event: any) => {
+        const response = await this.mapView.hitTest(event);
+        
+        if (response.results.length > 0) {
+          const graphic = response.results[0].graphic;
+          
+          // Check if it's a cell graphic (not a conflict line)
+          if (graphic && graphic.attributes && graphic.attributes.CellId) {
+            const cellId = graphic.attributes.CellId;
+            if (this.onCellClickCallback) {
+              this.onCellClickCallback(cellId);
+            }
+          }
+        }
+      });
     }
   }
   

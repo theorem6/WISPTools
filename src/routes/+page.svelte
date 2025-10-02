@@ -31,6 +31,7 @@
   import UserProfile from '$lib/components/UserProfile.svelte';
   import NetworkManager from '$lib/components/NetworkManager.svelte';
   import NetworkSelector from '$lib/components/NetworkSelector.svelte';
+  import CellEditor from '$lib/components/CellEditor.svelte';
   
   // Auth and Network stores
   import { authStore, currentUser, isAuthenticated } from '$lib/stores/authStore';
@@ -40,6 +41,8 @@
   // Local state for modals
   let showImportWizard = false;
   let showNetworkManager = false;
+  let showCellEditor = false;
+  let selectedCell: Cell | null = null;
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -90,6 +93,11 @@
     if (mapContainer) {
       mapInstance = new PCIArcGISMapper(mapContainer);
       mapInstance.enableCellPopup();
+      
+      // Enable cell click to open editor
+      mapInstance.onCellClick((cellId) => {
+        handleCellClick(cellId);
+      });
     }
   });
   
@@ -260,6 +268,38 @@
   $: if (mapInstance && $cellsStore.items.length > 0) {
     updateMapVisualization();
   }
+  
+  // ========================================================================
+  // Cell Editor - Handle cell editing
+  // ========================================================================
+  
+  function handleCellClick(cellId: string) {
+    const cell = $cellsStore.items.find(c => c.id === cellId);
+    if (cell) {
+      selectedCell = cell;
+      showCellEditor = true;
+    }
+  }
+  
+  async function handleCellSave(event: CustomEvent) {
+    const updatedCell = event.detail as Cell;
+    
+    // Update cell in store
+    const cells = $cellsStore.items.map(c => 
+      c.id === updatedCell.id ? updatedCell : c
+    );
+    
+    cellsStore.set({ items: cells });
+    
+    // Re-analyze conflicts with updated cell
+    await performAnalysis();
+    
+    // Auto-save to network
+    await saveCurrentNetwork();
+    
+    showCellEditor = false;
+    selectedCell = null;
+  }
 </script>
 
 {#if $isAuthenticated}
@@ -389,14 +429,23 @@
     result={$optimizationStore.result}
     on:close={() => uiActions.closeModal('showOptimizationResultModal')}
   />
-</div>
-{:else}
+  
+  {#if selectedCell}
+    <CellEditor 
+      cell={selectedCell}
+      isOpen={showCellEditor}
+      on:save={handleCellSave}
+      on:close={() => { showCellEditor = false; selectedCell = null; }}
+    />
+  {/if}
+            </div>
+          {:else}
   <!-- Loading state while checking auth -->
   <div class="auth-loading">
     <div class="spinner"></div>
     <p>Loading...</p>
-  </div>
-{/if}
+    </div>
+  {/if}
 
 <style>
   /* App Container */
