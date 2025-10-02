@@ -192,29 +192,58 @@
         </section>
         
         <!-- Sectors Section -->
-        <section class="editor-section">
+        <section class="editor-section sectors-section">
           <div class="section-header">
-            <h3>Sectors (Transmitters)</h3>
-            <button type="button" class="add-sector-btn" on:click={addSector}>
-              ➕ Add Sector
+            <h3>📡 Sectors (Transmitters on this Cell)</h3>
+            <div class="sector-count-badge">{editedSite.sectors.length} Sector{editedSite.sectors.length !== 1 ? 's' : ''}</div>
+          </div>
+          
+          <div class="add-sector-prompt">
+            <button type="button" class="add-sector-btn-large" on:click={addSector}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="16"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+              </svg>
+              Add New Sector
             </button>
+            <p class="add-sector-hint">Each sector represents a separate antenna/transmitter on this cell site</p>
           </div>
           
           {#if editedSite.sectors.length === 0}
-            <p class="empty-message">No sectors yet. Click "Add Sector" to create one.</p>
+            <p class="empty-message">
+              📍 No sectors configured yet.<br/>
+              Click "Add New Sector" above to create your first sector.
+            </p>
           {:else}
-            <div class="sectors-list">
+            <div class="sectors-grid">
               {#each editedSite.sectors as sector, sectorIndex}
-                <div class="sector-card" class:selected={selectedSectorIndex === sectorIndex}>
-                  <div class="sector-header">
-                    <h4>Sector {sector.sectorNumber} - Azimuth {sector.azimuth}°</h4>
+                <div class="sector-unit" class:selected={selectedSectorIndex === sectorIndex}>
+                  <!-- Sector Header with Visual Indicator -->
+                  <div class="sector-unit-header">
+                    <div class="sector-title-section">
+                      <div class="sector-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                          <path d="M2 17l10 5 10-5"></path>
+                          <path d="M2 12l10 5 10-5"></path>
+                        </svg>
+                      </div>
+                      <div class="sector-title-info">
+                        <h4>Sector {sector.sectorNumber}</h4>
+                        <span class="sector-subtitle">Azimuth: {sector.azimuth}° | PCI: {sector.pci}</span>
+                      </div>
+                    </div>
                     <button 
                       type="button"
-                      class="remove-btn" 
+                      class="remove-sector-btn" 
                       on:click={() => removeSector(sectorIndex)}
-                      title="Remove sector"
+                      title="Remove this sector"
                     >
-                      🗑️
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
                     </button>
                   </div>
                   
@@ -466,79 +495,156 @@
     background: var(--bg-secondary);
   }
 
-  .add-sector-btn {
-    padding: 0.625rem 1.25rem;
-    border: none;
-    border-radius: var(--border-radius);
-    background: var(--success-color);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition);
+  .sectors-section {
+    background: linear-gradient(to bottom, var(--surface-secondary), var(--card-bg));
+    padding: 1.5rem;
+    border-radius: var(--border-radius-lg);
+    border: 2px dashed var(--border-color);
   }
 
-  .add-sector-btn:hover {
+  .sector-count-badge {
+    padding: 0.375rem 0.875rem;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .add-sector-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    background: var(--card-bg);
+    border: 2px dashed var(--primary-color);
+    border-radius: var(--border-radius-lg);
+  }
+
+  .add-sector-btn-large {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: var(--border-radius-lg);
+    background: var(--success-color);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition);
+    box-shadow: var(--shadow-md);
+  }
+
+  .add-sector-btn-large:hover {
     background: var(--success-dark);
-    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .add-sector-hint {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
   }
 
   .empty-message {
-    padding: 2rem;
+    padding: 3rem 2rem;
     text-align: center;
     color: var(--text-secondary);
-    font-style: italic;
+    font-size: 1rem;
+    line-height: 1.6;
   }
 
-  .sectors-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  .sectors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
   }
 
-  .sector-card {
-    border: 1px solid var(--border-color);
+  .sector-unit {
+    border: 2px solid var(--border-color);
     border-radius: var(--border-radius-lg);
-    padding: 1rem;
-    background: var(--surface-secondary);
+    padding: 0;
+    background: var(--card-bg);
     transition: all var(--transition);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
   }
 
-  .sector-card.selected {
+  .sector-unit.selected {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px var(--primary-light);
+    box-shadow: 0 0 0 3px var(--primary-light), var(--shadow-md);
+    transform: scale(1.02);
   }
 
-  .sector-header {
+  .sector-unit-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-bottom: 2px solid var(--primary-dark);
   }
 
-  .sector-header h4 {
+  .sector-title-section {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sector-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+  }
+
+  .sector-title-info h4 {
     margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: white;
   }
 
-  .remove-btn {
-    padding: 0.375rem 0.75rem;
+  .sector-subtitle {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+  }
+
+  .remove-sector-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
     border: none;
-    border-radius: var(--border-radius);
-    background: var(--danger-light);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
     cursor: pointer;
     transition: all var(--transition);
   }
 
-  .remove-btn:hover {
+  .remove-sector-btn:hover {
     background: var(--danger-color);
+    transform: scale(1.1);
   }
 
   .sector-details {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    padding: 1.25rem;
   }
 
   .form-row {
