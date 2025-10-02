@@ -749,8 +749,8 @@
   .smart-input-section {
     margin-bottom: 1.5rem;
     padding: 1.25rem;
-    background: linear-gradient(135deg, var(--primary-light) 0%, var(--success-light) 100%);
-    border: 2px solid var(--primary-color);
+    background: var(--surface-secondary);
+    border: 1px solid var(--primary-color);
     border-radius: var(--border-radius-lg);
   }
 
@@ -758,7 +758,7 @@
     display: block;
     font-size: 1rem;
     font-weight: 600;
-    color: var(--primary-color);
+    color: var(--text-primary);
     margin-bottom: 0.5rem;
   }
 
@@ -777,9 +777,9 @@
   .smart-input {
     flex: 1;
     padding: 0.875rem;
-    border: 2px solid var(--primary-color);
+    border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    background: white;
+    background: var(--input-bg);
     color: var(--text-primary);
     font-size: 1.1rem;
     font-weight: 600;
@@ -789,7 +789,7 @@
   .smart-input:focus {
     outline: none;
     border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px var(--primary-light);
+    box-shadow: var(--focus-ring);
   }
 
   .smart-input::placeholder {
@@ -807,7 +807,7 @@
     background: var(--primary-color);
     color: white;
     font-size: 1rem;
-    font-weight: 700;
+    font-weight: 600;
     cursor: pointer;
     transition: all var(--transition);
     white-space: nowrap;
@@ -815,8 +815,7 @@
 
   .smart-btn:hover:not(:disabled) {
     background: var(--button-primary-hover);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
   }
 
   .smart-btn:disabled {
