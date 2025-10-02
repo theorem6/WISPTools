@@ -30,22 +30,25 @@ export class SimplePCIOptimizer {
     let initialHigh = initialConflicts.filter(c => c.severity === 'HIGH').length;
     
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`🎯 SIMPLE PCI OPTIMIZER`);
+    console.log(`🎯 EFFICIENT PCI OPTIMIZER`);
     console.log(`📊 Starting: ${originalConflictCount} conflicts`);
     console.log(`   🔴 Critical: ${initialCritical}`);
     console.log(`   🟠 High: ${initialHigh}`);
-    console.log(`🎯 ABSOLUTE GOAL: 0 critical conflicts`);
-    console.log(`🎯 SECONDARY GOAL: Minimize high conflicts`);
+    console.log(`🎯 ULTIMATE GOAL: 0 conflicts (complete deconfliction)`);
+    console.log(`⚡ Strategy: Maximum efficiency, minimum changes`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     let iteration = 0;
+    let prevConflicts = originalConflictCount;
     let prevCritical = initialCritical;
     let prevHigh = initialHigh;
     let bestCells = JSON.parse(JSON.stringify(currentCells)) as Cell[]; // Track best solution
+    let bestConflicts = originalConflictCount;
     let bestCritical = initialCritical;
     let bestHigh = initialHigh;
     let rollbackCount = 0; // Track consecutive rollbacks for extra randomization
     let iterationsWithoutProgress = 0; // Track stagnation
+    let totalChangesApplied = 0; // Track efficiency
     
     // Run until critical = 0 OR stuck for too long OR hit safety limit
     while (iteration < this.ABSOLUTE_MAX_ITERATIONS) {
@@ -54,20 +57,24 @@ export class SimplePCIOptimizer {
       // Save state before making changes (for potential rollback)
       const cellsBeforeIteration = JSON.parse(JSON.stringify(currentCells)) as Cell[];
       
-      // SIMPLE STRATEGY: Fix critical first, then high
+      // EFFICIENT STRATEGY: Prioritize by severity, fix hotspots first
       let conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
-      const conflictsToFix = [
-        ...conflicts.filter(c => c.severity === 'CRITICAL'),
-        ...conflicts.filter(c => c.severity === 'HIGH')
-      ];
       
-      if (conflictsToFix.length === 0) {
-        console.log(`✅ All critical and high conflicts resolved!`);
+      if (conflicts.length === 0) {
+        console.log(`🎉 ZERO CONFLICTS! Perfect deconfliction achieved!`);
         break;
       }
       
-      // Process conflicts and make changes (pass rollback count for extra randomization)
-      const changes = this.resolveConflictsSimple(currentCells, conflictsToFix, iteration, rollbackCount);
+      // Prioritize: Critical > High > Medium > Low
+      const conflictsToFix = [
+        ...conflicts.filter(c => c.severity === 'CRITICAL'),
+        ...conflicts.filter(c => c.severity === 'HIGH'),
+        ...conflicts.filter(c => c.severity === 'MEDIUM'),
+        ...conflicts.filter(c => c.severity === 'LOW')
+      ];
+      
+      // Process conflicts efficiently (pass rollback count for extra randomization)
+      const changes = this.resolveConflictsEfficiently(currentCells, conflictsToFix, iteration, rollbackCount);
       
       console.log(`\n🔄 Iteration ${iteration}: Making ${changes.length} PCI changes...`);
       
@@ -78,16 +85,21 @@ export class SimplePCIOptimizer {
       
       // Re-check conflicts after changes
       conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
+      const totalConflicts = conflicts.length;
       const totalCritical = conflicts.filter(c => c.severity === 'CRITICAL').length;
       const totalHigh = conflicts.filter(c => c.severity === 'HIGH').length;
+      const totalMedium = conflicts.filter(c => c.severity === 'MEDIUM').length;
+      const totalLow = conflicts.filter(c => c.severity === 'LOW').length;
       
-      console.log(`📊 After changes: ${conflicts.length} conflicts (🔴 ${totalCritical} critical, 🟠 ${totalHigh} high)`);
+      console.log(`📊 After changes: ${totalConflicts} conflicts (🔴 ${totalCritical} critical, 🟠 ${totalHigh} high, 🟡 ${totalMedium} med, 🟢 ${totalLow} low)`);
       
-      // CRITICAL CHECK: Did critical or high conflicts get worse or stay the same?
+      // EFFICIENCY CHECK: Did we make progress?
+      // Priority: Critical > High > Total Conflicts
       const madeProgress = (totalCritical < prevCritical) || 
-                          (totalCritical === prevCritical && totalHigh < prevHigh);
+                          (totalCritical === prevCritical && totalHigh < prevHigh) ||
+                          (totalCritical === prevCritical && totalHigh === prevHigh && totalConflicts < prevConflicts);
       
-      if (totalCritical > prevCritical || (totalCritical === prevCritical && totalCritical > 0)) {
+      if (totalCritical > prevCritical || (totalCritical === prevCritical && totalCritical > 0 && totalHigh >= prevHigh && totalConflicts >= prevConflicts)) {
         console.error(`❌ REJECTED! Critical conflicts increased or didn't improve: ${prevCritical} → ${totalCritical}`);
         console.log(`🔙 Rolling back iteration ${iteration} changes...`);
         
@@ -134,17 +146,21 @@ export class SimplePCIOptimizer {
       }
       
       // Changes ACCEPTED - this iteration improved things!
-      console.log(`   ✅ ACCEPTED! Critical: ${prevCritical}→${totalCritical}, High: ${prevHigh}→${totalHigh}`);
+      console.log(`   ✅ ACCEPTED! Total: ${prevConflicts}→${totalConflicts} (🔴 ${prevCritical}→${totalCritical}, 🟠 ${prevHigh}→${totalHigh})`);
       allChanges.push(...changes);
+      totalChangesApplied += changes.length;
       rollbackCount = 0; // Reset on success
       iterationsWithoutProgress = 0; // Reset stagnation counter on progress
       
-      // Update best solution if this is better
-      if (totalCritical < bestCritical || (totalCritical === bestCritical && totalHigh < bestHigh)) {
+      // Update best solution if this is better (prioritize: critical < conflicts)
+      if (totalCritical < bestCritical || 
+          (totalCritical === bestCritical && totalHigh < bestHigh) ||
+          (totalCritical === bestCritical && totalHigh === bestHigh && totalConflicts < bestConflicts)) {
         bestCells = JSON.parse(JSON.stringify(currentCells)) as Cell[];
+        bestConflicts = totalConflicts;
         bestCritical = totalCritical;
         bestHigh = totalHigh;
-        console.log(`   ⭐ NEW BEST SOLUTION!`);
+        console.log(`   ⭐ NEW BEST: ${bestConflicts} total (${bestCritical} critical, ${bestHigh} high)`);
       }
       
       // Track history
@@ -156,23 +172,24 @@ export class SimplePCIOptimizer {
         changes: allChanges.length
       });
       
-      // Check ABSOLUTE goal: Critical = 0
-      if (totalCritical === 0) {
-        console.log(`\n🎉 ABSOLUTE GOAL ACHIEVED! Zero critical conflicts!`);
-        console.log(`   🟠 High conflicts remaining: ${totalHigh}`);
+      // Check ULTIMATE goal: Zero conflicts
+      if (totalConflicts === 0) {
+        console.log(`\n💎 ULTIMATE GOAL ACHIEVED! ZERO CONFLICTS!`);
+        console.log(`⚡ Efficiency: ${totalChangesApplied} changes in ${iteration} iterations`);
+        console.log(`📈 Improvement: ${originalConflictCount} → 0 conflicts (100%)`);
         
         // Validate with Wolfram Alpha
-        await this.validateWithWolfram(totalCritical, totalHigh, allChanges.length);
-        
-        if (totalHigh === 0) {
-          console.log(`🌟 PERFECT! All critical AND high conflicts eliminated!`);
-          if (conflicts.length === 0) {
-            console.log(`💎 FLAWLESS! Complete deconfliction achieved!`);
-          }
-        }
-        break; // Stop - absolute goal achieved
+        await this.validateWithWolfram(totalCritical, totalHigh, totalChangesApplied);
+        break; // Stop - ultimate goal achieved
       }
       
+      // Check secondary goal: Critical = 0
+      if (totalCritical === 0 && totalHigh === 0) {
+        console.log(`\n🌟 Critical and High conflicts ELIMINATED! (${totalConflicts} low-priority remaining)`);
+        console.log(`⚡ Continuing to eliminate all conflicts...`);
+      }
+      
+      prevConflicts = totalConflicts;
       prevCritical = totalCritical;
       prevHigh = totalHigh;
     }
@@ -186,12 +203,21 @@ export class SimplePCIOptimizer {
     const finalHigh = finalConflicts.filter(c => c.severity === 'HIGH').length;
     
     console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`✅ OPTIMIZATION COMPLETE (${iteration} iterations)`);
-    console.log(`📊 BEFORE → AFTER:`);
-    console.log(`   Total: ${originalConflictCount} → ${finalConflicts.length}`);
-    console.log(`   Critical: ${initialCritical} → ${finalCritical} ${finalCritical === 0 ? '✅' : '❌'}`);
-    console.log(`   High: ${initialHigh} → ${finalHigh} ${finalHigh === 0 ? '✅' : '❌'}`);
-    console.log(`   Changes: ${allChanges.length} PCIs reassigned`);
+    console.log(`✅ OPTIMIZATION COMPLETE`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`📊 RESULTS:`);
+    console.log(`   Total Conflicts: ${originalConflictCount} → ${finalConflicts.length} (${((originalConflictCount - finalConflicts.length) / Math.max(originalConflictCount, 1) * 100).toFixed(1)}% reduction)`);
+    console.log(`   🔴 Critical: ${initialCritical} → ${finalCritical} ${finalCritical === 0 ? '✅' : '❌'}`);
+    console.log(`   🟠 High: ${initialHigh} → ${finalHigh} ${finalHigh === 0 ? '✅' : '❌'}`);
+    console.log(`⚡ EFFICIENCY:`);
+    console.log(`   Iterations: ${iteration}`);
+    console.log(`   PCI Changes: ${allChanges.length}`);
+    console.log(`   Changes per Iteration: ${(allChanges.length / iteration).toFixed(1)}`);
+    if (finalConflicts.length === 0) {
+      console.log(`💎 ZERO CONFLICTS - PERFECT DECONFLICTION!`);
+    } else if (finalCritical === 0 && finalHigh === 0) {
+      console.log(`🌟 All critical and high conflicts eliminated!`);
+    }
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     return {
@@ -209,29 +235,46 @@ export class SimplePCIOptimizer {
   }
   
   /**
-   * Resolve conflicts using SIMPLE, PROVEN logic
-   * No complex scoring - just pick random PCIs that work
+   * Resolve conflicts EFFICIENTLY using hotspot analysis
+   * Identifies cells involved in multiple conflicts and fixes them first
    */
-  private resolveConflictsSimple(cells: Cell[], conflicts: PCIConflict[], iteration: number, rollbackCount = 0): PCIChange[] {
+  private resolveConflictsEfficiently(cells: Cell[], conflicts: PCIConflict[], iteration: number, rollbackCount = 0): PCIChange[] {
     const changes: PCIChange[] = [];
     const modifiedThisIteration = new Set<string>();
     
     // Get all currently used PCIs
     const usedPCIs = new Set(cells.map(c => c.pci));
     
-    // If we've had rollbacks, be MORE aggressive with changes
-    const numToFix = rollbackCount > 0 ? Math.min(10, conflicts.length) : Math.min(5, conflicts.length);
+    // EFFICIENCY: Identify hotspot cells (involved in multiple conflicts)
+    const cellConflictCount = new Map<string, number>();
+    for (const conflict of conflicts) {
+      cellConflictCount.set(conflict.primaryCell.id, (cellConflictCount.get(conflict.primaryCell.id) || 0) + 1);
+      cellConflictCount.set(conflict.conflictingCell.id, (cellConflictCount.get(conflict.conflictingCell.id) || 0) + 1);
+    }
     
-    console.log(`   🎯 Fixing ${numToFix} conflicts ${rollbackCount > 0 ? '(EXTRA aggressive after rollback)' : ''}`);
+    // Smart number of fixes: more aggressive after rollbacks, but always efficient
+    const baseToFix = rollbackCount > 0 ? 8 : 3; // Fewer changes = more efficient
+    const numToFix = Math.min(baseToFix, conflicts.length);
     
-    // Process conflicts
+    console.log(`   🎯 Efficiently fixing ${numToFix} conflicts (targeting hotspots)`);
+    if (cellConflictCount.size > 0) {
+      const maxConflicts = Math.max(...Array.from(cellConflictCount.values()));
+      console.log(`   🔥 Hotspot detected: cell with ${maxConflicts} conflicts`);
+    }
+    
+    // Process conflicts - prioritize hotspot cells
     for (let i = 0; i < numToFix && i < conflicts.length; i++) {
       const conflict = conflicts[i];
       
-      // Pick which cell to change (prefer conflicting cell, or weaker signal)
+      // Pick which cell to change - prefer hotspot cells (involved in more conflicts)
+      const primaryConflicts = cellConflictCount.get(conflict.primaryCell.id) || 0;
+      const conflictingConflicts = cellConflictCount.get(conflict.conflictingCell.id) || 0;
+      
       let cellToChange = conflict.conflictingCell;
-      if (conflict.primaryCell.rsPower < conflict.conflictingCell.rsPower) {
-        cellToChange = conflict.conflictingCell; // Change the one with weaker signal
+      if (primaryConflicts > conflictingConflicts) {
+        cellToChange = conflict.primaryCell; // Fix the hotspot
+      } else if (primaryConflicts === conflictingConflicts && conflict.primaryCell.rsPower < conflict.conflictingCell.rsPower) {
+        cellToChange = conflict.conflictingCell; // If equal, fix weaker signal
       }
       
       // Skip if already modified this iteration
