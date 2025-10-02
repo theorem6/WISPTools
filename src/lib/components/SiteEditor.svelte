@@ -20,9 +20,12 @@
     sectors: []
   };
   let selectedSectorIndex: number | null = null;
+  let initialized = false;
   
-  // Initialize site data when modal opens
-  $: if (isOpen) {
+  // Initialize site data when modal opens (only once per open)
+  $: if (isOpen && !initialized) {
+    console.log('SiteEditor: Initializing modal. isNewSite:', isNewSite, 'site:', site);
+    
     if (isNewSite) {
       const siteNumber = Date.now().toString().slice(-4);
       editedSite = {
@@ -33,12 +36,19 @@
         longitude: initialLongitude || -74.0060,
         sectors: []
       };
+      console.log('SiteEditor: Created new site template:', editedSite);
     } else if (site) {
       // Deep copy to avoid mutating the original
       editedSite = JSON.parse(JSON.stringify(site));
       console.log('SiteEditor: Loaded site for editing:', editedSite.name, 'with', editedSite.sectors.length, 'sectors');
     }
     selectedSectorIndex = null;
+    initialized = true;
+  }
+  
+  // Reset initialized flag when modal closes
+  $: if (!isOpen && initialized) {
+    initialized = false;
   }
   
   function handleClose() {
