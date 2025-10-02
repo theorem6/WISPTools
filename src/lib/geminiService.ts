@@ -5,7 +5,7 @@ import type { PCIConflict, Cell } from './pciMapper';
 
 export class GeminiService {
   private apiKey: string = PUBLIC_GEMINI_API_KEY;
-  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
+  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
   private useAI = true; // Enable AI by default
 
   /**
