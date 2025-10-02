@@ -468,6 +468,19 @@
     // Auto-save to network
     await saveCurrentNetwork();
   }
+  
+  function handleNetworkDeleted(event: CustomEvent) {
+    const deletedNetworkId = event.detail;
+    console.log('Network deleted, clearing cells and map:', deletedNetworkId);
+    
+    // Clear all cells from the store
+    pciService.clearCells();
+    
+    // Clear the map
+    if (mapInstance) {
+      mapInstance.clearMap();
+    }
+  }
 </script>
 
 {#if $isAuthenticated}
@@ -580,6 +593,7 @@
     on:close={() => showNetworkManager = false}
     on:networkCreated={() => {}}
     on:networkSelected={() => {}}
+    on:networkDeleted={handleNetworkDeleted}
   />
   
   <ImportWizard 

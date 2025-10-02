@@ -184,14 +184,29 @@
   async function handleDeleteNetwork(networkId: string, event: Event) {
     event.stopPropagation();
     
-    if (!confirm('Are you sure you want to delete this network? This cannot be undone.')) {
+    const networkToDelete = $allNetworks.find(n => n.id === networkId);
+    const cellCount = networkToDelete?.cells?.length || 0;
+    
+    const confirmMessage = cellCount > 0 
+      ? `Are you sure you want to delete this network?\n\nThis will permanently delete:\n- The network "${networkToDelete?.name}"\n- ${cellCount} cell site(s) with all sectors and channels\n\nThis cannot be undone.`
+      : `Are you sure you want to delete this network? This cannot be undone.`;
+    
+    if (!confirm(confirmMessage)) {
       return;
     }
+    
+    // Check if deleting the current active network
+    const isDeletingCurrentNetwork = $currentNetwork?.id === networkId;
     
     const result = await networkService.deleteNetwork(networkId);
     
     if (result.success) {
       networkStore.deleteNetwork(networkId);
+      
+      // If we deleted the current network, clear the map and cells
+      if (isDeletingCurrentNetwork) {
+        dispatch('networkDeleted', networkId);
+      }
     } else {
       alert(result.error || 'Failed to delete network');
     }
