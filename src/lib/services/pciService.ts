@@ -145,11 +145,17 @@ export class PCIService {
       conflictsActions.setLoading(true);
       analysisActions.setLoading(true);
       
+      console.log(`[PCIService] performAnalysis called with ${cells.length} cells`);
+      
       // Detect conflicts
       const analysis = await pciMapper.analyzeConflicts(cells, true); // Enable LOS checking
       const conflicts = analysis.conflicts;
       
+      console.log(`[PCIService] Detected ${conflicts.length} conflicts after analysis`);
+      console.log(`[PCIService] Breakdown: ${conflicts.filter(c => c.severity === 'CRITICAL').length} critical, ${conflicts.filter(c => c.severity === 'HIGH').length} high`);
+      
       // Update conflicts store
+      console.log(`[PCIService] Updating conflicts store with ${conflicts.length} conflicts`);
       conflictsActions.set(conflicts, analysis);
       
       // Get AI analysis - pass actual conflicts for accurate counts
@@ -229,14 +235,22 @@ export class PCIService {
       optimizationActions.setOptimizing(true);
       
       // Run optimization
+      console.log(`[PCIService] Starting optimization with ${cells.length} cells`);
       const result = await pciOptimizer.optimizePCIAssignments(cells, true); // Enable LOS checking
+      
+      console.log(`[PCIService] Optimization complete. Changes: ${result.changes.length}`);
+      console.log(`[PCIService] Updating cells store with ${result.optimizedCells.length} optimized cells`);
       
       // Update stores
       optimizationActions.setResult(result);
       cellsActions.set(result.optimizedCells);
       
+      console.log(`[PCIService] Cells store updated. Re-running analysis...`);
+      
       // Re-run analysis with optimized cells (with LOS)
       await this.performAnalysis(result.optimizedCells);
+      
+      console.log(`[PCIService] Analysis complete after optimization`);
       
       return { success: true, data: result };
     } catch (error) {
