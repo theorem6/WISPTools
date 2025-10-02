@@ -1,23 +1,36 @@
 // LTE PCI Conflict Detection and Mapping
+//
+// IMPORTANT: Data Model Hierarchy
+// Network > Cell Site (Tower) > Sector > EARFCN/Channel
+//
+// This "Cell" interface is a FLATTENED representation of a SECTOR for analysis.
+// In the proper hierarchy:
+// - Cell Site = Physical tower location (has GPS coordinates)
+// - Sector = Transmitter on the tower (has azimuth, beamwidth, PCI)
+// - Channel = EARFCN with bandwidth (multiple per sector)
+//
+// This flat format simplifies conflict detection by representing each sector
+// as an independent "cell" record with inherited tower coordinates.
+
 export interface Cell {
-  id: string;
-  eNodeB: number;
-  sector: number;
-  pci: number;
-  latitude: number;
-  longitude: number;
-  frequency: number; // Legacy field - center frequency in MHz
-  rsPower: number;
-  azimuth?: number; // Sector azimuth direction (0-359 degrees)
-  towerType?: '3-sector' | '4-sector'; // Tower configuration
-  technology?: 'LTE' | 'CBRS' | 'LTE+CBRS'; // Technology type
+  id: string;                  // Sector ID (inherits from Cell Site)
+  eNodeB: number;              // Cell Site eNodeB ID
+  sector: number;              // Sector number within the Cell Site
+  pci: number;                 // Physical Cell ID (belongs to Sector)
+  latitude: number;            // Inherited from Cell Site (tower location)
+  longitude: number;           // Inherited from Cell Site (tower location)
+  frequency: number;           // Primary frequency in MHz (from Channel)
+  rsPower: number;             // Reference signal power (Sector property)
+  azimuth?: number;            // Sector azimuth direction (0-359 degrees) - SECTOR property
+  towerType?: '3-sector' | '4-sector'; // Cell Site configuration
+  technology?: 'LTE' | 'CBRS' | 'LTE+CBRS'; // Sector technology
   
-  // LTE Frequency Parameters
-  earfcn?: number; // LTE EARFCN (E-UTRA Absolute Radio Frequency Channel Number)
-  centerFreq?: number; // Center frequency in MHz (derived from EARFCN)
+  // LTE Frequency Parameters (from Channel)
+  earfcn?: number;             // Primary EARFCN for this sector
+  centerFreq?: number;         // Center frequency in MHz (derived from EARFCN)
   channelBandwidth?: 1.4 | 3 | 5 | 10 | 15 | 20; // Channel bandwidth in MHz
-  dlEarfcn?: number; // Downlink EARFCN (if different from earfcn)
-  ulEarfcn?: number; // Uplink EARFCN (if different from earfcn)
+  dlEarfcn?: number;           // Downlink EARFCN
+  ulEarfcn?: number;           // Uplink EARFCN
 }
 
 export interface PCIConflict {

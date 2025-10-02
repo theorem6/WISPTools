@@ -1,14 +1,35 @@
-// Proper cellular network data model
-// Cell = Physical tower/site
-// Sector = Individual transmitter/antenna on the cell
+// ============================================================================
+// PROPER CELLULAR NETWORK DATA MODEL HIERARCHY
+// ============================================================================
+//
+// Network > Cell Site (Tower) > Sector > EARFCN/Channel
+//
+// 1. Cell Site (CellSite) = Physical tower/site location
+//    - Has GPS coordinates (latitude, longitude)
+//    - Has eNodeB identifier
+//    - Contains multiple sectors
+//    - NO azimuth (azimuths belong to sectors)
+//
+// 2. Sector = Individual transmitter/antenna on the cell site
+//    - Has azimuth (direction it points)
+//    - Has beamwidth (coverage angle)
+//    - Has PCI (Physical Cell ID)
+//    - Has RS Power
+//    - Contains multiple channels/EARFCNs
+//
+// 3. Channel = Frequency channel (EARFCN) with bandwidth
+//    - Multiple EARFCNs can exist per sector
+//    - Each has DL/UL EARFCN and bandwidth
+//
+// ============================================================================
 
 export interface CellSite {
   id: string;              // Unique cell/site ID (e.g., "SITE001")
   name: string;            // Site name (e.g., "Manhattan Tower A")
-  eNodeB: number;          // eNodeB ID
-  latitude: number;        // Site coordinates
-  longitude: number;
-  sectors: Sector[];       // Array of sectors on this cell
+  eNodeB: number;          // eNodeB ID for this cell site
+  latitude: number;        // Cell site GPS coordinates (ONE per site)
+  longitude: number;       // Cell site GPS coordinates (ONE per site)
+  sectors: Sector[];       // Array of sectors on this cell site
   metadata?: {
     operator?: string;
     siteType?: string;     // Rooftop, tower, small cell, etc.
@@ -19,8 +40,8 @@ export interface CellSite {
 export interface Sector {
   id: string;              // Unique sector ID (e.g., "SITE001-SEC1")
   sectorNumber: number;    // Sector number (1, 2, 3, etc.)
-  azimuth: number;         // Direction in degrees (0-359)
-  beamwidth: number;       // Horizontal beamwidth in degrees (typically 60-90)
+  azimuth: number;         // Direction in degrees (0-359) - ONLY sectors have azimuths
+  beamwidth: number;       // Horizontal beamwidth in degrees (typically 33, 65, 78, 90, 120)
   pci: number;             // Physical Cell ID (0-503)
   channels: Channel[];     // Multiple EARFCNs per sector
   rsPower: number;         // Reference signal power (dBm)
@@ -29,7 +50,7 @@ export interface Sector {
 
 export interface Channel {
   dlEarfcn: number;        // Downlink EARFCN
-  ulEarfcn: number;        // Uplink EARFCN
+  ulEarfcn: number;        // Uplink EARFCN  
   centerFreq: number;      // Center frequency in MHz
   channelBandwidth: number; // Bandwidth in MHz (1.4, 3, 5, 10, 15, 20)
   isPrimary: boolean;      // Primary channel for this sector
