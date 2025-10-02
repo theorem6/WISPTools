@@ -2,20 +2,45 @@
   import { createEventDispatcher } from 'svelte';
   import type { Cell } from '$lib/pciMapper';
   
-  export let cell: Cell;
+  export let cell: Cell | null = null;
   export let isOpen = false;
+  export let isNewCell = false;
+  export let initialLatitude: number | undefined = undefined;
+  export let initialLongitude: number | undefined = undefined;
   
   const dispatch = createEventDispatcher();
   
   // Create a working copy of the cell data
-  let editedCell: Cell = { ...cell };
+  let editedCell: Cell;
   let additionalEarfcns: number[] = [];
   let newEarfcn = '';
   
-  // Initialize additional EARFCNs if any
-  $: if (cell && isOpen) {
-    editedCell = { ...cell };
-    // If the cell has multiple frequencies, we could parse them here
+  // Initialize cell data
+  $: if (isOpen) {
+    if (isNewCell) {
+      // Create new cell with default values
+      const nextCellNumber = Date.now().toString().slice(-6);
+      editedCell = {
+        id: `CELL${nextCellNumber}`,
+        eNodeB: 1000,
+        sector: 1,
+        pci: 0,
+        latitude: initialLatitude || 40.7128,
+        longitude: initialLongitude || -74.0060,
+        frequency: 2100,
+        rsPower: -75,
+        azimuth: 0,
+        towerType: '3-sector',
+        technology: 'LTE',
+        earfcn: 1950,
+        centerFreq: 2100,
+        channelBandwidth: 20,
+        dlEarfcn: 1950,
+        ulEarfcn: 1850
+      };
+    } else if (cell) {
+      editedCell = { ...cell };
+    }
     additionalEarfcns = [];
     newEarfcn = '';
   }
@@ -81,7 +106,13 @@
   <div class="modal-backdrop" on:click={handleBackdropClick}>
     <div class="cell-editor">
       <div class="editor-header">
-        <h2>📡 Edit Cell: {cell.id}</h2>
+        <h2>
+          {#if isNewCell}
+            ➕ Create New Cell
+          {:else}
+            📡 Edit Cell: {cell?.id || 'Unknown'}
+          {/if}
+        </h2>
         <button class="close-btn" on:click={handleClose}>×</button>
       </div>
       
@@ -96,7 +127,8 @@
                 type="text" 
                 id="cellId"
                 bind:value={editedCell.id} 
-                disabled
+                disabled={!isNewCell}
+                placeholder="CELL001"
               />
             </div>
             
@@ -291,7 +323,13 @@
       
       <div class="editor-footer">
         <button class="cancel-btn" on:click={handleClose}>Cancel</button>
-        <button class="save-btn" on:click={handleSave}>Save Changes</button>
+        <button class="save-btn" on:click={handleSave}>
+          {#if isNewCell}
+            ➕ Create Cell
+          {:else}
+            💾 Save Changes
+          {/if}
+        </button>
       </div>
     </div>
   </div>

@@ -17,6 +17,7 @@ export class PCIArcGISMapper {
   private cellLayer: any;
   private conflictLayer: any;
   private onCellClickCallback: ((cellId: string) => void) | null = null;
+  private onMapRightClickCallback: ((latitude: number, longitude: number) => void) | null = null;
   
   constructor(containerId: string) {
     this.initializeMap(containerId);
@@ -333,6 +334,37 @@ export class PCIArcGISMapper {
           }
         }
       });
+    }
+  }
+  
+  /**
+   * Enable right-click to add new cell at location
+   */
+  onMapRightClick(callback: (latitude: number, longitude: number) => void) {
+    this.onMapRightClickCallback = callback;
+    
+    if (this.mapView) {
+      this.mapView.on('click', async (event: any) => {
+        // Check if right-click (button 2)
+        if (event.button === 2) {
+          event.stopPropagation();
+          
+          // Get the map coordinates
+          const point = this.mapView.toMap({ x: event.x, y: event.y });
+          
+          if (point && this.onMapRightClickCallback) {
+            this.onMapRightClickCallback(point.latitude, point.longitude);
+          }
+        }
+      });
+      
+      // Disable default context menu on the map container
+      const container = this.mapView.container;
+      if (container) {
+        container.addEventListener('contextmenu', (e: Event) => {
+          e.preventDefault();
+        });
+      }
     }
   }
   

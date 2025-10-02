@@ -43,6 +43,9 @@
   let showNetworkManager = false;
   let showCellEditor = false;
   let selectedCell: Cell | null = null;
+  let isCreatingNewCell = false;
+  let newCellLatitude: number | undefined = undefined;
+  let newCellLongitude: number | undefined = undefined;
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -97,6 +100,11 @@
       // Enable cell click to open editor
       mapInstance.onCellClick((cellId) => {
         handleCellClick(cellId);
+      });
+      
+      // Enable right-click to create new cell
+      mapInstance.onMapRightClick((latitude, longitude) => {
+        handleMapRightClick(latitude, longitude);
       });
     }
   });
@@ -270,26 +278,41 @@
   }
   
   // ========================================================================
-  // Cell Editor - Handle cell editing
+  // Cell Editor - Handle cell editing and creation
   // ========================================================================
   
   function handleCellClick(cellId: string) {
     const cell = $cellsStore.items.find(c => c.id === cellId);
     if (cell) {
       selectedCell = cell;
+      isCreatingNewCell = false;
       showCellEditor = true;
     }
+  }
+  
+  function handleMapRightClick(latitude: number, longitude: number) {
+    // Open cell editor in "create new" mode
+    selectedCell = null;
+    isCreatingNewCell = true;
+    newCellLatitude = latitude;
+    newCellLongitude = longitude;
+    showCellEditor = true;
   }
   
   async function handleCellSave(event: CustomEvent) {
     const updatedCell = event.detail as Cell;
     
-    // Update cell in store
-    const cells = $cellsStore.items.map(c => 
-      c.id === updatedCell.id ? updatedCell : c
-    );
-    
-    cellsStore.set({ items: cells });
+    if (isCreatingNewCell) {
+      // Add new cell to store
+      const cells = [...$cellsStore.items, updatedCell];
+      cellsStore.set({ items: cells });
+    } else {
+      // Update existing cell in store
+      const cells = $cellsStore.items.map(c => 
+        c.id === updatedCell.id ? updatedCell : c
+      );
+      cellsStore.set({ items: cells });
+    }
     
     // Re-analyze conflicts with updated cell
     await performAnalysis();
@@ -297,8 +320,12 @@
     // Auto-save to network
     await saveCurrentNetwork();
     
+    // Reset state
     showCellEditor = false;
     selectedCell = null;
+    isCreatingNewCell = false;
+    newCellLatitude = undefined;
+    newCellLongitude = undefined;
   }
 </script>
 
@@ -323,6 +350,14 @@
         <circle cx="12" cy="10" r="3"></circle>
       </svg>
       <span class="brand-text">LTE PCI Mapper</span>
+      <span class="map-hint" title="Right-click on map to add new cell">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        Right-click map to add cell
+      </span>
       
       {#if $isAuthenticated}
         <div class="network-selector-container">
@@ -430,14 +465,21 @@
     on:close={() => uiActions.closeModal('showOptimizationResultModal')}
   />
   
-  {#if selectedCell}
-    <CellEditor 
-      cell={selectedCell}
-      isOpen={showCellEditor}
-      on:save={handleCellSave}
-      on:close={() => { showCellEditor = false; selectedCell = null; }}
-    />
-  {/if}
+  <CellEditor 
+    cell={selectedCell}
+    isOpen={showCellEditor}
+    isNewCell={isCreatingNewCell}
+    initialLatitude={newCellLatitude}
+    initialLongitude={newCellLongitude}
+    on:save={handleCellSave}
+    on:close={() => { 
+      showCellEditor = false; 
+      selectedCell = null; 
+      isCreatingNewCell = false;
+      newCellLatitude = undefined;
+      newCellLongitude = undefined;
+    }}
+  />
             </div>
           {:else}
   <!-- Loading state while checking auth -->
@@ -562,6 +604,30 @@
     white-space: nowrap;
   }
 
+  .map-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: 1rem;
+    padding: 0.25rem 0.625rem;
+    background: var(--primary-light);
+    border-radius: var(--border-radius);
+    font-size: 0.75rem;
+    color: var(--primary-color);
+    font-weight: 500;
+    cursor: help;
+    transition: all var(--transition);
+  }
+
+  .map-hint:hover {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .map-hint svg {
+    flex-shrink: 0;
+  }
+
   .network-selector-container {
     display: flex;
     align-items: center;
@@ -670,6 +736,10 @@
     }
 
     .brand-text {
+      display: none;
+    }
+
+    .map-hint {
       display: none;
     }
 
