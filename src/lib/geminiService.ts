@@ -5,7 +5,7 @@ import type { PCIConflict, Cell } from './pciMapper';
 
 export class GeminiService {
   private apiKey: string = PUBLIC_GEMINI_API_KEY;
-  private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+  private baseUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
   private useAI = true; // Enable AI by default
 
   /**
@@ -62,7 +62,10 @@ export class GeminiService {
       });
 
       if (!response.ok) {
-        console.warn(`[GeminiService] API returned ${response.status}`);
+        const errorText = await response.text();
+        console.error(`[GeminiService] API Error ${response.status}:`, errorText);
+        console.error(`[GeminiService] Using endpoint:`, this.baseUrl);
+        console.error(`[GeminiService] API key exists:`, !!this.apiKey);
         return null;
       }
 
