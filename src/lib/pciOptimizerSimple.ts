@@ -79,7 +79,8 @@ export class SimplePCIOptimizer {
       console.log(`\n🔄 Iteration ${iteration}: Making ${changes.length} PCI changes...`);
       
       if (changes.length === 0) {
-        console.warn(`   ⚠️  No changes possible - stopping`);
+        console.error(`   ❌ No changes possible - optimizer stuck!`);
+        console.error(`   🛑 Cannot find valid PCI assignments to resolve conflicts`);
         break;
       }
       
@@ -113,10 +114,10 @@ export class SimplePCIOptimizer {
         
         // Check if we're stuck
         if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
-          console.warn(`\n⚠️ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} iterations`);
-          console.warn(`🛑 Stopping optimization - best solution so far:`);
-          console.warn(`   🔴 Critical: ${bestCritical}`);
-          console.warn(`   🟠 High: ${bestHigh}`);
+          console.error(`\n❌ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} consecutive iterations`);
+          console.error(`🛑 Optimizer unable to make further progress`);
+          console.error(`   Best achieved: ${bestConflicts} conflicts (🔴 ${bestCritical} critical, 🟠 ${bestHigh} high)`);
+          console.error(`   ${originalConflictCount - bestConflicts} conflicts resolved (${((originalConflictCount - bestConflicts) / Math.max(originalConflictCount, 1) * 100).toFixed(1)}%)`);
           break;
         }
         
@@ -135,10 +136,10 @@ export class SimplePCIOptimizer {
         
         // Check if we're stuck
         if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
-          console.warn(`\n⚠️ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} iterations`);
-          console.warn(`🛑 Stopping optimization - best solution so far:`);
-          console.warn(`   🔴 Critical: ${bestCritical}`);
-          console.warn(`   🟠 High: ${bestHigh}`);
+          console.error(`\n❌ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} consecutive iterations`);
+          console.error(`🛑 Optimizer unable to make further progress`);
+          console.error(`   Best achieved: ${bestConflicts} conflicts (🔴 ${bestCritical} critical, 🟠 ${bestHigh} high)`);
+          console.error(`   ${originalConflictCount - bestConflicts} conflicts resolved (${((originalConflictCount - bestConflicts) / Math.max(originalConflictCount, 1) * 100).toFixed(1)}%)`);
           break;
         }
         
@@ -202,22 +203,60 @@ export class SimplePCIOptimizer {
     const finalCritical = finalConflicts.filter(c => c.severity === 'CRITICAL').length;
     const finalHigh = finalConflicts.filter(c => c.severity === 'HIGH').length;
     
+    const conflictsResolved = originalConflictCount - finalConflicts.length;
+    const reductionPercent = originalConflictCount > 0 ? 
+      ((conflictsResolved) / originalConflictCount) * 100 : 0;
+    
     console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`✅ OPTIMIZATION COMPLETE`);
-    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`📊 RESULTS:`);
-    console.log(`   Total Conflicts: ${originalConflictCount} → ${finalConflicts.length} (${((originalConflictCount - finalConflicts.length) / Math.max(originalConflictCount, 1) * 100).toFixed(1)}% reduction)`);
-    console.log(`   🔴 Critical: ${initialCritical} → ${finalCritical} ${finalCritical === 0 ? '✅' : '❌'}`);
-    console.log(`   🟠 High: ${initialHigh} → ${finalHigh} ${finalHigh === 0 ? '✅' : '❌'}`);
-    console.log(`⚡ EFFICIENCY:`);
-    console.log(`   Iterations: ${iteration}`);
-    console.log(`   PCI Changes: ${allChanges.length}`);
-    console.log(`   Changes per Iteration: ${(allChanges.length / iteration).toFixed(1)}`);
-    if (finalConflicts.length === 0) {
+    
+    // Determine success or failure
+    if (conflictsResolved === 0 && originalConflictCount > 0) {
+      console.log(`❌ OPTIMIZATION FAILED - NO PROGRESS`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`⚠️  Could not resolve any conflicts`);
+      console.log(`   Total Conflicts: ${originalConflictCount} → ${finalConflicts.length} (0% reduction)`);
+      console.log(`   Iterations: ${iteration}`);
+      console.log(`   Changes Attempted: ${allChanges.length}`);
+      console.error(`\n🚨 Optimizer unable to make progress - possible causes:`);
+      console.error(`   • Network topology too complex`);
+      console.error(`   • Insufficient PCI pool (only using 30-503)`);
+      console.error(`   • Conflicts may require manual intervention`);
+    } else if (finalConflicts.length === 0) {
+      console.log(`✅ OPTIMIZATION COMPLETE - PERFECT SUCCESS`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.log(`💎 ZERO CONFLICTS - PERFECT DECONFLICTION!`);
-    } else if (finalCritical === 0 && finalHigh === 0) {
-      console.log(`🌟 All critical and high conflicts eliminated!`);
+      console.log(`📊 RESULTS:`);
+      console.log(`   Total Conflicts: ${originalConflictCount} → 0 (100% reduction)`);
+      console.log(`   🔴 Critical: ${initialCritical} → 0 ✅`);
+      console.log(`   🟠 High: ${initialHigh} → 0 ✅`);
+      console.log(`⚡ EFFICIENCY:`);
+      console.log(`   Iterations: ${iteration}`);
+      console.log(`   PCI Changes: ${allChanges.length}`);
+      console.log(`   Changes per Iteration: ${(allChanges.length / iteration).toFixed(1)}`);
+    } else if (conflictsResolved > 0) {
+      console.log(`✅ OPTIMIZATION COMPLETE - PARTIAL SUCCESS`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`📊 RESULTS:`);
+      console.log(`   Total Conflicts: ${originalConflictCount} → ${finalConflicts.length} (${reductionPercent.toFixed(1)}% reduction)`);
+      console.log(`   Conflicts Resolved: ${conflictsResolved}`);
+      console.log(`   🔴 Critical: ${initialCritical} → ${finalCritical} ${finalCritical === 0 ? '✅' : `(${initialCritical - finalCritical} resolved)`}`);
+      console.log(`   🟠 High: ${initialHigh} → ${finalHigh} ${finalHigh === 0 ? '✅' : `(${initialHigh - finalHigh} resolved)`}`);
+      console.log(`⚡ EFFICIENCY:`);
+      console.log(`   Iterations: ${iteration}`);
+      console.log(`   PCI Changes: ${allChanges.length}`);
+      console.log(`   Changes per Iteration: ${(allChanges.length / iteration).toFixed(1)}`);
+      
+      if (finalCritical === 0 && finalHigh === 0) {
+        console.log(`🌟 All critical and high conflicts eliminated!`);
+      } else if (reductionPercent < 50) {
+        console.warn(`⚠️  Less than 50% reduction - consider manual review`);
+      }
+    } else {
+      console.log(`❌ OPTIMIZATION FAILED`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`   No conflicts to optimize`);
     }
+    
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     return {
