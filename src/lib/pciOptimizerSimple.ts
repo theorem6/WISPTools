@@ -38,26 +38,82 @@ export class SimplePCIOptimizer {
     let iteration = 0;
     let prevCritical = initialCritical;
     let prevHigh = initialHigh;
+    let bestCells = JSON.parse(JSON.stringify(currentCells)) as Cell[]; // Track best solution
+    let bestCritical = initialCritical;
+    let bestHigh = initialHigh;
+    let rollbackCount = 0; // Track consecutive rollbacks for extra randomization
     
     while (iteration < this.MAX_ITERATIONS) {
       iteration++;
       
-      // Detect current conflicts
-      const conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
-      const criticalConflicts = conflicts.filter(c => c.severity === 'CRITICAL');
-      const highConflicts = conflicts.filter(c => c.severity === 'HIGH');
-      const totalCritical = criticalConflicts.length;
-      const totalHigh = highConflicts.length;
+      // Save state before making changes (for potential rollback)
+      const cellsBeforeIteration = JSON.parse(JSON.stringify(currentCells)) as Cell[];
       
-      console.log(`\n🔄 Iteration ${iteration}: ${conflicts.length} conflicts (🔴 ${totalCritical} critical, 🟠 ${totalHigh} high)`);
+      // SIMPLE STRATEGY: Fix critical first, then high
+      let conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
+      const conflictsToFix = [
+        ...conflicts.filter(c => c.severity === 'CRITICAL'),
+        ...conflicts.filter(c => c.severity === 'HIGH')
+      ];
       
-      // Goal achieved?
-      if (totalCritical === 0 && totalHigh === 0) {
-        console.log(`✅ SUCCESS! Zero critical and high conflicts achieved!`);
-        if (conflicts.length === 0) {
-          console.log(`🎉 PERFECT! All conflicts eliminated!`);
-        }
+      if (conflictsToFix.length === 0) {
+        console.log(`✅ All critical and high conflicts resolved!`);
         break;
+      }
+      
+      // Process conflicts and make changes (pass rollback count for extra randomization)
+      const changes = this.resolveConflictsSimple(currentCells, conflictsToFix, iteration, rollbackCount);
+      
+      console.log(`\n🔄 Iteration ${iteration}: Making ${changes.length} PCI changes...`);
+      
+      if (changes.length === 0) {
+        console.warn(`   ⚠️  No changes possible - stopping`);
+        break;
+      }
+      
+      // Re-check conflicts after changes
+      conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
+      const totalCritical = conflicts.filter(c => c.severity === 'CRITICAL').length;
+      const totalHigh = conflicts.filter(c => c.severity === 'HIGH').length;
+      
+      console.log(`📊 After changes: ${conflicts.length} conflicts (🔴 ${totalCritical} critical, 🟠 ${totalHigh} high)`);
+      
+      // CRITICAL CHECK: Did critical or high conflicts get worse or stay the same?
+      if (totalCritical > prevCritical || (totalCritical === prevCritical && totalCritical > 0)) {
+        console.error(`❌ REJECTED! Critical conflicts increased or didn't improve: ${prevCritical} → ${totalCritical}`);
+        console.log(`🔙 Rolling back iteration ${iteration} changes...`);
+        
+        // ROLLBACK: Restore cells from before this iteration
+        currentCells = cellsBeforeIteration;
+        rollbackCount++; // Increase for more aggressive randomization
+        
+        // Try more aggressive randomization next iteration by increasing diversity
+        console.log(`   🎲 Next iteration will use MORE randomization (rollback #${rollbackCount})`);
+        continue; // Skip to next iteration without accepting changes
+      }
+      
+      if (totalHigh > prevHigh || (totalHigh === prevHigh && totalHigh > 0 && totalCritical === prevCritical)) {
+        console.warn(`❌ REJECTED! High conflicts increased or didn't improve: ${prevHigh} → ${totalHigh}`);
+        console.log(`🔙 Rolling back iteration ${iteration} changes...`);
+        
+        // ROLLBACK
+        currentCells = cellsBeforeIteration;
+        rollbackCount++; // Increase for more aggressive randomization
+        console.log(`   🎲 Next iteration will use MORE randomization (rollback #${rollbackCount})`);
+        continue;
+      }
+      
+      // Changes ACCEPTED - this iteration improved things!
+      console.log(`   ✅ ACCEPTED! Critical: ${prevCritical}→${totalCritical}, High: ${prevHigh}→${totalHigh}`);
+      allChanges.push(...changes);
+      rollbackCount = 0; // Reset on success
+      
+      // Update best solution if this is better
+      if (totalCritical < bestCritical || (totalCritical === bestCritical && totalHigh < bestHigh)) {
+        bestCells = JSON.parse(JSON.stringify(currentCells)) as Cell[];
+        bestCritical = totalCritical;
+        bestHigh = totalHigh;
+        console.log(`   ⭐ NEW BEST SOLUTION!`);
       }
       
       // Track history
@@ -69,27 +125,21 @@ export class SimplePCIOptimizer {
         changes: allChanges.length
       });
       
-      // SIMPLE STRATEGY: Fix critical first, then high
-      const conflictsToFix = [...criticalConflicts, ...highConflicts];
-      
-      if (conflictsToFix.length === 0) break;
-      
-      // Process conflicts one by one
-      const changes = this.resolveConflictsSimple(currentCells, conflictsToFix, iteration);
-      allChanges.push(...changes);
-      
-      console.log(`   ✏️  Made ${changes.length} PCI changes`);
-      
-      // Check progress
-      if (totalCritical < prevCritical || totalHigh < prevHigh) {
-        console.log(`   ✅ Progress! Critical: ${prevCritical}→${totalCritical}, High: ${prevHigh}→${totalHigh}`);
-      } else if (totalCritical > prevCritical || totalHigh > prevHigh) {
-        console.warn(`   ⚠️  WORSE! Critical: ${prevCritical}→${totalCritical}, High: ${prevHigh}→${totalHigh}`);
+      // Check goal
+      if (totalCritical === 0 && totalHigh === 0) {
+        console.log(`\n✅ SUCCESS! Zero critical and high conflicts achieved!`);
+        if (conflicts.length === 0) {
+          console.log(`🎉 PERFECT! All conflicts eliminated!`);
+        }
+        break;
       }
       
       prevCritical = totalCritical;
       prevHigh = totalHigh;
     }
+    
+    // Use best solution found
+    currentCells = bestCells;
     
     // Final analysis
     const finalConflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
@@ -123,15 +173,22 @@ export class SimplePCIOptimizer {
    * Resolve conflicts using SIMPLE, PROVEN logic
    * No complex scoring - just pick random PCIs that work
    */
-  private resolveConflictsSimple(cells: Cell[], conflicts: PCIConflict[], iteration: number): PCIChange[] {
+  private resolveConflictsSimple(cells: Cell[], conflicts: PCIConflict[], iteration: number, rollbackCount = 0): PCIChange[] {
     const changes: PCIChange[] = [];
     const modifiedThisIteration = new Set<string>();
     
     // Get all currently used PCIs
     const usedPCIs = new Set(cells.map(c => c.pci));
     
-    // Process each conflict
-    for (const conflict of conflicts) {
+    // If we've had rollbacks, be MORE aggressive with changes
+    const numToFix = rollbackCount > 0 ? Math.min(10, conflicts.length) : Math.min(5, conflicts.length);
+    
+    console.log(`   🎯 Fixing ${numToFix} conflicts ${rollbackCount > 0 ? '(EXTRA aggressive after rollback)' : ''}`);
+    
+    // Process conflicts
+    for (let i = 0; i < numToFix && i < conflicts.length; i++) {
+      const conflict = conflicts[i];
+      
       // Pick which cell to change (prefer conflicting cell, or weaker signal)
       let cellToChange = conflict.conflictingCell;
       if (conflict.primaryCell.rsPower < conflict.conflictingCell.rsPower) {
@@ -150,7 +207,8 @@ export class SimplePCIOptimizer {
       const oldPCI = cellToChange.pci;
       
       // SIMPLE STRATEGY: Pick a RANDOM PCI from available pool
-      const newPCI = this.pickRandomGoodPCI(cellToChange, cells, usedPCIs);
+      // After rollbacks, use even more randomization
+      const newPCI = this.pickRandomGoodPCI(cellToChange, cells, usedPCIs, rollbackCount > 0);
       
       if (newPCI !== oldPCI) {
         // Apply the change
@@ -162,7 +220,7 @@ export class SimplePCIOptimizer {
           cellId: cellToChange.id,
           oldPCI,
           newPCI,
-          reason: `Simple: Resolve ${conflict.severity} ${conflict.conflictType} conflict with ${conflict.primaryCell.id === cellToChange.id ? conflict.conflictingCell.id : conflict.primaryCell.id}`
+          reason: `Resolve ${conflict.severity} ${conflict.conflictType} conflict`
         });
         
         console.log(`      ${cellToChange.id}: ${oldPCI} → ${newPCI} (Mod3: ${oldPCI%3} → ${newPCI%3})`);
@@ -175,7 +233,7 @@ export class SimplePCIOptimizer {
   /**
    * Pick a random PCI that's good (simple, effective logic)
    */
-  private pickRandomGoodPCI(cell: Cell, allCells: Cell[], usedPCIs: Set<number>): number {
+  private pickRandomGoodPCI(cell: Cell, allCells: Cell[], usedPCIs: Set<number>, extraRandom = false): number {
     const currentMod3 = cell.pci % 3;
     
     // Find nearby cells (within 5km) - these are the ones that matter
