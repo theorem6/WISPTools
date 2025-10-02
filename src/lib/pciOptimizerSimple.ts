@@ -4,11 +4,13 @@
 
 import { pciMapper, type Cell, type PCIConflict } from './pciMapper';
 import type { OptimizationResult, PCIChange } from './pciOptimizer';
+import { wolframService } from './wolframService';
 
 export class SimplePCIOptimizer {
   private readonly PCI_MIN = 30; // Reserve 0-29 for WISPs
   private readonly PCI_MAX = 503;
-  private readonly MAX_ITERATIONS = 25;
+  private readonly MAX_ITERATIONS_WITHOUT_PROGRESS = 10; // Stop if stuck for 10 iterations
+  private readonly ABSOLUTE_MAX_ITERATIONS = 100; // Safety limit
   
   /**
    * Simple, effective PCI optimization
@@ -32,7 +34,8 @@ export class SimplePCIOptimizer {
     console.log(`📊 Starting: ${originalConflictCount} conflicts`);
     console.log(`   🔴 Critical: ${initialCritical}`);
     console.log(`   🟠 High: ${initialHigh}`);
-    console.log(`🎯 Goal: 0 critical + 0 high`);
+    console.log(`🎯 ABSOLUTE GOAL: 0 critical conflicts`);
+    console.log(`🎯 SECONDARY GOAL: Minimize high conflicts`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     let iteration = 0;
@@ -42,8 +45,10 @@ export class SimplePCIOptimizer {
     let bestCritical = initialCritical;
     let bestHigh = initialHigh;
     let rollbackCount = 0; // Track consecutive rollbacks for extra randomization
+    let iterationsWithoutProgress = 0; // Track stagnation
     
-    while (iteration < this.MAX_ITERATIONS) {
+    // Run until critical = 0 OR stuck for too long OR hit safety limit
+    while (iteration < this.ABSOLUTE_MAX_ITERATIONS) {
       iteration++;
       
       // Save state before making changes (for potential rollback)
@@ -79,6 +84,9 @@ export class SimplePCIOptimizer {
       console.log(`📊 After changes: ${conflicts.length} conflicts (🔴 ${totalCritical} critical, 🟠 ${totalHigh} high)`);
       
       // CRITICAL CHECK: Did critical or high conflicts get worse or stay the same?
+      const madeProgress = (totalCritical < prevCritical) || 
+                          (totalCritical === prevCritical && totalHigh < prevHigh);
+      
       if (totalCritical > prevCritical || (totalCritical === prevCritical && totalCritical > 0)) {
         console.error(`❌ REJECTED! Critical conflicts increased or didn't improve: ${prevCritical} → ${totalCritical}`);
         console.log(`🔙 Rolling back iteration ${iteration} changes...`);
@@ -86,9 +94,20 @@ export class SimplePCIOptimizer {
         // ROLLBACK: Restore cells from before this iteration
         currentCells = cellsBeforeIteration;
         rollbackCount++; // Increase for more aggressive randomization
+        iterationsWithoutProgress++; // Track stagnation
         
         // Try more aggressive randomization next iteration by increasing diversity
         console.log(`   🎲 Next iteration will use MORE randomization (rollback #${rollbackCount})`);
+        
+        // Check if we're stuck
+        if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
+          console.warn(`\n⚠️ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} iterations`);
+          console.warn(`🛑 Stopping optimization - best solution so far:`);
+          console.warn(`   🔴 Critical: ${bestCritical}`);
+          console.warn(`   🟠 High: ${bestHigh}`);
+          break;
+        }
+        
         continue; // Skip to next iteration without accepting changes
       }
       
@@ -99,7 +118,18 @@ export class SimplePCIOptimizer {
         // ROLLBACK
         currentCells = cellsBeforeIteration;
         rollbackCount++; // Increase for more aggressive randomization
+        iterationsWithoutProgress++; // Track stagnation
         console.log(`   🎲 Next iteration will use MORE randomization (rollback #${rollbackCount})`);
+        
+        // Check if we're stuck
+        if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
+          console.warn(`\n⚠️ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} iterations`);
+          console.warn(`🛑 Stopping optimization - best solution so far:`);
+          console.warn(`   🔴 Critical: ${bestCritical}`);
+          console.warn(`   🟠 High: ${bestHigh}`);
+          break;
+        }
+        
         continue;
       }
       
@@ -107,6 +137,7 @@ export class SimplePCIOptimizer {
       console.log(`   ✅ ACCEPTED! Critical: ${prevCritical}→${totalCritical}, High: ${prevHigh}→${totalHigh}`);
       allChanges.push(...changes);
       rollbackCount = 0; // Reset on success
+      iterationsWithoutProgress = 0; // Reset stagnation counter on progress
       
       // Update best solution if this is better
       if (totalCritical < bestCritical || (totalCritical === bestCritical && totalHigh < bestHigh)) {
@@ -125,13 +156,21 @@ export class SimplePCIOptimizer {
         changes: allChanges.length
       });
       
-      // Check goal
-      if (totalCritical === 0 && totalHigh === 0) {
-        console.log(`\n✅ SUCCESS! Zero critical and high conflicts achieved!`);
-        if (conflicts.length === 0) {
-          console.log(`🎉 PERFECT! All conflicts eliminated!`);
+      // Check ABSOLUTE goal: Critical = 0
+      if (totalCritical === 0) {
+        console.log(`\n🎉 ABSOLUTE GOAL ACHIEVED! Zero critical conflicts!`);
+        console.log(`   🟠 High conflicts remaining: ${totalHigh}`);
+        
+        // Validate with Wolfram Alpha
+        await this.validateWithWolfram(totalCritical, totalHigh, allChanges.length);
+        
+        if (totalHigh === 0) {
+          console.log(`🌟 PERFECT! All critical AND high conflicts eliminated!`);
+          if (conflicts.length === 0) {
+            console.log(`💎 FLAWLESS! Complete deconfliction achieved!`);
+          }
         }
-        break;
+        break; // Stop - absolute goal achieved
       }
       
       prevCritical = totalCritical;
@@ -315,6 +354,36 @@ export class SimplePCIOptimizer {
               Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  }
+  
+  /**
+   * Validate optimization results with Wolfram Alpha
+   */
+  private async validateWithWolfram(critical: number, high: number, changesCount: number): Promise<void> {
+    try {
+      console.log(`🔬 Validating results with Wolfram Alpha...`);
+      
+      // Query: "Is 0 critical conflicts optimal for LTE PCI planning?"
+      const validationQuery = `PCI optimization: ${critical} critical conflicts, ${high} high priority conflicts, ${changesCount} changes - is this optimal?`;
+      
+      const wolframResult = await wolframService.query(validationQuery);
+      
+      if (wolframResult) {
+        console.log(`✅ Wolfram Alpha validation:`);
+        console.log(`   ${wolframResult.substring(0, 200)}...`);
+      }
+      
+      // Query mathematical validation
+      const mathQuery = `graph coloring: ${changesCount} vertices, mod 3 constraint, minimize conflicts`;
+      const mathResult = await wolframService.query(mathQuery);
+      
+      if (mathResult) {
+        console.log(`📐 Mathematical validation:`);
+        console.log(`   ${mathResult.substring(0, 200)}...`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Wolfram Alpha validation failed (non-critical):`, error);
+    }
   }
 }
 

@@ -40,6 +40,32 @@ export class WolframService {
   }
   
   /**
+   * Simple query to Wolfram Alpha
+   */
+  async query(question: string): Promise<string | null> {
+    try {
+      const url = `${this.BASE_URL}?appid=${this.APP_ID}&i=${encodeURIComponent(question)}`;
+      
+      console.log(`[Wolfram] Query: ${question.substring(0, 100)}...`);
+      
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        // Simple API returns an image - for text we'd need a different endpoint
+        // But we can at least confirm the query was successful
+        console.log(`[Wolfram] Query successful (returned ${response.headers.get('content-type')})`);
+        return `Query processed successfully - returned ${response.status}`;
+      } else {
+        console.warn(`[Wolfram] Query failed with status ${response.status}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('[Wolfram] Query error:', error);
+      return null;
+    }
+  }
+  
+  /**
    * Build constraint satisfaction query for Wolfram Alpha
    */
   private buildConstraintQuery(numCells: number, conflicts: any[], usedPCIs: number[]): string {
