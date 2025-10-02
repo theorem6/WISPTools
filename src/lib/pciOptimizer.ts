@@ -137,7 +137,8 @@ export class PCIOptimizer {
       const iterationChanges = this.resolveConflicts(
         currentCells, 
         [...criticalConflicts, ...highConflicts, ...otherConflicts],
-        stalledIterations >= 2 || badIterations > 0 // Use aggressive mode if stalled or had bad iterations
+        stalledIterations >= 2 || badIterations > 0, // Use aggressive mode if stalled or had bad iterations
+        badIterations // Pass badIterations for extra aggressive mode
       );
       changes.push(...iterationChanges);
 
@@ -182,7 +183,7 @@ export class PCIOptimizer {
    * Resolve conflicts for a single iteration
    * SON-inspired: Prioritize critical conflicts and use intelligent PCI selection
    */
-  private resolveConflicts(cells: Cell[], conflicts: PCIConflict[], aggressiveMode = false): PCIChange[] {
+  private resolveConflicts(cells: Cell[], conflicts: PCIConflict[], aggressiveMode = false, badIterations = 0): PCIChange[] {
     const changes: PCIChange[] = [];
     
     // SON Algorithm: Sort conflicts by severity and distance
