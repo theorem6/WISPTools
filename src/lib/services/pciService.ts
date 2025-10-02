@@ -152,12 +152,12 @@ export class PCIService {
       // Update conflicts store
       conflictsActions.set(conflicts, analysis);
       
-      // Get AI analysis
+      // Get AI analysis - pass actual conflicts for accurate counts
       const analysisData = this.formatConflictsForAI(conflicts);
       console.log(`[PCIService] Formatted ${conflicts.length} conflicts for AI analysis`);
       console.log(`[PCIService] Analysis data length: ${analysisData.length} characters`);
       
-      const geminiAnalysis = await this.getAIAnalysis(analysisData);
+      const geminiAnalysis = await this.getAIAnalysis(analysisData, conflicts);
       console.log(`[PCIService] Gemini analysis received: ${geminiAnalysis.substring(0, 100)}...`);
       
       // Update analysis store
@@ -181,9 +181,10 @@ export class PCIService {
   
   /**
    * Get AI analysis for conflicts
+   * Passes actual conflict objects for accurate analysis
    */
-  private async getAIAnalysis(analysisData: string): Promise<string> {
-    console.log(`[PCIService] getAIAnalysis called with data: ${analysisData ? 'YES' : 'NO'}`);
+  private async getAIAnalysis(analysisData: string, actualConflicts: PCIConflict[]): Promise<string> {
+    console.log(`[PCIService] getAIAnalysis called with ${actualConflicts.length} actual conflicts`);
     
     if (!analysisData || analysisData.trim() === '') {
       console.warn('[PCIService] No analysis data provided - returning default message');
@@ -193,7 +194,8 @@ export class PCIService {
     console.log(`[PCIService] Calling Gemini API with ${analysisData.length} chars of conflict data`);
     
     try {
-      const result = await geminiService.analyzePCIConflicts(analysisData);
+      // Pass actual conflicts for accurate fallback analysis
+      const result = await geminiService.analyzePCIConflicts(analysisData, actualConflicts);
       console.log(`[PCIService] Gemini returned: ${result.substring(0, 150)}...`);
       return result;
     } catch (error) {

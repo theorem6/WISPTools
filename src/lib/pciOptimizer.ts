@@ -161,26 +161,37 @@ export class PCIOptimizer {
         }
       }
 
-      // If no changes were made this iteration, force at least one change
+      // If no changes were made this iteration, force random changes to break stalemate
       if (changesThisIteration === 0 && sortedConflicts.length > 0) {
-        const firstConflict = sortedConflicts[0];
-        const cellToReassign = this.selectCellForReassignment(firstConflict);
-        const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
+        console.log('No changes made - forcing random PCI reassignments to break conflicts');
         
-        if (cellIndex !== -1) {
-          // Force a PCI change by picking a different PCI
-          const newPCI = (cellToReassign.pci + 3) % 504; // Simple increment strategy
-          const oldPCI = cellToReassign.pci;
-          cells[cellIndex].pci = newPCI;
+        // Force changes for up to 3 conflicting cells with random PCIs
+        const conflictsToForce = sortedConflicts.slice(0, 3);
+        
+        for (const conflict of conflictsToForce) {
+          const cellToReassign = this.selectCellForReassignment(conflict);
+          const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
           
-          changes.push({
-            cellId: cellToReassign.id,
-            oldPCI,
-            newPCI,
-            reason: `Forced reassignment for ${firstConflict.conflictType} conflict`
-          });
-          
-          console.log(`Forced PCI change: ${cellToReassign.id} ${oldPCI} → ${newPCI}`);
+          if (cellIndex !== -1 && !modifiedCellIds.has(cellToReassign.id)) {
+            // Use randomized PCI selection from available pool
+            const usedPCIs = new Set(cells.map(c => c.pci));
+            const newPCI = this.selectRandomAvailablePCI(cellToReassign.pci, usedPCIs);
+            const oldPCI = cellToReassign.pci;
+            
+            cells[cellIndex].pci = newPCI;
+            
+            changes.push({
+              cellId: cellToReassign.id,
+              oldPCI,
+              newPCI,
+              reason: `Random reassignment to break ${conflict.conflictType} conflict with ${conflict.primaryCell.id === cellToReassign.id ? conflict.conflictingCell.id : conflict.primaryCell.id}`
+            });
+            
+            modifiedCellIds.add(cellToReassign.id);
+            changesThisIteration++;
+            
+            console.log(`Forced random PCI change: ${cellToReassign.id} ${oldPCI} → ${newPCI}`);
+          }
         }
       }
 
@@ -200,6 +211,54 @@ export class PCIOptimizer {
     
     // If equal signal strength, prefer the conflicting cell
     return conflict.conflictingCell;
+  }
+  
+  /**
+   * Select a random available PCI from a different Mod3 group
+   * This helps break difficult conflicts by providing diversity
+   */
+  private selectRandomAvailablePCI(currentPCI: number, usedPCIs: Set<number>): number {
+    const currentMod3 = currentPCI % 3;
+    const availablePCIs: number[] = [];
+    
+    // First try: Different Mod3 group (best for avoiding CRS conflicts)
+    for (let mod3 = 0; mod3 < 3; mod3++) {
+      if (mod3 === currentMod3) continue; // Skip current Mod3
+      
+      for (let base = mod3; base <= this.PCI_MAX; base += 3) {
+        if (!usedPCIs.has(base)) {
+          availablePCIs.push(base);
+        }
+      }
+    }
+    
+    // If no different Mod3 available, try same Mod3 but different Mod6
+    if (availablePCIs.length === 0) {
+      const currentMod6 = currentPCI % 6;
+      for (let pci = 0; pci <= this.PCI_MAX; pci++) {
+        if (!usedPCIs.has(pci) && pci % 3 === currentMod3 && pci % 6 !== currentMod6) {
+          availablePCIs.push(pci);
+        }
+      }
+    }
+    
+    // If still no options, use any available PCI
+    if (availablePCIs.length === 0) {
+      for (let pci = 0; pci <= this.PCI_MAX; pci++) {
+        if (!usedPCIs.has(pci)) {
+          availablePCIs.push(pci);
+        }
+      }
+    }
+    
+    // Return random selection from available PCIs
+    if (availablePCIs.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availablePCIs.length);
+      return availablePCIs[randomIndex];
+    }
+    
+    // Last resort: increment by 3 to at least change Mod3
+    return (currentPCI + 3) % 504;
   }
 
   /**
@@ -289,17 +348,33 @@ export class PCIOptimizer {
     }
 
     // Find the PCI with the highest score
-    let bestPCI = targetCell.pci;
+    // Collect all PCIs within 10% of the best score for randomization
     let bestScore = -Infinity;
+    const topCandidates: number[] = [];
 
+    // First pass: find the best score
     for (const [pci, score] of candidateScores) {
       if (score > bestScore) {
         bestScore = score;
-        bestPCI = pci;
       }
     }
 
-    return bestPCI;
+    // Second pass: collect all candidates within 10% of best score
+    const scoreThreshold = bestScore * 0.9;
+    for (const [pci, score] of candidateScores) {
+      if (score >= scoreThreshold) {
+        topCandidates.push(pci);
+      }
+    }
+
+    // Randomly select from top candidates for diversity
+    if (topCandidates.length > 0) {
+      const randomIndex = Math.floor(Math.random() * topCandidates.length);
+      return topCandidates[randomIndex];
+    }
+
+    // Fallback to current PCI if no good candidates
+    return targetCell.pci;
   }
   
   /**
@@ -522,3 +597,4 @@ export class PCIOptimizer {
 }
 
 export const pciOptimizer = new PCIOptimizer();
+
