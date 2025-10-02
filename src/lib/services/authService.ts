@@ -31,23 +31,62 @@ export interface AuthResult<T = any> {
 export class AuthService {
   private currentUser: User | null = null;
   private authStateListeners: ((user: User | null) => void)[] = [];
+  private tokenRefreshInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     if (browser) {
       this.initializeAuthListener();
+      this.setupTokenRefresh();
     }
   }
 
   /**
-   * Initialize Firebase auth state listener
+   * Initialize Firebase auth state listener with error recovery
    */
   private initializeAuthListener(): void {
     onAuthStateChanged(auth, (user) => {
       this.currentUser = user;
+      
+      // Log auth state changes for debugging
+      if (user) {
+        console.log('Auth state: User signed in', user.email);
+        console.log('Token expiration:', user.metadata.lastSignInTime);
+      } else {
+        console.log('Auth state: User signed out');
+      }
+      
       this.notifyListeners(user);
+    }, (error) => {
+      console.error('Auth state change error:', error);
+      // Handle auth errors (expired tokens, etc.)
+      this.currentUser = null;
+      this.notifyListeners(null);
     });
   }
 
+  /**
+   * Setup automatic token refresh every 50 minutes (tokens expire after 1 hour)
+   */
+  private setupTokenRefresh(): void {
+    // Clear any existing interval
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+    }
+    
+    // Refresh token every 50 minutes to prevent expiration
+    this.tokenRefreshInterval = setInterval(async () => {
+      if (this.currentUser) {
+        try {
+          await this.currentUser.getIdToken(true); // Force refresh
+          console.log('Auth token refreshed successfully');
+        } catch (error) {
+          console.error('Token refresh failed:', error);
+          // User might need to re-authenticate
+        }
+      }
+    }, 50 * 60 * 1000); // 50 minutes in milliseconds
+  }
+  
   /**
    * Subscribe to auth state changes
    */
