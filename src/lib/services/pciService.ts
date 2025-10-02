@@ -154,7 +154,11 @@ export class PCIService {
       
       // Get AI analysis
       const analysisData = this.formatConflictsForAI(conflicts);
+      console.log(`[PCIService] Formatted ${conflicts.length} conflicts for AI analysis`);
+      console.log(`[PCIService] Analysis data length: ${analysisData.length} characters`);
+      
       const geminiAnalysis = await this.getAIAnalysis(analysisData);
+      console.log(`[PCIService] Gemini analysis received: ${geminiAnalysis.substring(0, 100)}...`);
       
       // Update analysis store
       analysisActions.setGeminiAnalysis(geminiAnalysis);
@@ -179,14 +183,21 @@ export class PCIService {
    * Get AI analysis for conflicts
    */
   private async getAIAnalysis(analysisData: string): Promise<string> {
-    if (!analysisData) {
+    console.log(`[PCIService] getAIAnalysis called with data: ${analysisData ? 'YES' : 'NO'}`);
+    
+    if (!analysisData || analysisData.trim() === '') {
+      console.warn('[PCIService] No analysis data provided - returning default message');
       return "No conflicts to analyze.";
     }
     
+    console.log(`[PCIService] Calling Gemini API with ${analysisData.length} chars of conflict data`);
+    
     try {
-      return await geminiService.analyzePCIConflicts(analysisData);
+      const result = await geminiService.analyzePCIConflicts(analysisData);
+      console.log(`[PCIService] Gemini returned: ${result.substring(0, 150)}...`);
+      return result;
     } catch (error) {
-      console.warn('[PCIService] AI analysis unavailable, using fallback');
+      console.error('[PCIService] AI analysis error:', error);
       return 'AI analysis unavailable. Please review the conflict list manually.';
     }
   }
