@@ -196,10 +196,60 @@
   
   // Handle smart input field
   let smartInputValue = '';
+  let selectedBand = 'auto'; // Band selection for accurate conversion
+  
+  // Band definitions with their frequency ranges and EARFCN ranges
+  const bandOptions = [
+    { value: 'auto', label: 'Auto-Detect' },
+    { value: '1', label: 'Band 1 (2100 MHz FDD)', freqRange: [2110, 2170], earfcnRange: [0, 599] },
+    { value: '2', label: 'Band 2 (1900 MHz FDD)', freqRange: [1930, 1990], earfcnRange: [600, 1199] },
+    { value: '3', label: 'Band 3 (1800 MHz FDD)', freqRange: [1805, 1880], earfcnRange: [1200, 1949] },
+    { value: '4', label: 'Band 4 (AWS 2100 FDD)', freqRange: [2110, 2155], earfcnRange: [1950, 2399] },
+    { value: '5', label: 'Band 5 (850 MHz FDD)', freqRange: [869, 894], earfcnRange: [2400, 2649] },
+    { value: '7', label: 'Band 7 (2600 MHz FDD)', freqRange: [2620, 2690], earfcnRange: [2750, 3449] },
+    { value: '12', label: 'Band 12 (700 MHz FDD)', freqRange: [729, 746], earfcnRange: [9210, 9659] },
+    { value: '13', label: 'Band 13 (700 MHz FDD)', freqRange: [746, 756], earfcnRange: [9870, 9919] },
+    { value: '17', label: 'Band 17 (700 MHz FDD)', freqRange: [734, 746], earfcnRange: [5180, 5279] },
+    { value: '25', label: 'Band 25 (1900 MHz FDD)', freqRange: [1930, 1995], earfcnRange: [5730, 5849] },
+    { value: '26', label: 'Band 26 (850 MHz FDD)', freqRange: [859, 894], earfcnRange: [5850, 6449] },
+    { value: '66', label: 'Band 66 (AWS-3 FDD)', freqRange: [2110, 2200], earfcnRange: [66436, 67335] },
+    { value: '71', label: 'Band 71 (600 MHz FDD)', freqRange: [617, 652], earfcnRange: [68586, 68935] },
+    { value: '33', label: 'Band 33 (1900 MHz TDD)', freqRange: [1900, 1920], earfcnRange: [36000, 36199] },
+    { value: '34', label: 'Band 34 (2000 MHz TDD)', freqRange: [2010, 2025], earfcnRange: [36200, 36349] },
+    { value: '41', label: 'Band 41 (2500 MHz TDD)', freqRange: [2496, 2690], earfcnRange: [38650, 39649] },
+    { value: '42', label: 'Band 42 (3500 MHz TDD)', freqRange: [3400, 3600], earfcnRange: [39650, 41589] },
+    { value: '43', label: 'Band 43 (3700 MHz TDD)', freqRange: [3600, 3800], earfcnRange: [41590, 43589] },
+    { value: '48', label: 'Band 48 (CBRS 3550 TDD)', freqRange: [3550, 3700], earfcnRange: [55240, 56739] },
+  ];
+  
   function handleSmartInput() {
     const value = parseFloat(smartInputValue);
     if (!isNaN(value) && value >= 0) {
-      detectAndConvert(value);
+      if (selectedBand === 'auto') {
+        detectAndConvert(value);
+      } else {
+        // Use selected band for conversion
+        const band = bandOptions.find(b => b.value === selectedBand);
+        if (band && band.freqRange && band.earfcnRange) {
+          if (value >= 600 && value <= 4000) {
+            // It's a frequency - convert to EARFCN using selected band
+            const [minFreq, maxFreq] = band.freqRange;
+            const [minEarfcn, maxEarfcn] = band.earfcnRange;
+            if (value >= minFreq && value <= maxFreq) {
+              const earfcn = Math.round(minEarfcn + ((value - minFreq) / 0.1));
+              editedCell.dlEarfcn = earfcn;
+              handleDlEarfcnChange();
+            } else {
+              console.warn('Frequency out of range for selected band');
+              detectAndConvert(value);
+            }
+          } else {
+            // It's an EARFCN
+            editedCell.dlEarfcn = value;
+            handleDlEarfcnChange();
+          }
+        }
+      }
       smartInputValue = ''; // Clear after processing
     }
   }
@@ -321,7 +371,19 @@
           <!-- Smart Frequency/EARFCN Input -->
           <div class="smart-input-section">
             <label for="smartInput">🎯 Quick Entry: Frequency or EARFCN</label>
-            <p class="smart-help">Enter a frequency (e.g., 2100, 3550) or EARFCN (e.g., 1950, 55240) - it will auto-detect!</p>
+            <p class="smart-help">Enter a frequency (e.g., 2100, 3550) or EARFCN (e.g., 1950, 55240)</p>
+            
+            <!-- Band Selector -->
+            <div class="band-selector-group">
+              <label for="bandSelect" class="band-label">LTE Band:</label>
+              <select id="bandSelect" bind:value={selectedBand} class="band-select">
+                {#each bandOptions as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            </div>
+            
+            <!-- Frequency/EARFCN Input -->
             <div class="smart-input-group">
               <input 
                 type="number" 
@@ -341,9 +403,16 @@
                   <polyline points="9 11 12 14 22 4"></polyline>
                   <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                 </svg>
-                Auto-Fill
+                Convert
               </button>
             </div>
+            
+            {#if selectedBand !== 'auto'}
+              <p class="band-hint">
+                ℹ️ {bandOptions.find(b => b.value === selectedBand)?.label || ''} - 
+                Enter frequency between {bandOptions.find(b => b.value === selectedBand)?.freqRange?.[0]}-{bandOptions.find(b => b.value === selectedBand)?.freqRange?.[1]} MHz
+              </p>
+            {/if}
           </div>
           
           <div class="divider"></div>
@@ -767,6 +836,48 @@
     font-size: 0.85rem;
     color: var(--text-secondary);
     font-style: italic;
+  }
+
+  .band-selector-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .band-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  .band-select {
+    flex: 1;
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .band-select:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: var(--focus-ring);
+  }
+
+  .band-hint {
+    margin: 0.75rem 0 0 0;
+    padding: 0.5rem;
+    background: var(--info-light);
+    border-left: 3px solid var(--primary-color);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    border-radius: var(--border-radius);
   }
 
   .smart-input-group {
