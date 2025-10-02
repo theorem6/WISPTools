@@ -10,11 +10,18 @@
   
   const dispatch = createEventDispatcher();
   
-  // Create working copy
-  let editedSite: CellSite;
+  // Create working copy with default initialization
+  let editedSite: CellSite = {
+    id: 'TEMP',
+    name: '',
+    eNodeB: 1000,
+    latitude: 0,
+    longitude: 0,
+    sectors: []
+  };
   let selectedSectorIndex: number | null = null;
   
-  // Initialize site data
+  // Initialize site data when modal opens
   $: if (isOpen) {
     if (isNewSite) {
       const siteNumber = Date.now().toString().slice(-4);
@@ -27,7 +34,9 @@
         sectors: []
       };
     } else if (site) {
-      editedSite = JSON.parse(JSON.stringify(site)); // Deep copy
+      // Deep copy to avoid mutating the original
+      editedSite = JSON.parse(JSON.stringify(site));
+      console.log('SiteEditor: Loaded site for editing:', editedSite.name, 'with', editedSite.sectors.length, 'sectors');
     }
     selectedSectorIndex = null;
   }
@@ -48,6 +57,8 @@
   }
   
   function addSector() {
+    console.log('SiteEditor: Adding sector. Current sectors:', editedSite.sectors.length);
+    
     const sectorNumber = editedSite.sectors.length + 1;
     // Smart azimuth suggestion based on existing sectors
     let suggestedAzimuth = 0;
@@ -86,6 +97,8 @@
     
     editedSite.sectors = [...editedSite.sectors, newSector];
     selectedSectorIndex = editedSite.sectors.length - 1;
+    
+    console.log('SiteEditor: Added sector. New count:', editedSite.sectors.length);
   }
   
   // Find the largest gap between azimuths for smart sector placement
@@ -111,10 +124,12 @@
   }
   
   function removeSector(index: number) {
+    console.log('SiteEditor: Removing sector at index', index, '. Current count:', editedSite.sectors.length);
     editedSite.sectors = editedSite.sectors.filter((_, i) => i !== index);
     if (selectedSectorIndex === index) {
       selectedSectorIndex = null;
     }
+    console.log('SiteEditor: Removed sector. New count:', editedSite.sectors.length);
   }
   
   function addChannelToSector(sectorIndex: number) {
