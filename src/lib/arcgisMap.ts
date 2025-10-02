@@ -17,7 +17,7 @@ export class PCIArcGISMapper {
   private cellLayer: any;
   private conflictLayer: any;
   private onCellClickCallback: ((cellId: string) => void) | null = null;
-  private onMapRightClickCallback: ((latitude: number, longitude: number) => void) | null = null;
+  private onMapRightClickCallback: ((latitude: number, longitude: number, screenX: number, screenY: number, cellId: string | null) => void) | null = null;
   private isInitialized = false;
   private initPromise: Promise<void>;
   
@@ -438,9 +438,9 @@ export class PCIArcGISMapper {
   }
   
   /**
-   * Enable right-click to add new cell at location
+   * Enable right-click to show context menu
    */
-  onMapRightClick(callback: (latitude: number, longitude: number) => void) {
+  onMapRightClick(callback: (latitude: number, longitude: number, screenX: number, screenY: number, cellId: string | null) => void) {
     this.onMapRightClickCallback = callback;
     
     console.log('PCIArcGISMapper: onMapRightClick called, mapView exists:', !!this.mapView);
@@ -452,7 +452,7 @@ export class PCIArcGISMapper {
       console.log('PCIArcGISMapper: Container exists:', !!container);
       
       if (container) {
-        container.addEventListener('contextmenu', (e: MouseEvent) => {
+        container.addEventListener('contextmenu', async (e: MouseEvent) => {
           console.log('PCIArcGISMapper: Right-click detected!', e.clientX, e.clientY);
           e.preventDefault();
           e.stopPropagation();
@@ -465,11 +465,26 @@ export class PCIArcGISMapper {
           // Convert screen coordinates to map coordinates
           const point = this.mapView.toMap({ x, y });
           
+          // Check if clicking on an existing cell
+          let clickedCellId: string | null = null;
+          try {
+            const response = await this.mapView.hitTest({ x, y });
+            if (response.results.length > 0) {
+              const graphic = response.results[0].graphic;
+              if (graphic && graphic.attributes && graphic.attributes.CellId) {
+                clickedCellId = graphic.attributes.CellId;
+                console.log('PCIArcGISMapper: Clicked on cell:', clickedCellId);
+              }
+            }
+          } catch (err) {
+            console.error('Hit test error:', err);
+          }
+          
           console.log('PCIArcGISMapper: Map point:', point?.latitude, point?.longitude);
           
           if (point && this.onMapRightClickCallback) {
-            console.log('PCIArcGISMapper: Calling callback with coordinates');
-            this.onMapRightClickCallback(point.latitude, point.longitude);
+            console.log('PCIArcGISMapper: Calling callback with coordinates and cellId');
+            this.onMapRightClickCallback(point.latitude, point.longitude, e.clientX, e.clientY, clickedCellId);
           }
         });
         console.log('PCIArcGISMapper: Right-click listener attached successfully');

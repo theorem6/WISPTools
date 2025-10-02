@@ -33,6 +33,7 @@
   import NetworkSelector from '$lib/components/NetworkSelector.svelte';
   import CellEditor from '$lib/components/CellEditor.svelte';
   import SiteEditor from '$lib/components/SiteEditor.svelte';
+  import ContextMenu from '$lib/components/ContextMenu.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -46,12 +47,16 @@
   let showNetworkManager = false;
   let showCellEditor = false;
   let showSiteEditor = false;
+  let showContextMenu = false;
+  let contextMenuX = 0;
+  let contextMenuY = 0;
   let selectedCell: Cell | null = null;
   let selectedSite: CellSite | null = null;
   let isCreatingNewCell = false;
   let isCreatingNewSite = false;
   let newCellLatitude: number | undefined = undefined;
   let newCellLongitude: number | undefined = undefined;
+  let contextMenuCellId = '';
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
@@ -115,11 +120,11 @@
         handleCellClick(cellId);
       });
       
-      // Enable right-click to create new cell
+      // Enable right-click to show context menu
       console.log('Page: Attaching right-click handler');
-      mapInstance.onMapRightClick((latitude, longitude) => {
-        console.log('Page: Right-click callback triggered', latitude, longitude);
-        handleMapRightClick(latitude, longitude);
+      mapInstance.onMapRightClick((latitude, longitude, screenX, screenY, cellId) => {
+        console.log('Page: Right-click callback triggered', latitude, longitude, cellId);
+        handleMapRightClick(latitude, longitude, screenX, screenY, cellId);
       });
       
       console.log('Page: All event handlers attached');
@@ -313,13 +318,53 @@
     }
   }
   
-  function handleMapRightClick(latitude: number, longitude: number) {
-    // Open SITE editor in "create new" mode (proper data model)
-    selectedSite = null;
-    isCreatingNewSite = true;
+  function handleMapRightClick(latitude: number, longitude: number, screenX: number, screenY: number, cellId: string | null) {
+    // Store click information
     newCellLatitude = latitude;
     newCellLongitude = longitude;
+    contextMenuCellId = cellId || '';
+    
+    // Show context menu at click position
+    contextMenuX = screenX;
+    contextMenuY = screenY;
+    showContextMenu = true;
+  }
+  
+  function handleContextMenuAddSite() {
+    showContextMenu = false;
+    selectedSite = null;
+    isCreatingNewSite = true;
     showSiteEditor = true;
+  }
+  
+  function handleContextMenuEditSector() {
+    showContextMenu = false;
+    const cell = $cellsStore.items.find(c => c.id === contextMenuCellId);
+    if (cell) {
+      selectedCell = cell;
+      isCreatingNewCell = false;
+      showCellEditor = true;
+    }
+  }
+  
+  async function handleContextMenuDeleteSector() {
+    showContextMenu = false;
+    
+    if (!contextMenuCellId) return;
+    
+    if (confirm(`Delete sector ${contextMenuCellId}?`)) {
+      // Remove from store
+      const cells = $cellsStore.items.filter(c => c.id !== contextMenuCellId);
+      cellsStore.set({ items: cells });
+      
+      // Re-analyze
+      await performAnalysis();
+      
+      // Auto-save
+      await saveCurrentNetwork();
+      
+      console.log('Sector deleted:', contextMenuCellId);
+    }
   }
   
   async function handleCellSave(event: CustomEvent) {
@@ -558,7 +603,19 @@
       newCellLongitude = undefined;
     }}
   />
-        </div>
+  
+  <ContextMenu 
+    show={showContextMenu}
+    x={contextMenuX}
+    y={contextMenuY}
+    hasSelectedCell={!!contextMenuCellId}
+    cellId={contextMenuCellId}
+    on:addSite={handleContextMenuAddSite}
+    on:editSector={handleContextMenuEditSector}
+    on:deleteSector={handleContextMenuDeleteSector}
+    on:close={() => showContextMenu = false}
+  />
+            </div>
           {:else}
   <!-- Loading state while checking auth -->
   <div class="auth-loading">
