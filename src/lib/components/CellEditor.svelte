@@ -65,11 +65,8 @@
     additionalEarfcns = additionalEarfcns.filter((_, i) => i !== index);
   }
   
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  }
+  // Removed handleBackdropClick - modal should only close via Cancel or X button
+  // This prevents accidental closes when editing cells
   
   // EARFCN to Frequency conversion
   function earfcnToFrequency(earfcn: number): { centerFreq: number, isTDD: boolean, band: string } {
@@ -270,12 +267,8 @@
 </script>
 
 {#if isOpen}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click={handleBackdropClick}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="cell-editor" on:click|stopPropagation>
+  <div class="modal-backdrop">
+    <div class="cell-editor">
       <div class="editor-header">
         <h2>
           {#if isNewCell}
@@ -545,8 +538,8 @@
       </div>
       
       <div class="editor-footer">
-        <button class="cancel-btn" on:click={handleClose}>Cancel</button>
-        <button class="save-btn" on:click={handleSave}>
+        <button type="button" class="cancel-btn" on:click={handleClose}>Cancel</button>
+        <button type="button" class="save-btn" on:click={handleSave}>
           {#if isNewCell}
             ➕ Create Cell
           {:else}

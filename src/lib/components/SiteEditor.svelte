@@ -184,20 +184,13 @@
     editedSite = { ...editedSite, sectors: editedSite.sectors };
   }
   
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
-  }
+  // Removed handleBackdropClick - modal should only close via Cancel or X button
+  // This prevents accidental closes when editing sectors
 </script>
 
 {#if isOpen}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click={handleBackdropClick}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="site-editor" on:click|stopPropagation>
+  <div class="modal-backdrop">
+    <div class="site-editor">
       <div class="editor-header">
         <h2>
           {#if isNewSite}
@@ -497,8 +490,8 @@
       </div>
       
       <div class="editor-footer">
-        <button class="cancel-btn" on:click={handleClose}>Cancel</button>
-        <button class="save-btn" on:click={handleSave}>
+        <button type="button" class="cancel-btn" on:click={handleClose}>Cancel</button>
+        <button type="button" class="save-btn" on:click={handleSave}>
           {#if isNewSite}
             🏗️ Create Site
           {:else}
