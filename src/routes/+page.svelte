@@ -281,7 +281,8 @@
     const conflicts = $conflictsStore.items;
     
     if (cells.length > 0) {
-        mapInstance.renderCells(cells);
+      // Pass conflicts to renderCells for color-coding
+      mapInstance.renderCells(cells, conflicts);
     }
     
         if (conflicts.length > 0) {
@@ -289,8 +290,13 @@
         }
       }
       
-  // Reactive statement to update map when store changes
+  // Reactive statement to update map when cells or conflicts change
   $: if (mapInstance && $cellsStore.items.length > 0) {
+    updateMapVisualization();
+  }
+  
+  // Update map when conflicts change (color updates)
+  $: if (mapInstance && $conflictsStore.items) {
     updateMapVisualization();
   }
   

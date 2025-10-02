@@ -79,9 +79,9 @@ export class PCIArcGISMapper {
   }
   
   /**
-   * Render cells on the map with PCI information
+   * Render cells on the map with PCI information and conflict status
    */
-  async renderCells(cells: MapCell[]) {
+  async renderCells(cells: MapCell[], conflicts: any[] = []) {
     if (!browser || !this.cellLayer) return;
 
     // Dynamically import required modules
@@ -96,12 +96,41 @@ export class PCIArcGISMapper {
     // Clear existing graphics
     this.cellLayer.removeAll();
     
+    // Build conflict map for quick lookup
+    const cellConflictMap = new Map<string, { severity: string, count: number }>();
+    for (const conflict of conflicts) {
+      const primaryId = conflict.primaryCell?.id;
+      const conflictingId = conflict.conflictingCell?.id;
+      
+      if (primaryId) {
+        const existing = cellConflictMap.get(primaryId) || { severity: 'NONE', count: 0 };
+        if (this.getSeverityWeight(conflict.severity) > this.getSeverityWeight(existing.severity)) {
+          existing.severity = conflict.severity;
+        }
+        existing.count++;
+        cellConflictMap.set(primaryId, existing);
+      }
+      
+      if (conflictingId) {
+        const existing = cellConflictMap.get(conflictingId) || { severity: 'NONE', count: 0 };
+        if (this.getSeverityWeight(conflict.severity) > this.getSeverityWeight(existing.severity)) {
+          existing.severity = conflict.severity;
+        }
+        existing.count++;
+        cellConflictMap.set(conflictingId, existing);
+      }
+    }
+    
     cells.forEach((cell: MapCell) => {
       const point = new Point({
         longitude: cell.longitude,
         latitude: cell.latitude,
         spatialReference: { wkid: 4326 }
       });
+      
+      // Get conflict status for this cell
+      const conflictInfo = cellConflictMap.get(cell.id);
+      const hasConflict = conflictInfo && conflictInfo.count > 0;
       
       // Create a sector cone instead of a simple marker
       const azimuth = (cell as any).azimuth || 0;
@@ -132,14 +161,30 @@ export class PCIArcGISMapper {
         spatialReference: { wkid: 4326 }
       };
       
+      // Choose color based on conflict status
+      let fillColor, outlineColor, outlineWidth;
+      
+      if (hasConflict) {
+        // Color based on conflict severity
+        const severityColor = this.getConflictColorArray(conflictInfo.severity);
+        fillColor = [...severityColor, 0.5]; // Semi-transparent conflict color
+        outlineColor = severityColor;
+        outlineWidth = 3; // Thicker outline for conflicts
+      } else {
+        // No conflicts - use success green
+        fillColor = [76, 175, 80, 0.4]; // Green with transparency
+        outlineColor = [56, 142, 60, 255]; // Dark green outline
+        outlineWidth = 2;
+      }
+      
       const graphic = new Graphic({
         geometry: sectorPolygon,
         symbol: {
           type: "simple-fill",
-          color: [...this.getPCIColorArray(cell.pci), 0.6], // Semi-transparent
+          color: fillColor,
           outline: {
-            color: this.getPCIColorArray(cell.pci),
-            width: 2
+            color: outlineColor,
+            width: outlineWidth
           }
         },
         attributes: {
@@ -148,7 +193,9 @@ export class PCIArcGISMapper {
           Sector: cell.sector,
           PCI: cell.pci,
           Frequency: cell.frequency,
-          RSPower: cell.rsPower
+          RSPower: cell.rsPower,
+          ConflictStatus: conflictInfo?.severity || 'NONE',
+          ConflictCount: conflictInfo?.count || 0
         }
       });
       
@@ -218,6 +265,19 @@ export class PCIArcGISMapper {
   /**
    * Get color for PCI value visualization as array
    */
+  /**
+   * Get numeric weight for conflict severity (for comparison)
+   */
+  private getSeverityWeight(severity: string): number {
+    switch (severity) {
+      case 'CRITICAL': return 4;
+      case 'HIGH': return 3;
+      case 'MEDIUM': return 2;
+      case 'LOW': return 1;
+      default: return 0;
+    }
+  }
+  
   private getPCIColorArray(pci: number): number[] {
     // Color scheme based on PCI modulo for better visualization
     const hue = (pci % 30) * 12; // Spread across color spectrum
