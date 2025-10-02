@@ -220,6 +220,11 @@
         });
         console.log('Map centered on network location:', location.latitude, location.longitude);
       } catch (error: any) {
+        // Ignore "goto-interrupted" errors - these are expected when new data loads
+        if (error?.name === 'view:goto-interrupted') {
+          console.log('Map centering interrupted by new data load (expected)');
+          return;
+        }
         console.warn('Map centering failed:', error);
       }
     }
