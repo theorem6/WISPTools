@@ -72,33 +72,107 @@
     }
   }
   
+  // EARFCN to Frequency conversion
+  function earfcnToFrequency(earfcn: number): { centerFreq: number, isTDD: boolean, band: string } {
+    // FDD Bands
+    if (earfcn >= 0 && earfcn <= 599) return { centerFreq: 2110 + 0.1 * earfcn, isTDD: false, band: 'Band 1 (2100 MHz)' };
+    if (earfcn >= 600 && earfcn <= 1199) return { centerFreq: 1930 + 0.1 * (earfcn - 600), isTDD: false, band: 'Band 2 (1900 MHz)' };
+    if (earfcn >= 1200 && earfcn <= 1949) return { centerFreq: 1805 + 0.1 * (earfcn - 1200), isTDD: false, band: 'Band 3 (1800 MHz)' };
+    if (earfcn >= 1950 && earfcn <= 2399) return { centerFreq: 2110 + 0.1 * (earfcn - 1950), isTDD: false, band: 'Band 4 (AWS)' };
+    if (earfcn >= 2400 && earfcn <= 2649) return { centerFreq: 869 + 0.1 * (earfcn - 2400), isTDD: false, band: 'Band 5 (850 MHz)' };
+    if (earfcn >= 2650 && earfcn <= 2749) return { centerFreq: 875 + 0.1 * (earfcn - 2650), isTDD: false, band: 'Band 6 (800 MHz)' };
+    if (earfcn >= 2750 && earfcn <= 3449) return { centerFreq: 2620 + 0.1 * (earfcn - 2750), isTDD: false, band: 'Band 7 (2600 MHz)' };
+    if (earfcn >= 3450 && earfcn <= 3799) return { centerFreq: 925 + 0.1 * (earfcn - 3450), isTDD: false, band: 'Band 8 (900 MHz)' };
+    if (earfcn >= 9210 && earfcn <= 9659) return { centerFreq: 729 + 0.1 * (earfcn - 9210), isTDD: false, band: 'Band 12 (700 MHz)' };
+    if (earfcn >= 9870 && earfcn <= 9919) return { centerFreq: 746 + 0.1 * (earfcn - 9870), isTDD: false, band: 'Band 13 (700 MHz)' };
+    if (earfcn >= 5180 && earfcn <= 5279) return { centerFreq: 734 + 0.1 * (earfcn - 5180), isTDD: false, band: 'Band 17 (700 MHz)' };
+    if (earfcn >= 5730 && earfcn <= 5849) return { centerFreq: 1930 + 0.1 * (earfcn - 5730), isTDD: false, band: 'Band 25 (1900 MHz)' };
+    if (earfcn >= 5850 && earfcn <= 6449) return { centerFreq: 859 + 0.1 * (earfcn - 5850), isTDD: false, band: 'Band 26 (850 MHz)' };
+    if (earfcn >= 66436 && earfcn <= 67335) return { centerFreq: 2110 + 0.1 * (earfcn - 66436), isTDD: false, band: 'Band 66 (AWS-3)' };
+    if (earfcn >= 68586 && earfcn <= 68935) return { centerFreq: 617 + 0.1 * (earfcn - 68586), isTDD: false, band: 'Band 71 (600 MHz)' };
+    
+    // TDD Bands
+    if (earfcn >= 36000 && earfcn <= 36199) return { centerFreq: 1900 + 0.1 * (earfcn - 36000), isTDD: true, band: 'Band 33 (TDD 1900)' };
+    if (earfcn >= 36200 && earfcn <= 36349) return { centerFreq: 2010 + 0.1 * (earfcn - 36200), isTDD: true, band: 'Band 34 (TDD 2000)' };
+    if (earfcn >= 38650 && earfcn <= 39649) return { centerFreq: 2496 + 0.1 * (earfcn - 38650), isTDD: true, band: 'Band 41 (TDD 2500)' };
+    if (earfcn >= 39650 && earfcn <= 41589) return { centerFreq: 3400 + 0.1 * (earfcn - 39650), isTDD: true, band: 'Band 42 (TDD 3500)' };
+    if (earfcn >= 41590 && earfcn <= 43589) return { centerFreq: 3600 + 0.1 * (earfcn - 41590), isTDD: true, band: 'Band 43 (TDD 3700)' };
+    if (earfcn >= 55240 && earfcn <= 56739) return { centerFreq: 3550 + 0.1 * (earfcn - 55240), isTDD: true, band: 'Band 48 (CBRS 3550)' };
+    
+    return { centerFreq: 0, isTDD: false, band: 'Unknown Band' };
+  }
+  
+  // Frequency to EARFCN conversion (approximation for common bands)
+  function frequencyToEarfcn(freq: number): number {
+    // Common FDD bands
+    if (freq >= 2110 && freq <= 2170) return Math.round((freq - 2110) / 0.1); // Band 1
+    if (freq >= 1930 && freq <= 1990) return Math.round((freq - 1930) / 0.1) + 600; // Band 2
+    if (freq >= 1805 && freq <= 1880) return Math.round((freq - 1805) / 0.1) + 1200; // Band 3
+    if (freq >= 869 && freq <= 894) return Math.round((freq - 869) / 0.1) + 2400; // Band 5
+    if (freq >= 729 && freq <= 746) return Math.round((freq - 729) / 0.1) + 9210; // Band 12
+    if (freq >= 617 && freq <= 652) return Math.round((freq - 617) / 0.1) + 68586; // Band 71
+    
+    // Common TDD bands
+    if (freq >= 2496 && freq <= 2690) return Math.round((freq - 2496) / 0.1) + 38650; // Band 41
+    if (freq >= 3400 && freq <= 3600) return Math.round((freq - 3400) / 0.1) + 39650; // Band 42
+    if (freq >= 3550 && freq <= 3700) return Math.round((freq - 3550) / 0.1) + 55240; // Band 48 (CBRS)
+    
+    // Default to Band 4 (AWS) for 2100 MHz range
+    return 1950;
+  }
+  
   // Frequency band helper
   function getFrequencyBand(earfcn: number): string {
-    if (earfcn >= 0 && earfcn <= 599) return 'Band 1 (2100 MHz)';
-    if (earfcn >= 600 && earfcn <= 1199) return 'Band 2 (1900 MHz)';
-    if (earfcn >= 1200 && earfcn <= 1949) return 'Band 3 (1800 MHz)';
-    if (earfcn >= 1950 && earfcn <= 2399) return 'Band 4 (AWS)';
-    if (earfcn >= 2400 && earfcn <= 2649) return 'Band 5 (850 MHz)';
-    if (earfcn >= 2650 && earfcn <= 2749) return 'Band 6 (800 MHz)';
-    if (earfcn >= 2750 && earfcn <= 3449) return 'Band 7 (2600 MHz)';
-    if (earfcn >= 3450 && earfcn <= 3799) return 'Band 8 (900 MHz)';
-    if (earfcn >= 9210 && earfcn <= 9659) return 'Band 12 (700 MHz)';
-    if (earfcn >= 9870 && earfcn <= 9919) return 'Band 13 (700 MHz)';
-    if (earfcn >= 5180 && earfcn <= 5279) return 'Band 17 (700 MHz)';
-    if (earfcn >= 5730 && earfcn <= 5849) return 'Band 25 (1900 MHz)';
-    if (earfcn >= 5850 && earfcn <= 6449) return 'Band 26 (850 MHz)';
-    if (earfcn >= 9040 && earfcn <= 9209) return 'Band 28 (700 MHz)';
-    if (earfcn >= 9660 && earfcn <= 9769) return 'Band 29 (700 MHz)';
-    if (earfcn >= 36000 && earfcn <= 36199) return 'Band 33 (TDD 1900)';
-    if (earfcn >= 36200 && earfcn <= 36349) return 'Band 34 (TDD 2000)';
-    if (earfcn >= 38650 && earfcn <= 39649) return 'Band 41 (TDD 2500)';
-    if (earfcn >= 39650 && earfcn <= 41589) return 'Band 42 (TDD 3500)';
-    if (earfcn >= 41590 && earfcn <= 43589) return 'Band 43 (TDD 3700)';
-    if (earfcn >= 55240 && earfcn <= 56739) return 'Band 48 (CBRS 3550)';
-    if (earfcn >= 66436 && earfcn <= 67335) return 'Band 66 (AWS-3)';
-    if (earfcn >= 67336 && earfcn <= 67535) return 'Band 70 (AWS-4)';
-    if (earfcn >= 68586 && earfcn <= 68935) return 'Band 71 (600 MHz)';
-    return 'Unknown Band';
+    return earfcnToFrequency(earfcn).band;
+  }
+  
+  // Calculate UL EARFCN from DL EARFCN (FDD only)
+  function calculateUlEarfcn(dlEarfcn: number): number {
+    const info = earfcnToFrequency(dlEarfcn);
+    if (info.isTDD) return dlEarfcn; // TDD uses same EARFCN for UL/DL
+    
+    // FDD: UL offset varies by band
+    if (dlEarfcn >= 0 && dlEarfcn <= 599) return dlEarfcn + 18000; // Band 1
+    if (dlEarfcn >= 600 && dlEarfcn <= 1199) return dlEarfcn + 18000; // Band 2
+    if (dlEarfcn >= 1200 && dlEarfcn <= 1949) return dlEarfcn + 18000; // Band 3
+    if (dlEarfcn >= 1950 && dlEarfcn <= 2399) return dlEarfcn + 18000; // Band 4
+    if (dlEarfcn >= 2400 && dlEarfcn <= 2649) return dlEarfcn + 18000; // Band 5
+    if (dlEarfcn >= 9210 && dlEarfcn <= 9659) return dlEarfcn + 18000; // Band 12
+    if (dlEarfcn >= 5180 && dlEarfcn <= 5279) return dlEarfcn + 18000; // Band 17
+    if (dlEarfcn >= 68586 && dlEarfcn <= 68935) return dlEarfcn + 18000; // Band 71
+    
+    return dlEarfcn + 18000; // Default offset
+  }
+  
+  // Update all frequency-related fields when DL EARFCN changes
+  function handleDlEarfcnChange() {
+    if (!editedCell.dlEarfcn) return;
+    
+    const info = earfcnToFrequency(editedCell.dlEarfcn);
+    editedCell.centerFreq = info.centerFreq;
+    editedCell.frequency = info.centerFreq; // Legacy field
+    editedCell.ulEarfcn = calculateUlEarfcn(editedCell.dlEarfcn);
+    editedCell.earfcn = editedCell.dlEarfcn; // Legacy field
+    
+    // Set technology based on TDD/FDD and frequency
+    if (info.isTDD && info.centerFreq >= 3550 && info.centerFreq <= 3700) {
+      editedCell.technology = 'CBRS';
+    } else if (info.isTDD) {
+      editedCell.technology = 'LTE';
+    } else {
+      editedCell.technology = 'LTE';
+    }
+  }
+  
+  // Update EARFCN when center frequency changes
+  function handleCenterFreqChange() {
+    if (!editedCell.centerFreq) return;
+    
+    const dlEarfcn = frequencyToEarfcn(editedCell.centerFreq);
+    editedCell.dlEarfcn = dlEarfcn;
+    editedCell.earfcn = dlEarfcn; // Legacy field
+    editedCell.frequency = editedCell.centerFreq; // Legacy field
+    editedCell.ulEarfcn = calculateUlEarfcn(dlEarfcn);
   }
 </script>
 
@@ -221,20 +295,27 @@
                 type="number" 
                 id="dlEarfcn"
                 bind:value={editedCell.dlEarfcn}
+                on:input={handleDlEarfcnChange}
                 min="0"
                 max="70000"
               />
-              <span class="helper-text">{getFrequencyBand(editedCell.dlEarfcn || 0)}</span>
+              <span class="helper-text">
+                {getFrequencyBand(editedCell.dlEarfcn || 0)}
+                {#if editedCell.dlEarfcn}
+                  • {earfcnToFrequency(editedCell.dlEarfcn).isTDD ? 'TDD' : 'FDD'}
+                {/if}
+              </span>
             </div>
             
             <div class="form-group">
-              <label for="ulEarfcn">UL EARFCN</label>
+              <label for="ulEarfcn">UL EARFCN {earfcnToFrequency(editedCell.dlEarfcn || 0).isTDD ? '(Same as DL for TDD)' : ''}</label>
               <input 
                 type="number" 
                 id="ulEarfcn"
                 bind:value={editedCell.ulEarfcn}
                 min="0"
                 max="70000"
+                disabled={earfcnToFrequency(editedCell.dlEarfcn || 0).isTDD}
               />
             </div>
             
@@ -244,6 +325,7 @@
                 type="number" 
                 id="centerFreq"
                 bind:value={editedCell.centerFreq}
+                on:input={handleCenterFreqChange}
                 step="0.1"
               />
             </div>
