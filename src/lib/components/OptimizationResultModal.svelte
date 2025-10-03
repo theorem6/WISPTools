@@ -22,6 +22,7 @@
     <div 
       class="modal" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="optimization-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation

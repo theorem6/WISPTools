@@ -23,6 +23,7 @@
     <div 
       class="modal" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="analysis-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation

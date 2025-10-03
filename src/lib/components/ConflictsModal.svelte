@@ -22,6 +22,7 @@
     <div 
       class="modal modal-large" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="conflicts-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation

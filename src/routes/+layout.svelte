@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { themeManager } from '$lib/stores/themeStore';
 	
-	// Import centralized theme CSS
+	// Import centralized theme CSS (includes html/body global styles)
 	import '../styles/theme.css';
 
 	onMount(() => {
@@ -12,19 +12,3 @@
 </script>
 
 <slot />
-
-<style>
-	:global(html) {
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-		background: var(--bg-primary);
-		min-height: 100vh;
-		margin: 0;
-		padding: 0;
-	}
-	
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		overflow-x: hidden;
-	}
-</style>

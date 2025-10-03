@@ -391,6 +391,7 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     <div 
       class="wizard-modal" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="import-wizard-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation
@@ -827,85 +828,6 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
     color: var(--text-primary);
   }
 
-  .add-btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: var(--border-radius);
-    background: var(--primary-color);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .add-btn:hover {
-    background: var(--button-primary-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .cell-preview {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: var(--surface-secondary);
-    border-radius: var(--border-radius-lg);
-    border: 1px solid var(--border-color);
-  }
-
-  .cell-preview h4 {
-    margin: 0 0 1rem 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .cell-list {
-    max-height: 200px;
-    overflow-y: auto;
-    margin-bottom: 1rem;
-  }
-
-  .cell-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    margin-bottom: 0.5rem;
-  }
-
-  .cell-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    min-width: 80px;
-  }
-
-  .cell-info {
-    flex: 1;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
-
-  .remove-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    border-radius: 6px;
-    background: var(--danger-light);
-    color: var(--danger-color);
-    font-size: 1.25rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .remove-btn:hover {
-    background: var(--danger-color);
-    color: white;
-  }
-
   .import-btn {
     width: 100%;
     padding: 0.875rem 1.5rem;
@@ -1067,10 +989,6 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
 
   @media (max-width: 768px) {
     .method-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .form-grid {
       grid-template-columns: 1fr;
     }
 

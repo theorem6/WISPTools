@@ -21,6 +21,7 @@
     <div 
       class="modal modal-large" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="recommendations-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation

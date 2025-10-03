@@ -149,6 +149,7 @@
     <div 
       class="export-modal" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="export-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation

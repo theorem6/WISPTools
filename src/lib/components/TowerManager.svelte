@@ -191,6 +191,7 @@
     <div 
       class="tower-modal" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="tower-manager-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation
@@ -338,7 +339,11 @@
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                       </svg>
                     </button>
-                    <button class="expand-btn" on:click|stopPropagation={() => toggleExpand(tower.eNodeB)}>
+                    <button 
+                      class="expand-btn" 
+                      aria-label={expandedTowerId === tower.eNodeB.toString() ? 'Collapse tower details' : 'Expand tower details'}
+                      on:click|stopPropagation={() => toggleExpand(tower.eNodeB)}
+                    >
                       <svg 
                         width="16" 
                         height="16" 

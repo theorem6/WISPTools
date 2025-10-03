@@ -153,25 +153,6 @@
     white-space: nowrap;
   }
 
-  .sign-in-btn {
-    height: 36px;
-    padding: 0 1.25rem;
-    border: 1px solid var(--primary-color);
-    border-radius: 18px;
-    background: var(--primary-color);
-    color: white;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .sign-in-btn:hover {
-    background: var(--button-primary-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
-  }
-
   .dropdown-menu {
     position: absolute;
     top: calc(100% + 0.5rem);

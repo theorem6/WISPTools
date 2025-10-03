@@ -233,6 +233,7 @@
     <div 
       class="network-modal" 
       role="dialog"
+      tabindex="-1"
       aria-labelledby="network-manager-modal-title"
       on:click|stopPropagation
       on:keydown|stopPropagation
@@ -543,87 +544,6 @@
     align-items: center;
     padding: 3rem;
     color: var(--text-secondary);
-  }
-
-  .setup-banner {
-    display: flex;
-    gap: 1rem;
-    padding: 1.5rem;
-    background: var(--warning-light);
-    border: 1px solid var(--warning-color);
-    border-radius: var(--border-radius-lg);
-    margin-bottom: 2rem;
-  }
-
-  .setup-banner svg {
-    color: var(--warning-color);
-    flex-shrink: 0;
-  }
-
-  .banner-content {
-    flex: 1;
-  }
-
-  .banner-content strong {
-    display: block;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-  }
-
-  .banner-content p {
-    font-size: 0.9rem;
-    color: var(--text-primary);
-    margin: 0 0 1rem 0;
-  }
-
-  .banner-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .banner-link {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    background: var(--warning-color);
-    color: white;
-    border-radius: var(--border-radius);
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.875rem;
-    transition: all var(--transition);
-    align-self: flex-start;
-  }
-
-  .banner-link:hover {
-    background: var(--warning-dark);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .banner-or {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
-
-  .banner-actions code {
-    display: block;
-    padding: 0.5rem 0.75rem;
-    background: var(--surface-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    color: var(--text-primary);
-  }
-
-  .banner-note {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin: 0.75rem 0 0 0;
-    font-style: italic;
   }
 
   .spinner-small {

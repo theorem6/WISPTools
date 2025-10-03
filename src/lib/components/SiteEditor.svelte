@@ -323,12 +323,12 @@
                   <div class="sector-details">
                     <!-- Prominent Azimuth Control -->
                     <div class="azimuth-control">
-                      <label class="azimuth-label">
+                      <div class="azimuth-label">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
                         </svg>
                         Azimuth Direction
-                      </label>
+                      </div>
                       <div class="azimuth-input-group">
                         <input 
                           type="range" 
@@ -360,12 +360,12 @@
                     
                     <!-- Beamwidth Control -->
                     <div class="beamwidth-control">
-                      <label class="beamwidth-label">
+                      <div class="beamwidth-label">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M12 2L2 7v10c0 5.5 3.84 7.66 10 9 6.16-1.34 10-3.5 10-9V7l-10-5z"></path>
                         </svg>
                         Beamwidth (Coverage Angle)
-                      </label>
+                      </div>
                       <div class="beamwidth-selector">
                         <select bind:value={sector.beamwidth} class="beamwidth-select">
                           <option value={33}>33° (Narrow - Directional)</option>
@@ -380,14 +380,14 @@
                     
                     <!-- Height AGL Control -->
                     <div class="height-control">
-                      <label class="height-label">
+                      <div class="height-label">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <line x1="12" y1="20" x2="12" y2="4"></line>
                           <polyline points="8 8 12 4 16 8"></polyline>
                           <polyline points="8 16 12 20 16 16"></polyline>
                         </svg>
                         Height Above Ground Level
-                      </label>
+                      </div>
                       <div class="height-input-group">
                         <input 
                           type="number" 
@@ -403,30 +403,36 @@
                     
                     <div class="form-row">
                       <div class="form-group-sm">
-                        <label>PCI</label>
-                        <input 
-                          type="number" 
-                          bind:value={sector.pci}
-                          min="0"
-                          max="503"
-                        />
+                        <label>
+                          PCI
+                          <input 
+                            type="number" 
+                            bind:value={sector.pci}
+                            min="0"
+                            max="503"
+                          />
+                        </label>
                       </div>
                       
                       <div class="form-group-sm">
-                        <label>RS Power (dBm)</label>
-                        <input 
-                          type="number" 
-                          bind:value={sector.rsPower}
-                        />
+                        <label>
+                          RS Power (dBm)
+                          <input 
+                            type="number" 
+                            bind:value={sector.rsPower}
+                          />
+                        </label>
                       </div>
                       
                       <div class="form-group-sm">
-                        <label>Technology</label>
-                        <select bind:value={sector.technology}>
-                          <option value="LTE">LTE</option>
-                          <option value="CBRS">CBRS</option>
-                          <option value="5G">5G</option>
-                        </select>
+                        <label>
+                          Technology
+                          <select bind:value={sector.technology}>
+                            <option value="LTE">LTE</option>
+                            <option value="CBRS">CBRS</option>
+                            <option value="5G">5G</option>
+                          </select>
+                        </label>
                       </div>
                     </div>
                     
@@ -614,8 +620,7 @@
     color: var(--text-primary);
   }
 
-  .form-group input,
-  .form-group select {
+  .form-group input {
     padding: 0.625rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
@@ -625,8 +630,7 @@
     transition: all var(--transition);
   }
 
-  .form-group input:focus,
-  .form-group select:focus {
+  .form-group input:focus {
     outline: none;
     border-color: var(--border-focus);
     box-shadow: var(--focus-ring);

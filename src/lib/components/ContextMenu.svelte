@@ -44,7 +44,12 @@
 
 {#if show}
   <!-- Invisible backdrop to close menu -->
-  <div class="context-backdrop" on:click={handleBackdropClick}></div>
+  <div 
+    class="context-backdrop" 
+    role="presentation"
+    on:click={handleBackdropClick}
+    on:keydown={(e) => e.key === 'Escape' && handleBackdropClick()}
+  ></div>
   
   <!-- Context menu -->
   <div class="context-menu" style="left: {x}px; top: {y}px;">
