@@ -68,7 +68,7 @@ export class NetworkService {
   }
 
   /**
-   * Get a specific network by ID
+   * Get a specific network by ID (with cells from subcollection)
    */
   async getNetwork(networkId: string): Promise<NetworkResult<Network>> {
     if (!browser) {
@@ -84,6 +84,13 @@ export class NetworkService {
       }
 
       const network = this.fromFirestoreDoc(docSnap.id, docSnap.data());
+      
+      // Load cells from subcollection
+      const cellsResult = await this.getNetworkCells(networkId);
+      if (cellsResult.success && cellsResult.data) {
+        network.cells = cellsResult.data;
+      }
+      
       return { success: true, data: network };
     } catch (error: any) {
       console.error('[NetworkService] Get error:', error);
@@ -95,7 +102,7 @@ export class NetworkService {
   }
 
   /**
-   * Get all networks for a user
+   * Get all networks for a user (with cells from subcollections)
    */
   async getUserNetworks(userId: string): Promise<NetworkResult<Network[]>> {
     if (!browser) {
@@ -112,9 +119,20 @@ export class NetworkService {
       const querySnapshot = await getDocs(q);
       const networks: Network[] = [];
 
+      // Load networks
       querySnapshot.forEach((doc) => {
         networks.push(this.fromFirestoreDoc(doc.id, doc.data()));
       });
+
+      // Load cells for each network from subcollections
+      await Promise.all(
+        networks.map(async (network) => {
+          const cellsResult = await this.getNetworkCells(network.id);
+          if (cellsResult.success && cellsResult.data) {
+            network.cells = cellsResult.data;
+          }
+        })
+      );
 
       // Sort locally by updatedAt (descending)
       networks.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
@@ -161,17 +179,75 @@ export class NetworkService {
   }
 
   /**
-   * Update network cells
+   * Update network cells in subcollection
    */
   async updateNetworkCells(
     networkId: string,
     cells: Cell[]
   ): Promise<NetworkResult<void>> {
-    return this.updateNetwork(networkId, { cells });
+    if (!browser) {
+      return { success: false, error: 'Not in browser environment' };
+    }
+
+    try {
+      // Store cells in a subcollection, not as an array
+      const cellsCollectionRef = collection(db, this.COLLECTION_NAME, networkId, 'cells');
+      
+      // Delete all existing cells first
+      const existingCells = await getDocs(cellsCollectionRef);
+      const deletePromises = existingCells.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      // Add new cells
+      const addPromises = cells.map(cell => 
+        setDoc(doc(cellsCollectionRef, cell.id), cell)
+      );
+      await Promise.all(addPromises);
+      
+      // Update the network's updatedAt timestamp
+      await updateDoc(doc(db, this.COLLECTION_NAME, networkId), {
+        updatedAt: Timestamp.now()
+      });
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('[NetworkService] Update cells error:', error);
+      return {
+        success: false,
+        error: error?.message || 'Failed to update cells'
+      };
+    }
   }
 
   /**
-   * Delete a network
+   * Get cells for a network from subcollection
+   */
+  async getNetworkCells(networkId: string): Promise<NetworkResult<Cell[]>> {
+    if (!browser) {
+      return { success: false, error: 'Not in browser environment' };
+    }
+
+    try {
+      const cellsCollectionRef = collection(db, this.COLLECTION_NAME, networkId, 'cells');
+      const querySnapshot = await getDocs(cellsCollectionRef);
+      
+      const cells: Cell[] = [];
+      querySnapshot.forEach((doc) => {
+        cells.push(doc.data() as Cell);
+      });
+      
+      return { success: true, data: cells };
+    } catch (error: any) {
+      console.error('[NetworkService] Get cells error:', error);
+      return {
+        success: false,
+        error: error?.message || 'Failed to load cells'
+      };
+    }
+  }
+
+  /**
+   * Delete a network and all its cells
    */
   async deleteNetwork(networkId: string): Promise<NetworkResult<void>> {
     if (!browser) {
@@ -179,6 +255,13 @@ export class NetworkService {
     }
 
     try {
+      // Delete all cells in the subcollection first
+      const cellsCollectionRef = collection(db, this.COLLECTION_NAME, networkId, 'cells');
+      const cellsSnapshot = await getDocs(cellsCollectionRef);
+      const deleteCellPromises = cellsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deleteCellPromises);
+      
+      // Then delete the network document
       await deleteDoc(doc(db, this.COLLECTION_NAME, networkId));
       return { success: true };
     } catch (error: any) {
@@ -208,7 +291,7 @@ export class NetworkService {
   }
 
   /**
-   * Search networks by market
+   * Search networks by market (with cells from subcollections)
    */
   async searchNetworksByMarket(
     userId: string,
@@ -229,9 +312,20 @@ export class NetworkService {
       const querySnapshot = await getDocs(q);
       const networks: Network[] = [];
 
+      // Load networks
       querySnapshot.forEach((doc) => {
         networks.push(this.fromFirestoreDoc(doc.id, doc.data()));
       });
+
+      // Load cells for each network from subcollections
+      await Promise.all(
+        networks.map(async (network) => {
+          const cellsResult = await this.getNetworkCells(network.id);
+          if (cellsResult.success && cellsResult.data) {
+            network.cells = cellsResult.data;
+          }
+        })
+      );
 
       // Sort locally by updatedAt (descending)
       networks.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
@@ -253,13 +347,14 @@ export class NetworkService {
   /**
    * Convert Network to Firestore document
    * Note: Firestore doesn't support undefined values, so we filter them out
+   * Cells are stored in a subcollection, not in the network document
    */
   private toFirestoreDoc(network: Network): any {
     const doc: any = {
       name: network.name,
       market: network.market,
       description: network.description || '',
-      cells: network.cells,
+      // cells are stored in subcollection, not in document
       createdAt: Timestamp.fromDate(network.createdAt),
       updatedAt: Timestamp.fromDate(network.updatedAt),
       ownerId: network.ownerId,
@@ -303,6 +398,7 @@ export class NetworkService {
 
   /**
    * Convert Firestore document to Network
+   * Cells are loaded separately from subcollection
    */
   private fromFirestoreDoc(id: string, data: any): Network {
     return {
@@ -315,7 +411,7 @@ export class NetworkService {
         zoom: 12
       },
       description: data.description,
-      cells: data.cells || [],
+      cells: [], // Cells loaded from subcollection
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
       ownerId: data.ownerId,

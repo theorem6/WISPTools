@@ -13,27 +13,7 @@ This error occurs when environment variables are not configured in Firebase App 
 3. Click on **Settings** tab (or **Environment variables** section)
 
 ### Step 2: Add Environment Variables
-
-Click **"Add variable"** and add each of these:
-
-#### Firebase Configuration (REQUIRED):
-
-| Name | Value |
-|------|-------|
-| `PUBLIC_FIREBASE_API_KEY` | `AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0` |
-| `PUBLIC_FIREBASE_AUTH_DOMAIN` | `lte-pci-mapper-65450042-bbf71.firebaseapp.com` |
-| `PUBLIC_FIREBASE_PROJECT_ID` | `lte-pci-mapper-65450042-bbf71` |
-| `PUBLIC_FIREBASE_STORAGE_BUCKET` | `lte-pci-mapper-65450042-bbf71.firebasestorage.app` |
-| `PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | `1044782186913` |
-| `PUBLIC_FIREBASE_APP_ID` | `1:1044782186913:web:a5367441ce136118948be0` |
-
-#### API Keys (OPTIONAL but recommended):
-
-| Name | Value |
-|------|-------|
-| `PUBLIC_ARCGIS_API_KEY` | `AAPT85fOqywZsicJupSmVSCGrjWNNjURUpnE--wnh6GZUreHU00VSEoRGgbf0JZjKYEmLnUXJw8E5r8Nz55eqYvvfcecdjs2BjpjcShOZgei0o-Myxttbl5f1qu9-AfdJaw4w3ugB4-uH6dh9v0PNN--vklICR-vCwt8YjMxw7CBrsZ5vxsZjo_jp31mV5hlMSSxQMJsKtFh0ltDrN4YwuK_8ZLmHMdIp5w9_jZrqJVlC2I.AT2_12sjSDHZ` |
-| `PUBLIC_GEMINI_API_KEY` | `AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg` |
-| `PUBLIC_WOLFRAM_APP_ID` | `WQPAJ72446` |
+SKU: CYG-CPCNAC5-3FT
 
 ### Step 3: Redeploy
 
