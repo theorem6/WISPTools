@@ -40,8 +40,8 @@ export interface Cell {
 export interface PCIConflict {
   primaryCell: Cell;
   conflictingCell: Cell;
-  conflictType: 'COLLISION' | 'CONFUSION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL';
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  conflictType: 'COLLISION' | 'CONFUSION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL' | 'CO_CHANNEL' | 'FREQUENCY_CONGESTION';
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNRESOLVABLE';
   distance: number; // in meters
   frequencyOverlap?: boolean; // Whether cells operate on overlapping frequencies
   channelSeparation?: number; // Channel separation in MHz
@@ -49,6 +49,8 @@ export interface PCIConflict {
   terrainBlocked?: boolean; // Whether terrain blocks the signal path
   losChecked?: boolean; // Whether LOS analysis was performed
   confusionCount?: number; // For CONFUSION type: how many neighbors share same PCI
+  congestedSectors?: Cell[]; // List of all sectors causing frequency congestion
+  isUnresolvable?: boolean; // True if conflict cannot be resolved by PCI changes alone
 }
 
 export interface PCIConflictAnalysis {
@@ -190,12 +192,117 @@ class PCIMapper {
   }
 
   /**
+   * Detect frequency congestion: when more than 3 sectors share the same EARFCN/frequency in proximity
+   * This creates an UNRESOLVABLE conflict that cannot be fixed by PCI changes alone
+   * 
+   * LTE constraint: Maximum 3 unique PCI mod-3 values (0, 1, 2) available for co-channel cells
+   * If 4+ sectors on same frequency are in proximity, at least 2 must share the same PCI mod-3,
+   * causing unavoidable CRS collision
+   */
+  private detectFrequencyCongestion(cells: Cell[]): PCIConflict[] {
+    const conflicts: PCIConflict[] = [];
+    const frequencyGroups = new Map<string, Cell[]>();
+    
+    // Group cells by EARFCN/frequency
+    for (const cell of cells) {
+      const earfcn = cell.dlEarfcn || cell.earfcn;
+      const freq = cell.centerFreq || cell.frequency;
+      
+      // Use EARFCN as primary key, fall back to frequency
+      const key = earfcn ? `earfcn_${earfcn}` : `freq_${freq}`;
+      
+      if (!frequencyGroups.has(key)) {
+        frequencyGroups.set(key, []);
+      }
+      frequencyGroups.get(key)!.push(cell);
+    }
+    
+    // Check each frequency group for congestion
+    for (const [freqKey, groupCells] of frequencyGroups.entries()) {
+      if (groupCells.length <= 3) continue; // 3 or fewer is manageable
+      
+      // Find cells in proximity (within interference range)
+      for (let i = 0; i < groupCells.length; i++) {
+        const cell1 = groupCells[i];
+        const proximityCells: Cell[] = [cell1];
+        
+        for (let j = 0; j < groupCells.length; j++) {
+          if (i === j) continue;
+          
+          const cell2 = groupCells[j];
+          const distance = this.calculateDistance(cell1, cell2);
+          
+          // Check if within interference range
+          if (this.canCellsInterfere(cell1, cell2, distance) && distance < 10000) {
+            proximityCells.push(cell2);
+          }
+        }
+        
+        // If more than 3 sectors on same frequency in proximity = UNRESOLVABLE
+        if (proximityCells.length > 3) {
+          const earfcn = cell1.dlEarfcn || cell1.earfcn || 0;
+          const freq = cell1.centerFreq || cell1.frequency;
+          
+          // Create conflict for each pair showing the congestion
+          for (let k = 1; k < Math.min(proximityCells.length, 4); k++) {
+            conflicts.push({
+              primaryCell: cell1,
+              conflictingCell: proximityCells[k],
+              conflictType: 'FREQUENCY_CONGESTION',
+              severity: 'UNRESOLVABLE',
+              distance: this.calculateDistance(cell1, proximityCells[k]),
+              frequencyOverlap: true,
+              channelSeparation: 0,
+              congestedSectors: proximityCells,
+              isUnresolvable: true
+            });
+          }
+          
+          console.warn(
+            `⚠️ UNRESOLVABLE: ${proximityCells.length} sectors on same frequency (EARFCN: ${earfcn}, Freq: ${freq} MHz) within 10km. ` +
+            `LTE constraint: Max 3 co-channel sectors can coexist without CRS collision. ` +
+            `Solution: Reassign frequencies or relocate sectors.`
+          );
+          
+          break; // Only report once per group
+        }
+      }
+    }
+    
+    return conflicts;
+  }
+
+  /**
+   * Check if two cells are on the exact same frequency/EARFCN (co-channel)
+   */
+  private areCellsCoChannel(cell1: Cell, cell2: Cell): boolean {
+    // First check EARFCN (most precise)
+    const earfcn1 = cell1.dlEarfcn || cell1.earfcn;
+    const earfcn2 = cell2.dlEarfcn || cell2.earfcn;
+    
+    if (earfcn1 && earfcn2) {
+      return earfcn1 === earfcn2;
+    }
+    
+    // Fall back to frequency comparison (within 0.1 MHz tolerance)
+    const freq1 = cell1.centerFreq || cell1.frequency;
+    const freq2 = cell2.centerFreq || cell2.frequency;
+    
+    if (freq1 && freq2) {
+      return Math.abs(freq1 - freq2) < 0.1;
+    }
+    
+    return false;
+  }
+
+  /**
    * Detect PCI conflicts based on LTE standards with Line of Sight analysis
    * Supports:
    * - Traditional 3-sector towers (120 degrees apart)
    * - CBRS 4-sector towers (90 degrees apart)
    * - Frequency-based conflicts (co-channel, adjacent channel)
    * - Terrain-based line of sight checking (reduces conflicts when blocked)
+   * - Frequency congestion detection (>3 sectors on same frequency)
    * 
    * PCI conflicts occur when:
    * - CRS (Cell Reference Signal) collision: PCI % 3 = same
@@ -204,6 +311,7 @@ class PCIMapper {
    * - PRS interference: PCI % 30 = same
    * - Co-channel frequency overlap with same PCI
    * - Adjacent channel interference with conflicting PCI
+   * - Frequency congestion: >3 sectors on same EARFCN in proximity (UNRESOLVABLE)
    * 
    * LOS Integration:
    * - Checks if sectors have line of sight using ArcGIS elevation data
@@ -212,6 +320,10 @@ class PCIMapper {
    */
   async detectConflicts(cells: Cell[], checkLOS: boolean = true): Promise<PCIConflict[]> {
     const conflicts: PCIConflict[] = [];
+    
+    // First, detect frequency congestion (more than 3 sectors on same frequency in proximity)
+    const congestionConflicts = this.detectFrequencyCongestion(cells);
+    conflicts.push(...congestionConflicts);
     
     for (let i = 0; i < cells.length; i++) {
       for (let j = i + 1; j < cells.length; j++) {
@@ -246,17 +358,20 @@ class PCIMapper {
         // Calculate frequency overlap
         const frequencyInfo = this.calculateFrequencyOverlap(cell1, cell2);
         
+        // Check if cells are on exact same frequency/EARFCN (co-channel)
+        const isCoChannel = this.areCellsCoChannel(cell1, cell2);
+        
         // PRIORITY 1: Check for PCI COLLISION (exact same PCI in proximity)
         // This is the most severe conflict - cells cannot be distinguished
         const conflictTypes: Array<{ 
-          type: 'COLLISION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL'; 
+          type: 'COLLISION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL' | 'CO_CHANNEL'; 
           value: number; 
           check: (pci1: number, pci2: number) => boolean;
           confusionCount?: number;
         }> = [];
         
+        // Exact same PCI = COLLISION
         if (cell1.pci === cell2.pci && distance < 15000) {
-          // Exact PCI match within 15km = COLLISION
           conflictTypes.push({
             type: 'COLLISION' as const,
             value: 0,
@@ -264,15 +379,30 @@ class PCIMapper {
           });
         }
         
-        // Standard modulo conflicts
-        conflictTypes.push(
-          { type: 'MOD3' as const, value: 3, check: (pci1, pci2) => pci1 % 3 === pci2 % 3 },
-          { type: 'MOD6' as const, value: 6, check: (pci1, pci2) => pci1 % 6 === pci2 % 6 },
-          { type: 'MOD12' as const, value: 12, check: (pci1, pci2) => pci1 % 12 === pci2 % 12 },
-          { type: 'MOD30' as const, value: 30, check: (pci1, pci2) => pci1 % 30 === pci2 % 30 }
-        );
+        // CO-CHANNEL: Same EARFCN/frequency with any PCI mod-3 conflict
+        // This is critical because co-channel interference is strongest
+        if (isCoChannel && distance < 10000) {
+          // Check for mod-3 conflict (CRS collision risk on same frequency)
+          if (cell1.pci % 3 === cell2.pci % 3) {
+            conflictTypes.push({
+              type: 'CO_CHANNEL' as const,
+              value: 0,
+              check: () => true
+            });
+          }
+        }
+        
+        // Standard modulo conflicts (only if within reasonable distance)
+        if (distance < 5000 || isCoChannel) {
+          conflictTypes.push(
+            { type: 'MOD3' as const, value: 3, check: (pci1, pci2) => pci1 % 3 === pci2 % 3 },
+            { type: 'MOD6' as const, value: 6, check: (pci1, pci2) => pci1 % 6 === pci2 % 6 },
+            { type: 'MOD12' as const, value: 12, check: (pci1, pci2) => pci1 % 12 === pci2 % 12 },
+            { type: 'MOD30' as const, value: 30, check: (pci1, pci2) => pci1 % 30 === pci2 % 30 }
+          );
+        }
 
-        // Add frequency-based conflicts
+        // Frequency overlap conflicts (co-channel or overlapping frequencies)
         if (frequencyInfo.overlap && cell1.pci === cell2.pci) {
           conflictTypes.push({
             type: 'FREQUENCY' as const,
@@ -356,7 +486,7 @@ class PCIMapper {
     
     return conflicts.sort((a, b) => {
       // Sort by severity, then by distance
-      const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+      const severityOrder = { 'UNRESOLVABLE': 5, 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
       return severityOrder[b.severity] - severityOrder[a.severity] || a.distance - b.distance;
     });
   }
@@ -461,7 +591,24 @@ class PCIMapper {
   ): PCIConflict['severity'] {
     const signalDifference = Math.abs(rsPower1 - rsPower2);
     
-    // PRIORITY 0: PCI COLLISION - exact same PCI (most severe)
+    // PRIORITY -1: FREQUENCY CONGESTION - Unresolvable by PCI changes
+    if (conflictType === 'FREQUENCY_CONGESTION') {
+      return 'UNRESOLVABLE'; // Cannot be fixed without frequency changes
+    }
+    
+    // PRIORITY 0: CO-CHANNEL with MOD3 conflict - Most severe co-channel issue
+    if (conflictType === 'CO_CHANNEL') {
+      // Same EARFCN with PCI mod-3 conflict = CRS collision
+      if (distance < 3000) {
+        return 'CRITICAL'; // Very close - severe interference
+      } else if (distance < 7000) {
+        return 'HIGH'; // Medium distance - significant interference
+      } else {
+        return 'MEDIUM'; // Farther but still problematic
+      }
+    }
+    
+    // PRIORITY 1: PCI COLLISION - exact same PCI (most severe)
     if (conflictType === 'COLLISION') {
       // Cells with same PCI cannot be distinguished by UE
       if (distance < 5000) {
