@@ -26,7 +26,7 @@
 		<link rel="icon" type="image/png" href="/favicon.png" />
 		
 		<!-- Security Headers -->
-		<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; img-src 'self' data: https: blob:; worker-src 'self' blob:; child-src 'self' blob:;">
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; img-src 'self' data: https: blob:; worker-src 'self' blob:; frame-src 'self' blob: https://*.firebaseapp.com https://*.google.com https://accounts.google.com; child-src 'self' blob: https://*.firebaseapp.com https://*.google.com;">
 		
 		%sveltekit.head%
 	</head>
