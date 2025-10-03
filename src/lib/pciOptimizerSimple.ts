@@ -9,7 +9,7 @@ import { wolframService } from './wolframService';
 export class SimplePCIOptimizer {
   private readonly PCI_MIN = 30; // Reserve 0-29 for WISPs
   private readonly PCI_MAX = 503;
-  private readonly MAX_ITERATIONS_WITHOUT_PROGRESS = 10; // Stop if stuck for 10 iterations
+  private readonly MAX_ITERATIONS_WITHOUT_PROGRESS = 5; // Stop if stuck for 5 iterations (reduced to trigger emergency fallback faster)
   private readonly ABSOLUTE_MAX_ITERATIONS = 100; // Safety limit
   
   /**
@@ -79,9 +79,45 @@ export class SimplePCIOptimizer {
       console.log(`\n🔄 Iteration ${iteration}: Applying ${changes.length} PCI changes...`);
       
       if (changes.length === 0) {
-        console.error(`   ❌ No changes possible - optimizer stuck!`);
-        console.error(`   🛑 Cannot find valid PCI assignments to resolve conflicts`);
-        break;
+        console.error(`   ❌ No changes generated from conflict resolution!`);
+        console.error(`   🔍 Conflicts detected: ${conflicts.length} (🔴 ${conflicts.filter(c => c.severity === 'CRITICAL').length} critical)`);
+        
+        // EMERGENCY FALLBACK: Force a change on the first conflicting cell
+        if (conflicts.length > 0) {
+          console.warn(`   🚨 EMERGENCY FALLBACK: Forcing PCI change on first conflict...`);
+          
+          const firstConflict = conflicts[0];
+          const cellToChange = firstConflict.conflictingCell;
+          const cellIndex = currentCells.findIndex(c => c.id === cellToChange.id);
+          
+          if (cellIndex !== -1) {
+            const oldPCI = cellToChange.pci;
+            // Try +4 (MOD3 shift), or +1 if that doesn't work
+            let newPCI = oldPCI + 4;
+            if (newPCI > this.PCI_MAX) {
+              newPCI = oldPCI + 1;
+              if (newPCI > this.PCI_MAX) {
+                newPCI = this.PCI_MIN; // Wrap to start
+              }
+            }
+            
+            currentCells[cellIndex].pci = newPCI;
+            changes.push({
+              cellId: cellToChange.id,
+              oldPCI,
+              newPCI,
+              reason: `Emergency fallback: Force change to break stagnation`
+            });
+            
+            console.warn(`   🔧 Forced change: ${cellToChange.id}: ${oldPCI} → ${newPCI}`);
+          } else {
+            console.error(`   ❌ Cannot apply emergency fix - cell not found`);
+            break;
+          }
+        } else {
+          console.error(`   🛑 No conflicts to fix - stopping`);
+          break;
+        }
       }
       
       // Log the actual PCI changes that were applied
@@ -315,12 +351,16 @@ export class SimplePCIOptimizer {
     const changes: PCIChange[] = [];
     const mod3Conflicts = conflicts.filter(c => c.conflictType === 'MOD3');
     
-    if (mod3Conflicts.length === 0) return changes;
+    if (mod3Conflicts.length === 0) {
+      console.log(`   ⏭️  No MOD3 conflicts to fix with quick method`);
+      return changes;
+    }
     
     console.log(`   ⚡ Attempting quick MOD3 fix for ${mod3Conflicts.length} conflicts (add +4 rule)`);
     
     // Track which cells we've already modified - CRITICAL to avoid modifying both sectors
     const alreadyModified = new Set<string>();
+    let skippedCount = 0;
     
     for (const conflict of mod3Conflicts.slice(0, 5)) { // Fix up to 5 at a time
       // Pick ONE cell to adjust (prefer conflicting cell, but check if already modified)
@@ -331,6 +371,7 @@ export class SimplePCIOptimizer {
         if (alreadyModified.has(conflict.primaryCell.id)) {
           // Both already modified - skip this conflict
           console.log(`      ⏭️  Skipping conflict (both cells already modified)`);
+          skippedCount++;
           continue;
         }
         cellToChange = conflict.primaryCell;
@@ -344,6 +385,7 @@ export class SimplePCIOptimizer {
       if (alreadyModified.has(otherCell.id)) {
         // Other cell was already modified - skip to avoid reintroducing conflict
         console.log(`      ⏭️  Skipping ${cellToChange.id} (paired cell ${otherCell.id} already modified)`);
+        skippedCount++;
         continue;
       }
       
@@ -390,7 +432,12 @@ export class SimplePCIOptimizer {
     }
     
     if (changes.length > 0) {
-      console.log(`   ✅ Modified ${changes.length} sectors (one per conflict pair)`);
+      console.log(`   ✅ Quick MOD3 fix: Modified ${changes.length} sectors (skipped ${skippedCount})`);
+    } else if (skippedCount > 0) {
+      console.warn(`   ⚠️  Quick MOD3 fix: No changes made (all ${skippedCount} conflicts skipped - cells already modified)`);
+      console.warn(`   💡 Will fall back to full conflict resolution`);
+    } else {
+      console.warn(`   ⚠️  Quick MOD3 fix: Failed to generate any changes`);
     }
     
     return changes;
