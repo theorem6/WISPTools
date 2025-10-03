@@ -136,8 +136,17 @@
     }
   });
   
-  // Redirect if user logs out
+  // Redirect if user logs out and clear all state
   $: if (!$authStore.isLoading && !$isAuthenticated) {
+    // Clear all app state
+    networkStore.clear();
+    pciService.clearCells();
+    
+    // Clear the map
+    if (mapInstance) {
+      mapInstance.clearMap();
+    }
+    
     goto('/login');
   }
   

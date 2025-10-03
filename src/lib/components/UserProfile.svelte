@@ -39,9 +39,40 @@
     showDropdown = false;
   }
   
+  import { networkStore } from '../stores/networkStore';
+  import { cellsStore, conflictsStore, optimizationStore, analysisStore, uiStore } from '../stores/appState';
+  
   async function handleSignOut() {
     showDropdown = false;
+    
+    // Clear all app state before signing out
+    networkStore.clear();
+    cellsStore.set({ items: [] });
+    conflictsStore.set({ items: [], analysis: null });
+    optimizationStore.set({ isOptimizing: false, result: null });
+    analysisStore.set({ recommendations: [], geminiAnalysis: null });
+    uiStore.set({
+      showImportWizard: false,
+      showAnalysisModal: false,
+      showConflictsModal: false,
+      showRecommendationsModal: false,
+      showOptimizationResultModal: false
+    });
+    
+    // Clear browser storage (except theme preference)
+    if (browser) {
+      const theme = localStorage.getItem('theme'); // Preserve theme
+      sessionStorage.clear();
+      localStorage.clear();
+      if (theme) {
+        localStorage.setItem('theme', theme); // Restore theme
+      }
+    }
+    
+    // Sign out from Firebase
     await authService.signOut();
+    
+    // Redirect to login
     goto('/login');
   }
   
