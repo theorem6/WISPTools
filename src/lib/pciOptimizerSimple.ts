@@ -76,7 +76,7 @@ export class SimplePCIOptimizer {
       // Process conflicts efficiently (pass rollback count for extra randomization)
       const changes = this.resolveConflictsEfficiently(currentCells, conflictsToFix, iteration, rollbackCount);
       
-      console.log(`\n🔄 Iteration ${iteration}: Making ${changes.length} PCI changes...`);
+      console.log(`\n🔄 Iteration ${iteration}: Applying ${changes.length} PCI changes...`);
       
       if (changes.length === 0) {
         console.error(`   ❌ No changes possible - optimizer stuck!`);
@@ -84,7 +84,14 @@ export class SimplePCIOptimizer {
         break;
       }
       
-      // Re-check conflicts after changes
+      // Log the actual PCI changes that were applied
+      for (const change of changes) {
+        const cell = currentCells.find(c => c.id === change.cellId);
+        console.log(`   📝 ${change.cellId}: PCI ${change.oldPCI} → ${change.newPCI} (Current: ${cell?.pci}) ${cell?.pci === change.newPCI ? '✅' : '❌ NOT APPLIED!'}`);
+      }
+      
+      // Re-analyze conflicts after changes
+      console.log(`   🔍 Re-analyzing conflicts after PCI changes...`);
       conflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
       const totalConflicts = conflicts.length;
       const totalCritical = conflicts.filter(c => c.severity === 'CRITICAL').length;
@@ -102,12 +109,26 @@ export class SimplePCIOptimizer {
       
       if (totalCritical > prevCritical || (totalCritical === prevCritical && totalCritical > 0 && totalHigh >= prevHigh && totalConflicts >= prevConflicts)) {
         console.error(`❌ REJECTED! Critical conflicts increased or didn't improve: ${prevCritical} → ${totalCritical}`);
-        console.log(`🔙 Rolling back iteration ${iteration} changes...`);
+        console.log(`🔙 Rolling back ${changes.length} PCI changes...`);
+        
+        // Show what's being rolled back
+        for (const change of changes.slice(0, 3)) {
+          console.log(`   ↩️  ${change.cellId}: ${change.newPCI} → ${change.oldPCI} (reverting)`);
+        }
+        if (changes.length > 3) {
+          console.log(`   ... and ${changes.length - 3} more changes`);
+        }
         
         // ROLLBACK: Restore cells from before this iteration
         currentCells = cellsBeforeIteration;
         rollbackCount++; // Increase for more aggressive randomization
         iterationsWithoutProgress++; // Track stagnation
+        
+        // Verify rollback worked
+        const revertedCell = currentCells.find(c => c.id === changes[0]?.cellId);
+        if (revertedCell) {
+          console.log(`   ✅ Rollback verified: ${revertedCell.id} PCI is now ${revertedCell.pci}`);
+        }
         
         // Try more aggressive randomization next iteration by increasing diversity
         console.log(`   🎲 Next iteration will use MORE randomization (rollback #${rollbackCount})`);
@@ -148,6 +169,17 @@ export class SimplePCIOptimizer {
       
       // Changes ACCEPTED - this iteration improved things!
       console.log(`   ✅ ACCEPTED! Total: ${prevConflicts}→${totalConflicts} (🔴 ${prevCritical}→${totalCritical}, 🟠 ${prevHigh}→${totalHigh})`);
+      console.log(`   💾 Committing ${changes.length} PCI changes to network state...`);
+      
+      // Verify changes are persisted
+      for (const change of changes.slice(0, 3)) {
+        const cell = currentCells.find(c => c.id === change.cellId);
+        console.log(`   ✓ ${change.cellId}: PCI permanently set to ${cell?.pci}`);
+      }
+      if (changes.length > 3) {
+        console.log(`   ... and ${changes.length - 3} more cells updated`);
+      }
+      
       allChanges.push(...changes);
       totalChangesApplied += changes.length;
       rollbackCount = 0; // Reset on success
