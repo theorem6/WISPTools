@@ -276,6 +276,8 @@ export class SimplePCIOptimizer {
   /**
    * Quick MOD3 fix: Add +4 to PCI to shift MOD3 group
    * (PCI + 4) % 3 moves to next MOD3 group, resolving MOD3 conflicts
+   * 
+   * IMPORTANT: Only modifies ONE sector per conflict pair to avoid reintroducing conflicts
    */
   private tryQuickMod3Fix(cells: Cell[], conflicts: PCIConflict[]): PCIChange[] {
     const changes: PCIChange[] = [];
@@ -285,9 +287,33 @@ export class SimplePCIOptimizer {
     
     console.log(`   ⚡ Attempting quick MOD3 fix for ${mod3Conflicts.length} conflicts (add +4 rule)`);
     
+    // Track which cells we've already modified - CRITICAL to avoid modifying both sectors
+    const alreadyModified = new Set<string>();
+    
     for (const conflict of mod3Conflicts.slice(0, 5)) { // Fix up to 5 at a time
-      // Pick which cell to adjust (prefer conflicting cell)
+      // Pick ONE cell to adjust (prefer conflicting cell, but check if already modified)
       let cellToChange = conflict.conflictingCell;
+      
+      // If conflicting cell already modified, try primary instead
+      if (alreadyModified.has(conflict.conflictingCell.id)) {
+        if (alreadyModified.has(conflict.primaryCell.id)) {
+          // Both already modified - skip this conflict
+          console.log(`      ⏭️  Skipping conflict (both cells already modified)`);
+          continue;
+        }
+        cellToChange = conflict.primaryCell;
+      }
+      
+      // Double-check the other cell in the pair hasn't been modified
+      const otherCell = cellToChange.id === conflict.primaryCell.id 
+        ? conflict.conflictingCell 
+        : conflict.primaryCell;
+      
+      if (alreadyModified.has(otherCell.id)) {
+        // Other cell was already modified - skip to avoid reintroducing conflict
+        console.log(`      ⏭️  Skipping ${cellToChange.id} (paired cell ${otherCell.id} already modified)`);
+        continue;
+      }
       
       const cellIndex = cells.findIndex(c => c.id === cellToChange.id);
       if (cellIndex === -1) continue;
@@ -309,14 +335,20 @@ export class SimplePCIOptimizer {
       
       if (oldMod3 !== newMod3) {
         cells[cellIndex].pci = newPCI;
+        alreadyModified.add(cellToChange.id); // Mark as modified
+        
         changes.push({
           cellId: cellToChange.id,
           oldPCI,
           newPCI,
           reason: `Quick MOD3 fix: ${oldPCI} (+4) → ${newPCI} (Mod3: ${oldMod3}→${newMod3})`
         });
-        console.log(`      ${cellToChange.id}: ${oldPCI} → ${newPCI} (Mod3: ${oldMod3}→${newMod3})`);
+        console.log(`      ${cellToChange.id}: ${oldPCI} → ${newPCI} (Mod3: ${oldMod3}→${newMod3}) [paired cell: ${otherCell.id} unchanged]`);
       }
+    }
+    
+    if (changes.length > 0) {
+      console.log(`   ✅ Modified ${changes.length} sectors (one per conflict pair)`);
     }
     
     return changes;
