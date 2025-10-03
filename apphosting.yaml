@@ -1,0 +1,7 @@
+# Settings for SvelteKit apps.
+# See https://firebase.google.com/docs/app-hosting/frameworks/svelte
+runtime: nodejs20
+build:
+  run: npm install && NODE_OPTIONS='--max-old-space-size=4096' npm run build
+start:
+  run: node .svelte-kit/output/server/index.js

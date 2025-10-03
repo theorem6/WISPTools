@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-import * as cors from 'cors';
+import admin from 'firebase-admin';
+import cors from 'cors';
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
@@ -69,7 +69,7 @@ function analyzeConflictsSimple(cells: any[]) {
       ];
       
       for (const modConflict of modConflicts) {
-        if (cell1.pci % mod conflict.value === cell2.pci % modConflict.value) {
+        if (cell1.pci % modConflict.value === cell2.pci % modConflict.value) {
           conflicts.push({
             primaryCell: cell1,
             conflictingCell: cell2,
