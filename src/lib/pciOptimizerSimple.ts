@@ -352,10 +352,12 @@ export class SimplePCIOptimizer {
   }
   
   /**
-   * Pick a PCI following WISP hierarchy:
-   * 1. MUST avoid MOD3 conflicts on same channel
-   * 2. Should avoid MOD30 conflicts on same channel
-   * 3. Allow N=1 reuse on different channels
+   * Pick a PCI using cost-based selection following WISP hierarchy:
+   * 1. MUST avoid MOD3 conflicts on same channel (high cost)
+   * 2. Should avoid MOD30 conflicts on same channel (medium cost)
+   * 3. Allow N=1 reuse on different channels (low cost if distance OK)
+   * 
+   * Uses weighted cost function instead of pure randomization for better results
    */
   private pickRandomGoodPCI(cell: Cell, allCells: Cell[], usedPCIs: Set<number>, extraRandom = false): number {
     const currentMod3 = cell.pci % 3;
@@ -413,9 +415,21 @@ export class SimplePCIOptimizer {
       }
       
       if (candidates.length > 0) {
-        const randomPCI = candidates[Math.floor(Math.random() * candidates.length)];
-        console.log(`      → OPTIMAL: No same-channel MOD3/MOD30 conflict - picked ${randomPCI} (${candidates.length} options)`);
-        return randomPCI;
+        // Use cost-based selection for optimal choice
+        const pciWithCost = candidates.map(pci => ({
+          pci,
+          cost: this.calculatePCICost(pci, cell, allCells)
+        }));
+        
+        // Sort by cost (lowest first)
+        pciWithCost.sort((a, b) => a.cost - b.cost);
+        
+        // Take best option (or randomly from top 3 for diversity)
+        const topCandidates = pciWithCost.slice(0, Math.min(3, pciWithCost.length));
+        const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+        
+        console.log(`      → OPTIMAL: No same-channel MOD3/MOD30 - picked ${selected.pci} (cost: ${selected.cost}, from ${candidates.length} options)`);
+        return selected.pci;
       }
     }
     
@@ -516,6 +530,64 @@ export class SimplePCIOptimizer {
               Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+  }
+  
+  /**
+   * Calculate cost score for a candidate PCI based on potential conflicts
+   * Lower cost = better PCI choice
+   * 
+   * Cost penalties:
+   * - PCI collision (same PCI as nearby cell): 100 points
+   * - Same-channel MOD3 conflict: 50 points (CRITICAL)
+   * - Same-channel MOD30 conflict: 25 points (HIGH)
+   * - Different-channel MOD3 conflict: 10 points (MEDIUM)
+   * - Same PCI globally: 5 points (avoid reuse when possible)
+   */
+  private calculatePCICost(candidatePCI: number, cell: Cell, allCells: Cell[]): number {
+    let cost = 0;
+    const currentEarfcn = cell.earfcn || cell.frequency;
+    
+    for (const otherCell of allCells) {
+      if (otherCell.id === cell.id) continue;
+      
+      const dist = this.distance(cell.latitude, cell.longitude, otherCell.latitude, otherCell.longitude);
+      const otherEarfcn = otherCell.earfcn || otherCell.frequency;
+      const sameChannel = Math.abs(currentEarfcn - otherEarfcn) < 1;
+      
+      // Only consider cells within interference range
+      if (dist > 15000) continue; // Beyond 15km
+      
+      // COLLISION: Exact same PCI nearby (worst case)
+      if (candidatePCI === otherCell.pci) {
+        if (dist < 5000) {
+          cost += 100; // Very high penalty for collision
+        } else if (dist < 10000) {
+          cost += 50;
+        } else {
+          cost += 20;
+        }
+      }
+      
+      // Same-channel conflicts (critical for WISP)
+      if (sameChannel) {
+        // MOD3 conflict on same channel = CRITICAL
+        if (candidatePCI % 3 === otherCell.pci % 3) {
+          cost += 50; // High penalty
+        }
+        
+        // MOD30 conflict on same channel = HIGH (PSS/SSS)
+        if (candidatePCI % 30 === otherCell.pci % 30) {
+          cost += 25; // Medium-high penalty
+        }
+      } else {
+        // Different channel conflicts (less severe)
+        if (candidatePCI % 3 === otherCell.pci % 3 && dist < 5000) {
+          cost += 10; // Lower penalty for different channels
+        }
+      }
+    }
+    
+    return cost;
   }
   
   /**

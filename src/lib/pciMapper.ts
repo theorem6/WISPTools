@@ -40,7 +40,7 @@ export interface Cell {
 export interface PCIConflict {
   primaryCell: Cell;
   conflictingCell: Cell;
-  conflictType: 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL';
+  conflictType: 'COLLISION' | 'CONFUSION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL';
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   distance: number; // in meters
   frequencyOverlap?: boolean; // Whether cells operate on overlapping frequencies
@@ -48,6 +48,7 @@ export interface PCIConflict {
   hasLineOfSight?: boolean; // Whether sectors have terrain-based LOS
   terrainBlocked?: boolean; // Whether terrain blocks the signal path
   losChecked?: boolean; // Whether LOS analysis was performed
+  confusionCount?: number; // For CONFUSION type: how many neighbors share same PCI
 }
 
 export interface PCIConflictAnalysis {
@@ -245,13 +246,31 @@ class PCIMapper {
         // Calculate frequency overlap
         const frequencyInfo = this.calculateFrequencyOverlap(cell1, cell2);
         
-        // Check for different types of conflicts
-        const conflictTypes = [
+        // PRIORITY 1: Check for PCI COLLISION (exact same PCI in proximity)
+        // This is the most severe conflict - cells cannot be distinguished
+        const conflictTypes: Array<{ 
+          type: 'COLLISION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL'; 
+          value: number; 
+          check: (pci1: number, pci2: number) => boolean;
+          confusionCount?: number;
+        }> = [];
+        
+        if (cell1.pci === cell2.pci && distance < 15000) {
+          // Exact PCI match within 15km = COLLISION
+          conflictTypes.push({
+            type: 'COLLISION' as const,
+            value: 0,
+            check: () => true
+          });
+        }
+        
+        // Standard modulo conflicts
+        conflictTypes.push(
           { type: 'MOD3' as const, value: 3, check: (pci1, pci2) => pci1 % 3 === pci2 % 3 },
           { type: 'MOD6' as const, value: 6, check: (pci1, pci2) => pci1 % 6 === pci2 % 6 },
           { type: 'MOD12' as const, value: 12, check: (pci1, pci2) => pci1 % 12 === pci2 % 12 },
           { type: 'MOD30' as const, value: 30, check: (pci1, pci2) => pci1 % 30 === pci2 % 30 }
-        ];
+        );
 
         // Add frequency-based conflicts
         if (frequencyInfo.overlap && cell1.pci === cell2.pci) {
@@ -428,8 +447,9 @@ class PCIMapper {
   
   /**
    * Calculate conflict severity based on WISP hierarchy:
-   * 1. Same channel PCI MUST not have MOD3 conflicts (CRITICAL)
-   * 2. Avoid Modulus 30 on same channels (HIGH - PSS/SSS collision)
+   * 0. PCI COLLISION = CRITICAL (exact same PCI - cells indistinguishable)
+   * 1. Same channel MOD3 conflicts = CRITICAL (CRS collision)
+   * 2. Same channel MOD30 = HIGH (PSS/SSS collision)
    * 3. Allow N=1 reuse but reduce PSS/SSS conflicts
    */
   private calculateSeverity(
@@ -440,6 +460,18 @@ class PCIMapper {
     frequencyOverlap: boolean = false
   ): PCIConflict['severity'] {
     const signalDifference = Math.abs(rsPower1 - rsPower2);
+    
+    // PRIORITY 0: PCI COLLISION - exact same PCI (most severe)
+    if (conflictType === 'COLLISION') {
+      // Cells with same PCI cannot be distinguished by UE
+      if (distance < 5000) {
+        return 'CRITICAL'; // Very close - definite problem
+      } else if (distance < 10000) {
+        return 'HIGH'; // Medium distance - likely problem
+      } else {
+        return 'MEDIUM'; // Far but still within propagation range
+      }
+    }
     
     // HIERARCHY RULE 1: Same channel MOD3 conflicts are ALWAYS CRITICAL
     if (frequencyOverlap && conflictType === 'MOD3') {
