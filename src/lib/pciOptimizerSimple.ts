@@ -353,11 +353,21 @@ export class SimplePCIOptimizer {
       const oldPCI = cellToChange.pci;
       let newPCI = oldPCI + 4;
       
-      // Keep within valid range
+      // WRAPAROUND: Keep within valid range (30-503)
       if (newPCI > this.PCI_MAX) {
-        newPCI = oldPCI - 5; // Go backwards instead
+        // Wrap around to beginning of pool
+        const overflow = newPCI - this.PCI_MAX;
+        newPCI = this.PCI_MIN + overflow - 1;
+        console.log(`      🔄 Wraparound: ${oldPCI} + 4 = ${oldPCI + 4} → wrapped to ${newPCI}`);
+      }
+      
+      // Double-check still in valid range
+      if (newPCI < this.PCI_MIN || newPCI > this.PCI_MAX) {
+        // Fallback: try going backwards
+        newPCI = oldPCI - 5;
         if (newPCI < this.PCI_MIN) {
-          newPCI = oldPCI + 1; // Just shift by 1
+          // Wrap from beginning
+          newPCI = this.PCI_MAX - (this.PCI_MIN - newPCI);
         }
       }
       
@@ -618,7 +628,7 @@ export class SimplePCIOptimizer {
       return randomPCI;
     }
     
-    // STEP 5: Last resort - any PCI >= 30 that's not globally used
+    // STEP 5: Any unused PCI from the pool (30-503)
     const anyAvailable = [];
     for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
       if (!usedPCIs.has(pci)) {
@@ -628,14 +638,33 @@ export class SimplePCIOptimizer {
     
     if (anyAvailable.length > 0) {
       const randomPCI = anyAvailable[Math.floor(Math.random() * anyAvailable.length)];
-      console.warn(`      → ⚠️  LAST RESORT: Any unused PCI - picked ${randomPCI}`);
+      console.warn(`      → ⚠️  LAST RESORT: Any unused PCI - picked ${randomPCI} (${anyAvailable.length} available)`);
       return randomPCI;
     }
     
-    // STEP 6: Absolute last resort - random PCI >= 30
-    const randomPCI = Math.floor(Math.random() * (this.PCI_MAX - this.PCI_MIN + 1)) + this.PCI_MIN;
-    console.error(`      → ❌ FORCED: Random fallback - picked ${randomPCI} (may cause conflicts)`);
-    return randomPCI;
+    // STEP 6: POOL EXHAUSTED - Use least-cost PCI even if "in use"
+    // This means we're reusing PCIs, which is acceptable with proper distance
+    console.warn(`      ⚠️  PCI pool exhausted (all 474 PCIs in use), calculating least-cost reuse...`);
+    
+    const allPCIs = [];
+    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
+      allPCIs.push(pci);
+    }
+    
+    // Calculate cost for ALL PCIs and pick the lowest
+    const pciWithCost = allPCIs.map(pci => ({
+      pci,
+      cost: this.calculatePCICost(pci, cell, allCells)
+    }));
+    
+    pciWithCost.sort((a, b) => a.cost - b.cost);
+    
+    // Pick from top 5 lowest cost (some randomization)
+    const topCandidates = pciWithCost.slice(0, Math.min(5, pciWithCost.length));
+    const selected = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+    
+    console.warn(`      → 🔄 WRAPAROUND REUSE: Picked ${selected.pci} (cost: ${selected.cost}, reusing from pool)`);
+    return selected.pci;
   }
   
   /**
