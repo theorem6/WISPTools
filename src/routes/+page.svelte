@@ -518,7 +518,7 @@
         <circle cx="12" cy="10" r="3"></circle>
       </svg>
       <span class="brand-text">LTE PCI Mapper</span>
-      <span class="map-hint" title="Right-click on map to add new cell">
+      <span class="map-hint" title="Quick Tip: Right-click anywhere on the map to add a new cell site or sector at that location">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -535,32 +535,32 @@
         </div>
 
     <div class="topbar-stats">
-      <div class="stat-item">
+      <div class="stat-item" title="Total number of cells/sectors in current network">
         <span class="stat-value">{$cellCount}</span>
         <span class="stat-label">Cells</span>
         </div>
       <div class="stat-divider"></div>
-      <div class="stat-item {$conflictCount > 0 ? 'warning' : ''}">
+      <div class="stat-item {$conflictCount > 0 ? 'warning' : ''}" title="Total PCI conflicts detected (all severities combined)">
         <span class="stat-value">{$conflictCount}</span>
         <span class="stat-label">Total</span>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-item {$criticalConflictCount > 0 ? 'danger' : 'success'}">
+      <div class="stat-item {$criticalConflictCount > 0 ? 'danger' : 'success'}" title="Critical conflicts - PCI collision within 500m, requires immediate attention">
         <span class="stat-value">{$criticalConflictCount}</span>
         <span class="stat-label">Critical</span>
     </div>
       <div class="stat-divider"></div>
-      <div class="stat-item {$highConflictCount > 0 ? 'warning' : ''}">
+      <div class="stat-item {$highConflictCount > 0 ? 'warning' : ''}" title="High priority conflicts - Within 1000m, MOD3 conflicts, should be resolved">
         <span class="stat-value">{$highConflictCount}</span>
         <span class="stat-label">High</span>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-item {$mediumConflictCount > 0 ? 'info' : ''}">
+      <div class="stat-item {$mediumConflictCount > 0 ? 'info' : ''}" title="Medium priority conflicts - Within 2000m, MOD6/MOD12 conflicts">
         <span class="stat-value">{$mediumConflictCount}</span>
         <span class="stat-label">Medium</span>
       </div>
       <div class="stat-divider"></div>
-      <div class="stat-item">
+      <div class="stat-item" title="Low priority conflicts - Beyond 3000m, MOD30 conflicts, monitor but not urgent">
         <span class="stat-value">{$lowConflictCount}</span>
         <span class="stat-label">Low</span>
       </div>
@@ -585,28 +585,28 @@
         on:networks={() => showNetworkManager = true}
       />
       <ThemeSwitcher />
-      <button class="icon-btn" on:click={() => showTowerManager = true} title="Tower Management">
+      <button class="icon-btn" on:click={() => showTowerManager = true} title="Manage cell sites and towers - View all towers in current network">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
           <polyline points="2 17 12 22 22 17"></polyline>
           <polyline points="2 12 12 17 22 12"></polyline>
         </svg>
       </button>
-      <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="Analysis">
+      <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="View detailed network analysis - Cell statistics and health metrics">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="20" x2="18" y2="10"></line>
           <line x1="12" y1="20" x2="12" y2="4"></line>
           <line x1="6" y1="20" x2="6" y2="14"></line>
         </svg>
       </button>
-      <button class="icon-btn" on:click={() => uiActions.openModal('showConflictsModal')} title="Conflicts">
+      <button class="icon-btn" on:click={() => uiActions.openModal('showConflictsModal')} title="View PCI conflicts - Shows collision, confusion, and modulo conflicts by severity">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
           <line x1="12" y1="9" x2="12" y2="13"></line>
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
       </button>
-      <button class="icon-btn" on:click={() => uiActions.openModal('showRecommendationsModal')} title="Recommendations">
+      <button class="icon-btn" on:click={() => uiActions.openModal('showRecommendationsModal')} title="AI-powered recommendations - Get intelligent suggestions to resolve conflicts">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"></circle>
           <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
