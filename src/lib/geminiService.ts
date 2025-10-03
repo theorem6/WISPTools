@@ -1,10 +1,10 @@
 // Gemini AI Service for PCI Conflict Analysis
-import { PUBLIC_GEMINI_API_KEY } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 import { browser } from '$app/environment';
 import type { PCIConflict, Cell } from './pciMapper';
 
 export class GeminiService {
-  private apiKey: string = PUBLIC_GEMINI_API_KEY;
+  private apiKey: string = env.PUBLIC_GEMINI_API_KEY || '';
   private baseUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
   private useAI = true; // Enable AI by default
 

@@ -1,29 +1,19 @@
 // Environment Configuration for LTE PCI Mapper
 import { browser } from '$app/environment';
-import { 
-  PUBLIC_FIREBASE_API_KEY,
-  PUBLIC_FIREBASE_AUTH_DOMAIN,
-  PUBLIC_FIREBASE_PROJECT_ID,
-  PUBLIC_FIREBASE_STORAGE_BUCKET,
-  PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  PUBLIC_FIREBASE_APP_ID,
-  PUBLIC_FIREBASE_MEASUREMENT_ID,
-  PUBLIC_ARCGIS_API_KEY,
-  PUBLIC_GEMINI_API_KEY
-} from '$env/static/public';
+import { env } from '$env/dynamic/public';
 
 export const config = {
   firebase: {
-    apiKey: PUBLIC_FIREBASE_API_KEY,
-    authDomain: PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: PUBLIC_FIREBASE_APP_ID,
-    measurementId: PUBLIC_FIREBASE_MEASUREMENT_ID
+    apiKey: env.PUBLIC_FIREBASE_API_KEY || '',
+    authDomain: env.PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+    projectId: env.PUBLIC_FIREBASE_PROJECT_ID || '',
+    storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: env.PUBLIC_FIREBASE_APP_ID || '',
+    measurementId: env.PUBLIC_FIREBASE_MEASUREMENT_ID || ''
   },
   arcgis: {
-    apiKey: PUBLIC_ARCGIS_API_KEY,
+    apiKey: env.PUBLIC_ARCGIS_API_KEY || '',
     tileServers: {
       street: "streets-vector",
       satellite: "satellite",
@@ -32,7 +22,7 @@ export const config = {
     }
   },
   gemini: {
-    apiKey: PUBLIC_GEMINI_API_KEY,
+    apiKey: env.PUBLIC_GEMINI_API_KEY || '',
     apiUrl: "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
     maxTokens: 300,
     temperature: 0.3
