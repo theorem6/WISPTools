@@ -172,10 +172,39 @@ export class SimplePCIOptimizer {
         // Check if we're stuck
         if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
           console.error(`\n❌ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} consecutive iterations`);
-          console.error(`🛑 Optimizer unable to make further progress`);
-          console.error(`   Best achieved: ${bestConflicts} conflicts (🔴 ${bestCritical} critical, 🟠 ${bestHigh} high)`);
-          console.error(`   ${originalConflictCount - bestConflicts} conflicts resolved (${((originalConflictCount - bestConflicts) / Math.max(originalConflictCount, 1) * 100).toFixed(1)}%)`);
-          break;
+          console.warn(`🎲 SHAKEUP: Randomizing PCIs on conflicting cells to break deadlock...`);
+          
+          // Get all cells involved in conflicts
+          const conflictingCellIds = new Set<string>();
+          for (const conflict of conflicts) {
+            conflictingCellIds.add(conflict.primaryCell.id);
+            conflictingCellIds.add(conflict.conflictingCell.id);
+          }
+          
+          // Randomly reassign PCIs to these cells
+          let randomizedCount = 0;
+          for (const cellId of conflictingCellIds) {
+            const cellIndex = currentCells.findIndex(c => c.id === cellId);
+            if (cellIndex !== -1) {
+              const oldPCI = currentCells[cellIndex].pci;
+              const newPCI = Math.floor(Math.random() * (this.PCI_MAX - this.PCI_MIN + 1)) + this.PCI_MIN;
+              currentCells[cellIndex].pci = newPCI;
+              console.log(`   🎲 ${cellId}: ${oldPCI} → ${newPCI} (random)`);
+              randomizedCount++;
+            }
+          }
+          
+          console.warn(`   ✅ Randomized ${randomizedCount} cells, restarting optimization...`);
+          
+          // Reset counters and try again
+          iterationsWithoutProgress = 0;
+          rollbackCount = 0;
+          prevCritical = 999; // Force acceptance of first iteration
+          prevHigh = 999;
+          prevConflicts = 999;
+          
+          // Don't break - continue to next iteration with fresh random state
+          continue;
         }
         
         continue; // Skip to next iteration without accepting changes
@@ -194,10 +223,39 @@ export class SimplePCIOptimizer {
         // Check if we're stuck
         if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
           console.error(`\n❌ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} consecutive iterations`);
-          console.error(`🛑 Optimizer unable to make further progress`);
-          console.error(`   Best achieved: ${bestConflicts} conflicts (🔴 ${bestCritical} critical, 🟠 ${bestHigh} high)`);
-          console.error(`   ${originalConflictCount - bestConflicts} conflicts resolved (${((originalConflictCount - bestConflicts) / Math.max(originalConflictCount, 1) * 100).toFixed(1)}%)`);
-          break;
+          console.warn(`🎲 SHAKEUP: Randomizing PCIs on conflicting cells to break deadlock...`);
+          
+          // Get all cells involved in conflicts
+          const conflictingCellIds = new Set<string>();
+          for (const conflict of conflicts) {
+            conflictingCellIds.add(conflict.primaryCell.id);
+            conflictingCellIds.add(conflict.conflictingCell.id);
+          }
+          
+          // Randomly reassign PCIs to these cells
+          let randomizedCount = 0;
+          for (const cellId of conflictingCellIds) {
+            const cellIndex = currentCells.findIndex(c => c.id === cellId);
+            if (cellIndex !== -1) {
+              const oldPCI = currentCells[cellIndex].pci;
+              const newPCI = Math.floor(Math.random() * (this.PCI_MAX - this.PCI_MIN + 1)) + this.PCI_MIN;
+              currentCells[cellIndex].pci = newPCI;
+              console.log(`   🎲 ${cellId}: ${oldPCI} → ${newPCI} (random)`);
+              randomizedCount++;
+            }
+          }
+          
+          console.warn(`   ✅ Randomized ${randomizedCount} cells, restarting optimization...`);
+          
+          // Reset counters and try again
+          iterationsWithoutProgress = 0;
+          rollbackCount = 0;
+          prevCritical = 999; // Force acceptance of first iteration
+          prevHigh = 999;
+          prevConflicts = 999;
+          
+          // Don't break - continue to next iteration with fresh random state
+          continue;
         }
         
         continue;
