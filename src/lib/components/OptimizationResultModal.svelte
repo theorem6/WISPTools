@@ -13,14 +13,21 @@
 </script>
 
 {#if show && result}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="modal-overlay" on:click={handleClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="modal" on:click|stopPropagation>
+  <div 
+    class="modal-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="modal" 
+      role="dialog"
+      aria-labelledby="optimization-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="modal-header">
-        <h2>Optimization Complete</h2>
+        <h2 id="optimization-modal-title">Optimization Complete</h2>
         <button class="close-btn" on:click={handleClose}>×</button>
       </div>
       <div class="modal-body">

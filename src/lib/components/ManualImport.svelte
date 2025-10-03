@@ -162,14 +162,21 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
 </button>
 
 {#if showImportModal}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="modal-overlay" on:click={() => showImportModal = false} role="dialog" aria-modal="true">
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="modal-content" on:click|stopPropagation>
+  <div 
+    class="modal-overlay" 
+    role="presentation"
+    on:click={() => showImportModal = false}
+    on:keydown={(e) => e.key === 'Escape' && (showImportModal = false)}
+  >
+    <div 
+      class="modal-content" 
+      role="dialog"
+      aria-labelledby="manual-import-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="modal-header">
-        <h2>Import Towers, Cells & Transmitters</h2>
+        <h2 id="manual-import-modal-title">Import Towers, Cells & Transmitters</h2>
         <button class="close-button" on:click={() => showImportModal = false}>×</button>
       </div>
       

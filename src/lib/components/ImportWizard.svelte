@@ -382,14 +382,21 @@ CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850`;
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="wizard-overlay" on:click={handleClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="wizard-modal" on:click|stopPropagation>
+  <div 
+    class="wizard-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="wizard-modal" 
+      role="dialog"
+      aria-labelledby="import-wizard-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="wizard-header">
-        <h2>Import Data</h2>
+        <h2 id="import-wizard-modal-title">Import Data</h2>
         <button class="close-btn" on:click={handleClose}>×</button>
       </div>
       

@@ -120,14 +120,21 @@
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="auth-overlay" on:click={handleClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="auth-modal" on:click|stopPropagation>
+  <div 
+    class="auth-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="auth-modal" 
+      role="dialog"
+      aria-labelledby="auth-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="auth-header">
-        <h2>
+        <h2 id="auth-modal-title">
           {#if mode === 'signin'}
             Sign In to PCI Mapper
           {:else if mode === 'signup'}

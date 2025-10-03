@@ -12,14 +12,21 @@
 </script>
 
 {#if show && geminiAnalysis}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="modal-overlay" on:click={handleClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="modal modal-large" on:click|stopPropagation>
+  <div 
+    class="modal-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="modal modal-large" 
+      role="dialog"
+      aria-labelledby="recommendations-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="modal-header">
-        <h2>AI Recommendations</h2>
+        <h2 id="recommendations-modal-title">AI Recommendations</h2>
         <button class="close-btn" on:click={handleClose}>×</button>
       </div>
       <div class="modal-body scrollable">

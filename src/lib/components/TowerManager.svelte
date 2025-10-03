@@ -182,12 +182,19 @@
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="tower-overlay" on:click={handleClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="tower-modal" on:click|stopPropagation>
+  <div 
+    class="tower-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="tower-modal" 
+      role="dialog"
+      aria-labelledby="tower-manager-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="tower-header">
         <div class="header-title">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -195,7 +202,7 @@
             <polyline points="2 17 12 22 22 17"></polyline>
             <polyline points="2 12 12 17 22 12"></polyline>
           </svg>
-          <h2>Tower Management</h2>
+          <h2 id="tower-manager-modal-title">Tower Management</h2>
           {#if $currentNetwork}
             <span class="network-badge">{$currentNetwork.name}</span>
           {/if}
@@ -269,9 +276,13 @@
           {:else}
             {#each filteredTowers as tower (tower.eNodeB)}
               <div class="tower-card" class:expanded={expandedTowerId === tower.eNodeB.toString()}>
-                <!-- svelte-ignore a11y-click-events-have-key-events -->
-                <!-- svelte-ignore a11y-no-static-element-interactions -->
-                <div class="tower-card-header" on:click={() => toggleExpand(tower.eNodeB)}>
+                <div 
+                  class="tower-card-header" 
+                  role="button"
+                  tabindex="0"
+                  on:click={() => toggleExpand(tower.eNodeB)}
+                  on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleExpand(tower.eNodeB)}
+                >
                   <div class="tower-info">
                     <div class="tower-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

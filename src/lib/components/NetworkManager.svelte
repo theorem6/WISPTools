@@ -224,14 +224,21 @@
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="network-overlay" on:click={handleClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="network-modal" on:click|stopPropagation>
+  <div 
+    class="network-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="network-modal" 
+      role="dialog"
+      aria-labelledby="network-manager-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="network-header">
-        <h2>
+        <h2 id="network-manager-modal-title">
           {#if view === 'list'}
             My Networks
           {:else}
@@ -264,12 +271,13 @@
             {:else}
               <div class="network-grid">
                 {#each $allNetworks as network}
-                  <!-- svelte-ignore a11y-click-events-have-key-events -->
-                  <!-- svelte-ignore a11y-no-static-element-interactions -->
                   <div 
                     class="network-card" 
                     class:active={$currentNetwork?.id === network.id}
+                    role="button"
+                    tabindex="0"
                     on:click={() => handleSelectNetwork(network.id)}
+                    on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleSelectNetwork(network.id)}
                   >
                     <div class="network-card-header">
                       <div class="network-icon">
