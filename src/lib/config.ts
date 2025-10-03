@@ -27,6 +27,10 @@ export const config = {
     maxTokens: 300,
     temperature: 0.3
   },
+  wolfram: {
+    appId: env.PUBLIC_WOLFRAM_APP_ID || 'WQPAJ72446',
+    apiUrl: 'http://api.wolframalpha.com/v1/simple'
+  },
   app: {
     name: "LTE PCI Conflict Mapper",
     version: "1.0.0",

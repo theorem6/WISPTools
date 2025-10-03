@@ -1,8 +1,9 @@
 // Wolfram Alpha Service for Mathematical PCI Optimization
 // Uses Wolfram's computational intelligence for constraint satisfaction
+import { env } from '$env/dynamic/public';
 
 export class WolframService {
-  private readonly APP_ID = 'WQPAJ72446';
+  private readonly APP_ID = env.PUBLIC_WOLFRAM_APP_ID || 'WQPAJ72446';
   private readonly BASE_URL = 'http://api.wolframalpha.com/v1/simple';
   
   /**
