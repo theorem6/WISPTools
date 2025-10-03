@@ -274,12 +274,68 @@ export class SimplePCIOptimizer {
   }
   
   /**
+   * Quick MOD3 fix: Add +4 to PCI to shift MOD3 group
+   * (PCI + 4) % 3 moves to next MOD3 group, resolving MOD3 conflicts
+   */
+  private tryQuickMod3Fix(cells: Cell[], conflicts: PCIConflict[]): PCIChange[] {
+    const changes: PCIChange[] = [];
+    const mod3Conflicts = conflicts.filter(c => c.conflictType === 'MOD3');
+    
+    if (mod3Conflicts.length === 0) return changes;
+    
+    console.log(`   ⚡ Attempting quick MOD3 fix for ${mod3Conflicts.length} conflicts (add +4 rule)`);
+    
+    for (const conflict of mod3Conflicts.slice(0, 5)) { // Fix up to 5 at a time
+      // Pick which cell to adjust (prefer conflicting cell)
+      let cellToChange = conflict.conflictingCell;
+      
+      const cellIndex = cells.findIndex(c => c.id === cellToChange.id);
+      if (cellIndex === -1) continue;
+      
+      const oldPCI = cellToChange.pci;
+      let newPCI = oldPCI + 4;
+      
+      // Keep within valid range
+      if (newPCI > this.PCI_MAX) {
+        newPCI = oldPCI - 5; // Go backwards instead
+        if (newPCI < this.PCI_MIN) {
+          newPCI = oldPCI + 1; // Just shift by 1
+        }
+      }
+      
+      // Verify it actually fixes the MOD3 conflict
+      const oldMod3 = oldPCI % 3;
+      const newMod3 = newPCI % 3;
+      
+      if (oldMod3 !== newMod3) {
+        cells[cellIndex].pci = newPCI;
+        changes.push({
+          cellId: cellToChange.id,
+          oldPCI,
+          newPCI,
+          reason: `Quick MOD3 fix: ${oldPCI} (+4) → ${newPCI} (Mod3: ${oldMod3}→${newMod3})`
+        });
+        console.log(`      ${cellToChange.id}: ${oldPCI} → ${newPCI} (Mod3: ${oldMod3}→${newMod3})`);
+      }
+    }
+    
+    return changes;
+  }
+  
+  /**
    * Resolve conflicts EFFICIENTLY using hotspot analysis
    * Identifies cells involved in multiple conflicts and fixes them first
    */
   private resolveConflictsEfficiently(cells: Cell[], conflicts: PCIConflict[], iteration: number, rollbackCount = 0): PCIChange[] {
     const changes: PCIChange[] = [];
     const modifiedThisIteration = new Set<string>();
+    
+    // STEP 0: Try quick MOD3 fix first (add +4 rule)
+    const quickFixes = this.tryQuickMod3Fix(cells, conflicts);
+    if (quickFixes.length > 0) {
+      console.log(`   ✅ Quick MOD3 fix applied: ${quickFixes.length} changes`);
+      return quickFixes; // Return immediately if quick fix worked
+    }
     
     // Get all currently used PCIs
     const usedPCIs = new Set(cells.map(c => c.pci));
