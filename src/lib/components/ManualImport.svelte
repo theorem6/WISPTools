@@ -8,68 +8,66 @@
   let importData = '';
   let csvFile: FileList | null = null;
   
-  // Manual entry fields
+  // Manual entry fields (simplified)
   let cellId = '';
-  let eNodeB = 0;
   let sector = 1;
   let pci = '';
   let latitude = 0;
   let longitude = 0;
-  let frequency = 2100;
-  let rsPower = -85;
   let azimuth = 0;
-  let towerType: '3-sector' | '4-sector' = '3-sector';
-  let technology: 'LTE' | 'CBRS' | 'LTE+CBRS' = 'LTE';
-  
-  // LTE Frequency Parameters
-  let earfcn = 0;
-  let channelBandwidth: 1.4 | 3 | 5 | 10 | 15 | 20 = 20;
-  let dlEarfcn = 0;
-  let ulEarfcn = 0;
+  let altitude = 0;
+  let earfcn = 1950; // Default to LTE Band 1
   
   let manualCells: Cell[] = [];
   
   function addManualCell() {
-    if (!cellId || !latitude || !longitude) {
-      alert('Please fill in Cell ID, Latitude, and Longitude');
+    if (!cellId || !latitude || !longitude || !earfcn) {
+      alert('Please fill in Cell ID, Latitude, Longitude, and EARFCN');
       return;
+    }
+    
+    // Derive frequency from EARFCN
+    let frequency = 2100;
+    if (earfcn >= 55240 && earfcn <= 56739) {
+      frequency = 3550; // CBRS
+    } else if (earfcn >= 0 && earfcn <= 599) {
+      frequency = 2100; // Band 1
+    } else if (earfcn >= 1200 && earfcn <= 1949) {
+      frequency = 1800; // Band 3
+    } else if (earfcn >= 2750 && earfcn <= 3449) {
+      frequency = 2600; // Band 7
     }
     
     const newCell: Cell = {
       id: cellId,
-      eNodeB: eNodeB,
+      eNodeB: parseInt(cellId.replace(/[^0-9]/g, '')) || 0,
       sector: sector,
-      pci: pci ? parseInt(pci) : -1, // -1 means PCI needs to be assigned
+      pci: pci ? parseInt(pci) : -1,
       latitude: latitude,
       longitude: longitude,
       frequency: frequency,
-      rsPower: rsPower,
-      azimuth: azimuth || undefined, // Allow undefined for auto-calculate
-      towerType: towerType,
-      technology: technology,
-      earfcn: earfcn || undefined,
-      centerFreq: frequency, // Use frequency as center frequency
-      channelBandwidth: channelBandwidth,
-      dlEarfcn: dlEarfcn || undefined,
-      ulEarfcn: ulEarfcn || undefined
+      rsPower: -85, // Default value
+      azimuth: azimuth || undefined,
+      heightAGL: altitude || undefined,
+      technology: frequency === 3550 ? 'CBRS' : 'LTE',
+      earfcn: earfcn,
+      centerFreq: frequency,
+      channelBandwidth: 20,
+      dlEarfcn: earfcn,
+      ulEarfcn: earfcn
     };
     
     manualCells = [...manualCells, newCell];
     
     // Reset form
     cellId = '';
-    eNodeB = 0;
     sector = 1;
     pci = '';
     latitude = 0;
     longitude = 0;
-    frequency = 2100;
-    rsPower = -85;
     azimuth = 0;
-    earfcn = 0;
-    dlEarfcn = 0;
-    ulEarfcn = 0;
-    // Keep towerType, technology, and channelBandwidth as they're likely the same for batch entry
+    altitude = 0;
+    earfcn = 1950;
   }
   
   function removeCell(index: number) {
@@ -233,7 +231,8 @@ CELL010,4,270,150,,55650,40.7589,-73.9851`;
         
         <!-- Manual Entry -->
         <div class="import-section">
-          <h3>✏️ Manual Entry</h3>
+          <h3>✏️ Manual Entry (Simplified)</h3>
+          <p class="help-text">Enter only essential fields: Cell ID, Sector, Azimuth, Altitude, PCI, EARFCN, Lat/Lng. Frequency and RS Power are auto-derived.</p>
           <div class="form-grid">
             <div class="form-group">
               <label>Cell ID *</label>
@@ -241,18 +240,33 @@ CELL010,4,270,150,,55650,40.7589,-73.9851`;
             </div>
             
             <div class="form-group">
-              <label>eNodeB</label>
-              <input type="number" bind:value={eNodeB} placeholder="1001" />
+              <label>Sector</label>
+              <input type="number" bind:value={sector} min="1" max="4" />
+              <small class="help-text">Sector number (1-4)</small>
             </div>
             
             <div class="form-group">
-              <label>Sector</label>
-              <input type="number" bind:value={sector} min="1" max="3" />
+              <label>Azimuth (degrees)</label>
+              <input type="number" min="0" max="359" bind:value={azimuth} placeholder="0" />
+              <small class="help-text">0=auto-calculate from sector. 3-sector: 0°/120°/240°, 4-sector: 0°/90°/180°/270°</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Altitude (feet)</label>
+              <input type="number" bind:value={altitude} placeholder="100" />
+              <small class="help-text">Height above ground for line-of-sight calculations</small>
             </div>
             
             <div class="form-group">
               <label>PCI (leave blank for auto-assign)</label>
               <input type="text" bind:value={pci} placeholder="Auto" />
+              <small class="help-text">Physical Cell ID (0-503)</small>
+            </div>
+            
+            <div class="form-group">
+              <label>EARFCN *</label>
+              <input type="number" bind:value={earfcn} placeholder="1950" />
+              <small class="help-text">Frequency channel. 1950=Band1(2100MHz), 55650=CBRS(3550MHz). Frequency/RS Power auto-derived.</small>
             </div>
             
             <div class="form-group">
@@ -263,77 +277,6 @@ CELL010,4,270,150,,55650,40.7589,-73.9851`;
             <div class="form-group">
               <label>Longitude *</label>
               <input type="number" step="0.000001" bind:value={longitude} placeholder="-74.0060" />
-            </div>
-            
-            <div class="form-group">
-              <label>Frequency (MHz)</label>
-              <input type="number" bind:value={frequency} placeholder="2100" />
-            </div>
-            
-            <div class="form-group">
-              <label>RS Power (dBm)</label>
-              <input type="number" bind:value={rsPower} placeholder="-85" />
-            </div>
-            
-            <div class="form-group">
-              <label>Azimuth (degrees) - Leave blank for auto-calculate</label>
-              <input type="number" min="0" max="359" bind:value={azimuth} placeholder="Auto-calculate" />
-              <small class="help-text">
-                {#if towerType === '3-sector'}
-                  Auto: 0°, 120°, 240° (based on sector 1,2,3)
-                {:else}
-                  Auto: 0°, 90°, 180°, 270° (based on sector 1,2,3,4)
-                {/if}
-              </small>
-            </div>
-            
-            <div class="form-group">
-              <label>Tower Type</label>
-              <select bind:value={towerType}>
-                <option value="3-sector">3-Sector (120° LTE)</option>
-                <option value="4-sector">4-Sector (90° CBRS)</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label>Technology</label>
-              <select bind:value={technology}>
-                <option value="LTE">LTE</option>
-                <option value="CBRS">CBRS</option>
-                <option value="LTE+CBRS">LTE+CBRS</option>
-              </select>
-            </div>
-            
-            <!-- LTE Frequency Parameters -->
-            <h4>LTE Frequency Parameters</h4>
-            <div class="form-group">
-              <label>EARFCN (Primary)</label>
-              <input type="number" bind:value={earfcn} placeholder="e.g., 1950" />
-              <small class="help-text">E-UTRA Absolute Radio Frequency Channel Number</small>
-            </div>
-            
-            <div class="form-group">
-              <label>Channel Bandwidth (MHz)</label>
-              <select bind:value={channelBandwidth}>
-                <option value={1.4}>1.4 MHz</option>
-                <option value={3}>3 MHz</option>
-                <option value={5}>5 MHz</option>
-                <option value={10}>10 MHz</option>
-                <option value={15}>15 MHz</option>
-                <option value={20}>20 MHz</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label>DL EARFCN (Optional)</label>
-              <input type="number" bind:value={dlEarfcn} placeholder="Downlink EARFCN" />
-              <small class="help-text">Leave blank to use primary EARFCN</small>
-            </div>
-            
-            <div class="form-group">
-              <label>UL EARFCN (Optional)</label>
-              <input type="number" bind:value={ulEarfcn} placeholder="Uplink EARFCN" />
-              <small class="help-text">Leave blank to use primary EARFCN</small>
             </div>
           </div>
           

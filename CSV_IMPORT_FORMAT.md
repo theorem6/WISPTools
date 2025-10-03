@@ -63,24 +63,26 @@ CELL010,4,270,150,,55650,40.7589,-73.9851
 
 ## 🎯 What Happens Automatically
 
-### **1. Frequency Derivation**
-The system automatically derives the frequency from EARFCN:
+### **1. Frequency Derivation (Auto-Calculated)**
+⚠️ **You do NOT provide Frequency** - the system automatically derives it from EARFCN:
 
-| EARFCN Range | Frequency | Band |
-|--------------|-----------|------|
+| EARFCN Range | Frequency (Auto) | Band |
+|--------------|------------------|------|
 | 0 - 599 | 2100 MHz | LTE Band 1 |
 | 1200 - 1949 | 1800 MHz | LTE Band 3 |
 | 2750 - 3449 | 2600 MHz | LTE Band 7 |
 | 55240 - 56739 | 3550 MHz | CBRS |
 
-### **2. Default Values**
-Fields not provided get sensible defaults:
+### **2. RS Power (Auto-Set)**
+⚠️ **You do NOT provide RS Power** - automatically set to **-85 dBm** (typical reference signal power)
+
+### **3. Other Auto-Filled Values**
+Fields not in CSV get sensible defaults:
 
 - **eNodeB**: Extracted from Cell ID numbers (e.g., `CELL001` → eNodeB `1`)
-- **RS Power**: `-85 dBm` (typical value)
 - **Technology**: `LTE` (or `CBRS` if EARFCN is in CBRS range)
 - **Channel Bandwidth**: `20 MHz`
-- **Center Frequency**: Derived from EARFCN
+- **Center Frequency**: Same as derived frequency
 - **DL/UL EARFCN**: Both set to the provided EARFCN
 
 ### **3. PCI Auto-Assignment**
