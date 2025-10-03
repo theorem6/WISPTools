@@ -11,6 +11,7 @@ export class SimplePCIOptimizer {
   private readonly PCI_MAX = 503;
   private readonly MAX_ITERATIONS_WITHOUT_PROGRESS = 5; // Stop if stuck for 5 iterations (reduced to trigger emergency fallback faster)
   private readonly ABSOLUTE_MAX_ITERATIONS = 100; // Safety limit
+  private readonly MAX_SHAKEUPS = 3; // Maximum number of random shakeups before giving up
   
   /**
    * Simple, effective PCI optimization
@@ -49,6 +50,7 @@ export class SimplePCIOptimizer {
     let rollbackCount = 0; // Track consecutive rollbacks for extra randomization
     let iterationsWithoutProgress = 0; // Track stagnation
     let totalChangesApplied = 0; // Track efficiency
+    let shakeupsUsed = 0; // Track how many random shakeups we've attempted
     
     // Run until critical = 0 OR stuck for too long OR hit safety limit
     while (iteration < this.ABSOLUTE_MAX_ITERATIONS) {
@@ -171,8 +173,17 @@ export class SimplePCIOptimizer {
         
         // Check if we're stuck
         if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
+          shakeupsUsed++;
+          
+          if (shakeupsUsed > this.MAX_SHAKEUPS) {
+            console.error(`\n❌ MAX SHAKEUPS REACHED: Tried ${this.MAX_SHAKEUPS} random restarts`);
+            console.error(`🛑 Optimizer exhausted all attempts`);
+            console.error(`   Best achieved: ${bestConflicts} conflicts (🔴 ${bestCritical} critical, 🟠 ${bestHigh} high)`);
+            break;
+          }
+          
           console.error(`\n❌ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} consecutive iterations`);
-          console.warn(`🎲 SHAKEUP: Randomizing PCIs on conflicting cells to break deadlock...`);
+          console.warn(`🎲 SHAKEUP #${shakeupsUsed}/${this.MAX_SHAKEUPS}: Randomizing PCIs to break deadlock...`);
           
           // Get all cells involved in conflicts
           const conflictingCellIds = new Set<string>();
@@ -194,7 +205,7 @@ export class SimplePCIOptimizer {
             }
           }
           
-          console.warn(`   ✅ Randomized ${randomizedCount} cells, restarting optimization...`);
+          console.warn(`   ✅ Randomized ${randomizedCount} cells, restarting optimization (attempt ${shakeupsUsed + 1})...`);
           
           // Reset counters and try again
           iterationsWithoutProgress = 0;
@@ -222,8 +233,17 @@ export class SimplePCIOptimizer {
         
         // Check if we're stuck
         if (iterationsWithoutProgress >= this.MAX_ITERATIONS_WITHOUT_PROGRESS) {
+          shakeupsUsed++;
+          
+          if (shakeupsUsed > this.MAX_SHAKEUPS) {
+            console.error(`\n❌ MAX SHAKEUPS REACHED: Tried ${this.MAX_SHAKEUPS} random restarts`);
+            console.error(`🛑 Optimizer exhausted all attempts`);
+            console.error(`   Best achieved: ${bestConflicts} conflicts (🔴 ${bestCritical} critical, 🟠 ${bestHigh} high)`);
+            break;
+          }
+          
           console.error(`\n❌ STAGNATION DETECTED: No progress for ${iterationsWithoutProgress} consecutive iterations`);
-          console.warn(`🎲 SHAKEUP: Randomizing PCIs on conflicting cells to break deadlock...`);
+          console.warn(`🎲 SHAKEUP #${shakeupsUsed}/${this.MAX_SHAKEUPS}: Randomizing PCIs to break deadlock...`);
           
           // Get all cells involved in conflicts
           const conflictingCellIds = new Set<string>();
@@ -245,7 +265,7 @@ export class SimplePCIOptimizer {
             }
           }
           
-          console.warn(`   ✅ Randomized ${randomizedCount} cells, restarting optimization...`);
+          console.warn(`   ✅ Randomized ${randomizedCount} cells, restarting optimization (attempt ${shakeupsUsed + 1})...`);
           
           // Reset counters and try again
           iterationsWithoutProgress = 0;
@@ -343,10 +363,16 @@ export class SimplePCIOptimizer {
       console.log(`   Total Conflicts: ${originalConflictCount} → ${finalConflicts.length} (0% reduction)`);
       console.log(`   Iterations: ${iteration}`);
       console.log(`   Changes Attempted: ${allChanges.length}`);
-      console.error(`\n🚨 Optimizer unable to make progress - possible causes:`);
-      console.error(`   • Network topology too complex`);
-      console.error(`   • Insufficient PCI pool (only using 30-503)`);
-      console.error(`   • Conflicts may require manual intervention`);
+      console.log(`   Random Shakeups Used: ${shakeupsUsed}/${this.MAX_SHAKEUPS}`);
+      console.error(`\n💡 The optimizer tried everything:`);
+      console.error(`   ✓ Quick MOD3 fix (+4 rule)`);
+      console.error(`   ✓ Cost-based PCI selection`);
+      console.error(`   ✓ Emergency fallback changes`);
+      console.error(`   ✓ ${shakeupsUsed} random shakeup attempt(s)`);
+      console.error(`\n🔍 Consider:`);
+      console.error(`   • Check if cells are on same EARFCN/frequency`);
+      console.error(`   • Verify cell locations and distances`);
+      console.error(`   • Review remaining conflicts for manual resolution`);
     } else if (finalConflicts.length === 0) {
       console.log(`✅ OPTIMIZATION COMPLETE - PERFECT SUCCESS`);
       console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
