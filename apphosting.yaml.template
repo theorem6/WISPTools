@@ -1,5 +1,5 @@
-# Firebase App Hosting Configuration
-# This file defines environment variables and settings for your deployed app
+# Firebase App Hosting Configuration Template
+# Copy this to apphosting.yaml and fill in your actual values
 
 runConfig:
   minInstances: 0
@@ -8,37 +8,37 @@ runConfig:
 env:
   # Firebase Configuration
   - variable: PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0
+    value: your-firebase-api-key
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: lte-pci-mapper-65450042-bbf71.firebaseapp.com
+    value: your-project.firebaseapp.com
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_FIREBASE_PROJECT_ID
-    value: lte-pci-mapper-65450042-bbf71
+    value: your-project-id
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: lte-pci-mapper-65450042-bbf71.firebasestorage.app
+    value: your-project.firebasestorage.app
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "1044782186913"
+    value: "your-sender-id"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_FIREBASE_APP_ID
-    value: 1:1044782186913:web:a5367441ce136118948be0
+    value: your-app-id
     availability:
       - BUILD
       - RUNTIME
@@ -51,19 +51,20 @@ env:
   
   # API Keys
   - variable: PUBLIC_ARCGIS_API_KEY
-    value: AAPT85fOqywZsicJupSmVSCGrjWNNjURUpnE--wnh6GZUreHU00VSEoRGgbf0JZjKYEmLnUXJw8E5r8Nz55eqYvvfcecdjs2BjpjcShOZgei0o-Myxttbl5f1qu9-AfdJaw4w3ugB4-uH6dh9v0PNN--vklICR-vCwt8YjMxw7CBrsZ5vxsZjo_jp31mV5hlMSSxQMJsKtFh0ltDrN4YwuK_8ZLmHMdIp5w9_jZrqJVlC2I.AT2_12sjSDHZ
+    value: your-arcgis-api-key
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GEMINI_API_KEY
-    value: AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg
+    value: your-gemini-api-key
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_WOLFRAM_APP_ID
-    value: WQPAJ72446
+    value: your-wolfram-app-id
     availability:
       - BUILD
       - RUNTIME
+

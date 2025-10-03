@@ -18,6 +18,11 @@ pnpm-lock.yaml
 .env
 .env.*
 !.env.example
+!.env.production
+
+# App Hosting config (contains API keys)
+# Uncomment to exclude from git:
+# apphosting.yaml
 
 # GitHub templates
 getStart:*
