@@ -20,7 +20,8 @@
     hasData,
     hasConflicts,
     isAnyLoading,
-    uiActions
+    uiActions,
+    resetAllStores
   } from '$lib/stores/appState';
   
   // Components
@@ -139,8 +140,9 @@
   // Redirect if user logs out and clear all state
   $: if (!$authStore.isLoading && !$isAuthenticated) {
     // Clear all app state
-    networkStore.clear();
-    pciService.clearCells();
+    resetAllStores();     // Resets cells, conflicts, optimization, analysis, UI stores
+    networkStore.clear(); // Clear network store
+    pciService.clearCells(); // Clear PCI service internal state
     
     // Clear the map
     if (mapInstance) {

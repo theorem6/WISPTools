@@ -40,24 +40,14 @@
   }
   
   import { networkStore } from '../stores/networkStore';
-  import { cellsStore, conflictsStore, optimizationStore, analysisStore, uiStore } from '../stores/appState';
+  import { resetAllStores } from '../stores/appState';
   
   async function handleSignOut() {
     showDropdown = false;
     
     // Clear all app state before signing out
-    networkStore.clear();
-    cellsStore.set({ items: [] });
-    conflictsStore.set({ items: [], analysis: null });
-    optimizationStore.set({ isOptimizing: false, result: null });
-    analysisStore.set({ recommendations: [], geminiAnalysis: null });
-    uiStore.set({
-      showImportWizard: false,
-      showAnalysisModal: false,
-      showConflictsModal: false,
-      showRecommendationsModal: false,
-      showOptimizationResultModal: false
-    });
+    resetAllStores();     // Resets cells, conflicts, optimization, analysis, UI stores
+    networkStore.clear(); // Clear network store
     
     // Clear browser storage (except theme preference)
     if (browser) {
