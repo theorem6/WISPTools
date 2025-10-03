@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// DEVELOPMENT RULES - More permissive for testing
+// Use these for initial setup and debugging
+// DO NOT use in production!
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Networks collection - Allow any authenticated user during development
+    match /networks/{networkId} {
+      // Allow authenticated users to read any network (for testing)
+      allow read: if isAuthenticated();
+      
+      // Allow authenticated users to create networks
+      allow create: if isAuthenticated();
+      
+      // Allow authenticated users to update any network (for testing)
+      allow update: if isAuthenticated();
+      
+      // Allow authenticated users to delete any network (for testing)
+      allow delete: if isAuthenticated();
+      
+      // Cells subcollection within a network
+      match /cells/{cellId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+    
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    // Allow authenticated users to read/write during development
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
+
