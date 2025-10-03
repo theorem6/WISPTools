@@ -140,10 +140,21 @@
 
 <!-- Export Modal -->
 {#if showExportModal}
-  <div class="export-modal-overlay" on:click={() => showExportModal = false}>
-    <div class="export-modal" on:click|stopPropagation>
+  <div 
+    class="export-modal-overlay" 
+    role="presentation"
+    on:click={() => showExportModal = false}
+    on:keydown={(e) => e.key === 'Escape' && (showExportModal = false)}
+  >
+    <div 
+      class="export-modal" 
+      role="dialog"
+      aria-labelledby="export-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="export-modal-header">
-        <h3>Export Reports</h3>
+        <h3 id="export-modal-title">Export Reports</h3>
         <button class="close-btn" on:click={() => showExportModal = false}>×</button>
       </div>
       <div class="export-modal-body">

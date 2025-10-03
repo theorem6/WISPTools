@@ -527,7 +527,7 @@
       <div class="stat-item">
         <span class="stat-value">{$cellCount}</span>
         <span class="stat-label">Cells</span>
-      </div>
+        </div>
       <div class="stat-divider"></div>
       <div class="stat-item {$conflictCount > 0 ? 'warning' : ''}">
         <span class="stat-value">{$conflictCount}</span>
@@ -537,7 +537,7 @@
       <div class="stat-item {$criticalConflictCount > 0 ? 'danger' : 'success'}">
         <span class="stat-value">{$criticalConflictCount}</span>
         <span class="stat-label">Critical</span>
-      </div>
+    </div>
       <div class="stat-divider"></div>
       <div class="stat-item {$highConflictCount > 0 ? 'warning' : ''}">
         <span class="stat-value">{$highConflictCount}</span>

@@ -362,10 +362,6 @@
     padding: 2rem;
   }
 
-  [data-theme="dark"] .login-page {
-    background: linear-gradient(135deg, #1e3a8a 0%, #581c87 100%);
-  }
-
   .login-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -384,10 +380,6 @@
     align-items: center;
     justify-content: center;
     color: white;
-  }
-
-  [data-theme="dark"] .login-brand {
-    background: linear-gradient(135deg, #1e3a8a 0%, #581c87 100%);
   }
 
   .brand-content {
@@ -602,11 +594,6 @@
     background: white;
     color: #1f1f1f;
     border: 1px solid var(--border-color);
-  }
-
-  [data-theme="dark"] .auth-btn.google {
-    background: var(--surface-secondary);
-    color: var(--text-primary);
   }
 
   .auth-btn.google:hover:not(:disabled) {
