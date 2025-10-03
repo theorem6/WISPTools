@@ -104,51 +104,81 @@
         if (!line) continue;
         
         const parts = line.split(',');
-        if (parts.length >= 8) {
+        // Simplified CSV: Cell ID, Sector, Azimuth, Altitude, PCI, EARFCN, Latitude, Longitude
+        if (parts.length >= 6) {
+          const cellId = parts[0].trim();
+          const sector = parts[1].trim() ? parseInt(parts[1].trim()) : 1;
+          const azimuth = parts[2].trim() ? parseInt(parts[2].trim()) : undefined;
+          const altitude = parts[3].trim() ? parseInt(parts[3].trim()) : undefined;
+          const pci = parts[4].trim() ? parseInt(parts[4].trim()) : -1;
+          const earfcn = parts[5].trim() ? parseInt(parts[5].trim()) : undefined;
+          const latitude = parts.length > 6 && parts[6].trim() ? parseFloat(parts[6].trim()) : 0;
+          const longitude = parts.length > 7 && parts[7].trim() ? parseFloat(parts[7].trim()) : 0;
+          
+          // Derive frequency from EARFCN if provided, otherwise default to 2100
+          let frequency = 2100;
+          if (earfcn) {
+            if (earfcn >= 55240 && earfcn <= 56739) {
+              frequency = 3550; // CBRS
+            } else if (earfcn >= 0 && earfcn <= 599) {
+              frequency = 2100; // Band 1
+            } else if (earfcn >= 1200 && earfcn <= 1949) {
+              frequency = 1800; // Band 3
+            } else if (earfcn >= 2750 && earfcn <= 3449) {
+              frequency = 2600; // Band 7
+            }
+          }
+          
           imported.push({
-            id: parts[0].trim(),
-            eNodeB: parseInt(parts[1].trim()),
-            sector: parseInt(parts[2].trim()),
-            pci: parts[3].trim() ? parseInt(parts[3].trim()) : -1,
-            latitude: parseFloat(parts[4].trim()),
-            longitude: parseFloat(parts[5].trim()),
-            frequency: parseInt(parts[6].trim()),
-            rsPower: parseFloat(parts[7].trim()),
-            azimuth: parts[8] && parts[8].trim() ? parseInt(parts[8].trim()) : undefined,
-            towerType: parts[9] ? parts[9].trim() as '3-sector' | '4-sector' : '3-sector',
-            technology: parts[10] ? parts[10].trim() as 'LTE' | 'CBRS' | 'LTE+CBRS' : 'LTE',
-            earfcn: parts[11] && parts[11].trim() ? parseInt(parts[11].trim()) : undefined,
-            channelBandwidth: parts[12] && parts[12].trim() ? parseFloat(parts[12].trim()) as 1.4 | 3 | 5 | 10 | 15 | 20 : 20,
-            dlEarfcn: parts[13] && parts[13].trim() ? parseInt(parts[13].trim()) : undefined,
-            ulEarfcn: parts[14] && parts[14].trim() ? parseInt(parts[14].trim()) : undefined
+            id: cellId,
+            eNodeB: parseInt(cellId.replace(/[^0-9]/g, '')) || 0, // Extract numbers from cell ID for eNodeB
+            sector: sector,
+            pci: pci,
+            latitude: latitude,
+            longitude: longitude,
+            frequency: frequency,
+            rsPower: -85, // Default value
+            azimuth: azimuth,
+            heightAGL: altitude,
+            technology: frequency === 3550 ? 'CBRS' : 'LTE',
+            earfcn: earfcn,
+            centerFreq: frequency,
+            channelBandwidth: 20,
+            dlEarfcn: earfcn,
+            ulEarfcn: earfcn
           });
         }
       }
       
-      manualCells = [...manualCells, ...imported];
+      if (imported.length > 0) {
+        manualCells = [...manualCells, ...imported];
+        alert(`Imported ${imported.length} cell(s) successfully`);
+      } else {
+        alert('No valid cells found in CSV. Please check the format.');
+      }
     };
     
     reader.readAsText(file);
   }
   
   function downloadCSVTemplate() {
-    const template = `Cell ID,eNodeB,Sector,PCI,Latitude,Longitude,Frequency,RS Power,Azimuth,Tower Type,Technology,EARFCN,Channel Bandwidth,DL EARFCN,UL EARFCN
-CELL001,1001,1,15,40.7128,-74.0060,2100,-85,0,3-sector,LTE,1950,20,1950,1850
-CELL002,1001,2,,40.7128,-74.0060,2100,-87,120,3-sector,LTE,1950,20,1950,1850
-CELL003,1001,3,21,40.7128,-74.0060,2100,-83,240,3-sector,LTE,1950,20,1950,1850
-CELL004,1002,1,,40.7689,-73.9667,2100,-89,0,3-sector,LTE,1950,20,1950,1850
-CELL005,1002,2,,40.7689,-73.9667,2100,-86,120,3-sector,LTE,1950,20,1950,1850
-CELL006,1002,3,,40.7689,-73.9667,2100,-88,240,3-sector,LTE,1950,20,1950,1850
-CELL007,1003,1,,40.7589,-73.9851,3550,-85,0,4-sector,CBRS,55650,20,55650,55650
-CELL008,1003,2,,40.7589,-73.9851,3550,-87,90,4-sector,CBRS,55650,20,55650,55650
-CELL009,1003,3,,40.7589,-73.9851,3550,-83,180,4-sector,CBRS,55650,20,55650,55650
-CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650`;
+    const template = `Cell ID,Sector,Azimuth,Altitude,PCI,EARFCN,Latitude,Longitude
+CELL001,1,0,100,15,1950,40.7128,-74.0060
+CELL002,2,120,100,,1950,40.7128,-74.0060
+CELL003,3,240,100,21,1950,40.7128,-74.0060
+CELL004,1,0,120,,1950,40.7689,-73.9667
+CELL005,2,120,120,,1950,40.7689,-73.9667
+CELL006,3,240,120,,1950,40.7689,-73.9667
+CELL007,1,0,150,,55650,40.7589,-73.9851
+CELL008,2,90,150,,55650,40.7589,-73.9851
+CELL009,3,180,150,,55650,40.7589,-73.9851
+CELL010,4,270,150,,55650,40.7589,-73.9851`;
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pci-import-template.csv';
+    a.download = 'pci-import-template-simplified.csv';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -184,7 +214,8 @@ CELL010,1003,4,,40.7589,-73.9851,3550,-89,270,4-sector,CBRS,55650,20,55650,55650
         <!-- CSV Import -->
         <div class="import-section">
           <h3>📄 CSV Import</h3>
-          <p class="help-text">Upload a CSV file with tower/cell data. Leave PCI blank for auto-assignment.</p>
+          <p class="help-text">Upload a simplified CSV with just the essentials: Cell ID, Sector, Azimuth, Altitude, PCI, EARFCN, Latitude, Longitude.</p>
+          <p class="help-text"><strong>Note:</strong> Leave PCI blank for auto-assignment. Frequency is automatically derived from EARFCN.</p>
           <div class="file-upload">
             <input 
               type="file" 
