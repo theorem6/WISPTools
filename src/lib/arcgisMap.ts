@@ -38,15 +38,13 @@ export class PCIArcGISMapper {
       { default: Map },
       { default: MapView },
       { default: GraphicsLayer },
-      { default: BasemapGallery },
-      { default: Expand },
+      { default: BasemapToggle },
       { default: Zoom }
     ] = await Promise.all([
       import('@arcgis/core/Map.js'),
       import('@arcgis/core/views/MapView.js'),
       import('@arcgis/core/layers/GraphicsLayer.js'),
-      import('@arcgis/core/widgets/BasemapGallery.js'),
-      import('@arcgis/core/widgets/Expand.js'),
+      import('@arcgis/core/widgets/BasemapToggle.js'),
       import('@arcgis/core/widgets/Zoom.js')
     ]);
 
@@ -93,26 +91,19 @@ export class PCIArcGISMapper {
       index: 0
     });
     
-    // Add BasemapGallery widget in an Expand widget
-    const basemapGallery = new BasemapGallery({
-      view: this.mapView
-    });
-    
-    const basemapExpand = new Expand({
+    // Add BasemapToggle widget (non-deprecated alternative to BasemapGallery)
+    const basemapToggle = new BasemapToggle({
       view: this.mapView,
-      content: basemapGallery,
-      expandIcon: "basemap",
-      expandTooltip: "Change Basemap",
-      expanded: false
+      nextBasemap: isDarkMode ? "streets-night-vector" : "hybrid"  // Toggle between current and satellite/hybrid
     });
     
-    this.mapView.ui.add(basemapExpand, {
-      position: "top-center",
+    this.mapView.ui.add(basemapToggle, {
+      position: "top-right",
       index: 1
     });
     
     this.isInitialized = true;
-    console.log('PCIArcGISMapper: Map initialized and ready with basemap gallery');
+    console.log('PCIArcGISMapper: Map initialized and ready with basemap toggle');
   }
   
   /**
