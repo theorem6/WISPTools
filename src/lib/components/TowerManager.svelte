@@ -35,13 +35,21 @@
   $: towers = groupCellsByTower($cellsStore.items);
   $: filteredTowers = filterTowers(towers, searchQuery);
   
+  interface SectorGroup {
+    sectorNumber: number;
+    carriers: Cell[];
+    azimuth: number;
+    pcis: number[];
+  }
+  
   interface Tower {
     eNodeB: number;
     name: string;
     latitude: number;
     longitude: number;
-    sectors: Cell[];
+    sectors: SectorGroup[];
     sectorCount: number;
+    carrierCount: number;
     technologies: string[];
     frequencies: number[];
   }
@@ -58,14 +66,34 @@
           longitude: cell.longitude,
           sectors: [],
           sectorCount: 0,
+          carrierCount: 0,
           technologies: [],
           frequencies: []
         });
       }
       
       const tower = towerMap.get(cell.eNodeB)!;
-      tower.sectors.push(cell);
+      
+      // Find or create sector group
+      let sectorGroup = tower.sectors.find(s => s.sectorNumber === cell.sector);
+      if (!sectorGroup) {
+        sectorGroup = {
+          sectorNumber: cell.sector,
+          carriers: [],
+          azimuth: cell.azimuth || 0,
+          pcis: []
+        };
+        tower.sectors.push(sectorGroup);
+      }
+      
+      // Add carrier to sector
+      sectorGroup.carriers.push(cell);
+      if (!sectorGroup.pcis.includes(cell.pci)) {
+        sectorGroup.pcis.push(cell.pci);
+      }
+      
       tower.sectorCount = tower.sectors.length;
+      tower.carrierCount = tower.sectors.reduce((sum, s) => sum + s.carriers.length, 0);
       
       // Collect unique technologies
       if (!tower.technologies.includes(cell.technology)) {
@@ -121,9 +149,14 @@
   }
   
   function handleEditTower(tower: Tower) {
-    // Convert tower sectors back to CellSite format
-    // Cast to LegacyCell[] since Cell and LegacyCell are structurally compatible
-    const cellSites = convertLegacyToCellSite(tower.sectors as any);
+    // Flatten all carriers from all sectors for this tower
+    const towerCells: Cell[] = [];
+    tower.sectors.forEach(sectorGroup => {
+      towerCells.push(...sectorGroup.carriers);
+    });
+    
+    // Convert to CellSite format
+    const cellSites = convertLegacyToCellSite(towerCells as any);
     if (cellSites.length > 0) {
       selectedSite = cellSites[0]; // Should only be one site per eNodeB
       isCreatingNewSite = false;
@@ -314,7 +347,7 @@
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
-                          {tower.sectorCount} sector{tower.sectorCount !== 1 ? 's' : ''}
+                          {tower.sectorCount} sector{tower.sectorCount !== 1 ? 's' : ''} ({tower.carrierCount} carriers)
                         </span>
                         <span class="meta-divider">•</span>
                         <span class="meta-item">
@@ -375,42 +408,35 @@
                 
                 {#if expandedTowerId === tower.eNodeB.toString()}
                   <div class="tower-sectors">
-                    <h4>Sectors ({tower.sectorCount})</h4>
+                    <h4>Sectors ({tower.sectorCount}) - {tower.carrierCount} Total Carriers</h4>
                     <div class="sectors-grid">
-                      {#each tower.sectors as sector}
+                      {#each tower.sectors as sectorGroup}
                         <div class="sector-card">
                           <div class="sector-header">
-                            <span class="sector-id">{sector.id}</span>
-                            <span class="sector-pci">PCI: {sector.pci}</span>
+                            <span class="sector-id">Sector {sectorGroup.sectorNumber}</span>
+                            <span class="sector-pci">Azimuth: {sectorGroup.azimuth}°</span>
                           </div>
                           <div class="sector-details">
                             <div class="sector-row">
-                              <span class="label">Sector:</span>
-                              <span class="value">{sector.sector}</span>
+                              <span class="label">Carriers:</span>
+                              <span class="value">{sectorGroup.carriers.length}</span>
                             </div>
                             <div class="sector-row">
-                              <span class="label">Azimuth:</span>
-                              <span class="value">{sector.azimuth}°</span>
+                              <span class="label">PCIs:</span>
+                              <span class="value">{sectorGroup.pcis.join(', ')}</span>
                             </div>
-                            <div class="sector-row">
-                              <span class="label">Height AGL:</span>
-                              <span class="value">{sector.heightAGL || 100} ft</span>
-                            </div>
-                            <div class="sector-row">
-                              <span class="label">Frequency:</span>
-                              <span class="value">{sector.frequency} MHz</span>
-                            </div>
-                            <div class="sector-row">
-                              <span class="label">Technology:</span>
-                              <span class="value">{sector.technology}</span>
-                            </div>
-                            <div class="sector-row">
-                              <span class="label">DL EARFCN:</span>
-                              <span class="value">{sector.dlEarfcn || sector.earfcn}</span>
-                            </div>
-                            <div class="sector-row">
-                              <span class="label">Power:</span>
-                              <span class="value">{sector.rsPower} dBm</span>
+                            
+                            <!-- List carriers -->
+                            <div class="carriers-list">
+                              <strong>RMOD Carriers:</strong>
+                              {#each sectorGroup.carriers as carrier, idx}
+                                <div class="carrier-row">
+                                  <span class="carrier-label">C{idx + 1}:</span>
+                                  <span class="carrier-data">PCI {carrier.pci}</span>
+                                  <span class="carrier-data">EARFCN {carrier.dlEarfcn || carrier.earfcn}</span>
+                                  <span class="carrier-data">{carrier.frequency} MHz</span>
+                                </div>
+                              {/each}
                             </div>
                           </div>
                         </div>
@@ -930,6 +956,44 @@
   .sector-row .value {
     color: var(--text-primary);
     font-weight: 600;
+  }
+
+  .carriers-list {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .carriers-list strong {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .carrier-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.375rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+  }
+
+  .carrier-label {
+    font-weight: 700;
+    color: var(--primary-color);
+    min-width: 30px;
+  }
+
+  .carrier-data {
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--card-bg);
+    border-radius: 4px;
   }
 
   @media (max-width: 768px) {

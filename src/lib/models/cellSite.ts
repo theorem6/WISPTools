@@ -82,6 +82,8 @@ export interface LegacyCell {
 
 /**
  * Convert legacy cell format to new CellSite format
+ * Groups cells by eNodeB and sector number
+ * If multiple cells share same eNodeB+sector, they become carriers on the same sector
  */
 export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
   const sitesMap = new Map<string, CellSite>();
@@ -103,30 +105,37 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
     
     const site = sitesMap.get(siteId)!;
     
-    // Create sector
-    const sector: Sector = {
-      id: legacyCell.id,
-      sectorNumber: legacyCell.sector,
-      azimuth: legacyCell.azimuth || 0,
-      beamwidth: (legacyCell as any).beamwidth || 65, // Use sector beamwidth if available
-      heightAGL: (legacyCell as any).heightAGL || 100, // Default 100 feet if not specified
-      rmodId: ((legacyCell.sector - 1) % 3) + 1, // Auto-assign RMOD based on sector number
-      channels: [
-        {
-          id: `${legacyCell.id}-CH1`,
-          dlEarfcn: legacyCell.dlEarfcn || legacyCell.earfcn || 0,
-          ulEarfcn: legacyCell.ulEarfcn || 0,
-          centerFreq: legacyCell.centerFreq || legacyCell.frequency || 0,
-          channelBandwidth: legacyCell.channelBandwidth || 20,
-          pci: legacyCell.pci,
-          isPrimary: true
-        }
-      ],
-      rsPower: legacyCell.rsPower,
-      technology: legacyCell.technology || 'LTE'
-    };
+    // Check if sector already exists
+    let sector = site.sectors.find(s => s.sectorNumber === legacyCell.sector);
     
-    site.sectors.push(sector);
+    if (!sector) {
+      // Create new sector
+      sector = {
+        id: `${siteId}-SEC${legacyCell.sector}`,
+        sectorNumber: legacyCell.sector,
+        azimuth: legacyCell.azimuth || 0,
+        beamwidth: (legacyCell as any).beamwidth || 65,
+        heightAGL: (legacyCell as any).heightAGL || 100,
+        rmodId: ((legacyCell.sector - 1) % 3) + 1,
+        channels: [],
+        rsPower: legacyCell.rsPower,
+        technology: legacyCell.technology || 'LTE'
+      };
+      site.sectors.push(sector);
+    }
+    
+    // Add carrier/channel to the sector
+    const carrierNumber = sector.channels.length + 1;
+    sector.channels.push({
+      id: legacyCell.id, // Use original cell ID as carrier ID
+      name: `RMOD Carrier ${carrierNumber}`,
+      dlEarfcn: legacyCell.dlEarfcn || legacyCell.earfcn || 0,
+      ulEarfcn: legacyCell.ulEarfcn || 0,
+      centerFreq: legacyCell.centerFreq || legacyCell.frequency || 0,
+      channelBandwidth: legacyCell.channelBandwidth || 20,
+      pci: legacyCell.pci,
+      isPrimary: carrierNumber === 1 // First carrier is primary
+    });
   }
   
   return Array.from(sitesMap.values());
