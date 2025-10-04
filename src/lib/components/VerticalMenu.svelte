@@ -154,6 +154,7 @@
     border: 1px solid var(--border-color);
     overflow-y: auto;
     max-height: calc(100vh - 193px);
+    box-sizing: border-box;
   }
 
   .menu-items {
@@ -261,6 +262,7 @@
       top: 163px;
       left: 10px;
       width: 160px;
+      box-sizing: border-box;
     }
   }
 </style>

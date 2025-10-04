@@ -43,9 +43,10 @@
     background: var(--card-bg);
     backdrop-filter: blur(16px);
     border-radius: 12px;
-    padding: 0.75rem 1.25rem;
+    padding: 0.75rem 0.5rem;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
+    box-sizing: border-box;
   }
 
   .brand-content {
@@ -121,7 +122,7 @@
       top: 90px;
       left: 10px;
       width: 160px;
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem;
     }
 
     .app-title {
