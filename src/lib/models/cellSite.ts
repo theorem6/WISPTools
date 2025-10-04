@@ -134,33 +134,40 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
 
 /**
  * Convert CellSite format back to legacy format for compatibility
+ * NOW EXPORTS ALL CARRIERS: Each carrier/channel gets its own "cell" record for PCI conflict analysis
+ * This is critical because each RMOD can have multiple carriers with different PCIs
  */
 export function convertCellSiteToLegacy(sites: CellSite[]): LegacyCell[] {
   const legacyCells: LegacyCell[] = [];
   
   for (const site of sites) {
     for (const sector of site.sectors) {
-      const primaryChannel = sector.channels.find(c => c.isPrimary) || sector.channels[0];
-      
-      if (primaryChannel) {
+      // Export ALL channels/carriers, not just the primary
+      // Each carrier has its own PCI and must be checked independently
+      for (let channelIndex = 0; channelIndex < sector.channels.length; channelIndex++) {
+        const channel = sector.channels[channelIndex];
+        
+        // Create unique ID for each carrier
+        const carrierId = channel.id || `${sector.id}-CH${channelIndex + 1}`;
+        
         legacyCells.push({
-          id: sector.id,
+          id: carrierId,
           eNodeB: site.eNodeB,
           sector: sector.sectorNumber,
-          pci: primaryChannel.pci, // Use carrier's PCI
+          pci: channel.pci, // Each carrier has its own PCI
           latitude: site.latitude, // All sectors share the site's GPS coordinate
           longitude: site.longitude, // All sectors share the site's GPS coordinate
-          frequency: primaryChannel.centerFreq,
+          frequency: channel.centerFreq,
           rsPower: sector.rsPower,
           azimuth: sector.azimuth,
           technology: sector.technology,
-          earfcn: primaryChannel.dlEarfcn,
-          centerFreq: primaryChannel.centerFreq,
-          channelBandwidth: primaryChannel.channelBandwidth,
-          dlEarfcn: primaryChannel.dlEarfcn,
-          ulEarfcn: primaryChannel.ulEarfcn,
-          beamwidth: sector.beamwidth, // Include beamwidth
-          heightAGL: sector.heightAGL // Include height above ground level
+          earfcn: channel.dlEarfcn,
+          centerFreq: channel.centerFreq,
+          channelBandwidth: channel.channelBandwidth,
+          dlEarfcn: channel.dlEarfcn,
+          ulEarfcn: channel.ulEarfcn,
+          beamwidth: sector.beamwidth,
+          heightAGL: sector.heightAGL
         } as any);
       }
     }

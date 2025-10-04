@@ -6,11 +6,13 @@
 // This "Cell" interface is a FLATTENED representation of a SECTOR for analysis.
 // In the proper hierarchy:
 // - Cell Site = Physical tower location (has GPS coordinates)
-// - Sector = Transmitter on the tower (has azimuth, beamwidth, PCI)
-// - Channel = EARFCN with bandwidth (multiple per sector)
+// - Sector = Transmitter/RMOD on the tower (has azimuth, beamwidth)
+// - Channel/Carrier = EARFCN with bandwidth and PCI (multiple per sector/RMOD)
 //
-// This flat format simplifies conflict detection by representing each sector
-// as an independent "cell" record with inherited tower coordinates.
+// This flat format simplifies conflict detection by representing each CARRIER
+// as an independent "cell" record with inherited tower coordinates and sector azimuth.
+// Each RMOD can have multiple carriers (e.g., 3 carriers per RMOD), and each carrier
+// has its own PCI that must be checked for conflicts independently.
 
 import { losService, type LOSResult } from './services/losService';
 
@@ -341,6 +343,13 @@ class PCIMapper {
         
         // Check if cells are on the same tower
         const sameTower = cell1.eNodeB === cell2.eNodeB;
+        const sameSector = sameTower && cell1.sector === cell2.sector;
+        
+        // Skip if carriers are from the SAME SECTOR on the same tower
+        // (Multiple carriers per sector/RMOD can have same or different PCIs - this is normal)
+        if (sameSector) {
+          continue; // Carriers on same sector don't conflict with each other
+        }
         
         // Skip conflict check if cells are on same tower but different sectors
         // (this is normal for 3-sector/4-sector configurations)
