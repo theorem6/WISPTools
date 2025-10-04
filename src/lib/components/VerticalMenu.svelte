@@ -130,12 +130,13 @@
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
+    overflow-y: auto;
+    max-height: calc(100vh - 260px);
   }
 
   .menu-toggle {
     width: 100%;
-    height: 48px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -144,6 +145,7 @@
     border: none;
     cursor: pointer;
     transition: all 0.2s;
+    flex-shrink: 0;
   }
 
   .menu-toggle:hover {
@@ -153,8 +155,8 @@
   .menu-items {
     display: flex;
     flex-direction: column;
-    padding: 0.5rem;
-    gap: 0.25rem;
+    padding: 0.35rem;
+    gap: 0.15rem;
   }
 
   .vertical-menu:not(.expanded) .menu-items {
@@ -162,26 +164,26 @@
   }
 
   .vertical-menu.expanded {
-    width: 220px;
+    width: 180px;
   }
 
   .vertical-menu:not(.expanded) {
-    width: 48px;
+    width: 44px;
   }
 
   .menu-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: 0.65rem;
+    padding: 0.6rem 0.65rem;
     background: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-weight: 500;
   }
 
@@ -207,13 +209,20 @@
   .menu-divider {
     height: 1px;
     background: var(--border-color);
-    margin: 0.5rem 0;
+    margin: 0.35rem 0;
   }
 
   .menu-item-wrapper {
     display: flex;
     justify-content: center;
-    padding: 0.25rem 0;
+    padding: 0.15rem 0;
+  }
+
+  .menu-item-wrapper :global(button),
+  .menu-item-wrapper :global(.icon-btn) {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px;
   }
 
   @media (max-width: 768px) {

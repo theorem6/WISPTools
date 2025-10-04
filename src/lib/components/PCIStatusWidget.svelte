@@ -46,7 +46,7 @@
 <style>
   .pci-status-widget {
     position: fixed;
-    top: 80px;
+    top: 40px;
     right: 40px;
     z-index: 200;
     background: var(--card-bg);

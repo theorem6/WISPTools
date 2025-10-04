@@ -36,8 +36,8 @@
 <style>
   .top-brand {
     position: fixed;
-    top: 80px;
-    left: 20px;
+    top: 40px;
+    left: 100px;
     z-index: 200;
     background: var(--card-bg);
     backdrop-filter: blur(16px);
