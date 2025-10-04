@@ -1126,8 +1126,6 @@
     background: var(--button-primary-hover);
   }
 
-  /* Removed unused channel-row styles - now using carrier-card */
-
   .remove-channel-btn {
     width: 24px;
     height: 24px;
