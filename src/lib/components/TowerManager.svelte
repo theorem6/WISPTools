@@ -116,8 +116,7 @@
     return towers.filter(tower => 
       tower.name.toLowerCase().includes(lowerQuery) ||
       tower.eNodeB.toString().includes(lowerQuery) ||
-      tower.technologies.some(tech => tech.toLowerCase().includes(lowerQuery)) ||
-      tower.sectors.some(sector => sector.id.toLowerCase().includes(lowerQuery))
+      tower.sectors.some(sector => sector.sectorNumber.toString().includes(lowerQuery))
     );
   }
   
@@ -268,7 +267,7 @@
             </svg>
             <input 
               type="text" 
-              placeholder="Search towers by eNodeB, technology, or sector ID..."
+              placeholder="Search towers by eNodeB or sector ID..."
               bind:value={searchQuery}
             />
           </div>
@@ -288,16 +287,12 @@
             <span class="stat-label">Towers</span>
           </div>
           <div class="stat-card">
-            <span class="stat-value">{$cellsStore.items.length}</span>
+            <span class="stat-value">{towers.reduce((sum, t) => sum + t.sectorCount, 0)}</span>
             <span class="stat-label">Sectors</span>
           </div>
           <div class="stat-card">
-            <span class="stat-value">{new Set($cellsStore.items.map(c => c.technology)).size}</span>
-            <span class="stat-label">Technologies</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-value">{new Set($cellsStore.items.map(c => c.frequency)).size}</span>
-            <span class="stat-label">Frequencies</span>
+            <span class="stat-value">{$cellsStore.items.length}</span>
+            <span class="stat-label">Carriers</span>
           </div>
         </div>
         
@@ -350,18 +345,9 @@
                           {tower.sectorCount} sector{tower.sectorCount !== 1 ? 's' : ''} ({tower.carrierCount} carriers)
                         </span>
                         <span class="meta-divider">•</span>
-                        <span class="meta-item">
-                          {tower.technologies.join(', ')}
-                        </span>
-                        <span class="meta-divider">•</span>
                         <span class="meta-item coordinates">
                           📍 {formatCoordinates(tower.latitude, tower.longitude)}
                         </span>
-                      </div>
-                      <div class="tower-frequencies">
-                        {#each tower.frequencies as freq}
-                          <span class="freq-badge">{freq} MHz</span>
-                        {/each}
                       </div>
                     </div>
                   </div>
