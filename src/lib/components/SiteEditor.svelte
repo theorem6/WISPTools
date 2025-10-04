@@ -119,9 +119,9 @@
         {
           id: `${editedSite.id}-SEC${sectorNumber}-CH1`,
           name: `Carrier 1`,
-          dlEarfcn: 55640,
-          ulEarfcn: 55640,
-          centerFreq: 3625,
+          dlEarfcn: 1950,
+          ulEarfcn: 19500,
+          centerFreq: 2100,
           channelBandwidth: 20,
           pci: 0,
           isPrimary: true
@@ -181,9 +181,9 @@
     const newChannel: Channel = {
       id: `${sector.id}-CH${channelNumber}`,
       name: `Carrier ${channelNumber}`,
-      dlEarfcn: 55640,
-      ulEarfcn: 55640,
-      centerFreq: 3625,
+      dlEarfcn: 1950,
+      ulEarfcn: 19500,
+      centerFreq: 2100,
       channelBandwidth: 20,
       pci: channelNumber - 1, // Auto-assign sequential PCI as default
       isPrimary: false

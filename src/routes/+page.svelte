@@ -278,12 +278,33 @@
   }
   
   async function performAnalysis() {
+    console.log('[+page] performAnalysis called');
     const cells = $cellsStore.items;
-    if (!cells.length) return;
+    console.log('[+page] Analyzing', cells.length, 'cells');
+    
+    if (!cells.length) {
+      console.warn('[+page] No cells to analyze');
+      alert('No cells to analyze. Please add towers first.');
+      return;
+    }
     
     const result = await pciService.performAnalysis(cells);
+    console.log('[+page] Analysis result:', result.success, 'conflicts:', result.data?.conflicts?.length);
+    
     if (result.success && result.data) {
       updateMapVisualization();
+      console.log('[+page] Analysis complete. Conflicts stored:', $conflictsStore.items.length);
+      
+      // Show user feedback
+      const conflictCount = $conflictsStore.items.length;
+      if (conflictCount === 0) {
+        alert(`✅ Analysis complete!\n\nNo PCI conflicts detected.`);
+      } else {
+        alert(`✅ Analysis complete!\n\n${conflictCount} conflict(s) detected.\n\nView details in the Analysis, Conflicts, or Recommendations buttons.`);
+      }
+    } else {
+      console.error('[+page] Analysis failed:', result.error);
+      alert(`❌ Analysis failed: ${result.error || 'Unknown error'}`);
     }
   }
   
@@ -462,6 +483,9 @@
     // Convert site to legacy cell format for analysis
     const legacyCells = convertCellSiteToLegacy([savedSite]);
     console.log('[+page] Converted to', legacyCells.length, 'carriers for analysis');
+    if (legacyCells.length > 0) {
+      console.log('[+page] Sample cell:', JSON.stringify(legacyCells[0], null, 2));
+    }
     
     if (isCreatingNewSite) {
       // Add all sectors from the new site to store
