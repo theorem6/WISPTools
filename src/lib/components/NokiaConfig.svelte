@@ -3,7 +3,8 @@
   import { nokiaService, type NokiaBaseStation, type NokiaSector, type NokiaCarrier } from '$lib/services/nokiaService';
   import { pciService } from '$lib/services/pciService';
   import { networkStore } from '$lib/stores/networkStore';
-  import type { CellSite } from '$lib/models/cellSite';
+  import { cellsStore } from '$lib/stores/appState';
+  import { convertLegacyToCellSite, type CellSite } from '$lib/models/cellSite';
 
   export let visible = false;
 
@@ -32,8 +33,11 @@
   let importing = false;
   let importSuccess = false;
 
-  $: if ($networkStore.sites) {
-    sites = Array.from($networkStore.sites.values());
+  // Convert cells from cellsStore to CellSite format
+  $: {
+    const cells = $cellsStore.items;
+    sites = convertLegacyToCellSite(cells);
+    console.log('NokiaConfig: Available sites:', sites.length, sites.map(s => `${s.name} (eNodeB ${s.eNodeB})`));
   }
 
   function addSector() {
@@ -105,7 +109,7 @@
     }
 
     importing = true;
-    const site = $networkStore.sites.get(selectedSiteId);
+    const site = sites.find(s => s.id === selectedSiteId);
     
     console.log('NokiaConfig: Importing from site:', site);
     
