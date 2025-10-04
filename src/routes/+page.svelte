@@ -202,7 +202,8 @@
     if (network.cells && network.cells.length > 0) {
       const result = await pciService.loadCells(network.cells);
       if (result.success) {
-        await performAnalysis();
+        // Render cells on map without analyzing
+        updateMapVisualization();
       }
     } else {
       // Empty network - just center on location
@@ -261,7 +262,8 @@
   async function loadSampleData() {
     const result = await pciService.loadCells(sampleCells);
     if (result.success && result.data) {
-      await performAnalysis();
+      // Render cells on map without analyzing
+      updateMapVisualization();
     }
   }
   
@@ -269,7 +271,8 @@
     const importedCells = event.detail.cells;
     const result = await pciService.addCells(importedCells);
     if (result.success) {
-      await performAnalysis();
+      // Render cells on map without analyzing
+      updateMapVisualization();
       await saveCurrentNetwork(); // Auto-save to network
     }
   }
@@ -403,8 +406,8 @@
         error: null
       });
       
-      // Re-analyze
-      await performAnalysis();
+      // Update map visualization
+      updateMapVisualization();
       
       // Auto-save
       await saveCurrentNetwork();
@@ -436,8 +439,8 @@
       });
     }
     
-    // Re-analyze conflicts with updated cell
-    await performAnalysis();
+    // Update map visualization
+    updateMapVisualization();
     
     // Auto-save to network
     await saveCurrentNetwork();
@@ -485,9 +488,9 @@
       console.log(`[+page] Updated site with ${legacyCells.length} carriers. Total cells now: ${cells.length}`);
     }
     
-    // Re-analyze conflicts
-    console.log('[+page] Performing analysis...');
-    await performAnalysis();
+    // Update map visualization
+    console.log('[+page] Updating map...');
+    updateMapVisualization();
     
     // Auto-save to network
     console.log('[+page] Saving to network...');
@@ -502,8 +505,8 @@
   }
   
   async function handleTowersChanged() {
-    // Re-analyze after tower changes
-    await performAnalysis();
+    // Update map visualization after tower changes
+    updateMapVisualization();
     
     // Auto-save to network
     await saveCurrentNetwork();
