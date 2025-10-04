@@ -199,15 +199,13 @@ class PCIMapper {
   }
 
   /**
-   * Detect frequency congestion: when more than 3 sectors share the same EARFCN/frequency in proximity
-   * This creates an UNRESOLVABLE conflict that cannot be fixed by PCI changes alone
+   * Detect frequency reuse patterns (informational logging only)
+   * Co-channel sectors can coexist with proper azimuth separation
    * 
-   * LTE constraint: Maximum 3 unique PCI mod-3 values (0, 1, 2) available for co-channel cells
-   * If 4+ sectors on same frequency are in proximity, at least 2 must share the same PCI mod-3,
-   * causing unavoidable CRS collision
+   * Previous limitation removed: Multiple co-channel sectors are now allowed
+   * Mitigation strategy: Minimum 90° azimuth separation (180° recommended)
    */
-  private detectFrequencyCongestion(cells: Cell[]): PCIConflict[] {
-    const conflicts: PCIConflict[] = [];
+  private detectFrequencyCongestion(cells: Cell[]): void {
     const frequencyGroups = new Map<string, Cell[]>();
     
     // Group cells by EARFCN/frequency
@@ -245,38 +243,22 @@ class PCIMapper {
           }
         }
         
-        // If more than 3 sectors on same frequency in proximity = UNRESOLVABLE
+        // Frequency congestion info (removed UNRESOLVABLE limitation)
+        // Co-channel sectors CAN coexist if properly separated by azimuth
         if (proximityCells.length > 3) {
           const earfcn = cell1.dlEarfcn || cell1.earfcn || 0;
           const freq = cell1.centerFreq || cell1.frequency;
           
-          // Create conflict for each pair showing the congestion
-          for (let k = 1; k < Math.min(proximityCells.length, 4); k++) {
-            conflicts.push({
-              primaryCell: cell1,
-              conflictingCell: proximityCells[k],
-              conflictType: 'FREQUENCY_CONGESTION',
-              severity: 'UNRESOLVABLE',
-              distance: this.calculateDistance(cell1, proximityCells[k]),
-              frequencyOverlap: true,
-              channelSeparation: 0,
-              congestedSectors: proximityCells,
-              isUnresolvable: true
-            });
-          }
-          
-          console.warn(
-            `⚠️ UNRESOLVABLE: ${proximityCells.length} sectors on same frequency (EARFCN: ${earfcn}, Freq: ${freq} MHz) within 10km. ` +
-            `LTE constraint: Max 3 co-channel sectors can coexist without CRS collision. ` +
-            `Solution: Reassign frequencies or relocate sectors.`
+          console.log(
+            `ℹ️ FREQUENCY REUSE: ${proximityCells.length} sectors on same frequency (EARFCN: ${earfcn}, Freq: ${freq} MHz) within 10km. ` +
+            `Checking azimuth separation and MOD3 conflicts...`
           );
           
+          // Don't create UNRESOLVABLE conflicts - let normal MOD3/azimuth checks handle it
           break; // Only report once per group
         }
       }
     }
-    
-    return conflicts;
   }
 
   /**
@@ -309,16 +291,19 @@ class PCIMapper {
    * - CBRS 4-sector towers (90 degrees apart)
    * - Frequency-based conflicts (co-channel, adjacent channel)
    * - Terrain-based line of sight checking (reduces conflicts when blocked)
-   * - Frequency congestion detection (>3 sectors on same frequency)
+   * - Azimuth separation mitigation (90° min, 180° recommended for co-channel MOD3)
    * 
    * PCI conflicts occur when:
    * - CRS (Cell Reference Signal) collision: PCI % 3 = same
    * - PBCH (Physical Broadcast Channel) interference: PCI % 6 = same  
-   * - PSS/SSS interference: PCI % 12 = same
    * - PRS interference: PCI % 30 = same
    * - Co-channel frequency overlap with same PCI
    * - Adjacent channel interference with conflicting PCI
-   * - Frequency congestion: >3 sectors on same EARFCN in proximity (UNRESOLVABLE)
+   * 
+   * Azimuth Separation Rules:
+   * - Co-channel MOD3 with <90° separation: CRITICAL
+   * - Co-channel MOD3 with 90-179° separation: MEDIUM (acceptable)
+   * - Co-channel MOD3 with ≥180° separation: LOW (back-to-back, minimal interference)
    * 
    * LOS Integration:
    * - Checks if sectors have line of sight using ArcGIS elevation data
@@ -328,9 +313,9 @@ class PCIMapper {
   async detectConflicts(cells: Cell[], checkLOS: boolean = true): Promise<PCIConflict[]> {
     const conflicts: PCIConflict[] = [];
     
-    // First, detect frequency congestion (more than 3 sectors on same frequency in proximity)
-    const congestionConflicts = this.detectFrequencyCongestion(cells);
-    conflicts.push(...congestionConflicts);
+    // Check frequency reuse patterns (informational only - no longer UNRESOLVABLE)
+    // Co-channel sectors can coexist with proper azimuth separation (90° min, 180° recommended)
+    this.detectFrequencyCongestion(cells); // Logs frequency reuse info
     
     for (let i = 0; i < cells.length; i++) {
       for (let j = i + 1; j < cells.length; j++) {
@@ -416,14 +401,32 @@ class PCIMapper {
         
         // CO-CHANNEL: Same EARFCN/frequency with any PCI mod-3 conflict
         // This is critical because co-channel interference is strongest
+        // HOWEVER: Azimuth separation can mitigate co-channel MOD3 conflicts
         if (isCoChannel && distance < 10000) {
           // Check for mod-3 conflict (CRS collision risk on same frequency)
           if (cell1.pci % 3 === cell2.pci % 3) {
-            conflictTypes.push({
-              type: 'CO_CHANNEL' as const,
-              value: 0,
-              check: () => true
-            });
+            // Calculate azimuth separation
+            const azimuthSeparation = this.calculateAzimuthSeparation(
+              cell1.azimuth || 0, 
+              cell2.azimuth || 0
+            );
+            
+            // If azimuths are well separated (>= 90°), reduce severity
+            // Minimum 90° separation, recommended 180° for co-channel MOD3
+            if (azimuthSeparation >= 180) {
+              // Excellent separation - downgrade to LOW
+              // Will still be flagged as MOD3 but with lower severity
+            } else if (azimuthSeparation >= 90) {
+              // Acceptable separation - will be MEDIUM severity
+              // CO_CHANNEL type will be checked but azimuth helps
+            } else {
+              // Poor separation < 90° - critical co-channel MOD3
+              conflictTypes.push({
+                type: 'CO_CHANNEL' as const,
+                value: 0,
+                check: () => true
+              });
+            }
           }
         }
         
@@ -502,6 +505,19 @@ class PCIMapper {
               severity = this.reduceSeverityForNoLOS(severity);
             }
             
+            // Reduce severity for co-channel MOD3 if good azimuth separation
+            if ((conflictType.type === 'CO_CHANNEL' || conflictType.type === 'MOD3') && frequencyInfo.overlap) {
+              const azimuthSep = this.calculateAzimuthSeparation(cell1, cell2);
+              if (azimuthSep >= 180) {
+                // Excellent separation - reduce severity significantly
+                severity = severity === 'CRITICAL' ? 'LOW' : severity === 'HIGH' ? 'LOW' : severity;
+              } else if (azimuthSep >= 90) {
+                // Acceptable separation - reduce severity moderately
+                severity = severity === 'CRITICAL' ? 'MEDIUM' : severity === 'HIGH' ? 'MEDIUM' : severity;
+              }
+              // < 90° separation remains critical
+            }
+            
             conflicts.push({
               primaryCell: cell1,
               conflictingCell: cell2,
@@ -547,11 +563,21 @@ class PCIMapper {
   }
   
   /**
-   * Calculate azimuth separation between two cells
+   * Calculate azimuth separation between two azimuths
    */
-  private calculateAzimuthSeparation(cell1: Cell, cell2: Cell): number {
-    const azimuth1 = cell1.azimuth || this.getDefaultAzimuth(cell1);
-    const azimuth2 = cell2.azimuth || this.getDefaultAzimuth(cell2);
+  private calculateAzimuthSeparation(azimuth1: number, azimuth2: number): number;
+  private calculateAzimuthSeparation(cell1: Cell, cell2: Cell): number;
+  private calculateAzimuthSeparation(arg1: number | Cell, arg2: number | Cell): number {
+    let azimuth1: number;
+    let azimuth2: number;
+    
+    if (typeof arg1 === 'number') {
+      azimuth1 = arg1;
+      azimuth2 = arg2 as number;
+    } else {
+      azimuth1 = arg1.azimuth || this.getDefaultAzimuth(arg1);
+      azimuth2 = (arg2 as Cell).azimuth || this.getDefaultAzimuth(arg2 as Cell);
+    }
     
     let separation = Math.abs(azimuth1 - azimuth2);
     
@@ -626,12 +652,8 @@ class PCIMapper {
   ): PCIConflict['severity'] {
     const signalDifference = Math.abs(rsPower1 - rsPower2);
     
-    // PRIORITY -1: FREQUENCY CONGESTION - Unresolvable by PCI changes
-    if (conflictType === 'FREQUENCY_CONGESTION') {
-      return 'UNRESOLVABLE'; // Cannot be fixed without frequency changes
-    }
-    
     // PRIORITY 0: CO-CHANNEL with MOD3 conflict - Most severe co-channel issue
+    // Note: Azimuth separation (90°+ min, 180° recommended) can mitigate co-channel MOD3
     if (conflictType === 'CO_CHANNEL') {
       // Same EARFCN with PCI mod-3 conflict = CRS collision
       if (distance < 3000) {
@@ -845,6 +867,7 @@ class PCIMapper {
     const mod3Conflicts = conflicts.filter(c => c.conflictType === 'MOD3');
     const mod6Conflicts = conflicts.filter(c => c.conflictType === 'MOD6');
     const mod30Conflicts = conflicts.filter(c => c.conflictType === 'MOD30');
+    const coChannelMod3 = conflicts.filter(c => c.conflictType === 'CO_CHANNEL' || (c.conflictType === 'MOD3' && c.frequencyOverlap));
     
     if (mod3Conflicts.length > 0) {
       recommendations.push(`📐 ${mod3Conflicts.length} MOD3 conflicts (most destructive) - HIGH PRIORITY to convert to MOD6/MOD30`);
@@ -856,6 +879,32 @@ class PCIMapper {
     
     if (mod30Conflicts.length > 0) {
       recommendations.push(`📐 ${mod30Conflicts.length} MOD30 conflicts - UL DMRS pattern conflicts (rarely cause real issues in practice)`);
+    }
+    
+    // Co-channel MOD3 conflicts - check azimuth separation
+    if (coChannelMod3.length > 0) {
+      const poorSeparation = coChannelMod3.filter(c => {
+        const azimuthSep = this.calculateAzimuthSeparation(c.primaryCell, c.conflictingCell);
+        return azimuthSep < 90;
+      });
+      const goodSeparation = coChannelMod3.filter(c => {
+        const azimuthSep = this.calculateAzimuthSeparation(c.primaryCell, c.conflictingCell);
+        return azimuthSep >= 90 && azimuthSep < 180;
+      });
+      const excellentSeparation = coChannelMod3.filter(c => {
+        const azimuthSep = this.calculateAzimuthSeparation(c.primaryCell, c.conflictingCell);
+        return azimuthSep >= 180;
+      });
+      
+      if (poorSeparation.length > 0) {
+        recommendations.push(`⚠️ ${poorSeparation.length} co-channel MOD3 conflicts with <90° azimuth separation - CRITICAL: Adjust sector azimuths to minimum 90° apart (180° recommended)`);
+      }
+      if (goodSeparation.length > 0) {
+        recommendations.push(`📍 ${goodSeparation.length} co-channel MOD3 conflicts with 90-179° azimuth separation - ACCEPTABLE: Consider increasing to 180° for optimal performance`);
+      }
+      if (excellentSeparation.length > 0) {
+        recommendations.push(`✅ ${excellentSeparation.length} co-channel MOD3 conflicts with ≥180° azimuth separation - GOOD: Sectors are back-to-back, minimal interference`);
+      }
     }
     
     // Modulus improvement recommendations based on industry best practices
