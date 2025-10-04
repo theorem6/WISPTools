@@ -453,10 +453,12 @@
   async function handleSiteSave(event: CustomEvent) {
     const savedSite = event.detail as CellSite;
     
-    console.log('Site saved:', savedSite);
+    console.log('[+page] Site saved:', savedSite);
+    console.log('[+page] Site has', savedSite.sectors.length, 'sectors');
     
     // Convert site to legacy cell format for analysis
     const legacyCells = convertCellSiteToLegacy([savedSite]);
+    console.log('[+page] Converted to', legacyCells.length, 'carriers for analysis');
     
     if (isCreatingNewSite) {
       // Add all sectors from the new site to store
@@ -466,7 +468,7 @@
         isLoading: false,
         error: null
       });
-      console.log(`Added ${legacyCells.length} carriers from new site`);
+      console.log(`[+page] Added ${legacyCells.length} carriers from new site. Total cells now: ${cells.length}`);
     } else {
       // Update existing site's sectors
       // Remove old sectors from this site, add new ones
@@ -480,13 +482,15 @@
         isLoading: false,
         error: null
       });
-      console.log(`Updated site with ${legacyCells.length} carriers`);
+      console.log(`[+page] Updated site with ${legacyCells.length} carriers. Total cells now: ${cells.length}`);
     }
     
     // Re-analyze conflicts
+    console.log('[+page] Performing analysis...');
     await performAnalysis();
     
     // Auto-save to network
+    console.log('[+page] Saving to network...');
     await saveCurrentNetwork();
     
     // Reset state

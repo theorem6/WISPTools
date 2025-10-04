@@ -7,6 +7,15 @@
     mediumConflictCount,
     lowConflictCount
   } from '$lib/stores/appState';
+  
+  // Debug reactive updates
+  $: if ($cellCount !== undefined) {
+    console.log('[PCIStatusWidget] Cell count updated:', $cellCount);
+  }
+  
+  $: if ($conflictCount !== undefined) {
+    console.log('[PCIStatusWidget] Conflict count updated:', $conflictCount);
+  }
 </script>
 
 <div class="pci-status-widget">
