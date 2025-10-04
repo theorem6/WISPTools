@@ -13,6 +13,8 @@
   // Handle Escape key to close modal
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && isOpen) {
+      event.preventDefault();
+      event.stopPropagation();
       handleClose();
     }
   }
@@ -108,7 +110,7 @@
       channels: [
         {
           id: `${editedSite.id}-SEC${sectorNumber}-CH1`,
-          name: `Carrier 1`,
+          name: `RMOD Carrier 1`,
           dlEarfcn: 55640,
           ulEarfcn: 55640,
           centerFreq: 3625,
@@ -170,12 +172,12 @@
     const channelNumber = sector.channels.length + 1;
     const newChannel: Channel = {
       id: `${sector.id}-CH${channelNumber}`,
-      name: `Carrier ${channelNumber}`,
+      name: `RMOD Carrier ${channelNumber}`,
       dlEarfcn: 55640,
       ulEarfcn: 55640,
       centerFreq: 3625,
       channelBandwidth: 20,
-      pci: 0,
+      pci: channelNumber - 1, // Auto-assign sequential PCI as default
       isPrimary: false
     };
     
@@ -322,9 +324,9 @@
                         </svg>
                       </div>
                       <div class="sector-title-info">
-                        <h4>Transmitter {sector.sectorNumber}</h4>
-                        <span class="sector-subtitle">Azimuth: {sector.azimuth}° | RMOD-{sector.rmodId || 1} | {sector.channels.length} Carrier{sector.channels.length !== 1 ? 's' : ''}</span>
-                        <span class="sector-pcis">PCIs: {sector.channels.map(c => c.pci).join(', ')}</span>
+                        <h4>Sector {sector.sectorNumber} (RMOD-{sector.rmodId || 1})</h4>
+                        <span class="sector-subtitle">Azimuth: {sector.azimuth}° | {sector.channels.length} Carrier{sector.channels.length !== 1 ? 's' : ''}</span>
+                        <span class="sector-pcis">Carrier PCIs: {sector.channels.map((c, i) => `C${i + 1}:${c.pci}`).join(', ')}</span>
                       </div>
                     </div>
                     <button 
@@ -463,13 +465,14 @@
                         <line x1="12" y1="8" x2="12" y2="12"></line>
                         <line x1="12" y1="16" x2="12.01" y2="16"></line>
                       </svg>
-                      <span>PCIs are configured per carrier below (each carrier needs its own unique PCI)</span>
+                      <span>Each RMOD transmitter can have multiple carriers. Each carrier needs its own PCI and EARFCN.</span>
                     </div>
                     
-                    <!-- Carriers for this transmitter -->
+                    <!-- Carriers for this transmitter/RMOD -->
                     <div class="channels-section">
                       <div class="channels-header">
-                        <strong>📻 Carriers (Frequency Channels)</strong>
+                        <strong>📻 RMOD Carriers</strong>
+                        <span class="carrier-info">Each carrier has its own EARFCN & PCI</span>
                         <button 
                           type="button"
                           class="add-channel-btn-sm" 
@@ -482,19 +485,20 @@
                       {#each sector.channels as channel, channelIndex}
                         <div class="carrier-card">
                           <div class="carrier-header">
-                            <input 
-                              type="radio" 
-                              name="primary-{sectorIndex}"
-                              checked={channel.isPrimary}
-                              on:change={() => setPrimaryChannel(sectorIndex, channelIndex)}
-                              title="Primary carrier"
-                            />
-                            <input 
-                              type="text" 
-                              bind:value={channel.name}
-                              placeholder="Carrier name"
-                              class="carrier-name-input"
-                            />
+                            <div class="carrier-number">Carrier {channelIndex + 1}</div>
+                            <div class="carrier-primary-select">
+                              <input 
+                                type="radio" 
+                                name="primary-{sectorIndex}"
+                                checked={channel.isPrimary}
+                                on:change={() => setPrimaryChannel(sectorIndex, channelIndex)}
+                                title="Primary carrier"
+                                id="primary-{sectorIndex}-{channelIndex}"
+                              />
+                              <label for="primary-{sectorIndex}-{channelIndex}" class="primary-label">
+                                {channel.isPrimary ? 'Primary' : 'Set Primary'}
+                              </label>
+                            </div>
                             <button 
                               type="button"
                               class="remove-channel-btn" 
@@ -1112,14 +1116,23 @@
 
   .channels-header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 0.5rem;
     margin-bottom: 0.75rem;
   }
 
   .channels-header strong {
     font-size: 0.875rem;
     color: var(--text-primary);
+  }
+
+  .carrier-info {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    flex: 1 1 100%;
   }
 
   .add-channel-btn-sm {
@@ -1177,6 +1190,40 @@
     margin-bottom: 0.75rem;
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--border-color);
+  }
+
+  .carrier-number {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    background: var(--primary-light);
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--border-radius);
+  }
+
+  .carrier-primary-select {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  .carrier-primary-select input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .primary-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .carrier-primary-select input[type="radio"]:checked + .primary-label {
+    color: var(--success-color);
+    font-weight: 600;
   }
 
   .carrier-name-input {

@@ -13,6 +13,8 @@
   // Handle Escape key to close modal
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && isOpen) {
+      event.preventDefault();
+      event.stopPropagation();
       handleClose();
     }
   }
