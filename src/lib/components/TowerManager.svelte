@@ -60,8 +60,12 @@
   function groupCellsByTower(cells: Cell[]): Tower[] {
     const towerMap = new Map<number, Tower>();
     
+    console.log('TowerManager: groupCellsByTower called with', cells.length, 'cells');
+    
     cells.forEach(cell => {
+      console.log('TowerManager: Processing cell', cell.id, 'eNodeB:', cell.eNodeB, 'sector:', cell.sector);
       if (!towerMap.has(cell.eNodeB)) {
+        console.log('TowerManager: Creating new tower for eNodeB:', cell.eNodeB);
         towerMap.set(cell.eNodeB, {
           eNodeB: cell.eNodeB,
           name: `Tower ${cell.eNodeB}`,
@@ -109,7 +113,9 @@
       }
     });
     
-    return Array.from(towerMap.values()).sort((a, b) => a.eNodeB - b.eNodeB);
+    const towers = Array.from(towerMap.values()).sort((a, b) => a.eNodeB - b.eNodeB);
+    console.log('TowerManager: Created', towers.length, 'towers:', towers.map(t => `eNodeB ${t.eNodeB} (${t.sectorCount} sectors)`).join(', '));
+    return towers;
   }
   
   function filterTowers(towers: Tower[], query: string): Tower[] {

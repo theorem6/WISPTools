@@ -42,15 +42,17 @@
     
     if (isNewSite) {
       const siteNumber = Date.now().toString().slice(-4);
+      // Generate unique eNodeB - use last 4 digits of timestamp to ensure uniqueness
+      const uniqueENodeB = parseInt(siteNumber);
       editedSite = {
         id: `SITE${siteNumber}`,
         name: `New Site ${siteNumber}`,
-        eNodeB: 1000,
+        eNodeB: uniqueENodeB,
         latitude: initialLatitude || 40.7128,
         longitude: initialLongitude || -74.0060,
         sectors: []
       };
-      console.log('SiteEditor: Created new site template:', editedSite);
+      console.log('SiteEditor: Created new site template with eNodeB:', uniqueENodeB);
     } else if (site) {
       // Deep copy to avoid mutating the original
       editedSite = JSON.parse(JSON.stringify(site));
