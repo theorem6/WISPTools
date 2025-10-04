@@ -194,10 +194,10 @@
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.75rem;
-    background: var(--danger-light);
-    border: 1px solid var(--danger-color);
+    background: white;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
-    color: var(--danger-color);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
     margin-bottom: 0.5rem;
@@ -206,6 +206,7 @@
   .logout-button:hover {
     background: var(--danger-color);
     color: white;
+    border-color: var(--danger-color);
   }
 
   .user-info {
