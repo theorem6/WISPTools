@@ -806,7 +806,7 @@
     min-height: 56px;
     transition: all var(--transition);
     flex-wrap: nowrap;
-    overflow-x: auto;
+    overflow: visible;
   }
 
   .topbar:hover {
@@ -920,6 +920,7 @@
     gap: 0.75rem;
     flex-shrink: 0;
     flex-wrap: wrap;
+    overflow: visible;
   }
 
   .icon-btn {

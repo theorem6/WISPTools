@@ -154,6 +154,7 @@
 <style>
   .actions-dropdown {
     position: relative;
+    overflow: visible;
   }
 
   .action-trigger {
@@ -195,9 +196,9 @@
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-xl);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     padding: 0.5rem;
-    z-index: var(--z-dropdown);
+    z-index: 10001;
     animation: slideDown var(--transition-fast);
   }
 
