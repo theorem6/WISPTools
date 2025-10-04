@@ -10,9 +10,9 @@
   export let isOptimizing = false;
   export let hasData = false;
   export let hasConflicts = false;
+  export let showExportModal = false;
   
   let showDropdown = false;
-  let showExportModal = false;
   
   const dispatch = createEventDispatcher();
   

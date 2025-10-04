@@ -25,20 +25,20 @@
   } from '$lib/stores/appState';
   
   // Components
-  import ActionsDropdown from '$lib/components/ActionsDropdown.svelte';
   import ImportWizard from '$lib/components/ImportWizard.svelte';
   import AnalysisModal from '$lib/components/AnalysisModal.svelte';
   import ConflictsModal from '$lib/components/ConflictsModal.svelte';
   import RecommendationsModal from '$lib/components/RecommendationsModal.svelte';
   import OptimizationResultModal from '$lib/components/OptimizationResultModal.svelte';
-  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
-  import UserProfile from '$lib/components/UserProfile.svelte';
+  import ConflictReportExport from '$lib/components/ConflictReportExport.svelte';
   import NetworkManager from '$lib/components/NetworkManager.svelte';
-  import NetworkSelector from '$lib/components/NetworkSelector.svelte';
   import CellEditor from '$lib/components/CellEditor.svelte';
   import SiteEditor from '$lib/components/SiteEditor.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
   import TowerManager from '$lib/components/TowerManager.svelte';
+  import TopBrand from '$lib/components/TopBrand.svelte';
+  import PCIStatusWidget from '$lib/components/PCIStatusWidget.svelte';
+  import VerticalMenu from '$lib/components/VerticalMenu.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -54,6 +54,7 @@
   let showSiteEditor = false;
   let showContextMenu = false;
   let showTowerManager = false;
+  let showExportModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let selectedCell: Cell | null = null;
@@ -510,111 +511,28 @@
     {/if}
   </div>
 
-  <!-- Compact Floating Top Bar -->
-  <nav class="topbar">
-    <div class="topbar-brand">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="brand-icon">
-        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-        <circle cx="12" cy="10" r="3"></circle>
-      </svg>
-      <span class="brand-text">LTE PCI Mapper</span>
-      <span class="map-hint" title="Quick Tip: Right-click anywhere on the map to add a new cell site or sector at that location">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        Right-click map to add cell
-      </span>
-      
-      {#if $isAuthenticated}
-        <div class="network-selector-container">
-          <NetworkSelector on:manage={() => showNetworkManager = true} />
-        </div>
-      {/if}
-        </div>
-
-    <div class="topbar-stats">
-      <div class="stat-item" title="Total number of cells/sectors in current network">
-        <span class="stat-value">{$cellCount}</span>
-        <span class="stat-label">Cells</span>
-        </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item {$conflictCount > 0 ? 'warning' : ''}" title="Total PCI conflicts detected (all severities combined)">
-        <span class="stat-value">{$conflictCount}</span>
-        <span class="stat-label">Total</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item {$criticalConflictCount > 0 ? 'danger' : 'success'}" title="Critical conflicts - PCI collision within 500m, requires immediate attention">
-        <span class="stat-value">{$criticalConflictCount}</span>
-        <span class="stat-label">Critical</span>
-    </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item {$highConflictCount > 0 ? 'warning' : ''}" title="High priority conflicts - Within 1000m, MOD3 conflicts, should be resolved">
-        <span class="stat-value">{$highConflictCount}</span>
-        <span class="stat-label">High</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item {$mediumConflictCount > 0 ? 'info' : ''}" title="Medium priority conflicts - Within 2000m, MOD6/MOD12 conflicts">
-        <span class="stat-value">{$mediumConflictCount}</span>
-        <span class="stat-label">Medium</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat-item" title="Low priority conflicts - Beyond 3000m, MOD30 conflicts, monitor but not urgent">
-        <span class="stat-value">{$lowConflictCount}</span>
-        <span class="stat-label">Low</span>
-      </div>
-    </div>
-
-    <div class="topbar-actions">
-      <ActionsDropdown 
-        cells={$cellsStore.items}
-        conflicts={$conflictsStore.items}
-        recommendations={$analysisStore.recommendations}
-        isOptimizing={$optimizationStore.isOptimizing}
-        hasData={$hasData}
-        hasConflicts={$hasConflicts}
-        on:openImport={() => showImportWizard = true}
-        on:import={handleManualImport}
-        on:loadSample={loadSampleData}
-        on:clearMap={clearMap}
-        on:runAnalysis={performAnalysis}
-        on:optimize={optimizePCIAssignments}
-      />
-      <UserProfile 
-        on:networks={() => showNetworkManager = true}
-      />
-      <ThemeSwitcher />
-      <button class="icon-btn" on:click={() => showTowerManager = true} title="Manage cell sites and towers - View all towers in current network">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-          <polyline points="2 17 12 22 22 17"></polyline>
-          <polyline points="2 12 12 17 22 12"></polyline>
-        </svg>
-      </button>
-      <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="View detailed network analysis - Cell statistics and health metrics">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6" y1="20" x2="6" y2="14"></line>
-        </svg>
-      </button>
-      <button class="icon-btn" on:click={() => uiActions.openModal('showConflictsModal')} title="View PCI conflicts - Shows collision, confusion, and modulo conflicts by severity">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-          <line x1="12" y1="9" x2="12" y2="13"></line>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-      </button>
-      <button class="icon-btn" on:click={() => uiActions.openModal('showRecommendationsModal')} title="AI-powered recommendations - Get intelligent suggestions to resolve conflicts">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-      </button>
-    </div>
-  </nav>
+  <!-- New UI Layout: Separate Positioned Elements -->
+  
+  <!-- Top Left: Brand and Network Info -->
+  <TopBrand on:manageNetworks={() => showNetworkManager = true} />
+  
+  <!-- Top Right: PCI Status Widget -->
+  <PCIStatusWidget />
+  
+  <!-- Left Sidebar: Vertical Menu -->
+  <VerticalMenu 
+    hasData={$hasData}
+    hasConflicts={$hasConflicts}
+    on:import={() => showImportWizard = true}
+    on:towers={() => showTowerManager = true}
+    on:analyze={performAnalysis}
+    on:optimize={optimizePCIAssignments}
+    on:analysis={() => uiActions.openModal('showAnalysisModal')}
+    on:conflicts={() => uiActions.openModal('showConflictsModal')}
+    on:recommendations={() => uiActions.openModal('showRecommendationsModal')}
+    on:export={() => showExportModal = true}
+    on:networks={() => showNetworkManager = true}
+  />
 
   <!-- Modular Components - Isolated and reusable -->
   <NetworkManager 
@@ -707,6 +625,37 @@
     on:close={() => showTowerManager = false}
   />
   
+  <!-- Export Modal -->
+  {#if showExportModal}
+    <div 
+      class="modal-overlay" 
+      role="presentation"
+      on:click={() => showExportModal = false}
+      on:keydown={(e) => e.key === 'Escape' && (showExportModal = false)}
+    >
+      <div 
+        class="modal-container" 
+        role="dialog"
+        tabindex="-1"
+        aria-labelledby="export-modal-title"
+        on:click|stopPropagation
+        on:keydown|stopPropagation
+      >
+        <div class="modal-header">
+          <h3 id="export-modal-title">📤 Export & Configuration</h3>
+          <button class="modal-close-btn" on:click={() => showExportModal = false}>×</button>
+        </div>
+        <div class="modal-body">
+          <ConflictReportExport 
+            cells={$cellsStore.items} 
+            conflicts={$conflictsStore.items} 
+            recommendations={$analysisStore.recommendations} 
+          />
+        </div>
+      </div>
+    </div>
+  {/if}
+  
         </div>
           {:else}
   <!-- Loading state while checking auth -->
@@ -785,152 +734,81 @@
     font-size: 1rem;
   }
 
-  /* Compact Floating Top Bar */
-  .topbar {
-    position: absolute;
-    top: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 95%;
-    max-width: 100%;
-    z-index: 100;
+  /* Removed old topbar styles - now using separate positioned components */
+  
+  /* Modal Overlay for Export */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 99998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal-container {
     background: var(--card-bg);
-    backdrop-filter: blur(16px);
     border-radius: 12px;
-    padding: 0.75rem 1.5rem;
-    box-shadow: var(--shadow-lg);
+    max-width: 700px;
+    width: 100%;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    animation: slideUp 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 99999;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid var(--border-color);
-    min-height: 56px;
-    transition: all var(--transition);
-    flex-wrap: nowrap;
-    overflow: visible;
+    background: var(--bg-secondary);
   }
 
-  .topbar:hover {
-    box-shadow: var(--shadow-xl);
-  }
-
-  /* Brand Section */
-  .topbar-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
-  }
-
-  .brand-icon {
-    color: var(--primary-color);
-    flex-shrink: 0;
-  }
-
-  .brand-text {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--text-primary) !important;
-    white-space: nowrap;
-  }
-
-  .map-hint {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    margin-left: 1rem;
-    padding: 0.25rem 0.625rem;
-    background: var(--primary-light);
-    border-radius: var(--border-radius);
-    font-size: 0.75rem;
-    color: var(--primary-color);
-    font-weight: 500;
-    cursor: help;
-    transition: all var(--transition);
-  }
-
-  .map-hint:hover {
-    background: var(--primary-color);
-    color: white;
-  }
-
-  .map-hint svg {
-    flex-shrink: 0;
-  }
-
-  .network-selector-container {
-    display: flex;
-    align-items: center;
-    padding-left: 0.75rem;
-    margin-left: 0.75rem;
-    border-left: 1px solid var(--border-color);
-    height: 100%;
-  }
-
-  /* Stats Section */
-  .topbar-stats {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
-    justify-content: center;
-    padding: 0 1rem;
-  }
-
-  .stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-
-  .stat-value {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary) !important;
-    line-height: 1;
-  }
-
-  .stat-label {
-    font-size: 0.65rem;
-    color: var(--text-secondary) !important;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1;
-    margin-top: 2px;
-  }
-
-  .stat-item.warning .stat-value {
-    color: var(--warning-color) !important;
-  }
-
-  .stat-item.danger .stat-value {
-    color: var(--danger-color) !important;
-  }
-
-  .stat-divider {
-    width: 1px;
-    height: 24px;
-    background: var(--border-color);
-  }
-
-  /* Actions Section */
-  .topbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-    overflow: visible;
-  }
-
-  .icon-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    border: 1px solid var(--border-color);
-    background: var(--card-bg);
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
     color: var(--text-primary);
+  }
+
+  .modal-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 1.5rem;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -938,92 +816,13 @@
     transition: all 0.2s;
   }
 
-  .icon-btn:hover {
-    background: var(--hover-bg);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+  .modal-close-btn:hover {
+    background: var(--danger-light);
+    color: var(--danger-color);
   }
 
-
-  /* Responsive */
-  @media (max-width: 1024px) {
-    .topbar-stats {
-      gap: 0.5rem;
-      padding: 0 0.5rem;
-  }
-
-  .stat-label {
-      display: none;
-    }
-
-    .stat-value {
-      font-size: 0.95rem;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .topbar {
-      top: 60px;
-      min-height: auto;
-      padding: 0.5rem;
-      gap: 0.5rem;
-      width: 98%;
-    }
-
-    .brand-text {
-      display: none;
-    }
-
-    .map-hint {
-      display: none;
-    }
-
-    .network-selector-container {
-      margin-left: 0.5rem;
-      padding-left: 0.5rem;
-    }
-
-    .topbar-stats {
-      gap: 0.5rem;
-      padding: 0;
-    }
-
-    .stat-divider {
-      height: 20px;
-    }
-
-    .topbar-actions {
-      gap: 0.5rem;
-      flex-wrap: nowrap;
-    }
-
-    .icon-btn {
-      width: 32px;
-      height: 32px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .topbar {
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .topbar-brand {
-      order: 1;
-    }
-
-    .topbar-stats {
-      order: 3;
-      width: 100%;
-      justify-content: space-around;
-      padding: 0.25rem 0;
-      border-top: 1px solid var(--border-color);
-      margin-top: 0.25rem;
-    }
-
-    .topbar-actions {
-      order: 2;
-    }
+  .modal-body {
+    overflow-y: auto;
+    padding: 0;
   }
 </style>
