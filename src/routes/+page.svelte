@@ -39,6 +39,7 @@
   import TopBrand from '$lib/components/TopBrand.svelte';
   import PCIStatusWidget from '$lib/components/PCIStatusWidget.svelte';
   import VerticalMenu from '$lib/components/VerticalMenu.svelte';
+  import SettingsMenu from '$lib/components/SettingsMenu.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -533,6 +534,9 @@
     on:export={() => showExportModal = true}
     on:networks={() => showNetworkManager = true}
   />
+  
+  <!-- Bottom Right: Settings Gear Menu -->
+  <SettingsMenu />
 
   <!-- Modular Components - Isolated and reusable -->
   <NetworkManager 

@@ -36,13 +36,13 @@
 <style>
   .top-brand {
     position: fixed;
-    top: 40px;
-    left: 100px;
+    top: 20px;
+    left: 120px;
     z-index: 200;
     background: var(--card-bg);
     backdrop-filter: blur(16px);
     border-radius: 12px;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1.25rem;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
   }
@@ -115,13 +115,18 @@
 
   @media (max-width: 768px) {
     .top-brand {
-      top: 60px;
-      left: 10px;
-      padding: 0.75rem 1rem;
+      top: 20px;
+      left: 60px;
+      padding: 0.5rem 0.75rem;
     }
 
     .app-title {
-      font-size: 0.95rem;
+      font-size: 0.85rem;
+    }
+
+    .brand-icon {
+      width: 20px;
+      height: 20px;
     }
   }
 </style>
