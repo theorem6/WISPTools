@@ -13,6 +13,11 @@
 // as an independent "cell" record with inherited tower coordinates and sector azimuth.
 // Each RMOD can have multiple carriers (e.g., 3 carriers per RMOD), and each carrier
 // has its own PCI that must be checked for conflicts independently.
+//
+// SON PCI ASSIGNMENT RULES (per SON_MATHEMATICS.md):
+// Rule 1: Co-located carriers (same sector, different EARFCN) → Different Mod3 preferred
+// Rule 2: Same EARFCN, different sectors → MUST have different Mod3 (CRITICAL)
+// Rule 3: Different EARFCNs, overlapping sectors → Different Mod3 recommended
 
 import { losService, type LOSResult } from './services/losService';
 
@@ -341,14 +346,34 @@ class PCIMapper {
           continue; // Skip - cells are in separate networks (too far apart)
         }
         
-        // Check if cells are on the same tower
+        // Check if cells are on the same tower and sector
         const sameTower = cell1.eNodeB === cell2.eNodeB;
         const sameSector = sameTower && cell1.sector === cell2.sector;
+        const sameEarfcn = this.areCellsCoChannel(cell1, cell2);
         
-        // Skip if carriers are from the SAME SECTOR on the same tower
-        // (Multiple carriers per sector/RMOD can have same or different PCIs - this is normal)
-        if (sameSector) {
-          continue; // Carriers on same sector don't conflict with each other
+        // SON RULE 1: Co-located carriers (same sector) on DIFFERENT EARFCNs
+        // Should have different Mod3 for inter-frequency interference mitigation
+        if (sameSector && !sameEarfcn) {
+          // Check Mod3 diversity for co-located carriers
+          if (cell1.pci % 3 === cell2.pci % 3) {
+            // Same Mod3 on same sector = MEDIUM priority (should fix for optimal performance)
+            conflicts.push({
+              primaryCell: cell1,
+              conflictingCell: cell2,
+              conflictType: 'MOD3',
+              severity: 'MEDIUM',
+              distance: 0, // Same location
+              frequencyOverlap: false,
+              losChecked: false
+            });
+          }
+          continue; // Don't check other conflict types for same-sector carriers
+        }
+        
+        // SON RULE 2: Same EARFCN on different sectors = CRITICAL
+        // Skip if carriers are the SAME EARFCN on the SAME SECTOR (impossible - duplicate)
+        if (sameSector && sameEarfcn) {
+          continue; // This shouldn't happen - it's the same carrier
         }
         
         // Skip conflict check if cells are on same tower but different sectors
@@ -358,8 +383,9 @@ class PCIMapper {
           const azimuthSeparation = this.calculateAzimuthSeparation(cell1, cell2);
           const expectedSeparation = this.getExpectedAzimuthSeparation(cell1, cell2);
           
-          // If sectors are properly separated, skip conflict check
-          if (Math.abs(azimuthSeparation - expectedSeparation) < 15) {
+          // If sectors are properly separated, skip MOST conflicts (they shouldn't interfere)
+          // BUT: Co-channel (same EARFCN) conflicts are ALWAYS checked
+          if (Math.abs(azimuthSeparation - expectedSeparation) < 15 && !sameEarfcn) {
             continue;
           }
         }
