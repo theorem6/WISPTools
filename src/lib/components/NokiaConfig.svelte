@@ -107,6 +107,8 @@
     importing = true;
     const site = $networkStore.sites.get(selectedSiteId);
     
+    console.log('NokiaConfig: Importing from site:', site);
+    
     if (!site) {
       alert('Site not found');
       importing = false;
@@ -114,29 +116,35 @@
     }
 
     // Populate base station info
+    config.btsId = site.eNodeB.toString();
+    config.lnBtsId = site.eNodeB.toString();
     config.btsName = site.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+    
+    console.log('NokiaConfig: BTS ID:', config.btsId, 'Name:', config.btsName);
     
     // Clear existing sectors
     config.sectors = [];
 
-    // Import sectors and their cells
+    // Import sectors and their channels (carriers)
     site.sectors.forEach((sector, sectorIdx) => {
       const nokiaSector: NokiaSector = {
         id: sectorIdx + 1,
         azimuth: sector.azimuth,
-        rmodId: (sectorIdx % 3) + 1,
+        rmodId: sector.rmodId || ((sectorIdx % 3) + 1),
         carriers: []
       };
 
-      // Import carriers from cells
-      sector.cells.forEach((cell, cellIdx) => {
+      // Import carriers from channels
+      sector.channels.forEach((channel, channelIdx) => {
         const carrier: NokiaCarrier = {
-          id: cellIdx + 1,
-          earfcnDL: cell.earfcn || 55640,
-          bandwidth: '20MHz',
-          pci: cell.pci,
+          id: channelIdx + 1,
+          earfcnDL: channel.dlEarfcn,
+          earfcnUL: channel.ulEarfcn,
+          bandwidth: channel.channelBandwidth === 20 ? '20MHz' : 
+                     channel.channelBandwidth === 15 ? '15MHz' : '10MHz',
+          pci: channel.pci,
           sectorId: nokiaSector.id,
-          cellName: cell.name
+          cellName: channel.name || `${site.name}-S${sector.sectorNumber}-C${channelIdx + 1}`
         };
         nokiaSector.carriers.push(carrier);
       });
@@ -144,9 +152,16 @@
       config.sectors.push(nokiaSector);
     });
 
+    console.log('NokiaConfig: Imported', config.sectors.length, 'sectors');
+    const totalCarriers = config.sectors.reduce((sum, s) => sum + s.carriers.length, 0);
+    console.log('NokiaConfig: Total carriers:', totalCarriers);
+
     config.sectors = [...config.sectors];
     importing = false;
     importSuccess = true;
+    
+    alert(`✅ Import successful!\n\nImported ${config.sectors.length} sector(s) with ${totalCarriers} carrier(s) from ${site.name}`);
+    
     setTimeout(() => { importSuccess = false; }, 3000);
   }
 
