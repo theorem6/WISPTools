@@ -800,23 +800,25 @@
   /* Compact Floating Top Bar */
   .topbar {
     position: absolute;
-    top: 10px;
+    top: 80px;
     left: 50%;
     transform: translateX(-50%);
-    width: 90%;
-    max-width: 1400px;
+    width: 95%;
+    max-width: 100%;
     z-index: 100;
     background: var(--card-bg);
     backdrop-filter: blur(16px);
     border-radius: 12px;
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1.5rem;
     box-shadow: var(--shadow-lg);
     display: flex;
     justify-content: space-between;
     align-items: center;
     border: 1px solid var(--border-color);
-    height: 48px;
+    min-height: 56px;
     transition: all var(--transition);
+    flex-wrap: nowrap;
+    overflow-x: auto;
   }
 
   .topbar:hover {
@@ -927,8 +929,9 @@
   .topbar-actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     flex-shrink: 0;
+    flex-wrap: wrap;
   }
 
   .icon-btn {
@@ -952,30 +955,33 @@
   }
 
   .btn-nokia {
-    display: flex;
+    display: flex !important;
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     border-radius: 10px;
-    border: 1px solid #124191;
+    border: 2px solid #124191;
     background: linear-gradient(135deg, #124191 0%, #1a5bc4 100%);
-    color: white;
+    color: white !important;
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
     white-space: nowrap;
-    box-shadow: 0 2px 4px rgba(18, 65, 145, 0.2);
+    box-shadow: 0 2px 8px rgba(18, 65, 145, 0.4);
+    flex-shrink: 0;
   }
 
   .btn-nokia:hover {
     background: linear-gradient(135deg, #0d2f6b 0%, #124191 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(18, 65, 145, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(18, 65, 145, 0.5);
+    border-color: #1a5bc4;
   }
 
   .btn-label {
     display: inline;
+    font-weight: 700;
   }
 
   /* Responsive */
@@ -996,9 +1002,11 @@
 
   @media (max-width: 768px) {
     .topbar {
-      height: auto;
+      top: 60px;
+      min-height: auto;
       padding: 0.5rem;
       gap: 0.5rem;
+      width: 98%;
     }
 
     .brand-text {
@@ -1024,7 +1032,8 @@
     }
 
     .topbar-actions {
-      gap: 0.25rem;
+      gap: 0.5rem;
+      flex-wrap: nowrap;
     }
 
     .icon-btn {
@@ -1033,11 +1042,12 @@
     }
 
     .btn-label {
-      display: none;
+      font-size: 0.75rem;
     }
 
     .btn-nokia {
-      padding: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      flex-shrink: 0;
     }
   }
 
