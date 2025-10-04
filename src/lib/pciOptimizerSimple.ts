@@ -131,13 +131,26 @@ export class SimplePCIOptimizer {
           
           if (cellIndex !== -1) {
             const oldPCI = cellToChange.pci;
-            // Try +4 (MOD3 shift), or +1 if that doesn't work
+            const networkUsedPCIs = new Set(currentCells.map(c => c.pci));
+            
+            // Try +4 (MOD3 shift) ensuring network-wide uniqueness
             let newPCI = oldPCI + 4;
+            while (newPCI <= this.PCI_MAX && networkUsedPCIs.has(newPCI)) {
+              newPCI += 3; // Keep trying different MOD3 values
+            }
+            
+            // If wrapped, try from start
             if (newPCI > this.PCI_MAX) {
-              newPCI = oldPCI + 1;
-              if (newPCI > this.PCI_MAX) {
-                newPCI = this.PCI_MIN; // Wrap to start
+              newPCI = this.PCI_MIN;
+              while (newPCI <= this.PCI_MAX && networkUsedPCIs.has(newPCI)) {
+                newPCI++;
               }
+            }
+            
+            // Safety check
+            if (newPCI > this.PCI_MAX) {
+              console.error(`   ❌ CRITICAL: No available unique PCI found! Network exhausted.`);
+              break;
             }
             
             currentCells[cellIndex].pci = newPCI;
@@ -634,8 +647,15 @@ export class SimplePCIOptimizer {
       return quickFixes; // Return immediately if quick fix worked
     }
     
-    // Get all currently used PCIs
+    // CRITICAL RULE: Get all currently used PCIs across the ENTIRE NETWORK
+    // NEVER assign the same PCI twice in the network
     const usedPCIs = new Set(cells.map(c => c.pci));
+    console.log(`   📋 Network-wide PCI usage: ${usedPCIs.size} unique PCIs out of ${cells.length} cells`);
+    
+    if (usedPCIs.size < cells.length) {
+      const duplicates = cells.length - usedPCIs.size;
+      console.warn(`   ⚠️ ${duplicates} duplicate PCI(s) detected - will ensure uniqueness`);
+    }
     
     // EFFICIENCY: Identify hotspot cells (involved in multiple conflicts)
     const cellConflictCount = new Map<string, number>();
@@ -751,13 +771,19 @@ export class SimplePCIOptimizer {
           
           const pciMod30 = pci % 30;
           
-          // CRITICAL: Must not match same-channel MOD3
+          // RULE 1: NEVER assign same PCI twice in network (network-wide uniqueness)
+          if (pci !== cell.pci && usedPCIs.has(pci)) continue;
+          
+          // RULE 2: Neighboring cells must not have same PCI mod 3
           if (sameChannelMod3s.has(pci % 3)) continue;
           
-          // HIGH PRIORITY: Should not match same-channel MOD30 (PSS/SSS)
+          // RULE 3: Neighboring cells should not have same PCI mod 6
+          // (Already covered by MOD3 check since MOD6 is a subset)
+          
+          // RULE 4: Neighboring cells should not have same PCI mod 30
           if (sameChannelMod30s.has(pciMod30)) continue;
           
-          // Avoid using exact same PCI as same-channel cells
+          // Avoid using exact same PCI as same-channel cells (redundant with Rule 1 but explicit)
           if (sameChannelPCIs.has(pci)) continue;
           
           // Avoid if nearby cells on ANY channel use it (less restrictive)
@@ -794,7 +820,10 @@ export class SimplePCIOptimizer {
         for (let pci = safeMod3; pci <= this.PCI_MAX; pci += 3) {
           if (pci < this.PCI_MIN) continue;
           
-          // CRITICAL: Still must not match same-channel MOD3
+          // RULE 1: NEVER assign same PCI twice in network
+          if (pci !== cell.pci && usedPCIs.has(pci)) continue;
+          
+          // RULE 2: Must not match same-channel MOD3
           if (sameChannelMod3s.has(pci % 3)) continue;
           
           // Allow MOD30 match now (less optimal but acceptable)
@@ -820,6 +849,10 @@ export class SimplePCIOptimizer {
       for (const mod3 of availableMod3Groups) {
         for (let pci = mod3; pci <= this.PCI_MAX; pci += 3) {
           if (pci < this.PCI_MIN) continue;
+          
+          // RULE 1: NEVER assign same PCI twice in network
+          if (pci !== cell.pci && usedPCIs.has(pci)) continue;
+          
           if (!nearbyPCIs.has(pci)) {
             candidates.push(pci);
           }
@@ -836,10 +869,13 @@ export class SimplePCIOptimizer {
     // STEP 4: At least avoid same-channel conflicts (critical constraint)
     const candidates = [];
     for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
-      // MUST not match same-channel MOD3 (critical rule)
+      // RULE 1: NEVER assign same PCI twice in network
+      if (pci !== cell.pci && usedPCIs.has(pci)) continue;
+      
+      // RULE 2: MUST not match same-channel MOD3 (critical rule)
       if (sameChannelMod3s.has(pci % 3)) continue;
       
-      // Avoid exact same-channel PCI match
+      // Avoid exact same-channel PCI match (redundant with Rule 1)
       if (sameChannelPCIs.has(pci)) continue;
       
       candidates.push(pci);

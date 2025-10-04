@@ -257,6 +257,81 @@ export class ReportGenerator {
         </ul>
     </div>
 
+    <div class="conflict-comparison" style="margin-top: 40px; page-break-before: always;">
+        <h2>Understanding MOD3 vs MOD30 Conflicts</h2>
+        <table class="comparison-table" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <thead>
+                <tr style="background-color: #007bff; color: white;">
+                    <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">Feature</th>
+                    <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">MOD3 Conflict</th>
+                    <th style="border: 1px solid #ddd; padding: 12px; text-align: left;">MOD30 Conflict</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold; background-color: #f8f9fa;">Affected Signal</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;"><strong>Downlink (DL) Reference Signals (RS):</strong> Specifically impacts the Primary Synchronization Signal (PSS), which helps a device find and synchronize with a cell.</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;"><strong>Uplink (UL) Demodulation Reference Signals (DMRS):</strong> Impacts the signals used by the base station to decode data coming from a user's device.</td>
+                </tr>
+                <tr style="background-color: #f8f9fa;">
+                    <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Cause</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">Occurs when neighboring cells have the same PCI modulo 3 value. This causes their downlink reference signals to align in frequency, creating high interference.</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">Occurs when neighboring cells have the same PCI modulo 30 value. This causes their uplink reference signal patterns to be identical.</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold; background-color: #f8f9fa;">Impact on Performance</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li><strong>High downlink interference:</strong> Leads to a lower Reference Signal Signal-to-Interference-plus-Noise Ratio (RS-SINR).</li>
+                            <li><strong>Slower cell acquisition:</strong> It takes longer for user equipment (UE) to camp on a cell.</li>
+                            <li><strong>Handover issues:</strong> Can cause issues during the handover process between cells.</li>
+                            <li><strong>Reduced throughput:</strong> Ultimately leads to lower downlink throughput.</li>
+                        </ul>
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li><strong>High uplink interference:</strong> Increases the chance of strong inter-cell interference in the uplink, especially in highly-loaded scenarios.</li>
+                            <li><strong>Increased Block Error Rate (BLER):</strong> Can result in decoding issues and a higher uplink BLER.</li>
+                            <li><strong>Reduced uplink throughput:</strong> Lower decoding accuracy can lead to reduced uplink throughput.</li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr style="background-color: #f8f9fa;">
+                    <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold;">Severity</td>
+                    <td style="border: 1px solid #ddd; padding: 10px; color: #dc3545;"><strong>CRITICAL:</strong> Generally considered a more critical and impactful issue, as it directly affects a device's ability to initially connect and maintain a high-quality downlink signal.</td>
+                    <td style="border: 1px solid #ddd; padding: 10px; color: #ffc107;"><strong>MODERATE:</strong> Often considered less critical than mod3 in typical commercial networks, but it can become significant in specific scenarios with high utilization rates.</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 10px; font-weight: bold; background-color: #f8f9fa;">Resolution</td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li><strong>Careful PCI planning:</strong> Ensure that adjacent cells do not have the same PCI mod 3 value.</li>
+                            <li><strong>Intelligent algorithms:</strong> Use network optimization software to intelligently assign PCIs.</li>
+                            <li><strong>Azimuth separation:</strong> For co-channel MOD3, ensure minimum 90° azimuth separation (180° recommended).</li>
+                        </ul>
+                    </td>
+                    <td style="border: 1px solid #ddd; padding: 10px;">
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li><strong>Careful PCI planning:</strong> Avoid assigning the same PCI mod 30 to neighboring cells.</li>
+                            <li><strong>Group hopping:</strong> Enable the uplink "Group hopping" feature in the PUSCH configuration.</li>
+                        </ul>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #856404;">⚠️ PCI Planning Rules</h3>
+            <ol style="margin: 10px 0; padding-left: 20px;">
+                <li><strong>NEVER assign the same PCI twice in a network</strong> - Each cell must have a unique PCI</li>
+                <li><strong>Neighboring cells must not have the same PCI</strong> - Avoid PCI collision</li>
+                <li><strong>Neighboring cells must not share the same PCI mod 3 value</strong> - Critical for DL reference signals</li>
+                <li><strong>Neighboring cells should not share the same PCI mod 6 value</strong> - Important for single-antenna systems</li>
+                <li><strong>Neighboring cells should not share the same PCI mod 30 value</strong> - Affects UL performance</li>
+            </ol>
+        </div>
+    </div>
+
     <div class="footer">
         <p>Generated by LTE PCI Conflict Mapper - ${new Date().toLocaleString()}</p>
     </div>
