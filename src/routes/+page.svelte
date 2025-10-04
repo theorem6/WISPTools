@@ -863,6 +863,7 @@
     padding-left: 0.75rem;
     margin-left: 0.75rem;
     border-left: 1px solid var(--border-color);
+    height: 100%;
   }
 
   /* Stats Section */

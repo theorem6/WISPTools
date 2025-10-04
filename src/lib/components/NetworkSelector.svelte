@@ -48,15 +48,17 @@
     padding: 0 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 10px;
-    background: var(--card-bg);
+    background: transparent;
     cursor: pointer;
     transition: all var(--transition);
     max-width: 200px;
+    color: var(--text-primary);
   }
 
   .selector-button:hover {
     background: var(--hover-bg);
     box-shadow: var(--shadow-sm);
+    border-color: var(--primary-color);
   }
 
   .selector-button svg:first-child {
