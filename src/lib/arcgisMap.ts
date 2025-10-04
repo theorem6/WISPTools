@@ -38,13 +38,11 @@ export class PCIArcGISMapper {
       { default: Map },
       { default: MapView },
       { default: GraphicsLayer },
-      { default: BasemapToggle },
       { default: Zoom }
     ] = await Promise.all([
       import('@arcgis/core/Map.js'),
       import('@arcgis/core/views/MapView.js'),
       import('@arcgis/core/layers/GraphicsLayer.js'),
-      import('@arcgis/core/widgets/BasemapToggle.js'),
       import('@arcgis/core/widgets/Zoom.js')
     ]);
 
@@ -91,19 +89,12 @@ export class PCIArcGISMapper {
       index: 0
     });
     
-    // Add BasemapToggle widget (non-deprecated alternative to BasemapGallery)
-    const basemapToggle = new BasemapToggle({
-      view: this.mapView,
-      nextBasemap: isDarkMode ? "streets-night-vector" : "hybrid"  // Toggle between current and satellite/hybrid
-    });
-    
-    this.mapView.ui.add(basemapToggle, {
-      position: "top-right",
-      index: 1
-    });
+    // Note: ArcGIS widgets are deprecated in favor of web components
+    // Users can right-click on map to access basemap options via native ArcGIS context menu
+    // Or use the mapView.map.basemap property to change basemaps programmatically
     
     this.isInitialized = true;
-    console.log('PCIArcGISMapper: Map initialized and ready with basemap toggle');
+    console.log('PCIArcGISMapper: Map initialized and ready');
   }
   
   /**
@@ -583,5 +574,16 @@ export class PCIArcGISMapper {
   updateTheme(isDarkMode: boolean) {
     const basemap = isDarkMode ? "dark-gray-vector" : "topo-vector";
     this.map.basemap = basemap;
+  }
+  
+  /**
+   * Change map basemap programmatically
+   * Available basemaps: 'topo-vector', 'streets-vector', 'satellite', 'hybrid', 
+   *                     'dark-gray-vector', 'streets-night-vector', 'oceans', 'osm'
+   */
+  changeBasemap(basemapId: string) {
+    if (!this.map) return;
+    this.map.basemap = basemapId as any;
+    console.log('PCIArcGISMapper: Changed basemap to', basemapId);
   }
 }
