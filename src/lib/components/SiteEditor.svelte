@@ -110,7 +110,7 @@
       channels: [
         {
           id: `${editedSite.id}-SEC${sectorNumber}-CH1`,
-          name: `RMOD Carrier 1`,
+          name: `Carrier 1`,
           dlEarfcn: 55640,
           ulEarfcn: 55640,
           centerFreq: 3625,
@@ -172,7 +172,7 @@
     const channelNumber = sector.channels.length + 1;
     const newChannel: Channel = {
       id: `${sector.id}-CH${channelNumber}`,
-      name: `RMOD Carrier ${channelNumber}`,
+      name: `Carrier ${channelNumber}`,
       dlEarfcn: 55640,
       ulEarfcn: 55640,
       centerFreq: 3625,
@@ -324,7 +324,7 @@
                         </svg>
                       </div>
                       <div class="sector-title-info">
-                        <h4>Sector {sector.sectorNumber} (RMOD-{sector.rmodId || 1})</h4>
+                        <h4>Sector {sector.sectorNumber}</h4>
                         <span class="sector-subtitle">Azimuth: {sector.azimuth}° | {sector.channels.length} Carrier{sector.channels.length !== 1 ? 's' : ''}</span>
                         <span class="sector-pcis">Carrier PCIs: {sector.channels.map((c, i) => `C${i + 1}:${c.pci}`).join(', ')}</span>
                       </div>
@@ -426,17 +426,6 @@
                     <div class="form-row">
                       <div class="form-group-sm">
                         <label>
-                          Radio Module
-                          <select bind:value={sector.rmodId}>
-                            <option value={1}>RMOD-1</option>
-                            <option value={2}>RMOD-2</option>
-                            <option value={3}>RMOD-3</option>
-                          </select>
-                        </label>
-                      </div>
-                      
-                      <div class="form-group-sm">
-                        <label>
                           RS Power (dBm)
                           <input 
                             type="number" 
@@ -465,13 +454,13 @@
                         <line x1="12" y1="8" x2="12" y2="12"></line>
                         <line x1="12" y1="16" x2="12.01" y2="16"></line>
                       </svg>
-                      <span>Each RMOD transmitter can have multiple carriers. Each carrier needs its own PCI and EARFCN.</span>
+                      <span>Each sector transmitter can have multiple carriers. Each carrier needs its own PCI and EARFCN.</span>
                     </div>
                     
-                    <!-- Carriers for this transmitter/RMOD -->
+                    <!-- Carriers for this transmitter -->
                     <div class="channels-section">
                       <div class="channels-header">
-                        <strong>📻 RMOD Carriers</strong>
+                        <strong>📻 Carriers</strong>
                         <span class="carrier-info">Each carrier has its own EARFCN & PCI</span>
                         <button 
                           type="button"

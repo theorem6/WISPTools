@@ -428,7 +428,7 @@
                             
                             <!-- List carriers -->
                             <div class="carriers-list">
-                              <strong>RMOD Carriers:</strong>
+                              <strong>Carriers:</strong>
                               {#each sectorGroup.carriers as carrier, idx}
                                 <div class="carrier-row">
                                   <span class="carrier-label">C{idx + 1}:</span>

@@ -128,7 +128,7 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
     const carrierNumber = sector.channels.length + 1;
     sector.channels.push({
       id: legacyCell.id, // Use original cell ID as carrier ID
-      name: `RMOD Carrier ${carrierNumber}`,
+      name: `Carrier ${carrierNumber}`,
       dlEarfcn: legacyCell.dlEarfcn || legacyCell.earfcn || 0,
       ulEarfcn: legacyCell.ulEarfcn || 0,
       centerFreq: legacyCell.centerFreq || legacyCell.frequency || 0,
