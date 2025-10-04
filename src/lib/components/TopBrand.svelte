@@ -36,8 +36,8 @@
 <style>
   .top-brand {
     position: fixed;
-    top: 20px;
-    left: 120px;
+    top: 90px;
+    left: 20px;
     z-index: 200;
     background: var(--card-bg);
     backdrop-filter: blur(16px);
@@ -115,8 +115,8 @@
 
   @media (max-width: 768px) {
     .top-brand {
-      top: 20px;
-      left: 60px;
+      top: 90px;
+      left: 10px;
       padding: 0.5rem 0.75rem;
     }
 
