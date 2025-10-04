@@ -146,7 +146,7 @@
     top: 173px;
     left: 20px;
     width: 180px;
-    z-index: 150;
+    z-index: 200;
     background: var(--card-bg);
     backdrop-filter: blur(16px);
     border-radius: 12px;
@@ -155,6 +155,7 @@
     overflow-y: auto;
     max-height: calc(100vh - 193px);
     box-sizing: border-box;
+    pointer-events: auto;
   }
 
   .menu-items {
