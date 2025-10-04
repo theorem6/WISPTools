@@ -33,6 +33,9 @@
   
   // Group cells by eNodeB to get towers
   $: towers = groupCellsByTower($cellsStore.items);
+  $: {
+    console.log('TowerManager: Reactive update - towers count:', towers.length, 'cells:', $cellsStore.items.length);
+  }
   $: filteredTowers = filterTowers(towers, searchQuery);
   
   interface SectorGroup {
@@ -127,8 +130,11 @@
   let showImportWizard = false;
   
   function handleAddTower() {
-    // Show import wizard instead of directly opening site editor
-    showImportWizard = true;
+    // Create a new empty site
+    selectedSite = null;
+    isCreatingNewSite = true;
+    showSiteEditor = true;
+    console.log('TowerManager: Opening SiteEditor for new tower');
   }
   
   function handleImport(event: CustomEvent) {
@@ -184,13 +190,16 @@
   
   function handleSiteSave(event: CustomEvent) {
     const savedSite = event.detail as CellSite;
+    console.log('TowerManager: Saving site:', savedSite.name, 'isCreatingNewSite:', isCreatingNewSite);
     
     // Convert site to legacy cell format
     const legacyCells = convertCellSiteToLegacy([savedSite]);
+    console.log('TowerManager: Converted to', legacyCells.length, 'legacy cells');
     
     if (isCreatingNewSite) {
       // Add new site (cast to any to handle Cell/LegacyCell compatibility)
       const cells = [...$cellsStore.items, ...legacyCells] as any;
+      console.log('TowerManager: Adding new tower. Total cells now:', cells.length);
       cellsStore.set({ 
         items: cells,
         isLoading: false,
@@ -203,6 +212,7 @@
         ...$cellsStore.items.filter(c => !c.id.startsWith(siteId)),
         ...legacyCells
       ] as any;
+      console.log('TowerManager: Updating existing tower. Total cells now:', cells.length);
       cellsStore.set({ 
         items: cells,
         isLoading: false,
@@ -214,6 +224,7 @@
     showSiteEditor = false;
     selectedSite = null;
     isCreatingNewSite = false;
+    console.log('TowerManager: Site saved successfully');
     dispatch('towersChanged');
   }
   
