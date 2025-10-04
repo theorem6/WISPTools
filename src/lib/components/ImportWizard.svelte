@@ -14,7 +14,7 @@
     if (event.key === 'Escape' && show) {
       event.preventDefault();
       event.stopPropagation();
-      close();
+      handleClose();
     }
   }
   
