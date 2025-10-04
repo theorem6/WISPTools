@@ -1,10 +1,13 @@
 <script lang="ts">
   import { reportGenerator, type ConflictReport } from '$lib/reportGenerator';
   import type { Cell, PCIConflict } from '$lib/pciMapper';
+  import NokiaConfig from './NokiaConfig.svelte';
 
   export let cells: Cell[] = [];
   export let conflicts: PCIConflict[] = [];
   export let recommendations: string[] = [];
+  
+  let showNokiaConfig = false;
 
   let report: ConflictReport | null = null;
   let isGenerating = false;
@@ -52,7 +55,8 @@
 </script>
 
 <div class="export-panel">
-  <h3>📊 Conflict Report Export</h3>
+  <h3>📊 Export Options</h3>
+  <p class="export-subtitle">Export conflict reports or generate Nokia base station configurations</p>
   
   {#if !report}
     <div class="generate-section">
@@ -100,6 +104,9 @@
         <button class="export-button pdf" on:click={exportToPDF}>
           📋 Export PDF
         </button>
+        <button class="export-button nokia" on:click={() => showNokiaConfig = true}>
+          📻 Nokia XML
+        </button>
       </div>
       
       <div class="report-details">
@@ -142,6 +149,9 @@
   {/if}
 </div>
 
+<!-- Nokia Export Modal -->
+<NokiaConfig bind:visible={showNokiaConfig} />
+
 <style>
   .export-panel {
     background: var(--card-bg);
@@ -153,12 +163,19 @@
   }
 
   .export-panel h3 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.5rem 0;
     color: var(--text-primary);
     font-size: 1.2rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .export-subtitle {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.4;
   }
 
   .export-panel h4 {
@@ -290,6 +307,17 @@
   .export-button.pdf:hover {
     background: var(--primary-color);
     color: white;
+  }
+
+  .export-button.nokia {
+    border-color: #124191;
+    color: #124191;
+  }
+
+  .export-button.nokia:hover {
+    background: linear-gradient(135deg, #124191 0%, #1a5bc4 100%);
+    color: white;
+    border-color: #124191;
   }
 
   .report-details {

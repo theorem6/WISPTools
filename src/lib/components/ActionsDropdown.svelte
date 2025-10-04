@@ -77,20 +77,6 @@
           </svg>
           Import Cells
         </button>
-        <button class="dropdown-item" on:click={() => handleAction('loadSample')}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-            <polyline points="13 2 13 9 20 9"></polyline>
-          </svg>
-          Load Sample
-        </button>
-        <button class="dropdown-item" on:click={() => handleAction('clearMap')} disabled={!hasData}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          Clear Map
-        </button>
       </div>
 
       <div class="dropdown-divider"></div>
@@ -131,7 +117,7 @@
             <polyline points="17 8 12 3 7 8"></polyline>
             <line x1="12" y1="3" x2="12" y2="15"></line>
           </svg>
-          Export Report
+          Export & Configure
         </button>
       </div>
     </div>
@@ -155,7 +141,7 @@
       on:keydown|stopPropagation
     >
       <div class="export-modal-header">
-        <h3 id="export-modal-title">Export Reports</h3>
+        <h3 id="export-modal-title">📤 Export & Configuration</h3>
         <button class="close-btn" on:click={() => showExportModal = false}>×</button>
       </div>
       <div class="export-modal-body">

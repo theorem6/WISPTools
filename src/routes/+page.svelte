@@ -39,7 +39,6 @@
   import SiteEditor from '$lib/components/SiteEditor.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
   import TowerManager from '$lib/components/TowerManager.svelte';
-  import NokiaConfig from '$lib/components/NokiaConfig.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -55,7 +54,6 @@
   let showSiteEditor = false;
   let showContextMenu = false;
   let showTowerManager = false;
-  let showNokiaConfig = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let selectedCell: Cell | null = null;
@@ -594,13 +592,6 @@
           <polyline points="2 12 12 17 22 12"></polyline>
         </svg>
       </button>
-      <button class="btn-nokia" on:click={() => showNokiaConfig = true} title="Nokia LTE Configuration Export - Generate Nokia XML configuration files">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <path d="M7 7h10M7 12h10M7 17h10"></path>
-        </svg>
-        <span class="btn-label">Nokia Export</span>
-      </button>
       <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="View detailed network analysis - Cell statistics and health metrics">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -716,9 +707,6 @@
     on:close={() => showTowerManager = false}
   />
   
-  <NokiaConfig 
-    bind:visible={showNokiaConfig}
-  />
         </div>
           {:else}
   <!-- Loading state while checking auth -->
@@ -954,35 +942,6 @@
     box-shadow: var(--shadow-sm);
   }
 
-  .btn-nokia {
-    display: flex !important;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
-    border: 2px solid #124191;
-    background: linear-gradient(135deg, #124191 0%, #1a5bc4 100%);
-    color: white !important;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.875rem;
-    font-weight: 700;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(18, 65, 145, 0.4);
-    flex-shrink: 0;
-  }
-
-  .btn-nokia:hover {
-    background: linear-gradient(135deg, #0d2f6b 0%, #124191 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(18, 65, 145, 0.5);
-    border-color: #1a5bc4;
-  }
-
-  .btn-label {
-    display: inline;
-    font-weight: 700;
-  }
 
   /* Responsive */
   @media (max-width: 1024px) {
@@ -1039,15 +998,6 @@
     .icon-btn {
       width: 32px;
       height: 32px;
-    }
-
-    .btn-label {
-      font-size: 0.75rem;
-    }
-
-    .btn-nokia {
-      padding: 0.5rem 0.75rem;
-      flex-shrink: 0;
     }
   }
 
