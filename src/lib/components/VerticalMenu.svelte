@@ -1,19 +1,66 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import UserProfile from './UserProfile.svelte';
+  import { authStore, currentUser, isAuthenticated } from '../stores/authStore';
+  import { authService } from '../services/authService';
+  import { networkStore } from '../stores/networkStore';
+  import { resetAllStores } from '../stores/appState';
+  import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   
   export let hasData = false;
   export let hasConflicts = false;
   
   const dispatch = createEventDispatcher();
+  
+  async function handleLogout() {
+    // Clear all app state before signing out
+    resetAllStores();
+    networkStore.clear();
+    
+    // Clear browser storage (except theme preference)
+    if (browser) {
+      const theme = localStorage.getItem('theme');
+      sessionStorage.clear();
+      localStorage.clear();
+      if (theme) {
+        localStorage.setItem('theme', theme);
+      }
+    }
+    
+    // Sign out from Firebase
+    await authService.signOut();
+    
+    // Redirect to login
+    goto('/login');
+  }
+  
+  function getUserName(): string {
+    if ($currentUser?.displayName) {
+      return $currentUser.displayName;
+    }
+    if ($currentUser?.email) {
+      return $currentUser.email.split('@')[0];
+    }
+    return 'User';
+  }
 </script>
 
 <div class="vertical-menu">
   <div class="menu-items">
     <!-- Logout Button at Top -->
-    <div class="logout-section">
-      <UserProfile on:networks={() => dispatch('networks')} />
-    </div>
+    {#if $isAuthenticated && $currentUser}
+      <button class="logout-button" on:click={handleLogout} title="Sign out">
+        <div class="user-info">
+          <span class="user-name">{getUserName()}</span>
+          <span class="user-email">{$currentUser.email}</span>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </button>
+    {/if}
     
     <div class="menu-divider"></div>
     <button class="menu-item" on:click={() => dispatch('import')} title="Import cell data">
@@ -116,14 +163,56 @@
     gap: 0.15rem;
   }
 
-  .logout-section {
-    padding: 0.25rem 0;
+  .logout-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: 8px;
+    color: var(--danger-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 0.5rem;
   }
 
-  .logout-section :global(button) {
-    width: 100% !important;
-    justify-content: flex-start !important;
-    padding-left: 0.75rem !important;
+  .logout-button:hover {
+    background: var(--danger-color);
+    color: white;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .user-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .user-email {
+    font-size: 0.65rem;
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .logout-button svg {
+    flex-shrink: 0;
   }
 
   .menu-item {
