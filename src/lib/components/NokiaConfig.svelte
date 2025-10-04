@@ -392,9 +392,10 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 100001;
     overflow-y: auto;
+    backdrop-filter: blur(8px);
   }
 
   .nokia-config-modal.visible {
@@ -409,8 +410,10 @@
     border-radius: 8px;
     width: 100%;
     max-width: 1000px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     margin: auto;
+    position: relative;
+    z-index: 100002;
   }
 
   .modal-header {

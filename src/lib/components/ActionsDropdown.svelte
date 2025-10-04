@@ -267,12 +267,15 @@
 
   /* Export Modal - Centered on screen */
   .export-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.75) !important;
     backdrop-filter: blur(8px);
-    z-index: 2000;
-    display: flex;
+    z-index: 99998 !important;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     padding: 1rem;
@@ -285,17 +288,19 @@
   }
 
   .export-modal {
-    background: var(--card-bg);
+    background: var(--card-bg) !important;
     border-radius: var(--border-radius-xl);
-    max-width: 600px;
+    max-width: 700px;
     width: 100%;
     max-height: 85vh;
     overflow: hidden;
-    box-shadow: var(--shadow-2xl);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
     border: 1px solid var(--border-color);
     animation: slideUp var(--transition);
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 99999 !important;
   }
 
   @keyframes slideUp {
