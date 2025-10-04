@@ -397,7 +397,11 @@
     if (confirm(`Delete sector ${contextMenuCellId}?`)) {
       // Remove from store
       const cells = $cellsStore.items.filter(c => c.id !== contextMenuCellId);
-      cellsStore.set({ items: cells });
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
       
       // Re-analyze
       await performAnalysis();
@@ -415,17 +419,25 @@
     if (isCreatingNewCell) {
       // Add new cell to store
       const cells = [...$cellsStore.items, updatedCell];
-      cellsStore.set({ items: cells });
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
     } else {
       // Update existing cell in store
       const cells = $cellsStore.items.map(c => 
         c.id === updatedCell.id ? updatedCell : c
       );
-      cellsStore.set({ items: cells });
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
     }
     
     // Re-analyze conflicts with updated cell
-      await performAnalysis();
+    await performAnalysis();
     
     // Auto-save to network
     await saveCurrentNetwork();
@@ -449,8 +461,12 @@
     if (isCreatingNewSite) {
       // Add all sectors from the new site to store
       const cells = [...$cellsStore.items, ...legacyCells];
-      cellsStore.set({ items: cells });
-      console.log(`Added ${legacyCells.length} sectors from new site`);
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+      console.log(`Added ${legacyCells.length} carriers from new site`);
     } else {
       // Update existing site's sectors
       // Remove old sectors from this site, add new ones
@@ -459,8 +475,12 @@
         ...$cellsStore.items.filter(c => !c.id.startsWith(siteId)),
         ...legacyCells
       ];
-      cellsStore.set({ items: cells });
-      console.log(`Updated site with ${legacyCells.length} sectors`);
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+      console.log(`Updated site with ${legacyCells.length} carriers`);
     }
     
     // Re-analyze conflicts
