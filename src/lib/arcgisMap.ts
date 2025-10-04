@@ -553,4 +553,48 @@ export class PCIArcGISMapper {
     const basemap = isDarkMode ? "dark-gray-vector" : "topo-vector";
     this.map.basemap = basemap;
   }
+
+  /**
+   * Change basemap
+   */
+  changeBasemap(basemap: 'streets' | 'topo' | 'satellite') {
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    
+    switch (basemap) {
+      case 'streets':
+        this.map.basemap = isDarkMode ? "dark-gray-vector" : "streets-vector";
+        break;
+      case 'topo':
+        this.map.basemap = isDarkMode ? "dark-gray-vector" : "topo-vector";
+        break;
+      case 'satellite':
+        this.map.basemap = "satellite";
+        break;
+    }
+  }
+
+  /**
+   * Get current zoom level
+   */
+  getZoom(): number {
+    return this.mapView?.zoom || 10;
+  }
+
+  /**
+   * Zoom in
+   */
+  zoomIn() {
+    if (this.mapView) {
+      this.mapView.zoom = Math.min(this.mapView.zoom + 1, 20);
+    }
+  }
+
+  /**
+   * Zoom out
+   */
+  zoomOut() {
+    if (this.mapView) {
+      this.mapView.zoom = Math.max(this.mapView.zoom - 1, 3);
+    }
+  }
 }

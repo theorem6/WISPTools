@@ -143,8 +143,8 @@
 <style>
   .vertical-menu {
     position: fixed;
-    top: 173px;
-    left: 20px;
+    top: 90px;
+    left: 220px;
     width: 180px;
     z-index: 200;
     background: var(--card-bg);
@@ -153,7 +153,7 @@
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
     overflow-y: auto;
-    max-height: calc(100vh - 193px);
+    max-height: calc(100vh - 110px);
     box-sizing: border-box;
     pointer-events: auto;
   }
@@ -260,7 +260,7 @@
 
   @media (max-width: 768px) {
     .vertical-menu {
-      top: 163px;
+      top: 130px;
       left: 10px;
       width: 160px;
       box-sizing: border-box;
