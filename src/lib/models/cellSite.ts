@@ -43,17 +43,20 @@ export interface Sector {
   azimuth: number;         // Direction in degrees (0-359) - ONLY sectors have azimuths
   beamwidth: number;       // Horizontal beamwidth in degrees (typically 33, 65, 78, 90, 120)
   heightAGL: number;       // Height above ground level in feet
-  pci: number;             // Physical Cell ID (0-503)
-  channels: Channel[];     // Multiple EARFCNs per sector
+  rmodId?: number;         // Radio Module ID (1-3) for Nokia configurations
+  channels: Channel[];     // Multiple carriers/channels per sector (transmitter)
   rsPower: number;         // Reference signal power (dBm)
   technology: 'LTE' | 'CBRS' | '5G';
 }
 
 export interface Channel {
+  id?: string;             // Unique channel/carrier ID
+  name?: string;           // Optional carrier name
   dlEarfcn: number;        // Downlink EARFCN
   ulEarfcn: number;        // Uplink EARFCN  
   centerFreq: number;      // Center frequency in MHz
   channelBandwidth: number; // Bandwidth in MHz (1.4, 3, 5, 10, 15, 20)
+  pci: number;             // Physical Cell ID (0-503) - Each carrier has its own PCI
   isPrimary: boolean;      // Primary channel for this sector
 }
 
@@ -107,13 +110,15 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
       azimuth: legacyCell.azimuth || 0,
       beamwidth: (legacyCell as any).beamwidth || 65, // Use sector beamwidth if available
       heightAGL: (legacyCell as any).heightAGL || 100, // Default 100 feet if not specified
-      pci: legacyCell.pci,
+      rmodId: ((legacyCell.sector - 1) % 3) + 1, // Auto-assign RMOD based on sector number
       channels: [
         {
+          id: `${legacyCell.id}-CH1`,
           dlEarfcn: legacyCell.dlEarfcn || legacyCell.earfcn || 0,
           ulEarfcn: legacyCell.ulEarfcn || 0,
           centerFreq: legacyCell.centerFreq || legacyCell.frequency || 0,
           channelBandwidth: legacyCell.channelBandwidth || 20,
+          pci: legacyCell.pci,
           isPrimary: true
         }
       ],
@@ -142,7 +147,7 @@ export function convertCellSiteToLegacy(sites: CellSite[]): LegacyCell[] {
           id: sector.id,
           eNodeB: site.eNodeB,
           sector: sector.sectorNumber,
-          pci: sector.pci,
+          pci: primaryChannel.pci, // Use carrier's PCI
           latitude: site.latitude, // All sectors share the site's GPS coordinate
           longitude: site.longitude, // All sectors share the site's GPS coordinate
           frequency: primaryChannel.centerFreq,

@@ -92,18 +92,21 @@
       azimuth: suggestedAzimuth,
       beamwidth: 65, // Default 65° beamwidth (typical for macro cells)
       heightAGL: 100, // Default 100 feet above ground level
-      pci: 0,
+      rmodId: ((sectorNumber - 1) % 3) + 1, // Auto-assign RMOD (1-3)
       channels: [
         {
-          dlEarfcn: 1950,
-          ulEarfcn: 19950,
-          centerFreq: 2110,
+          id: `${editedSite.id}-SEC${sectorNumber}-CH1`,
+          name: `Carrier 1`,
+          dlEarfcn: 55640,
+          ulEarfcn: 55640,
+          centerFreq: 3625,
           channelBandwidth: 20,
+          pci: 0,
           isPrimary: true
         }
       ],
       rsPower: -75,
-      technology: 'LTE'
+      technology: 'CBRS'
     };
     
     editedSite.sectors = [...editedSite.sectors, newSector];
@@ -152,11 +155,15 @@
   
   function addChannelToSector(sectorIndex: number) {
     const sector = editedSite.sectors[sectorIndex];
+    const channelNumber = sector.channels.length + 1;
     const newChannel: Channel = {
-      dlEarfcn: 1950,
-      ulEarfcn: 19950,
-      centerFreq: 2110,
+      id: `${sector.id}-CH${channelNumber}`,
+      name: `Carrier ${channelNumber}`,
+      dlEarfcn: 55640,
+      ulEarfcn: 55640,
+      centerFreq: 3625,
       channelBandwidth: 20,
+      pci: 0,
       isPrimary: false
     };
     
@@ -303,8 +310,8 @@
                         </svg>
                       </div>
                       <div class="sector-title-info">
-                        <h4>Sector {sector.sectorNumber}</h4>
-                        <span class="sector-subtitle">Azimuth: {sector.azimuth}° | PCI: {sector.pci}</span>
+                        <h4>Transmitter {sector.sectorNumber}</h4>
+                        <span class="sector-subtitle">Azimuth: {sector.azimuth}° | RMOD-{sector.rmodId || 1} | {sector.channels.length} Carrier{sector.channels.length !== 1 ? 's' : ''}</span>
                       </div>
                     </div>
                     <button 
@@ -404,13 +411,12 @@
                     <div class="form-row">
                       <div class="form-group-sm">
                         <label>
-                          PCI
-                          <input 
-                            type="number" 
-                            bind:value={sector.pci}
-                            min="0"
-                            max="503"
-                          />
+                          Radio Module
+                          <select bind:value={sector.rmodId}>
+                            <option value={1}>RMOD-1</option>
+                            <option value={2}>RMOD-2</option>
+                            <option value={3}>RMOD-3</option>
+                          </select>
                         </label>
                       </div>
                       
@@ -420,6 +426,8 @@
                           <input 
                             type="number" 
                             bind:value={sector.rsPower}
+                            min="-120"
+                            max="30"
                           />
                         </label>
                       </div>
@@ -429,61 +437,92 @@
                           Technology
                           <select bind:value={sector.technology}>
                             <option value="LTE">LTE</option>
-                            <option value="CBRS">CBRS</option>
-                            <option value="5G">5G</option>
+                            <option value="CBRS">CBRS (Band 48)</option>
+                            <option value="5G">5G NR</option>
                           </select>
                         </label>
                       </div>
                     </div>
                     
-                    <!-- Channels for this sector -->
+                    <!-- Carriers for this transmitter -->
                     <div class="channels-section">
                       <div class="channels-header">
-                        <strong>Channels (EARFCNs)</strong>
+                        <strong>📻 Carriers (Frequency Channels)</strong>
                         <button 
                           type="button"
                           class="add-channel-btn-sm" 
                           on:click={() => addChannelToSector(sectorIndex)}
                         >
-                          + Add Channel
+                          + Add Carrier
                         </button>
                       </div>
                       
                       {#each sector.channels as channel, channelIndex}
-                        <div class="channel-row">
-                          <input 
-                            type="radio" 
-                            name="primary-{sectorIndex}"
-                            checked={channel.isPrimary}
-                            on:change={() => setPrimaryChannel(sectorIndex, channelIndex)}
-                            title="Primary channel"
-                          />
+                        <div class="carrier-card">
+                          <div class="carrier-header">
+                            <input 
+                              type="radio" 
+                              name="primary-{sectorIndex}"
+                              checked={channel.isPrimary}
+                              on:change={() => setPrimaryChannel(sectorIndex, channelIndex)}
+                              title="Primary carrier"
+                            />
+                            <input 
+                              type="text" 
+                              bind:value={channel.name}
+                              placeholder="Carrier name"
+                              class="carrier-name-input"
+                            />
+                            <button 
+                              type="button"
+                              class="remove-channel-btn" 
+                              on:click={() => removeChannel(sectorIndex, channelIndex)}
+                              disabled={sector.channels.length === 1}
+                              title="Remove carrier"
+                            >
+                              ×
+                            </button>
+                          </div>
                           
-                          <input 
-                            type="number" 
-                            bind:value={channel.dlEarfcn}
-                            placeholder="DL EARFCN"
-                            class="channel-input"
-                          />
-                          
-                          <span class="channel-label">{channel.centerFreq} MHz</span>
-                          
-                          <input 
-                            type="number" 
-                            bind:value={channel.channelBandwidth}
-                            class="channel-input-sm"
-                            placeholder="BW"
-                          />
-                          <span class="channel-label-sm">MHz</span>
-                          
-                          <button 
-                            type="button"
-                            class="remove-channel-btn" 
-                            on:click={() => removeChannel(sectorIndex, channelIndex)}
-                            disabled={sector.channels.length === 1}
-                          >
-                            ×
-                          </button>
+                          <div class="carrier-details">
+                            <div class="carrier-field">
+                              <label class="carrier-label-inline">EARFCN DL</label>
+                              <input 
+                                type="number" 
+                                bind:value={channel.dlEarfcn}
+                                placeholder="55640"
+                                class="carrier-input"
+                                min="55240"
+                                max="56739"
+                                title="Band 48: 55240-56739"
+                              />
+                            </div>
+                            
+                            <div class="carrier-field">
+                              <label class="carrier-label-inline">Bandwidth</label>
+                              <select bind:value={channel.channelBandwidth} class="carrier-select">
+                                <option value={10}>10 MHz</option>
+                                <option value={15}>15 MHz</option>
+                                <option value={20}>20 MHz</option>
+                              </select>
+                            </div>
+                            
+                            <div class="carrier-field">
+                              <label class="carrier-label-inline">PCI</label>
+                              <input 
+                                type="number" 
+                                bind:value={channel.pci}
+                                placeholder="0"
+                                class="carrier-input-sm"
+                                min="0"
+                                max="503"
+                              />
+                            </div>
+                            
+                            <div class="carrier-field">
+                              <span class="freq-display">{channel.centerFreq} MHz</span>
+                            </div>
+                          </div>
                         </div>
                       {/each}
                     </div>
@@ -1110,6 +1149,95 @@
   .remove-channel-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* Carrier Card Styles */
+  .carrier-card {
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .carrier-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .carrier-name-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .carrier-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .carrier-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .carrier-label-inline {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .carrier-input {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .carrier-input-sm {
+    width: 80px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .carrier-select {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .freq-display {
+    display: flex;
+    align-items: center;
+    height: 38px;
+    padding: 0.5rem;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: 0.875rem;
   }
 
   .editor-footer {
