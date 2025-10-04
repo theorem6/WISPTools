@@ -46,7 +46,7 @@ export const config = {
       medium: 2000,
       low: 3000
     },
-    moduloTypes: ['MOD3', 'MOD6', 'MOD12', 'MOD30'],
+    moduloTypes: ['MOD3', 'MOD6', 'MOD30'],
     frequencyBands: {
       'LTE_BAND_1': { frequency: 2100, bandwidth: 2100 },
       'LTE_BAND_3': { frequency: 1800, bandwidth: 1800 },

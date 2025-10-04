@@ -14,7 +14,6 @@ export interface ConflictReport {
     low: number;
     mod3: number;
     mod6: number;
-    mod12: number;
     mod30: number;
     threeSector: number;
     fourSector: number;
@@ -37,7 +36,6 @@ export class ReportGenerator {
       low: conflicts.filter(c => c.severity === 'LOW').length,
       mod3: conflicts.filter(c => c.conflictType === 'MOD3').length,
       mod6: conflicts.filter(c => c.conflictType === 'MOD6').length,
-      mod12: conflicts.filter(c => c.conflictType === 'MOD12').length,
       mod30: conflicts.filter(c => c.conflictType === 'MOD30').length,
       threeSector: conflicts.filter(c => 
         c.primaryCell.towerType === '3-sector' || c.conflictingCell.towerType === '3-sector'
@@ -200,10 +198,6 @@ export class ReportGenerator {
             <div class="summary-item">
                 <div class="summary-value">${report.summary.mod6}</div>
                 <div class="summary-label">Mod6 (PBCH)</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">${report.summary.mod12}</div>
-                <div class="summary-label">Mod12 (PSS/SSS)</div>
             </div>
             <div class="summary-item">
                 <div class="summary-value">${report.summary.mod30}</div>

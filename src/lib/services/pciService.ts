@@ -339,7 +339,6 @@ export class PCIService {
       byType: {
         mod3: conflicts.filter(c => c.conflictType === 'MOD3').length,
         mod6: conflicts.filter(c => c.conflictType === 'MOD6').length,
-        mod12: conflicts.filter(c => c.conflictType === 'MOD12').length,
         mod30: conflicts.filter(c => c.conflictType === 'MOD30').length,
         frequency: conflicts.filter(c => c.conflictType === 'FREQUENCY').length,
         adjacentChannel: conflicts.filter(c => c.conflictType === 'ADJACENT_CHANNEL').length,

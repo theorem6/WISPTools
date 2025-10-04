@@ -47,7 +47,7 @@ export interface Cell {
 export interface PCIConflict {
   primaryCell: Cell;
   conflictingCell: Cell;
-  conflictType: 'COLLISION' | 'CONFUSION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL' | 'CO_CHANNEL' | 'FREQUENCY_CONGESTION';
+  conflictType: 'COLLISION' | 'CONFUSION' | 'MOD3' | 'MOD6' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL' | 'CO_CHANNEL' | 'FREQUENCY_CONGESTION';
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'UNRESOLVABLE';
   distance: number; // in meters
   frequencyOverlap?: boolean; // Whether cells operate on overlapping frequencies
@@ -399,7 +399,7 @@ class PCIMapper {
         // PRIORITY 1: Check for PCI COLLISION (exact same PCI in proximity)
         // This is the most severe conflict - cells cannot be distinguished
         const conflictTypes: Array<{ 
-          type: 'COLLISION' | 'MOD3' | 'MOD6' | 'MOD12' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL' | 'CO_CHANNEL'; 
+          type: 'COLLISION' | 'MOD3' | 'MOD6' | 'MOD30' | 'FREQUENCY' | 'ADJACENT_CHANNEL' | 'CO_CHANNEL'; 
           value: number; 
           check: (pci1: number, pci2: number) => boolean;
           confusionCount?: number;
@@ -427,12 +427,12 @@ class PCIMapper {
           }
         }
         
-        // Standard modulo conflicts (only if within reasonable distance)
+        // SON Standard modulo conflicts: MOD3, MOD6, MOD30 only
+        // (Removed MOD12 per user request - focus on key modulo types)
         if (distance < 5000 || isCoChannel) {
           conflictTypes.push(
             { type: 'MOD3' as const, value: 3, check: (pci1, pci2) => pci1 % 3 === pci2 % 3 },
             { type: 'MOD6' as const, value: 6, check: (pci1, pci2) => pci1 % 6 === pci2 % 6 },
-            { type: 'MOD12' as const, value: 12, check: (pci1, pci2) => pci1 % 12 === pci2 % 12 },
             { type: 'MOD30' as const, value: 30, check: (pci1, pci2) => pci1 % 30 === pci2 % 30 }
           );
         }
@@ -709,11 +709,6 @@ class PCIMapper {
         high: 600, 
         medium: 1500 
       },
-      MOD12: { 
-        critical: 150, 
-        high: 400, 
-        medium: 1000 
-      },
       MOD30: { 
         critical: 100,  // PSS/SSS reuse less critical on different channels
         high: 300, 
@@ -844,15 +839,30 @@ class PCIMapper {
       recommendations.push(`${fourSectorCells.length} conflicts involve CBRS 4-sector towers (90° separation) - verify sector alignment.`);
     }
     
-    // Frequency-specific recommendations
+    // Modulus-specific recommendations (MOD3, MOD6, MOD30 only)
     const mod3Conflicts = conflicts.filter(c => c.conflictType === 'MOD3');
+    const mod6Conflicts = conflicts.filter(c => c.conflictType === 'MOD6');
+    const mod30Conflicts = conflicts.filter(c => c.conflictType === 'MOD30');
+    
     if (mod3Conflicts.length > 0) {
-      recommendations.push('Mod3 conflicts detected: Consider frequency-domain optimization.');
+      recommendations.push(`📐 ${mod3Conflicts.length} MOD3 conflicts (most destructive) - HIGH PRIORITY to convert to MOD6/MOD30`);
     }
     
-    const mod6Conflicts = conflicts.filter(c => c.conflictType === 'MOD6');
     if (mod6Conflicts.length > 0) {
-      recommendations.push('Mod6 conflicts detected: Review PBCH configuration.');
+      recommendations.push(`📐 ${mod6Conflicts.length} MOD6 conflicts (moderate) - Should convert to MOD30 for optimal performance`);
+    }
+    
+    if (mod30Conflicts.length > 0) {
+      recommendations.push(`📐 ${mod30Conflicts.length} MOD30 conflicts (least destructive) - These are acceptable, lowest priority`);
+    }
+    
+    // Modulus improvement recommendations
+    if (mod3Conflicts.length === 0 && mod6Conflicts.length === 0 && mod30Conflicts.length > 0) {
+      recommendations.push('✅ Excellent modulus quality: Only MOD30 conflicts remain (least destructive type)');
+    } else if (mod3Conflicts.length === 0 && mod6Conflicts.length > 0) {
+      recommendations.push('⚡ Good progress: No MOD3 conflicts. Continue optimization to convert MOD6 → MOD30');
+    } else if (mod3Conflicts.length > 0) {
+      recommendations.push('⚠️ MOD3 conflicts present: Run optimizer to improve modulus quality (MOD3 → MOD6 → MOD30)');
     }
     
     // Geographic recommendations

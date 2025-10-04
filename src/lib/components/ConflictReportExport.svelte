@@ -129,10 +129,6 @@
           <span class="breakdown-value">{report.summary.mod6}</span>
         </div>
         <div class="breakdown-item">
-          <span class="breakdown-label">Mod12 (PSS/SSS)</span>
-          <span class="breakdown-value">{report.summary.mod12}</span>
-        </div>
-        <div class="breakdown-item">
           <span class="breakdown-label">Mod30 (PRS)</span>
           <span class="breakdown-value">{report.summary.mod30}</span>
         </div>

@@ -15,25 +15,26 @@ export class SimplePCIOptimizer {
   
   /**
    * Calculate modulus quality score - higher is better
-   * MOD3 = 3 (worst), MOD6 = 6, MOD12 = 12, MOD30 = 30 (best)
+   * Only MOD3, MOD6, and MOD30 are considered per SON requirements
+   * MOD3 = 3 (worst - most destructive)
+   * MOD6 = 6 (moderate)
+   * MOD30 = 30 (best - least destructive)
    */
   private calculateModulusQuality(conflicts: PCIConflict[]): number {
     let totalQuality = 0;
     for (const conflict of conflicts) {
       if (conflict.severity === 'CRITICAL' || conflict.severity === 'UNRESOLVABLE') {
         totalQuality += 0; // Critical = no quality
-      } else if (conflict.conflictType === 'MOD3') {
-        totalQuality += 3;
-      } else if (conflict.conflictType === 'MOD6') {
-        totalQuality += 6;
-      } else if (conflict.conflictType === 'MOD12') {
-        totalQuality += 12;
-      } else if (conflict.conflictType === 'MOD30') {
-        totalQuality += 30;
       } else if (conflict.conflictType === 'COLLISION') {
         totalQuality += 0; // Collision = no quality
+      } else if (conflict.conflictType === 'MOD3') {
+        totalQuality += 3; // Worst modulus type
+      } else if (conflict.conflictType === 'MOD6') {
+        totalQuality += 6; // Moderate
+      } else if (conflict.conflictType === 'MOD30') {
+        totalQuality += 30; // Best - least interference
       } else {
-        totalQuality += 15; // Other types
+        totalQuality += 10; // Other types (FREQUENCY, ADJACENT, etc.)
       }
     }
     return totalQuality;
@@ -64,11 +65,12 @@ export class SimplePCIOptimizer {
     console.log(`📊 Starting: ${originalConflictCount} conflicts`);
     console.log(`   🔴 Critical: ${initialCritical}`);
     console.log(`   🟠 High: ${initialHigh}`);
-    console.log(`   📐 MOD3 Conflicts: ${initialMod3Count}`);
+    console.log(`   📐 MOD3 Conflicts: ${initialMod3Count} (most destructive)`);
     console.log(`   📊 Modulus Quality: ${initialModulusQuality}`);
     console.log(`🎯 PRIMARY GOAL: Eliminate MOD3 conflicts`);
-    console.log(`🎯 SECONDARY GOAL: Improve to MOD12/MOD30 (higher modulus = better)`);
-    console.log(`⚡ Strategy: Continuous improvement, never settle for MOD3`);
+    console.log(`🎯 SECONDARY GOAL: Improve to MOD6/MOD30 (higher modulus = less destructive)`);
+    console.log(`⚡ Strategy: MOD3 → MOD6 → MOD30 progression`);
+    console.log(`📊 Modulus Hierarchy: MOD3 (worst) < MOD6 (moderate) < MOD30 (best)`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     let iteration = 0;
@@ -390,11 +392,15 @@ export class SimplePCIOptimizer {
       if (totalCritical === 0 && totalHigh === 0) {
         if (currentMod3Count > 0) {
           console.log(`\n🌟 Critical and High ELIMINATED! But ${currentMod3Count} MOD3 conflicts remain`);
-          console.log(`⚡ SON OPTIMIZATION: Converting MOD3 → MOD6/MOD12/MOD30...`);
+          console.log(`⚡ SON OPTIMIZATION: Converting MOD3 → MOD6/MOD30...`);
+          console.log(`📊 Target: Eliminate all MOD3, maximize MOD30`);
           // Don't break - continue optimizing to improve modulus quality
         } else if (totalConflicts > 0) {
-          console.log(`\n🌟 Critical, High, and MOD3 ELIMINATED! (${totalConflicts} MOD6+ remaining)`);
-          console.log(`⚡ SON OPTIMIZATION: Improving modulus quality to MOD12/MOD30...`);
+          const mod6Count = conflicts.filter(c => c.conflictType === 'MOD6').length;
+          const mod30Count = conflicts.filter(c => c.conflictType === 'MOD30').length;
+          console.log(`\n🌟 Critical, High, and MOD3 ELIMINATED!`);
+          console.log(`   📊 Remaining: ${mod6Count} MOD6, ${mod30Count} MOD30`);
+          console.log(`⚡ SON OPTIMIZATION: Converting MOD6 → MOD30...`);
           // Don't break - continue to improve modulus quality
         }
       }
@@ -465,9 +471,13 @@ export class SimplePCIOptimizer {
       console.log(`   PCI Changes: ${allChanges.length}`);
       console.log(`   Changes per Iteration: ${(allChanges.length / iteration).toFixed(1)}`);
       
+      const finalMod6Count = finalConflicts.filter(c => c.conflictType === 'MOD6').length;
+      const finalMod30Count = finalConflicts.filter(c => c.conflictType === 'MOD30').length;
+      
       if (finalCritical === 0 && finalHigh === 0 && finalMod3Count === 0) {
         console.log(`🌟 All critical, high, and MOD3 conflicts eliminated!`);
-        console.log(`📊 Remaining conflicts are MOD6+ (higher modulus = less destructive)`);
+        console.log(`📊 Remaining: ${finalMod6Count} MOD6, ${finalMod30Count} MOD30`);
+        console.log(`📈 Modulus hierarchy achieved: No MOD3 (most destructive) remaining`);
       } else if (finalCritical === 0 && finalHigh === 0) {
         console.log(`🌟 All critical and high conflicts eliminated!`);
         console.log(`📐 ${finalMod3Count} MOD3 conflicts remain - recommend further optimization`);
