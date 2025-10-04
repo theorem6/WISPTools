@@ -143,7 +143,7 @@
 <style>
   .vertical-menu {
     position: fixed;
-    top: 20px;
+    top: 420px;
     left: 20px;
     width: 180px;
     z-index: 150;
@@ -153,7 +153,7 @@
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
     overflow-y: auto;
-    max-height: calc(100vh - 40px);
+    max-height: calc(100vh - 440px);
   }
 
   .menu-items {
@@ -258,7 +258,7 @@
 
   @media (max-width: 768px) {
     .vertical-menu {
-      top: 20px;
+      top: 420px;
       left: 10px;
       width: 160px;
     }
