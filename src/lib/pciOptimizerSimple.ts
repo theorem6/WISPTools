@@ -14,6 +14,32 @@ export class SimplePCIOptimizer {
   private readonly MAX_SHAKEUPS = 3; // Maximum number of random shakeups before giving up
   
   /**
+   * Calculate modulus quality score - higher is better
+   * MOD3 = 3 (worst), MOD6 = 6, MOD12 = 12, MOD30 = 30 (best)
+   */
+  private calculateModulusQuality(conflicts: PCIConflict[]): number {
+    let totalQuality = 0;
+    for (const conflict of conflicts) {
+      if (conflict.severity === 'CRITICAL' || conflict.severity === 'UNRESOLVABLE') {
+        totalQuality += 0; // Critical = no quality
+      } else if (conflict.conflictType === 'MOD3') {
+        totalQuality += 3;
+      } else if (conflict.conflictType === 'MOD6') {
+        totalQuality += 6;
+      } else if (conflict.conflictType === 'MOD12') {
+        totalQuality += 12;
+      } else if (conflict.conflictType === 'MOD30') {
+        totalQuality += 30;
+      } else if (conflict.conflictType === 'COLLISION') {
+        totalQuality += 0; // Collision = no quality
+      } else {
+        totalQuality += 15; // Other types
+      }
+    }
+    return totalQuality;
+  }
+  
+  /**
    * Simple, effective PCI optimization
    * Strategy: For each conflicting cell, pick a TRULY RANDOM PCI that works
    */
@@ -30,23 +56,32 @@ export class SimplePCIOptimizer {
     let initialCritical = initialConflicts.filter(c => c.severity === 'CRITICAL').length;
     let initialHigh = initialConflicts.filter(c => c.severity === 'HIGH').length;
     
+    const initialMod3Count = initialConflicts.filter(c => c.conflictType === 'MOD3').length;
+    const initialModulusQuality = this.calculateModulusQuality(initialConflicts);
+    
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-    console.log(`🎯 EFFICIENT PCI OPTIMIZER`);
+    console.log(`🎯 SON-COMPLIANT PCI OPTIMIZER`);
     console.log(`📊 Starting: ${originalConflictCount} conflicts`);
     console.log(`   🔴 Critical: ${initialCritical}`);
     console.log(`   🟠 High: ${initialHigh}`);
-    console.log(`🎯 ULTIMATE GOAL: 0 conflicts (complete deconfliction)`);
-    console.log(`⚡ Strategy: Maximum efficiency, minimum changes`);
+    console.log(`   📐 MOD3 Conflicts: ${initialMod3Count}`);
+    console.log(`   📊 Modulus Quality: ${initialModulusQuality}`);
+    console.log(`🎯 PRIMARY GOAL: Eliminate MOD3 conflicts`);
+    console.log(`🎯 SECONDARY GOAL: Improve to MOD12/MOD30 (higher modulus = better)`);
+    console.log(`⚡ Strategy: Continuous improvement, never settle for MOD3`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     let iteration = 0;
     let prevConflicts = originalConflictCount;
     let prevCritical = initialCritical;
     let prevHigh = initialHigh;
+    let prevMod3Count = initialMod3Count;
+    let prevModulusQuality = initialModulusQuality;
     let bestCells = JSON.parse(JSON.stringify(currentCells)) as Cell[]; // Track best solution
     let bestConflicts = originalConflictCount;
     let bestCritical = initialCritical;
     let bestHigh = initialHigh;
+    let bestModulusQuality = initialModulusQuality;
     let rollbackCount = 0; // Track consecutive rollbacks for extra randomization
     let iterationsWithoutProgress = 0; // Track stagnation
     let totalChangesApplied = 0; // Track efficiency
@@ -137,13 +172,20 @@ export class SimplePCIOptimizer {
       const totalMedium = conflicts.filter(c => c.severity === 'MEDIUM').length;
       const totalLow = conflicts.filter(c => c.severity === 'LOW').length;
       
+      // Calculate modulus quality metrics
+      const currentMod3Count = conflicts.filter(c => c.conflictType === 'MOD3').length;
+      const currentModulusQuality = this.calculateModulusQuality(conflicts);
+      
       console.log(`📊 After changes: ${totalConflicts} conflicts (🔴 ${totalCritical} critical, 🟠 ${totalHigh} high, 🟡 ${totalMedium} med, 🟢 ${totalLow} low)`);
+      console.log(`   📐 MOD3: ${currentMod3Count} | Modulus Quality: ${currentModulusQuality} (higher = better)`);
       
       // EFFICIENCY CHECK: Did we make progress?
-      // Priority: Critical > High > Total Conflicts
+      // Priority: Critical > High > MOD3 Count > Modulus Quality > Total Conflicts
       const madeProgress = (totalCritical < prevCritical) || 
                           (totalCritical === prevCritical && totalHigh < prevHigh) ||
-                          (totalCritical === prevCritical && totalHigh === prevHigh && totalConflicts < prevConflicts);
+                          (totalCritical === prevCritical && totalHigh === prevHigh && currentMod3Count < prevMod3Count) ||
+                          (totalCritical === prevCritical && totalHigh === prevHigh && currentMod3Count === prevMod3Count && currentModulusQuality > prevModulusQuality) ||
+                          (totalCritical === prevCritical && totalHigh === prevHigh && currentMod3Count === prevMod3Count && currentModulusQuality === prevModulusQuality && totalConflicts < prevConflicts);
       
       if (totalCritical > prevCritical || (totalCritical === prevCritical && totalCritical > 0 && totalHigh >= prevHigh && totalConflicts >= prevConflicts)) {
         console.error(`❌ REJECTED! Critical conflicts increased or didn't improve: ${prevCritical} → ${totalCritical}`);
@@ -283,6 +325,7 @@ export class SimplePCIOptimizer {
       
       // Changes ACCEPTED - this iteration improved things!
       console.log(`   ✅ ACCEPTED! Total: ${prevConflicts}→${totalConflicts} (🔴 ${prevCritical}→${totalCritical}, 🟠 ${prevHigh}→${totalHigh})`);
+      console.log(`   📐 MOD3: ${prevMod3Count}→${currentMod3Count} | Quality: ${prevModulusQuality}→${currentModulusQuality}`);
       console.log(`   💾 Committing ${changes.length} PCI changes to network state...`);
       
       // Verify changes are persisted
@@ -299,15 +342,17 @@ export class SimplePCIOptimizer {
       rollbackCount = 0; // Reset on success
       iterationsWithoutProgress = 0; // Reset stagnation counter on progress
       
-      // Update best solution if this is better (prioritize: critical < conflicts)
+      // Update best solution - prioritize: critical < high < modulus quality < total conflicts
       if (totalCritical < bestCritical || 
           (totalCritical === bestCritical && totalHigh < bestHigh) ||
-          (totalCritical === bestCritical && totalHigh === bestHigh && totalConflicts < bestConflicts)) {
+          (totalCritical === bestCritical && totalHigh === bestHigh && currentModulusQuality > bestModulusQuality) ||
+          (totalCritical === bestCritical && totalHigh === bestHigh && currentModulusQuality === bestModulusQuality && totalConflicts < bestConflicts)) {
         bestCells = JSON.parse(JSON.stringify(currentCells)) as Cell[];
         bestConflicts = totalConflicts;
         bestCritical = totalCritical;
         bestHigh = totalHigh;
-        console.log(`   ⭐ NEW BEST: ${bestConflicts} total (${bestCritical} critical, ${bestHigh} high)`);
+        bestModulusQuality = currentModulusQuality;
+        console.log(`   ⭐ NEW BEST: ${bestConflicts} total (${bestCritical} critical, ${bestHigh} high, Quality: ${currentModulusQuality})`);
       }
       
       // Track history
@@ -316,29 +361,43 @@ export class SimplePCIOptimizer {
         conflictCount: conflicts.length,
         criticalCount: totalCritical,
         highCount: totalHigh,
+        mod3Count: currentMod3Count,
+        modulusQuality: currentModulusQuality,
         changes: allChanges.length
       });
+      
+      // Update tracking variables for next iteration
+      prevConflicts = totalConflicts;
+      prevCritical = totalCritical;
+      prevHigh = totalHigh;
+      prevMod3Count = currentMod3Count;
+      prevModulusQuality = currentModulusQuality;
       
       // Check ULTIMATE goal: Zero conflicts
       if (totalConflicts === 0) {
         console.log(`\n💎 ULTIMATE GOAL ACHIEVED! ZERO CONFLICTS!`);
+        console.log(`✨ Network is perfectly deconflicted!`);
         console.log(`⚡ Efficiency: ${totalChangesApplied} changes in ${iteration} iterations`);
         console.log(`📈 Improvement: ${originalConflictCount} → 0 conflicts (100%)`);
+        console.log(`📐 Modulus Quality: ${initialModulusQuality} → ${currentModulusQuality}`);
         
         // Validate with Wolfram Alpha
         await this.validateWithWolfram(totalCritical, totalHigh, totalChangesApplied);
         break; // Stop - ultimate goal achieved
       }
       
-      // Check secondary goal: Critical = 0
+      // SON CONTINUOUS IMPROVEMENT: Don't stop at critical=0, improve modulus types
       if (totalCritical === 0 && totalHigh === 0) {
-        console.log(`\n🌟 Critical and High conflicts ELIMINATED! (${totalConflicts} low-priority remaining)`);
-        console.log(`⚡ Continuing to eliminate all conflicts...`);
+        if (currentMod3Count > 0) {
+          console.log(`\n🌟 Critical and High ELIMINATED! But ${currentMod3Count} MOD3 conflicts remain`);
+          console.log(`⚡ SON OPTIMIZATION: Converting MOD3 → MOD6/MOD12/MOD30...`);
+          // Don't break - continue optimizing to improve modulus quality
+        } else if (totalConflicts > 0) {
+          console.log(`\n🌟 Critical, High, and MOD3 ELIMINATED! (${totalConflicts} MOD6+ remaining)`);
+          console.log(`⚡ SON OPTIMIZATION: Improving modulus quality to MOD12/MOD30...`);
+          // Don't break - continue to improve modulus quality
+        }
       }
-      
-      prevConflicts = totalConflicts;
-      prevCritical = totalCritical;
-      prevHigh = totalHigh;
     }
     
     // Use best solution found
@@ -348,10 +407,14 @@ export class SimplePCIOptimizer {
     const finalConflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
     const finalCritical = finalConflicts.filter(c => c.severity === 'CRITICAL').length;
     const finalHigh = finalConflicts.filter(c => c.severity === 'HIGH').length;
+    const finalMod3Count = finalConflicts.filter(c => c.conflictType === 'MOD3').length;
+    const finalModulusQuality = this.calculateModulusQuality(finalConflicts);
     
     const conflictsResolved = originalConflictCount - finalConflicts.length;
     const reductionPercent = originalConflictCount > 0 ? 
       ((conflictsResolved) / originalConflictCount) * 100 : 0;
+    const mod3Improvement = initialMod3Count - finalMod3Count;
+    const qualityImprovement = finalModulusQuality - initialModulusQuality;
     
     console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
@@ -381,6 +444,8 @@ export class SimplePCIOptimizer {
       console.log(`   Total Conflicts: ${originalConflictCount} → 0 (100% reduction)`);
       console.log(`   🔴 Critical: ${initialCritical} → 0 ✅`);
       console.log(`   🟠 High: ${initialHigh} → 0 ✅`);
+      console.log(`   📐 MOD3: ${initialMod3Count} → 0 ✅`);
+      console.log(`   📊 Modulus Quality: ${initialModulusQuality} → ${finalModulusQuality} (+${qualityImprovement})`);
       console.log(`⚡ EFFICIENCY:`);
       console.log(`   Iterations: ${iteration}`);
       console.log(`   PCI Changes: ${allChanges.length}`);
@@ -393,13 +458,19 @@ export class SimplePCIOptimizer {
       console.log(`   Conflicts Resolved: ${conflictsResolved}`);
       console.log(`   🔴 Critical: ${initialCritical} → ${finalCritical} ${finalCritical === 0 ? '✅' : `(${initialCritical - finalCritical} resolved)`}`);
       console.log(`   🟠 High: ${initialHigh} → ${finalHigh} ${finalHigh === 0 ? '✅' : `(${initialHigh - finalHigh} resolved)`}`);
+      console.log(`   📐 MOD3: ${initialMod3Count} → ${finalMod3Count} ${finalMod3Count === 0 ? '✅' : `(${mod3Improvement} converted to higher modulus)`}`);
+      console.log(`   📊 Modulus Quality: ${initialModulusQuality} → ${finalModulusQuality} (${qualityImprovement > 0 ? '+' : ''}${qualityImprovement})`);
       console.log(`⚡ EFFICIENCY:`);
       console.log(`   Iterations: ${iteration}`);
       console.log(`   PCI Changes: ${allChanges.length}`);
       console.log(`   Changes per Iteration: ${(allChanges.length / iteration).toFixed(1)}`);
       
-      if (finalCritical === 0 && finalHigh === 0) {
+      if (finalCritical === 0 && finalHigh === 0 && finalMod3Count === 0) {
+        console.log(`🌟 All critical, high, and MOD3 conflicts eliminated!`);
+        console.log(`📊 Remaining conflicts are MOD6+ (higher modulus = less destructive)`);
+      } else if (finalCritical === 0 && finalHigh === 0) {
         console.log(`🌟 All critical and high conflicts eliminated!`);
+        console.log(`📐 ${finalMod3Count} MOD3 conflicts remain - recommend further optimization`);
       } else if (reductionPercent < 50) {
         console.warn(`⚠️  Less than 50% reduction - consider manual review`);
       }
