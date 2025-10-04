@@ -192,21 +192,23 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: white;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    gap: 0.65rem;
+    padding: 0.6rem 0.65rem;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
     margin-bottom: 0.5rem;
+    text-align: left;
+    font-size: 0.8125rem;
+    font-weight: 500;
   }
 
   .logout-button:hover {
-    background: var(--danger-color);
-    color: white;
-    border-color: var(--danger-color);
+    background: var(--danger-light);
+    color: var(--danger-color);
   }
 
   .user-info {
@@ -220,7 +222,7 @@
 
   .user-name {
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -238,6 +240,7 @@
 
   .logout-button svg {
     flex-shrink: 0;
+    stroke-width: 2;
   }
 
   .menu-item {
