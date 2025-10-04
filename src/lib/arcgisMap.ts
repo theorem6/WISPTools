@@ -37,11 +37,17 @@ export class PCIArcGISMapper {
     const [
       { default: Map },
       { default: MapView },
-      { default: GraphicsLayer }
+      { default: GraphicsLayer },
+      { default: BasemapGallery },
+      { default: Expand },
+      { default: Zoom }
     ] = await Promise.all([
       import('@arcgis/core/Map.js'),
       import('@arcgis/core/views/MapView.js'),
-      import('@arcgis/core/layers/GraphicsLayer.js')
+      import('@arcgis/core/layers/GraphicsLayer.js'),
+      import('@arcgis/core/widgets/BasemapGallery.js'),
+      import('@arcgis/core/widgets/Expand.js'),
+      import('@arcgis/core/widgets/Zoom.js')
     ]);
 
     // Check for dark mode
@@ -57,7 +63,10 @@ export class PCIArcGISMapper {
       container: containerId,
       map: this.map,
       center: [-74.5, 40], // Default to New York area
-      zoom: 10
+      zoom: 10,
+      ui: {
+        components: [] // Remove default UI components, we'll add custom ones
+      }
     });
     
     // Initialize layers
@@ -74,6 +83,38 @@ export class PCIArcGISMapper {
     
     // Wait for the view to be ready before allowing interactions
     await this.mapView.when();
+    
+    // Add Zoom widget
+    const zoom = new Zoom({
+      view: this.mapView
+    });
+    this.mapView.ui.add(zoom, {
+      position: "top-center",
+      index: 0
+    });
+    
+    // Add BasemapGallery widget in an Expand widget
+    const basemapGallery = new BasemapGallery({
+      view: this.mapView,
+      source: {
+        query: {
+          title: "ArcGIS:Streets,ArcGIS:Topographic,ArcGIS:Imagery"
+        }
+      }
+    });
+    
+    const basemapExpand = new Expand({
+      view: this.mapView,
+      content: basemapGallery,
+      expandIcon: "basemap",
+      expandTooltip: "Change Basemap"
+    });
+    
+    this.mapView.ui.add(basemapExpand, {
+      position: "top-center",
+      index: 1
+    });
+    
     this.isInitialized = true;
     console.log('PCIArcGISMapper: Map initialized and ready');
   }
@@ -552,49 +593,5 @@ export class PCIArcGISMapper {
   updateTheme(isDarkMode: boolean) {
     const basemap = isDarkMode ? "dark-gray-vector" : "topo-vector";
     this.map.basemap = basemap;
-  }
-
-  /**
-   * Change basemap
-   */
-  changeBasemap(basemap: 'streets' | 'topo' | 'satellite') {
-    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
-    
-    switch (basemap) {
-      case 'streets':
-        this.map.basemap = isDarkMode ? "dark-gray-vector" : "streets-vector";
-        break;
-      case 'topo':
-        this.map.basemap = isDarkMode ? "dark-gray-vector" : "topo-vector";
-        break;
-      case 'satellite':
-        this.map.basemap = "satellite";
-        break;
-    }
-  }
-
-  /**
-   * Get current zoom level
-   */
-  getZoom(): number {
-    return this.mapView?.zoom || 10;
-  }
-
-  /**
-   * Zoom in
-   */
-  zoomIn() {
-    if (this.mapView) {
-      this.mapView.zoom = Math.min(this.mapView.zoom + 1, 20);
-    }
-  }
-
-  /**
-   * Zoom out
-   */
-  zoomOut() {
-    if (this.mapView) {
-      this.mapView.zoom = Math.max(this.mapView.zoom - 1, 3);
-    }
   }
 }

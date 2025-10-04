@@ -37,7 +37,7 @@
   .top-brand {
     position: fixed;
     top: 20px;
-    left: 220px;
+    left: 20px;
     width: 180px;
     z-index: 200;
     background: var(--card-bg);

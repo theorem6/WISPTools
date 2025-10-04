@@ -144,7 +144,7 @@
   .vertical-menu {
     position: fixed;
     top: 90px;
-    left: 220px;
+    left: 20px;
     width: 180px;
     z-index: 200;
     background: var(--card-bg);

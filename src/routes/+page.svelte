@@ -40,7 +40,6 @@
   import PCIStatusWidget from '$lib/components/PCIStatusWidget.svelte';
   import VerticalMenu from '$lib/components/VerticalMenu.svelte';
   import SettingsMenu from '$lib/components/SettingsMenu.svelte';
-  import MapControls from '$lib/components/MapControls.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -69,8 +68,6 @@
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
-  let currentBasemap: 'streets' | 'topo' | 'satellite' = 'topo';
-  let currentZoom = 10;
   
   // Realistic Sample Data with Intentional Conflicts
   // These PCIs are deliberately chosen to create conflicts that CAN be resolved
@@ -500,28 +497,6 @@
       mapInstance.clearMap();
     }
   }
-  
-  // Map control handlers
-  function handleBasemapChange(event: CustomEvent<'streets' | 'topo' | 'satellite'>) {
-    currentBasemap = event.detail;
-    if (mapInstance) {
-      mapInstance.changeBasemap(currentBasemap);
-    }
-  }
-  
-  function handleZoomIn() {
-    if (mapInstance) {
-      mapInstance.zoomIn();
-      currentZoom = mapInstance.getZoom();
-    }
-  }
-  
-  function handleZoomOut() {
-    if (mapInstance) {
-      mapInstance.zoomOut();
-      currentZoom = mapInstance.getZoom();
-    }
-  }
 </script>
 
 {#if $isAuthenticated}
@@ -539,16 +514,7 @@
 
   <!-- New UI Layout: Separate Positioned Elements -->
   
-  <!-- Top Left: Map Controls (Zoom + Basemap) -->
-  <MapControls 
-    {currentBasemap}
-    zoom={currentZoom}
-    on:basemapChange={handleBasemapChange}
-    on:zoomIn={handleZoomIn}
-    on:zoomOut={handleZoomOut}
-  />
-  
-  <!-- Top Left: Brand and Network Info (next to map controls) -->
+  <!-- Top Left: Brand and Network Info -->
   <TopBrand on:manageNetworks={() => showNetworkManager = true} />
   
   <!-- Top Right: PCI Status Widget -->
