@@ -41,9 +41,121 @@ export interface NokiaBaseStation {
 
 export class NokiaConfigService {
   /**
-   * Generate Nokia XML configuration
+   * Generate Nokia XML configuration using reference template
    */
-  generateConfig(config: NokiaBaseStation): string {
+  async generateConfig(config: NokiaBaseStation): Promise<string> {
+    // For comprehensive configuration, use template-based generation
+    return this.generateFromTemplate(config);
+  }
+  
+  /**
+   * Generate configuration using reference template
+   * This produces a production-grade 20k+ line configuration
+   */
+  private async generateFromTemplate(config: NokiaBaseStation): Promise<string> {
+    console.log('Nokia: Generating comprehensive configuration from template');
+    console.log('Nokia: BTS ID:', config.btsId, 'Sectors:', config.sectors.length);
+    
+    // Load reference template
+    const templatePath = '/nokia/nokia-3s-3c.xml';
+    let template: string;
+    
+    try {
+      const response = await fetch(templatePath);
+      if (!response.ok) {
+        throw new Error('Reference template not found');
+      }
+      template = await response.text();
+      console.log('Nokia: Loaded reference template,', template.split('\n').length, 'lines');
+    } catch (error) {
+      console.warn('Nokia: Could not load template, falling back to basic generation');
+      return this.generateBasicConfig(config);
+    }
+    
+    // Replace template values with actual configuration
+    return this.substituteTemplateValues(template, config);
+  }
+  
+  /**
+   * Substitute actual values into template
+   */
+  private substituteTemplateValues(template: string, config: NokiaBaseStation): string {
+    let xml = template;
+    
+    // Replace BTS ID and name (from reference: 10219)
+    xml = xml.replace(/MRBTS-10219/g, `MRBTS-${config.btsId}`);
+    xml = xml.replace(/LNBTS-10219/g, `LNBTS-${config.lnBtsId}`);
+    xml = xml.replace(/BBU-NKASIA-ALW-CENTREVILLE/g, config.btsName);
+    xml = xml.replace(/btsId">10219</g, `btsId">${config.btsId}<`);
+    xml = xml.replace(/lnBtsId">10219</g, `lnBtsId">${config.lnBtsId}<`);
+    
+    // Replace IP addresses (from reference: 100.71.2.9/10.71.2.9)
+    xml = xml.replace(/100\.71\.2\.9/g, config.ipConfig.managementIP);
+    xml = xml.replace(/100\.71\.2\.1/g, config.ipConfig.managementGateway);
+    xml = xml.replace(/10\.71\.2\.9/g, config.ipConfig.transportIP);
+    xml = xml.replace(/10\.71\.2\.1/g, config.ipConfig.transportGateway);
+    
+    // Replace TAC (from reference: 1)
+    xml = xml.replace(/tac">1</g, `tac">${config.tac}<`);
+    
+    // Replace MCC/MNC
+    xml = xml.replace(/mcc">310</g, `mcc">${config.mcc}<`);
+    xml = xml.replace(/mnc">410</g, `mnc">${config.mnc}<`);
+    xml = xml.replace(/mncLength">3</g, `mncLength">${config.mncLength}<`);
+    
+    // Replace cell-specific values (PCIs and EARFCNs)
+    xml = this.substituteCellValues(xml, config);
+    
+    // Update timestamp
+    const timestamp = new Date().toISOString();
+    xml = xml.replace(/dateTime="[^"]+"/g, `dateTime="${timestamp}"`);
+    xml = xml.replace(/id="\d+"/g, `id="${Date.now()}"`);
+    
+    console.log('Nokia: Configuration generated,', xml.split('\n').length, 'lines');
+    return xml;
+  }
+  
+  /**
+   * Replace cell-specific PCIs and EARFCNs in template
+   */
+  private substituteCellValues(template: string, config: NokiaBaseStation): string {
+    let xml = template;
+    let cellIndex = 1;
+    
+    // Reference template has 9 cells (3 sectors × 3 carriers)
+    // LNCEL-1,4,7 = Sector 1 (PCI 84,85,86 / EARFCN 55640,55840,56040)
+    // LNCEL-2,5,8 = Sector 2 (PCI 84,85,86 / EARFCN 55640,55840,56040)
+    // LNCEL-3,6,9 = Sector 3 (PCI 84,85,86 / EARFCN 55640,55840,56040)
+    
+    for (const sector of config.sectors) {
+      for (const carrier of sector.carriers) {
+        // Replace PCI for this cell
+        const cellPattern = new RegExp(`(LNCEL-${cellIndex}[^>]*>\\s*<p name="physCellId">)\\d+`, 'g');
+        xml = xml.replace(cellPattern, `$1${carrier.pci}`);
+        
+        // Replace EARFCN DL
+        const earfcnDlPattern = new RegExp(`(LNCEL-${cellIndex}[^>]*>\\s*<p name="earfcnDL">)\\d+`, 'g');
+        xml = xml.replace(earfcnDlPattern, `$1${carrier.earfcnDL}`);
+        
+        // Replace EARFCN UL
+        const earfcnUlPattern = new RegExp(`(LNCEL-${cellIndex}[^>]*>\\s*<p name="earfcnUL">)\\d+`, 'g');
+        xml = xml.replace(earfcnUlPattern, `$1${carrier.earfcnUL || carrier.earfcnDL}`);
+        
+        // Replace cell name
+        const namePattern = new RegExp(`(LNCEL-${cellIndex}[^>]*>\\s*<p name="cellName">)[^<]+`, 'g');
+        xml = xml.replace(namePattern, `$1${carrier.cellName || `Cell-${cellIndex}`}`);
+        
+        cellIndex++;
+      }
+    }
+    
+    return xml;
+  }
+  
+  /**
+   * Basic configuration generator (fallback)
+   */
+  private generateBasicConfig(config: NokiaBaseStation): string {
     const timestamp = new Date().toISOString();
     let cellIndex = 1;
     
@@ -335,8 +447,8 @@ export class NokiaConfigService {
   /**
    * Download XML configuration file
    */
-  downloadConfig(config: NokiaBaseStation, filename?: string): void {
-    const xml = this.generateConfig(config);
+  async downloadConfig(config: NokiaBaseStation, filename?: string): Promise<void> {
+    const xml = await this.generateConfig(config);
     const blob = new Blob([xml], { type: 'application/xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
