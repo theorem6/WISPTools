@@ -58,11 +58,11 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    border: none;
-    background: var(--primary-color);
-    color: white;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-primary);
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -70,9 +70,11 @@
   }
 
   .settings-trigger:hover {
-    background: var(--button-primary-hover);
+    background: var(--hover-bg);
+    color: var(--primary-color);
     transform: rotate(90deg) scale(1.05);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
   }
 
   .settings-panel {

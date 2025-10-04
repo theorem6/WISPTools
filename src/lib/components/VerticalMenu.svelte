@@ -229,7 +229,7 @@
 
   .user-email {
     font-size: 0.65rem;
-    opacity: 0.8;
+    color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
