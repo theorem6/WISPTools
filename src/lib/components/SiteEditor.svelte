@@ -312,6 +312,7 @@
                       <div class="sector-title-info">
                         <h4>Transmitter {sector.sectorNumber}</h4>
                         <span class="sector-subtitle">Azimuth: {sector.azimuth}° | RMOD-{sector.rmodId || 1} | {sector.channels.length} Carrier{sector.channels.length !== 1 ? 's' : ''}</span>
+                        <span class="sector-pcis">PCIs: {sector.channels.map(c => c.pci).join(', ')}</span>
                       </div>
                     </div>
                     <button 
@@ -442,6 +443,15 @@
                           </select>
                         </label>
                       </div>
+                    </div>
+                    
+                    <div class="pci-note">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <span>PCIs are configured per carrier below (each carrier needs its own unique PCI)</span>
                     </div>
                     
                     <!-- Carriers for this transmitter -->
@@ -805,6 +815,37 @@
     font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.9);
     font-weight: 500;
+  }
+
+  .sector-pcis {
+    display: block;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+    margin-top: 0.25rem;
+  }
+
+  .pci-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: var(--info-light);
+    border: 1px solid var(--info-color);
+    border-radius: var(--border-radius);
+    margin-top: 0.5rem;
+  }
+
+  .pci-note svg {
+    flex-shrink: 0;
+    color: var(--info-color);
+    margin-top: 0.125rem;
+  }
+
+  .pci-note span {
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    line-height: 1.4;
   }
 
   .remove-sector-btn {
