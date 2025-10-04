@@ -125,12 +125,15 @@
     config.btsName = site.name.replace(/[^a-zA-Z0-9-_]/g, '_');
     
     console.log('NokiaConfig: BTS ID:', config.btsId, 'Name:', config.btsName);
+    console.log('NokiaConfig: Site has', site.sectors.length, 'sectors');
+    console.log('NokiaConfig: Full site object:', JSON.stringify(site, null, 2));
     
     // Clear existing sectors
     config.sectors = [];
 
     // Import sectors and their channels (carriers)
     site.sectors.forEach((sector, sectorIdx) => {
+      console.log(`NokiaConfig: Processing sector ${sectorIdx + 1}/${site.sectors.length}:`, sector);
       const nokiaSector: NokiaSector = {
         id: sectorIdx + 1,
         azimuth: sector.azimuth,
@@ -139,7 +142,15 @@
       };
 
       // Import carriers from channels
+      if (!sector.channels || sector.channels.length === 0) {
+        console.warn(`NokiaConfig: Sector ${sectorIdx + 1} has no channels, skipping`);
+        return; // Skip sectors with no channels
+      }
+      
+      console.log(`NokiaConfig: Sector ${sectorIdx + 1} has ${sector.channels.length} channels`);
+      
       sector.channels.forEach((channel, channelIdx) => {
+        console.log(`NokiaConfig: Processing channel ${channelIdx + 1}:`, channel);
         const carrier: NokiaCarrier = {
           id: channelIdx + 1,
           earfcnDL: channel.dlEarfcn,
@@ -162,8 +173,13 @@
 
     config.sectors = [...config.sectors];
     importing = false;
-    importSuccess = true;
     
+    if (config.sectors.length === 0) {
+      alert(`⚠️ Import failed!\n\nThe selected site has no sectors with carriers.\n\nPlease make sure your towers have:\n• At least 1 sector\n• At least 1 carrier per sector`);
+      return;
+    }
+    
+    importSuccess = true;
     alert(`✅ Import successful!\n\nImported ${config.sectors.length} sector(s) with ${totalCarriers} carrier(s) from ${site.name}`);
     
     setTimeout(() => { importSuccess = false; }, 3000);
