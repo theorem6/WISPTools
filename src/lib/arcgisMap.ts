@@ -95,19 +95,15 @@ export class PCIArcGISMapper {
     
     // Add BasemapGallery widget in an Expand widget
     const basemapGallery = new BasemapGallery({
-      view: this.mapView,
-      source: {
-        query: {
-          title: "ArcGIS:Streets,ArcGIS:Topographic,ArcGIS:Imagery"
-        }
-      }
+      view: this.mapView
     });
     
     const basemapExpand = new Expand({
       view: this.mapView,
       content: basemapGallery,
       expandIcon: "basemap",
-      expandTooltip: "Change Basemap"
+      expandTooltip: "Change Basemap",
+      expanded: false
     });
     
     this.mapView.ui.add(basemapExpand, {
@@ -116,7 +112,7 @@ export class PCIArcGISMapper {
     });
     
     this.isInitialized = true;
-    console.log('PCIArcGISMapper: Map initialized and ready');
+    console.log('PCIArcGISMapper: Map initialized and ready with basemap gallery');
   }
   
   /**
