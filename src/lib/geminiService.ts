@@ -102,13 +102,14 @@ export class GeminiService {
       analysis += `  Action: Reassign to different Mod3 groups immediately\n\n`;
     }
     if (mod6Count > 0) {
-      analysis += `• Mod6 (PBCH): ${mod6Count} conflicts - HIGH PRIORITY\n`;
+      analysis += `• Mod6 (PBCH): ${mod6Count} conflicts - MODERATE PRIORITY\n`;
       analysis += `  Impact: Broadcast channel interference affects cell acquisition\n`;
-      analysis += `  Action: Change PCI to different Mod6 value\n\n`;
+      analysis += `  Action: Should convert to MOD30 for optimal performance\n\n`;
     }
-    if (mod12Count > 0) {
-      analysis += `• Mod12 (PSS/SSS): ${mod12Count} conflicts\n`;
-      analysis += `  Impact: Synchronization signal interference\n\n`;
+    if (mod30Count > 0) {
+      analysis += `• Mod30 (PRS): ${mod30Count} conflicts - LOW PRIORITY\n`;
+      analysis += `  Impact: Minimal - PRS signal reuse (least destructive)\n`;
+      analysis += `  Action: Acceptable - lowest priority conflicts\n\n`;
     }
 
     // Specific recommendations
