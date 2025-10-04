@@ -514,8 +514,8 @@
 
   <!-- New UI Layout: Separate Positioned Elements -->
   
-  <!-- Top Left: Brand and Network Info -->
-  <TopBrand on:manageNetworks={() => showNetworkManager = true} />
+  <!-- Top Left: Brand -->
+  <TopBrand />
   
   <!-- Top Right: PCI Status Widget -->
   <PCIStatusWidget />

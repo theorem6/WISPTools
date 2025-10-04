@@ -2,7 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { authStore, currentUser, isAuthenticated } from '../stores/authStore';
   import { authService } from '../services/authService';
-  import { networkStore } from '../stores/networkStore';
+  import { networkStore, currentNetwork } from '../stores/networkStore';
   import { resetAllStores } from '../stores/appState';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
@@ -58,6 +58,28 @@
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
           <polyline points="16 17 21 12 16 7"></polyline>
           <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </button>
+    {/if}
+    
+    <div class="menu-divider"></div>
+    
+    <!-- Network Selector -->
+    {#if $currentNetwork}
+      <button class="network-selector" on:click={() => dispatch('networks')} title="Change network">
+        <div class="network-info">
+          <span class="network-name-menu">{$currentNetwork.name}</span>
+          <span class="network-market-menu">{$currentNetwork.market}</span>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    {:else}
+      <button class="network-selector empty" on:click={() => dispatch('networks')} title="Select network">
+        <span>Select Network</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron">
+          <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
       </button>
     {/if}
@@ -256,6 +278,75 @@
     height: 1px;
     background: var(--border-color);
     margin: 0.35rem 0;
+  }
+
+  .network-selector {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.65rem;
+    background: var(--primary-light);
+    border: 1px solid var(--primary-color);
+    border-radius: 6px;
+    color: var(--primary-color);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.8125rem;
+  }
+
+  .network-selector:hover {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .network-selector.empty {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .network-selector.empty:hover {
+    background: var(--hover-bg);
+    color: var(--primary-color);
+  }
+
+  .network-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .network-name-menu {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .network-market-menu {
+    font-size: 0.65rem;
+    opacity: 0.8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .network-selector .chevron {
+    flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+
+  .network-selector:hover .chevron {
+    transform: translateY(2px);
   }
 
   @media (max-width: 768px) {
