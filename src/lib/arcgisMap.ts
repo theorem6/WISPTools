@@ -167,11 +167,11 @@ export class PCIArcGISMapper {
       
       // Get conflict status for this cell
       const conflictInfo = cellConflictMap.get(cell.id);
-      const hasConflict = conflictInfo && conflictInfo.count > 0;
+      const hasConflict = conflictInfo && conflictInfo.count > 0 && conflictInfo.severity !== 'NONE';
       
       // Create a sector cone instead of a simple marker
       const azimuth = (cell as any).azimuth || 0;
-      const sectorWidth = (cell as any).beamwidth || 65; // Use sector-specific beamwidth
+      const sectorWidth = (cell as any).beamwidth || 65; // Use sector-specific beamwidth (default 65°)
       const sectorRadius = 0.005; // ~500m in degrees
       
       // Calculate sector polygon points
@@ -353,15 +353,18 @@ export class PCIArcGISMapper {
   private getConflictColorArray(severity: string): number[] {
     switch (severity) {
       case 'CRITICAL':
-        return [255, 0, 0, 255]; // Red
+        return [239, 68, 68, 255]; // Red (--danger-color)
       case 'HIGH':
-        return [255, 128, 0, 255]; // Orange
+        return [245, 158, 11, 255]; // Orange (--warning-color)
       case 'MEDIUM':
-        return [255, 255, 0, 255]; // Yellow
+        return [6, 182, 212, 255]; // Cyan (--info-color)
       case 'LOW':
-        return [0, 255, 255, 255]; // Cyan
+        return [100, 116, 139, 255]; // Gray (--text-secondary)
+      case 'UNRESOLVABLE':
+        return [139, 0, 139, 255]; // Purple for unresolvable
       default:
-        return [128, 128, 128, 255]; // Gray
+        // Should never get here - no conflict
+        return [76, 175, 80, 255]; // Green (success)
     }
   }
   
