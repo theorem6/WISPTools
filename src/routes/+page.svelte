@@ -594,11 +594,12 @@
           <polyline points="2 12 12 17 22 12"></polyline>
         </svg>
       </button>
-      <button class="icon-btn nokia-btn" on:click={() => showNokiaConfig = true} title="Nokia LTE Configuration Export - Generate Nokia XML configuration files">
+      <button class="btn-nokia" on:click={() => showNokiaConfig = true} title="Nokia LTE Configuration Export - Generate Nokia XML configuration files">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
           <path d="M7 7h10M7 12h10M7 17h10"></path>
         </svg>
+        <span class="btn-label">Nokia Export</span>
       </button>
       <button class="icon-btn" on:click={() => uiActions.openModal('showAnalysisModal')} title="View detailed network analysis - Cell statistics and health metrics">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -950,13 +951,31 @@
     box-shadow: var(--shadow-sm);
   }
 
-  .nokia-btn {
-    border-color: #124191;
+  .btn-nokia {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    border: 1px solid #124191;
+    background: linear-gradient(135deg, #124191 0%, #1a5bc4 100%);
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(18, 65, 145, 0.2);
   }
 
-  .nokia-btn:hover {
-    background: #124191;
-    color: white;
+  .btn-nokia:hover {
+    background: linear-gradient(135deg, #0d2f6b 0%, #124191 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(18, 65, 145, 0.3);
+  }
+
+  .btn-label {
+    display: inline;
   }
 
   /* Responsive */
@@ -1011,6 +1030,14 @@
     .icon-btn {
       width: 32px;
       height: 32px;
+    }
+
+    .btn-label {
+      display: none;
+    }
+
+    .btn-nokia {
+      padding: 0.5rem;
     }
   }
 
