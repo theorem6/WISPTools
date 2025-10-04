@@ -292,12 +292,12 @@
             </div>
             <div class="form-grid">
               <div class="form-group">
-                <label>Azimuth (°)</label>
-                <input type="number" bind:value={sector.azimuth} min="0" max="359" />
+                <label for="azimuth-{sectorIdx}">Azimuth (°)</label>
+                <input type="number" id="azimuth-{sectorIdx}" bind:value={sector.azimuth} min="0" max="359" />
               </div>
               <div class="form-group">
-                <label>Radio Module (RMOD)</label>
-                <select bind:value={sector.rmodId}>
+                <label for="rmod-{sectorIdx}">Radio Module (RMOD)</label>
+                <select id="rmod-{sectorIdx}" bind:value={sector.rmodId}>
                   <option value={1}>RMOD-1</option>
                   <option value={2}>RMOD-2</option>
                   <option value={3}>RMOD-3</option>

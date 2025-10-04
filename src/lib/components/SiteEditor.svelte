@@ -496,9 +496,10 @@
                           
                           <div class="carrier-details">
                             <div class="carrier-field">
-                              <label class="carrier-label-inline">EARFCN DL</label>
+                              <label class="carrier-label-inline" for="earfcn-{sectorIndex}-{channelIndex}">EARFCN DL</label>
                               <input 
-                                type="number" 
+                                type="number"
+                                id="earfcn-{sectorIndex}-{channelIndex}"
                                 bind:value={channel.dlEarfcn}
                                 placeholder="55640"
                                 class="carrier-input"
@@ -509,8 +510,8 @@
                             </div>
                             
                             <div class="carrier-field">
-                              <label class="carrier-label-inline">Bandwidth</label>
-                              <select bind:value={channel.channelBandwidth} class="carrier-select">
+                              <label class="carrier-label-inline" for="bw-{sectorIndex}-{channelIndex}">Bandwidth</label>
+                              <select id="bw-{sectorIndex}-{channelIndex}" bind:value={channel.channelBandwidth} class="carrier-select">
                                 <option value={10}>10 MHz</option>
                                 <option value={15}>15 MHz</option>
                                 <option value={20}>20 MHz</option>
@@ -518,9 +519,10 @@
                             </div>
                             
                             <div class="carrier-field">
-                              <label class="carrier-label-inline">PCI</label>
+                              <label class="carrier-label-inline" for="pci-{sectorIndex}-{channelIndex}">PCI</label>
                               <input 
-                                type="number" 
+                                type="number"
+                                id="pci-{sectorIndex}-{channelIndex}"
                                 bind:value={channel.pci}
                                 placeholder="0"
                                 class="carrier-input-sm"
@@ -1124,50 +1126,7 @@
     background: var(--button-primary-hover);
   }
 
-  .channel-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: var(--surface-secondary);
-    border-radius: var(--border-radius);
-    margin-bottom: 0.5rem;
-  }
-
-  .channel-row:last-child {
-    margin-bottom: 0;
-  }
-
-  .channel-input {
-    width: 100px;
-    padding: 0.375rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--input-bg);
-    color: var(--text-primary);
-    font-size: 0.875rem;
-  }
-
-  .channel-input-sm {
-    width: 60px;
-    padding: 0.375rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--input-bg);
-    color: var(--text-primary);
-    font-size: 0.875rem;
-  }
-
-  .channel-label {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    min-width: 80px;
-  }
-
-  .channel-label-sm {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
+  /* Removed unused channel-row styles - now using carrier-card */
 
   .remove-channel-btn {
     width: 24px;

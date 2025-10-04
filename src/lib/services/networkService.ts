@@ -11,8 +11,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
-  limit,
   Timestamp,
   type QueryConstraint
 } from 'firebase/firestore';
