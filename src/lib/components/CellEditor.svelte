@@ -503,9 +503,7 @@
             <div class="form-group">
               <label for="technology">Technology</label>
               <select id="technology" bind:value={editedCell.technology}>
-                <option value="LTE">LTE</option>
-                <option value="CBRS">CBRS</option>
-                <option value="5G">5G</option>
+                <option value="LTE">LTE (4G)</option>
               </select>
             </div>
           </div>

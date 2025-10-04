@@ -83,6 +83,12 @@
   function addSector() {
     console.log('SiteEditor: Adding sector. Current sectors:', editedSite.sectors.length);
     
+    // Limit to 4 sectors per tower (3-sector or 4-sector configurations)
+    if (editedSite.sectors.length >= 4) {
+      alert('Maximum 4 sectors per tower. LTE towers typically use 3-sector (120°) or 4-sector (90°) configurations.');
+      return;
+    }
+    
     const sectorNumber = editedSite.sectors.length + 1;
     // Smart azimuth suggestion based on existing sectors
     let suggestedAzimuth = 0;
@@ -120,7 +126,7 @@
         }
       ],
       rsPower: -75,
-      technology: 'CBRS'
+      technology: 'LTE'
     };
     
     editedSite.sectors = [...editedSite.sectors, newSector];
@@ -301,7 +307,7 @@
               </svg>
               Add New Sector
             </button>
-            <p class="add-sector-hint">Each sector represents a separate antenna/transmitter on this cell site</p>
+            <p class="add-sector-hint">Add up to 4 sectors (3-sector or 4-sector tower). Each sector can have multiple carriers.</p>
           </div>
           
           {#if editedSite.sectors.length === 0}
@@ -440,9 +446,7 @@
                         <label>
                           Technology
                           <select bind:value={sector.technology}>
-                            <option value="LTE">LTE</option>
-                            <option value="CBRS">CBRS (Band 48)</option>
-                            <option value="5G">5G NR</option>
+                            <option value="LTE">LTE (4G)</option>
                           </select>
                         </label>
                       </div>
