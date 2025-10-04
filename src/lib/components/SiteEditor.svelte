@@ -1221,16 +1221,6 @@
     font-weight: 600;
   }
 
-  .carrier-name-input {
-    flex: 1;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--input-bg);
-    color: var(--text-primary);
-    font-weight: 500;
-  }
-
   .carrier-details {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

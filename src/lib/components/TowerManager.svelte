@@ -805,22 +805,6 @@
     font-size: 0.8rem;
   }
 
-  .tower-frequencies {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .freq-badge {
-    padding: 0.25rem 0.625rem;
-    background: var(--primary-light);
-    color: var(--primary-color);
-    border-radius: var(--border-radius);
-    font-size: 0.8rem;
-    font-weight: 500;
-  }
-
   .tower-actions {
     display: flex;
     align-items: center;

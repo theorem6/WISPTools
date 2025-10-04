@@ -32,7 +32,7 @@
       
       <div class="settings-content">
         <div class="setting-item">
-          <label>Theme</label>
+          <span class="setting-label">Theme</span>
           <ThemeSwitcher />
         </div>
         
@@ -147,7 +147,7 @@
     padding: 0.75rem 0;
   }
 
-  .setting-item label {
+  .setting-label {
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-primary);
