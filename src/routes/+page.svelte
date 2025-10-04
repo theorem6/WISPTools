@@ -40,6 +40,7 @@
   import PCIStatusWidget from '$lib/components/PCIStatusWidget.svelte';
   import VerticalMenu from '$lib/components/VerticalMenu.svelte';
   import SettingsMenu from '$lib/components/SettingsMenu.svelte';
+  import BasemapSwitcher from '$lib/components/BasemapSwitcher.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -68,6 +69,7 @@
   
   let mapContainer: HTMLDivElement;
   let mapInstance: PCIArcGISMapper | null = null;
+  let currentBasemap: string = 'topo-vector';
   
   // Realistic Sample Data with Intentional Conflicts
   // These PCIs are deliberately chosen to create conflicts that CAN be resolved
@@ -120,6 +122,10 @@
       console.log('Page: Waiting for map initialization...');
       await mapInstance.waitForInit();
       console.log('Page: Map initialized, attaching event handlers');
+      
+      // Set initial basemap based on theme
+      const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+      currentBasemap = isDarkMode ? 'dark-gray-vector' : 'topo-vector';
       
       mapInstance.enableCellPopup();
       
@@ -334,6 +340,14 @@
       mapInstance.clearMap();
     }
     pciService.clearCells();
+  }
+  
+  function handleBasemapChange(event: CustomEvent<string>) {
+    const basemapId = event.detail;
+    if (mapInstance) {
+      mapInstance.changeBasemap(basemapId);
+      currentBasemap = basemapId;
+    }
   }
   
   // ========================================================================
@@ -568,7 +582,10 @@
   <!-- Top Left: Brand -->
   <TopBrand />
   
-  <!-- Top Right: PCI Status Widget -->
+  <!-- Top Right: Basemap Switcher -->
+  <BasemapSwitcher currentBasemap={currentBasemap} on:change={handleBasemapChange} />
+  
+  <!-- Right Side: PCI Status Widget -->
   <PCIStatusWidget />
   
   <!-- Left Sidebar: Vertical Menu -->
