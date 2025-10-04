@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { cellsStore } from '../stores/appState';
   import { currentNetwork } from '../stores/networkStore';
   import { convertLegacyToCellSite, convertCellSiteToLegacy, type CellSite } from '../models/cellSite';
@@ -10,6 +10,18 @@
   export let show = false;
   
   const dispatch = createEventDispatcher();
+  
+  // Handle Escape key to close modal
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && show) {
+      close();
+    }
+  }
+  
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
   
   let showSiteEditor = false;
   let selectedSite: CellSite | null = null;

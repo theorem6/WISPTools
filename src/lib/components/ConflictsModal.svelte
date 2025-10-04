@@ -1,11 +1,23 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import type { PCIConflict } from '../pciMapper';
   
   export let show = false;
   export let conflicts: PCIConflict[] = [];
   
   const dispatch = createEventDispatcher();
+  
+  // Handle Escape key to close modal
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && show) {
+      handleClose();
+    }
+  }
+  
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
   
   function handleClose() {
     dispatch('close');

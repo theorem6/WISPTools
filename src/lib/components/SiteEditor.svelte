@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import type { CellSite, Sector, Channel } from '$lib/models/cellSite';
   
   export let site: CellSite | null = null;
@@ -9,6 +9,18 @@
   export let initialLongitude: number | undefined = undefined;
   
   const dispatch = createEventDispatcher();
+  
+  // Handle Escape key to close modal
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && isOpen) {
+      handleClose();
+    }
+  }
+  
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
   
   // Create working copy with default initialization
   let editedSite: CellSite = {

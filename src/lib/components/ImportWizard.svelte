@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import type { Cell } from '../pciMapper';
   import SiteEditor from './SiteEditor.svelte';
   import type { CellSite } from '$lib/models/cellSite';
@@ -8,6 +8,18 @@
   export let show = false;
   
   const dispatch = createEventDispatcher();
+  
+  // Handle Escape key to close modal
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && show) {
+      close();
+    }
+  }
+  
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
   
   let importMethod: 'csv' | 'kml' | 'manual' | null = null;
   let csvFile: FileList | null = null;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { networkStore, currentNetwork, allNetworks, isNetworkLoading } from '../stores/networkStore';
   import { currentUser } from '../stores/authStore';
   import { networkService } from '../services/networkService';
@@ -8,6 +8,18 @@
   export let show = false;
   
   const dispatch = createEventDispatcher();
+  
+  // Handle Escape key to close modal
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && show) {
+      close();
+    }
+  }
+  
+  onMount(() => {
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  });
   
   let view: 'list' | 'create' = 'list';
   let isCreating = false;
