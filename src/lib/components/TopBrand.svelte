@@ -38,6 +38,7 @@
     position: fixed;
     top: 90px;
     left: 20px;
+    width: 180px;
     z-index: 200;
     background: var(--card-bg);
     backdrop-filter: blur(16px);
@@ -117,6 +118,7 @@
     .top-brand {
       top: 90px;
       left: 10px;
+      width: 160px;
       padding: 0.5rem 0.75rem;
     }
 
