@@ -208,8 +208,8 @@
     if (network.cells && network.cells.length > 0) {
       const result = await pciService.loadCells(network.cells);
       if (result.success) {
-        // Render cells on map without analyzing
-        updateMapVisualization();
+        // Analyze loaded network
+        await performAnalysis();
       }
     } else {
       // Empty network - just center on location
@@ -268,8 +268,8 @@
   async function loadSampleData() {
     const result = await pciService.loadCells(sampleCells);
     if (result.success && result.data) {
-      // Render cells on map without analyzing
-      updateMapVisualization();
+      // Analyze sample data
+      await performAnalysis();
     }
   }
   
@@ -277,20 +277,22 @@
     const importedCells = event.detail.cells;
     const result = await pciService.addCells(importedCells);
     if (result.success) {
-      // Render cells on map without analyzing
-      updateMapVisualization();
+      // Analyze and render cells on map
+      await performAnalysis();
       await saveCurrentNetwork(); // Auto-save to network
     }
   }
   
-  async function performAnalysis() {
+  async function performAnalysis(showAlert: boolean = false) {
     console.log('[+page] performAnalysis called');
     const cells = $cellsStore.items;
     console.log('[+page] Analyzing', cells.length, 'cells');
     
     if (!cells.length) {
       console.warn('[+page] No cells to analyze');
-      alert('No cells to analyze. Please add towers first.');
+      if (showAlert) {
+        alert('No cells to analyze. Please add towers first.');
+      }
       return;
     }
     
@@ -301,16 +303,20 @@
       updateMapVisualization();
       console.log('[+page] Analysis complete. Conflicts stored:', $conflictsStore.items.length);
       
-      // Show user feedback
-      const conflictCount = $conflictsStore.items.length;
-      if (conflictCount === 0) {
-        alert(`✅ Analysis complete!\n\nNo PCI conflicts detected.`);
-      } else {
-        alert(`✅ Analysis complete!\n\n${conflictCount} conflict(s) detected.\n\nView details in the Analysis, Conflicts, or Recommendations buttons.`);
+      // Show user feedback only when manually triggered
+      if (showAlert) {
+        const conflictCount = $conflictsStore.items.length;
+        if (conflictCount === 0) {
+          alert(`✅ Analysis complete!\n\nNo PCI conflicts detected.`);
+        } else {
+          alert(`✅ Analysis complete!\n\n${conflictCount} conflict(s) detected.\n\nView details in the Analysis, Conflicts, or Recommendations buttons.`);
+        }
       }
     } else {
       console.error('[+page] Analysis failed:', result.error);
-      alert(`❌ Analysis failed: ${result.error || 'Unknown error'}`);
+      if (showAlert) {
+        alert(`❌ Analysis failed: ${result.error || 'Unknown error'}`);
+      }
     }
   }
   
@@ -441,8 +447,8 @@
         error: null
       });
       
-      // Update map visualization
-      updateMapVisualization();
+      // Re-analyze after deletion
+      await performAnalysis();
       
       // Auto-save
       await saveCurrentNetwork();
@@ -474,8 +480,8 @@
       });
     }
     
-    // Update map visualization
-    updateMapVisualization();
+    // Re-analyze after cell save
+    await performAnalysis();
     
     // Auto-save to network
     await saveCurrentNetwork();
@@ -526,9 +532,9 @@
       console.log(`[+page] Updated site with ${legacyCells.length} carriers. Total cells now: ${cells.length}`);
     }
     
-    // Update map visualization
-    console.log('[+page] Updating map...');
-    updateMapVisualization();
+    // Re-analyze after site save
+    console.log('[+page] Re-analyzing after site save...');
+    await performAnalysis();
     
     // Auto-save to network
     console.log('[+page] Saving to network...');
@@ -543,8 +549,8 @@
   }
   
   async function handleTowersChanged() {
-    // Update map visualization after tower changes
-    updateMapVisualization();
+    // Re-analyze after tower changes
+    await performAnalysis();
     
     // Auto-save to network
     await saveCurrentNetwork();
@@ -594,7 +600,7 @@
     hasConflicts={$hasConflicts}
     on:import={() => showImportWizard = true}
     on:towers={() => showTowerManager = true}
-    on:analyze={performAnalysis}
+    on:analyze={() => performAnalysis(true)}
     on:optimize={optimizePCIAssignments}
     on:analysis={() => uiActions.openModal('showAnalysisModal')}
     on:conflicts={() => uiActions.openModal('showConflictsModal')}
