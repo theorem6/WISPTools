@@ -57,6 +57,8 @@
   .brand-icon {
     color: var(--primary-color);
     flex-shrink: 0;
+    width: 24px;
+    height: 24px;
   }
 
   .brand-info {
@@ -67,7 +69,7 @@
 
   .app-title {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.2;
@@ -82,7 +84,7 @@
     padding: 0;
     cursor: pointer;
     color: var(--text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     transition: all 0.2s;
   }
 
@@ -105,7 +107,7 @@
   }
 
   .network-market {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     opacity: 0.8;
   }
 
