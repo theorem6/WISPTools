@@ -693,6 +693,8 @@ class PCIMapper {
     }
     
     // Different channels have relaxed rules (interference is lower)
+    // Based on industry best practices: MOD3 is critical for TDD (time-synced),
+    // less critical for FDD (not time-synced). MOD30 is rarely a real issue.
     const thresholds = {
       ADJACENT_CHANNEL: {
         critical: 500,
@@ -700,19 +702,19 @@ class PCIMapper {
         medium: 2000
       },
       MOD3: { 
-        critical: 300,  // Less critical on different channels
+        critical: 300,  // RS collision between antenna ports (critical for TDD, moderate for FDD)
         high: 800, 
         medium: 2000 
       },
       MOD6: { 
-        critical: 200, 
+        critical: 200,  // For single-port systems (IBS)
         high: 600, 
         medium: 1500 
       },
       MOD30: { 
-        critical: 100,  // PSS/SSS reuse less critical on different channels
-        high: 300, 
-        medium: 800 
+        critical: 50,   // UL DMRS pattern conflict - "not critical, rarely observed" per industry standards
+        high: 200, 
+        medium: 500 
       }
     };
     
@@ -853,16 +855,16 @@ class PCIMapper {
     }
     
     if (mod30Conflicts.length > 0) {
-      recommendations.push(`📐 ${mod30Conflicts.length} MOD30 conflicts (least destructive) - These are acceptable, lowest priority`);
+      recommendations.push(`📐 ${mod30Conflicts.length} MOD30 conflicts - UL DMRS pattern conflicts (rarely cause real issues in practice)`);
     }
     
-    // Modulus improvement recommendations
+    // Modulus improvement recommendations based on industry best practices
     if (mod3Conflicts.length === 0 && mod6Conflicts.length === 0 && mod30Conflicts.length > 0) {
-      recommendations.push('✅ Excellent modulus quality: Only MOD30 conflicts remain (least destructive type)');
+      recommendations.push('✅ Excellent PCI plan: Only MOD30 conflicts remain (not critical in commercial networks)');
     } else if (mod3Conflicts.length === 0 && mod6Conflicts.length > 0) {
-      recommendations.push('⚡ Good progress: No MOD3 conflicts. Continue optimization to convert MOD6 → MOD30');
+      recommendations.push('⚡ Good progress: No MOD3 conflicts. MOD6 remaining (important for single-antenna systems)');
     } else if (mod3Conflicts.length > 0) {
-      recommendations.push('⚠️ MOD3 conflicts present: Run optimizer to improve modulus quality (MOD3 → MOD6 → MOD30)');
+      recommendations.push('⚠️ MOD3 conflicts present: Run optimizer (critical for TDD, important for FDD with MIMO)');
     }
     
     // Geographic recommendations

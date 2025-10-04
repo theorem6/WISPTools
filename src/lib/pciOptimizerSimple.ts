@@ -65,12 +65,12 @@ export class SimplePCIOptimizer {
     console.log(`📊 Starting: ${originalConflictCount} conflicts`);
     console.log(`   🔴 Critical: ${initialCritical}`);
     console.log(`   🟠 High: ${initialHigh}`);
-    console.log(`   📐 MOD3 Conflicts: ${initialMod3Count} (most destructive)`);
+    console.log(`   📐 MOD3 Conflicts: ${initialMod3Count} (critical for TDD/MIMO)`);
     console.log(`   📊 Modulus Quality: ${initialModulusQuality}`);
-    console.log(`🎯 PRIMARY GOAL: Eliminate MOD3 conflicts`);
-    console.log(`🎯 SECONDARY GOAL: Improve to MOD6/MOD30 (higher modulus = less destructive)`);
-    console.log(`⚡ Strategy: MOD3 → MOD6 → MOD30 progression`);
-    console.log(`📊 Modulus Hierarchy: MOD3 (worst) < MOD6 (moderate) < MOD30 (best)`);
+    console.log(`🎯 PRIMARY GOAL: Eliminate MOD3 conflicts (RS collision)`);
+    console.log(`🎯 SECONDARY GOAL: Reduce MOD6 conflicts (for single-antenna systems)`);
+    console.log(`⚡ Strategy: MOD3 → MOD6 → MOD30 (MOD30 is acceptable end state)`);
+    console.log(`📊 Industry Standard: MOD3 critical (TDD), MOD6 moderate, MOD30 rarely an issue`);
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     let iteration = 0;
@@ -393,15 +393,22 @@ export class SimplePCIOptimizer {
         if (currentMod3Count > 0) {
           console.log(`\n🌟 Critical and High ELIMINATED! But ${currentMod3Count} MOD3 conflicts remain`);
           console.log(`⚡ SON OPTIMIZATION: Converting MOD3 → MOD6/MOD30...`);
-          console.log(`📊 Target: Eliminate all MOD3, maximize MOD30`);
+          console.log(`📊 Target: Eliminate all MOD3 (critical for TDD/MIMO systems)`);
           // Don't break - continue optimizing to improve modulus quality
         } else if (totalConflicts > 0) {
           const mod6Count = conflicts.filter(c => c.conflictType === 'MOD6').length;
           const mod30Count = conflicts.filter(c => c.conflictType === 'MOD30').length;
           console.log(`\n🌟 Critical, High, and MOD3 ELIMINATED!`);
           console.log(`   📊 Remaining: ${mod6Count} MOD6, ${mod30Count} MOD30`);
-          console.log(`⚡ SON OPTIMIZATION: Converting MOD6 → MOD30...`);
-          // Don't break - continue to improve modulus quality
+          if (mod6Count > 0) {
+            console.log(`⚡ Optimizing MOD6 conflicts (important for single-antenna systems)...`);
+            // Continue to reduce MOD6
+          } else {
+            console.log(`✅ Optimal PCI plan achieved! Only MOD30 conflicts remain.`);
+            console.log(`📋 Note: MOD30 conflicts rarely cause real issues in commercial networks`);
+            // MOD30 only is acceptable - we can stop
+            break;
+          }
         }
       }
     }
@@ -474,13 +481,17 @@ export class SimplePCIOptimizer {
       const finalMod6Count = finalConflicts.filter(c => c.conflictType === 'MOD6').length;
       const finalMod30Count = finalConflicts.filter(c => c.conflictType === 'MOD30').length;
       
-      if (finalCritical === 0 && finalHigh === 0 && finalMod3Count === 0) {
-        console.log(`🌟 All critical, high, and MOD3 conflicts eliminated!`);
+      if (finalCritical === 0 && finalHigh === 0 && finalMod3Count === 0 && finalMod6Count === 0) {
+        console.log(`🌟 OPTIMAL PCI PLAN ACHIEVED!`);
+        console.log(`📊 Only ${finalMod30Count} MOD30 conflicts remain`);
+        console.log(`✅ MOD30 conflicts are acceptable - rarely cause issues in commercial networks`);
+      } else if (finalCritical === 0 && finalHigh === 0 && finalMod3Count === 0) {
+        console.log(`🌟 Excellent PCI plan achieved!`);
         console.log(`📊 Remaining: ${finalMod6Count} MOD6, ${finalMod30Count} MOD30`);
-        console.log(`📈 Modulus hierarchy achieved: No MOD3 (most destructive) remaining`);
+        console.log(`📈 No MOD3 conflicts (critical for TDD/MIMO). MOD6 acceptable for multi-antenna systems.`);
       } else if (finalCritical === 0 && finalHigh === 0) {
         console.log(`🌟 All critical and high conflicts eliminated!`);
-        console.log(`📐 ${finalMod3Count} MOD3 conflicts remain - recommend further optimization`);
+        console.log(`📐 ${finalMod3Count} MOD3 conflicts remain - recommend further optimization (critical for TDD)`);
       } else if (reductionPercent < 50) {
         console.warn(`⚠️  Less than 50% reduction - consider manual review`);
       }
