@@ -35,7 +35,8 @@
   .basemap-switcher {
     position: fixed;
     top: 20px;
-    right: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 150;
     display: flex;
     gap: 0.5rem;
@@ -90,7 +91,8 @@
   @media (max-width: 768px) {
     .basemap-switcher {
       top: 10px;
-      right: 10px;
+      left: 50%;
+      transform: translateX(-50%);
       padding: 0.35rem;
       gap: 0.35rem;
     }
