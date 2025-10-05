@@ -1,689 +1,906 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { PCIArcGISMapper } from '$lib/arcgisMap';
+  import { pciService } from '$lib/services/pciService';
+  import type { Cell } from '$lib/pciMapper';
+  
+  // Store imports
+  import {
+    cellsStore,
+    conflictsStore,
+    optimizationStore,
+    analysisStore,
+    uiStore,
+    cellCount,
+    conflictCount,
+    criticalConflictCount,
+    highConflictCount,
+    mediumConflictCount,
+    lowConflictCount,
+    hasData,
+    hasConflicts,
+    isAnyLoading,
+    uiActions,
+    resetAllStores
+  } from '$lib/stores/appState';
+  
+  // Components
+  import ImportWizard from '$lib/components/ImportWizard.svelte';
+  import AnalysisModal from '$lib/components/AnalysisModal.svelte';
+  import ConflictsModal from '$lib/components/ConflictsModal.svelte';
+  import RecommendationsModal from '$lib/components/RecommendationsModal.svelte';
+  import OptimizationResultModal from '$lib/components/OptimizationResultModal.svelte';
+  import ConflictReportExport from '$lib/components/ConflictReportExport.svelte';
+  import NetworkManager from '$lib/components/NetworkManager.svelte';
+  import CellEditor from '$lib/components/CellEditor.svelte';
+  import SiteEditor from '$lib/components/SiteEditor.svelte';
+  import ContextMenu from '$lib/components/ContextMenu.svelte';
+  import TowerManager from '$lib/components/TowerManager.svelte';
+  import TopBrand from '$lib/components/TopBrand.svelte';
+  import PCIStatusWidget from '$lib/components/PCIStatusWidget.svelte';
+  import VerticalMenu from '$lib/components/VerticalMenu.svelte';
+  import SettingsMenu from '$lib/components/SettingsMenu.svelte';
+  import BasemapSwitcher from '$lib/components/BasemapSwitcher.svelte';
+  import type { CellSite } from '$lib/models/cellSite';
+  import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
+  
+  // Auth and Network stores
+  import { authStore, currentUser, isAuthenticated } from '$lib/stores/authStore';
+  import { networkStore, currentNetwork as activeNetwork } from '$lib/stores/networkStore';
+  import { networkService } from '$lib/services/networkService';
+  
+  // Local state for modals
+  let showImportWizard = false;
+  let showNetworkManager = false;
+  let showCellEditor = false;
+  let showSiteEditor = false;
+  let showContextMenu = false;
+  let showTowerManager = false;
+  let showExportModal = false;
+  let contextMenuX = 0;
+  let contextMenuY = 0;
+  let selectedCell: Cell | null = null;
+  let selectedSite: CellSite | null = null;
+  let isCreatingNewCell = false;
+  let isCreatingNewSite = false;
+  let newCellLatitude: number | undefined = undefined;
+  let newCellLongitude: number | undefined = undefined;
+  let contextMenuCellId = '';
+  
+  let mapContainer: HTMLDivElement;
+  let mapInstance: PCIArcGISMapper | null = null;
+  let currentBasemap: string = 'topo-vector';
+  
+  // Realistic Sample Data with Intentional Conflicts
+  // These PCIs are deliberately chosen to create conflicts that CAN be resolved
+  const sampleCells: Cell[] = [
+    // Tower 1 - Manhattan Midtown (3-sector)
+    { id: 'CELL001', eNodeB: 1001, sector: 1, pci: 15, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -75, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL002', eNodeB: 1001, sector: 2, pci: 16, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -77, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL003', eNodeB: 1001, sector: 3, pci: 17, latitude: 40.7580, longitude: -73.9855, frequency: 2100, rsPower: -76, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    
+    // Tower 2 - Near Tower 1 with INTENTIONAL MOD3 conflicts (500m away)
+    { id: 'CELL004', eNodeB: 1002, sector: 1, pci: 18, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -78, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL005', eNodeB: 1002, sector: 2, pci: 19, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -80, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL006', eNodeB: 1002, sector: 3, pci: 20, latitude: 40.7625, longitude: -73.9810, frequency: 2100, rsPower: -79, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    
+    // Tower 3 - Chelsea with MOD6 conflicts (700m from Tower 1)
+    { id: 'CELL007', eNodeB: 1003, sector: 1, pci: 21, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -82, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL008', eNodeB: 1003, sector: 2, pci: 15, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -81, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL009', eNodeB: 1003, sector: 3, pci: 27, latitude: 40.7489, longitude: -73.9980, frequency: 2100, rsPower: -83, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    
+    // Tower 4 - Greenwich Village with more conflicts (800m south)
+    { id: 'CELL010', eNodeB: 1004, sector: 1, pci: 18, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -85, azimuth: 0, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL011', eNodeB: 1004, sector: 2, pci: 24, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -84, azimuth: 120, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    { id: 'CELL012', eNodeB: 1004, sector: 3, pci: 21, latitude: 40.7350, longitude: -74.0027, frequency: 2100, rsPower: -86, azimuth: 240, technology: 'LTE', earfcn: 1950, centerFreq: 2100, channelBandwidth: 20, dlEarfcn: 1950, ulEarfcn: 1850 },
+    
+    // Tower 5 - CBRS 4-sector in Midtown East (different frequency, fewer conflicts)
+    { id: 'CELL013', eNodeB: 1005, sector: 1, pci: 100, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -70, azimuth: 0, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
+    { id: 'CELL014', eNodeB: 1005, sector: 2, pci: 103, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -72, azimuth: 90, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
+    { id: 'CELL015', eNodeB: 1005, sector: 3, pci: 106, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -71, azimuth: 180, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 },
+    { id: 'CELL016', eNodeB: 1005, sector: 4, pci: 109, latitude: 40.7527, longitude: -73.9772, frequency: 3550, rsPower: -73, azimuth: 270, technology: 'CBRS', earfcn: 55650, centerFreq: 3550, channelBandwidth: 20, dlEarfcn: 55650, ulEarfcn: 55650 }
+  ];
+  
+  // ========================================================================
+  // Auth Guard - Redirect to login if not authenticated
+  // ========================================================================
+  
   import { goto } from '$app/navigation';
-  import { authService } from '$lib/services/authService';
-  import { authStore, isAuthenticated } from '$lib/stores/authStore';
   
-  let mode: 'signin' | 'signup' | 'reset' = 'signin';
-  let email = '';
-  let password = '';
-  let confirmPassword = '';
-  let displayName = '';
-  let isLoading = false;
-  let error = '';
-  
-  // Redirect if already authenticated
-  onMount(() => {
-    if ($isAuthenticated) {
-      goto('/');
+  onMount(async () => {
+    // Check authentication and redirect if needed
+    if (!$authStore.isLoading && !$isAuthenticated) {
+      goto('/login');
+      return;
+    }
+    
+    if (mapContainer) {
+      console.log('Page: Creating map instance');
+      mapInstance = new PCIArcGISMapper(mapContainer);
+      
+      // Wait for the map to fully initialize
+      console.log('Page: Waiting for map initialization...');
+      await mapInstance.waitForInit();
+      console.log('Page: Map initialized, attaching event handlers');
+      
+      // Set initial basemap based on theme
+      const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+      currentBasemap = isDarkMode ? 'dark-gray-vector' : 'topo-vector';
+      
+      mapInstance.enableCellPopup();
+      
+      // Enable cell click to open editor
+      mapInstance.onCellClick((cellId) => {
+        handleCellClick(cellId);
+      });
+      
+      // Enable right-click to show context menu
+      console.log('Page: Attaching right-click handler');
+      mapInstance.onMapRightClick((latitude, longitude, screenX, screenY, cellId) => {
+        console.log('Page: Right-click callback triggered', latitude, longitude, cellId);
+        handleMapRightClick(latitude, longitude, screenX, screenY, cellId);
+      });
+      
+      console.log('Page: All event handlers attached');
     }
   });
   
-  $: if ($isAuthenticated) {
-    goto('/');
-  }
-  
-  function resetForm() {
-    email = '';
-    password = '';
-    confirmPassword = '';
-    displayName = '';
-    error = '';
-    isLoading = false;
-  }
-  
-  function switchMode(newMode: 'signin' | 'signup' | 'reset') {
-    mode = newMode;
-    error = '';
-  }
-  
-  async function handleSignIn() {
-    if (!email || !password) {
-      error = 'Please fill in all fields';
-      return;
+  // Redirect if user logs out and clear all state
+  $: if (!$authStore.isLoading && !$isAuthenticated) {
+    // Clear all app state
+    resetAllStores();     // Resets cells, conflicts, optimization, analysis, UI stores
+    networkStore.clear(); // Clear network store
+    pciService.clearCells(); // Clear PCI service internal state
+    
+    // Clear the map
+    if (mapInstance) {
+      mapInstance.clearMap();
     }
     
-    isLoading = true;
-    error = '';
+    goto('/login');
+  }
+  
+  // Load user's networks when authenticated
+  $: if ($isAuthenticated && $currentUser) {
+    loadUserNetworks();
+  }
+  
+  // Sync current network cells with cell store
+  $: if ($activeNetwork) {
+    syncNetworkCells($activeNetwork);
+  }
+  
+  async function loadUserNetworks() {
+    if (!$currentUser) return;
     
-    const result = await authService.signIn(email, password);
+    networkStore.setLoading(true);
+    const result = await networkService.getUserNetworks($currentUser.uid);
     
-    if (result.success) {
-      goto('/');
+    if (result.success && result.data) {
+      networkStore.setNetworks(result.data);
+      
+      // If no current network, select the first one
+      if (!$activeNetwork && result.data.length > 0) {
+        networkStore.setCurrentNetwork(result.data[0]);
+      }
     } else {
-      error = result.error || 'Sign in failed';
-      isLoading = false;
+      console.error('Failed to load networks:', result.error);
+      
+      // If index error, show helpful message but don't block the app
+      if (result.error?.includes('index')) {
+        console.warn('⚠️  Firestore index not created yet. Networks will load after you create the index.');
+        console.warn('📋 Click the link in the error above to auto-create the index in Firebase Console.');
+        
+        // Set empty networks array so app still works
+        networkStore.setNetworks([]);
+      }
+    }
+    
+    networkStore.setLoading(false);
+  }
+  
+  async function syncNetworkCells(network: any) {
+    // Wait for map to be ready before centering
+    if (mapInstance && network.location) {
+      await centerMapOnNetwork(network);
+    }
+    
+    if (network.cells && network.cells.length > 0) {
+      const result = await pciService.loadCells(network.cells);
+      if (result.success) {
+        // Analyze loaded network
+        await performAnalysis();
+      }
+    } else {
+      // Empty network - just center on location
+      pciService.clearCells();
     }
   }
   
-  async function handleSignUp() {
-    if (!email || !password) {
-      error = 'Please fill in all fields';
+  async function centerMapOnNetwork(network: any) {
+    if (!mapInstance || !network.location) return;
+    
+    // Wait for map to be fully initialized
+    try {
+      await mapInstance.waitForInit();
+    } catch (error) {
+      console.warn('Map not ready for centering:', error);
       return;
     }
     
-    if (password !== confirmPassword) {
-      error = 'Passwords do not match';
-      return;
-    }
+    const location = network.location;
+    const targetZoom = location.zoom || 12;
     
-    if (password.length < 6) {
-      error = 'Password must be at least 6 characters';
-      return;
-    }
-    
-    isLoading = true;
-    error = '';
-    
-    const result = await authService.signUp(email, password, displayName);
-    
-    if (result.success) {
-      goto('/');
-    } else {
-      error = result.error || 'Sign up failed';
-      isLoading = false;
+    // Center map on network location
+    if (mapInstance.mapView && mapInstance.mapView.ready) {
+      try {
+        await mapInstance.mapView.goTo({
+          center: [location.longitude, location.latitude],
+          zoom: targetZoom
+        }, {
+          animate: true,
+          duration: 1000
+        });
+        console.log('Map centered on network location:', location.latitude, location.longitude);
+      } catch (error: any) {
+        // Ignore "goto-interrupted" errors - these are expected when new data loads
+        if (error?.name === 'view:goto-interrupted') {
+          console.log('Map centering interrupted by new data load (expected)');
+          return;
+        }
+        console.warn('Map centering failed:', error);
+      }
     }
   }
   
-  async function handleGoogleSignIn() {
-    isLoading = true;
-    error = '';
+  async function saveCurrentNetwork() {
+    if (!$activeNetwork || !$isAuthenticated) return;
     
-    const result = await authService.signInWithGoogle();
-    
-    if (result.success) {
-      goto('/');
-    } else {
-      error = result.error || 'Google sign in failed';
-      isLoading = false;
+    const cells = $cellsStore.items;
+    await networkService.updateNetworkCells($activeNetwork.id, cells);
+    networkStore.updateCurrentNetworkCells(cells);
+  }
+  
+  // ========================================================================
+  // Event Handlers - Delegated to service layer
+  // ========================================================================
+  
+  async function loadSampleData() {
+    const result = await pciService.loadCells(sampleCells);
+    if (result.success && result.data) {
+      // Analyze sample data
+      await performAnalysis();
     }
   }
   
-  async function handlePasswordReset() {
-    if (!email) {
-      error = 'Please enter your email address';
+  async function handleManualImport(event: CustomEvent) {
+    const importedCells = event.detail.cells;
+    const result = await pciService.addCells(importedCells);
+    if (result.success) {
+      // Analyze and render cells on map
+      await performAnalysis();
+      await saveCurrentNetwork(); // Auto-save to network
+    }
+  }
+  
+  async function performAnalysis(showAlert: boolean = false) {
+    console.log('[+page] performAnalysis called');
+    const cells = $cellsStore.items;
+    console.log('[+page] Analyzing', cells.length, 'cells');
+    
+    if (!cells.length) {
+      console.warn('[+page] No cells to analyze');
+      if (showAlert) {
+        alert('No cells to analyze. Please add towers first.');
+      }
       return;
     }
     
-    isLoading = true;
-    error = '';
+    const result = await pciService.performAnalysis(cells);
+    console.log('[+page] Analysis result:', result.success, 'conflicts:', result.data?.conflicts?.length);
     
-    const result = await authService.resetPassword(email);
-    
-    if (result.success) {
-      alert('Password reset email sent! Check your inbox.');
-      mode = 'signin';
-      resetForm();
+    if (result.success && result.data) {
+      updateMapVisualization();
+      console.log('[+page] Analysis complete. Conflicts stored:', $conflictsStore.items.length);
+      
+      // Show user feedback only when manually triggered
+      if (showAlert) {
+        const conflictCount = $conflictsStore.items.length;
+        if (conflictCount === 0) {
+          alert(`✅ Analysis complete!\n\nNo PCI conflicts detected.`);
+        } else {
+          alert(`✅ Analysis complete!\n\n${conflictCount} conflict(s) detected.\n\nView details in the Analysis, Conflicts, or Recommendations buttons.`);
+        }
+      }
     } else {
-      error = result.error || 'Password reset failed';
+      console.error('[+page] Analysis failed:', result.error);
+      if (showAlert) {
+        alert(`❌ Analysis failed: ${result.error || 'Unknown error'}`);
+      }
+    }
+  }
+  
+  async function optimizePCIAssignments() {
+    const cells = $cellsStore.items;
+    if (!cells.length) {
+      alert('No cells loaded.');
+      return;
     }
     
-    isLoading = false;
+    const conflicts = $conflictsStore.items;
+    if (!conflicts.length) {
+      alert('No conflicts detected.');
+      return;
+    }
+    
+    const result = await pciService.optimizePCIs(cells);
+    if (result.success) {
+      updateMapVisualization();
+      uiActions.openModal('showOptimizationResultModal');
+      await saveCurrentNetwork(); // Auto-save optimized network
+    }
+  }
+
+  function clearMap() {
+      if (mapInstance) {
+      mapInstance.clearMap();
+    }
+    pciService.clearCells();
+  }
+  
+  function handleBasemapChange(event: CustomEvent<string>) {
+    const basemapId = event.detail;
+    if (mapInstance) {
+      mapInstance.changeBasemap(basemapId);
+      currentBasemap = basemapId;
+    }
+  }
+  
+  // ========================================================================
+  // Map Visualization - Isolated map rendering logic
+  // ========================================================================
+  
+  function updateMapVisualization() {
+    if (!mapInstance) return;
+    
+    const cells = $cellsStore.items;
+    const conflicts = $conflictsStore.items;
+    
+    if (cells.length > 0) {
+      // Pass conflicts to renderCells for color-coding
+      mapInstance.renderCells(cells, conflicts);
+    }
+    
+        if (conflicts.length > 0) {
+          mapInstance.renderConflicts(conflicts);
+        }
+      }
+      
+  // Reactive statement to update map when cells or conflicts change
+  $: if (mapInstance && $cellsStore.items.length > 0) {
+    updateMapVisualization();
+  }
+  
+  // Update map when conflicts change (color updates)
+  $: if (mapInstance && $conflictsStore.items) {
+    updateMapVisualization();
+  }
+  
+  // ========================================================================
+  // Cell Editor - Handle cell editing and creation
+  // ========================================================================
+  
+  function handleCellClick(cellId: string) {
+    const cell = $cellsStore.items.find(c => c.id === cellId);
+    if (cell) {
+      selectedCell = cell;
+      isCreatingNewCell = false;
+      showCellEditor = true;
+    }
+  }
+  
+  function handleMapRightClick(latitude: number, longitude: number, screenX: number, screenY: number, cellId: string | null) {
+    // Store click information
+    newCellLatitude = latitude;
+    newCellLongitude = longitude;
+    contextMenuCellId = cellId || '';
+    
+    // Show context menu at click position
+    contextMenuX = screenX;
+    contextMenuY = screenY;
+    showContextMenu = true;
+  }
+  
+  function handleContextMenuAddSite() {
+    showContextMenu = false;
+    selectedSite = null;
+    isCreatingNewSite = true;
+    showSiteEditor = true;
+  }
+  
+  function handleContextMenuImport() {
+    showContextMenu = false;
+    showImportWizard = true;
+  }
+  
+  function handleContextMenuEditSector() {
+    showContextMenu = false;
+    const cell = $cellsStore.items.find(c => c.id === contextMenuCellId);
+    if (cell) {
+      selectedCell = cell;
+      isCreatingNewCell = false;
+      showCellEditor = true;
+    }
+  }
+  
+  async function handleContextMenuDeleteSector() {
+    showContextMenu = false;
+    
+    if (!contextMenuCellId) return;
+    
+    if (confirm(`Delete sector ${contextMenuCellId}?`)) {
+      // Remove from store
+      const cells = $cellsStore.items.filter(c => c.id !== contextMenuCellId);
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+      
+      // Re-analyze after deletion
+      await performAnalysis();
+      
+      // Auto-save
+      await saveCurrentNetwork();
+      
+      console.log('Sector deleted:', contextMenuCellId);
+    }
+  }
+  
+  async function handleCellSave(event: CustomEvent) {
+    const updatedCell = event.detail as Cell;
+    
+    if (isCreatingNewCell) {
+      // Add new cell to store
+      const cells = [...$cellsStore.items, updatedCell];
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+    } else {
+      // Update existing cell in store
+      const cells = $cellsStore.items.map(c => 
+        c.id === updatedCell.id ? updatedCell : c
+      );
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+    }
+    
+    // Re-analyze after cell save
+    await performAnalysis();
+    
+    // Auto-save to network
+    await saveCurrentNetwork();
+    
+    // Reset state
+    showCellEditor = false;
+    selectedCell = null;
+    isCreatingNewCell = false;
+    newCellLatitude = undefined;
+    newCellLongitude = undefined;
+  }
+  
+  async function handleSiteSave(event: CustomEvent) {
+    const savedSite = event.detail as CellSite;
+    
+    console.log('[+page] Site saved:', savedSite);
+    console.log('[+page] Site has', savedSite.sectors.length, 'sectors');
+    
+    // Convert site to legacy cell format for analysis
+    const legacyCells = convertCellSiteToLegacy([savedSite]);
+    console.log('[+page] Converted to', legacyCells.length, 'carriers for analysis');
+    if (legacyCells.length > 0) {
+      console.log('[+page] Sample cell:', JSON.stringify(legacyCells[0], null, 2));
+    }
+    
+    if (isCreatingNewSite) {
+      // Add all sectors from the new site to store
+      const cells = [...$cellsStore.items, ...legacyCells];
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+      console.log(`[+page] Added ${legacyCells.length} carriers from new site. Total cells now: ${cells.length}`);
+    } else {
+      // Update existing site's sectors
+      // Remove old sectors from this site, add new ones
+      const siteId = savedSite.id;
+      const cells = [
+        ...$cellsStore.items.filter(c => !c.id.startsWith(siteId)),
+        ...legacyCells
+      ];
+      cellsStore.set({ 
+        items: cells,
+        isLoading: false,
+        error: null
+      });
+      console.log(`[+page] Updated site with ${legacyCells.length} carriers. Total cells now: ${cells.length}`);
+    }
+    
+    // Re-analyze after site save
+    console.log('[+page] Re-analyzing after site save...');
+    await performAnalysis();
+    
+    // Auto-save to network
+    console.log('[+page] Saving to network...');
+    await saveCurrentNetwork();
+    
+    // Reset state
+    showSiteEditor = false;
+    selectedSite = null;
+    isCreatingNewSite = false;
+    newCellLatitude = undefined;
+    newCellLongitude = undefined;
+  }
+  
+  async function handleTowersChanged() {
+    // Re-analyze after tower changes
+    await performAnalysis();
+    
+    // Auto-save to network
+    await saveCurrentNetwork();
+  }
+  
+  function handleNetworkDeleted(event: CustomEvent) {
+    const deletedNetworkId = event.detail;
+    console.log('Network deleted, clearing cells and map:', deletedNetworkId);
+    
+    // Clear all cells from the store
+    pciService.clearCells();
+    
+    // Clear the map
+    if (mapInstance) {
+      mapInstance.clearMap();
+    }
   }
 </script>
 
-<div class="login-page">
-  <div class="login-container">
-    <!-- Left Side - Branding -->
-    <div class="login-brand">
-      <div class="brand-content">
-        <div class="brand-icon-large">
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
-        </div>
-        <h1>LTE PCI Mapper</h1>
-        <p class="tagline">Professional Network Planning & Conflict Resolution</p>
-        
-        <div class="features">
-          <div class="feature-item">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-            </svg>
-            <span>Real-time Conflict Detection</span>
-          </div>
-          <div class="feature-item">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 6v6l4 2"></path>
-            </svg>
-            <span>AI-Powered Optimization</span>
-          </div>
-          <div class="feature-item">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            <span>Multi-Network Management</span>
-          </div>
-        </div>
+{#if $isAuthenticated}
+<!-- Full Screen Map -->
+<div class="app">
+  <!-- Map Background -->
+  <div class="map-fullscreen" bind:this={mapContainer}>
+    {#if $isAnyLoading}
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Analyzing...</p>
       </div>
-    </div>
-    
-    <!-- Right Side - Auth Form -->
-    <div class="login-form-container">
-      <div class="login-form">
-        <h2>
-          {#if mode === 'signin'}
-            Welcome Back
-          {:else if mode === 'signup'}
-            Create Account
-          {:else}
-            Reset Password
-          {/if}
-        </h2>
-        <p class="subtitle">
-          {#if mode === 'signin'}
-            Sign in to access your networks
-          {:else if mode === 'signup'}
-            Start planning your LTE deployment
-          {:else}
-            We'll send you a reset link
-          {/if}
-        </p>
-        
-        <!-- Firebase Setup Notice -->
-        {#if error && error.includes('Bad Request')}
-          <div class="setup-notice">
-            <h4>⚙️ Firebase Setup Required</h4>
-            <p>To enable authentication, please:</p>
-            <ol>
-              <li>Go to <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
-              <li>Navigate to Authentication → Sign-in method</li>
-              <li>Enable "Email/Password" provider</li>
-              <li>Optionally enable "Google" provider</li>
-              <li>Refresh this page</li>
-            </ol>
-            <p class="note"><strong>For testing:</strong> You can create a test account after enabling Email/Password authentication.</p>
-          </div>
-        {:else if error}
-          <div class="error-message">{error}</div>
-        {/if}
-        
-        {#if mode === 'signin'}
-          <form on:submit|preventDefault={handleSignIn}>
-            <div class="form-group">
-              <label for="email">Email Address</label>
-              <input 
-                type="email" 
-                id="email"
-                bind:value={email} 
-                placeholder="your@email.com"
-                required
-                disabled={isLoading}
-                autocomplete="email"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label for="password">Password</label>
-              <input 
-                type="password" 
-                id="password"
-                bind:value={password} 
-                placeholder="Enter your password"
-                required
-                disabled={isLoading}
-                autocomplete="current-password"
-              />
-            </div>
-            
-            <button type="submit" class="auth-btn primary" disabled={isLoading}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
-            </button>
-          </form>
-          
-          <div class="divider">or</div>
-          
-          <button class="auth-btn google" on:click={handleGoogleSignIn} disabled={isLoading}>
-            <svg width="20" height="20" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continue with Google
-          </button>
-          
-          <div class="auth-footer">
-            <button class="link-btn" on:click={() => switchMode('reset')}>
-              Forgot password?
-            </button>
-            <span class="separator">•</span>
-            <button class="link-btn" on:click={() => switchMode('signup')}>
-              Create account
-            </button>
-          </div>
-        {:else if mode === 'signup'}
-          <form on:submit|preventDefault={handleSignUp}>
-            <div class="form-group">
-              <label for="displayName">Display Name (Optional)</label>
-              <input 
-                type="text" 
-                id="displayName"
-                bind:value={displayName} 
-                placeholder="John Doe"
-                disabled={isLoading}
-                autocomplete="name"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label for="email">Email Address</label>
-              <input 
-                type="email" 
-                id="email"
-                bind:value={email} 
-                placeholder="your@email.com"
-                required
-                disabled={isLoading}
-                autocomplete="email"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label for="password">Password</label>
-              <input 
-                type="password" 
-                id="password"
-                bind:value={password} 
-                placeholder="At least 6 characters"
-                required
-                disabled={isLoading}
-                autocomplete="new-password"
-              />
-            </div>
-            
-            <div class="form-group">
-              <label for="confirmPassword">Confirm Password</label>
-              <input 
-                type="password" 
-                id="confirmPassword"
-                bind:value={confirmPassword} 
-                placeholder="Re-enter password"
-                required
-                disabled={isLoading}
-                autocomplete="new-password"
-              />
-            </div>
-            
-            <button type="submit" class="auth-btn primary" disabled={isLoading}>
-              {isLoading ? 'Creating Account...' : 'Create Account'}
-            </button>
-          </form>
-          
-          <div class="auth-footer">
-            <span>Already have an account?</span>
-            <button class="link-btn" on:click={() => switchMode('signin')}>
-              Sign in
-            </button>
-          </div>
-        {:else}
-          <form on:submit|preventDefault={handlePasswordReset}>
-            <p class="reset-info">Enter your email and we'll send you a password reset link.</p>
-            
-            <div class="form-group">
-              <label for="email">Email Address</label>
-              <input 
-                type="email" 
-                id="email"
-                bind:value={email} 
-                placeholder="your@email.com"
-                required
-                disabled={isLoading}
-                autocomplete="email"
-              />
-            </div>
-            
-            <button type="submit" class="auth-btn primary" disabled={isLoading}>
-              {isLoading ? 'Sending...' : 'Send Reset Link'}
-            </button>
-          </form>
-          
-          <div class="auth-footer">
-            <button class="link-btn" on:click={() => switchMode('signin')}>
-              ← Back to sign in
-            </button>
-          </div>
-        {/if}
-      </div>
-    </div>
+    {/if}
   </div>
-</div>
+
+  <!-- New UI Layout: Separate Positioned Elements -->
+  
+  <!-- Top Left: Brand -->
+  <TopBrand />
+  
+  <!-- Top Right: Basemap Switcher -->
+  <BasemapSwitcher currentBasemap={currentBasemap} on:change={handleBasemapChange} />
+  
+  <!-- Right Side: PCI Status Widget -->
+  <PCIStatusWidget />
+  
+  <!-- Left Sidebar: Vertical Menu -->
+  <VerticalMenu 
+    hasData={$hasData}
+    hasConflicts={$hasConflicts}
+    on:import={() => showImportWizard = true}
+    on:towers={() => showTowerManager = true}
+    on:analyze={() => performAnalysis(true)}
+    on:optimize={optimizePCIAssignments}
+    on:analysis={() => uiActions.openModal('showAnalysisModal')}
+    on:conflicts={() => uiActions.openModal('showConflictsModal')}
+    on:recommendations={() => uiActions.openModal('showRecommendationsModal')}
+    on:export={() => showExportModal = true}
+    on:networks={() => showNetworkManager = true}
+  />
+  
+  <!-- Bottom Right: Settings Gear Menu -->
+  <SettingsMenu />
+
+  <!-- Modular Components - Isolated and reusable -->
+  <NetworkManager 
+    show={showNetworkManager}
+    on:close={() => showNetworkManager = false}
+    on:networkCreated={() => {}}
+    on:networkSelected={() => {}}
+    on:networkDeleted={handleNetworkDeleted}
+  />
+  
+  <ImportWizard 
+    show={showImportWizard}
+    on:import={handleManualImport}
+    on:close={() => showImportWizard = false}
+  />
+  
+  <AnalysisModal 
+    show={$uiStore.showAnalysisModal}
+    analysis={$conflictsStore.analysis}
+    conflicts={$conflictsStore.items}
+    on:close={() => uiActions.closeModal('showAnalysisModal')}
+  />
+  
+  <ConflictsModal 
+    show={$uiStore.showConflictsModal}
+    conflicts={$conflictsStore.items}
+    on:close={() => uiActions.closeModal('showConflictsModal')}
+  />
+  
+  <RecommendationsModal 
+    show={$uiStore.showRecommendationsModal}
+    geminiAnalysis={$analysisStore.geminiAnalysis}
+    on:close={() => uiActions.closeModal('showRecommendationsModal')}
+  />
+  
+  <OptimizationResultModal 
+    show={$uiStore.showOptimizationResultModal}
+    result={$optimizationStore.result}
+    on:close={() => uiActions.closeModal('showOptimizationResultModal')}
+  />
+  
+  <CellEditor 
+    cell={selectedCell}
+    isOpen={showCellEditor}
+    isNewCell={isCreatingNewCell}
+    initialLatitude={newCellLatitude}
+    initialLongitude={newCellLongitude}
+    on:save={handleCellSave}
+    on:close={() => { 
+      showCellEditor = false; 
+      selectedCell = null; 
+      isCreatingNewCell = false;
+      newCellLatitude = undefined;
+      newCellLongitude = undefined;
+    }}
+  />
+  
+  <SiteEditor 
+    site={selectedSite}
+    isOpen={showSiteEditor}
+    isNewSite={isCreatingNewSite}
+    initialLatitude={newCellLatitude}
+    initialLongitude={newCellLongitude}
+    on:save={handleSiteSave}
+    on:close={() => { 
+      showSiteEditor = false; 
+      selectedSite = null; 
+      isCreatingNewSite = false;
+      newCellLatitude = undefined;
+      newCellLongitude = undefined;
+    }}
+  />
+  
+  <ContextMenu 
+    show={showContextMenu}
+    x={contextMenuX}
+    y={contextMenuY}
+    hasSelectedCell={!!contextMenuCellId}
+    cellId={contextMenuCellId}
+    on:addSite={handleContextMenuAddSite}
+    on:import={handleContextMenuImport}
+    on:editSector={handleContextMenuEditSector}
+    on:deleteSector={handleContextMenuDeleteSector}
+    on:close={() => showContextMenu = false}
+  />
+  
+  <TowerManager 
+    show={showTowerManager}
+    on:towersChanged={handleTowersChanged}
+    on:close={() => showTowerManager = false}
+  />
+  
+  <!-- Export Modal -->
+  {#if showExportModal}
+    <div 
+      class="modal-overlay" 
+      role="presentation"
+      on:click={() => showExportModal = false}
+      on:keydown={(e) => e.key === 'Escape' && (showExportModal = false)}
+    >
+      <div 
+        class="modal-container" 
+        role="dialog"
+        tabindex="-1"
+        aria-labelledby="export-modal-title"
+        on:click|stopPropagation
+        on:keydown|stopPropagation
+      >
+        <div class="modal-header">
+          <h3 id="export-modal-title">📤 Export & Configuration</h3>
+          <button class="modal-close-btn" on:click={() => showExportModal = false}>×</button>
+        </div>
+        <div class="modal-body">
+          <ConflictReportExport 
+            cells={$cellsStore.items} 
+            conflicts={$conflictsStore.items} 
+            recommendations={$analysisStore.recommendations} 
+          />
+        </div>
+      </div>
+    </div>
+  {/if}
+  
+        </div>
+          {:else}
+  <!-- Loading state while checking auth -->
+  <div class="auth-loading">
+    <div class="spinner"></div>
+    <p>Loading...</p>
+    </div>
+  {/if}
 
 <style>
-  .login-page {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-  }
-
-  .login-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    max-width: 1100px;
-    width: 100%;
-    background: var(--card-bg);
-    border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    overflow: hidden;
-  }
-
-  .login-brand {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 4rem 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-  }
-
-  .brand-content {
-    text-align: center;
-  }
-
-  .brand-icon-large {
-    margin-bottom: 2rem;
-    display: flex;
-    justify-content: center;
-  }
-
-  .brand-icon-large svg {
-    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
-  }
-
-  .login-brand h1 {
-    margin: 0 0 0.5rem 0;
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: white;
-  }
-
-  .tagline {
-    margin: 0 0 3rem 0;
-    font-size: 1.125rem;
-    color: rgba(255,255,255,0.9);
-  }
-
-  .features {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    text-align: left;
-  }
-
-  .feature-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    color: white;
-  }
-
-  .feature-item svg {
-    flex-shrink: 0;
-  }
-
-  .feature-item span {
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
-  .login-form-container {
-    padding: 4rem 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .login-form {
-    width: 100%;
-    max-width: 400px;
-  }
-
-  .login-form h2 {
-    margin: 0 0 0.5rem 0;
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .subtitle {
-    margin: 0 0 2rem 0;
-    font-size: 1rem;
-    color: var(--text-secondary);
-  }
-
-  .error-message {
-    padding: 1rem;
-    background: var(--danger-light);
-    border-left: 4px solid var(--danger-color);
-    border-radius: var(--border-radius);
-    color: var(--text-primary);
-    margin-bottom: 1.5rem;
-    font-size: 0.9rem;
-  }
-
-  .setup-notice {
-    padding: 1.5rem;
-    background: var(--info-light);
-    border-left: 4px solid var(--info-color);
-    border-radius: var(--border-radius);
-    margin-bottom: 1.5rem;
-  }
-
-  .setup-notice h4 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.125rem;
-  }
-
-  .setup-notice p {
-    margin: 0 0 0.75rem 0;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-  }
-
-  .setup-notice ol {
-    margin: 0.75rem 0;
-    padding-left: 1.5rem;
-    color: var(--text-primary);
-  }
-
-  .setup-notice li {
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-  }
-
-  .setup-notice a {
-    color: var(--primary-color);
-    text-decoration: underline;
-    font-weight: 500;
-  }
-
-  .setup-notice .note {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
-
-  .reset-info {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-    margin-bottom: 1.5rem;
-  }
-
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .form-group label {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-  }
-
-  .form-group input {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--input-bg);
-    color: var(--text-primary);
-    font-size: 1rem;
-    transition: all var(--transition);
-  }
-
-  .form-group input:focus {
-    outline: none;
-    border-color: var(--border-focus);
-    box-shadow: var(--focus-ring);
-  }
-
-  .form-group input:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .auth-btn {
-    width: 100%;
-    padding: 1rem;
-    border: none;
-    border-radius: var(--border-radius);
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all var(--transition);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
-  }
-
-  .auth-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .auth-btn.primary {
-    background: var(--primary-color);
-    color: white;
-  }
-
-  .auth-btn.primary:hover:not(:disabled) {
-    background: var(--button-primary-hover);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .auth-btn.google {
-    background: white;
-    color: #1f1f1f;
-    border: 1px solid var(--border-color);
-  }
-
-  .auth-btn.google:hover:not(:disabled) {
-    background: var(--hover-bg);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .divider {
-    text-align: center;
-    color: var(--text-tertiary);
-    font-size: 0.875rem;
-    margin: 1.5rem 0;
+  /* App Container */
+  .app {
     position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-primary);
   }
 
-  .divider::before,
-  .divider::after {
-    content: '';
+  /* Full Screen Map */
+  .map-fullscreen {
     position: absolute;
-    top: 50%;
-    width: 42%;
-    height: 1px;
-    background: var(--border-color);
+    inset: 0;
+    z-index: 0;
   }
 
-  .divider::before {
-    left: 0;
+  .loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 10;
   }
 
-  .divider::after {
-    right: 0;
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
   }
 
-  .auth-footer {
-    margin-top: 2rem;
-    text-align: center;
-    font-size: 0.9rem;
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .auth-loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+  }
+
+  .auth-loading .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  .auth-loading p {
     color: var(--text-secondary);
+    font-size: 1rem;
+  }
+
+  /* Removed old topbar styles - now using separate positioned components */
+  
+  /* Modal Overlay for Export */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 99998;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease-out;
   }
 
-  .separator {
-    color: var(--text-tertiary);
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
-  .link-btn {
-    background: none;
-    border: none;
-    color: var(--primary-color);
+  .modal-container {
+    background: var(--card-bg);
+    border-radius: 12px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    animation: slideUp 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 99999;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-secondary);
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
     font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .modal-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 1.5rem;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .modal-close-btn:hover {
+    background: var(--danger-light);
+    color: var(--danger-color);
+  }
+
+  .modal-body {
+    overflow-y: auto;
     padding: 0;
-    transition: all var(--transition);
-  }
-
-  .link-btn:hover {
-    color: var(--button-primary-hover);
-    text-decoration: underline;
-  }
-
-  @media (max-width: 1024px) {
-    .login-container {
-      grid-template-columns: 1fr;
-    }
-
-    .login-brand {
-      padding: 3rem 2rem;
-    }
-
-    .features {
-      display: none;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .login-page {
-      padding: 1rem;
-    }
-
-    .login-form-container {
-      padding: 2rem 1.5rem;
-    }
-
-    .login-brand h1 {
-      font-size: 2rem;
-    }
   }
 </style>
-
