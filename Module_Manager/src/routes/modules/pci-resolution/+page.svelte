@@ -102,17 +102,14 @@
   ];
   
   // ========================================================================
-  // Auth Guard - Redirect to login if not authenticated
+  // Initialization
   // ========================================================================
   
   import { goto } from '$app/navigation';
   
   onMount(async () => {
-    // Check authentication and redirect if needed
-    if (!$authStore.isLoading && !$isAuthenticated) {
-      goto('/login');
-      return;
-    }
+    // Note: Auth is handled by Module_Manager dashboard
+    // Users must be authenticated to reach this page
     
     if (mapContainer) {
       console.log('Page: Creating map instance');
@@ -145,20 +142,7 @@
     }
   });
   
-  // Redirect if user logs out and clear all state
-  $: if (!$authStore.isLoading && !$isAuthenticated) {
-    // Clear all app state
-    resetAllStores();     // Resets cells, conflicts, optimization, analysis, UI stores
-    networkStore.clear(); // Clear network store
-    pciService.clearCells(); // Clear PCI service internal state
-    
-    // Clear the map
-    if (mapInstance) {
-      mapInstance.clearMap();
-    }
-    
-    goto('/login');
-  }
+  // Note: Auth redirects removed - handled by Module_Manager dashboard
   
   // Load user's networks when authenticated
   $: if ($isAuthenticated && $currentUser) {
@@ -570,8 +554,8 @@
   }
 </script>
 
-{#if $isAuthenticated}
 <!-- Full Screen Map -->
+<!-- Note: Auth check removed - Module_Manager dashboard handles authentication -->
 <div class="app">
   <!-- Map Background -->
   <div class="map-fullscreen" bind:this={mapContainer}>
@@ -735,13 +719,6 @@
   {/if}
   
         </div>
-          {:else}
-  <!-- Loading state while checking auth -->
-  <div class="auth-loading">
-    <div class="spinner"></div>
-    <p>Loading...</p>
-    </div>
-  {/if}
 
 <style>
   /* App Container */
