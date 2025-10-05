@@ -16,8 +16,12 @@ export default defineConfig({
 	},
 	server: {
 		port: 5173,
+		host: true, // Listen on all addresses (needed for Firebase Web IDE preview)
 		fs: {
 			allow: ['..']
+		},
+		hmr: {
+			clientPort: 5173 // Ensure HMR works in Firebase Web IDE
 		}
 	},
 	build: {
