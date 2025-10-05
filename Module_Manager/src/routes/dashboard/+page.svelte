@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
 
   interface Module {
     id: string;
@@ -55,15 +56,23 @@
   let userEmail = '';
 
   onMount(() => {
+    if (!browser) return;
+    
+    console.log('Dashboard mounted');
+    
     // Check authentication
     const isAuthenticated = localStorage.getItem('isAuthenticated');
+    console.log('Auth check in dashboard:', isAuthenticated);
+    
     if (isAuthenticated !== 'true') {
+      console.log('Not authenticated, redirecting to login');
       goto('/login');
       return;
     }
 
     // Get user email
     userEmail = localStorage.getItem('userEmail') || 'user@example.com';
+    console.log('User email:', userEmail);
 
     // Check for saved theme preference
     const savedTheme = localStorage.getItem('theme');

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
 
   let email = '';
   let password = '';
@@ -12,10 +13,12 @@
   // This will be replaced with Firebase auth from Login_Logic fork
   
   onMount(() => {
-    // Check if already logged in
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    if (isAuthenticated === 'true') {
-      goto('/dashboard');
+    if (browser) {
+      // Check if already logged in
+      const isAuthenticated = localStorage.getItem('isAuthenticated');
+      if (isAuthenticated === 'true') {
+        goto('/dashboard');
+      }
     }
   });
 
@@ -36,14 +39,21 @@
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
+    // Simulate API call with promise
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    if (browser) {
       // For demo: accept any email/password
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userEmail', email);
-      isLoading = false;
-      goto('/dashboard');
-    }, 1000);
+      console.log('Auth set:', localStorage.getItem('isAuthenticated'));
+      console.log('Navigating to dashboard...');
+    }
+    
+    isLoading = false;
+    
+    // Navigate to dashboard
+    goto('/dashboard');
   }
 
   function toggleMode() {
