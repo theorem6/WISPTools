@@ -12,13 +12,20 @@
   // For now, we'll use localStorage to simulate authentication
   // This will be replaced with Firebase auth from Login_Logic fork
   
-  onMount(() => {
-    if (browser) {
-      // Check if already logged in
-      const isAuthenticated = localStorage.getItem('isAuthenticated');
-      if (isAuthenticated === 'true') {
-        goto('/dashboard');
-      }
+  onMount(async () => {
+    if (!browser) return;
+    
+    console.log('Login page: Checking if already authenticated...');
+    
+    // Check if already logged in
+    const isAuthenticated = localStorage.getItem('isAuthenticated');
+    console.log('Login page: isAuthenticated =', isAuthenticated);
+    
+    if (isAuthenticated === 'true') {
+      console.log('Login page: Already authenticated, redirecting to dashboard');
+      await goto('/dashboard', { replaceState: true });
+    } else {
+      console.log('Login page: Not authenticated, showing login form');
     }
   });
 
@@ -46,14 +53,14 @@
       // For demo: accept any email/password
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userEmail', email);
-      console.log('Auth set:', localStorage.getItem('isAuthenticated'));
-      console.log('Navigating to dashboard...');
+      console.log('Login page: Auth set:', localStorage.getItem('isAuthenticated'));
+      console.log('Login page: Navigating to dashboard...');
+      
+      // Navigate to dashboard
+      await goto('/dashboard', { replaceState: true });
     }
     
     isLoading = false;
-    
-    // Navigate to dashboard
-    goto('/dashboard');
   }
 
   function toggleMode() {

@@ -55,29 +55,33 @@
   let isDarkMode = false;
   let userEmail = '';
 
-  onMount(() => {
+  onMount(async () => {
     if (!browser) return;
     
-    console.log('Dashboard mounted');
+    console.log('Dashboard: Mounted');
     
     // Check authentication
     const isAuthenticated = localStorage.getItem('isAuthenticated');
-    console.log('Auth check in dashboard:', isAuthenticated);
+    console.log('Dashboard: isAuthenticated =', isAuthenticated);
     
     if (isAuthenticated !== 'true') {
-      console.log('Not authenticated, redirecting to login');
-      goto('/login');
+      console.log('Dashboard: Not authenticated, redirecting to login');
+      await goto('/login', { replaceState: true });
       return;
     }
 
+    console.log('Dashboard: User is authenticated, loading dashboard');
+
     // Get user email
     userEmail = localStorage.getItem('userEmail') || 'user@example.com';
-    console.log('User email:', userEmail);
+    console.log('Dashboard: User email =', userEmail);
 
     // Check for saved theme preference
     const savedTheme = localStorage.getItem('theme');
     isDarkMode = savedTheme === 'dark';
     updateTheme();
+    
+    console.log('Dashboard: Initialization complete');
   });
 
   function toggleTheme() {

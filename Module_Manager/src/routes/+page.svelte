@@ -1,17 +1,28 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
 
-  onMount(() => {
+  onMount(async () => {
+    if (!browser) return;
+    
+    console.log('Root page: Checking authentication...');
+    
+    // Small delay to ensure services have initialized
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     // Check if user is authenticated
     const isAuthenticated = localStorage.getItem('isAuthenticated');
+    console.log('Root page: isAuthenticated =', isAuthenticated);
     
     if (isAuthenticated === 'true') {
       // User is logged in, go to dashboard
-      goto('/dashboard');
+      console.log('Root page: Navigating to dashboard');
+      await goto('/dashboard', { replaceState: true });
     } else {
       // User is not logged in, go to login
-      goto('/login');
+      console.log('Root page: Navigating to login');
+      await goto('/login', { replaceState: true });
     }
   });
 </script>
