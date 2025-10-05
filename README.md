@@ -1,6 +1,43 @@
-# LTE PCI Conflict Mapper
+# LTE WISP Management Platform
 
-An advanced LTE Physical Cell Identity (PCI) conflict detection and visualization tool powered by ArcGIS mapping, Firebase backend, and Gemini AI recommendations.
+A comprehensive modular platform for LTE network planning, optimization, and management.
+
+> **🎉 New**: This project has evolved into a modular platform with a central Module Manager. See [MODULE_MANAGER_SETUP.md](MODULE_MANAGER_SETUP.md) for details.
+
+## 🚀 Quick Start
+
+The platform is now managed through the **Module Manager**:
+
+```bash
+cd ../Module_Manager
+npm install
+npm run dev
+```
+
+Visit: `http://localhost:5173`
+
+## 📦 Platform Structure
+
+This platform consists of specialized forks orchestrated by the Module Manager:
+
+- **[Module_Manager](../Module_Manager/)** - ⭐ Main landing page and module orchestration
+- **[PCI](../PCI/)** - PCI conflict detection and optimization algorithms
+- **[Login_Logic](../Login_Logic/)** - Authentication and database management
+- **[ARCGIS](../ARCGIS/)** - Map visualization and spatial analysis  
+- **[ACS](../ACS/)** - Legacy application (being replaced)
+- **[PCI_mapper](./)** - Original project (now documentation hub)
+
+## 🎯 Available Modules
+
+### Active Modules
+
+1. **PCI Resolution** - Physical Cell ID conflict detection and optimization ✅
+
+### Coming Soon
+
+2. **Coverage Planning** - RF coverage analysis and site planning 🚧
+3. **Spectrum Management** - Frequency planning and interference analysis 📋
+4. **Network Optimization** - SON/CSON algorithms 📋
 
 ## 🚀 Features
 
