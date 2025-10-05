@@ -16,19 +16,28 @@
   const modules: Module[] = [
     {
       id: 'pci-resolution',
-      name: 'PCI Resolution',
-      description: 'Automated Physical Cell ID conflict detection and optimization for LTE networks',
+      name: 'PCI Resolution & Network Optimization',
+      description: 'Physical Cell ID conflict detection, SON optimization, and network self-organization',
       icon: '📊',
       color: '#2563eb',
       status: 'active',
       path: '/modules/pci-resolution'
     },
     {
+      id: 'ue-cpe-management',
+      name: 'UE/CPE Management',
+      description: 'User Equipment and Customer Premise Equipment management and monitoring',
+      icon: '📱',
+      color: '#10b981',
+      status: 'coming-soon',
+      path: '/modules/ue-cpe-management'
+    },
+    {
       id: 'coverage-planning',
       name: 'Coverage Planning',
       description: 'RF coverage analysis and site planning tools',
       icon: '📡',
-      color: '#10b981',
+      color: '#7c3aed',
       status: 'coming-soon',
       path: '/modules/coverage-planning'
     },
@@ -37,18 +46,9 @@
       name: 'Spectrum Management',
       description: 'Frequency planning and interference analysis',
       icon: '🌐',
-      color: '#7c3aed',
-      status: 'coming-soon',
-      path: '/modules/spectrum-management'
-    },
-    {
-      id: 'network-optimization',
-      name: 'Network Optimization',
-      description: 'SON/CSON algorithms for network self-optimization',
-      icon: '⚡',
       color: '#f59e0b',
       status: 'coming-soon',
-      path: '/modules/network-optimization'
+      path: '/modules/spectrum-management'
     }
   ];
 

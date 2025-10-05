@@ -33,9 +33,9 @@
   
   /* Module Colors */
   --module-pci: #2563eb;
-  --module-coverage: #10b981;
-  --module-spectrum: #7c3aed;
-  --module-network: #f59e0b;
+  --module-ue-cpe: #10b981;
+  --module-coverage: #7c3aed;
+  --module-spectrum: #f59e0b;
 }
 
 [data-theme="dark"] {
