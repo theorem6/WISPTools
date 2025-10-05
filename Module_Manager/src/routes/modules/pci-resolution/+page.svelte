@@ -1,4 +1,7 @@
 <script lang="ts">
+  // Import PCI application styles (includes ArcGIS)
+  import '../../app.css';
+  
   import { onMount } from 'svelte';
   import { PCIArcGISMapper } from '$lib/arcgisMap';
   import { pciService } from '$lib/services/pciService';
