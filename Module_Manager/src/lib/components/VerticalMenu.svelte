@@ -12,25 +12,12 @@
   
   const dispatch = createEventDispatcher();
   
-  async function handleLogout() {
-    // Clear all app state before signing out
+  async function handleBackToDashboard() {
+    // Clear PCI module state but keep user logged in
     resetAllStores();
     networkStore.clear();
     
-    // Clear browser storage (except theme preference)
-    if (browser) {
-      const theme = localStorage.getItem('theme');
-      sessionStorage.clear();
-      localStorage.clear();
-      if (theme) {
-        localStorage.setItem('theme', theme);
-      }
-    }
-    
-    // Sign out from Firebase
-    await authService.signOut();
-    
-    // Redirect to Module Manager dashboard
+    // Return to Module Manager dashboard (user stays logged in)
     goto('/dashboard');
   }
   
@@ -47,17 +34,16 @@
 
 <div class="vertical-menu">
   <div class="menu-items">
-    <!-- Logout Button at Top -->
+    <!-- Back to Dashboard Button at Top -->
     {#if $isAuthenticated && $currentUser}
-      <button class="logout-button" on:click={handleLogout} title="Sign out">
+      <button class="logout-button back-button" on:click={handleBackToDashboard} title="Back to Module Manager">
         <div class="user-info">
           <span class="user-name">{getUserName()}</span>
           <span class="user-email">{$currentUser.email}</span>
         </div>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-          <polyline points="16 17 21 12 16 7"></polyline>
-          <line x1="21" y1="12" x2="9" y2="12"></line>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
         </svg>
       </button>
     {/if}
@@ -207,8 +193,13 @@
   }
 
   .logout-button:hover {
-    background: var(--danger-light);
-    color: var(--danger-color);
+    background: var(--primary-light);
+    color: var(--primary-color);
+  }
+  
+  .back-button:hover {
+    background: var(--primary-light);
+    color: var(--primary-color);
   }
 
   .user-info {
