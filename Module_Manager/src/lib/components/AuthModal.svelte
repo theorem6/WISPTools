@@ -1,8 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { authService } from '$lib/services/authService';
-  import { authStore, isAuthenticated } from '$lib/stores/authStore';
+  import { createEventDispatcher } from 'svelte';
+  import { authService } from '../services/authService';
+  import { authStore } from '../stores/authStore';
+  
+  export let show = false;
+  
+  const dispatch = createEventDispatcher();
   
   let mode: 'signin' | 'signup' | 'reset' = 'signin';
   let email = '';
@@ -12,15 +15,9 @@
   let isLoading = false;
   let error = '';
   
-  // Redirect if already authenticated
-  onMount(() => {
-    if ($isAuthenticated) {
-      goto('/');
-    }
-  });
-  
-  $: if ($isAuthenticated) {
-    goto('/');
+  function handleClose() {
+    resetForm();
+    dispatch('close');
   }
   
   function resetForm() {
@@ -30,11 +27,6 @@
     displayName = '';
     error = '';
     isLoading = false;
-  }
-  
-  function switchMode(newMode: 'signin' | 'signup' | 'reset') {
-    mode = newMode;
-    error = '';
   }
   
   async function handleSignIn() {
@@ -49,7 +41,7 @@
     const result = await authService.signIn(email, password);
     
     if (result.success) {
-      goto('/');
+      handleClose();
     } else {
       error = result.error || 'Sign in failed';
       isLoading = false;
@@ -78,7 +70,7 @@
     const result = await authService.signUp(email, password, displayName);
     
     if (result.success) {
-      goto('/');
+      handleClose();
     } else {
       error = result.error || 'Sign up failed';
       isLoading = false;
@@ -92,7 +84,7 @@
     const result = await authService.signInWithGoogle();
     
     if (result.success) {
-      goto('/');
+      handleClose();
     } else {
       error = result.error || 'Google sign in failed';
       isLoading = false;
@@ -120,91 +112,49 @@
     
     isLoading = false;
   }
+  
+  function switchMode(newMode: 'signin' | 'signup' | 'reset') {
+    mode = newMode;
+    error = '';
+  }
 </script>
 
-<div class="login-page">
-  <div class="login-container">
-    <!-- Left Side - Branding -->
-    <div class="login-brand">
-      <div class="brand-content">
-        <div class="brand-icon-large">
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
-        </div>
-        <h1>LTE PCI Mapper</h1>
-        <p class="tagline">Professional Network Planning & Conflict Resolution</p>
-        
-        <div class="features">
-          <div class="feature-item">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-            </svg>
-            <span>Real-time Conflict Detection</span>
-          </div>
-          <div class="feature-item">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 6v6l4 2"></path>
-            </svg>
-            <span>AI-Powered Optimization</span>
-          </div>
-          <div class="feature-item">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-              <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-            <span>Multi-Network Management</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Right Side - Auth Form -->
-    <div class="login-form-container">
-      <div class="login-form">
-        <h2>
+{#if show}
+  <div 
+    class="auth-overlay" 
+    role="presentation"
+    on:click={handleClose}
+    on:keydown={(e) => e.key === 'Escape' && handleClose()}
+  >
+    <div 
+      class="auth-modal" 
+      role="dialog"
+      aria-labelledby="auth-modal-title"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
+      <div class="auth-header">
+        <h2 id="auth-modal-title">
           {#if mode === 'signin'}
-            Welcome Back
+            Sign In to PCI Mapper
           {:else if mode === 'signup'}
             Create Account
           {:else}
             Reset Password
           {/if}
         </h2>
-        <p class="subtitle">
-          {#if mode === 'signin'}
-            Sign in to access your networks
-          {:else if mode === 'signup'}
-            Start planning your LTE deployment
-          {:else}
-            We'll send you a reset link
-          {/if}
-        </p>
-        
-        <!-- Firebase Setup Notice -->
-        {#if error && error.includes('Bad Request')}
-          <div class="setup-notice">
-            <h4>⚙️ Firebase Setup Required</h4>
-            <p>To enable authentication, please:</p>
-            <ol>
-              <li>Go to <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
-              <li>Navigate to Authentication → Sign-in method</li>
-              <li>Enable "Email/Password" provider</li>
-              <li>Optionally enable "Google" provider</li>
-              <li>Refresh this page</li>
-            </ol>
-            <p class="note"><strong>For testing:</strong> You can create a test account after enabling Email/Password authentication.</p>
-          </div>
-        {:else if error}
+        <button class="close-btn" on:click={handleClose}>×</button>
+      </div>
+      
+      <div class="auth-body">
+        {#if error}
           <div class="error-message">{error}</div>
         {/if}
         
         {#if mode === 'signin'}
           <form on:submit|preventDefault={handleSignIn}>
             <div class="form-group">
-              <label for="email">Email Address</label>
+              <label for="email">Email</label>
               <input 
                 type="email" 
                 id="email"
@@ -212,7 +162,6 @@
                 placeholder="your@email.com"
                 required
                 disabled={isLoading}
-                autocomplete="email"
               />
             </div>
             
@@ -222,10 +171,9 @@
                 type="password" 
                 id="password"
                 bind:value={password} 
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 required
                 disabled={isLoading}
-                autocomplete="current-password"
               />
             </div>
             
@@ -250,7 +198,7 @@
             <button class="link-btn" on:click={() => switchMode('reset')}>
               Forgot password?
             </button>
-            <span class="separator">•</span>
+            <span>•</span>
             <button class="link-btn" on:click={() => switchMode('signup')}>
               Create account
             </button>
@@ -265,12 +213,11 @@
                 bind:value={displayName} 
                 placeholder="John Doe"
                 disabled={isLoading}
-                autocomplete="name"
               />
             </div>
             
             <div class="form-group">
-              <label for="email">Email Address</label>
+              <label for="email">Email</label>
               <input 
                 type="email" 
                 id="email"
@@ -278,7 +225,6 @@
                 placeholder="your@email.com"
                 required
                 disabled={isLoading}
-                autocomplete="email"
               />
             </div>
             
@@ -291,7 +237,6 @@
                 placeholder="At least 6 characters"
                 required
                 disabled={isLoading}
-                autocomplete="new-password"
               />
             </div>
             
@@ -304,7 +249,6 @@
                 placeholder="Re-enter password"
                 required
                 disabled={isLoading}
-                autocomplete="new-password"
               />
             </div>
             
@@ -321,10 +265,10 @@
           </div>
         {:else}
           <form on:submit|preventDefault={handlePasswordReset}>
-            <p class="reset-info">Enter your email and we'll send you a password reset link.</p>
+            <p class="reset-info">Enter your email and we'll send you a reset link.</p>
             
             <div class="form-group">
-              <label for="email">Email Address</label>
+              <label for="email">Email</label>
               <input 
                 type="email" 
                 id="email"
@@ -332,7 +276,6 @@
                 placeholder="your@email.com"
                 required
                 disabled={isLoading}
-                autocomplete="email"
               />
             </div>
             
@@ -343,118 +286,90 @@
           
           <div class="auth-footer">
             <button class="link-btn" on:click={() => switchMode('signin')}>
-              ← Back to sign in
+              Back to sign in
             </button>
           </div>
         {/if}
       </div>
     </div>
   </div>
-</div>
+{/if}
 
 <style>
-  .login-page {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  .auth-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 2rem;
+    animation: fadeIn 0.2s;
   }
 
-  .login-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    max-width: 1100px;
-    width: 100%;
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .auth-modal {
     background: var(--card-bg);
-    border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    overflow: hidden;
-  }
-
-  .login-brand {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 4rem 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-  }
-
-  .brand-content {
-    text-align: center;
-  }
-
-  .brand-icon-large {
-    margin-bottom: 2rem;
-    display: flex;
-    justify-content: center;
-  }
-
-  .brand-icon-large svg {
-    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
-  }
-
-  .login-brand h1 {
-    margin: 0 0 0.5rem 0;
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: white;
-  }
-
-  .tagline {
-    margin: 0 0 3rem 0;
-    font-size: 1.125rem;
-    color: rgba(255,255,255,0.9);
-  }
-
-  .features {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    text-align: left;
-  }
-
-  .feature-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    color: white;
-  }
-
-  .feature-item svg {
-    flex-shrink: 0;
-  }
-
-  .feature-item span {
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
-  .login-form-container {
-    padding: 4rem 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .login-form {
+    border-radius: var(--border-radius-xl);
     width: 100%;
-    max-width: 400px;
+    max-width: 450px;
+    box-shadow: var(--shadow-2xl);
+    border: 1px solid var(--border-color);
+    animation: slideUp 0.3s;
   }
 
-  .login-form h2 {
-    margin: 0 0 0.5rem 0;
-    font-size: 2rem;
-    font-weight: 700;
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .auth-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .auth-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
     color: var(--text-primary);
   }
 
-  .subtitle {
-    margin: 0 0 2rem 0;
-    font-size: 1rem;
+  .close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-secondary);
     color: var(--text-secondary);
+    font-size: 1.75rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .close-btn:hover {
+    background: var(--danger-light);
+    color: var(--danger-color);
+  }
+
+  .auth-body {
+    padding: 2rem;
   }
 
   .error-message {
@@ -467,70 +382,19 @@
     font-size: 0.9rem;
   }
 
-  .setup-notice {
-    padding: 1.5rem;
-    background: var(--info-light);
-    border-left: 4px solid var(--info-color);
-    border-radius: var(--border-radius);
-    margin-bottom: 1.5rem;
-  }
-
-  .setup-notice h4 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-    font-size: 1.125rem;
-  }
-
-  .setup-notice p {
-    margin: 0 0 0.75rem 0;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-  }
-
-  .setup-notice ol {
-    margin: 0.75rem 0;
-    padding-left: 1.5rem;
-    color: var(--text-primary);
-  }
-
-  .setup-notice li {
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-  }
-
-  .setup-notice a {
-    color: var(--primary-color);
-    text-decoration: underline;
-    font-weight: 500;
-  }
-
-  .setup-notice .note {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-  }
-
   .reset-info {
     color: var(--text-secondary);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     margin-bottom: 1.5rem;
-  }
-
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
   }
 
   .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    margin-bottom: 1.25rem;
   }
 
   .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-secondary);
@@ -538,7 +402,7 @@
 
   .form-group input {
     width: 100%;
-    padding: 0.875rem 1rem;
+    padding: 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background: var(--input-bg);
@@ -560,7 +424,7 @@
 
   .auth-btn {
     width: 100%;
-    padding: 1rem;
+    padding: 0.875rem;
     border: none;
     border-radius: var(--border-radius);
     font-size: 1rem;
@@ -571,7 +435,6 @@
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    margin-top: 0.5rem;
   }
 
   .auth-btn:disabled {
@@ -586,14 +449,20 @@
 
   .auth-btn.primary:hover:not(:disabled) {
     background: var(--button-primary-hover);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
   }
 
   .auth-btn.google {
     background: white;
     color: #1f1f1f;
     border: 1px solid var(--border-color);
+    margin-top: 1rem;
+  }
+
+  [data-theme="dark"] .auth-btn.google {
+    background: var(--surface-secondary);
+    color: var(--text-primary);
   }
 
   .auth-btn.google:hover:not(:disabled) {
@@ -614,7 +483,7 @@
     content: '';
     position: absolute;
     top: 50%;
-    width: 42%;
+    width: 40%;
     height: 1px;
     background: var(--border-color);
   }
@@ -628,7 +497,7 @@
   }
 
   .auth-footer {
-    margin-top: 2rem;
+    margin-top: 1.5rem;
     text-align: center;
     font-size: 0.9rem;
     color: var(--text-secondary);
@@ -636,18 +505,13 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .separator {
-    color: var(--text-tertiary);
   }
 
   .link-btn {
     background: none;
     border: none;
     color: var(--primary-color);
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     padding: 0;
     transition: all var(--transition);
@@ -658,31 +522,13 @@
     text-decoration: underline;
   }
 
-  @media (max-width: 1024px) {
-    .login-container {
-      grid-template-columns: 1fr;
-    }
-
-    .login-brand {
-      padding: 3rem 2rem;
-    }
-
-    .features {
-      display: none;
-    }
-  }
-
   @media (max-width: 640px) {
-    .login-page {
-      padding: 1rem;
+    .auth-modal {
+      max-width: 95%;
     }
 
-    .login-form-container {
-      padding: 2rem 1.5rem;
-    }
-
-    .login-brand h1 {
-      font-size: 2rem;
+    .auth-body {
+      padding: 1.5rem;
     }
   }
 </style>
