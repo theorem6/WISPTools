@@ -46,18 +46,36 @@
       return;
     }
 
-    // Simulate API call with promise
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (browser) {
-      // For demo: accept any email/password
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', email);
-      console.log('Login page: Auth set:', localStorage.getItem('isAuthenticated'));
-      console.log('Login page: Navigating to dashboard...');
+    try {
+      // Use real Firebase authentication
+      const { authService } = await import('$lib/services/authService');
       
-      // Navigate to dashboard
-      await goto('/dashboard', { replaceState: true });
+      let result;
+      if (mode === 'signup') {
+        console.log('Login page: Creating new account with Firebase...');
+        result = await authService.signUp(email, password);
+      } else {
+        console.log('Login page: Signing in with Firebase...');
+        result = await authService.signIn(email, password);
+      }
+      
+      if (result.success) {
+        console.log('Login page: Firebase auth successful!');
+        console.log('Login page: User:', result.user?.email);
+        
+        // Also set localStorage for backwards compatibility
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('userEmail', email);
+        
+        // Navigate to dashboard
+        await goto('/dashboard', { replaceState: true });
+      } else {
+        error = result.error || 'Authentication failed';
+        console.error('Login page: Auth failed:', error);
+      }
+    } catch (err: any) {
+      error = err.message || 'An error occurred during authentication';
+      console.error('Login page: Auth error:', err);
     }
     
     isLoading = false;
@@ -138,8 +156,8 @@
       </div>
 
       <div class="demo-notice">
-        <p><strong>Demo Mode:</strong> Authentication with Firebase will be integrated from Login_Logic fork.</p>
-        <p>For now, any email/password combination will work.</p>
+        <p><strong>Firebase Authentication:</strong> Use your Firebase account to access your saved networks and data.</p>
+        <p>Don't have an account? Click "Sign up" to create one.</p>
       </div>
     </div>
 

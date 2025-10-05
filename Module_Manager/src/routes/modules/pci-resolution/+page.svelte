@@ -144,11 +144,10 @@
   
   // Note: Auth redirects removed - handled by Module_Manager dashboard
   
-  // Load user's networks when authenticated (Firebase only)
-  // Note: Network loading disabled in Module_Manager - works in standalone PCI app
-  // $: if ($isAuthenticated && $currentUser) {
-  //   loadUserNetworks();
-  // }
+  // Load user's networks when authenticated
+  $: if ($isAuthenticated && $currentUser) {
+    loadUserNetworks();
+  }
   
   // Sync current network cells with cell store
   $: if ($activeNetwork) {
@@ -156,10 +155,6 @@
   }
   
   async function loadUserNetworks() {
-    // Network loading requires Firebase auth - disabled in Module_Manager
-    console.log('Network loading disabled - use standalone PCI app for network management');
-    return;
-    
     if (!$currentUser) return;
     
     networkStore.setLoading(true);
@@ -243,10 +238,6 @@
   }
   
   async function saveCurrentNetwork() {
-    // Network saving requires Firebase auth - disabled in Module_Manager
-    console.log('Network saving disabled - use standalone PCI app for network management');
-    return;
-    
     if (!$activeNetwork || !$isAuthenticated) return;
     
     const cells = $cellsStore.items;
