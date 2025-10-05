@@ -108,11 +108,8 @@
   import { goto } from '$app/navigation';
   
   onMount(async () => {
-    // Check authentication and redirect if needed
-    if (!$authStore.isLoading && !$isAuthenticated) {
-      goto('/login');
-      return;
-    }
+    // User is already authenticated (came from dashboard)
+    // No need to check auth here
     
     if (mapContainer) {
       console.log('Page: Creating map instance');
@@ -145,20 +142,8 @@
     }
   });
   
-  // Redirect if user logs out and clear all state
-  $: if (!$authStore.isLoading && !$isAuthenticated) {
-    // Clear all app state
-    resetAllStores();     // Resets cells, conflicts, optimization, analysis, UI stores
-    networkStore.clear(); // Clear network store
-    pciService.clearCells(); // Clear PCI service internal state
-    
-    // Clear the map
-    if (mapInstance) {
-      mapInstance.clearMap();
-    }
-    
-    goto('/login');
-  }
+  // Note: Auth redirect removed - dashboard handles auth protection
+  // If user logs out, they'll be redirected from root page, not from here
   
   // Load user's networks when authenticated
   $: if ($isAuthenticated && $currentUser) {
