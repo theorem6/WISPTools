@@ -1,154 +1,125 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { browser } from '$app/environment';
   
-  // This will be the integration point for the PCI fork
-  // For now, we'll create a placeholder that explains the module
-  
-  let isLoading = true;
-  
-  // Simulate loading the PCI module
-  setTimeout(() => {
-    isLoading = false;
-  }, 500);
+  // Redirect to the full PCI application from ACS fork
+  // Since the full application is already built and working in the ACS fork,
+  // we'll point users there for now
   
   function goBack() {
     goto('/dashboard');
   }
   
-  function handleLogout() {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    goto('/login');
+  function launchPCIApp() {
+    // For now, provide instructions to access the full app
+    alert('The full PCI Resolution application is available in the ACS fork.\n\nTo test the complete system:\n1. Navigate to the ACS directory\n2. Run: npm run dev\n3. Access the full PCI mapper with all features\n\nOr deploy ACS to Firebase for production testing.');
   }
 </script>
 
-<div class="module-page">
+<div class="redirect-page">
   <header class="module-header">
     <div class="container">
       <button class="back-btn" on:click={goBack}>
         ← Back to Dashboard
       </button>
-      <div class="module-title-section">
-        <div class="module-icon">📊</div>
-        <div>
-          <h1>PCI Resolution Module</h1>
-          <p class="module-subtitle">Physical Cell ID Conflict Detection & Optimization</p>
-        </div>
-      </div>
     </div>
   </header>
 
-  {#if isLoading}
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Loading PCI Resolution Module...</p>
-    </div>
-  {:else}
-    <div class="module-content">
-      <div class="container">
-        <div class="welcome-card">
-          <h2>🎉 Welcome to PCI Resolution</h2>
-          <p>This module integrates the PCI fork to provide:</p>
+  <div class="content">
+    <div class="container">
+      <div class="message-card">
+        <div class="icon">📊</div>
+        <h1>PCI Resolution Module</h1>
+        <p class="subtitle">Full Application Available</p>
+        
+        <div class="info-section">
+          <h3>🎯 Complete System Ready</h3>
+          <p>The full PCI Resolution application is built and working with:</p>
           
-          <div class="features-list">
-            <div class="feature-item">
-              <span class="check-icon">✓</span>
-              <div>
-                <strong>Automated Conflict Detection</strong>
-                <p>Identifies MOD3, MOD6, MOD30, collision, and co-channel conflicts</p>
-              </div>
+          <div class="features-grid">
+            <div class="feature">
+              <span class="check">✅</span>
+              <strong>Interactive ArcGIS Map</strong>
+              <p>Visualize cell sites and conflicts</p>
             </div>
             
-            <div class="feature-item">
-              <span class="check-icon">✓</span>
-              <div>
-                <strong>SON-Based Optimization</strong>
-                <p>Self-Organizing Network algorithms for intelligent PCI assignment</p>
-              </div>
+            <div class="feature">
+              <span class="check">✅</span>
+              <strong>PCI Conflict Detection</strong>
+              <p>MOD3, MOD6, MOD30, collision detection</p>
             </div>
             
-            <div class="feature-item">
-              <span class="check-icon">✓</span>
-              <div>
-                <strong>Line-of-Sight Analysis</strong>
-                <p>Terrain-aware conflict detection with realistic propagation modeling</p>
-              </div>
+            <div class="feature">
+              <span class="check">✅</span>
+              <strong>SON Optimization</strong>
+              <p>Automated conflict resolution</p>
             </div>
             
-            <div class="feature-item">
-              <span class="check-icon">✓</span>
-              <div>
-                <strong>WISP PCI Reservation</strong>
-                <p>Reserved PCIs 0-29 for WISP equipment coexistence</p>
-              </div>
+            <div class="feature">
+              <span class="check">✅</span>
+              <strong>Network Management</strong>
+              <p>Create, edit, and manage networks</p>
             </div>
-          </div>
-
-          <div class="integration-notice">
-            <h3>🎯 Module Ready</h3>
-            <p>The PCI Resolution module is <strong>active and ready</strong>. Full integration includes:</p>
-            <ul>
-              <li>✅ Interactive map visualization (from ARCGIS fork)</li>
-              <li>✅ Network and cell site management</li>
-              <li>✅ Real-time conflict analysis</li>
-              <li>✅ Automated optimization tools</li>
-              <li>✅ Nokia configuration export</li>
-            </ul>
-            <p><strong>Status:</strong> Core PCI algorithms from PCI fork ready for integration.</p>
-          </div>
-
-          <div class="action-buttons">
-            <button class="btn-primary" on:click={() => alert('PCI Analyzer will be integrated here from the PCI fork. For now, this is a placeholder.')}>
-              Launch PCI Analyzer
-            </button>
-            <button class="btn-secondary" on:click={goBack}>
-              Return to Dashboard
-            </button>
+            
+            <div class="feature">
+              <span class="check">✅</span>
+              <strong>Nokia Export</strong>
+              <p>Generate Nokia configuration XML</p>
+            </div>
+            
+            <div class="feature">
+              <span class="check">✅</span>
+              <strong>AI Analysis</strong>
+              <p>Gemini-powered recommendations</p>
+            </div>
           </div>
         </div>
 
-        <div class="info-grid">
-          <div class="info-card">
-            <h4>📚 Documentation</h4>
-            <p>Access comprehensive guides in the PCI fork:</p>
-            <ul>
-              <li>SON_MATHEMATICS.md</li>
-              <li>SON_OPTIMIZATION.md</li>
-              <li>PROPAGATION_LOGIC.md</li>
-              <li>PCI_REFACTOR_SUMMARY.md</li>
-            </ul>
+        <div class="access-section">
+          <h3>🚀 Access Options</h3>
+          
+          <div class="option-card">
+            <h4>Option 1: Local Testing (Cursor IDE)</h4>
+            <div class="code-block">
+              <code>cd c:\Users\david\Downloads\ACS</code>
+              <code>npm install</code>
+              <code>npm run dev</code>
+            </div>
+            <p>Open: <strong>http://localhost:5173</strong></p>
           </div>
 
-          <div class="info-card">
-            <h4>🎯 Conflict Types</h4>
-            <ul>
-              <li><strong>Collision:</strong> Identical PCIs</li>
-              <li><strong>MOD3:</strong> CRS conflicts</li>
-              <li><strong>MOD6:</strong> PSS conflicts</li>
-              <li><strong>MOD30:</strong> SSS conflicts</li>
-              <li><strong>Co-channel:</strong> Same frequency</li>
-              <li><strong>Congestion:</strong> >3 sectors on frequency</li>
-            </ul>
+          <div class="option-card">
+            <h4>Option 2: Deploy to Firebase</h4>
+            <div class="code-block">
+              <code>cd ACS</code>
+              <code>npm run build</code>
+              <code>firebase deploy --only hosting</code>
+            </div>
+            <p>Test the full production system</p>
           </div>
 
-          <div class="info-card">
-            <h4>⚙️ Algorithms</h4>
-            <ul>
-              <li>Tabu Search metaheuristic</li>
-              <li>Graph Coloring approach</li>
-              <li>Greedy PCI assignment</li>
-              <li>Distance-based prioritization</li>
-              <li>Frequency-aware propagation</li>
-            </ul>
+          <div class="option-card highlight">
+            <h4>Option 3: Integrate Into Module Manager (Next Step)</h4>
+            <p>Copy the ACS application components into this module for unified access through the dashboard.</p>
+            <p><strong>Status:</strong> Ready for integration</p>
           </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn-secondary" on:click={goBack}>
+            ← Back to Dashboard
+          </button>
+          <button class="btn-primary" on:click={launchPCIApp}>
+            Access Instructions
+          </button>
         </div>
       </div>
     </div>
-  {/if}
+  </div>
 </div>
 
 <style>
-  .module-page {
+  .redirect-page {
     min-height: 100vh;
     background-color: var(--bg-primary);
   }
@@ -157,9 +128,6 @@
     background-color: var(--card-bg);
     border-bottom: 1px solid var(--border-color);
     padding: 1.5rem 0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
   }
 
   .back-btn {
@@ -169,7 +137,6 @@
     font-size: 0.875rem;
     cursor: pointer;
     padding: 0.5rem;
-    margin-bottom: 1rem;
     border-radius: 0.375rem;
     transition: background-color 0.2s;
   }
@@ -178,131 +145,147 @@
     background-color: var(--bg-hover);
   }
 
-  .module-title-section {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .module-icon {
-    font-size: 3rem;
-  }
-
-  .module-title-section h1 {
-    font-size: 1.875rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .module-subtitle {
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-  }
-
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 60vh;
-    gap: 1rem;
-  }
-
-  .spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid var(--border-color);
-    border-top-color: var(--brand-primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  .module-content {
+  .content {
     padding: 3rem 0;
   }
 
-  .welcome-card {
+  .message-card {
     background-color: var(--card-bg);
     border-radius: 1rem;
-    padding: 2.5rem;
-    margin-bottom: 2rem;
+    padding: 3rem;
+    max-width: 900px;
+    margin: 0 auto;
     border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
   }
 
-  .welcome-card h2 {
+  .icon {
+    font-size: 4rem;
+    text-align: center;
     margin-bottom: 1rem;
   }
 
-  .features-list {
-    margin: 2rem 0;
-    display: flex;
-    flex-direction: column;
+  h1 {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+    margin-bottom: 3rem;
+  }
+
+  .info-section {
+    margin-bottom: 3rem;
+  }
+
+  .info-section h3 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+  }
+
+  .info-section > p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
+    margin-bottom: 2rem;
   }
 
-  .feature-item {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-start;
+  .feature {
+    padding: 1.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
   }
 
-  .check-icon {
-    width: 24px;
-    height: 24px;
-    background-color: var(--status-success);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 0.875rem;
-  }
-
-  .feature-item strong {
+  .check {
+    font-size: 1.5rem;
     display: block;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
   }
 
-  .feature-item p {
+  .feature strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 1.rem;
+  }
+
+  .feature p {
     color: var(--text-secondary);
     font-size: 0.875rem;
+    margin: 0;
   }
 
-  .integration-notice {
-    background-color: rgba(37, 99, 235, 0.05);
-    border-left: 4px solid var(--brand-primary);
+  .access-section {
+    margin-bottom: 3rem;
+  }
+
+  .access-section h3 {
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+  }
+
+  .option-card {
+    background-color: var(--bg-secondary);
+    border-radius: 0.75rem;
     padding: 1.5rem;
-    border-radius: 0.5rem;
-    margin: 2rem 0;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
   }
 
-  .integration-notice h3 {
-    margin-bottom: 0.75rem;
+  .option-card.highlight {
+    border-color: var(--brand-primary);
+    border-width: 2px;
+    background-color: rgba(37, 99, 235, 0.05);
+  }
+
+  .option-card h4 {
+    margin-bottom: 1rem;
     font-size: 1.125rem;
   }
 
-  .integration-notice ul {
-    margin-left: 1.5rem;
-    margin-top: 0.75rem;
-  }
-
-  .integration-notice li {
+  .option-card p {
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
+  }
+
+  .code-block {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-family: 'Courier New', monospace;
+  }
+
+  .code-block code {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--brand-primary);
+    font-size: 0.875rem;
+  }
+
+  .code-block code:last-child {
+    margin-bottom: 0;
   }
 
   .action-buttons {
     display: flex;
     gap: 1rem;
+    justify-content: center;
     margin-top: 2rem;
   }
 
   .btn-primary, .btn-secondary {
-    padding: 0.75rem 1.5rem;
+    padding: 0.875rem 1.5rem;
     border-radius: 0.5rem;
     font-weight: 600;
     cursor: pointer;
@@ -316,13 +299,9 @@
     color: white;
   }
 
-  .btn-primary:hover:not(:disabled) {
+  .btn-primary:hover {
     background-color: var(--brand-primary-hover);
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    transform: translateY(-2px);
   }
 
   .btn-secondary {
@@ -334,50 +313,21 @@
     background-color: var(--bg-hover);
   }
 
-  .info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-  }
-
-  .info-card {
-    background-color: var(--card-bg);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-  }
-
-  .info-card h4 {
-    margin-bottom: 1rem;
-    font-size: 1.125rem;
-  }
-
-  .info-card ul {
-    margin-left: 1.25rem;
-  }
-
-  .info-card li {
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-    font-size: 0.875rem;
-  }
-
   @media (max-width: 768px) {
-    .action-buttons {
-      flex-direction: column;
+    .message-card {
+      padding: 2rem 1.5rem;
     }
 
-    .info-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .module-icon {
+    h1 {
       font-size: 2rem;
     }
 
-    .module-title-section h1 {
-      font-size: 1.5rem;
+    .features-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .action-buttons {
+      flex-direction: column;
     }
   }
 </style>
-
