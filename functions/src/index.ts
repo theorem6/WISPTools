@@ -1,14 +1,23 @@
-import * as functions from 'firebase-functions';
-import admin from 'firebase-admin';
-import cors from 'cors';
+// Firebase Functions - Main Entry Point
+// Combines PCI analysis and GenieACS integration
 
-// Initialize Firebase Admin SDK
-admin.initializeApp();
+import { onRequest } from 'firebase-functions/v2/https';
+import * as cors from 'cors';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+// Initialize Firebase Admin
+import { initializeApp } from 'firebase-admin/app';
+initializeApp();
 
 const corsHandler = cors({ origin: true });
+const db = getFirestore();
 
-// PCI Analysis Function
-export const analyzePCI = functions.https.onRequest((req, res) => {
+// PCI Analysis Function (existing)
+export const analyzePCI = onRequest({
+  region: 'us-central1',
+  memory: '512MiB',
+  timeoutSeconds: 30
+}, async (req, res) => {
   return corsHandler(req, res, async () => {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
@@ -25,15 +34,13 @@ export const analyzePCI = functions.https.onRequest((req, res) => {
       const conflicts = analyzeConflictsSimple(cells);
       
       // Save analysis to Firestore
-      const analysisRef = await admin.firestore()
-        .collection('pci_analyses')
-        .add({
-          cells: cells,
-          conflicts: conflicts,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-          cellCount: cells.length,
-          conflictCount: conflicts.length
-        });
+      const analysisRef = await db.collection('pci_analyses').add({
+        cells: cells,
+        conflicts: conflicts,
+        timestamp: FieldValue.serverTimestamp(),
+        cellCount: cells.length,
+        conflictCount: conflicts.length
+      });
 
       return res.json({
         analysisId: analysisRef.id,
@@ -51,7 +58,25 @@ export const analyzePCI = functions.https.onRequest((req, res) => {
   });
 });
 
-// Simple PCI conflict detection function
+// Export GenieACS integration functions
+export {
+  syncCPEDevices,
+  getCPEDevices,
+  getCPEDevice,
+  updateCPELocation,
+  getCPEPerformanceMetrics,
+  scheduledCPESync
+} from './genieacsIntegration';
+
+// Export GenieACS core services
+export {
+  genieacsCWMP,
+  genieacsNBI,
+  genieacsFS,
+  genieacsUI
+} from './genieacsServices';
+
+// Simple PCI conflict detection function (existing)
 function analyzeConflictsSimple(cells: any[]) {
   const conflicts: any[] = [];
   
@@ -60,24 +85,26 @@ function analyzeConflictsSimple(cells: any[]) {
       const cell1 = cells[i];
       const cell2 = cells[j];
       
-      // Check for different modulo conflicts
-      const modConflicts = [
-        { type: 'MOD3', value: 3 },
-        { type: 'MOD6', value: 6 },
-        { type: 'MOD12', value: 12 },
-        { type: 'MOD30', value: 30 }
-      ];
+      // Check for PCI conflicts
+      if (cell1.pci === cell2.pci) {
+        conflicts.push({
+          type: 'COLLISION',
+          severity: 'CRITICAL',
+          cell1: cell1,
+          cell2: cell2,
+          distance: calculateDistance(cell1, cell2)
+        });
+      }
       
-      for (const modConflict of modConflicts) {
-        if (cell1.pci % modConflict.value === cell2.pci % modConflict.value) {
-          conflicts.push({
-            primaryCell: cell1,
-            conflictingCell: cell2,
-            conflictType: modConflict.type,
-            severity: 'MEDIUM', // Simplified
-            timestamp: Date.now()
-          });
-        }
+      // Check for Mod3 conflicts
+      if (cell1.pci % 3 === cell2.pci % 3) {
+        conflicts.push({
+          type: 'MOD3',
+          severity: 'HIGH',
+          cell1: cell1,
+          cell2: cell2,
+          distance: calculateDistance(cell1, cell2)
+        });
       }
     }
   }
@@ -85,67 +112,20 @@ function analyzeConflictsSimple(cells: any[]) {
   return conflicts;
 }
 
-// Export cell data function
-export const exportCells = functions.https.onRequest((req, res) => {
-  return corsHandler(req, res, async () => {
-    if (req.method !== 'GET') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
+// Calculate distance between two cells
+function calculateDistance(cell1: any, cell2: any): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = toRadians(cell2.latitude - cell1.latitude);
+  const dLon = toRadians(cell2.longitude - cell1.longitude);
+  
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRadians(cell1.latitude)) * Math.cos(toRadians(cell2.latitude)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in meters
+}
 
-    try {
-      const cellsSnapshot = await admin.firestore()
-        .collection('sample_cells')
-        .get();
-
-      const cells: any[] = [];
-      cellsSnapshot.forEach(doc => {
-        cells.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-
-      return res.json({
-        cells: cells,
-        count: cells.length,
-        exportedAt: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Export Error:', error);
-      return res.status(500).json({ error: 'Export failed' });
-    }
-  });
-});
-
-// Get analysis history
-export const getAnalysisHistory = functions.https.onRequest((req, res) => {
-  return corsHandler(req, res, async () => {
-    if (req.method !== 'GET') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    try {
-      const analysesSnapshot = await admin.firestore()
-        .collection('pci_analyses')
-        .orderBy('timestamp', 'desc')
-        .limit(20)
-        .get();
-
-      const analyses: any[] = [];
-      analysesSnapshot.forEach(doc => {
-        analyses.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-
-      return res.json({
-        analyses: analyses,
-        count: analyses.length
-      });
-    } catch (error) {
-      console.error('Get Analysis History Error:', error);
-      return res.status(500).json({ error: 'Failed to get analysis history' });
-    }
-  });
-});
+function toRadians(degrees: number): number {
+  return degrees * (Math.PI / 180);
+}

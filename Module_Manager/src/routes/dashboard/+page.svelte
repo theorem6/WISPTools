@@ -24,11 +24,20 @@
       path: '/modules/pci-resolution'
     },
     {
+      id: 'genieacs-cpe-management',
+      name: 'GenieACS CPE Management',
+      description: 'TR-069 device management and CPE monitoring with GPS mapping',
+      icon: '📡',
+      color: '#10b981',
+      status: 'active',
+      path: '/modules/genieacs-cpe-management'
+    },
+    {
       id: 'ue-cpe-management',
       name: 'UE/CPE Management',
       description: 'User Equipment and Customer Premise Equipment management and monitoring',
       icon: '📱',
-      color: '#10b981',
+      color: '#059669',
       status: 'coming-soon',
       path: '/modules/ue-cpe-management'
     },
@@ -210,8 +219,8 @@
         <div class="stat-card">
           <div class="stat-icon">📊</div>
           <div class="stat-content">
-            <div class="stat-value">1</div>
-            <div class="stat-label">Active Module</div>
+            <div class="stat-value">2</div>
+            <div class="stat-label">Active Modules</div>
           </div>
         </div>
         <div class="stat-card">

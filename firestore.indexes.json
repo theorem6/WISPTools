@@ -27,6 +27,58 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "cpe_devices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "location.latitude",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "location.longitude",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cpe_devices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastContact",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cpe_devices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "lastSync",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cpe_performance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "deviceId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

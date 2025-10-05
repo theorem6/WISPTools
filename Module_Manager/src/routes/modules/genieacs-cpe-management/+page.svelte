@@ -1,0 +1,642 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { genieacsService } from '$lib/genieacs/services/genieacsService';
+  import { locationService } from '$lib/genieacs/services/locationService';
+  import EnhancedArcGISMapper from '$lib/genieacs/mappers/enhancedArcGISMapper';
+  import CPEPerformanceModal from '$lib/components/CPEPerformanceModal.svelte';
+  import { darkMode } from '$lib/stores/darkMode';
+  
+  // Module data
+  let moduleData = {
+    title: 'GenieACS CPE Management',
+    description: 'TR-069 device management and CPE monitoring',
+    icon: 'device-hub'
+  };
+
+  // Component state
+  let mapContainer: HTMLDivElement;
+  let cpeDevices: any[] = [];
+  let selectedCPE: any = null;
+  let showPerformanceModal = false;
+  let isLoading = true;
+  let error: string | null = null;
+  let mapInstance: any = null;
+
+  // GenieACS service instances
+  let genieacs: any;
+  let location: any;
+  let mapper: any;
+
+  onMount(async () => {
+    try {
+      // Initialize GenieACS services
+      genieacs = genieacsService;
+      location = locationService;
+      mapper = new EnhancedArcGISMapper();
+
+      // Load CPE devices
+      await loadCPEDevices();
+      
+      // Initialize map
+      await initializeMap();
+      
+      isLoading = false;
+    } catch (err) {
+      console.error('Failed to initialize GenieACS module:', err);
+      error = err.message;
+      isLoading = false;
+    }
+  });
+
+  async function loadCPEDevices() {
+    try {
+      cpeDevices = await genieacs.getDevices();
+      console.log(`Loaded ${cpeDevices.length} CPE devices`);
+    } catch (err) {
+      console.error('Failed to load CPE devices:', err);
+      throw err;
+    }
+  }
+
+  async function initializeMap() {
+    if (!mapContainer) return;
+
+    try {
+      mapInstance = await mapper.createMap(mapContainer, {
+        darkMode: $darkMode,
+        showCPEDevices: true,
+        cpeDevices: cpeDevices
+      });
+
+      // Set up CPE click handler
+      mapper.onCPEClick = (cpe: any) => {
+        selectedCPE = cpe;
+        showPerformanceModal = true;
+      };
+
+    } catch (err) {
+      console.error('Failed to initialize map:', err);
+      throw err;
+    }
+  }
+
+  async function syncCPEDevices() {
+    isLoading = true;
+    try {
+      await genieacs.syncDevices();
+      await loadCPEDevices();
+      
+      // Update map with new devices
+      if (mapInstance) {
+        await mapper.updateCPEDevices(cpeDevices);
+      }
+      
+      console.log('CPE devices synced successfully');
+    } catch (err) {
+      console.error('Failed to sync CPE devices:', err);
+      error = err.message;
+    }
+    isLoading = false;
+  }
+
+  async function refreshCPEData() {
+    await loadCPEDevices();
+    if (mapInstance) {
+      await mapper.updateCPEDevices(cpeDevices);
+    }
+  }
+
+  function handleCPEClick(cpe: any) {
+    selectedCPE = cpe;
+    showPerformanceModal = true;
+  }
+
+  function closePerformanceModal() {
+    showPerformanceModal = false;
+    selectedCPE = null;
+  }
+
+  // Reactive statements
+  $: if (mapInstance && cpeDevices.length > 0) {
+    mapper.updateCPEDevices(cpeDevices);
+  }
+</script>
+
+<svelte:head>
+  <title>GenieACS CPE Management - LTE WISP Platform</title>
+  <meta name="description" content="TR-069 device management and CPE monitoring with GPS mapping" />
+</svelte:head>
+
+<div class="genieacs-module">
+  <!-- Module Header -->
+  <div class="module-header">
+    <div class="header-content">
+      <div class="module-info">
+        <h1 class="module-title">
+          <span class="module-icon">📡</span>
+          {moduleData.title}
+        </h1>
+        <p class="module-description">{moduleData.description}</p>
+      </div>
+      
+      <div class="module-actions">
+        <button 
+          class="btn btn-primary" 
+          on:click={syncCPEDevices}
+          disabled={isLoading}
+        >
+          {#if isLoading}
+            <span class="spinner"></span>
+            Syncing...
+          {:else}
+            🔄 Sync CPE Devices
+          {/if}
+        </button>
+        
+        <button 
+          class="btn btn-secondary" 
+          on:click={refreshCPEData}
+          disabled={isLoading}
+        >
+          🔄 Refresh Data
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Display -->
+  {#if error}
+    <div class="error-banner">
+      <div class="error-content">
+        <span class="error-icon">⚠️</span>
+        <span class="error-message">{error}</span>
+        <button class="btn btn-sm" on:click={() => error = null}>✕</button>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Module Content -->
+  <div class="module-content">
+    <!-- CPE Statistics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📱</div>
+        <div class="stat-content">
+          <div class="stat-number">{cpeDevices.length}</div>
+          <div class="stat-label">Total CPEs</div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🟢</div>
+        <div class="stat-content">
+          <div class="stat-number">
+            {cpeDevices.filter(d => d.status === 'Online').length}
+          </div>
+          <div class="stat-label">Online</div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🔴</div>
+        <div class="stat-content">
+          <div class="stat-number">
+            {cpeDevices.filter(d => d.status === 'Offline').length}
+          </div>
+          <div class="stat-label">Offline</div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">📍</div>
+        <div class="stat-content">
+          <div class="stat-number">
+            {cpeDevices.filter(d => d.location).length}
+          </div>
+          <div class="stat-label">With GPS</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map Container -->
+    <div class="map-section">
+      <div class="map-header">
+        <h3>CPE Device Map</h3>
+        <div class="map-controls">
+          <div class="legend">
+            <div class="legend-item">
+              <span class="legend-color online"></span>
+              <span>Online CPEs</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color offline"></span>
+              <span>Offline CPEs</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color error"></span>
+              <span>Error CPEs</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="map-container">
+        <div bind:this={mapContainer} class="arcgis-map"></div>
+        
+        {#if isLoading}
+          <div class="map-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading CPE devices and map...</p>
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    <!-- CPE Device List -->
+    <div class="cpe-list-section">
+      <div class="section-header">
+        <h3>CPE Device List</h3>
+        <div class="list-controls">
+          <input 
+            type="text" 
+            placeholder="Search CPE devices..." 
+            class="search-input"
+          />
+        </div>
+      </div>
+      
+      <div class="cpe-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Device ID</th>
+              <th>Manufacturer</th>
+              <th>Status</th>
+              <th>Location</th>
+              <th>Last Contact</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each cpeDevices as cpe}
+              <tr class="cpe-row" class:online={cpe.status === 'Online'} class:offline={cpe.status === 'Offline'}>
+                <td class="device-id">{cpe.id}</td>
+                <td class="manufacturer">{cpe.manufacturer}</td>
+                <td class="status">
+                  <span class="status-badge {cpe.status.toLowerCase()}">
+                    {cpe.status}
+                  </span>
+                </td>
+                <td class="location">
+                  {#if cpe.location}
+                    📍 {cpe.location.latitude.toFixed(4)}, {cpe.location.longitude.toFixed(4)}
+                  {:else}
+                    No GPS data
+                  {/if}
+                </td>
+                <td class="last-contact">
+                  {cpe.lastContact ? new Date(cpe.lastContact).toLocaleString() : 'Unknown'}
+                </td>
+                <td class="actions">
+                  <button 
+                    class="btn btn-sm btn-primary"
+                    on:click={() => handleCPEClick(cpe)}
+                  >
+                    📊 View Performance
+                  </button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- CPE Performance Modal -->
+  {#if showPerformanceModal && selectedCPE}
+    <CPEPerformanceModal 
+      {selectedCPE}
+      on:close={closePerformanceModal}
+    />
+  {/if}
+</div>
+
+<style>
+  .genieacs-module {
+    min-height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .module-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+  }
+
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .module-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .module-icon {
+    font-size: 1.25rem;
+  }
+
+  .module-description {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .module-actions {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-hover);
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .error-banner {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 1rem 2rem;
+    margin: 0 2rem;
+    border-radius: 0.375rem;
+  }
+
+  .error-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .module-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .stat-icon {
+    font-size: 2rem;
+  }
+
+  .stat-number {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--accent-color);
+  }
+
+  .stat-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .map-section {
+    margin-bottom: 2rem;
+  }
+
+  .map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .map-container {
+    position: relative;
+    height: 500px;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .arcgis-map {
+    width: 100%;
+    height: 100%;
+  }
+
+  .map-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 1000;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .legend-color.online {
+    background: #10b981;
+  }
+
+  .legend-color.offline {
+    background: #ef4444;
+  }
+
+  .legend-color.error {
+    background: #f59e0b;
+  }
+
+  .cpe-list-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .section-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .search-input {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .cpe-table {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .cpe-row.online {
+    border-left: 3px solid #10b981;
+  }
+
+  .cpe-row.offline {
+    border-left: 3px solid #ef4444;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  .status-badge.online {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-badge.offline {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .map-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .section-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+  }
+</style>

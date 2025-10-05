@@ -46,6 +46,33 @@ service cloud.firestore {
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
     
+    // CPE Devices collection (GenieACS integration)
+    match /cpe_devices/{deviceId} {
+      // Allow read if user is authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow write only from Firebase Functions (server-side)
+      allow write: if false; // Only server-side writes allowed
+    }
+    
+    // CPE Performance data
+    match /cpe_performance/{deviceId} {
+      // Allow read if user is authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow write only from Firebase Functions (server-side)
+      allow write: if false; // Only server-side writes allowed
+    }
+    
+    // PCI Analyses collection
+    match /pci_analyses/{analysisId} {
+      // Allow read if user is authenticated
+      allow read: if isAuthenticated();
+      
+      // Allow write only from Firebase Functions (server-side)
+      allow write: if false; // Only server-side writes allowed
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
