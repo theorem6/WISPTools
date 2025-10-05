@@ -15,7 +15,8 @@
     "@sveltejs/kit": "^2.7.4",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "svelte": "^5.0.0",
-    "firebase": "^11.0.1"
+    "firebase": "^11.1.0",
+    "@arcgis/core": "^4.33.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
