@@ -772,32 +772,6 @@
     to { transform: rotate(360deg); }
   }
 
-  .auth-loading {
-    position: fixed;
-    inset: 0;
-    background: var(--bg-primary);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-primary);
-  }
-
-  .auth-loading .spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid var(--border-color);
-    border-top-color: var(--primary-color);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 1rem;
-  }
-
-  .auth-loading p {
-    color: var(--text-secondary);
-    font-size: 1rem;
-  }
-
   /* Removed old topbar styles - now using separate positioned components */
   
   /* Modal Overlay for Export */
