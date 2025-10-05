@@ -30,8 +30,8 @@
     // Sign out from Firebase
     await authService.signOut();
     
-    // Redirect to login
-    goto('/login');
+    // Redirect to Module Manager dashboard
+    goto('/dashboard');
   }
   
   function getUserName(): string {
