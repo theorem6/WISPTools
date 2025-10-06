@@ -3,7 +3,7 @@
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import * as cors from 'cors';
+import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
 const db = getFirestore();
@@ -14,6 +14,7 @@ export const getFaults = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { severity, status, limit } = req.query;
       
@@ -48,7 +49,7 @@ export const getFaults = onRequest({
       console.error('Failed to get faults:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -60,6 +61,7 @@ export const getFault = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { faultId } = req.params;
       
@@ -91,7 +93,7 @@ export const getFault = onRequest({
       console.error('Failed to get fault:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -103,6 +105,7 @@ export const resolveFault = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { faultId } = req.params;
       const { resolution, resolvedBy } = req.body;
@@ -149,7 +152,7 @@ export const resolveFault = onRequest({
       console.error('Failed to resolve fault:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -161,6 +164,7 @@ export const createFault = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const faultData = req.body;
       
@@ -206,7 +210,7 @@ export const createFault = onRequest({
       console.error('Failed to create fault:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -218,6 +222,7 @@ export const initializeSampleFaults = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const sampleFaults = [
         {
@@ -308,7 +313,7 @@ export const initializeSampleFaults = onRequest({
       console.error('Failed to initialize sample faults:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });

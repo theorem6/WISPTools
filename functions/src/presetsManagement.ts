@@ -3,7 +3,7 @@
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import * as cors from 'cors';
+import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
 const db = getFirestore();
@@ -14,6 +14,7 @@ export const getPresets = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { enabled, limit } = req.query;
       
@@ -44,7 +45,7 @@ export const getPresets = onRequest({
       console.error('Failed to get presets:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -56,6 +57,7 @@ export const getPreset = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { presetId } = req.params;
       
@@ -87,7 +89,7 @@ export const getPreset = onRequest({
       console.error('Failed to get preset:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -99,6 +101,7 @@ export const createPreset = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const presetData = req.body;
       
@@ -154,7 +157,7 @@ export const createPreset = onRequest({
       console.error('Failed to create preset:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -166,6 +169,7 @@ export const updatePreset = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { presetId } = req.params;
       const updateData = req.body;
@@ -209,7 +213,7 @@ export const updatePreset = onRequest({
       console.error('Failed to update preset:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -221,6 +225,7 @@ export const deletePreset = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { presetId } = req.params;
       
@@ -252,7 +257,7 @@ export const deletePreset = onRequest({
       console.error('Failed to delete preset:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -264,6 +269,7 @@ export const initializeSamplePresets = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const samplePresets = [
         {
@@ -421,7 +427,7 @@ export const initializeSamplePresets = onRequest({
       console.error('Failed to initialize sample presets:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });

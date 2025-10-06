@@ -2,24 +2,24 @@
 // Implements GenieACS CWMP, NBI, FS, and UI services
 
 import { onRequest } from 'firebase-functions/v2/https';
-import { MongoClient } from 'mongodb';
-import * as cors from 'cors';
+// import { MongoClient } from 'mongodb';
+import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
-let mongoClient: MongoClient | null = null;
+// let mongoClient: MongoClient | null = null;
 
-// Initialize MongoDB connection for GenieACS
-async function getGenieACSMongoClient(): Promise<MongoClient> {
-  if (!mongoClient) {
-    const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb://localhost:27017/genieacs';
-    mongoClient = new MongoClient(connectionUrl);
-    await mongoClient.connect();
-  }
-  return mongoClient;
-}
+// Initialize MongoDB connection for GenieACS (disabled for now)
+// async function getGenieACSMongoClient(): Promise<MongoClient> {
+//   if (!mongoClient) {
+//     const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb://localhost:27017/genieacs';
+//     mongoClient = new MongoClient(connectionUrl);
+//     await mongoClient.connect();
+//   }
+//   return mongoClient;
+// }
 
-// GenieACS CWMP Service (TR-069 Protocol)
-export const genieacsCWMP = onRequest({
+// GenieACS CWMP Service (TR-069 Protocol) - disabled for now
+// export const genieacsCWMP = onRequest({
   region: 'us-central1',
   memory: '1GiB',
   timeoutSeconds: 30

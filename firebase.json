@@ -11,8 +11,7 @@
     "predeploy": [
       "npm --prefix \"$RESOURCE_DIR\" run build"
     ],
-    "runtime": "nodejs20",
-    "generation": 2
+    "runtime": "nodejs20"
   },
   "apphosting": {
     "backendId": "pci-mapper",

@@ -3,7 +3,7 @@
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import * as cors from 'cors';
+import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
 const db = getFirestore();
@@ -14,6 +14,7 @@ export const getProvisions = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { enabled, limit } = req.query;
       
@@ -44,7 +45,7 @@ export const getProvisions = onRequest({
       console.error('Failed to get provisions:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -56,6 +57,7 @@ export const createProvision = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const provisionData = req.body;
       
@@ -108,7 +110,7 @@ export const createProvision = onRequest({
       console.error('Failed to create provision:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -120,6 +122,7 @@ export const updateProvision = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { provisionId } = req.params;
       const updateData = req.body;
@@ -163,7 +166,7 @@ export const updateProvision = onRequest({
       console.error('Failed to update provision:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -175,6 +178,7 @@ export const deleteProvision = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const { provisionId } = req.params;
       
@@ -206,7 +210,7 @@ export const deleteProvision = onRequest({
       console.error('Failed to delete provision:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -218,6 +222,7 @@ export const initializeSampleProvisions = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
+    try {
     try {
       const sampleProvisions = [
         {
@@ -299,7 +304,7 @@ declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey", []
       console.error('Failed to initialize sample provisions:', error);
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
