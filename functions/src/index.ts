@@ -76,6 +76,16 @@ export {
   genieacsUI
 } from './genieacsServices';
 
+// Export presets management functions
+export {
+  getPresets,
+  getPreset,
+  createPreset,
+  updatePreset,
+  deletePreset,
+  initializeSamplePresets
+} from './presetsManagement';
+
 // Simple PCI conflict detection function (existing)
 function analyzeConflictsSimple(cells: any[]) {
   const conflicts: any[] = [];

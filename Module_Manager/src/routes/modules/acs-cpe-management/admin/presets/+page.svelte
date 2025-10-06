@@ -93,13 +93,64 @@
   async function loadPresets() {
     isLoading = true;
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log(`Loaded ${presets.length} presets`);
+      console.log('Loading presets from Firebase Functions...');
+      
+      // Try to load from Firebase Functions
+      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      
+      const response = await fetch(`${functionsUrl}/getPresets`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.presets.length > 0) {
+          console.log(`Loaded ${data.presets.length} presets from Firebase Functions`);
+          presets = data.presets;
+          isLoading = false;
+          return;
+        }
+      }
+      
+      console.log('Firebase Functions not available, using sample data');
+      // Fallback to sample data
+      loadSamplePresets();
+      
     } catch (err) {
-      console.error('Failed to load presets:', err);
+      console.error('Failed to load presets from Firebase Functions:', err);
+      console.log('Using sample data as fallback');
+      loadSamplePresets();
     }
     isLoading = false;
+  }
+
+  function loadSamplePresets() {
+    // Load sample presets (fallback)
+    presets = [
+      {
+        id: 'default',
+        name: 'Default Provisioning',
+        description: 'Basic configuration for all CPE devices',
+        weight: 0,
+        configurations: [
+          {
+            type: 'value',
+            path: 'InternetGatewayDevice.ManagementServer.URL',
+            value: 'https://acs.example.com/cwmp'
+          }
+        ],
+        preCondition: '',
+        events: ['0 BOOTSTRAP', '1 BOOT', '2 PERIODIC'],
+        tags: ['default', 'provisioning'],
+        enabled: true,
+        created: '2025-01-01T00:00:00Z'
+      }
+    ];
+    console.log(`Loaded ${presets.length} sample presets (fallback)`);
   }
 
   function createPreset() {
@@ -111,12 +162,52 @@
     showEditModal = true;
   }
 
-  function deletePreset(preset) {
+  async function deletePreset(preset) {
     if (confirm(`Are you sure you want to delete preset "${preset.name}"?`)) {
-      const index = presets.findIndex(p => p.id === preset.id);
-      if (index > -1) {
-        presets.splice(index, 1);
-        presets = [...presets];
+      try {
+        console.log(`Deleting preset ${preset.id}...`);
+        
+        // Try to delete via Firebase Functions
+        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        const response = await fetch(`${functionsUrl}/deletePreset/${preset.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            console.log(`Successfully deleted preset ${preset.id}`);
+            // Remove from local array
+            const index = presets.findIndex(p => p.id === preset.id);
+            if (index > -1) {
+              presets.splice(index, 1);
+              presets = [...presets];
+            }
+            return;
+          }
+        }
+        
+        console.log('Firebase Functions not available, using local delete');
+        // Fallback to local delete
+        const index = presets.findIndex(p => p.id === preset.id);
+        if (index > -1) {
+          presets.splice(index, 1);
+          presets = [...presets];
+        }
+        
+      } catch (error) {
+        console.error('Failed to delete preset:', error);
+        // Still remove from local array even if API call failed
+        const index = presets.findIndex(p => p.id === preset.id);
+        if (index > -1) {
+          presets.splice(index, 1);
+          presets = [...presets];
+        }
       }
     }
   }
@@ -132,6 +223,42 @@
 
   function getStatusText(status) {
     return status ? 'Enabled' : 'Disabled';
+  }
+
+  async function initializeSamplePresets() {
+    if (confirm('Initialize sample presets in the database? This will create 5 sample presets for testing.')) {
+      try {
+        console.log('Initializing sample presets...');
+        
+        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        const response = await fetch(`${functionsUrl}/initializeSamplePresets`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            console.log(`Sample presets initialized: ${data.created} created, ${data.skipped} already existed`);
+            alert(`Sample presets initialized successfully!\n${data.created} created, ${data.skipped} already existed`);
+            // Reload presets to show the new data
+            await loadPresets();
+            return;
+          }
+        }
+        
+        console.log('Firebase Functions not available for initialization');
+        alert('Firebase Functions not available. Please deploy the functions first.');
+        
+      } catch (error) {
+        console.error('Failed to initialize sample presets:', error);
+        alert('Failed to initialize sample presets. Check console for details.');
+      }
+    }
   }
 </script>
 
@@ -156,6 +283,10 @@
       </p>
     </div>
     <div class="header-actions">
+      <button class="btn btn-secondary" on:click={initializeSamplePresets}>
+        <span class="btn-icon">🗂️</span>
+        Initialize Sample Data
+      </button>
       <button class="btn btn-primary" on:click={createPreset}>
         <span class="btn-icon">➕</span>
         Create Preset
@@ -488,6 +619,7 @@
 
   .btn-secondary:hover {
     background: var(--bg-primary);
+    color: var(--text-primary);
   }
 
   .btn-outline {
