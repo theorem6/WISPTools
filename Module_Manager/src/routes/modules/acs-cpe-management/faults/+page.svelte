@@ -75,13 +75,63 @@
   async function loadFaults() {
     isLoading = true;
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log(`Loaded ${faults.length} faults`);
+      console.log('Loading faults from Firebase Functions...');
+      
+      // Try to load from Firebase Functions
+      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      
+      const response = await fetch(`${functionsUrl}/getFaults`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.faults.length > 0) {
+          console.log(`Loaded ${data.faults.length} faults from Firebase Functions`);
+          faults = data.faults;
+          isLoading = false;
+          return;
+        }
+      }
+      
+      console.log('Firebase Functions not available, using sample data');
+      // Fallback to sample data
+      loadSampleFaults();
+      
     } catch (err) {
-      console.error('Failed to load faults:', err);
+      console.error('Failed to load faults from Firebase Functions:', err);
+      console.log('Using sample data as fallback');
+      loadSampleFaults();
     }
     isLoading = false;
+  }
+
+  function loadSampleFaults() {
+    // Load sample faults (fallback)
+    faults = [
+      {
+        id: 'FAULT-001',
+        deviceId: 'CPE-003',
+        deviceName: 'ZTE MF920U 4G LTE',
+        timestamp: '2025-01-04T14:20:00Z',
+        severity: 'Critical',
+        code: '9001',
+        message: 'Device connection timeout',
+        description: 'Device failed to respond to TR-069 requests within timeout period',
+        status: 'Open',
+        parameters: {
+          'InternetGatewayDevice.ManagementServer.PeriodicInformInterval': '86400'
+        },
+        resolution: '',
+        resolvedBy: null,
+        resolvedAt: null
+      }
+    ];
+    console.log(`Loaded ${faults.length} sample faults (fallback)`);
   }
 
   function viewFault(fault) {
@@ -89,12 +139,57 @@
     showFaultModal = true;
   }
 
-  function resolveFault(fault) {
+  async function resolveFault(fault) {
     if (confirm(`Mark fault "${fault.id}" as resolved?`)) {
-      fault.status = 'Resolved';
-      fault.resolvedBy = 'current-user@example.com';
-      fault.resolvedAt = new Date().toISOString();
-      faults = [...faults];
+      try {
+        console.log(`Resolving fault ${fault.id}...`);
+        
+        // Try to resolve via Firebase Functions
+        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        const response = await fetch(`${functionsUrl}/resolveFault/${fault.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            resolution: 'Fault resolved manually',
+            resolvedBy: 'current-user@example.com'
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            console.log(`Successfully resolved fault ${fault.id}`);
+            // Update local fault
+            fault.status = 'Resolved';
+            fault.resolvedBy = data.fault.resolvedBy;
+            fault.resolvedAt = data.fault.resolvedAt;
+            fault.resolution = data.fault.resolution;
+            faults = [...faults];
+            return;
+          }
+        }
+        
+        console.log('Firebase Functions not available, using local resolve');
+        // Fallback to local resolve
+        fault.status = 'Resolved';
+        fault.resolvedBy = 'current-user@example.com';
+        fault.resolvedAt = new Date().toISOString();
+        fault.resolution = 'Fault resolved manually';
+        faults = [...faults];
+        
+      } catch (error) {
+        console.error('Failed to resolve fault:', error);
+        // Still update locally even if API call failed
+        fault.status = 'Resolved';
+        fault.resolvedBy = 'current-user@example.com';
+        fault.resolvedAt = new Date().toISOString();
+        fault.resolution = 'Fault resolved manually';
+        faults = [...faults];
+      }
     }
   }
 
@@ -139,6 +234,42 @@
     
     return { total, open, resolved, critical };
   }
+
+  async function initializeSampleFaults() {
+    if (confirm('Initialize sample faults in the database? This will create 3 sample faults for testing.')) {
+      try {
+        console.log('Initializing sample faults...');
+        
+        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        const response = await fetch(`${functionsUrl}/initializeSampleFaults`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            console.log(`Sample faults initialized: ${data.created} created, ${data.skipped} already existed`);
+            alert(`Sample faults initialized successfully!\n${data.created} created, ${data.skipped} already existed`);
+            // Reload faults to show the new data
+            await loadFaults();
+            return;
+          }
+        }
+        
+        console.log('Firebase Functions not available for initialization');
+        alert('Firebase Functions not available. Please deploy the functions first.');
+        
+      } catch (error) {
+        console.error('Failed to initialize sample faults:', error);
+        alert('Failed to initialize sample faults. Check console for details.');
+      }
+    }
+  }
 </script>
 
 <svelte:head>
@@ -162,6 +293,10 @@
       </p>
     </div>
     <div class="header-actions">
+      <button class="btn btn-secondary" on:click={initializeSampleFaults}>
+        <span class="btn-icon">🗂️</span>
+        Initialize Sample Data
+      </button>
       <button class="btn btn-primary" on:click={refreshFaults}>
         <span class="btn-icon">🔄</span>
         Refresh

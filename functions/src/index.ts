@@ -86,6 +86,24 @@ export {
   initializeSamplePresets
 } from './presetsManagement';
 
+// Export provisions management functions
+export {
+  getProvisions,
+  createProvision,
+  updateProvision,
+  deleteProvision,
+  initializeSampleProvisions
+} from './provisionsManagement';
+
+// Export faults management functions
+export {
+  getFaults,
+  getFault,
+  createFault,
+  resolveFault,
+  initializeSampleFaults
+} from './faultsManagement';
+
 // Simple PCI conflict detection function (existing)
 function analyzeConflictsSimple(cells: any[]) {
   const conflicts: any[] = [];

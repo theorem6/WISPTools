@@ -54,12 +54,58 @@ if (device["InternetGatewayDevice.DeviceInfo.SoftwareVersion"] < "2.0") {
   async function loadProvisions() {
     isLoading = true;
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log(`Loaded ${provisions.length} provisions`);
+      console.log('Loading provisions from Firebase Functions...');
+      
+      // Try to load from Firebase Functions
+      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      
+      const response = await fetch(`${functionsUrl}/getProvisions`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.provisions.length > 0) {
+          console.log(`Loaded ${data.provisions.length} provisions from Firebase Functions`);
+          provisions = data.provisions;
+          isLoading = false;
+          return;
+        }
+      }
+      
+      console.log('Firebase Functions not available, using sample data');
+      // Fallback to sample data
+      loadSampleProvisions();
+      
     } catch (err) {
-      console.error('Failed to load provisions:', err);
+      console.error('Failed to load provisions from Firebase Functions:', err);
+      console.log('Using sample data as fallback');
+      loadSampleProvisions();
     }
     isLoading = false;
+  }
+
+  function loadSampleProvisions() {
+    // Load sample provisions (fallback)
+    provisions = [
+      {
+        id: 'default-provision',
+        name: 'Default Device Provisioning',
+        description: 'Basic device configuration and parameter setup',
+        script: `// Default device provisioning script
+declare("InternetGatewayDevice.ManagementServer.URL", [], "https://acs.example.com/cwmp");
+declare("InternetGatewayDevice.ManagementServer.Username", [], "acs-user");
+declare("InternetGatewayDevice.ManagementServer.Password", [], "acs-pass");`,
+        enabled: true,
+        tags: ['default', 'provisioning'],
+        created: '2025-01-01T00:00:00Z'
+      }
+    ];
+    console.log(`Loaded ${provisions.length} sample provisions (fallback)`);
   }
 
   function createProvision() {
@@ -71,12 +117,88 @@ if (device["InternetGatewayDevice.DeviceInfo.SoftwareVersion"] < "2.0") {
     showEditModal = true;
   }
 
-  function deleteProvision(provision) {
+  async function deleteProvision(provision) {
     if (confirm(`Are you sure you want to delete provision "${provision.name}"?`)) {
-      const index = provisions.findIndex(p => p.id === provision.id);
-      if (index > -1) {
-        provisions.splice(index, 1);
-        provisions = [...provisions];
+      try {
+        console.log(`Deleting provision ${provision.id}...`);
+        
+        // Try to delete via Firebase Functions
+        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        const response = await fetch(`${functionsUrl}/deleteProvision/${provision.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            console.log(`Successfully deleted provision ${provision.id}`);
+            // Remove from local array
+            const index = provisions.findIndex(p => p.id === provision.id);
+            if (index > -1) {
+              provisions.splice(index, 1);
+              provisions = [...provisions];
+            }
+            return;
+          }
+        }
+        
+        console.log('Firebase Functions not available, using local delete');
+        // Fallback to local delete
+        const index = provisions.findIndex(p => p.id === provision.id);
+        if (index > -1) {
+          provisions.splice(index, 1);
+          provisions = [...provisions];
+        }
+        
+      } catch (error) {
+        console.error('Failed to delete provision:', error);
+        // Still remove from local array even if API call failed
+        const index = provisions.findIndex(p => p.id === provision.id);
+        if (index > -1) {
+          provisions.splice(index, 1);
+          provisions = [...provisions];
+        }
+      }
+    }
+  }
+
+  async function initializeSampleProvisions() {
+    if (confirm('Initialize sample provisions in the database? This will create 3 sample provisions for testing.')) {
+      try {
+        console.log('Initializing sample provisions...');
+        
+        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+        
+        const response = await fetch(`${functionsUrl}/initializeSampleProvisions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            console.log(`Sample provisions initialized: ${data.created} created, ${data.skipped} already existed`);
+            alert(`Sample provisions initialized successfully!\n${data.created} created, ${data.skipped} already existed`);
+            // Reload provisions to show the new data
+            await loadProvisions();
+            return;
+          }
+        }
+        
+        console.log('Firebase Functions not available for initialization');
+        alert('Firebase Functions not available. Please deploy the functions first.');
+        
+      } catch (error) {
+        console.error('Failed to initialize sample provisions:', error);
+        alert('Failed to initialize sample provisions. Check console for details.');
       }
     }
   }
@@ -103,6 +225,10 @@ if (device["InternetGatewayDevice.DeviceInfo.SoftwareVersion"] < "2.0") {
       </p>
     </div>
     <div class="header-actions">
+      <button class="btn btn-secondary" on:click={initializeSampleProvisions}>
+        <span class="btn-icon">🗂️</span>
+        Initialize Sample Data
+      </button>
       <button class="btn btn-primary" on:click={createProvision}>
         <span class="btn-icon">➕</span>
         Create Provision

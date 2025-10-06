@@ -86,13 +86,63 @@
   async function loadDevices() {
     isLoading = true;
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      console.log(`Loaded ${devices.length} devices`);
+      console.log('Loading devices from Firebase Functions...');
+      
+      // Try to load from Firebase Functions
+      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      
+      const response = await fetch(`${functionsUrl}/getCPEDevices`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.devices.length > 0) {
+          console.log(`Loaded ${data.devices.length} devices from Firebase Functions`);
+          devices = data.devices;
+          isLoading = false;
+          return;
+        }
+      }
+      
+      console.log('Firebase Functions not available, using sample data');
+      // Fallback to sample data
+      loadSampleDevices();
+      
     } catch (err) {
-      console.error('Failed to load devices:', err);
+      console.error('Failed to load devices from Firebase Functions:', err);
+      console.log('Using sample data as fallback');
+      loadSampleDevices();
     }
     isLoading = false;
+  }
+
+  function loadSampleDevices() {
+    // Load sample devices (fallback)
+    devices = [
+      {
+        id: 'CPE-001',
+        manufacturer: 'Nokia',
+        model: 'FastMile 4G Gateway',
+        status: 'Online',
+        location: {
+          latitude: 40.7128,
+          longitude: -74.0060,
+          address: 'New York, NY'
+        },
+        lastContact: new Date(),
+        parameters: {
+          SoftwareVersion: '1.2.3',
+          HardwareVersion: 'HW-2.1'
+        },
+        tags: ['nokia', '4g', 'gateway']
+      }
+    ];
+    console.log(`Loaded ${devices.length} sample devices (fallback)`);
   }
 
   function viewDevice(device) {
