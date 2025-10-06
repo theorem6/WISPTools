@@ -1,10 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { genieacsService } from '$lib/genieacs/services/genieacsService';
-  import { locationService } from '$lib/genieacs/services/locationService';
-  import EnhancedArcGISMapper from '$lib/genieacs/mappers/enhancedArcGISMapper';
-  import CPEPerformanceModal from '$lib/components/CPEPerformanceModal.svelte';
   import { darkMode } from '$lib/stores/darkMode';
   
   // Module data
@@ -15,32 +11,16 @@
   };
 
   // Component state
-  let mapContainer: HTMLDivElement;
   let cpeDevices: any[] = [];
   let selectedCPE: any = null;
   let showPerformanceModal = false;
   let isLoading = true;
   let error: string | null = null;
-  let mapInstance: any = null;
-
-  // GenieACS service instances
-  let genieacs: any;
-  let location: any;
-  let mapper: any;
 
   onMount(async () => {
     try {
-      // Initialize GenieACS services
-      genieacs = genieacsService;
-      location = locationService;
-      mapper = new EnhancedArcGISMapper();
-
-      // Load CPE devices
-      await loadCPEDevices();
-      
-      // Initialize map
-      await initializeMap();
-      
+      // Load sample CPE devices for demonstration
+      await loadSampleCPEDevices();
       isLoading = false;
     } catch (err) {
       console.error('Failed to initialize GenieACS module:', err);
@@ -49,49 +29,61 @@
     }
   });
 
-  async function loadCPEDevices() {
-    try {
-      cpeDevices = await genieacs.getDevices();
-      console.log(`Loaded ${cpeDevices.length} CPE devices`);
-    } catch (err) {
-      console.error('Failed to load CPE devices:', err);
-      throw err;
-    }
-  }
-
-  async function initializeMap() {
-    if (!mapContainer) return;
-
-    try {
-      mapInstance = await mapper.createMap(mapContainer, {
-        darkMode: $darkMode,
-        showCPEDevices: true,
-        cpeDevices: cpeDevices
-      });
-
-      // Set up CPE click handler
-      mapper.onCPEClick = (cpe: any) => {
-        selectedCPE = cpe;
-        showPerformanceModal = true;
-      };
-
-    } catch (err) {
-      console.error('Failed to initialize map:', err);
-      throw err;
-    }
+  async function loadSampleCPEDevices() {
+    // Sample CPE devices for demonstration
+    cpeDevices = [
+      {
+        id: 'nokia-lte-router-001',
+        manufacturer: 'Nokia',
+        status: 'Online',
+        location: {
+          latitude: 40.7128,
+          longitude: -74.0060
+        },
+        lastContact: new Date(),
+        parameters: {
+          SoftwareVersion: '1.2.3',
+          HardwareVersion: 'HW-2.1'
+        }
+      },
+      {
+        id: 'huawei-lte-cpe-002',
+        manufacturer: 'Huawei',
+        status: 'Online',
+        location: {
+          latitude: 40.7589,
+          longitude: -73.9851
+        },
+        lastContact: new Date(),
+        parameters: {
+          SoftwareVersion: '2.1.0',
+          HardwareVersion: 'HW-3.0'
+        }
+      },
+      {
+        id: 'zte-lte-modem-003',
+        manufacturer: 'ZTE',
+        status: 'Offline',
+        location: {
+          latitude: 40.6892,
+          longitude: -74.0445
+        },
+        lastContact: new Date(Date.now() - 300000), // 5 minutes ago
+        parameters: {
+          SoftwareVersion: '1.8.2',
+          HardwareVersion: 'HW-1.5'
+        }
+      }
+    ];
+    console.log(`Loaded ${cpeDevices.length} sample CPE devices`);
   }
 
   async function syncCPEDevices() {
     isLoading = true;
     try {
-      await genieacs.syncDevices();
-      await loadCPEDevices();
-      
-      // Update map with new devices
-      if (mapInstance) {
-        await mapper.updateCPEDevices(cpeDevices);
-      }
-      
+      // Simulate sync delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await loadSampleCPEDevices();
       console.log('CPE devices synced successfully');
     } catch (err) {
       console.error('Failed to sync CPE devices:', err);
@@ -101,10 +93,7 @@
   }
 
   async function refreshCPEData() {
-    await loadCPEDevices();
-    if (mapInstance) {
-      await mapper.updateCPEDevices(cpeDevices);
-    }
+    await loadSampleCPEDevices();
   }
 
   function handleCPEClick(cpe: any) {
@@ -219,7 +208,7 @@
       </div>
     </div>
 
-    <!-- Map Container -->
+    <!-- Map Section Placeholder -->
     <div class="map-section">
       <div class="map-header">
         <h3>CPE Device Map</h3>
@@ -242,12 +231,21 @@
       </div>
       
       <div class="map-container">
-        <div bind:this={mapContainer} class="arcgis-map"></div>
+        <div class="map-placeholder">
+          <div class="map-icon">🗺️</div>
+          <h4>Interactive Map Coming Soon</h4>
+          <p>GPS-enabled CPE devices will be displayed on an interactive ArcGIS map</p>
+          <div class="map-features">
+            <div class="feature">📍 GPS Location Tracking</div>
+            <div class="feature">🔄 Real-time Status Updates</div>
+            <div class="feature">📊 Performance Analytics</div>
+          </div>
+        </div>
         
         {#if isLoading}
           <div class="map-loading">
             <div class="loading-spinner"></div>
-            <p>Loading CPE devices and map...</p>
+            <p>Loading CPE devices...</p>
           </div>
         {/if}
       </div>
@@ -314,12 +312,36 @@
     </div>
   </div>
 
-  <!-- CPE Performance Modal -->
+  <!-- CPE Performance Modal Placeholder -->
   {#if showPerformanceModal && selectedCPE}
-    <CPEPerformanceModal 
-      {selectedCPE}
-      on:close={closePerformanceModal}
-    />
+    <div class="modal-overlay" on:click={closePerformanceModal}>
+      <div class="modal-content" on:click|stopPropagation>
+        <div class="modal-header">
+          <h3>CPE Performance Data</h3>
+          <button class="modal-close" on:click={closePerformanceModal}>✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="cpe-info">
+            <h4>{selectedCPE.manufacturer} - {selectedCPE.id}</h4>
+            <p><strong>Status:</strong> {selectedCPE.status}</p>
+            <p><strong>Last Contact:</strong> {selectedCPE.lastContact ? new Date(selectedCPE.lastContact).toLocaleString() : 'Unknown'}</p>
+            {#if selectedCPE.location}
+              <p><strong>Location:</strong> {selectedCPE.location.latitude.toFixed(4)}, {selectedCPE.location.longitude.toFixed(4)}</p>
+            {/if}
+          </div>
+          <div class="performance-placeholder">
+            <div class="placeholder-icon">📊</div>
+            <h4>Performance Analytics Coming Soon</h4>
+            <p>Real-time performance metrics and historical data visualization will be available here.</p>
+            <div class="metrics-preview">
+              <div class="metric">Signal Strength: -45 dBm</div>
+              <div class="metric">Data Usage: 2.3 GB</div>
+              <div class="metric">Uptime: 99.2%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -477,9 +499,36 @@
     overflow: hidden;
   }
 
-  .arcgis-map {
-    width: 100%;
+  .map-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     height: 100%;
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg-tertiary);
+    border-radius: 0.5rem;
+  }
+
+  .map-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .map-features {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .feature {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
   }
 
   .map-loading {
@@ -613,6 +662,89 @@
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background: var(--bg-primary);
+    border-radius: 0.5rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+  }
+
+  .modal-close:hover {
+    background: var(--bg-hover);
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .cpe-info {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+  }
+
+  .performance-placeholder {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .placeholder-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .metrics-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .metric {
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 0.25rem;
+    font-family: monospace;
+    color: var(--text-secondary);
   }
 
   /* Responsive design */
