@@ -4,7 +4,7 @@
   
   // Module metadata
   let moduleInfo = {
-    title: 'GenieACS CPE Management',
+    title: 'ACS CPE Management',
     description: 'TR-069 device management and CPE monitoring with GPS mapping',
     icon: 'device-hub',
     category: 'Device Management',
@@ -20,7 +20,7 @@
 <svelte:head>
   <title>{moduleInfo.title} - LTE WISP Management Platform</title>
   <meta name="description" content={moduleInfo.description} />
-  <meta name="keywords" content="TR-069, GenieACS, CPE, device management, LTE, WISP" />
+  <meta name="keywords" content="TR-069, ACS, CPE, device management, LTE, WISP" />
 </svelte:head>
 
 <!-- Module Layout -->

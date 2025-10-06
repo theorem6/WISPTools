@@ -1,9 +1,9 @@
-// GenieACS CPE Management Module
+// ACS CPE Management Module
 // This module provides TR-069 device management and CPE monitoring
 
 export const load = async () => {
   return {
-    title: 'GenieACS CPE Management',
+    title: 'ACS CPE Management',
     description: 'TR-069 device management and CPE monitoring with GPS mapping',
     icon: 'device-hub',
     category: 'Device Management',
