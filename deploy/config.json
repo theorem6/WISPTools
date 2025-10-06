@@ -1,0 +1,177 @@
+{
+  "deployment": {
+    "name": "ACS Platform",
+    "version": "1.0.0",
+    "description": "Complete ACS (Auto Configuration Server) platform with GenieACS and Firebase integration"
+  },
+  "genieacs": {
+    "services": [
+      {
+        "name": "genieacs-cwmp",
+        "description": "TR-069 CWMP Protocol Server",
+        "port": 7547,
+        "protocol": "http",
+        "endpoint": "/cwmp"
+      },
+      {
+        "name": "genieacs-nbi",
+        "description": "Northbound Interface API",
+        "port": 7557,
+        "protocol": "http",
+        "endpoint": "/nbi"
+      },
+      {
+        "name": "genieacs-fs",
+        "description": "File Server for firmware/configs",
+        "port": 7567,
+        "protocol": "http",
+        "endpoint": "/fs"
+      },
+      {
+        "name": "genieacs-ui",
+        "description": "Web User Interface",
+        "port": 8080,
+        "protocol": "http",
+        "endpoint": "/"
+      }
+    ],
+    "database": {
+      "type": "mongodb",
+      "connectionString": "mongodb://localhost:27017/genieacs",
+      "collections": [
+        "devices",
+        "tasks",
+        "faults",
+        "presets",
+        "operations",
+        "files"
+      ]
+    },
+    "systemd": {
+      "user": "genieacs",
+      "group": "genieacs",
+      "workingDirectory": "/opt/genieacs",
+      "environment": "NODE_ENV=production"
+    }
+  },
+  "firebase": {
+    "functions": {
+      "region": "us-central1",
+      "runtime": "nodejs20",
+      "memory": "256MiB",
+      "timeout": "30s"
+    },
+    "hosting": {
+      "public": "build",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  },
+  "integration": {
+    "bridge": {
+      "source": "genieacs",
+      "target": "firebase",
+      "syncInterval": "300000",
+      "retryAttempts": 3
+    },
+    "dataFlow": [
+      "CPE Devices (TR-069)",
+      "GenieACS CWMP Service",
+      "MongoDB Database",
+      "Firebase Functions Bridge",
+      "Firestore Database",
+      "ACS Module UI"
+    ]
+  },
+  "deployment": {
+    "scripts": {
+      "genieacs": {
+        "description": "Install and configure GenieACS services",
+        "command": "npm run deploy:genieacs",
+        "requirements": ["sudo", "nodejs", "mongodb"]
+      },
+      "functions": {
+        "description": "Deploy Firebase Functions",
+        "command": "npm run deploy:functions",
+        "requirements": ["firebase-cli", "nodejs"]
+      },
+      "hosting": {
+        "description": "Deploy web hosting",
+        "command": "npm run deploy:hosting",
+        "requirements": ["firebase-cli", "nodejs"]
+      },
+      "complete": {
+        "description": "Deploy everything",
+        "command": "npm run deploy:complete",
+        "requirements": ["sudo", "firebase-cli", "nodejs", "mongodb"]
+      }
+    }
+  },
+  "monitoring": {
+    "healthChecks": [
+      {
+        "service": "genieacs-cwmp",
+        "url": "http://localhost:7547",
+        "interval": "30s"
+      },
+      {
+        "service": "genieacs-nbi",
+        "url": "http://localhost:7557",
+        "interval": "30s"
+      },
+      {
+        "service": "genieacs-fs",
+        "url": "http://localhost:7567",
+        "interval": "30s"
+      },
+      {
+        "service": "genieacs-ui",
+        "url": "http://localhost:8080",
+        "interval": "30s"
+      }
+    ],
+    "logs": {
+      "genieacs": "/var/log/genieacs/",
+      "firebase": "firebase functions:log"
+    }
+  },
+  "security": {
+    "firewall": {
+      "ports": [7547, 7557, 7567, 8080, 27017],
+      "protocols": ["tcp"],
+      "description": "GenieACS and MongoDB ports"
+    },
+    "authentication": {
+      "genieacs": {
+        "cwmp": "basic",
+        "nbi": "basic",
+        "ui": "session"
+      },
+      "firebase": {
+        "functions": "firebase-auth",
+        "hosting": "firebase-auth"
+      }
+    }
+  },
+  "backup": {
+    "mongodb": {
+      "schedule": "0 2 * * *",
+      "retention": "30d",
+      "location": "/backup/mongodb/"
+    },
+    "configurations": {
+      "schedule": "0 1 * * *",
+      "retention": "7d",
+      "location": "/backup/configs/"
+    }
+  }
+}

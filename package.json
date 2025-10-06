@@ -12,7 +12,15 @@
     "format": "prettier --plugin-search-dir . --write .",
     "update-deps": "npx npm-check-updates -u && npm install",
     "force-install": "rm -rf node_modules package-lock.json && npm install",
-    "upgrade": "npm run update-deps && npm run build"
+    "upgrade": "npm run update-deps && npm run build",
+    "deploy:genieacs": "node deploy/genieacs-install.js",
+    "deploy:functions": "node deploy/firebase-deploy.js",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy:complete": "node deploy/complete-deploy.js",
+    "deploy:all": "npm run deploy:complete",
+    "setup:genieacs": "chmod +x setup-genieacs-services.sh && sudo ./setup-genieacs-services.sh",
+    "test:functions": "curl -X POST https://us-central1-lte-pci-mapper.cloudfunctions.net/initializeSamplePresets",
+    "test:sync": "curl -X POST https://us-central1-lte-pci-mapper.cloudfunctions.net/syncGenieACSDevices"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.2.2",
