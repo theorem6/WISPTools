@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   
   // Module data
@@ -10,21 +10,33 @@
   };
 
   // Component state
+  let mapContainer: HTMLDivElement;
   let cpeDevices: any[] = [];
   let selectedCPE: any = null;
   let showPerformanceModal = false;
   let isLoading = true;
   let error: string | null = null;
+  let map: any = null;
 
   onMount(async () => {
     try {
       // Load sample CPE devices for demonstration
       await loadSampleCPEDevices();
+      
+      // Initialize map
+      await initializeMap();
+      
       isLoading = false;
     } catch (err) {
       console.error('Failed to initialize GenieACS module:', err);
       error = err.message;
       isLoading = false;
+    }
+  });
+
+  onDestroy(() => {
+    if (map) {
+      map.remove();
     }
   });
 
@@ -77,12 +89,110 @@
     console.log(`Loaded ${cpeDevices.length} sample CPE devices`);
   }
 
+  async function initializeMap() {
+    if (!mapContainer) return;
+
+    try {
+      // Dynamically import Leaflet
+      const L = await import('leaflet');
+      
+      // Initialize map centered on New York area
+      map = L.default.map(mapContainer).setView([40.7128, -74.0060], 10);
+
+      // Add OpenStreetMap tiles
+      L.default.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Add CPE device markers
+      addCPEMarkers();
+
+      console.log('Map initialized successfully');
+    } catch (err) {
+      console.error('Failed to initialize map:', err);
+      // Fallback to placeholder if map fails
+    }
+  }
+
+  function addCPEMarkers() {
+    if (!map) return;
+
+    // Clear existing markers
+    map.eachLayer((layer: any) => {
+      if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+        map.removeLayer(layer);
+      }
+    });
+
+    // Add markers for each CPE device
+    cpeDevices.forEach(device => {
+      if (device.location) {
+        const L = require('leaflet');
+        
+        // Create custom icon based on status
+        const iconHtml = device.status === 'Online' 
+          ? '<div class="cpe-marker online">📡</div>'
+          : '<div class="cpe-marker offline">📡</div>';
+        
+        const customIcon = L.divIcon({
+          html: iconHtml,
+          className: 'custom-cpe-icon',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+
+        // Create marker
+        const marker = L.marker([device.location.latitude, device.location.longitude], {
+          icon: customIcon
+        });
+
+        // Add popup with device info
+        const popupContent = `
+          <div class="cpe-popup">
+            <h4>${device.manufacturer} - ${device.id}</h4>
+            <p><strong>Status:</strong> <span class="status-${device.status.toLowerCase()}">${device.status}</span></p>
+            <p><strong>Location:</strong> ${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}</p>
+            <p><strong>Last Contact:</strong> ${device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown'}</p>
+            <button onclick="window.showCPEPerformance('${device.id}')" class="btn btn-sm btn-primary">View Performance</button>
+          </div>
+        `;
+        
+        marker.bindPopup(popupContent);
+        marker.addTo(map);
+
+        // Add click handler
+        marker.on('click', () => {
+          handleCPEClick(device);
+        });
+      }
+    });
+
+    // Fit map to show all markers
+    if (cpeDevices.length > 0) {
+      const group = new (require('leaflet')).featureGroup();
+      cpeDevices.forEach(device => {
+        if (device.location) {
+          group.addLayer(require('leaflet').marker([device.location.latitude, device.location.longitude]));
+        }
+      });
+      if (group.getLayers().length > 0) {
+        map.fitBounds(group.getBounds().pad(0.1));
+      }
+    }
+  }
+
   async function syncCPEDevices() {
     isLoading = true;
     try {
       // Simulate sync delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       await loadSampleCPEDevices();
+      
+      // Update map markers
+      if (map) {
+        addCPEMarkers();
+      }
+      
       console.log('CPE devices synced successfully');
     } catch (err) {
       console.error('Failed to sync CPE devices:', err);
@@ -93,6 +203,9 @@
 
   async function refreshCPEData() {
     await loadSampleCPEDevices();
+    if (map) {
+      addCPEMarkers();
+    }
   }
 
   function handleCPEClick(cpe: any) {
@@ -114,6 +227,7 @@
 <svelte:head>
   <title>GenieACS CPE Management - LTE WISP Platform</title>
   <meta name="description" content="TR-069 device management and CPE monitoring with GPS mapping" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </svelte:head>
 
 <div class="genieacs-module">
@@ -230,21 +344,12 @@
       </div>
       
       <div class="map-container">
-        <div class="map-placeholder">
-          <div class="map-icon">🗺️</div>
-          <h4>Interactive Map Coming Soon</h4>
-          <p>GPS-enabled CPE devices will be displayed on an interactive ArcGIS map</p>
-          <div class="map-features">
-            <div class="feature">📍 GPS Location Tracking</div>
-            <div class="feature">🔄 Real-time Status Updates</div>
-            <div class="feature">📊 Performance Analytics</div>
-          </div>
-        </div>
+        <div bind:this={mapContainer} class="leaflet-map"></div>
         
         {#if isLoading}
           <div class="map-loading">
             <div class="loading-spinner"></div>
-            <p>Loading CPE devices...</p>
+            <p>Loading CPE devices and map...</p>
           </div>
         {/if}
       </div>
@@ -498,36 +603,80 @@
     overflow: hidden;
   }
 
-  .map-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  .leaflet-map {
+    width: 100%;
     height: 100%;
-    text-align: center;
-    padding: 2rem;
-    background: var(--bg-tertiary);
     border-radius: 0.5rem;
   }
 
-  .map-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-  }
-
-  .map-features {
+  /* Custom CPE marker styles */
+  .cpe-marker {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin-top: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid white;
+    font-size: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 
-  .feature {
-    padding: 0.5rem 1rem;
-    background: var(--bg-secondary);
-    border-radius: 0.25rem;
+  .cpe-marker.online {
+    background: #10b981;
+    color: white;
+  }
+
+  .cpe-marker.offline {
+    background: #ef4444;
+    color: white;
+  }
+
+  .custom-cpe-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  /* Popup styles */
+  .cpe-popup {
+    font-family: inherit;
+    min-width: 200px;
+  }
+
+  .cpe-popup h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .cpe-popup p {
+    margin: 0.25rem 0;
     font-size: 0.875rem;
     color: var(--text-secondary);
+  }
+
+  .status-online {
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .status-offline {
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  .btn {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
+  }
+
+  .btn-primary {
+    background: var(--accent-color);
+    color: white;
   }
 
   .map-loading {
