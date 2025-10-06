@@ -105,10 +105,10 @@
     selectedCPE = null;
   }
 
-  // Reactive statements
-  $: if (mapInstance && cpeDevices.length > 0) {
-    mapper.updateCPEDevices(cpeDevices);
-  }
+  // Reactive statements for future map integration
+  // $: if (mapInstance && cpeDevices.length > 0) {
+  //   mapper.updateCPEDevices(cpeDevices);
+  // }
 </script>
 
 <svelte:head>
