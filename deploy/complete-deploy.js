@@ -2,9 +2,14 @@
 // Complete ACS Deployment Script
 // Run with: npm run deploy:complete
 
-const { execSync, spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync, spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Colors for console output
 const colors = {
@@ -39,7 +44,6 @@ function logError(message) {
 }
 
 async function promptUser(question) {
-  const readline = require('readline');
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -245,7 +249,7 @@ async function testDeployment(genieacsIP) {
       try {
         const response = await fetch(`http://${genieacsIP}:${service.port}`, {
           method: 'GET',
-          timeout: 5000
+          signal: AbortSignal.timeout(5000)
         });
         logSuccess(`${service.name} service is responding`);
       } catch (error) {
@@ -336,8 +340,8 @@ async function main() {
 }
 
 // Run the deployment
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = { main };
+export { main };
