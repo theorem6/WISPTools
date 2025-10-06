@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
+  import MainMenu from './components/MainMenu.svelte';
   
   // Module data
   let moduleData = {
@@ -181,6 +182,9 @@
 </svelte:head>
 
 <div class="acs-module">
+  <!-- Main Navigation -->
+  <MainMenu />
+  
   <!-- Module Header -->
   <div class="module-header">
     <div class="header-content">
