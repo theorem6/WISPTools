@@ -94,7 +94,55 @@
     if (!mapContainer) return;
 
     try {
-      // For now, create a placeholder map until ArcGIS integration is stable
+      // Dynamically import ArcGIS modules
+      const [
+        { default: Map },
+        { default: MapView },
+        { default: GraphicsLayer },
+        { default: SimpleMarkerSymbol },
+        { default: Graphic },
+        { default: Point }
+      ] = await Promise.all([
+        import('@arcgis/core/Map.js'),
+        import('@arcgis/core/views/MapView.js'),
+        import('@arcgis/core/layers/GraphicsLayer.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js')
+      ]);
+
+      // Check for dark mode
+      const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+      const basemap = isDarkMode ? 'dark-gray-vector' : 'streets-navigation-vector';
+
+      // Initialize ArcGIS map
+      map = new Map({
+        basemap: basemap
+      });
+
+      // Create map view
+      const view = new MapView({
+        container: mapContainer,
+        map: map,
+        center: [-74.0060, 40.7128], // [longitude, latitude] for New York
+        zoom: 10
+      });
+
+      // Create graphics layer for CPE devices
+      const graphicsLayer = new GraphicsLayer();
+      map.add(graphicsLayer);
+
+      // Store view and layer for later use
+      map._view = view;
+      map._graphicsLayer = graphicsLayer;
+
+      // Add CPE device markers
+      await addCPEMarkers();
+
+      console.log('ArcGIS map initialized successfully');
+    } catch (err) {
+      console.error('Failed to initialize ArcGIS map:', err);
+      // Fallback to placeholder if ArcGIS fails
       mapContainer.innerHTML = `
         <div style="
           display: flex;
@@ -108,33 +156,88 @@
           padding: 2rem;
         ">
           <div style="font-size: 4rem; margin-bottom: 1rem;">🗺️</div>
-          <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Interactive ArcGIS Map</h4>
+          <h4 style="margin-bottom: 1rem; color: var(--text-primary);">ArcGIS Map Loading...</h4>
           <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-            GPS-enabled CPE devices will be displayed on an interactive ArcGIS map
+            Interactive map with GPS-enabled CPE devices
           </p>
-          <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
-            <div style="padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
-              📍 GPS Location Tracking
-            </div>
-            <div style="padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
-              🔄 Real-time Status Updates
-            </div>
-            <div style="padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
-              📊 Performance Analytics
-            </div>
-          </div>
         </div>
       `;
-
-      console.log('Map placeholder initialized successfully');
-    } catch (err) {
-      console.error('Failed to initialize map:', err);
     }
   }
 
   async function addCPEMarkers() {
-    // Placeholder for future ArcGIS marker integration
-    console.log(`CPE markers would be added for ${cpeDevices.length} devices`);
+    if (!map || !map._graphicsLayer) return;
+
+    try {
+      // Import ArcGIS modules
+      const [
+        { default: Graphic },
+        { default: Point },
+        { default: SimpleMarkerSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js')
+      ]);
+
+      // Clear existing graphics
+      map._graphicsLayer.removeAll();
+
+      // Add markers for each CPE device
+      cpeDevices.forEach(device => {
+        if (device.location) {
+          // Create symbol based on status
+          const symbol = new SimpleMarkerSymbol({
+            style: 'circle',
+            color: device.status === 'Online' ? '#10b981' : '#ef4444',
+            size: '16px',
+            outline: {
+              color: 'white',
+              width: 2
+            }
+          });
+
+          // Create point geometry
+          const point = new Point({
+            longitude: device.location.longitude,
+            latitude: device.location.latitude
+          });
+
+          // Create graphic
+          const graphic = new Graphic({
+            geometry: point,
+            symbol: symbol,
+            attributes: {
+              id: device.id,
+              manufacturer: device.manufacturer,
+              status: device.status,
+              location: `${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}`,
+              lastContact: device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown',
+              device: device
+            }
+          });
+
+          // Add click handler
+          graphic.on('click', () => {
+            handleCPEClick(device);
+          });
+
+          map._graphicsLayer.add(graphic);
+        }
+      });
+
+      // Fit map to show all markers if we have devices
+      if (cpeDevices.length > 0 && map._view && map._graphicsLayer.graphics.length > 0) {
+        await map._view.goTo({
+          target: map._graphicsLayer.graphics,
+          padding: 50
+        });
+      }
+
+      console.log(`Added ${cpeDevices.length} CPE markers to ArcGIS map`);
+    } catch (err) {
+      console.error('Failed to add CPE markers:', err);
+    }
   }
 
   async function syncCPEDevices() {
@@ -144,8 +247,10 @@
       await new Promise(resolve => setTimeout(resolve, 1000));
       await loadSampleCPEDevices();
       
-      // Update map markers (placeholder)
-      addCPEMarkers();
+      // Update map markers
+      if (map) {
+        addCPEMarkers();
+      }
       
       console.log('CPE devices synced successfully');
     } catch (err) {
@@ -157,7 +262,9 @@
 
   async function refreshCPEData() {
     await loadSampleCPEDevices();
-    addCPEMarkers();
+    if (map) {
+      addCPEMarkers();
+    }
   }
 
   function handleCPEClick(cpe: any) {
