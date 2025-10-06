@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { darkMode } from '$lib/stores/darkMode';
   
   // Module data
   let moduleData = {
