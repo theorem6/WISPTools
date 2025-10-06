@@ -24,13 +24,13 @@
       path: '/modules/pci-resolution'
     },
     {
-      id: 'genieacs-cpe-management',
-      name: 'GenieACS CPE Management',
+      id: 'acs-cpe-management',
+      name: 'ACS CPE Management',
       description: 'TR-069 device management and CPE monitoring with GPS mapping',
       icon: '📡',
       color: '#10b981',
       status: 'active',
-      path: '/modules/genieacs-cpe-management'
+      path: '/modules/acs-cpe-management'
     },
     {
       id: 'ue-cpe-management',

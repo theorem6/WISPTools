@@ -4,7 +4,7 @@
   
   // Module data
   let moduleData = {
-    title: 'GenieACS CPE Management',
+    title: 'ACS CPE Management',
     description: 'TR-069 device management and CPE monitoring',
     icon: 'device-hub'
   };
@@ -28,7 +28,7 @@
       
       isLoading = false;
     } catch (err) {
-      console.error('Failed to initialize GenieACS module:', err);
+      console.error('Failed to initialize ACS module:', err);
       error = err.message;
       isLoading = false;
     }
@@ -93,91 +93,115 @@
     if (!mapContainer) return;
 
     try {
-      // Dynamically import Leaflet
-      const L = await import('leaflet');
+      // Dynamically import ArcGIS
+      const { Map, MapView, Graphic, GraphicsLayer, SimpleMarkerSymbol } = await import('@arcgis/core');
       
-      // Initialize map centered on New York area
-      map = L.default.map(mapContainer).setView([40.7128, -74.0060], 10);
+      // Initialize ArcGIS map
+      map = new Map({
+        basemap: 'streets-navigation-vector'
+      });
 
-      // Add OpenStreetMap tiles
-      L.default.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
+      // Create map view
+      const view = new MapView({
+        container: mapContainer,
+        map: map,
+        center: [-74.0060, 40.7128], // [longitude, latitude] for ArcGIS
+        zoom: 10
+      });
+
+      // Create graphics layer for CPE devices
+      const graphicsLayer = new GraphicsLayer();
+      map.add(graphicsLayer);
+
+      // Store view and layer for later use
+      map._view = view;
+      map._graphicsLayer = graphicsLayer;
 
       // Add CPE device markers
       addCPEMarkers();
 
-      console.log('Map initialized successfully');
+      console.log('ArcGIS map initialized successfully');
     } catch (err) {
-      console.error('Failed to initialize map:', err);
+      console.error('Failed to initialize ArcGIS map:', err);
       // Fallback to placeholder if map fails
     }
   }
 
-  function addCPEMarkers() {
-    if (!map) return;
+  async function addCPEMarkers() {
+    if (!map || !map._graphicsLayer) return;
 
-    // Clear existing markers
-    map.eachLayer((layer: any) => {
-      if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
-        map.removeLayer(layer);
-      }
-    });
+    try {
+      // Import ArcGIS modules
+      const { Graphic, SimpleMarkerSymbol } = await import('@arcgis/core');
 
-    // Add markers for each CPE device
-    cpeDevices.forEach(device => {
-      if (device.location) {
-        const L = require('leaflet');
-        
-        // Create custom icon based on status
-        const iconHtml = device.status === 'Online' 
-          ? '<div class="cpe-marker online">📡</div>'
-          : '<div class="cpe-marker offline">📡</div>';
-        
-        const customIcon = L.divIcon({
-          html: iconHtml,
-          className: 'custom-cpe-icon',
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        });
+      // Clear existing graphics
+      map._graphicsLayer.removeAll();
 
-        // Create marker
-        const marker = L.marker([device.location.latitude, device.location.longitude], {
-          icon: customIcon
-        });
-
-        // Add popup with device info
-        const popupContent = `
-          <div class="cpe-popup">
-            <h4>${device.manufacturer} - ${device.id}</h4>
-            <p><strong>Status:</strong> <span class="status-${device.status.toLowerCase()}">${device.status}</span></p>
-            <p><strong>Location:</strong> ${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}</p>
-            <p><strong>Last Contact:</strong> ${device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown'}</p>
-            <button onclick="window.showCPEPerformance('${device.id}')" class="btn btn-sm btn-primary">View Performance</button>
-          </div>
-        `;
-        
-        marker.bindPopup(popupContent);
-        marker.addTo(map);
-
-        // Add click handler
-        marker.on('click', () => {
-          handleCPEClick(device);
-        });
-      }
-    });
-
-    // Fit map to show all markers
-    if (cpeDevices.length > 0) {
-      const group = new (require('leaflet')).featureGroup();
+      // Add markers for each CPE device
       cpeDevices.forEach(device => {
         if (device.location) {
-          group.addLayer(require('leaflet').marker([device.location.latitude, device.location.longitude]));
+          // Create symbol based on status
+          const symbol = new SimpleMarkerSymbol({
+            style: 'circle',
+            color: device.status === 'Online' ? '#10b981' : '#ef4444',
+            size: '20px',
+            outline: {
+              color: 'white',
+              width: 2
+            }
+          });
+
+          // Create graphic
+          const graphic = new Graphic({
+            geometry: {
+              type: 'point',
+              longitude: device.location.longitude,
+              latitude: device.location.latitude
+            },
+            symbol: symbol,
+            attributes: {
+              id: device.id,
+              manufacturer: device.manufacturer,
+              status: device.status,
+              location: `${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}`,
+              lastContact: device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown',
+              device: device
+            },
+            popupTemplate: {
+              title: `${device.manufacturer} - ${device.id}`,
+              content: `
+                <div class="cpe-popup">
+                  <p><strong>Status:</strong> <span class="status-${device.status.toLowerCase()}">${device.status}</span></p>
+                  <p><strong>Location:</strong> ${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}</p>
+                  <p><strong>Last Contact:</strong> ${device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown'}</p>
+                </div>
+              `
+            }
+          });
+
+          // Add click handler
+          graphic.on('click', () => {
+            handleCPEClick(device);
+          });
+
+          map._graphicsLayer.add(graphic);
         }
       });
-      if (group.getLayers().length > 0) {
-        map.fitBounds(group.getBounds().pad(0.1));
+
+      // Fit map to show all markers
+      if (cpeDevices.length > 0 && map._view) {
+        const graphics = map._graphicsLayer.graphics;
+        if (graphics.length > 0) {
+          await map._view.goTo({
+            target: graphics,
+            padding: 50
+          });
+        }
       }
+
+      console.log('CPE markers added to ArcGIS map');
+    } catch (err) {
+      console.error('Failed to add CPE markers:', err);
     }
   }
 
@@ -225,12 +249,11 @@
 </script>
 
 <svelte:head>
-  <title>GenieACS CPE Management - LTE WISP Platform</title>
+  <title>ACS CPE Management - LTE WISP Platform</title>
   <meta name="description" content="TR-069 device management and CPE monitoring with GPS mapping" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </svelte:head>
 
-<div class="genieacs-module">
+<div class="acs-module">
   <!-- Module Header -->
   <div class="module-header">
     <div class="header-content">
@@ -344,7 +367,7 @@
       </div>
       
       <div class="map-container">
-        <div bind:this={mapContainer} class="leaflet-map"></div>
+        <div bind:this={mapContainer} class="arcgis-map"></div>
         
         {#if isLoading}
           <div class="map-loading">
@@ -450,7 +473,7 @@
 </div>
 
 <style>
-  .genieacs-module {
+  .acs-module {
     min-height: 100vh;
     background: var(--bg-primary);
     color: var(--text-primary);
@@ -603,38 +626,10 @@
     overflow: hidden;
   }
 
-  .leaflet-map {
+  .arcgis-map {
     width: 100%;
     height: 100%;
     border-radius: 0.5rem;
-  }
-
-  /* Custom CPE marker styles */
-  .cpe-marker {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 2px solid white;
-    font-size: 16px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-
-  .cpe-marker.online {
-    background: #10b981;
-    color: white;
-  }
-
-  .cpe-marker.offline {
-    background: #ef4444;
-    color: white;
-  }
-
-  .custom-cpe-icon {
-    background: transparent !important;
-    border: none !important;
   }
 
   /* Popup styles */
