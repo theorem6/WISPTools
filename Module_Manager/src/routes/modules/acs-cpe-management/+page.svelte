@@ -42,7 +42,43 @@
   });
 
   async function loadSampleCPEDevices() {
-    // Sample CPE devices for demonstration
+    try {
+      // Try to load real CPE devices from Firebase Functions
+      console.log('Attempting to load CPE devices from Firebase Functions...');
+      
+      // Get Firebase project ID from environment or use default
+      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      
+      const response = await fetch(`${functionsUrl}/getCPEDevices`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.devices.length > 0) {
+          console.log(`Loaded ${data.devices.length} real CPE devices from Firebase Functions`);
+          cpeDevices = data.devices;
+          return;
+        }
+      }
+      
+      console.log('Firebase Functions not available, using sample data');
+      // Fallback to sample data if Firebase Functions are not available
+      loadFallbackSampleData();
+      
+    } catch (error) {
+      console.error('Error loading CPE devices from Firebase Functions:', error);
+      console.log('Using sample data as fallback');
+      loadFallbackSampleData();
+    }
+  }
+
+  function loadFallbackSampleData() {
+    // Sample CPE devices for demonstration (fallback)
     cpeDevices = [
       {
         id: 'nokia-lte-router-001',
@@ -87,7 +123,7 @@
         }
       }
     ];
-    console.log(`Loaded ${cpeDevices.length} sample CPE devices`);
+    console.log(`Loaded ${cpeDevices.length} sample CPE devices (fallback)`);
   }
 
   async function initializeMap() {
@@ -242,9 +278,43 @@
 
   async function syncCPEDevices() {
     isLoading = true;
+    error = null;
+    
     try {
-      // Simulate sync delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Starting CPE device sync...');
+      
+      // Try to sync with Firebase Functions first
+      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
+      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      
+      const syncResponse = await fetch(`${functionsUrl}/syncCPEDevices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (syncResponse.ok) {
+        const syncData = await syncResponse.json();
+        if (syncData.success) {
+          console.log(`Sync completed: ${syncData.synced} devices synced, ${syncData.errors} errors`);
+          
+          // Now load the updated devices
+          await loadSampleCPEDevices();
+          
+          // Update map markers
+          if (map) {
+            addCPEMarkers();
+          }
+          
+          console.log('CPE devices synced successfully from MongoDB');
+          return;
+        }
+      }
+      
+      console.log('Firebase Functions sync not available, using local sync');
+      // Fallback to local sync (just reload sample data)
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate sync delay
       await loadSampleCPEDevices();
       
       // Update map markers
@@ -252,10 +322,11 @@
         addCPEMarkers();
       }
       
-      console.log('CPE devices synced successfully');
+      console.log('CPE devices synced successfully (local)');
+      
     } catch (err) {
       console.error('Failed to sync CPE devices:', err);
-      error = err.message;
+      error = err.message || 'Sync failed';
     }
     isLoading = false;
   }
