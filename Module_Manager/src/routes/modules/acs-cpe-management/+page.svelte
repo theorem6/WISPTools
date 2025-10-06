@@ -93,116 +93,47 @@
     if (!mapContainer) return;
 
     try {
-      // Dynamically import ArcGIS
-      const { Map, MapView, Graphic, GraphicsLayer, SimpleMarkerSymbol } = await import('@arcgis/core');
-      
-      // Initialize ArcGIS map
-      map = new Map({
-        basemap: 'streets-navigation-vector'
-      });
+      // For now, create a placeholder map until ArcGIS integration is stable
+      mapContainer.innerHTML = `
+        <div style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          background: var(--bg-tertiary);
+          border-radius: 0.5rem;
+          text-align: center;
+          padding: 2rem;
+        ">
+          <div style="font-size: 4rem; margin-bottom: 1rem;">🗺️</div>
+          <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Interactive ArcGIS Map</h4>
+          <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+            GPS-enabled CPE devices will be displayed on an interactive ArcGIS map
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem;">
+            <div style="padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+              📍 GPS Location Tracking
+            </div>
+            <div style="padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+              🔄 Real-time Status Updates
+            </div>
+            <div style="padding: 0.5rem 1rem; background: var(--bg-secondary); border-radius: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+              📊 Performance Analytics
+            </div>
+          </div>
+        </div>
+      `;
 
-      // Create map view
-      const view = new MapView({
-        container: mapContainer,
-        map: map,
-        center: [-74.0060, 40.7128], // [longitude, latitude] for ArcGIS
-        zoom: 10
-      });
-
-      // Create graphics layer for CPE devices
-      const graphicsLayer = new GraphicsLayer();
-      map.add(graphicsLayer);
-
-      // Store view and layer for later use
-      map._view = view;
-      map._graphicsLayer = graphicsLayer;
-
-      // Add CPE device markers
-      addCPEMarkers();
-
-      console.log('ArcGIS map initialized successfully');
+      console.log('Map placeholder initialized successfully');
     } catch (err) {
-      console.error('Failed to initialize ArcGIS map:', err);
-      // Fallback to placeholder if map fails
+      console.error('Failed to initialize map:', err);
     }
   }
 
   async function addCPEMarkers() {
-    if (!map || !map._graphicsLayer) return;
-
-    try {
-      // Import ArcGIS modules
-      const { Graphic, SimpleMarkerSymbol } = await import('@arcgis/core');
-
-      // Clear existing graphics
-      map._graphicsLayer.removeAll();
-
-      // Add markers for each CPE device
-      cpeDevices.forEach(device => {
-        if (device.location) {
-          // Create symbol based on status
-          const symbol = new SimpleMarkerSymbol({
-            style: 'circle',
-            color: device.status === 'Online' ? '#10b981' : '#ef4444',
-            size: '20px',
-            outline: {
-              color: 'white',
-              width: 2
-            }
-          });
-
-          // Create graphic
-          const graphic = new Graphic({
-            geometry: {
-              type: 'point',
-              longitude: device.location.longitude,
-              latitude: device.location.latitude
-            },
-            symbol: symbol,
-            attributes: {
-              id: device.id,
-              manufacturer: device.manufacturer,
-              status: device.status,
-              location: `${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}`,
-              lastContact: device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown',
-              device: device
-            },
-            popupTemplate: {
-              title: `${device.manufacturer} - ${device.id}`,
-              content: `
-                <div class="cpe-popup">
-                  <p><strong>Status:</strong> <span class="status-${device.status.toLowerCase()}">${device.status}</span></p>
-                  <p><strong>Location:</strong> ${device.location.latitude.toFixed(4)}, ${device.location.longitude.toFixed(4)}</p>
-                  <p><strong>Last Contact:</strong> ${device.lastContact ? new Date(device.lastContact).toLocaleString() : 'Unknown'}</p>
-                </div>
-              `
-            }
-          });
-
-          // Add click handler
-          graphic.on('click', () => {
-            handleCPEClick(device);
-          });
-
-          map._graphicsLayer.add(graphic);
-        }
-      });
-
-      // Fit map to show all markers
-      if (cpeDevices.length > 0 && map._view) {
-        const graphics = map._graphicsLayer.graphics;
-        if (graphics.length > 0) {
-          await map._view.goTo({
-            target: graphics,
-            padding: 50
-          });
-        }
-      }
-
-      console.log('CPE markers added to ArcGIS map');
-    } catch (err) {
-      console.error('Failed to add CPE markers:', err);
-    }
+    // Placeholder for future ArcGIS marker integration
+    console.log(`CPE markers would be added for ${cpeDevices.length} devices`);
   }
 
   async function syncCPEDevices() {
@@ -212,10 +143,8 @@
       await new Promise(resolve => setTimeout(resolve, 1000));
       await loadSampleCPEDevices();
       
-      // Update map markers
-      if (map) {
-        addCPEMarkers();
-      }
+      // Update map markers (placeholder)
+      addCPEMarkers();
       
       console.log('CPE devices synced successfully');
     } catch (err) {
@@ -227,9 +156,7 @@
 
   async function refreshCPEData() {
     await loadSampleCPEDevices();
-    if (map) {
-      addCPEMarkers();
-    }
+    addCPEMarkers();
   }
 
   function handleCPEClick(cpe: any) {
