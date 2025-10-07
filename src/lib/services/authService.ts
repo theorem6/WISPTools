@@ -1,6 +1,6 @@
 // Firebase Authentication Service
 import { browser } from '$app/environment';
-import { auth } from '../firebase';
+import { getFirebaseAuth } from '../firebase';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -10,7 +10,8 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
-  type User
+  type User,
+  type Auth
 } from 'firebase/auth';
 import type { UserProfile } from '../models/network';
 
@@ -32,6 +33,7 @@ export class AuthService {
   private currentUser: User | null = null;
   private authStateListeners: ((user: User | null) => void)[] = [];
   private tokenRefreshInterval: NodeJS.Timeout | null = null;
+  private authInstance: Auth | null = null;
 
   constructor() {
     if (browser) {
@@ -41,10 +43,22 @@ export class AuthService {
   }
 
   /**
+   * Get auth instance (lazy initialization)
+   */
+  private getAuth(): Auth {
+    if (!this.authInstance) {
+      this.authInstance = getFirebaseAuth();
+    }
+    return this.authInstance;
+  }
+
+  /**
    * Initialize Firebase auth state listener with error recovery
    */
   private initializeAuthListener(): void {
-    onAuthStateChanged(auth, (user) => {
+    if (!browser) return;
+    
+    onAuthStateChanged(this.getAuth(), (user) => {
       this.currentUser = user;
       
       // Log auth state changes for debugging
@@ -117,8 +131,12 @@ export class AuthService {
     password: string,
     displayName?: string
   ): Promise<AuthResult<UserProfile>> {
+    if (!browser) {
+      return { success: false, error: 'Auth is only available on the client' };
+    }
+    
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(this.getAuth(), email, password);
       const user = userCredential.user;
 
       // Update display name if provided
@@ -142,8 +160,12 @@ export class AuthService {
    * Sign in with email and password
    */
   async signIn(email: string, password: string): Promise<AuthResult<UserProfile>> {
+    if (!browser) {
+      return { success: false, error: 'Auth is only available on the client' };
+    }
+    
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(this.getAuth(), email, password);
       return {
         success: true,
         data: this.mapUserToProfile(userCredential.user)
@@ -160,9 +182,13 @@ export class AuthService {
    * Sign in with Google
    */
   async signInWithGoogle(): Promise<AuthResult<UserProfile>> {
+    if (!browser) {
+      return { success: false, error: 'Auth is only available on the client' };
+    }
+    
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(this.getAuth(), provider);
       return {
         success: true,
         data: this.mapUserToProfile(userCredential.user)
@@ -179,8 +205,12 @@ export class AuthService {
    * Sign out
    */
   async signOut(): Promise<AuthResult<void>> {
+    if (!browser) {
+      return { success: false, error: 'Auth is only available on the client' };
+    }
+    
     try {
-      await signOut(auth);
+      await signOut(this.getAuth());
       return { success: true };
     } catch (error: any) {
       return {
@@ -194,8 +224,12 @@ export class AuthService {
    * Send password reset email
    */
   async resetPassword(email: string): Promise<AuthResult<void>> {
+    if (!browser) {
+      return { success: false, error: 'Auth is only available on the client' };
+    }
+    
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(this.getAuth(), email);
       return { success: true };
     } catch (error: any) {
       return {
