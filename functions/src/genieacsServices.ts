@@ -207,7 +207,7 @@ async function processTR069Request(body: string): Promise<string> {
 // Handle devices API endpoints
 async function handleDevicesAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  // const path = url.pathname; // Reserved for future routing
+  const path = url.pathname;
   
   if (req.method === 'GET') {
     // Get devices
@@ -242,7 +242,7 @@ async function handleDevicesAPI(req: any, res: any, collections: any) {
 // Handle tasks API endpoints
 async function handleTasksAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  // const path = url.pathname; // Reserved for future routing
+  const path = url.pathname;
   
   if (req.method === 'GET') {
     // Get tasks
@@ -275,7 +275,7 @@ async function handleTasksAPI(req: any, res: any, collections: any) {
 // Handle faults API endpoints
 async function handleFaultsAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  // const path = url.pathname; // Reserved for future routing
+  const path = url.pathname;
   
   if (req.method === 'GET') {
     // Get faults
@@ -292,7 +292,7 @@ async function handleFaultsAPI(req: any, res: any, collections: any) {
 // Handle presets API endpoints
 async function handlePresetsAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  // const path = url.pathname; // Reserved for future routing
+  const path = url.pathname;
   
   if (req.method === 'GET') {
     // Get presets
@@ -322,7 +322,7 @@ async function handlePresetsAPI(req: any, res: any, collections: any) {
 // Handle ping API endpoints
 async function handlePingAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  // const path = url.pathname; // Reserved for future routing
+  const path = url.pathname;
   
   if (req.method === 'POST') {
     // Ping device
