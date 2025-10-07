@@ -46,3 +46,15 @@ Thumbs.db
 # Development files
 *.swp
 *~
+
+# Chat recovery and backup files
+chat-sessions.csv
+cursor-chats-backup.db
+cursor-chats-database.db
+genieacs-chat-search.txt
+genieacs-deployment-chat.txt
+recovered-chats.json
+*.db
+*-chat-*.txt
+*chat*.csv
+*chat*.json
