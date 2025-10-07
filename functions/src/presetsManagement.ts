@@ -1,13 +1,14 @@
 // Firebase Functions for Presets Management
 // Handles CRUD operations for device provisioning presets
 
+// Import shared Firebase initialization (must be first)
+import { db } from './firebaseInit.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
 
-// Firebase Admin is initialized in index.ts
 const corsHandler = cors({ origin: true });
-const db = getFirestore();
 
 // Get all presets
 export const getPresets = onRequest({

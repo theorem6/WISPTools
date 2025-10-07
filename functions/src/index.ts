@@ -1,16 +1,14 @@
 // Firebase Functions - Main Entry Point
 // Combines PCI analysis and GenieACS integration
 
+// Import shared Firebase initialization (must be first)
+import { db } from './firebaseInit.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-
-// Initialize Firebase Admin
-import { initializeApp } from 'firebase-admin/app';
-initializeApp();
+import { FieldValue } from 'firebase-admin/firestore';
 
 const corsHandler = cors({ origin: true });
-const db = getFirestore();
 
 // PCI Analysis Function (existing)
 export const analyzePCI = onRequest({

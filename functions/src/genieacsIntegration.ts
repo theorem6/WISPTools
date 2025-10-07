@@ -1,15 +1,16 @@
 // Firebase Functions for GenieACS Integration
 // Provides API bridge between GenieACS (MongoDB) and PCI Mapper (Firestore)
 
+// Import shared Firebase initialization (must be first)
+import { db } from './firebaseInit.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { MongoClient } from 'mongodb';
 import cors from 'cors';
 
-// Firebase Admin is initialized in index.ts
 const corsHandler = cors({ origin: true });
-const db = getFirestore();
 
 // MongoDB connection (will be initialized on first use)
 let mongoClient: MongoClient | null = null;

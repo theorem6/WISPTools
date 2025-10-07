@@ -1,13 +1,14 @@
 // Firebase Functions Bridge to GenieACS Services
 // Connects Firebase Functions to running GenieACS instance
 
+// Import shared Firebase initialization (must be first)
+import { db } from './firebaseInit.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
 
-// Firebase Admin is initialized in index.ts
 const corsHandler = cors({ origin: true });
-const db = getFirestore();
 
 // Configuration - Update these URLs to point to your GenieACS server
 const GENIEACS_CONFIG = {

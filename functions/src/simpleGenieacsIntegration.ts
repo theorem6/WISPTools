@@ -1,13 +1,14 @@
 // Simplified Firebase Functions for ACS Integration
 // Uses only Firestore (no MongoDB dependency)
 
+// Import shared Firebase initialization (must be first)
+import { db } from './firebaseInit.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
 
-// Firebase Admin is initialized in index.ts
 const corsHandler = cors({ origin: true });
-const db = getFirestore();
 
 // Get CPE devices from Firestore
 export const getCPEDevices = onRequest({
