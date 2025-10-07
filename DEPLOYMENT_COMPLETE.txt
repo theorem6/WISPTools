@@ -1,0 +1,318 @@
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║           ✅ MONGODB NPM DRIVER DEPLOYMENT - READY TO DEPLOY                ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    WHAT'S BEEN CONFIGURED                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+📦 MONGODB DRIVER UPGRADE:
+  ✅ Upgraded from v4.17.2 → v6.20.0 (latest)
+  ✅ Using official MongoDB Node.js npm package
+  ✅ Reference: https://www.mongodb.com/docs/drivers/node/current/
+
+🔧 NEW FEATURES:
+  ✅ Centralized connection handler (functions/src/mongoConnection.ts)
+  ✅ Connection pooling (2-10 connections, optimized for serverless)
+  ✅ Singleton pattern (reuses connections between invocations)
+  ✅ Automatic reconnection handling
+  ✅ Health checks and diagnostics
+  ✅ Compression enabled (zlib)
+  ✅ TypeScript type safety
+
+🌍 MONGODB ATLAS CONFIGURATION:
+  Cluster:    cluster0.1radgkw.mongodb.net
+  Username:   genieacs-user
+  Password:   <db_password> (needs to be set)
+  Connection: mongodb+srv://genieacs-user:<db_password>@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+
+📁 FILES CREATED/UPDATED:
+  ✅ functions/src/mongoConnection.ts        - Connection handler
+  ✅ functions/src/genieacsIntegration.ts    - Updated to use new handler
+  ✅ functions/package.json                  - MongoDB v6.20.0
+  ✅ apphosting.yaml                         - Connection string config
+  ✅ apphosting.staging.yaml                 - Staging config
+  ✅ apphosting.development.yaml             - Development config
+  ✅ set-mongodb-password.sh                 - Password setup (Linux/Mac)
+  ✅ set-mongodb-password.ps1                - Password setup (Windows)
+  ✅ MONGODB_NPM_DEPLOYMENT.md               - Complete guide
+  ✅ QUICK_DEPLOY.md                         - Quick start guide
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                   🚀 DEPLOYMENT STEPS (3 STEPS)                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+STEP 1: Set Your MongoDB Password
+──────────────────────────────────
+
+  You need to replace <db_password> in the configuration files.
+
+  METHOD A: Use the automated script (Recommended)
+  
+    Linux/Mac/Firebase Web IDE:
+      chmod +x set-mongodb-password.sh
+      ./set-mongodb-password.sh
+    
+    Windows PowerShell:
+      .\set-mongodb-password.ps1
+
+  METHOD B: Manual edit
+  
+    Edit these files and replace <db_password> with your actual password:
+    - apphosting.yaml
+    - apphosting.staging.yaml
+    - apphosting.development.yaml
+
+  Where to get your password:
+    1. Go to https://cloud.mongodb.com
+    2. Select your project
+    3. Go to Database Access → genieacs-user
+    4. If you don't remember it, click Edit → Reset Password
+
+
+STEP 2: Install Dependencies
+────────────────────────────
+
+  Run in Firebase Web IDE terminal or your local terminal:
+
+    cd functions
+    npm install
+    cd ..
+
+  This installs MongoDB Driver v6.20.0 from npm.
+
+
+STEP 3: Deploy to Firebase
+───────────────────────────
+
+  firebase deploy
+
+  Or deploy specific services:
+
+    firebase deploy --only functions
+    firebase deploy --only hosting
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         🧪 TEST YOUR DEPLOYMENT                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+After deployment, test your MongoDB connection:
+
+1. Test Sync Function (should connect to MongoDB):
+   
+   curl -X POST https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/syncCPEDevices
+
+   Expected response:
+   {
+     "success": true,
+     "synced": 0,
+     "errors": 0,
+     "total": 0,
+     "timestamp": "2025-..."
+   }
+
+
+2. Test Get Devices (reads from Firestore cache):
+   
+   curl https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/getCPEDevices
+
+   Expected response:
+   {
+     "success": true,
+     "devices": [],
+     "count": 0
+   }
+
+
+3. View Function Logs:
+   
+   firebase functions:log
+
+
+4. Monitor in Firebase Console:
+   
+   https://console.firebase.google.com/project/lte-pci-mapper-65450042-bbf71/functions
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    📊 MONGODB ATLAS VERIFICATION                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Verify your MongoDB Atlas setup:
+
+1. ✅ Cluster exists: cluster0.1radgkw.mongodb.net
+2. ✅ User created: genieacs-user
+3. ✅ Password set and working
+4. ✅ Network Access: 0.0.0.0/0 (allow from anywhere) for development
+5. ✅ Database: genieacs (will be created automatically)
+
+Go to: https://cloud.mongodb.com
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         💡 HOW IT WORKS                                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Data Flow:
+──────────
+
+  GenieACS (TR-069 CPE Management)
+         ↓
+  MongoDB Atlas (Source of Truth)
+         ↓
+  Firebase Functions (syncCPEDevices)
+         ↓
+  Firestore (Cached Data)
+         ↓
+  PCI Mapper UI (Real-time Access)
+
+
+Connection Lifecycle:
+─────────────────────
+
+  1. First function invocation → Create MongoDB connection
+  2. Connection pooling → 2-10 connections maintained
+  3. Subsequent invocations → Reuse existing connection
+  4. Idle timeout → Auto-reconnect when needed
+  5. Function shutdown → Graceful connection close
+
+
+Features:
+─────────
+
+  • Singleton Pattern: One connection pool per function instance
+  • Connection Pooling: Efficient resource usage
+  • Health Checks: Built-in diagnostics
+  • Auto-reconnect: Handles network issues
+  • Type Safety: Full TypeScript support
+  • Compression: Reduces bandwidth usage
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         🔐 SECURITY NOTES                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+⚠️  IMPORTANT:
+
+  • Your MongoDB password is now in apphosting.yaml files
+  • These files are in your Git repository
+  • DO NOT share your password publicly
+  • Consider using Firebase Secrets for production:
+
+    echo "mongodb+srv://..." | firebase functions:secrets:set MONGODB_URI
+
+  • Then update apphosting.yaml to use secret instead of value:
+    
+    - variable: MONGODB_URI
+      secret: MONGODB_URI
+      availability:
+        - RUNTIME
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         📚 DOCUMENTATION                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+📖 QUICK START:
+  ⭐ QUICK_DEPLOY.md            - 3-step deployment guide
+
+📖 DETAILED GUIDES:
+  📘 MONGODB_NPM_DEPLOYMENT.md  - Complete MongoDB setup guide
+  📕 FIREBASE_API_SETUP.md      - Firebase API configuration
+  📗 API_CONFIGURATION_SUMMARY.md - Quick reference
+  📙 API_ARCHITECTURE.md        - System architecture
+
+🔗 EXTERNAL DOCS:
+  • MongoDB Node.js Driver:
+    https://www.mongodb.com/docs/drivers/node/current/
+  
+  • MongoDB Atlas:
+    https://docs.atlas.mongodb.com/
+  
+  • Firebase Functions:
+    https://firebase.google.com/docs/functions
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         🆘 TROUBLESHOOTING                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Common Issues:
+──────────────
+
+1. "MongoServerError: bad auth"
+   → Check password is correct (no <db_password> placeholder)
+   → Reset password in MongoDB Atlas
+
+2. "MongoTimeoutError: Server selection timed out"
+   → Check Network Access in MongoDB Atlas
+   → Add 0.0.0.0/0 to allow all IPs (for testing)
+   → Wait 1-2 minutes for changes to propagate
+
+3. "Function deployment failed"
+   → Run: cd functions && npm install && npm run build
+   → Check firebase functions:log for errors
+
+4. "npm: command not found"
+   → Run commands in Firebase Web IDE terminal
+   → Or install Node.js on your local machine
+
+5. Connection string has <db_password>
+   → Run set-mongodb-password script
+   → Or manually edit apphosting.yaml files
+
+Full troubleshooting guide: MONGODB_NPM_DEPLOYMENT.md
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         ✅ DEPLOYMENT CHECKLIST                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Before deploying:
+
+  [ ] MongoDB Atlas cluster exists (cluster0.1radgkw.mongodb.net)
+  [ ] Database user 'genieacs-user' created with password
+  [ ] Network access configured (0.0.0.0/0 for development)
+  [ ] Password set in apphosting.yaml files (no <db_password>)
+  [ ] Dependencies installed (cd functions && npm install)
+  [ ] Functions built successfully (npm run build)
+  [ ] Ready to deploy (firebase deploy)
+
+After deploying:
+
+  [ ] Sync function tested (curl syncCPEDevices)
+  [ ] Get devices function tested (curl getCPEDevices)
+  [ ] Function logs checked (firebase functions:log)
+  [ ] MongoDB connection verified in logs
+  [ ] Sample data added to MongoDB (optional)
+  [ ] Data synced to Firestore successfully
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         🎉 YOU'RE READY TO DEPLOY!                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Your application now uses:
+  ✅ MongoDB Node.js Driver v6.20.0 (latest)
+  ✅ Optimized connection pooling for serverless
+  ✅ Production-ready configuration
+  ✅ Comprehensive error handling
+  ✅ Health monitoring and diagnostics
+
+Total deployment time: ~5 minutes ⏱️
+
+Next steps:
+  1. Set MongoDB password (2 min)
+  2. Install dependencies (1 min)
+  3. Deploy to Firebase (2 min)
+
+Run: ./set-mongodb-password.sh
+Then: cd functions && npm install && cd .. && firebase deploy
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Project: LTE PCI Mapper
+Firebase Project: lte-pci-mapper-65450042-bbf71
+MongoDB Cluster: cluster0.1radgkw.mongodb.net
+Driver: MongoDB Node.js v6.20.0 (npm package)
+Documentation: https://www.mongodb.com/docs/drivers/node/current/
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
