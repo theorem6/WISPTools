@@ -275,7 +275,7 @@ async function handleTasksAPI(req: any, res: any, collections: any) {
 // Handle faults API endpoints
 async function handleFaultsAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  const path = url.pathname;
+  // const path = url.pathname; // Not needed for faults API currently
   
   if (req.method === 'GET') {
     // Get faults
