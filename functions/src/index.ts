@@ -65,7 +65,7 @@ export {
   getDeviceParameters,
   executeDeviceTask,
   getDevicePerformanceMetrics
-} from './genieacsBridge';
+} from './genieacsBridge.js';
 
 // Export simplified GenieACS integration functions (Firestore only - fallback)
 export {
@@ -74,7 +74,7 @@ export {
   getCPEDevice,
   updateCPELocation,
   getCPEPerformanceMetrics
-} from './simpleGenieacsIntegration';
+} from './simpleGenieacsIntegration.js';
 
 // Export simplified GenieACS core services (placeholders)
 export {
@@ -82,7 +82,7 @@ export {
   genieacsNBI,
   genieacsFS,
   genieacsUI
-} from './simpleGenieacsServices';
+} from './simpleGenieacsServices.js';
 
 // Export clean presets management functions
 export {
@@ -90,7 +90,7 @@ export {
   createPreset,
   deletePreset,
   initializeSamplePresets
-} from './cleanPresetsManagement';
+} from './cleanPresetsManagement.js';
 
 // Export provisions management functions (disabled for now - TypeScript errors)
 // export {
