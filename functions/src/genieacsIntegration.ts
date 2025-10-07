@@ -127,7 +127,7 @@ export const getCPEDevices = onRequest({
       }
       
       const snapshot = await query.get();
-      const devices = snapshot.docs.map(doc => ({
+      const devices = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data()
       }));

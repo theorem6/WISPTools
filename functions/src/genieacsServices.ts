@@ -79,7 +79,7 @@ export const genieacsNBI = onRequest({
       
       // Route NBI requests
       const url = new URL(req.url, `http://localhost${req.url}`);
-      // const path = url.pathname; // Reserved for future routing
+      const path = url.pathname;
       
       if (path.startsWith('/devices')) {
         await handleDevicesAPI(req, res, collections);
@@ -184,7 +184,8 @@ export const genieacsUI = onRequest({
 });
 
 // Handle TR-069 SOAP requests
-// Unused function - reserved for future TR-069 implementation
+// Reserved for future TR-069 implementation
+// @ts-ignore - Function reserved for future use
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function processTR069Request(body: string): Promise<string> {
   // This is a simplified implementation
