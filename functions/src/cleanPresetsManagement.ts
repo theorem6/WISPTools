@@ -1,7 +1,13 @@
 // Clean Firebase Functions for Presets Management
 import { onRequest } from 'firebase-functions/v2/https';
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
+
+// Initialize Firebase Admin if not already initialized
+if (getApps().length === 0) {
+  initializeApp();
+}
 
 const corsHandler = cors({ origin: true });
 const db = getFirestore();
