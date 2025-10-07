@@ -79,7 +79,7 @@ export const getFault = onRequest({
         });
       }
       
-      res.json({
+      return res.json({
         success: true,
         fault: {
           id: doc.id,
@@ -89,7 +89,7 @@ export const getFault = onRequest({
       
     } catch (error) {
       console.error('Failed to get fault:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -137,7 +137,7 @@ export const resolveFault = onRequest({
       // Get updated document
       const updatedDoc = await db.collection('faults').doc(faultId).get();
       
-      res.json({
+      return res.json({
         success: true,
         fault: {
           id: updatedDoc.id,
@@ -147,7 +147,7 @@ export const resolveFault = onRequest({
       
     } catch (error) {
       console.error('Failed to resolve fault:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -194,7 +194,7 @@ export const createFault = onRequest({
       
       await db.collection('faults').doc(faultId).set(fault);
       
-      res.json({
+      return res.json({
         success: true,
         fault: {
           id: faultId,
@@ -204,7 +204,7 @@ export const createFault = onRequest({
       
     } catch (error) {
       console.error('Failed to create fault:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });

@@ -35,15 +35,14 @@ export const proxyGenieACSNBI = onRequest({
       const response = await fetch(url, {
         method: req.method,
         headers: {
-          'Content-Type': 'application/json',
-          ...req.headers
-        },
+          'Content-Type': 'application/json'
+        } as HeadersInit,
         body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined
       });
       
       const data = await response.json();
       
-      res.status(response.status).json({
+      return res.status(response.status).json({
         success: response.ok,
         data: data,
         source: 'genieacs-nbi'
@@ -51,7 +50,7 @@ export const proxyGenieACSNBI = onRequest({
       
     } catch (error) {
       console.error('GenieACS NBI proxy error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error),
         source: 'firebase-proxy'
@@ -105,7 +104,7 @@ export const syncGenieACSDevices = onRequest({
         }
       }
       
-      res.json({
+      return res.json({
         success: true,
         message: `Synced ${syncedCount} devices from GenieACS`,
         synced: syncedCount,
@@ -115,7 +114,7 @@ export const syncGenieACSDevices = onRequest({
       
     } catch (error) {
       console.error('GenieACS sync error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -153,7 +152,7 @@ export const getDeviceParameters = onRequest({
       
       const deviceData = await response.json();
       
-      res.json({
+      return res.json({
         success: true,
         device: convertGenieACSDeviceToCPE(deviceData),
         parameters: deviceData.parameters || {},
@@ -162,7 +161,7 @@ export const getDeviceParameters = onRequest({
       
     } catch (error) {
       console.error('Get device parameters error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -210,7 +209,7 @@ export const executeDeviceTask = onRequest({
       
       const taskResult = await response.json();
       
-      res.json({
+      return res.json({
         success: true,
         task: taskResult,
         message: `Task '${name}' created for device ${deviceId}`,
@@ -219,7 +218,7 @@ export const executeDeviceTask = onRequest({
       
     } catch (error) {
       console.error('Execute device task error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -235,7 +234,7 @@ export const getDevicePerformanceMetrics = onRequest({
   return corsHandler(req, res, async () => {
     try {
       const { deviceId } = req.params;
-      const { hours = 24 } = req.query;
+      // const { hours = 24 } = req.query; // Unused for now
       
       if (!deviceId) {
         return res.status(400).json({
@@ -270,7 +269,7 @@ export const getDevicePerformanceMetrics = onRequest({
         hardwareVersion: deviceData.parameters?.['InternetGatewayDevice.DeviceInfo.HardwareVersion'] || 'Unknown'
       };
       
-      res.json({
+      return res.json({
         success: true,
         metrics: metrics,
         source: 'genieacs'
@@ -278,7 +277,7 @@ export const getDevicePerformanceMetrics = onRequest({
       
     } catch (error) {
       console.error('Get device performance metrics error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });

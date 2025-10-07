@@ -34,7 +34,7 @@ export const getPresets = onRequest({
         ...doc.data()
       }));
       
-      res.json({
+      return res.json({
         success: true,
         presets,
         count: presets.length
@@ -42,7 +42,7 @@ export const getPresets = onRequest({
       
     } catch (error) {
       console.error('Failed to get presets:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -75,7 +75,7 @@ export const getPreset = onRequest({
         });
       }
       
-      res.json({
+      return res.json({
         success: true,
         preset: {
           id: doc.id,
@@ -85,7 +85,7 @@ export const getPreset = onRequest({
       
     } catch (error) {
       console.error('Failed to get preset:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -142,7 +142,7 @@ export const createPreset = onRequest({
       
       await db.collection('presets').doc(presetId).set(preset);
       
-      res.json({
+      return res.json({
         success: true,
         preset: {
           id: presetId,
@@ -152,7 +152,7 @@ export const createPreset = onRequest({
       
     } catch (error) {
       console.error('Failed to create preset:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -197,7 +197,7 @@ export const updatePreset = onRequest({
       // Get updated document
       const updatedDoc = await db.collection('presets').doc(presetId).get();
       
-      res.json({
+      return res.json({
         success: true,
         preset: {
           id: updatedDoc.id,
@@ -207,7 +207,7 @@ export const updatePreset = onRequest({
       
     } catch (error) {
       console.error('Failed to update preset:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -243,14 +243,14 @@ export const deletePreset = onRequest({
       // Delete the preset
       await db.collection('presets').doc(presetId).delete();
       
-      res.json({
+      return res.json({
         success: true,
         message: 'Preset deleted successfully'
       });
       
     } catch (error) {
       console.error('Failed to delete preset:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -409,7 +409,7 @@ export const initializeSamplePresets = onRequest({
         }
       }
       
-      res.json({
+      return res.json({
         success: true,
         message: `Sample presets initialized: ${createdCount} created, ${skippedCount} already existed`,
         created: createdCount,
@@ -419,7 +419,7 @@ export const initializeSamplePresets = onRequest({
       
     } catch (error) {
       console.error('Failed to initialize sample presets:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });

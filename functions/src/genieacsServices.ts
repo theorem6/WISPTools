@@ -79,7 +79,7 @@ export const genieacsNBI = onRequest({
       
       // Route NBI requests
       const url = new URL(req.url, `http://localhost${req.url}`);
-      const path = url.pathname;
+      // const path = url.pathname; // Reserved for future routing
       
       if (path.startsWith('/devices')) {
         await handleDevicesAPI(req, res, collections);
@@ -184,6 +184,8 @@ export const genieacsUI = onRequest({
 });
 
 // Handle TR-069 SOAP requests
+// Unused function - reserved for future TR-069 implementation
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function processTR069Request(body: string): Promise<string> {
   // This is a simplified implementation
   // In a full implementation, you would parse the SOAP XML and handle TR-069 operations
@@ -204,11 +206,12 @@ async function processTR069Request(body: string): Promise<string> {
 // Handle devices API endpoints
 async function handleDevicesAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  const path = url.pathname;
+  // const path = url.pathname; // Reserved for future routing
   
   if (req.method === 'GET') {
     // Get devices
-    const query = url.searchParams.get('query') ? JSON.parse(url.searchParams.get('query')) : {};
+    const queryParam = url.searchParams.get('query');
+    const query = queryParam ? JSON.parse(queryParam) : {};
     const limit = parseInt(url.searchParams.get('limit') || '100');
     const skip = parseInt(url.searchParams.get('skip') || '0');
     
@@ -238,11 +241,12 @@ async function handleDevicesAPI(req: any, res: any, collections: any) {
 // Handle tasks API endpoints
 async function handleTasksAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  const path = url.pathname;
+  // const path = url.pathname; // Reserved for future routing
   
   if (req.method === 'GET') {
     // Get tasks
-    const query = url.searchParams.get('query') ? JSON.parse(url.searchParams.get('query')) : {};
+    const queryParam = url.searchParams.get('query');
+    const query = queryParam ? JSON.parse(queryParam) : {};
     const tasks = await collections.tasks.find(query).toArray();
     res.json(tasks);
     
@@ -270,11 +274,12 @@ async function handleTasksAPI(req: any, res: any, collections: any) {
 // Handle faults API endpoints
 async function handleFaultsAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  const path = url.pathname;
+  // const path = url.pathname; // Reserved for future routing
   
   if (req.method === 'GET') {
     // Get faults
-    const query = url.searchParams.get('query') ? JSON.parse(url.searchParams.get('query')) : {};
+    const queryParam = url.searchParams.get('query');
+    const query = queryParam ? JSON.parse(queryParam) : {};
     const faults = await collections.faults.find(query).toArray();
     res.json(faults);
     
@@ -286,7 +291,7 @@ async function handleFaultsAPI(req: any, res: any, collections: any) {
 // Handle presets API endpoints
 async function handlePresetsAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  const path = url.pathname;
+  // const path = url.pathname; // Reserved for future routing
   
   if (req.method === 'GET') {
     // Get presets
@@ -316,7 +321,7 @@ async function handlePresetsAPI(req: any, res: any, collections: any) {
 // Handle ping API endpoints
 async function handlePingAPI(req: any, res: any, collections: any) {
   const url = new URL(req.url, `http://localhost${req.url}`);
-  const path = url.pathname;
+  // const path = url.pathname; // Reserved for future routing
   
   if (req.method === 'POST') {
     // Ping device

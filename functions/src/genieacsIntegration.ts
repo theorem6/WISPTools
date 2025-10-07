@@ -4,7 +4,7 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
@@ -83,7 +83,7 @@ export const syncCPEDevices = onRequest({
       
       console.log(`Sync completed: ${syncedCount} synced, ${errorCount} errors`);
       
-      res.json({
+      return res.json({
         success: true,
         synced: syncedCount,
         errors: errorCount,
@@ -93,9 +93,9 @@ export const syncCPEDevices = onRequest({
       
     } catch (error) {
       console.error('CPE device sync failed:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -110,7 +110,7 @@ export const getCPEDevices = onRequest({
     try {
       const { status, withGPS, limit } = req.query;
       
-      let query = db.collection('cpe_devices');
+      let query: any = db.collection('cpe_devices');
       
       // Apply filters
       if (status) {
@@ -132,7 +132,7 @@ export const getCPEDevices = onRequest({
         ...doc.data()
       }));
       
-      res.json({
+      return res.json({
         success: true,
         devices,
         count: devices.length
@@ -140,9 +140,9 @@ export const getCPEDevices = onRequest({
       
     } catch (error) {
       console.error('Failed to get CPE devices:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -173,7 +173,7 @@ export const getCPEDevice = onRequest({
         });
       }
       
-      res.json({
+      return res.json({
         success: true,
         device: {
           id: doc.id,
@@ -183,9 +183,9 @@ export const getCPEDevice = onRequest({
       
     } catch (error) {
       console.error('Failed to get CPE device:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -216,16 +216,16 @@ export const updateCPELocation = onRequest({
         lastSync: FieldValue.serverTimestamp()
       });
       
-      res.json({
+      return res.json({
         success: true,
         message: 'Location updated successfully'
       });
       
     } catch (error) {
       console.error('Failed to update CPE location:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -259,7 +259,7 @@ export const getCPEPerformanceMetrics = onRequest({
         ...doc.data()
       }));
       
-      res.json({
+      return res.json({
         success: true,
         deviceId,
         metrics,
@@ -268,9 +268,9 @@ export const getCPEPerformanceMetrics = onRequest({
       
     } catch (error) {
       console.error('Failed to get performance metrics:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });

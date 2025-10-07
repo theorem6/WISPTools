@@ -34,7 +34,7 @@ export const getProvisions = onRequest({
         ...doc.data()
       }));
       
-      res.json({
+      return res.json({
         success: true,
         provisions,
         count: provisions.length
@@ -42,7 +42,7 @@ export const getProvisions = onRequest({
       
     } catch (error) {
       console.error('Failed to get provisions:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -96,7 +96,7 @@ export const createProvision = onRequest({
       
       await db.collection('provisions').doc(provisionId).set(provision);
       
-      res.json({
+      return res.json({
         success: true,
         provision: {
           id: provisionId,
@@ -106,7 +106,7 @@ export const createProvision = onRequest({
       
     } catch (error) {
       console.error('Failed to create provision:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -151,7 +151,7 @@ export const updateProvision = onRequest({
       // Get updated document
       const updatedDoc = await db.collection('provisions').doc(provisionId).get();
       
-      res.json({
+      return res.json({
         success: true,
         provision: {
           id: updatedDoc.id,
@@ -161,7 +161,7 @@ export const updateProvision = onRequest({
       
     } catch (error) {
       console.error('Failed to update provision:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -197,14 +197,14 @@ export const deleteProvision = onRequest({
       // Delete the provision
       await db.collection('provisions').doc(provisionId).delete();
       
-      res.json({
+      return res.json({
         success: true,
         message: 'Provision deleted successfully'
       });
       
     } catch (error) {
       console.error('Failed to delete provision:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -287,7 +287,7 @@ declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey", []
         }
       }
       
-      res.json({
+      return res.json({
         success: true,
         message: `Sample provisions initialized: ${createdCount} created, ${skippedCount} already existed`,
         created: createdCount,
@@ -297,7 +297,7 @@ declare("InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey", []
       
     } catch (error) {
       console.error('Failed to initialize sample provisions:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });

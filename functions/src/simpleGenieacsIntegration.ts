@@ -34,7 +34,7 @@ export const getCPEDevices = onRequest({
         ...doc.data()
       }));
       
-      res.json({
+      return res.json({
         success: true,
         devices,
         count: devices.length
@@ -42,7 +42,7 @@ export const getCPEDevices = onRequest({
       
     } catch (error) {
       console.error('Failed to get CPE devices:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -75,7 +75,7 @@ export const getCPEDevice = onRequest({
         });
       }
       
-      res.json({
+      return res.json({
         success: true,
         device: {
           id: doc.id,
@@ -85,7 +85,7 @@ export const getCPEDevice = onRequest({
       
     } catch (error) {
       console.error('Failed to get CPE device:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -132,7 +132,7 @@ export const updateCPELocation = onRequest({
       // Get updated document
       const updatedDoc = await db.collection('cpe_devices').doc(deviceId).get();
       
-      res.json({
+      return res.json({
         success: true,
         device: {
           id: updatedDoc.id,
@@ -142,7 +142,7 @@ export const updateCPELocation = onRequest({
       
     } catch (error) {
       console.error('Failed to update CPE location:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -182,7 +182,7 @@ export const getCPEPerformanceMetrics = onRequest({
         ...doc.data()
       }));
       
-      res.json({
+      return res.json({
         success: true,
         metrics,
         count: metrics.length,
@@ -192,7 +192,7 @@ export const getCPEPerformanceMetrics = onRequest({
       
     } catch (error) {
       console.error('Failed to get CPE performance metrics:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -210,7 +210,7 @@ export const syncCPEDevices = onRequest({
       console.log('Syncing CPE devices...');
       
       // For now, just return success - real sync would connect to MongoDB
-      res.json({
+      return res.json({
         success: true,
         message: 'CPE devices sync completed',
         synced: 0,
@@ -219,7 +219,7 @@ export const syncCPEDevices = onRequest({
       
     } catch (error) {
       console.error('Failed to sync CPE devices:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : String(error)
       });
