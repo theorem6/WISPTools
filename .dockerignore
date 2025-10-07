@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build files
+.svelte-kit
+build
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase
+.firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+*.test.js
+*.spec.js
+test
+tests
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Misc
+coverage
+.nyc_output
+
