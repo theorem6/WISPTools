@@ -17,7 +17,6 @@ function getMongoConnectionString(): string {
   const connectionString = 
     process.env.MONGODB_URI ||
     process.env.MONGODB_CONNECTION_URL ||
-    process.env.mongodb?.connection_url || // Firebase config format
     // Default connection string (replace <db_password> with actual password)
     'mongodb+srv://genieacs-user:<db_password>@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
@@ -138,7 +137,8 @@ export async function isMongoConnected(): Promise<boolean> {
  */
 export async function getConnectionStats() {
   try {
-    const client = await getMongoClient();
+    // Ensure MongoDB client is connected
+    await getMongoClient();
     const db = await getMongoDb();
     
     // Get server info

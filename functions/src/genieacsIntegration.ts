@@ -6,7 +6,7 @@
 import { db } from './firebaseInit.js';
 
 // Import MongoDB connection handler
-import { getGenieACSCollections, getConnectionStats, closeMongoConnection } from './mongoConnection.js';
+import { getGenieACSCollections, closeMongoConnection } from './mongoConnection.js';
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
