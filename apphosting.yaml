@@ -1,4 +1,19 @@
+# Firebase App Hosting Configuration - Default (Production)
+# This is the base configuration that applies to all environments
+# Environment-specific overrides go in apphosting.[environment].yaml
+
+runConfig:
+  # Production-grade resources
+  cpu: 2
+  memoryMiB: 1024
+  minInstances: 1  # Keep at least 1 instance warm for production
+  maxInstances: 10
+  concurrency: 100
+
 env:
+  # ==========================================
+  # FIREBASE CONFIGURATION
+  # ==========================================
   - variable: PUBLIC_FIREBASE_API_KEY
     value: "AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0"
     availability:
@@ -34,21 +49,142 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  
+
+  # ==========================================
+  # FIREBASE FUNCTIONS API ENDPOINTS
+  # ==========================================
+  - variable: PUBLIC_FIREBASE_FUNCTIONS_REGION
+    value: "us-central1"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_FIREBASE_FUNCTIONS_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # GenieACS Integration API Endpoints
+  - variable: PUBLIC_GENIEACS_NBI_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/genieacsNBI"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_GENIEACS_CWMP_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/genieacsCWMP"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_GENIEACS_FS_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/genieacsFS"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_SYNC_CPE_DEVICES_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/syncCPEDevices"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_GET_CPE_DEVICES_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/getCPEDevices"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # PCI Analysis API
+  - variable: PUBLIC_PCI_ANALYSIS_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/analyzePCI"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # ARCGIS CONFIGURATION
+  # ==========================================
   - variable: PUBLIC_ARCGIS_API_KEY
     value: "AAPT85fOqywZsicJupSmVSCGrjWNNjURUpnE--wnh6GZUreHU00VSEoRGgbf0JZjKYEmLnUXJw8E5r8Nz55eqYvvfcecdjs2BjpjcShOZgei0o-Myxttbl5f1qu9-AfdJaw4w3ugB4-uH6dh9v0PNN--vklICR-vCwt8YjMxw7CBrsZ5vxsZjo_jp31mV5hlMSSxQMJsKtFh0ltDrN4YwuK_8ZLmHMdIp5w9_jZrqJVlC2I.AT2_12sjSDHZ"
     availability:
       - BUILD
       - RUNTIME
-  
+
+  # ==========================================
+  # AI SERVICES CONFIGURATION
+  # ==========================================
   - variable: PUBLIC_GEMINI_API_KEY
     value: "AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg"
     availability:
       - BUILD
       - RUNTIME
-  
+
   - variable: PUBLIC_WOLFRAM_APP_ID
     value: "WQPAJ72446"
     availability:
       - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # MONGODB CONFIGURATION (for GenieACS)
+  # ==========================================
+  # Note: MongoDB connection string should be stored as a secret
+  # To set: firebase functions:config:set mongodb.connection_url="your-connection-string"
+  - variable: MONGODB_URI
+    secret: mongodb-connection-url
+    availability:
+      - RUNTIME
+
+  - variable: MONGODB_DATABASE
+    value: "genieacs"
+    availability:
+      - RUNTIME
+
+  # ==========================================
+  # GENIEACS CONFIGURATION
+  # ==========================================
+  - variable: GENIEACS_ENABLE_FIRESTORE_SYNC
+    value: "true"
+    availability:
+      - RUNTIME
+
+  - variable: GENIEACS_SYNC_INTERVAL
+    value: "300000"  # 5 minutes in milliseconds
+    availability:
+      - RUNTIME
+
+  - variable: GENIEACS_CWMP_PORT
+    value: "7547"
+    availability:
+      - RUNTIME
+
+  # ==========================================
+  # APPLICATION CONFIGURATION
+  # ==========================================
+  - variable: NODE_ENV
+    value: "production"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_APP_URL
+    value: "https://lte-pci-mapper-65450042-bbf71.web.app"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_API_TIMEOUT
+    value: "30000"  # 30 seconds
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # CORS CONFIGURATION
+  # ==========================================
+  - variable: ALLOWED_ORIGINS
+    value: "https://lte-pci-mapper-65450042-bbf71.web.app,https://lte-pci-mapper-65450042-bbf71.firebaseapp.com"
+    availability:
       - RUNTIME

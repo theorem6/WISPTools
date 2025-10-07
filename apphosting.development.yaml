@@ -1,0 +1,91 @@
+# Firebase App Hosting Configuration - Development Environment
+# This file overrides apphosting.yaml for local/development deployments
+# Set environment name to "development" in Firebase Console → App Hosting → Settings → Environment
+
+runConfig:
+  # Development uses minimal resources
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 10
+
+env:
+  # ==========================================
+  # ENVIRONMENT OVERRIDE
+  # ==========================================
+  - variable: NODE_ENV
+    value: "development"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_APP_URL
+    value: "http://localhost:5173"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # DEVELOPMENT FIREBASE FUNCTIONS (use emulators if available)
+  # ==========================================
+  - variable: PUBLIC_FIREBASE_FUNCTIONS_URL
+    value: "http://localhost:5001/lte-pci-mapper-65450042-bbf71/us-central1"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: USE_FIREBASE_EMULATORS
+    value: "true"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # MONGODB DEVELOPMENT DATABASE
+  # ==========================================
+  - variable: MONGODB_DATABASE
+    value: "genieacs-dev"
+    availability:
+      - RUNTIME
+
+  - variable: MONGODB_URI
+    secret: mongodb-dev-connection-url
+    availability:
+      - RUNTIME
+
+  # ==========================================
+  # GENIEACS DEVELOPMENT CONFIGURATION
+  # ==========================================
+  - variable: GENIEACS_SYNC_INTERVAL
+    value: "60000"  # 1 minute for dev (frequent for testing)
+    availability:
+      - RUNTIME
+
+  - variable: GENIEACS_ENABLE_FIRESTORE_SYNC
+    value: "true"
+    availability:
+      - RUNTIME
+
+  # ==========================================
+  # CORS DEVELOPMENT CONFIGURATION
+  # ==========================================
+  - variable: ALLOWED_ORIGINS
+    value: "http://localhost:5173,http://127.0.0.1:5173"
+    availability:
+      - RUNTIME
+
+  # ==========================================
+  # DEBUG CONFIGURATION
+  # ==========================================
+  - variable: DEBUG_MODE
+    value: "true"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: LOG_LEVEL
+    value: "debug"
+    availability:
+      - RUNTIME
+
