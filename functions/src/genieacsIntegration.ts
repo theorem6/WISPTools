@@ -3,16 +3,11 @@
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { MongoClient } from 'mongodb';
 import cors from 'cors';
 
-// Initialize Firebase Admin if not already initialized
-if (getApps().length === 0) {
-  initializeApp();
-}
-
+// Firebase Admin is initialized in index.ts
 const corsHandler = cors({ origin: true });
 const db = getFirestore();
 
