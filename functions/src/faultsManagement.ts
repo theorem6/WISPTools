@@ -15,7 +15,6 @@ export const getFaults = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { severity, status, limit } = req.query;
       
       let query = db.collection('faults').orderBy('timestamp', 'desc');

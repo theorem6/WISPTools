@@ -20,7 +20,11 @@ async function getGenieACSMongoClient(): Promise<MongoClient> {
 }
 
 // GenieACS CWMP Service (TR-069 Protocol) - disabled for now
-// export const genieacsCWMP = onRequest({
+// NOTE: CWMP requires complex TR-069 SOAP processing
+// For production, consider using dedicated GenieACS server
+// Keeping this commented out until TR-069 implementation is complete
+/*
+export const genieacsCWMP = onRequest({
   region: 'us-central1',
   memory: '1GiB',
   timeoutSeconds: 30
@@ -48,6 +52,7 @@ async function getGenieACSMongoClient(): Promise<MongoClient> {
     }
   });
 });
+*/
 
 // GenieACS Northbound Interface (REST API)
 export const genieacsNBI = onRequest({
