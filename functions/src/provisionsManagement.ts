@@ -15,7 +15,6 @@ export const getProvisions = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { enabled, limit } = req.query;
       
       let query = db.collection('provisions').orderBy('name', 'asc');
@@ -57,7 +56,6 @@ export const createProvision = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const provisionData = req.body;
       
@@ -123,7 +121,6 @@ export const updateProvision = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { provisionId } = req.params;
       const updateData = req.body;
       
@@ -179,7 +176,6 @@ export const deleteProvision = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { provisionId } = req.params;
       
       if (!provisionId) {
@@ -222,7 +218,6 @@ export const initializeSampleProvisions = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const sampleProvisions = [
         {

@@ -15,7 +15,6 @@ export const getPresets = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { enabled, limit } = req.query;
       
       let query = db.collection('presets').orderBy('weight', 'asc');
@@ -57,7 +56,6 @@ export const getPreset = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const { presetId } = req.params;
       
@@ -101,7 +99,6 @@ export const createPreset = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const presetData = req.body;
       
@@ -170,7 +167,6 @@ export const updatePreset = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { presetId } = req.params;
       const updateData = req.body;
       
@@ -226,7 +222,6 @@ export const deletePreset = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { presetId } = req.params;
       
       if (!presetId) {
@@ -269,7 +264,6 @@ export const initializeSamplePresets = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const samplePresets = [
         {

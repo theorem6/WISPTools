@@ -61,7 +61,6 @@ export const getFault = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const { faultId } = req.params;
       
       if (!faultId) {
@@ -104,7 +103,6 @@ export const resolveFault = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const { faultId } = req.params;
       const { resolution, resolvedBy } = req.body;
@@ -164,7 +162,6 @@ export const createFault = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     try {
-    try {
       const faultData = req.body;
       
       if (!faultData.deviceId || !faultData.message || !faultData.severity) {
@@ -221,7 +218,6 @@ export const initializeSampleFaults = onRequest({
   memory: '256MiB'
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    try {
     try {
       const sampleFaults = [
         {
