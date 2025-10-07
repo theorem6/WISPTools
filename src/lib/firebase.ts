@@ -86,10 +86,12 @@ export function getFirebaseStorage(): FirebaseStorage {
   return firebaseStorage;
 }
 
-// Backward compatibility exports (will be lazily initialized)
-export const auth = browser ? getFirebaseAuth() : null as any;
-export const db = browser ? getFirebaseDb() : null as any;
-export const storage = browser ? getFirebaseStorage() : null as any;
+// Backward compatibility exports (lazy getters)
+// These will only initialize Firebase when actually accessed
+export const auth = browser ? getFirebaseAuth() : (null as any);
+export const db = browser ? getFirebaseDb() : (null as any);
+export const storage = browser ? getFirebaseStorage() : (null as any);
 
-// Export app (lazy)
-export default browser ? getFirebaseApp() : null as any;
+// Export app instance
+let appInstance: FirebaseApp | null = null;
+export default browser ? (appInstance || (appInstance = getFirebaseApp())) : (null as any);
