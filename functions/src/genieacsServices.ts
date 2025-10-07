@@ -2,21 +2,22 @@
 // Implements GenieACS CWMP, NBI, FS, and UI services
 
 import { onRequest } from 'firebase-functions/v2/https';
-// import { MongoClient } from 'mongodb';
+import { MongoClient } from 'mongodb';
 import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
-// let mongoClient: MongoClient | null = null;
+let mongoClient: MongoClient | null = null;
 
-// Initialize MongoDB connection for GenieACS (disabled for now)
-// async function getGenieACSMongoClient(): Promise<MongoClient> {
-//   if (!mongoClient) {
-//     const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb://localhost:27017/genieacs';
-//     mongoClient = new MongoClient(connectionUrl);
-//     await mongoClient.connect();
-//   }
-//   return mongoClient;
-// }
+// Initialize MongoDB connection for GenieACS
+async function getGenieACSMongoClient(): Promise<MongoClient> {
+  if (!mongoClient) {
+    const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    mongoClient = new MongoClient(connectionUrl);
+    await mongoClient.connect();
+    console.log('✅ GenieACS MongoDB connection established');
+  }
+  return mongoClient;
+}
 
 // GenieACS CWMP Service (TR-069 Protocol) - disabled for now
 // export const genieacsCWMP = onRequest({
@@ -336,6 +337,7 @@ async function handlePingAPI(req: any, res: any, collections: any) {
 // Cleanup MongoDB connection on function termination
 process.on('SIGTERM', async () => {
   if (mongoClient) {
+    console.log('Closing GenieACS MongoDB connection...');
     await mongoClient.close();
     mongoClient = null;
   }

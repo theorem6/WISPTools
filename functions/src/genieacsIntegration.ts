@@ -4,24 +4,25 @@
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-// import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
 const db = getFirestore();
 
 // MongoDB connection (will be initialized on first use)
-// let mongoClient: MongoClient | null = null;
+let mongoClient: MongoClient | null = null;
 
-// Initialize MongoDB connection (disabled for now)
-// async function getMongoClient(): Promise<MongoClient> {
-//   if (!mongoClient) {
-//     const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb://localhost:27017/genieacs';
-//     mongoClient = new MongoClient(connectionUrl);
-//     await mongoClient.connect();
-//   }
-//   return mongoClient;
-// }
+// Initialize MongoDB connection
+async function getMongoClient(): Promise<MongoClient> {
+  if (!mongoClient) {
+    const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
+    mongoClient = new MongoClient(connectionUrl);
+    await mongoClient.connect();
+    console.log('✅ MongoDB connection established');
+  }
+  return mongoClient;
+}
 
 // Get MongoDB collections
 async function getCollections() {
@@ -411,6 +412,7 @@ function determineDeviceStatus(genieacsDevice: any): string {
 // Cleanup MongoDB connection on function termination
 process.on('SIGTERM', async () => {
   if (mongoClient) {
+    console.log('Closing MongoDB connection...');
     await mongoClient.close();
     mongoClient = null;
   }
