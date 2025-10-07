@@ -44,13 +44,14 @@ env:
   # ==========================================
   # MONGODB DEVELOPMENT DATABASE
   # ==========================================
-  - variable: MONGODB_DATABASE
-    value: "genieacs-dev"
+  # Development uses separate database on same cluster
+  - variable: MONGODB_URI
+    value: "mongodb+srv://genieacs-user:<db_password>@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     availability:
       - RUNTIME
-
-  - variable: MONGODB_URI
-    secret: mongodb-dev-connection-url
+      
+  - variable: MONGODB_DATABASE
+    value: "genieacs-dev"
     availability:
       - RUNTIME
 

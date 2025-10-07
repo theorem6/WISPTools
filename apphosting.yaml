@@ -130,10 +130,13 @@ env:
   # ==========================================
   # MONGODB CONFIGURATION (for GenieACS)
   # ==========================================
-  # Note: MongoDB connection string should be stored as a secret
-  # To set: firebase functions:config:set mongodb.connection_url="your-connection-string"
+  # MongoDB Atlas connection using official Node.js driver v6.x
+  # Reference: https://www.mongodb.com/docs/drivers/node/current/
+  
+  # Production MongoDB connection string
+  # Replace <db_password> with your actual password
   - variable: MONGODB_URI
-    secret: mongodb-connection-url
+    value: "mongodb+srv://genieacs-user:<db_password>@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     availability:
       - RUNTIME
 

@@ -1,44 +1,19 @@
 // Firebase Functions for GenieACS Integration
 // Provides API bridge between GenieACS (MongoDB) and PCI Mapper (Firestore)
+// Uses MongoDB Node.js Driver v6.x: https://www.mongodb.com/docs/drivers/node/current/
 
 // Import shared Firebase initialization (must be first)
 import { db } from './firebaseInit.js';
 
+// Import MongoDB connection handler
+import { getGenieACSCollections, getConnectionStats, closeMongoConnection } from './mongoConnection.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { FieldValue } from 'firebase-admin/firestore';
-import { MongoClient } from 'mongodb';
 import cors from 'cors';
 
 const corsHandler = cors({ origin: true });
-
-// MongoDB connection (will be initialized on first use)
-let mongoClient: MongoClient | null = null;
-
-// Initialize MongoDB connection
-async function getMongoClient(): Promise<MongoClient> {
-  if (!mongoClient) {
-    const connectionUrl = process.env.MONGODB_CONNECTION_URL || 'mongodb+srv://genieacs-user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/genieacs?retryWrites=true&w=majority&appName=Cluster0';
-    mongoClient = new MongoClient(connectionUrl);
-    await mongoClient.connect();
-    console.log('✅ MongoDB connection established');
-  }
-  return mongoClient;
-}
-
-// Get MongoDB collections
-async function getCollections() {
-  const client = await getMongoClient();
-  const mongoDb = client.db('genieacs');
-  
-  return {
-    devices: mongoDb.collection('devices'),
-    tasks: mongoDb.collection('tasks'),
-    faults: mongoDb.collection('faults'),
-    presets: mongoDb.collection('presets'),
-    operations: mongoDb.collection('operations')
-  };
-}
 
 // Sync CPE devices from GenieACS MongoDB to Firestore
 export const syncCPEDevices = onRequest({
@@ -50,7 +25,7 @@ export const syncCPEDevices = onRequest({
     try {
       console.log('Starting CPE device sync from GenieACS...');
       
-      const collections = await getCollections();
+      const collections = await getGenieACSCollections();
       
       // Get all devices from GenieACS
       const genieacsDevices = await collections.devices.find({}).toArray();
@@ -287,7 +262,7 @@ export const scheduledCPESync = onSchedule({
   try {
     console.log('Starting scheduled CPE sync...');
     
-    const collections = await getCollections();
+    const collections = await getGenieACSCollections();
     
     // Get devices that need syncing (last contact within last 10 minutes)
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -413,16 +388,10 @@ function determineDeviceStatus(genieacsDevice: any): string {
 
 // Cleanup MongoDB connection on function termination
 process.on('SIGTERM', async () => {
-  if (mongoClient) {
-    console.log('Closing MongoDB connection...');
-    await mongoClient.close();
-    mongoClient = null;
-  }
+  console.log('Closing MongoDB connection...');
+  await closeMongoConnection();
 });
 
 process.on('SIGINT', async () => {
-  if (mongoClient) {
-    await mongoClient.close();
-    mongoClient = null;
-  }
+  await closeMongoConnection();
 });

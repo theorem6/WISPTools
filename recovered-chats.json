@@ -1,0 +1,887 @@
+﻿{
+    "totalMatches":  783,
+    "timestamp":  {
+                      "value":  "\/Date(1759782298664)\/",
+                      "DisplayHint":  2,
+                      "DateTime":  "Monday, October 6, 2025 2:24:58 PM"
+                  },
+    "source":  "C:\\Users\\david\\Downloads\\PCI_mapper\\cursor-chats-database.db",
+    "conversations":  [
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/.vscode/launch.json E  = ___$__targetStorageMarker{\"cursorAuth/workspaceOpenedDate\":1,\"workbench.explorer.views.state\":1,\"workbench.view.agents\":1,\"workbench.view.search.state\":1,\"workbench.scm.views.state\":1,\"workbench.panel.markers\":1,\"workbench.panel.output\":1,\"terminal\":1,\"agentLayout.shared.v6\":0,\"workbench.panel.viewContainersWorkspaceState\":1,\"workbench.auxiliarybar.initialViewContainers\":1,\"workbench.auxiliarybar.viewContainersWorkspaceState\":1,\"workbench.pan",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper::file:///c%3A/Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\"],\"selection\":[\"file:///c%3A/Users/david/Downloads/PCI_mapper::file:///c%3A/Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\"],\"expanded\":[\"file:///c%3A/Users/david/Downloads/PCI_mapper::file:///c%3A/Users/david/Downloads/PCI_mapper/Module_Manager\"],\"scrollTop\":900} t  e  workbench.panel.viewContainersWorkspaceState[{\"id\":\"workbench.panel.markers\",\"visible\":true},{\"id\":\"workbench",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/.vscode/launch.json   5 output.activechanneltasksc  U  workbench.auxiliarybar.activepanelidworkbench.panel.aichat.fec3e4c5-a2aa-418c-bc88-04c3d55d9822*  Q cursor/needsComposerInitialOpeningfalse *     Eworkbench.panel.composerChatViewPane.ee127783-61e4-401e-a668-0e2ff4162913{\"workbench.panel.aichat.view.863f3fc9-58dd-4877-9205-d67dc8b33a4a\":{\"collapsed\":false,\"isHidden\":false,\"size\":592},\"workbench.panel.aichat.view.4cc7222a-3919-4dbb-811b-498bc9832827\":{\"collapsed\":",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\",\"forceFile\":true,\"options\":{\"override\":\"default\"}}},{\"editor\":{\"resource\":\"file:///c%3A/Users/david/Downloads/PCI_mapper/FIREBASE_GENIEACS_DEPLOYMENT_GUIDE.md\",\"forceFile\":true,\"options\":{\"override\":\"default\"}}},{\"editor\":{\"resource\":\"file:///c%3A/Users/david/Downloads/PCI_mapper/webide-quick-test.ps1\",\"forceFile\":true,\"options\":{\"override\":\"default\"}}},{\"editor\":{\"resource\":\"file:///c%3A/Users/david/Downloads/PCI_mapper/.gitignore\",\"for",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/.gitattributes\",\"forceFile\":true,\"options\":{\"override\":\"default\"}}},{\"editor\":{\"resource\":\"vscode-userdata:/c%3A/Users/david/AppData/Roaming/Cursor/User/settings.json\",\"forceFile\":true,\"options\":{\"override\":\"default\"}}}] M  A kanysphere.cursor-retrieval{\"cursor-retrieval-state-version\":1,\"map/edaf49435d06c6cea114e6015ddab30393c85716a2e4b47238d9c0beff4cadc6-PCI_mapper/repoKeys\":{\"repoName\":\"723e2ca7-75a9-49a6-8275-5ebcbf76a986\",\"orthogonalTransformationSeed\":623237112",
+                              "length":  504
+                          },
+                          {
+                              "text":  "user_01K1KNJJYXCNETVA5KQVB009JQ/indexingStatus\":{\"globalStatus\":{\"case\":\"synced\",\"numFiles\":437},\"progress\":100}}B. ?Ynotepad.reactiveStorageId{\"notepads\":{},\"notepadDataVersion\":0}4- #YnotepadData{\"notepads\":{},\"notepadDataVersion\":0}U,  - workbench.panel.aichat.ee127783-61e4-401e-a668-0e2ff4162913.numberOfVisibleViews1c+ E  workbench.agentMode.exitInfo{\"wasVisible\":{\"panel\":false,\"auxiliaryBar\":false,\"sideBar\":false}}\"* A workbench.statusBar.hiddenfalse%) G workbench.auxiliaryBar.hiddenfalse   \u0027 d",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\resources\\\\app\\\\extensions\\\\git\\\\dist\\\\askpass.sh\",\"type\":1,\"options\":{\"applyAtProcessCreation\":true,\"applyAtShellIntegration\":false}}],[\"VSCODE_GIT_ASKPASS_NODE\",{\"variable\":\"VSCODE_GIT_ASKPASS_NODE\",\"value\":\"C:\\\\Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\Cursor.exe\",\"type\":1,\"options\":{\"applyAtProcessCreation\":true,\"applyAtShellIntegration\":false}}],[\"VSCODE_GIT_ASKPASS_EXTRA_ARGS\",{\"variable\":\"VSCODE_GIT_ASKPASS_EXTRA_ARGS\",\"value\":\"\",\"type\":1,",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\resources\\\\app\\\\extensions\\\\git\\\\dist\\\\askpass-main.js\",\"type\":1,\"options\":{\"applyAtProcessCreation\":true,\"applyAtShellIntegration\":false}}],[\"VSCODE_GIT_IPC_HANDLE\",{\"variable\":\"VSCODE_GIT_IPC_HANDLE\",\"value\":\"\\\\\\\\.\\\\pipe\\\\vscode-git-233701a041-sock\",\"type\":1,\"options\":{\"applyAtProcessCreation\":true,\"applyAtShellIntegration\":false}}]],\"description\":[[\"\",{\"description\":\"Enables the following features: git auth provider\"}]]}]",
+                              "length":  476
+                          },
+                          {
+                              "text":  "Messages\":false,\"totalLinesAdded\":4380,\"totalLinesRemoved\":468,\"hasBlockingPendingActions\":false,\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false,\"lastUpdatedAt\":1759546831063,\"subtitle\":\"networkService.ts, NokiaConfig.svelte, SiteEditor.svelte, VerticalMenu.svelte, +page.svelte\",\"contextUsagePercent\":65.78537368774414,\"name\":\"Configure Nokia LTE base band unit\"},{\"type\":\"head\",\"composerId\":\"8dfc1d91-63bc-4c50-a855-cd2e403e98f3\",\"name\":\"Organize web ide and git deployment\",\"lastUpdatedAt\":175952934",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":40.43299865722656,\"totalLinesAdded\":3052,\"totalLinesRemoved\":196,\"subtitle\":\"CSV_IMPORT_FORMAT.md, ManualImport.svelte, UI_TOOLTIPS_GUIDE.md, +page.svelte, Tooltip.svelte\",\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false},{\"type\":\"head\",\"composerId\":\"edbad2a1-3dab-47db-89f9-ad36093fc022\",\"name\":\"Fix git connection issues in firebase ide\",\"lastUpdatedAt\":1759512045530,\"createdAt\":1759467731985,\"unifiedMode\":\"agent\",\"forceMode\":\"edit\",\"hasUnreadMessages\":false,\"c",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"totalLinesAdded\":0,\"totalLinesRemoved\":0,\"hasBlockingPendingActions\":false,\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false,\"lastUpdatedAt\":1759782154647,\"subtitle\":\"extract-chats.js\",\"contextUsagePercent\":5.3148956298828125,\"name\":\"Recover lost old chats\"},{\"type\":\"head\",\"composerId\":\"91e07457-000d-4ead-8df3-9a75948f0ad8\",\"name\":\"Integrate genieacs with tr069 mapping\",\"lastUpdatedAt\":1759780950589,\"createdAt\":1759682886722,\"unifiedMode\":\"agent\",\"forceMode\":\"edit\",\"hasUnreadMessage",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":35.319000244140625,\"totalLinesAdded\":2842,\"totalLinesRemoved\":2419,\"subtitle\":\"VerticalMenu.svelte, +page.svelte, +page.svelte, +page.minimal.svelte, +layout.svelte\",\"hasBlockingPendingActions\":false,\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false},{\"type\":\"head\",\"composerId\":\"655bc51d-e58d-4fe3-b946-2a1fa0da7607\",\"name\":\"Project cleanup and restructuring plan\",\"lastUpdatedAt\":1759676433550,\"createdAt\":1759638322691,\"unifiedMode\":\"agent\",\"forceMode\":\"edit\",\"ha",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":63.40299987792969,\"totalLinesAdded\":9079,\"totalLinesRemoved\":310,\"subtitle\":\"+layout.svelte, +page.svelte, theme.css, +page.svelte, vite.config.ts\",\"hasBlockingPendingActions\":false,\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false},{\"ty    } 2 C comments.continueOnComments[] 1 5 interactive.sessions[]    E _scm:view:visibleRepositories{\"all\":[\"git:Git:file:///c%3A/Users/david/Downloads/PCI_mapper\"],\"sortKey\":\"discoveryTime\",\"visible\":[0]}}   Is:804\\r\\n_initiali",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/.gitattributes\",{\"0\":{\"cursorState\":[{\"inSelectionMode\":false,\"selectionStart\":{\"lineNumber\":1,\"column\":1},\"position\":{\"lineNumber\":1,\"column\":1}}],\"viewState\":{\"scrollLeft\":0,\"firstPosition\":{\"lineNumber\":32,\"column\":1},\"firstPositionDeltaTop\":-11},\"contributionsState\":{\"editor.contrib.folding\":{\"lineCount\":42,\"provider\":\"indent\",\"foldedImports\":false},\"editor.contrib.wordHighlighter\":false}}}],[\"file:///c%3A/Users/david/Downloads/PCI_mapper/.gitignore\",{\"0\":{\"curso",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Contents\":\"\",\"isSideBarExpanded\":false,\"cachedSelectedGitState\":{\"ref\":\"main\",\"continueRef\":\"main\",\"baseRef\":\"main\",\"autoBranch\":true},\"cachedSelectedRemote\":{\"name\":\"origin\",\"url\":\"github.com/theorem6/lte-pci-mapper\",\"rootUri\":{\"$mid\":1,\"external\":\"file:///c%3A/Users/david/Downloads/PCI_mapper\",\"path\":\"/c:/Users/david/Downloads/PCI_mapper\",\"scheme\":\"file\"}}} d; K  workbench.view.extensions.state{\"workbench.views.extensions.installed\":{\"collapsed\":false,\"isHidden\":true,\"size\":273},\"workbench.views.exte",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper\"],\"sortKey\":\"discoveryTime\",\"visible\":[0]}    2018.js:55\\r\\nPromise.then\\r\\nh.send @ webchannel_blob_es2018.js:52\\r\\nh.ea @ webchannel_blob_es2018.js:60\\r\\nJb @ webchannel_blob_es2018.js:30\\r\\nfd @ webchannel_blob_es2018.js:76\\r\\nh.Fa @ webchannel_blob_es2018.js:75\\r\\nDa @ webchannel_blob_es2018.js:14\\r\\nPromise.then\\r\\nx2 @ webchannel_blob_es2018.js:14\\r\\nec @ webchannel_blob_es2018.js:74\\r\\nRb @ webchannel_blob_es2018.js:39\\r\\nM2.Y @ webchannel_blob_es2018.js:33\\r\\",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putObjec",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.t    orks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts:318",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetw\r   \t        d A }                                                                                                                                                                                     B i 1memento/workbench.editors.files.textFileEditor{\"textEditorViewState\":[[\"file:///c%3A/Users/david/Downloads/PCI_mapper/.gitattributes\",{\"0\":{\"cursorState\":[{\"inSelectionMode\":false,\"selectionStart\":{\"lineNumber\":1,\"column\":1},\"position\":{\"lineNumber\":1,\"column\":1}}],\"viewState\":{\"scrollLeft\":",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/.gitignore\",{\"0\":{\"cursorState\":[{\"inSelectionMode\":false,\"selectionStart\":{\"lineNumber\":1,\"column\":1},\"position\":{\"lineNumber\":1,\"column\":1}}],\"viewState\":{\"scrollLeft\":0,\"firstPosition\":{\"lineNumber\":19,\"column\":1},\"firstPositionDeltaTop\":-8},\"contributionsState\":{\"editor.contrib.folding\":{\"lineCount\":44,\"provider\":\"indent\",\"foldedImports\":false},\"editor.contrib.wordHighlighter\":false}}}],[\"file:///c%3A/Users/david/Downloads/PCI_mapper/FIREBASE_APP_HOSTING_ENV_SETU",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/FIREBASE_GENIEACS_DEPLOYMENT_GUIDE.md\",{\"0\":{\"cursorState\":[{\"inSelectionMode\":true,\"selectionStart\":{\"lineNumber\":33,\"column\":30},\"position\":{\"lineNumber\":33,\"column\":17}}],\"viewState\":{\"scrollLeft\":0,\"firstPosition\":{\"lineNumber\":64,\"column\":1},\"firstPositionDeltaTop\":-15},\"contributionsState\":{\"editor.contrib.folding\":{\"lineCount\":380,\"provider\":\"syntax\",\"foldedImports\":false},\"editor.contrib.wordHighlighter\":false}}}],[\"file:///c%3A/Users/david/Downloads/PCI_mapp",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\",{\"0\":{\"cursorState\":[{\"inSelectionMode\":false,\"selectionStart\":{\"lineNumber\":5,\"column\":42},\"position\":{\"lineNumber\":5,\"column\":42}}],\"viewState\":{\"scrollLeft\":0,\"firstPosition\":{\"lineNumber\":27,\"column\":1},\"firstPositionDeltaTop\":-6},\"contributionsState\":{\"editor.contrib.folding\":{\"lineCount\":473,\"provider\":\"syntax\",\"foldedImports\":false},\"editor.contrib.wordHighlighter\":false}}}]]} BE    uworkbench.panel.composerChatViewPane.3b481c76-2",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @    gine_impl.ts:374\\r\\nawait in __PRIVATE_allocateTargetAndMaybeListen\\r\\n__PRIVATE_syncEngineListen @ sync_engine_impl.ts:313\\r\\n__PRIVATE_eventManagerListen @ event_manager.ts:170\\r\\n__PRIVATE_executeQueryViaSnapshotListener @ firestore_client.ts:800\\r\\n(anonymous) @ firestore",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @     istener @ firestore_client.ts:800\\r\\n(anonymous) @ firestore",
+                              "length":  504
+                          },
+                          {
+                              "text":  "message\\\":\\\"Unknown service account\\\",\\\"status\\\":\\\"NOT_FOUND\\\"}}\\r\\n[2025-10-06T06:05:35.674Z] [functions] service account IAM check errored, deploy may fail: Request to https://iam.googleapis.com/v1/projects/lte-pci-mapper/serviceAccounts/lte-pci-mapper@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account {\\\"name\\\":\\\"FirebaseError\\\",\\\"children\\\":[],\\\"context\\\":{\\\"body\\\":{\\\"error\\\":{\\\"code\\\":404,\\\"message\\\":\\\"Unknown service account\\\",\\\"status\\\":\\\"NOT_FOUND\\\"}},\\\"",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\\":\\\"Request to https://iam.googleapis.com/v1/projects/lte-pci-mapper/serviceAccounts/lte-pci-mapper@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account\\\",\\\"status\\\":404}\\r\\n\\r\\n=== Deploying to \u0027lte-pci-mapper\u0027...\\r\\n\\r\\ni  deploying functions \\r\\nRunning command: npm --prefix \\\"$RESOURCE_DIR\\\" run build\\r\\n\\r\\n\u003e lte-pci-mapper-functions@1.0.0 build\\r\\n\u003e tsc\",\"commandType\":4},{\"text\":\"For full integration of genieacs, we will need the following services r",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:122:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n122   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:166:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n166         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:177:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n177   return",
+                              "length":  506
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:302:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n302         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\n\\r\\nFound 50 errors in 6 files.\\r\\n\\r\\nErrors  Files\\r\\n     9  src/faultsManagement.ts:8\\r\\n    14  src/genieacsIntegration.ts:7\\r\\n     6  src/genieacsServices.ts:5\\r\\n     1  src/index.ts:12\\r\\n    11  src/presetsManagement.ts:8\\r\\n     9  src/provisionsManagement.ts:8\\r\\n\\r\\nError: functions predeploy",
+                              "length":  506
+                          },
+                          {
+                              "text":  "userinfo.email\\\"]\\r\\n[2025-10-06T06:05:35.008Z] \u003e authorizing via signed-in user (david@4gengineer.com)\\r\\n[2025-10-06T06:05:35.008Z] [iam] checking project lte-pci-mapper for permissions [\\\"cloudfunctions.functions.create\\\",\\\"cloudfunctions.functions.delete\\\",\\\"cloudfunctions.functions.get\\\",\\\"cloudfunctions.functions.list\\\",\\\"cloudfunctions.functions.update\\\",\\\"cloudfunctions.operations.get\\\",\\\"firebase.projects.get\\\"]\\r\\n[2025-10-06T06:05:35.011Z] Checked if tokens are valid: true, expires at: 17",
+                              "length":  504
+                          },
+                          {
+                              "text":  "user=projects/lte-pci-mapper\\r\\n[2025-10-06T06:05:35.016Z] \u003e   $ \u003cT extends e.CorsRequest = CorsRequest\u003e(options?: CorsOptions | CorsOptionsDelegate\u003cT\u003e | undefined) =\u003e (req: T, res: { statusCode?: number | undefined; setHeader(key: string, value: string): any; end(): any; }, next: (err?: any) =\u003e any) =\u003e void; }\u0027 has no call signatures.\\r\\n\\r\\n12 const corsHandler = cors({ origin: true });\\r\\n                       ~~~~\\r\\n\\r\\n  src/index.ts:5:1\\r\\n    5 import * as cors from \u0027cors\u0027;\\r\\n      ~~~~~~~",
+                              "length":  504
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:58:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n58   return corsHandler(req, res, async () =\u003e {\\r\\n                                  ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:90:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n90         error: error.message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:101:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n101   return corsHandler(req,",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:168:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n168   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:212:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n212         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:223:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n223   return corsHandl",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/presetsManagement.ts:424:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n424         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:8:21 - error TS2349: This expression is not callable.\\r\\n  Type \u0027{ default: \u003cT extends e.CorsRequest = CorsRequest\u003e(options?: CorsOptions | CorsOptionsDelegate\u003cT\u003e | undefined) =\u003e (req: T, res: { statusCode?: number | undefined; setHeader(key: string, value: string): any; end(): any",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\ns   %ents, and 2 more.\\r\\n\\r\\n120         query = query.where(\u0027location.latitude\u0027, \u0027\u003e\u0027, 0);\\r\\n            ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:125:9 - error TS2740: Type \u0027Query\u003cDocumentData, DocumentData\u003e\u0027 is missing the following properties from type \u0027CollectionReference\u003cDocumentData, DocumentData\u003e\u0027: id, parent, path, listDocuments, and 2 more.\\r\\n\\r\\n125         query = query.limit(parseInt(limit as string));\\r\\n            ~~~~~\\r\\n\\r\\nsrc/genieacsIntegr",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:155:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n155   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:187:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n187         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:198:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n198   return cor",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:238:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n238   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:272:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n272         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsServices.ts:5:29 - error TS2307: Cannot find module \u0027mongodb\u0027 or its corresponding type declarat",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:62:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n62   return corsHandler(req, res, async () =\u003e {\\r\\n                                  ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:94:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n94         error: error.message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:105:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n105   return corsHandler(req, re",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:163:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n163   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:209:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n209         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:311:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n311         error: error.mess",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:116:9 - error TS2740: Type \u0027Query\u003cDocumentData, DocumentData\u003e\u0027 is missing the following properties from type \u0027CollectionReference\u003cDocumentData, DocumentData\u003e\u0027: id, parent, path, listDocuments, and 2 more.\\r\\n\\r\\n116         query = query.where(\u0027status\u0027, \u0027==\u0027, status);\\r\\n            ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:120:9 - error TS2740: Type \u0027Query\u003cDocumentData, DocumentData\u003e\u0027 is missing the following properties from type \u0027Coll",
+                              "length":  507
+                          },
+                          {
+                              "text":  "User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\n+page.svelte:1   Failed to load resource: the server responded with a status of 500 (Internal Server Error)\\r\\nclient.js:3150  The next HMR update will cause the page to reload\\r\\nwarn @ client.js:3150\\r\\napp.js:26  TypeError: Failed to fetch dynamically imported module: https://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev/.svelte-kit/generated/client/nodes/7.js",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\n+page.svelte:18 Login page: Checking if already authenticated...\\r\\n+page.svelte:22 Login page: isAuthenticated = null\\r\\n+page.svelte:28 Login page: Not authenticated, showing login form\\r\\nclient:536  WebSocket connection to \u0027wss://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev:5173/?token=dt",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Mon, 06 Oct 2025 04:55:00 GMT\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\n+page.svelte:63 Login page: Firebase auth successful!\\r\\n+page.svelte:64 Login page: User: undefined\\r\\n+page.svelte:70 Dashboard: Mounted\\r\\n+page.svelte:74 Dashboard: isAuthenticated = true\\r\\n+page.svelte:82 Dashboard: User is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@davi",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\nclient:536  WebSocket connection to \u0027wss://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev:5173/?token=CjC-frygIRIG\u0027 failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED\\r\\nsetupWebSocket @ client:536\\r\\nclient:560 [vite] server connection lost. Polling for restart...\\r\\n:5173/",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\nerror-handling.js:68  Uncaught ReferenceError: mapInstance is not defined\\r\\n\\r\\n\\tin \u003cunknown\u003e\\r\\n\\tin +page.svelte\\r\\n\\tin +layout.svelte\\r\\n\\tin +layout.svelte\\r\\n\\tin root.svelte\\r\\n\\r\\n    at +page.svelte:106:3\\r\\n    at untrack (runtime.js:738:10)\\r\\n    at effects.js:316:3\\r\\n    at update_reaction (runtime.js:292:16)\\r\\n    at update_effe",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\n+page.svelte:1   Failed to load resource: the server responded with a status of 500 (Internal Server Error)\\r\\nclient.js:3150  The next HMR update will cause the page to reload\\r\\nwarn @ client.js:3150\\r\\napp.js:26  TypeError: Failed to fetch dynamically imported module: https://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd2",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:86 Da   )resource: the server responded with a status of 503 (Service Unavailable)\\n:5173/:1   Failed to load resource: net::ERR_CONNECTION_REFUSED\",\"commandType\":4},{\"text\":\"the connection to the database is likely the issue.  the objects are only accessible by the person\u0027s login\",\"commandType\":4},{\"text\":\"that is working now.  one small change, on the pci mapper app, there is an exit button that logs you out.  it should return you to the modu",
+                              "length":  505
+                          },
+                          {
+                              "text":  "user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/?retryWrites=true\u0026w=majority\u0026appName=Cluster0\\n\\nimplement the rest in git so we can deploy in firebase\",\"commandType\":4},{\"text\":\"we are testing in the firebase webide.  will this work there\",\"commandType\":4},{\"text\":\"how do i pull the code into the ide\",\"commandType\":4},{\"text\":\"this is already connected to git with this project.  this should be a module off the main lte wisp management platform module system\",\"commandType\":4},{\"text\":\"push to git\"",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nauthService.ts:52 Auth state: User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Mon, 06 Oct 2025 00:47:17 GMT\\r\\n+page.svelte:63 Login page: Firebase auth successful!\\r\\n+page.svelte:64 Login page: User: undefined\\r\\n+page.svelte:70 Dashboard: Mounted\\r\\n+page.svelte:74 Dashboard: isAuthenticated = true\\r\\n+page.svelte:82 Dashboard: User is authenticated, loading dashboard\\r\\n+",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n+page.svelte:18 Login page: Checking if already authenticated...\\r\\n+page.svelte:22 Login page: isAuthenticated = true\\r\\n+page.svelte:25 Login page: Already authenticated, redirecting to dashboard\\r\\n+page.svelte:61 Dashboard: Mounted\\r\\n+page.svelte:65 Dashboard: isAuthenticated = true\\r\\n+page.svelte:73 Dashboard: User is authenticated, loadin",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nclient:536  WebSocket connection to \u0027wss://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev:5173/?token=f7_Hp0qd0kDI\u0027 failed: Error in connection establishment: net::ERR_CONN",
+                              "length":  505
+                          },
+                          {
+                              "text":  "user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49258:41)\\n      at TransformPluginContext.error (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49253:16)\\n      at normalizeUrl (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:64306:23)\\n      at async file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:64438:39\\n",
+                              "length":  503
+                          },
+                          {
+                              "text":  "user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:64365:7)\\n      at async PluginContainer.transform (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49099:18)\\n      at async loadAndTransform (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:51977:27)\\n      at async viteTransformMiddleware (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/no",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n+page.svelte:18 Login page: Checking if already authenticated...\\r\\n+page.svelte:22 Login page: isAuthenticated = null\\r\\n+page.svelte:28 Login page: Not authenticated, showing login form\\r\\n+page.svelte:56 Login page: Auth set: true\\r\\n+page.svelte:57 Login page: Navigating to dashboard...\\r\\n+page.svelte:61 Dashboard: Mounted\\r\\n+page.svelte:65",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nclient:536  WebSocket connection to \u0027wss://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev:5173/?token=UkBZu4d2IPK1\u0027 failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED\\r\\nsetupWebSocket @ client:536\\r\\nclient:560 [vite] server connection lost. Polling for restart...\\r\\n+page.",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\n+page.svelte:18 Login page: Checking if already authenticated...\\r\\n+page.svelte:22 Login page: isAuthenticated = true\\r\\n+page.svelte:25 Login page: Alre",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n:5173/:1   Failed to load resource: net::ERR_CONNECTION_REFUSED\\r\\n\",\"commandType\":4},{\"text\":\"@https://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev/modules/pci-resolution \",\"commandType\":4},{\"text\":\"PCI Resolution Module - TEST\\nIf you see this, the route is working!\\n\\nNow we need to load t",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User signed out\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\n\",\"commandType\":4},{\"text\":\"still stuck\\n\\n+page.svelte:9 Root page: Checking authentication...\\r\\n+page.svelte:16 Root page: isAuthenticated = true\\r\\n+page.svelte:20 Root page: Navigating to dashboard\\r\\n+page.svelte:61 Dashboard: Mounted\\r\\n+page.svelte:65 Dashboard: isAuthenticated = true\\r\\n+page.svelte:73 Dashboard: User is authenticated,",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\n\",\"commandType\":4},{\"text\":\"+page.svelte:9 Root page: Checking authentication...\\r\\n+page.svelte:16 Root page: isAuthenticated = true\\r\\n+page.svelte:20 Root page: Navigating to dashboard\\r\\n+page.svelte:61 Dashboard: Mounted",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\npci-resolution:1   Failed to load resource: the server responded with a status of 503 (Service Unavailable)\\r\\n\",\"commandType\":4},{\"text\":\"from the main p",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n+layout.svelte:9 PCI Resolution layout: Mounting...\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\n+layout.svelte:13 PCI Resolution layout: Ready\\r\\npci-resolution:1   Failed to load resource: the s",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Sun, 05 Oct 2025 06:03:53 GMT\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n\",\"commandType\":4},{\"text\":\"The PCI and Network Optimization buttons are the same process, combine them.  \\n\\nMake the second button UE/CPE Management, this will be the ACS fork\",\"commandType\":4},{\"text\":\"+pa",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User email: david@david.com\\r\\n+page.svelte:49 Auth set: true\\r\\n+page.svelte:50 Navigating to dashboard...\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\nauthService.ts:52 Auth state: User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Sun, 05 Oct 2025 06:03:53 GM",
+                              "length":  505
+                          },
+                          {
+                              "text":  "contents \\n\\n# Environment Variables for LTE PCI Mapper\\n# Copy this file to .env and fill in your actual values\\n\\n# Firebase Configuration\\nPUBLIC_FIREBASE_API_KEY=\\\"AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0\\\"\\nPUBLIC_FIREBASE_AUTH_DOMAIN=\\\"lte-pci-mapper-65450042-bbf71.firebaseapp.com\\\"\\nPUBLIC_FIREBASE_PROJECT_ID=\\\"lte-pci-mapper-65450042-bbf71\\\"\\nPUBLIC_FIREBASE_STORAGE_BUCKET=\\\"lte-pci-mapper-65450042-bbf71.firebasestorage.app\\\"\\nPUBLIC_FIREBASE_MESSAGING_SENDER_ID=\\\"1044782186913\\\"\\nPUBLIC_FIREBAS",
+                              "length":  507
+                          },
+                          {
+                              "text":  "userEmail\u0027, \u0027test@test.com\u0027);\\r\\n\\r\\n// Navigate manually\\r\\nwindow.location.href = \u0027/dashboard\u0027;\\r\\nbash: //: Is a directory\\r\\nbash: syntax error near unexpected token `\u0027isAuthenticated\u0027,\u0027\\r\\nbash: syntax error near unexpected token `\u0027userEmail\u0027,\u0027\\r\\nbash: //: Is a directory\\r\\nbash: window.location.href: command not found\",\"commandType\":4},{\"text\":\"deploy\",\"commandType\":4},{\"text\":\"its exactly the same, send me commands to sync with your git push\",\"commandType\":4},{\"text\":\"i see lte-pci-mapper-65",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users\\\\\\\\david\\\\\\\\Downloads\\\\\\\\PCI_mapper\\\\\\\\FIREBASE_GENIEACS_DEPLOYMENT_GUIDE.md\\\",\\\"_sep\\\":1,\\\"external\\\":\\\"file:///c%3A/Users/david/Downloads/PCI_mapper/FIREBASE_GENIEACS_DEPLOYMENT_GUIDE.md\\\",\\\"path\\\":\\\"/c:/Users/david/Downloads/PCI_mapper/FIREBASE_GENIEACS_DEPLOYMENT_GUIDE.md\\\",\\\"scheme\\\":\\\"file\\\"},\\\"encoding\\\":\\\"utf8\\\"}\"},{\"id\":\"workbench.editors.files.fileEditorInput\",\"value\":\"{\\\"resourceJSON\\\":{\\\"$mid\\\":1,\\\"fsPath\\\":\\\"c:\\\\\\\\Users\\\\\\\\david\\\\\\\\Downloads\\\\\\\\PCI_mapper\\\\\\\\webide-setup-acs-datab",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\\\",\\\"path\\\":\\\"/c:/Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\\\",\\\"scheme\\\":\\\"file\\\"},\\\"encoding\\\":\\\"utf8\\\"}\"}],\"mru\":[1,0],\"preview\":1},\"size\":1188}],\"size\":2270},\"orientation\":0,\"width\":2270,\"height\":1188},\"activeGroup\":0,\"mostRecentActiveGroups\":[0]}} 6U    ]workbench.panel.composerChatViewPane.fec3e4c5-a2aa-418c-bc88-04c3d55d9822{\"workbench.panel.aichat.view.91e07457-000d-4ead-8df3-9a75948f0ad8\":{\"collapsed\":false,\"isH",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users/david/Downloads/PCI_mapper/.gitignore\":{\"lineCount\":44,\"lines\":[]},\"file:///c%3A/Users/david/Downloads/PCI_mapper/FIREBASE_APP_HOSTING_ENV_SETUP.md\":{\"lineCount\":164,\"lines\":[]},\"file:///c%3A/Users/david/Downloads/PCI_mapper/FIREBASE_GENIEACS_DEPLOYMENT_GUIDE.md\":{\"lineCount\":380,\"lines\":[]},\"file:///c%3A/Users/david/Downloads/PCI_mapper/webide-quick-test.ps1\":{\"lineCount\":74,\"lines\":[]},\"file:///c%3A/Users/david/Downloads/PCI_mapper/webide-setup-acs-database.js\":{\"lineCount\":473,\"lines\":[]}}U",
+                              "length":  504
+                          },
+                          {
+                              "text":  "content\\\"\u003e\\n34:         \u003cdiv class=\\\"setting-item\\\"\u003e\\n35:           \u003clabel\u003eTheme\u003c/label\u003e\\n                                  ^\\n36:           \u003cThemeSwitcher /\u003e\\n37:         \u003c/div\u003e\\n  3722 modules transformed.\\nvite v5.4.20 building for production...\\ntransforming (13) src/routes/+layout.svelte2:18:37 PM [vite-plugin-svelte] src/lib/components/SiteEditor.svelte:1224:2 Unused CSS selector \\\".carrier-name-input\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n1222:   }\\n1223: \\n1224:   .carrier-name-input {\\n",
+                              "length":  506
+                          },
+                          {
+                              "text":  "content\\\"\u003e\\n34:         \u003cdiv class=\\\"setting-item\\\"\u003e\\n35:           \u003clabel\u003eTheme\u003c/label\u003e\\n                                  ^\\n36:           \u003cThemeSwitcher /\u003e\\n37:         \u003c/div\u003e\",\"commandType\":4},{\"text\":\"fand and use the proper npm basemap module \\n\\narcgisMap.ts:95  [esri.widgets.BasemapToggle]    DEPRECATED - This widget is deprecated. Use the Basemap Toggle component instead.\\n\\t    Replacement: \u003carcgis-basemap-toggle\u003e\u003c/arcgis-basemap-toggle\u003e\\n\\t   Version: 4.32\\n\\t   See for more details:\\n\\t\\tBa",
+                              "length":  507
+                          },
+                          {
+                              "text":  "user\u0027s device.\\nCause\\tOccurs when neighboring cells have the same PCI modulo 3 value. This causes their downlink reference signals to align in frequency, creating high interference.\\tOccurs when neighboring cells have the same PCI modulo 30 value. This causes their uplink reference signal patterns to be identical.\\nImpact on Performance\\tHigh downlink interference: Leads to a lower Reference Signal Signal-to-Interference-plus-Noise Ratio (RS-SINR).\\nSlower cell acquisition: It takes longer for user",
+                              "length":  504
+                          },
+                          {
+                              "text":  "username and password login system.  Each network should only be seen and controlled by the user login.  No user should see other users networks\",\"commandType\":4},{\"text\":\"i can still see other peoples networks across two logins\",\"commandType\":4},{\"text\":\"how do i clear the web ides files and get a clean git\",\"commandType\":4},{\"text\":\"I can still see all networksl, cells and other information.  the database should be set so that the login is tied to the records created by that login\",\"commandType\":4",
+                              "length":  504
+                          },
+                          {
+                              "text":  "username\",\"commandType\":4},{\"text\":\"SKU: CYG-CPCNAC5-3FT\\n\",\"commandType\":4},{\"text\":\"  Scan failed: Missing or insufficient permissions.\",\"commandType\":4},{\"text\":\"ok i cannot see the networks and longer.  however, i can see the cells, earfcn, pci and other data.  the cell and sub data should be tied to the network\",\"commandType\":4},{\"text\":\"the cells are in a sub collection\",\"commandType\":4},{\"text\":\"this is a clean database.  we dont need to fix any existing data, only make future data saved prop",
+                              "length":  504
+                          },
+                          {
+                              "text":  "user, objects dont stay on the screen with other user logins\",\"commandType\":4},{\"text\":\"the pci data and the other netowrk data in the main bar stays the same as the last login\",\"commandType\":4},{\"text\":\"The CSV upload should only have the same fields as the Cell.  cell id, sector id, azimuth, altitude, PCI and EARFCN\",\"commandType\":4},{\"text\":\"look over all of the documentation and create hover ? for each button, etc for easy documentation\",\"commandType\":4},{\"text\":\"we can remove rs power and frequ",
+                              "length":  504
+                          },
+                          {
+                              "text":  "user should be able to create the usual cells, sectors, and transmitters as before.\\n4.  Leave the PCI deconflict mechanism in place.\\n5.  Create a working export with all of the variables, only replacin   ;auth/dist/node-esm/totp-a9833fe5.js:502:15) at Component.instanceFactory (file:///workspace/node_modules/@firebase/auth/dist/node-esm/totp-a9833fe5.js:7256:9) at Provider.getOrInitializeService (file:///workspace/node_modules/@firebase/component/dist/esm/index.esm2017.js:290:39) at Provider.initia",
+                              "length":  505
+                          },
+                          {
+                              "text":  "contents\\n\\n# Environment Variables for LTE PCI Mapper\\n# Copy this file to .env and fill in your actual values\\n\\n# Firebase Configuration\\nPUBLIC_FIREBASE_API_KEY=\\\"AIzaSyC9pkcLlAt04E3h-563WcC1Y5rzwt198z8\\\"\\nPUBLIC_FIREBASE_AUTH_DOMAIN=\\\"petersonmappingapp.firebaseapp.com\\\"\\nPUBLIC_FIREBASE_PROJECT_ID=\\\"petersonmappingapp\\\"\\nPUBLIC_FIREBASE_STORAGE_BUCKET=\\\"petersonmappingapp.firebasestorage.app\\\"\\nPUBLIC_FIREBASE_MESSAGING_SENDER_ID=\\\"234761360561\\\"\\nPUBLIC_FIREBASE_APP_ID=\\\"1:234761360561:web:a17b7",
+                              "length":  507
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:34 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:341:20 Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute\\nhttps://svelte.dev/e/a11y_consider_explicit_label\",\"commandType\":4},{\"text\":\"fix    functions: Runtime Node.js 18 was deprecated on 2025-04-30 and will be decommissioned on 2025-10-30, after which you will not be able to deploy wi",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserProfile.svelte:169:2 Unused CSS selector \\\".sign-in-btn:hover\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:233:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:548:2 Unused CSS selector \\\".setup-banner\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svel",
+                              "length":  504
+                          },
+                          {
+                              "text":  "content\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:567:2 Unused CSS selector \\\".banner-content strong\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:575:2 Unused CSS selector \\\".banner-content p\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:581:2 Unused CSS selector \\\".banner-actions\\\"\\nh",
+                              "length":  507
+                          },
+                          {
+                              "text":  "role\\nhttps://svelte   ?5:34:15 AM [vite-plugin-svelte] src/lib/components/ContextMenu.svelte:47:2 `\u003cdiv\u003e` with a click handler must have an ARIA role\\nhttps://svelte.dev/e/a11y_no_static_element_interactions\\n5:34:16 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:191:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:16 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:341:20 Buttons and l",
+                              "length":  504
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/AnalysisModal.svelte:23:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/ConflictsModal.svelte:22:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM",
+                              "length":  504
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/ImportWizard.svelte:830:2 Unused CSS selector \\\".add-btn\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/ImportWizard.svelte:841:2 Unused CSS selector \\\".add-btn:hover\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/ImportWizard.svelte:847:2 Unused CSS selector \\\".cell-p",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/OptimizationResultModal.svelte:22:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/UserProfile.svelte:156:2 Unused CSS selector \\\".sign-in-btn\\\"\\   @_interactive_supports_focus\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/UserProf",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserProfile.svelte:169:2 Unused CSS selector \\\".sign-in-btn:hover\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:233:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:548:2 Unused CSS selector \\\".setup-banner\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svel",
+                              "length":  504
+                          },
+                          {
+                              "text":  "content\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:567:2 Unused CSS selector \\\".banner-content strong\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:575:2 Unused CSS selector \\\".banner-content p\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:581:2 Unused CSS selector \\\".banner-actions\\\"\\nh",
+                              "length":  507
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/ImportWizard.svelte:391:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/ImportWizard.svelte:830:2 Unused CSS selector \\\".add-btn\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/ImportWizar",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/ConflictsModal.svelte:22:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/RecommendationsModal.svelte:21:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y   B\\\"dark\\\"] .login-brand\\\"\\r\\nhttps://svelte.dev/e/css_unused_selector\\r\\n387:   }\\r\\n388: \\r\\n389:   [data-theme=\\\"dark\\\"] .login-brand {\\r\\n                                       ^\\r\\n390:     background: linear-gradient(135deg, #1e3a8a 0%, #581c87 100%);\\r\\n391:   }\\r\\n5:19:00 AM [vite-plugin-svelte] src/routes/login/+page.svelte:607:2 Unused CSS selector \\\"[data-theme=\\\"dark\\\"] .auth-btn.google\\\"\\r\\nhttps://svelte.dev/e/css_unused_select",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role\\r\\nhttps://svelte.dev/e/a11y_no_static_element_interactions\\r\\n141: \u003c!-- Export Modal --\u003e\\r\\n142: {#if showExportModal}\\r\\n143:   \u003cdiv class=\\\"export-modal-overlay\\\" on:click={() =\u003e showExportModal = false}\u003e\\r\\n             ^\\r\\n144:     \u003cdiv class=\\\"export-modal\\\" on:click|stopPropagation\u003e\\r\\n145:       \u003cdiv class=\\\"export-modal-header\\\"\u003e\\r\\n5:19:00 AM [vite-plugin-svelte] src/lib/components/ActionsDropdown.svelte:144:4 Visible, non-interactive elements with a click event must be accompanied b",
+                              "length":  504
+                          },
+                          {
+                              "text":  "role\\r\\nhttps://svelte.dev/e/a11y_no_static_element_interactions\\r\\n142: {#if showExportModal}\\r\\n143:   \u003cdiv class=\\\"export-modal-overlay\\\" on:click={() =\u003e showExportModal = false}\u003e\\r\\n144:     \u003cdiv class=\\\"export-modal\\\" on:click|stopPropagation\u003e\\r\\n               ^\\r\\n145:       \u003cdiv class=\\\"export-modal-header\\\"\u003e\\r\\n146:         \u003ch3\u003eExport Reports\u003c/h3\u003e\\r\\n5:19:00 AM [vite-plugin-svelte] src/lib/components/ImportWizard.svelte:823:2 Unused CSS selector \\\".form-grid\\\"\\r\\nhttps://svelte.dev/e/css_un",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Thu, 02 Oct 2025 04:56:12 GMT\\r\\nfirebase.ts:38 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\n+page.svelte:113 Page: Creating map instance\\r\\n+page.svelte:117 Page: Waiting for map initialization...\\r\\nruntime.js:59 Using Calcite Components 3.3.1 [Date: 2025-09-30, Revision: f8b8c09e0]\\r\\narcgisMap.ts:78 PCIArcGISMapper: Map initialized and ready\\r\\n+page.svelte:119 Page: Map initialized, attaching event ha",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User signed out\\r\\napis.google.com/:1  Refused to frame \u0027https://petersonmappingapp.firebaseapp.com/\u0027 because it violates the following Content Security Policy directive: \\\"child-src \u0027self\u0027 blob:\\\". Note that \u0027frame-src\u0027 was not explicitly set, so \u0027child-src\u0027 is used as a fallback.\\r\\n\\r\\n\",\"commandType\":4},{\"text\":\"in the firebase web ide, it keeps breaking the connection to git \\n\\nlte-pci-mapper-65450042:~/lte-pci-mapper{main}$ git push origin main\\nfatal: cannot exec \u0027/nix/store/5i3x58p9483gb87yg",
+                              "length":  505
+                          },
+                          {
+                              "text":  "Username for \u0027https://github.com\u0027: ^C\\nlte-pci-mapper-65450042:~/lte-pci-mapper{main}$ \\n\\nhelp me establish it permanently\",\"commandType\":4},{\"text\":\"Username for \u0027https://github.com\u0027: theorem6\\r\\nPassword for \u0027https://theorem6@github.com\u0027: \\r\\nremote: Invalid username or token. Password authentication is not supported for Git operations.\\r\\nfatal: Authentication failed for \u0027https://github.com/theorem6/lte-pci-mapper.git/\u0027\",\"commandType\":4},{\"text\":\"To https://github.com/theorem6/lte-pci-mapper.git",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":58.165000915527344,\"totalLinesAdded\":12334,\"totalLinesRemoved\":10746,\"subtitle\":\"+page.svelte, BasemapSwitcher.svelte, arcgisMap.ts, SettingsMenu.svelte, TowerManager.svelte\",\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false,\"hasBlockingPendingActions\":false},{\"type\":\"head\",\"composerId\":\"a9288a10-f416-4d18-95c9-ac0c00cf2854\",\"createdAt\":1759534030729,\"unifiedMode\":\"agent\",\"forceMode\":\"edit\",\"hasUnreadMessages\":false,\"totalLinesAdded\":4380,\"totalLinesRemoved\":468",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":40.43299865722656,\"totalLinesAdded\":5217,\"totalLinesRemoved\":2361,\"subtitle\":\"CSV_IMPORT_FORMAT.md, ManualImport.svelte, UI_TOOLTIPS_GUIDE.md, +page.svelte, Tooltip.svelte\",\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false,\"hasBlockingPendingActions\":false},{\"type\":\"head\",\"composerId\":\"edbad2a1-3dab-47db-89f9-ad36093fc022\",\"name\":\"Fix git connection issues in firebase ide\",\"lastUpdatedAt\":1759512045530,\"createdAt\":1759467731985,\"unifiedMode\":\"agent\",\"forceMode\":",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":43.6192512512207,\"totalLinesAdded\":2527,\"totalLinesRemoved\":433,\"subtitle\":\"CLOUD_RUN_ENV_SETUP.md, setup-cloud-run-env.sh, .gitignore, apphosting.yaml.template, apphosting.yaml\",\"hasBlockingPendingActions\":false,\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false},{\"type\":\"head\",\"composerId\":\"09c3f4a8-7649-4039-b537-cd75d9cd1dee\",\"name\":\"Improve UI with centralized CSS\",\"lastUpdatedAt\":1759458482488,\"createdAt\":1759290984291,\"unifiedMode\":\"agent\",\"forceMode\":\"edi",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"contextUsagePercent\":37.14149856567383,\"totalLinesAdded\":10427,\"totalLinesRemoved\":4462,\"subtitle\":\"app.html, pciOptimizerSimple.ts\",\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false,\"hasBlockingPendingActions\":false},{\"type\":\"head\",\"composerId\":\"5e66c17d-2a77-4f9f-98d1-cd76fa89a33b\",\"name\":\"Reset git repository to specific commit\",\"lastUpdatedAt\":1759440132087,\"createdAt\":1759292837288,\"unifiedMode\":\"agent\",\"forceMode\":\"edit\",\"hasUnreadMessages\":false,\"contextUsagePercent\":34.90274",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Messages\":false,\"totalLinesAdded\":8744,\"totalLinesRemoved\":60,\"isArchived\":false,\"isWorktree\":false,\"isSpec\":false,\"lastUpdatedAt\":1759290910932,\"subtitle\":\"TopBar.svelte, components.css, +page.svelte\",\"contextUsagePercent\":87.42800045013428,\"name\":\"Create PCI conflict mapper for LTE\",\"hasBlockingPendingActions\":false},{\"type\":\"head\",\"composerId\":\"b8aab670-7bed-4b43-a4d0-b59aebb27019\",\"createdAt\":1759114710047,\"unifiedMode\":\"chat\",\"forceMode\":\"edit\",\"hasUnreadMessages\":false,\"totalLinesAdded\":0,\"totalL",
+                              "length":  507
+                          },
+                          {
+                              "text":  "UserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts:318\\r\\ninitialize @ provider.ts:242\\r\\ninitializeAuth @ initialize.ts:66\\r\\ngetAuth @ index.ts:83\\r\\n(anonymous) @ firebase.ts:30\\r\\ngeminiService.ts:68  [GeminiService]",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r   Pous) @ async_queue_impl.ts:136\\r\\n(anonymous) @ async_queue_impl.ts:187\\r\\nPromise.then\\r\\nuc @ async_queue_impl.ts:185\\r\\nenqueue @ async_queue_impl.ts:130\\r\\nenqueueAndForget @ async_queue_impl.ts:94\\r\\n__PRIVATE_firestoreClientGetDocumentsViaSnapshotListener @ firestore_client.ts:528\\r\\ngetDocs @ reference_impl.ts:226\\r\\ngetUserNetworks @ networkService.ts:11",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putObject @ indexed_db.ts:132\\r\\n(anonymous) @ index",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Content\\r\\ncallGeminiAPI @ geminiService.ts:67\\r\\nawait in callGeminiAPI\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_eff",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\\": \\\"models/gemini-1.5-flash is not found for API version v1, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.\\\",\\r\\n    \\\"status\\\": \\\"NOT_FOUND\\\"\\r\\n  }\\r\\n}\\r\\n\\r\\ncallGeminiAPI @ geminiService.ts:66\\r\\nawait in callGeminiAPI\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetw",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ gemin   Ueffects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putObject @ indexed_db.ts:132\\r\\n(anonymous) @ indexed_db.ts:332\\r\\n_withRetries @ indexed_db.ts:200\\r\\nawait in _withRetries\\r\\n(anonymous) @ indexed_db.ts:332\\r\\n_withPendingWrite @ indexed_db.ts:32",
+                              "length":  507
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_   We.then\\r\\nauth @ persistent_stream.ts:467\\r\\nstart @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction",
+                              "length":  506
+                          },
+                          {
+                              "text":  "User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Thu, 02 Oct 2025 04:56:12 GMT\\r\\nfirebase.ts:38 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\n+page.svelte:110 Page: Creating map instance\\r\\n+page.svelte:114 Page: Waiting for map initialization...\\r\\nruntime.js:59 Using Calcite Components 3.3.1 [Date: 2025-09-30, Revision: f8b8c09e0]\\r\\narcgisMap.ts:78 PCIArcGISMapper: Map initialized and ready\\r\\n+page.svelte:116 Page: Map initialized, attaching event ha",
+                              "length":  505
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\n(anonymous) @ index-client.js:178\\r\\nhandleAction @ ActionsDropdown.svelte:24\\r\\n(anonymous) @ ActionsDropdown.svelte:100\\r\\n(anonymous) @ events.js:61\\r\\nwithout_reactive_contex",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in   ]\\n__PRIVATE_executeQueryViaSnapshotListener @ firestore_client.ts:800\\r\\n(anonymous) @ firestore_client.ts:801\\r\\nawait in (anonymous)\\r\\n(anonymous) @ async_queue_impl.ts:136\\r\\n(anonymous) @ async_queue_impl.ts:187\\r\\nPromise.then",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nhandleSiteSave @ +page.svelte:451\\r\\n(anonymous) @ index-client.js:178\\r\\nhandleSave @ SiteEditor.svelte:65\\r\\n(anonymous) @ events.js:61\\r\\nwithout_reactive_context @ shared.js:",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\n   b.js:25\\r\\nF2 @ webchannel_blob_es2018.js:23\\r\\nWc @ webchannel_blob_es2018.js:62\\r\\nh.bb @ webchannel_blob_es2018.js:61\\r\\nh.Ea @ webchannel_blob_es2018.js:61\\r\\nLc @ webchannel_blob_es2018.js:57\\r\\nh.Pa @ webchannel_blob_es2018.js:55\\r\\nPr",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @   ctch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putObject @ indexed_db.ts:132\\r\\n(anonymous) @ indexed_db.ts:332\\r\\n_withRetries @ indexed_db.ts:200\\r\\nawait in _withRetries\\r\\n(anonymous) @ indexed_db.ts:332\\r\\n_withPendingWrite @ indexed_db.ts:324\\r\\n_set @ indexed",
+                              "length":  507
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ ba   en      }\\r\\n    });\\r\\nDefine Observer and Target Points:\\r\\nLOS analysis requires a starting point (observer) and one or more ending points (targets). These are typically represented as Point geometries",
+                              "length":  504
+                          },
+                          {
+                              "text":  "user interaction for defining points, and integrating with other API functionalities.\",\"commandType\":4},{\"text\":\"you broke gemini ai\\n\\nauthService.ts:52 Auth state: User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Thu, 02 Oct 2025 04:56:12 GMT\\r\\nfirebase.ts:38 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\n+page.svelte:110 Page: Creating",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:4   rtream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen @ sync_engine_impl.ts:374\\r\\nawait in __PRIVATE_allocateTargetAndMaybeListen\\r\\n__PRIVATE_syncEngineLis",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\   yTargetAndMaybeListen\\r\\n__PRIVATE_syncEngineLis",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts:318\\r\\ninitialize @ provider.ts:242\\r\\ninitializeAuth @ initialize.ts:66\\r\\ngetAuth @ index.ts:83\\r\\n(anonymous) @ firebase.ts:30\\r\\nlosService.ts:208   GET https://elev",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait i    30\\r\\nenqueueAndForget @ async_queue_impl.ts:94\\r\\n__PRIVATE_firestoreClientGetDocumentsViaSnapshotListener @ firestore_client.ts:528\\r\\ngetDocs @ reference_impl.ts:226\\r\\ngetUserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersisten    oadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nl    @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen @ sync_engine_impl.ts:374\\r\\nawait in __PRIVATE_allocateTargetAndMaybeListen\\r\\n__PRIVATE_syncEngineListen @ sync_engine_impl.ts:313\\r\\n__PRIVATE_eventManagerListen @ event_manager.ts:170\\r\\n__PRIVATE_executeQueryViaSnapshotListener @ firestore_client.ts:800\\r\\n(anonymous) @ firestore",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effec    IVATE_allocateTargetAndMaybeListen\\r\\n__PRIVATE_syncEngineListen @ sync_engine_impl.ts:313\\r\\n__PRIVATE_eventManagerListen @ event_manager.ts:170\\r\\n__PRIVATE_executeQueryViaSnapshotListener @ firestore_client.ts:800\\r\\n(anonymous) @ firestore",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.    \\r\\n(anonymous) @ firestore",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts:318\\r\\ninitialize @ provider.ts:242\\r\\ninitializeAuth @ initialize.ts:66\\r\\ngetAuth @ index.ts:83\\r\\n(anonymous) @ firebase.ts:30\\r\\nlosService.ts:224  Elevation fetch f",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurren    ce.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:29",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkServi    ebchannel_connection.ts:426\\r\\nz_ @ persistent_stream.ts:656\\r\\nW_ @ persistent_stream.ts:503\\r\\n(anonymous) @ persistent_stream.ts:477\\r\\nPromise.then\\r\\nauth @ persistent_stream.ts:467\\r\\nstart @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen @ sync_engine_impl.ts:374\\r\\nawait in __PRIVATE_allocateTargetAndMaybeListen\\r\\n__PRIVATE_syncEngineLis",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:16    traverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:29",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\n    67\\r\\nstart @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen @ sync_engine_impl.ts:374\\r\\nawait in __PRIVATE_allocateTargetAndMaybeL",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts:",
+                              "length":  502
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batc    RIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen @ sync_engine_impl.ts:374\\r\\",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94    erse_effect_tree_fn @ batch.js:226\\r\\npr",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntrav    tent_stream.ts:477\\r\\nPromise.then\\r\\nauth @ persistent_stream.ts:467\\r\\nstart @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen",
+                              "length":  503
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\    mmandType\":4},{\"text\":\"the create site button does not work, it will not add sectors in the modal or create a site\",\"commandType\":4},{\"text\":\"after adding sectors while changing azimuths and other data the mo",
+                              "length":  505
+                          },
+                          {
+                              "text":  "message: \u0027Goto was interrupted\u0027}\\r\\nwarn @ client.js:3150\\r\\ncenterMapOnNetwork @ +page.svelte:223\\r\\nawait in centerMapOnNetwork\\r\\nsyncNetworkCells @ +page.svelte:183\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:",
+                              "length":  509
+                          },
+                          {
+                              "text":  "User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Thu, 02 Oct 2025 04:56:12 GMT\\r\\nfirebase.ts:38 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\n+page.svelte:110 Page: Creating map instance\\r\\n+page.svelte:114 Page: Waiting for map initialization...\\r\\nchunk-HC5YXEKJ.js?v=5d30b38c:4137 Using Calcite Components 3.3.1 [Date: 2025-09-30, Revision: f8b8c09e0]\\r\\nclient.js:3150  Map centering failed: TypeError: Cannot read properties of undefined (reading \u0027anima",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n:5173/:1   Failed to load resource: net::ERR_CONNECTION_REFUSED\\r\\n\",\"commandType\":4},{\"text\":\"@https://5173-firebase-lte-pci-mapper-17593    78998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev/modules/pci-resolution \",\"commandType\":4},{\"text\":\"PCI Resolution Module - TEST\\nIf you see this, the route is working!\\n\\nNow we need to lo",
+                              "length":  505
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:116:9 - error TS2740: Type \u0027Query\u003cDocumentData, DocumentData\u003e\u0027 is missing the following properties from type \u0027CollectionReference\u003cDocumentData, DocumentData\u003e\u0027: id, parent, path, listDocuments, and 2 more.\\r\\n\\r\\n116         query = query.where(\u0027status\u0027, \u0027==\u0027, st    atus);\\r\\n            ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:120:9 - error TS2740: Type \u0027Query\u003cDocumentData, DocumentData\u003e\u0027 is missing the following properties from type \u0027",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:58:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n58   return corsHandler(req, res, async () =\u003e {\\r\\n                                  ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:111:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n111         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:122:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n122   return cors",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:177:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n177   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:209:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n209         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:302:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n302         error",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\n\\r\\nFound 50 errors in 6 files.\\r\\n\\r\\nErrors  Files\\r\\n     9  src/faultsManagement.ts:8\\r\\n    14  src/genieacsIntegration.ts:7\\r\\n     6  src/genieacsServices.ts:5\\r\\n     1  src/index.ts:12\\r\\n    11  src/presetsManagement.ts:8\\r\\n     9  src/provisionsManagement.ts:8\\r\\n\\r\\nError: functions predeploy error: Command terminated with non-zero exit code 2\\r\\n\\r\\nHaving trouble? Try firebase [command] --help\\r\\nlte-pci-mapper-65450042:~/lte-pci-mapper{main}$ \"",
+                              "length":  507
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectly    SetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch    .js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\    n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94    \\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initialize    CurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User @ persistence_user_manag    er.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:    562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrIniti    alizeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack     @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\n    run_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_    reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanal   #yzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_react",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCICo   (nflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\noptimizePCIs @ pciService.ts:226\\r\\nawait in optimizePCIs\\r\\noptimizePCIAssignments @ +page.svelte:284\\r\\n(anonymous) @ index-client.js:178\\r\\nhandleAction @ ActionsDropdown.svelte:24\\r\\n(anonymous) @ ActionsDrop",
+                              "length":  507
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.j   .s:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Content   0?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction",
+                              "length":  510
+                          },
+                          {
+                              "text":  "User @ persistence_u   5ser_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/UserProfile.svelte:156:2 Unused CSS selector \\\".sign-in-btn\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/UserProfile.svelte:169:2 Unused CSS selector \\\".sign-in-btn:hover\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:233:4 Elements with the \u0027di",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:548:2 Unused CSS selector \\\".setup-banner\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:558:2 Unused CSS selector \\\".setup-banner svg\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:563:2 Unused CSS sele",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role\\nhttps://svelte.dev/e/a11y_no_static_element_interactions\\n5:34:16 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:191:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:16 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:341:20 Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute\\nhttps://svelte.dev/e/a11y_consider_explicit_label",
+                              "length":  504
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/OptimizationResultModal.svelte:22:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_foc   Dus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/UserProfile.svelte:156:2 Unused CSS selector \\\".sign-in-btn\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/compo",
+                              "length":  505
+                          },
+                          {
+                              "text":  "role\\nhttps://svelte.dev/e/a11y_no_static_element_interactions\\n5:34:34 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:191:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:34 AM [vite-plugin-svelte] src/lib/components/TowerManager.svelte:341:20 Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute\\nhttps://svelte.dev/e/a11y_consider_explicit_label",
+                              "length":  504
+                          },
+                          {
+                              "text":  "user should be able to create the usual cells, sectors, and transmitters as before.\\n4   I.  Leave the PCI deconflict mechanism in place.\\n5.  Create a working export with all of the variables, only replacing what is needing to be changed including IP addresses\",\"commandType\":4},{\"text\":\"change the tower creation and editing routines to match the cell, transmitter/sector and carrier per transmitter to match\",\"commandType\":4},{\"text\":\"push all changes to git\",\"commandType\":4},{\"text\":\"one change, you",
+                              "length":  504
+                          },
+                          {
+                              "text":  "message\\\":\\\"Request to https://iam.googleapis.com/v1/projects/lte-pci-mapper/serviceAccounts/lte-pci-mapper@appspot.gserviceaccount.com:testIamPermissions had HTTP Error: 404, Unknown service account\\\",\\\"status\\\":404}\\r\\n\\r\\n=== Deploying to \u0027lte-pci-mapper\u0027...\\r\\n\\r\\ni  deploying functions \\r\\nRunning command: npm --prefix \\\"$RESOURCE_DIR\\\" run build\\r\\n\\r\\n\u003e lte-pci-mapper-functions@1.0.0 build\\r\\n\u003e tsc\"},{\"unixMs\":1759778613884,\"generationUUID\":\"3f04ee4e-54c9-42e8-9f3b-345e9e0dcb04\",\"type\":\"composer",
+                              "length":  507
+                          },
+                          {
+                              "text":  "user=projects/lte-pci-mapper\\r\\n[2025-10-06T06:05:35.016Z] \u003e\u003e\u003e [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/lte-pci-mapper:testIamPermissions {\\\"permissions\\\":[\\\"cloudfunctions.functions.create\\\",\\\"cloudfunctions.functions.delete\\\",\\\"cloudfunctions.functions.get\\\",\\\"cloudfunctions.functions.list\\\",\\\"cloudfunctions.functions.update\\\",\\\"cloudfunctions.operations.get\\\",\\\"firebase.projects.get\\\"]}\\r\\n[2025-10-06T06:05:35.425Z] \u003c\u003c\u003c [apiv2][status] POST https://cloudresourcem",
+                              "length":  504
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:177:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n177   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:209:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n209         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:302:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027   Q\\r\\nsrc/genieacsIntegr",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:105:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n105   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:152:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n152         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:163:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n163   return corsHandler(r",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:311:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n311         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:7:23 - error TS6133: \u0027ObjectId\u0027 is declared but its value is never read.\\r\\n\\r\\n7 import { MongoClient, ObjectId } from \u0027mongodb\u0027;\\r\\n                        ~~~~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:7:39 - error TS2307: Cannot find module \u0027mongodb\u0027 or its corresponding type declara",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:62:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n62   return corsHandler(req, res, async () =\u003e {\\r\\n                               TxMs\":1759723904570,\"generationUUID\":\"9cbb307f-ff3d-4d96-a83f-c98ccf428e91\",\"type\":\"composer\",\"textDescription\":\"the login works but there is no interactive map, create or enable one\"},{\"unixMs\":1759725636272,\"generationUUID\":\"6f5a0b23-54ed-4c13-bdbb-06f538f24e90\",\"type\":\"composer\",\"textDescrip",
+                              "length":  507
+                          },
+                          {
+                              "text":  "User: undefined\\r\\n+page.svelte:70 Dashboard: Mounted\\r\\n+page.svelte:74 Dashboard: isAuthenticated = true\\r\\n+page.svelte:82 Dashboard: User is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\n+page.svelte:1   Failed to load resource: the server responded with a status of 500 (Internal Server Error)\\r\\nclient.js:3150  The next HMR update will cause the page to reload\\r\\nwarn @ client.js:3150\\r\\napp.js:",
+                              "length":  506
+                          },
+                          {
+                              "text":  "user:fg2E8I10Pnx58gYP@cluster0.1radgkw.mongodb.net/?retryWrites=true\u0026w=majority\u0026appName=Cluster0\\n\\nimplement the rest in git so we can deploy in firebase\"},{\"unixMs\":1759685742351,\"generationUUID\":\"126fc9ef-8a26-49fd-ba9f-a0d7e7b394df\",\"type\":\"composer\",\"textDescription\":\"we are testing in the firebase webide.  will this work there\"},{\"unixMs\":1759685903031,\"generationUUID\":\"c33b9954-3b3e-461f-b4e6-2b89f549602e\",\"type\":\"composer\",\"textDescription\":\"how do i pull the code into the ide\"},{\"unixMs\":175",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nauthService.ts:52 Auth state: User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Mon, 06 Oct 2025 00:47:17 GMT\\r\\n+page.svelte:63 Login page: Firebase auth succ   Wge: isAuthenticated = null\\r\\n+page.svelte:24 Root page: Navigating to login\\r\\n+page.svelte:18 Login page: Checking if already authenticated...\\r\\n+page.svelte:22 Login page: isAuthenticated = null\\r\\n+page.svelte:28",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n:5173/:1   Failed to load resource: net::ERR_CONNECTION_REFUSED\\r\\n\"},{\"unixMs\":1759681147535,\"generationUUID\":\"f7b1f38a-8c1b-45ac-a733-dbb92cc9bca2\",\"type\":\"composer\",\"textDescription\":\"@https://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev/modules/pci-resolution \"},{\"unixMs\":1759681157425,\"g",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\npci-resolution:1   Failed to load resource: the server responded with a status of 503 (Service Unavailable)\\r\\n\"},{\"unixMs\":1759678167767,\"generationUUID\"",
+                              "length":  505
+                          },
+                          {
+                              "text":  "user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49258:41)\\n      at TransformPluginContext.error (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49253:16)\\n      at normalizeUrl (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:64306:23)\\n      at async file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite   Z1759676366496,\"generationUUID\":\"3fbfaa40-",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User signed out\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\n\"},{\"unixMs\":1759677468539,\"generationUUID\":\"7aa79faa-0b02-4e34-aa25-83ded492158c\",\"type\":\"composer\",\"textDescription\":\"still stuck\\n\\n+page.svelte:9 Root page: Checking authentication...\\r\\n+page.svelte:16 Root page: isAuthenticated = true\\r\\n+page.svelte:20 Root page: Navigating to dashboard\\r\\n+page.svelte:61 Dashboard: Mounted\\r\\n+page.svelt",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\n\"},{\"unixMs\":1759677787931,\"generationUUID\":\"fe5cb50b-7346-4a4a-8a32-43a6be33c9a1\",\"type\":\"composer\",\"textDescription\":\"+page.svelte:9 Root page: Checking",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n+page.svelte:61 Dashboard mounted\\r\\n+page.svelte:65 Auth check in dashboard: true\\r\\n+page.svelte:75 User email: david@david.com\\r\\n\"},{\"unixMs\":1759675720680,\"generationUUID\":\"8f2901c4-ffef-46bc-9b5c-82941193a783\",\"type\":\"composer\",\"textDescription\":\"The PCI and Network Optimization buttons are the same process, combine them.  \\n\\nMake t",
+                              "length":  505
+                          },
+                          {
+                              "text":  "contents \\n\\n# Environment Variables for LTE PCI Mapper\\n# C   ]\",\"textDescription\":\"put in your memory for this project, the firebase web ide is for visual testing, cursor ide is the master of the code for the project\"},{\"unixMs\":1759642521454,\"generationUUID\":\"597ce501-a7c3-4c10-9268-02fda2558482\",\"type\":\"composer\",\"textDescription\":\"so for future updates, how do i pull?\"},{\"unixMs\":1759642735577,\"generationUUID\":\"21a00ab3-0a66-4c1b-97dd-3041f16d66ff\",\"type\":\"composer\",\"textDescription\":\"we are going",
+                              "length":  507
+                          },
+                          {
+                              "text":  "userEmail\u0027, \u0027test@test.com\u0027);\\r\\n\\r\\n// Navigate manually\\r\\nwindow.location.href = \u0027/dashboard\u0027;\\r\\nbash: //: Is a directory\\r\\nbash: syntax error near unexpected token `\u0027isAuthenticated\u0027,\u0027\\r\\nbash: syntax error near unexpected token `\u0027userEmail\u0027,\u0027\\r\\nbash: //: Is a directory\\r\\nbash: window.location.href: command not found\"},{\"unixMs\":1759644157756,\"generationUUID\":\"c4e756ca-c439-4c58-96e2-b24440de9c0c\",\"type\":\"composer\",\"textDescription\":\"deploy\"},{\"unixMs\":1759644270496,\"generationUUID\":\"073266d",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous)    b.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ bat",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch   d_stream.ts:467\\r\\nstart @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen @ sync_engine_impl.ts:374\\r\\",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthIn   i runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\npr",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @   k\\r\\nW_ @ persistent_stream.ts:503\\r\\n(anonymous) @ persistent_stream.ts:477\\r\\nPromise.then\\r\\nauth @ persistent_stream.ts:467\\r\\nstart @ persistent_stream.ts:264\\r\\n__PRIVATE_startWatchStream @ remote_store.ts:381\\r\\n__PRIVATE_remoteStoreListen @ remote_store.ts:287\\r\\n__PRIVATE_allocateTargetAndMaybeListen",
+                              "length":  503
+                          },
+                          {
+                              "text":  "User\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts:318\\r\\ninitialize @ provider.ts:242\\r\\ninitializeAuth @ initialize.ts:66\\r\\ngetAuth @ index.ts:83\\r\\n(anonymous) @ firebase.ts:30\\r\\nlosService.ts:224  Elevation fetch failed: SyntaxError: Unexpected token \u0027\u003c\u0027, \\\"\u003chtml\u003e\u003chea\\\"... is not valid JSON\\r\\nwarn",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in i   vould be forks of the existing not new repositories\"},{\"unixMs\":1759642443120,\"generationUUID\":\"bb3e3358-0030-41ae-8d51-6c66ffb82162\",\"type\":\"composer\",\"textDescription\":\"put in your memory for this project, the firebase web ide is for visual testing, cursor ide is",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\nauthService.ts:55 Auth state: User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nlosService.ts:47 LOSService: ArcGIS modules initialized\\r\\n\"},{\"unixMs\":1759677787931,\"generationUUID\":\"fe5cb50b-7346-4a4a-8a32-43a6be   z33c9a1\",\"type\":\"composer\",\"textDescription\":\"+page.svelte:9 Root page: Chec",
+                              "length":  505
+                          },
+                          {
+                              "text":  "user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49258:41)\\n      at TransformPluginContext.error (file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:49253:16)\\n      at normalizeUrl (file:///home/user/lte-pci-mapper/Module_M   {anager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:64306:23)\\n      at async file:///home/user/lte-pci-mapper/Module_Manager/node_modules/vite/dist/node/chunks/dep-D_zLpgQd.js:64438:3",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User signed out\\r\\nfirebase.ts:30 Firebase Auth: Persistence set to LOCAL (survives browser restarts)\\r\\nauthService.ts:52 Auth state:    ~User signed in david@david.com\\r\\nauthService.ts:53 Token expiration: Mon, 06 Oct 2025 00:47:17 GMT\\r\\n+page.svelte:63 Login page: Firebase auth successful!\\r\\n+page.svelte:64 Login page: User: undefined\\r\\n+page.svelte:70 Dashboard: Mounted\\r\\n+page.svelte:74 Dashboard: isAuthenticated = true\\r\\n+page.svelte:82 Dashboard: User is authenticated, loading dashboard\\",
+                              "length":  505
+                          },
+                          {
+                              "text":  "message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/faultsManageme    nt.ts:62:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n62   return corsHandler(req, res, async () =\u003e {\\r\\n                                  ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:94:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n94         error: error.message\\r\\n                  ~~~~~\\r\\n\\r\\nsrc/faultsManagement.ts:105:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n105   return corsHandler(req",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:155:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n155   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:187:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n187         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/genieacsIntegration.ts:198:32 - error TS703    0: Not all code paths return a value.\\r\\n\\r\\n198   return",
+                              "length":  507
+                          },
+                          {
+                              "text":  "message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:177:32 - error TS7030: Not all code paths return a value.\\r\\n\\r\\n177   return corsHandler(req, res, async () =\u003e {\\r\\n                                   ~~~~~~~~~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:209:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\    n209         error: error.message\\r\\n                   ~~~~~\\r\\n\\r\\nsrc/provisionsManagement.ts:302:16 - error TS18046: \u0027error\u0027 is of type \u0027unknown\u0027.\\r\\n\\r\\n302         e",
+                              "length":  507
+                          },
+                          {
+                              "text":  "user=projects/lte-pci-mapper\\r\\n[2025-10-06T06:05:35.016Z] \u003e\u003e\u003e [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/lte-pci-mapper:testIamPermissions {\\\"permissions\\\":[\\\"cloudfunctions.functions.create\\\",\\\"cloudfunctions.functions.delete\\\",\\\"cloudfunctions.functions.get\\\",\\\"cloudfunctions.functions.list\\\",\\\"cloudfunctions.functions.update\\\",\\\"cloudfunctions.operations.get\\\",\\\"firebase.projects.get\\\"]}\\r\\n[2025-10-06T06:05    pe\":\"head\",\"composerId\":\"d4441602-c616-44e6-9121-1b4a",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reacti    on @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_im    pl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUser    OrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:    45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.j    s:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.the    n\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:795\\r\\nrel    oadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\    nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(an    onymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\    r\\ntraverse_effect_tree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98    f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_react",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pci    Service.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_react",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)\\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.    ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\noptimizePCIs @ pciService.ts:226\\r\\nawait in optimizePCIs\\r\\noptimizePCIAssignments @ +page.svelte:284\\r\\n(anonymous) @ index-client.js:178\\r\\nhandleAction @ ActionsDropdown.svelte:24\\r\\n(anonymous) @ ActionsDrop",
+                              "length":  507
+                          },
+                          {
+                              "text":  "UserNetworks @ networkService.ts:112\\r\\nloadUserNetworks @ +page.svelte:155\\r\\n(anonymous) @ +page.svelte:143\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_reaction @ runtime.js:292\\r\\nupdate_effect @ runtime.js:472\\r\\ntraverse_effect_t    ree_fn @ batch.js:226\\r\\nprocess @ batch.js:158\\r\\nflush_effects @ batch.js:562\\r\\nflush @ batch.js:299\\r\\n(anonymous) @ batch.js:416\\r\\nrun_all @ utils.js:45\\r\\nrun_micro_tasks @ task.js:10\\r\\n(anonymous) @ task.js:28\\r\\nIndexedDB\\r\\n_putO",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Content?key=AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg 404 (Not Found)    \\r\\nwindow.fetch @ fetcher.js:66\\r\\ncallGeminiAPI @ geminiService.ts:44\\r\\nanalyzePCIConflicts @ geminiService.ts:22\\r\\ngetAIAnalysis @ pciService.ts:187\\r\\nperformAnalysis @ pciService.ts:157\\r\\nawait in performAnalysis\\r\\nperformAnalysis @ +page.svelte:265\\r\\nsyncNetworkCells @ +page.svelte:189\\r\\nawait in syncNetworkCells\\r\\n(anonymous) @ +page.svelte:148\\r\\nuntrack @ runtime.js:738\\r\\n(anonymous) @ effects.js:316\\r\\nupdate_react",
+                              "length":  507
+                          },
+                          {
+                              "text":  "User @ persistence_user_manager.ts:66\\r\\ndirectlySetCurrentUser @ auth_impl.ts:7    95\\r\\nreloadAndSetCurrentUserOrClear @ auth_impl.ts:395\\r\\nawait in reloadAndSetCurrentUserOrClear\\r\\ninitializeCurrentUser @ auth_impl.ts:320\\r\\nawait in initializeCurrentUser\\r\\n(anonymous) @ auth_impl.ts:189\\r\\nPromise.then\\r\\nqueue @ auth_impl.ts:804\\r\\n_initializeWithPersistence @ auth_impl.ts:163\\r\\n_initializeAuthInstance @ initialize.ts:86\\r\\n(anonymous) @ register.ts:94\\r\\ngetOrInitializeService @ provider.ts",
+                              "length":  505
+                          },
+                          {
+                              "text":  "UserProfile.svelte:156:2 Unused CSS selector \\\".sign-in-btn\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:14 AM [vite-plugin-svelte] src/lib/components/UserProfile.svelte:169:2 Unused CSS selector \\\".sign-in-btn:hover\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:15 AM [vite-plugin-svelte] src/lib/components/NetworkManager.svelte:233:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:15 AM [vite-plugin-svelte]",
+                              "length":  503
+                          },
+                          {
+                              "text":  "role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/OptimizationResultModal.svelte:22:4 Elements with the \u0027dialog\u0027 interactive role must have a tabindex value\\nhttps://svelte.dev/e/a11y_interactive_supports_focus\\n5:34:33 AM [vite-plugin-svelte] src/lib/components/UserP    rofile.svelte:156:2 Unused CSS selector \\\".sign-in-btn\\\"\\nhttps://svelte.dev/e/css_unused_selector\\n5:34:33 AM [vite-plugin-svelte] src/lib/compo",
+                              "length":  505
+                          },
+                          {
+                              "text":  "user should be able to create the usual cells, sectors, and transmitters as before.\\n4.  Leave the PCI deconflict mechanism in place.\\n5.  Create     a working export with all of the variables, only replacing what is needing to be changed including IP addresses\",\"commandType\":4},{\"text\":\"change the tower creation and editing routines to match the cell, transmitter/sector and carrier per transmitter to match\",\"commandType\":4},{\"text\":\"push all changes to git\",\"commandType\":4},{\"text\":\"one change, you",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User is authenticated, loading dashboard\\r\\n+page.svelte:77 Dashboard: User email = david@david.com\\r\\n+page.svelte:84 Dashboard: Initialization complete\\r\\n:5173/:1   Failed to load resource: net::ERR_CONNECTION_REFUSED\\r\\n\",\"commandType\":4},{\"text\":\"@https://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev/modules/pci-resolution \",\"commandType\":4},{\"text\":\"PCI Resolution Module - TEST\\nIf you see this, the route is working!\\n\\nNow     we need to lo",
+                              "length":  505
+                          },
+                          {
+                              "text":  "User     is authenticated, loading dashboard\\r\\n+page.svelte:86 Dashboard: User email = david@david.com\\r\\n+page.svelte:93 Dashboard: Initialization complete\\r\\n+page.svelte:1   Failed to load resource: the server responded with a status of 500 (Internal Server Error)\\r\\nclient.js:3150  The next HMR update will cause the page to reload\\r\\nwarn @ client.js:3150\\r\\napp.js:26  TypeError: Failed to fetch dynamically imported module: https://5173-firebase-lte-pci-mapper-1759378998143.cluster-dwvm25yncracsxpd2",
+                              "length":  509
+                          },
+                          {
+                              "text":  "USERDOMAIN_ROAMINGPROFILE\":\"DAVIDPETERSON\",\"USERNAME\":\"david\",\"USERPROFILE\":\"C:\\\\Users\\\\david\",\"VSCODE_CODE_CACHE_PATH\":\"C:\\\\Users\\\\david\\\\AppData\\\\Roaming\\\\Cursor\\\\CachedData\\\\493c403e4a45c5f971d1c76cc74febd0968d57d0\",\"VSCODE_CWD\":\"C:\\\\Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\",\"VSCODE_IPC_HOOK\":\"\\\\\\\\.\\\\pipe\\\\b2bdad82-1.7.36-main-sock\",\"VSCODE_NLS_CONFIG\":\"{\\\"userLocale\\\":\\\"en-us\\\",\\\"osLocale\\\":\\\"en-us\\\",\\\"resolvedLanguage\\\":\\\"en\\\",\\\"defaultMessagesFile\\\":\\\"C:\\\\\\\\Users\\\\\\\\david\\\\\\\\AppData\\\\\\\\L",
+                              "length":  504
+                          },
+                          {
+                              "text":  "messages.json\\\",\\\"locale\\\":\\\"en-us\\\",\\\"availableLanguages\\\":{}}\",\"VSCODE_PID\":\"7400\",\"windir\":\"C:\\\\WINDOWS\",\"ZES_ENABLE_SYSMAN\":\"1\"},\"options\":{\"shellIntegration\":{\"enabled\":true,\"suggestEnabled\":false,\"nonce\":\"503adb33-66d9-4bc4-9b67-9236fde36b6d\"},\"windowsEnableConpty\":true,\"windowsUseConptyDll\":false,\"environmentVariableCollections\":[[\"vscode.git\",[[\"GIT_ASKPASS\",{\"variable\":\"GIT_ASKPASS\",\"value\":\"c:\\\\Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\resources\\\\app\\\\extensions\\\\git\\\\dist\\\\askpass.sh\",",
+                              "length":  507
+                          },
+                          {
+                              "text":  "Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\Cursor.exe\",\"type\":1,\"options\":{\"applyAtProcessCreation\":true,\"applyAtShellIntegration\":false}}],[\"VSCODE_GIT_ASKPASS_EXTRA_ARGS\",{\"variable\":\"VSCODE_GIT_ASKPASS_EXTRA_ARGS\",\"value\":\"\",\"type\":1,\"options\":{\"applyAtProcessCreation\":true,\"applyAtShellIntegration\":false}}],[\"VSCODE_GIT_ASKPASS_MAIN\",{\"variable\":\"VSCODE_GIT_ASKPASS_MAIN\",\"value\":\"c:\\\\Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\resources\\\\app\\\\extensions\\\\git\\\\dist\\\\askpass-main.js\",\"typ",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users\\\\david\\\\Downloads\\\\PCI_mapper\",\"_sep\":1,\"external\":\"file:///c%3A/Users/david/Downloads/PCI_mapper\",\"path\":\"/c:/Users/david/Downloads/PCI_mapper\",\"scheme\":\"file\"},\"name\":\"PCI_mapper\",\"index\":0}}},\"unicodeVersion\":\"11\",\"replayEvent\":{\"events\":[{\"cols\":138,\"rows\":5,\"data\":\"PS C:\\\\Users\\\\david\\\\Downloads\\\\PCI_mapper\u003e \"}],\"commands\":{\"isWindowsPty\":false,\"hasRichCommandDetection\":false,\"commands\":[]}},\"timestamp\":1759782014632},{\"id\":10,\"shellLaunchConfig\":{\"executable\":\"C:\\\\WINDOWS\\\\System32\\\\Wind",
+                              "length":  504
+                          },
+                          {
+                              "text":  "User\":true,\"forceShellIntegration\":true,\"name\":\"Cursor\",\"icon\":{\"id\":\"terminal-powershell\"},\"strictEnv\":false,\"shellIntegrationEnvironmentReporting\":false,\"color\":null,\"useShellEnvironment\":true},\"processDetails\":{\"id\":10,\"title\":\"Cursor\",\"titleSource\":0,\"pid\":7992,\"workspaceId\":\"66f53891d87434d797d2fc6c2eb031fd\",\"workspaceName\":\"PCI_mapper\",\"cwd\":\"C:\\\\Users\\\\david\\\\Downloads\\\\PCI_mapper\",\"isOrphan\":false,\"icon\":{\"id\":\"terminal-powershell\"},\"environmentVariableCollections\":[[\"vscode.git\",[[\"GIT_ASKP",
+                              "length":  504
+                          },
+                          {
+                              "text":  "Users\\\\david\\\\AppData\\\\Local\\\\Programs\\\\cursor\\\\resources\\\\app\\\\extensions\\\\git\\\\dist\\\\askpass-main.js\",\"type\":1,\"options\":{\"applyAt",
+                              "length":  132
+                          }
+                      ]
+}
