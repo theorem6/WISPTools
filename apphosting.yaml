@@ -7,12 +7,12 @@ buildCommand: npm install && npm run build
 runCommand: node build/index.js
 
 runConfig:
-  # Production-grade resources
-  cpu: 2
-  memoryMiB: 1024
-  minInstances: 1  # Keep at least 1 instance warm for production
-  maxInstances: 10
-  concurrency: 100
+  # Optimized for SvelteKit + ArcGIS
+  cpu: 1                # 1 CPU is sufficient for most web apps
+  memoryMiB: 2048       # 2 GB - needed for ArcGIS and startup stability
+  minInstances: 0       # Scale to zero when idle (saves cost during dev/testing)
+  maxInstances: 5       # Sufficient for initial deployment
+  concurrency: 80       # Standard concurrency per instance
 
 env:
   # ==========================================
