@@ -4,7 +4,7 @@
 
 # Build and run commands
 buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=4096" npm run build
-runCommand: node build/index.js
+runCommand: node server.js
 
 runConfig:
   # Optimized for SvelteKit + ArcGIS
