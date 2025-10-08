@@ -1,19 +1,4 @@
-// ACS CPE Management Module
-// This module provides TR-069 device management and CPE monitoring
-
-export const load = async () => {
-  return {
-    title: 'ACS CPE Management',
-    description: 'TR-069 device management and CPE monitoring with GPS mapping',
-    icon: 'device-hub',
-    category: 'Device Management',
-    features: [
-      'CPE Device Discovery',
-      'GPS Location Mapping',
-      'Real-time Status Monitoring',
-      'Performance Analytics',
-      'TR-069 Protocol Support',
-      'Firmware Management'
-    ]
-  };
-};
+// Force this page to be client-side only
+// ACS CPE Management requires browser environment for device management
+export const ssr = false;
+export const prerender = false;
