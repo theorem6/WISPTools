@@ -3,7 +3,7 @@
 # Environment-specific overrides go in apphosting.[environment].yaml
 
 # Build and run commands
-buildCommand: npm install && npm run build
+buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=4096" npm run build
 runCommand: node build/index.js
 
 runConfig:
