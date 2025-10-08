@@ -56,9 +56,15 @@ if (device["InternetGatewayDevice.DeviceInfo.SoftwareVersion"] < "2.0") {
     try {
       console.log('Loading provisions from Firebase Functions...');
       
-      // Try to load from Firebase Functions
-      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      // Use environment variable for Functions URL
+      const functionsUrl = import.meta.env.PUBLIC_FIREBASE_FUNCTIONS_URL;
+      
+      if (!functionsUrl) {
+        console.warn('PUBLIC_FIREBASE_FUNCTIONS_URL not configured, using sample data');
+        loadSampleProvisions();
+        isLoading = false;
+        return;
+      }
       
       const response = await fetch(`${functionsUrl}/getProvisions`, {
         method: 'GET',
