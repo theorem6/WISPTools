@@ -86,11 +86,32 @@ export function getFirebaseStorage(): FirebaseStorage {
   return firebaseStorage;
 }
 
-// Backward compatibility: Export the getter functions directly
-// Components should use these instead of direct imports
-export { getFirebaseAuth as auth };
-export { getFirebaseDb as db };
-export { getFirebaseStorage as storage };
+// Backward compatibility: Explicit wrapper functions for lazy initialization
+// These ensure Firebase is only initialized when actually called, not when module loads
+
+/**
+ * Get Firebase Auth instance - lazy initialization
+ * MUST be called as a function: auth()
+ */
+export function auth(): Auth {
+  return getFirebaseAuth();
+}
+
+/**
+ * Get Firestore instance - lazy initialization
+ * MUST be called as a function: db()
+ */
+export function db(): Firestore {
+  return getFirebaseDb();
+}
+
+/**
+ * Get Storage instance - lazy initialization
+ * MUST be called as a function: storage()
+ */
+export function storage(): FirebaseStorage {
+  return getFirebaseStorage();
+}
 
 // Default export - lazy getter
 export default function getDefaultApp(): FirebaseApp | null {
