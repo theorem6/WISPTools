@@ -1,0 +1,52 @@
+name: Deploy Firebase Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'functions/**'
+      - 'firebase.json'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+
+env:
+  PROJECT_ID: lte-pci-mapper-65450042-bbf71
+
+jobs:
+  deploy-functions:
+    name: Deploy Firebase Functions
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Install Functions dependencies
+        working-directory: ./functions
+        run: npm ci
+
+      - name: Build Functions
+        working-directory: ./functions
+        run: npm run build
+
+      - name: Deploy to Firebase
+        run: firebase deploy --only functions,firestore:rules,firestore:indexes --project ${{ env.PROJECT_ID }}
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Firebase Functions deployed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Project**: ${{ env.PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Region**: us-central1" >> $GITHUB_STEP_SUMMARY
+

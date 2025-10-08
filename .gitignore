@@ -1,51 +1,51 @@
-# Logs
-logs
-*.log
+# Dependencies
+node_modules/
+package-lock.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-.svelte-kit
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# Build output
+.svelte-kit/
+build/
+dist/
+.output/
+.vercel/
+.netlify/
 
 # Environment variables
 .env
 .env.*
 !.env.example
-!.env.production
-
-# App Hosting config (contains API keys)
-# Uncomment to exclude from git:
-# apphosting.yaml
-
-# GitHub templates
-getStart:*
 
 # IDE
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/extensions.json
-.idea
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Development files
-*.swp
-*~
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+
+# Google Cloud
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!firebase.json
+!apphosting*.yaml
+gcloud-key*.json
+service-account*.json
 
 # Chat recovery and backup files
 chat-sessions.csv
@@ -58,3 +58,22 @@ recovered-chats.json
 *-chat-*.txt
 *chat*.csv
 *chat*.json
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+.eslintcache
