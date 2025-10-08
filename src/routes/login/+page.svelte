@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { authService } from '$lib/services/authService';
   import { authStore, isAuthenticated } from '$lib/stores/authStore';
@@ -12,14 +13,15 @@
   let isLoading = false;
   let error = '';
   
-  // Redirect if already authenticated
+  // Redirect if already authenticated (browser-only)
   onMount(() => {
-    if ($isAuthenticated) {
+    if ($isAuthenticated && browser) {
       goto('/');
     }
   });
   
-  $: if ($isAuthenticated) {
+  // Reactive redirect (browser-only)
+  $: if (browser && $isAuthenticated) {
     goto('/');
   }
   
