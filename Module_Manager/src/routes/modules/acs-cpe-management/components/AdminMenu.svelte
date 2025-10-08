@@ -4,6 +4,13 @@
   // Admin menu items based on GenieACS structure
   const adminMenuItems = [
     {
+      id: 'database',
+      name: 'Database',
+      icon: '🗄️',
+      description: 'Initialize and check MongoDB status',
+      path: '/modules/acs-cpe-management/admin/database'
+    },
+    {
       id: 'services',
       name: 'Service Status',
       icon: '🔧',

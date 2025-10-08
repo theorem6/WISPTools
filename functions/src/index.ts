@@ -119,6 +119,14 @@ export {
   deleteResolvedMongoFaults
 } from './mongoFaultsManagement.js';
 
+// Export MongoDB initialization and health check functions
+export {
+  checkMongoHealth,
+  initializeMongoPresets,
+  initializeMongoFaults,
+  initializeMongoDatabase
+} from './mongoInitialization.js';
+
 // Simple PCI conflict detection function (existing)
 function analyzeConflictsSimple(cells: any[]) {
   const conflicts: any[] = [];

@@ -1,0 +1,711 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import MainMenu from '../../components/MainMenu.svelte';
+  import { env } from '$env/dynamic/public';
+  
+  let isLoading = false;
+  let mongoStatus = null;
+  let error = '';
+  let successMessage = '';
+  
+  onMount(async () => {
+    console.log('Database initialization page loaded');
+    await checkMongoDBStatus();
+  });
+  
+  async function checkMongoDBStatus() {
+    isLoading = true;
+    error = '';
+    
+    try {
+      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
+      
+      if (!functionsUrl) {
+        error = 'Firebase Functions URL not configured';
+        isLoading = false;
+        return;
+      }
+      
+      const response = await fetch(`${functionsUrl}/checkMongoHealth`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        mongoStatus = data;
+      } else {
+        error = data.error || 'Failed to check MongoDB status';
+      }
+    } catch (err) {
+      console.error('Failed to check MongoDB status:', err);
+      error = err.message || 'Failed to connect to MongoDB';
+    }
+    
+    isLoading = false;
+  }
+  
+  async function initializeDatabase() {
+    if (!confirm('Initialize MongoDB database with sample data?\n\nThis will create:\n- Sample presets (4 items)\n- Sample faults (3 items)\n\nExisting data will not be overwritten.')) {
+      return;
+    }
+    
+    isLoading = true;
+    error = '';
+    successMessage = '';
+    
+    try {
+      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
+      
+      if (!functionsUrl) {
+        error = 'Firebase Functions URL not configured';
+        isLoading = false;
+        return;
+      }
+      
+      const response = await fetch(`${functionsUrl}/initializeMongoDatabase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        successMessage = `✅ Database initialized!\n\nPresets: ${data.presets.created} created, ${data.presets.skipped} existed (${data.presets.total} total)\nFaults: ${data.faults.created} created, ${data.faults.skipped} existed (${data.faults.total} total)`;
+        
+        // Refresh status
+        await checkMongoDBStatus();
+      } else {
+        error = data.error || 'Failed to initialize database';
+      }
+    } catch (err) {
+      console.error('Failed to initialize database:', err);
+      error = err.message || 'Failed to initialize database';
+    }
+    
+    isLoading = false;
+  }
+  
+  async function initializePresets() {
+    if (!confirm('Initialize sample presets?\n\nThis will create 4 sample presets if they don\'t exist.')) {
+      return;
+    }
+    
+    isLoading = true;
+    error = '';
+    successMessage = '';
+    
+    try {
+      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
+      
+      const response = await fetch(`${functionsUrl}/initializeMongoPresets`, {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        successMessage = `✅ ${data.message}`;
+        await checkMongoDBStatus();
+      } else {
+        error = data.error;
+      }
+    } catch (err) {
+      error = err.message || 'Failed to initialize presets';
+    }
+    
+    isLoading = false;
+  }
+  
+  async function initializeFaults() {
+    if (!confirm('Initialize sample faults?\n\nThis will create 3 sample faults if they don\'t exist.')) {
+      return;
+    }
+    
+    isLoading = true;
+    error = '';
+    successMessage = '';
+    
+    try {
+      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
+      
+      const response = await fetch(`${functionsUrl}/initializeMongoFaults`, {
+        method: 'POST'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        successMessage = `✅ ${data.message}`;
+        await checkMongoDBStatus();
+      } else {
+        error = data.error;
+      }
+    } catch (err) {
+      error = err.message || 'Failed to initialize faults';
+    }
+    
+    isLoading = false;
+  }
+</script>
+
+<svelte:head>
+  <title>Database Initialization - ACS Administration</title>
+  <meta name="description" content="Initialize and manage MongoDB database" />
+</svelte:head>
+
+<div class="database-page">
+  <MainMenu />
+  
+  <div class="page-header">
+    <div class="header-content">
+      <h1 class="page-title">
+        <span class="page-icon">🗄️</span>
+        MongoDB Database Initialization
+      </h1>
+      <p class="page-description">
+        Check database status and initialize with sample data
+      </p>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- MongoDB Status Card -->
+    <div class="status-card">
+      <div class="card-header">
+        <h2>📊 MongoDB Status</h2>
+        <button class="btn btn-sm btn-secondary" on:click={checkMongoDBStatus} disabled={isLoading}>
+          {#if isLoading}
+            <span class="spinner-sm"></span>
+          {:else}
+            🔄
+          {/if}
+          Refresh
+        </button>
+      </div>
+      
+      {#if mongoStatus}
+        <div class="status-details">
+          <div class="status-row">
+            <span class="status-label">Connection:</span>
+            <span class="status-value success">✅ Connected</span>
+          </div>
+          
+          <div class="status-row">
+            <span class="status-label">Database:</span>
+            <span class="status-value">{mongoStatus.database}</span>
+          </div>
+          
+          <div class="status-row">
+            <span class="status-label">Server Version:</span>
+            <span class="status-value">{mongoStatus.serverVersion}</span>
+          </div>
+          
+          <div class="status-row">
+            <span class="status-label">Presets Count:</span>
+            <span class="status-value highlight">{mongoStatus.collections.presets}</span>
+          </div>
+          
+          <div class="status-row">
+            <span class="status-label">Faults Count:</span>
+            <span class="status-value highlight">{mongoStatus.collections.faults}</span>
+          </div>
+          
+          <div class="status-row">
+            <span class="status-label">Total Collections:</span>
+            <span class="status-value">{mongoStatus.stats.totalCollections}</span>
+          </div>
+          
+          <div class="status-row">
+            <span class="status-label">Data Size:</span>
+            <span class="status-value">{(mongoStatus.stats.dataSize / 1024).toFixed(2)} KB</span>
+          </div>
+        </div>
+      {:else if error}
+        <div class="error-box">
+          <span class="error-icon">❌</span>
+          <div class="error-content">
+            <strong>Connection Failed</strong>
+            <p>{error}</p>
+            <p class="error-hint">Make sure MONGODB_URI is configured in apphosting.yaml</p>
+          </div>
+        </div>
+      {:else}
+        <div class="loading-box">
+          <span class="spinner"></span>
+          <span>Checking MongoDB connection...</span>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Success Message -->
+    {#if successMessage}
+      <div class="message-box success">
+        <div class="message-content">
+          {#each successMessage.split('\n') as line}
+            <div>{line}</div>
+          {/each}
+        </div>
+        <button class="close-btn" on:click={() => successMessage = ''}>×</button>
+      </div>
+    {/if}
+
+    <!-- Error Message -->
+    {#if error && !mongoStatus}
+      <div class="message-box error">
+        <div class="message-content">
+          <strong>❌ Error:</strong> {error}
+        </div>
+        <button class="close-btn" on:click={() => error = ''}>×</button>
+      </div>
+    {/if}
+
+    <!-- Initialization Actions -->
+    <div class="actions-grid">
+      <div class="action-card">
+        <div class="action-icon">🚀</div>
+        <h3>Initialize All</h3>
+        <p>Create all sample collections and data at once</p>
+        <div class="action-details">
+          <ul>
+            <li>✅ 4 sample presets</li>
+            <li>✅ 3 sample faults</li>
+            <li>✅ Creates collections if needed</li>
+            <li>✅ Safe (won't overwrite existing)</li>
+          </ul>
+        </div>
+        <button class="btn btn-primary" on:click={initializeDatabase} disabled={isLoading || !env.PUBLIC_FIREBASE_FUNCTIONS_URL}>
+          {#if isLoading}
+            <span class="spinner-sm"></span>
+            Initializing...
+          {:else}
+            🗄️ Initialize Database
+          {/if}
+        </button>
+      </div>
+
+      <div class="action-card">
+        <div class="action-icon">⚙️</div>
+        <h3>Initialize Presets</h3>
+        <p>Create sample device provisioning presets</p>
+        <div class="action-details">
+          <ul>
+            <li>Default Provisioning</li>
+            <li>Nokia LTE Configuration</li>
+            <li>Huawei 5G Configuration</li>
+            <li>Firmware Upgrade Preset</li>
+          </ul>
+        </div>
+        <button class="btn btn-secondary" on:click={initializePresets} disabled={isLoading || !env.PUBLIC_FIREBASE_FUNCTIONS_URL}>
+          {#if isLoading}
+            <span class="spinner-sm"></span>
+          {:else}
+            ⚙️
+          {/if}
+          Initialize Presets
+        </button>
+      </div>
+
+      <div class="action-card">
+        <div class="action-icon">⚠️</div>
+        <h3>Initialize Faults</h3>
+        <p>Create sample device faults for testing</p>
+        <div class="action-details">
+          <ul>
+            <li>Connection Timeout (Critical)</li>
+            <li>Firmware Update Failed (Warning)</li>
+            <li>Config Mismatch (Info)</li>
+          </ul>
+        </div>
+        <button class="btn btn-secondary" on:click={initializeFaults} disabled={isLoading || !env.PUBLIC_FIREBASE_FUNCTIONS_URL}>
+          {#if isLoading}
+            <span class="spinner-sm"></span>
+          {:else}
+            ⚠️
+          {/if}
+          Initialize Faults
+        </button>
+      </div>
+    </div>
+
+    <!-- Information Panel -->
+    <div class="info-panel">
+      <h3>📋 About Database Initialization</h3>
+      <div class="info-content">
+        <p><strong>What happens when you initialize:</strong></p>
+        <ul>
+          <li>MongoDB collections are created if they don't exist</li>
+          <li>Sample data is inserted for testing and development</li>
+          <li>Existing data is NOT overwritten</li>
+          <li>Safe to run multiple times</li>
+        </ul>
+        
+        <p><strong>After initialization, you can:</strong></p>
+        <ul>
+          <li>View and edit presets in the Presets page</li>
+          <li>View and acknowledge faults in the Faults page</li>
+          <li>Test all CRUD operations</li>
+          <li>Verify MongoDB integration is working</li>
+        </ul>
+        
+        <p><strong>MongoDB Configuration:</strong></p>
+        <ul>
+          <li>Connection string configured in apphosting.yaml</li>
+          <li>Database: <code>{mongoStatus?.database || 'genieacs'}</code></li>
+          <li>Collections: presets, faults, devices, tasks</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .database-page {
+    min-height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .page-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .page-icon {
+    font-size: 1.25rem;
+  }
+
+  .page-description {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .status-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .card-header h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  .status-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 0.375rem;
+  }
+
+  .status-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .status-value {
+    font-family: monospace;
+    color: var(--text-primary);
+  }
+
+  .status-value.success {
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .status-value.highlight {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--accent-color);
+  }
+
+  .error-box,
+  .loading-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+  }
+
+  .error-box {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #dc2626;
+  }
+
+  .error-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .error-content strong {
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .error-hint {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    font-style: italic;
+  }
+
+  .loading-box {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    justify-content: center;
+  }
+
+  .message-box {
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .message-box.success {
+    background: #dcfce7;
+    border: 1px solid #10b981;
+    color: #166534;
+  }
+
+  .message-box.error {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #dc2626;
+  }
+
+  .message-content {
+    flex: 1;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+  }
+
+  .close-btn:hover {
+    opacity: 1;
+  }
+
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .action-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .action-icon {
+    font-size: 3rem;
+    text-align: center;
+  }
+
+  .action-card h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .action-card p {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  .action-details {
+    flex: 1;
+  }
+
+  .action-details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .action-details li {
+    padding: 0.375rem 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .info-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+  }
+
+  .info-panel h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .info-content {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .info-content p {
+    margin: 0.5rem 0;
+  }
+
+  .info-content ul {
+    margin: 0.5rem 0 1rem 1.5rem;
+  }
+
+  .info-content li {
+    margin: 0.25rem 0;
+  }
+
+  .info-content code {
+    background: var(--bg-tertiary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-size: 0.8125rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+
+  .btn-primary {
+    background: var(--accent-color);
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-hover);
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .spinner,
+  .spinner-sm {
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+  }
+
+  .spinner-sm {
+    width: 12px;
+    height: 12px;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  @media (max-width: 768px) {
+    .content {
+      padding: 1rem;
+    }
+
+    .actions-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
