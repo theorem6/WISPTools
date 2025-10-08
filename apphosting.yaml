@@ -108,6 +108,62 @@ env:
       - BUILD
       - RUNTIME
 
+  # MongoDB-backed Presets Management
+  - variable: PUBLIC_GET_MONGO_PRESETS_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/getMongoPresets"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_CREATE_MONGO_PRESET_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/createMongoPreset"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_UPDATE_MONGO_PRESET_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/updateMongoPreset"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_DELETE_MONGO_PRESET_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/deleteMongoPreset"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_TOGGLE_MONGO_PRESET_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/toggleMongoPreset"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # MongoDB-backed Faults Management
+  - variable: PUBLIC_GET_MONGO_FAULTS_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/getMongoFaults"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_ACKNOWLEDGE_MONGO_FAULT_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/acknowledgeMongoFault"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_DELETE_MONGO_FAULT_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/deleteMongoFault"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_CREATE_MONGO_FAULT_URL
+    value: "https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/createMongoFault"
+    availability:
+      - BUILD
+      - RUNTIME
+
   # ==========================================
   # ARCGIS CONFIGURATION
   # ==========================================

@@ -82,7 +82,8 @@ export {
   genieacsUI
 } from './simpleGenieacsServices.js';
 
-// Export clean presets management functions
+
+// Export Firestore-based presets management (legacy - fallback)
 export {
   getPresets,
   createPreset,
@@ -90,23 +91,33 @@ export {
   initializeSamplePresets
 } from './cleanPresetsManagement.js';
 
-// Export provisions management functions (disabled for now - TypeScript errors)
-// export {
-//   getProvisions,
-//   createProvision,
-//   updateProvision,
-//   deleteProvision,
-//   initializeSampleProvisions
-// } from './provisionsManagement';
+// Export Firestore-based faults management (legacy - fallback)
+export {
+  getFaults,
+  getFault,
+  createFault,
+  resolveFault,
+  initializeSampleFaults
+} from './faultsManagement.js';
 
-// Export faults management functions (disabled for now - TypeScript errors)
-// export {
-//   getFaults,
-//   getFault,
-//   createFault,
-//   resolveFault,
-//   initializeSampleFaults
-// } from './faultsManagement';
+// Export MongoDB-backed presets management (primary)
+export {
+  getMongoPresets,
+  createMongoPreset,
+  updateMongoPreset,
+  deleteMongoPreset,
+  toggleMongoPreset
+} from './mongoPresetsManagement.js';
+
+// Export MongoDB-backed faults management (primary)
+export {
+  getMongoFaults,
+  getMongoFault,
+  acknowledgeMongoFault,
+  deleteMongoFault,
+  createMongoFault,
+  deleteResolvedMongoFaults
+} from './mongoFaultsManagement.js';
 
 // Simple PCI conflict detection function (existing)
 function analyzeConflictsSimple(cells: any[]) {
