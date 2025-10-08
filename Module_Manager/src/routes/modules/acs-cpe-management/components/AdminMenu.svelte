@@ -4,6 +4,20 @@
   // Admin menu items based on GenieACS structure
   const adminMenuItems = [
     {
+      id: 'services',
+      name: 'Service Status',
+      icon: '🔧',
+      description: 'Monitor and manage all services',
+      path: '/modules/acs-cpe-management/admin/services'
+    },
+    {
+      id: 'config',
+      name: 'Configuration',
+      icon: '🔨',
+      description: 'System configuration settings',
+      path: '/modules/acs-cpe-management/admin/config'
+    },
+    {
       id: 'presets',
       name: 'Presets',
       icon: '⚙️',
@@ -20,7 +34,7 @@
     {
       id: 'virtualParameters',
       name: 'Virtual Parameters',
-      icon: '🔧',
+      icon: '🧮',
       description: 'Custom parameter definitions',
       path: '/modules/acs-cpe-management/admin/virtual-parameters'
     },
@@ -30,13 +44,6 @@
       icon: '📁',
       description: 'Firmware and configuration files',
       path: '/modules/acs-cpe-management/admin/files'
-    },
-    {
-      id: 'config',
-      name: 'Configuration',
-      icon: '🔨',
-      description: 'System configuration settings',
-      path: '/modules/acs-cpe-management/admin/config'
     },
     {
       id: 'users',

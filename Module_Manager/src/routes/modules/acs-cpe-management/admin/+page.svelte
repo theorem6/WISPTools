@@ -43,7 +43,7 @@
       <div class="stat-card">
         <div class="stat-icon">⚙️</div>
         <div class="stat-content">
-          <div class="stat-number">6</div>
+          <div class="stat-number">7</div>
           <div class="stat-label">Admin Modules</div>
         </div>
       </div>
