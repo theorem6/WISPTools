@@ -1,7 +1,6 @@
 // Authentication Store
 import { writable, derived, type Writable, type Readable } from 'svelte/store';
 import { browser } from '$app/environment';
-import { authService } from '../services/authService';
 import type { User } from 'firebase/auth';
 import type { UserProfile } from '../models/network';
 
@@ -34,37 +33,56 @@ const initialState: AuthState = {
 function createAuthStore() {
   const { subscribe, set, update }: Writable<AuthState> = writable(initialState);
 
-  // Initialize auth listener
+  // Initialize auth listener (only on client side)
   if (browser) {
-    authService.onAuthStateChange((firebaseUser: User | null) => {
-      if (firebaseUser) {
-        const userProfile: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || undefined,
-          photoURL: firebaseUser.photoURL || undefined,
-          createdAt: firebaseUser.metadata.creationTime 
-            ? new Date(firebaseUser.metadata.creationTime) 
-            : new Date(),
-          lastLoginAt: firebaseUser.metadata.lastSignInTime 
-            ? new Date(firebaseUser.metadata.lastSignInTime) 
-            : new Date()
-        };
+    // Dynamic import to prevent Firebase from being bundled in SSR
+    import('../services/authService').then(({ authService }) => {
+      authService.onAuthStateChange((firebaseUser: User | null) => {
+        if (firebaseUser) {
+          const userProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || undefined,
+            photoURL: firebaseUser.photoURL || undefined,
+            createdAt: firebaseUser.metadata.creationTime 
+              ? new Date(firebaseUser.metadata.creationTime) 
+              : new Date(),
+            lastLoginAt: firebaseUser.metadata.lastSignInTime 
+              ? new Date(firebaseUser.metadata.lastSignInTime) 
+              : new Date()
+          };
 
-        set({
-          user: userProfile,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        });
-      } else {
-        set({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null
-        });
-      }
+          set({
+            user: userProfile,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null
+          });
+        } else {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null
+          });
+        }
+      });
+    }).catch((error) => {
+      console.error('Failed to initialize auth service:', error);
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Failed to initialize authentication'
+      });
+    });
+  } else {
+    // On server, immediately set to not loading and not authenticated
+    set({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null
     });
   }
 
@@ -85,6 +103,7 @@ function createAuthStore() {
   };
 }
 
+// Create store instance (safe for SSR because browser guards are inside)
 export const authStore = createAuthStore();
 
 // ============================================================================
