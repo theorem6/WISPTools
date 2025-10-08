@@ -1,6 +1,6 @@
 // Network Management Service with Firestore Integration
 import { browser } from '$app/environment';
-import { db } from '../firebase';
+import { db as getDb } from '../firebase';
 import {
   collection,
   doc,
@@ -53,7 +53,7 @@ export class NetworkService {
       // Convert dates to Firestore Timestamps
       const networkDoc = this.toFirestoreDoc(network);
       
-      await setDoc(doc(db, this.COLLECTION_NAME, network.id), networkDoc);
+      await setDoc(doc(getDb(), this.COLLECTION_NAME, network.id), networkDoc);
       
       return { success: true, data: network };
     } catch (error: any) {
@@ -74,7 +74,7 @@ export class NetworkService {
     }
 
     try {
-      const docRef = doc(db, this.COLLECTION_NAME, networkId);
+      const docRef = doc(getDb(), this.COLLECTION_NAME, networkId);
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
@@ -110,7 +110,7 @@ export class NetworkService {
     try {
       // Simple query without orderBy to avoid composite index requirement
       const q = query(
-        collection(db, this.COLLECTION_NAME),
+        collection(getDb(), this.COLLECTION_NAME),
         where('ownerId', '==', userId)
       );
 
@@ -157,7 +157,7 @@ export class NetworkService {
     }
 
     try {
-      const docRef = doc(db, this.COLLECTION_NAME, networkId);
+      const docRef = doc(getDb(), this.COLLECTION_NAME, networkId);
       
       const updateData: any = {
         ...updates,
@@ -189,7 +189,7 @@ export class NetworkService {
 
     try {
       // Store cells in a subcollection, not as an array
-      const cellsCollectionRef = collection(db, this.COLLECTION_NAME, networkId, 'cells');
+      const cellsCollectionRef = collection(getDb(), this.COLLECTION_NAME, networkId, 'cells');
       
       // Delete all existing cells first
       const existingCells = await getDocs(cellsCollectionRef);
@@ -203,7 +203,7 @@ export class NetworkService {
       await Promise.all(addPromises);
       
       // Update the network's updatedAt timestamp
-      await updateDoc(doc(db, this.COLLECTION_NAME, networkId), {
+      await updateDoc(doc(getDb(), this.COLLECTION_NAME, networkId), {
         updatedAt: Timestamp.now()
       });
       
@@ -226,7 +226,7 @@ export class NetworkService {
     }
 
     try {
-      const cellsCollectionRef = collection(db, this.COLLECTION_NAME, networkId, 'cells');
+      const cellsCollectionRef = collection(getDb(), this.COLLECTION_NAME, networkId, 'cells');
       const querySnapshot = await getDocs(cellsCollectionRef);
       
       const cells: Cell[] = [];
@@ -254,13 +254,13 @@ export class NetworkService {
 
     try {
       // Delete all cells in the subcollection first
-      const cellsCollectionRef = collection(db, this.COLLECTION_NAME, networkId, 'cells');
+      const cellsCollectionRef = collection(getDb(), this.COLLECTION_NAME, networkId, 'cells');
       const cellsSnapshot = await getDocs(cellsCollectionRef);
       const deleteCellPromises = cellsSnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deleteCellPromises);
       
       // Then delete the network document
-      await deleteDoc(doc(db, this.COLLECTION_NAME, networkId));
+      await deleteDoc(doc(getDb(), this.COLLECTION_NAME, networkId));
       return { success: true };
     } catch (error: any) {
       console.error('[NetworkService] Delete error:', error);
@@ -302,7 +302,7 @@ export class NetworkService {
     try {
       // Simple query without orderBy to avoid composite index requirement
       const q = query(
-        collection(db, this.COLLECTION_NAME),
+        collection(getDb(), this.COLLECTION_NAME),
         where('ownerId', '==', userId),
         where('market', '==', market)
       );

@@ -1,6 +1,6 @@
 // Firebase Authentication Service
 import { browser } from '$app/environment';
-import { auth } from '../firebase';
+import { auth as getAuth } from '../firebase';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -44,7 +44,7 @@ export class AuthService {
    * Initialize Firebase auth state listener with error recovery
    */
   private initializeAuthListener(): void {
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(getAuth(), (user) => {
       this.currentUser = user;
       
       // Log auth state changes for debugging
@@ -118,7 +118,7 @@ export class AuthService {
     displayName?: string
   ): Promise<AuthResult<UserProfile>> {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(getAuth(), email, password);
       const user = userCredential.user;
 
       // Update display name if provided
@@ -143,7 +143,7 @@ export class AuthService {
    */
   async signIn(email: string, password: string): Promise<AuthResult<UserProfile>> {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(getAuth(), email, password);
       return {
         success: true,
         data: this.mapUserToProfile(userCredential.user)
@@ -162,7 +162,7 @@ export class AuthService {
   async signInWithGoogle(): Promise<AuthResult<UserProfile>> {
     try {
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(getAuth(), provider);
       return {
         success: true,
         data: this.mapUserToProfile(userCredential.user)
@@ -180,7 +180,7 @@ export class AuthService {
    */
   async signOut(): Promise<AuthResult<void>> {
     try {
-      await signOut(auth);
+      await signOut(getAuth());
       return { success: true };
     } catch (error: any) {
       return {
@@ -195,7 +195,7 @@ export class AuthService {
    */
   async resetPassword(email: string): Promise<AuthResult<void>> {
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(getAuth(), email);
       return { success: true };
     } catch (error: any) {
       return {

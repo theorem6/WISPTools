@@ -2,7 +2,7 @@
 // Integrates GenieACS with Firebase Functions and Firestore
 
 import { getFirestore, doc, collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { db } from '$lib/firebase';
+import { db as getDb } from '$lib/firebase';
 import type { CPEDevice } from '../models/cpeDevice';
 import type { GenieACSConfig } from '../api/nbiClient';
 
@@ -35,7 +35,7 @@ export class FirebaseGenieACSService {
     limit?: number;
   } = {}): Promise<CPEDevice[]> {
     try {
-      let q = collection(db, 'cpe_devices');
+      let q = collection(getDb(), 'cpe_devices');
       
       // Apply filters
       if (options.status) {
@@ -77,7 +77,7 @@ export class FirebaseGenieACSService {
    */
   async getCPEDevice(deviceId: string): Promise<CPEDevice | null> {
     try {
-      const deviceRef = doc(db, 'cpe_devices', deviceId);
+      const deviceRef = doc(getDb(), 'cpe_devices', deviceId);
       const deviceDoc = await deviceRef.get();
       
       if (!deviceDoc.exists()) {
