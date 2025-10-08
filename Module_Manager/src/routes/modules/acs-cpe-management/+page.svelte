@@ -46,11 +46,16 @@
       // Try to load real CPE devices from Firebase Functions
       console.log('Attempting to load CPE devices from Firebase Functions...');
       
-      // Get Firebase project ID from environment or use default
-      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      // Use environment variable for Functions URL
+      const getCPEDevicesUrl = import.meta.env.PUBLIC_GET_CPE_DEVICES_URL;
       
-      const response = await fetch(`${functionsUrl}/getCPEDevices`, {
+      if (!getCPEDevicesUrl) {
+        console.warn('PUBLIC_GET_CPE_DEVICES_URL not configured, using fallback data');
+        loadFallbackSampleData();
+        return;
+      }
+      
+      const response = await fetch(getCPEDevicesUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -283,11 +288,17 @@
     try {
       console.log('Starting CPE device sync...');
       
-      // Try to sync with Firebase Functions first
-      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      // Use environment variable for sync URL
+      const syncCPEDevicesUrl = import.meta.env.PUBLIC_SYNC_CPE_DEVICES_URL;
       
-      const syncResponse = await fetch(`${functionsUrl}/syncCPEDevices`, {
+      if (!syncCPEDevicesUrl) {
+        console.warn('PUBLIC_SYNC_CPE_DEVICES_URL not configured');
+        error = 'Sync endpoint not configured. Please check environment variables.';
+        isLoading = false;
+        return;
+      }
+      
+      const syncResponse = await fetch(syncCPEDevicesUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

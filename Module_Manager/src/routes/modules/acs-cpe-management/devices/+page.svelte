@@ -88,11 +88,17 @@
     try {
       console.log('Loading devices from Firebase Functions...');
       
-      // Try to load from Firebase Functions
-      const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-      const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
+      // Use environment variable for Functions URL
+      const getCPEDevicesUrl = import.meta.env.PUBLIC_GET_CPE_DEVICES_URL;
       
-      const response = await fetch(`${functionsUrl}/getCPEDevices`, {
+      if (!getCPEDevicesUrl) {
+        console.warn('PUBLIC_GET_CPE_DEVICES_URL not configured, using sample data');
+        loadSampleDevices();
+        isLoading = false;
+        return;
+      }
+      
+      const response = await fetch(getCPEDevicesUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
