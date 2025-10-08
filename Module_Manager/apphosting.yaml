@@ -141,7 +141,7 @@ env:
   # Production MongoDB connection string
   # Replace <db_password> with your actual password
   - variable: MONGODB_URI
-    value: "mongodb+srv://genieacs-user:<db_password>@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    value: "mongodb+srv://genieacs-user:5UDFrunhXI8FfqPZ@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     availability:
       - RUNTIME
 
