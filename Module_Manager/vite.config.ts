@@ -2,7 +2,19 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		sveltekit(),
+		{
+			name: 'build-progress',
+			buildStart() {
+				console.log('🏗️  Vite build starting...');
+				console.log('💾 Memory limit:', process.env.NODE_OPTIONS);
+			},
+			buildEnd() {
+				console.log('✅ Vite build completed!');
+			}
+		}
+	],
 	optimizeDeps: {
 		exclude: ['@firebase/app', '@arcgis/core']
 	},
@@ -28,36 +40,28 @@ export default defineConfig({
 		target: 'esnext',
 		minify: 'esbuild',
 		sourcemap: false,
-		chunkSizeWarningLimit: 2000,
+		chunkSizeWarningLimit: 5000,
+		// Reduce memory usage during build
 		rollupOptions: {
 			output: {
-				// Split large dependencies into separate chunks to reduce memory usage
+				// Simplified chunking to reduce memory usage
 				manualChunks(id) {
-					// Keep ArcGIS as external chunks loaded on demand
+					// ArcGIS - keep as single chunk (less memory for splitting)
 					if (id.includes('@arcgis/core')) {
-						// Split ArcGIS into smaller sub-chunks by feature area
-						if (id.includes('/views/')) return 'arcgis-views';
-						if (id.includes('/layers/')) return 'arcgis-layers';
-						if (id.includes('/widgets/')) return 'arcgis-widgets';
-						if (id.includes('/geometry/')) return 'arcgis-geometry';
-						return 'arcgis-core';
+						return 'arcgis';
 					}
-					// Split Firebase into its own chunk
+					// Firebase
 					if (id.includes('firebase')) {
 						return 'firebase';
 					}
-					// Split Svelte framework into its own chunk
-					if (id.includes('node_modules') && (id.includes('svelte') || id.includes('@sveltejs'))) {
-						return 'svelte-framework';
-					}
-					// All other node_modules
+					// All other vendor code
 					if (id.includes('node_modules')) {
 						return 'vendor';
 					}
-				},
-				// Increase max chunk size for large libraries
-				experimentalMinChunkSize: 5000
-			}
+				}
+			},
+			// Reduce parallelization to save memory
+			maxParallelFileOps: 2
 		}
 	},
 	ssr: {

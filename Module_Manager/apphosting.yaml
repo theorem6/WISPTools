@@ -3,7 +3,8 @@
 # Environment-specific overrides go in apphosting.[environment].yaml
 
 # Build and run commands
-buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=4096" npm run build
+# Using 6GB heap for build to handle ArcGIS + Firebase + SvelteKit bundling
+buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
 runCommand: node server.js
 
 runConfig:
