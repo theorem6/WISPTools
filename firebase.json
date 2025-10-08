@@ -15,8 +15,8 @@
     "runtime": "nodejs20"
   },
   "apphosting": {
-    "backendId": "pci-mapper",
-    "rootDir": "/",
+    "backendId": "lte-pci-mapper",
+    "rootDir": "/Module_Manager",
     "ignore": [
       "node_modules",
       ".git",
