@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { PCIArcGISMapper } from '$lib/arcgisMap';
   import { pciService } from '$lib/services/pciService';
   import type { Cell } from '$lib/pciMapper';
@@ -108,9 +109,9 @@
   import { goto } from '$app/navigation';
   
   onMount(async () => {
-    // Check authentication and redirect if needed
+    // Check authentication and redirect if needed (browser-only)
     if (!$authStore.isLoading && !$isAuthenticated) {
-      goto('/login');
+      if (browser) goto('/login');
       return;
     }
     
@@ -145,8 +146,8 @@
     }
   });
   
-  // Redirect if user logs out and clear all state
-  $: if (!$authStore.isLoading && !$isAuthenticated) {
+  // Redirect if user logs out and clear all state (browser-only)
+  $: if (browser && !$authStore.isLoading && !$isAuthenticated) {
     // Clear all app state
     resetAllStores();     // Resets cells, conflicts, optimization, analysis, UI stores
     networkStore.clear(); // Clear network store
