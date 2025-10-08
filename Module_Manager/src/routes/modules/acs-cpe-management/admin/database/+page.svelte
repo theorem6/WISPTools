@@ -8,9 +8,17 @@
   let error = '';
   let successMessage = '';
   
+  let autoInitialize = false;
+  let showAutoInitDialog = false;
+  
   onMount(async () => {
     console.log('Database initialization page loaded');
     await checkMongoDBStatus();
+    
+    // Check if database is empty and offer auto-initialization
+    if (mongoStatus && mongoStatus.collections.presets === 0 && mongoStatus.collections.faults === 0) {
+      showAutoInitDialog = true;
+    }
   });
   
   async function checkMongoDBStatus() {
@@ -48,10 +56,14 @@
     isLoading = false;
   }
   
-  async function initializeDatabase() {
-    if (!confirm('Initialize MongoDB database with sample data?\n\nThis will create:\n- Sample presets (4 items)\n- Sample faults (3 items)\n\nExisting data will not be overwritten.')) {
-      return;
+  async function initializeDatabase(skipConfirm = false) {
+    if (!skipConfirm) {
+      if (!confirm('Initialize MongoDB database with sample data?\n\nThis will create:\n- Sample presets (4 items)\n- Sample faults (3 items)\n\nExisting data will not be overwritten.')) {
+        return;
+      }
     }
+    
+    showAutoInitDialog = false;
     
     isLoading = true;
     error = '';
@@ -175,6 +187,33 @@
   </div>
 
   <div class="content">
+    <!-- Auto-Initialize Dialog -->
+    {#if showAutoInitDialog}
+      <div class="auto-init-banner">
+        <div class="banner-content">
+          <div class="banner-icon">🚀</div>
+          <div class="banner-text">
+            <h3>Database is Empty</h3>
+            <p>Would you like to automatically initialize the database with sample data?</p>
+            <p class="banner-hint">This creates 4 presets and 3 faults for testing and development.</p>
+          </div>
+          <div class="banner-actions">
+            <button class="btn btn-primary btn-lg" on:click={() => initializeDatabase(true)} disabled={isLoading}>
+              {#if isLoading}
+                <span class="spinner"></span>
+              {:else}
+                ✨
+              {/if}
+              Yes, Initialize Now
+            </button>
+            <button class="btn btn-secondary" on:click={() => showAutoInitDialog = false}>
+              Maybe Later
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <!-- MongoDB Status Card -->
     <div class="status-card">
       <div class="card-header">
@@ -265,9 +304,28 @@
       </div>
     {/if}
 
+    <!-- Quick Actions Banner -->
+    {#if mongoStatus && (mongoStatus.collections.presets === 0 || mongoStatus.collections.faults === 0)}
+      <div class="quick-action-banner">
+        <div class="banner-icon-large">💡</div>
+        <div class="banner-content-inline">
+          <h3>Quick Start</h3>
+          <p>Initialize your database with sample data to get started immediately!</p>
+        </div>
+        <button class="btn btn-primary btn-xl" on:click={() => initializeDatabase()} disabled={isLoading}>
+          {#if isLoading}
+            <span class="spinner"></span>
+            Initializing...
+          {:else}
+            🚀 Initialize Database Now
+          {/if}
+        </button>
+      </div>
+    {/if}
+
     <!-- Initialization Actions -->
     <div class="actions-grid">
-      <div class="action-card">
+      <div class="action-card" class:highlight={mongoStatus && mongoStatus.collections.presets === 0 && mongoStatus.collections.faults === 0}>
         <div class="action-icon">🚀</div>
         <h3>Initialize All</h3>
         <p>Create all sample collections and data at once</p>
@@ -399,6 +457,129 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
+  }
+
+  /* Auto-Initialize Banner */
+  .auto-init-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    animation: slideDown 0.5s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .banner-icon {
+    font-size: 4rem;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+
+  .banner-text {
+    flex: 1;
+  }
+
+  .banner-text h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .banner-text p {
+    margin: 0.25rem 0;
+    font-size: 1rem;
+    opacity: 0.95;
+  }
+
+  .banner-hint {
+    font-size: 0.875rem !important;
+    opacity: 0.8 !important;
+    font-style: italic;
+  }
+
+  .banner-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .btn-xl {
+    padding: 1.25rem 2.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  /* Quick Action Banner */
+  .quick-action-banner {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    box-shadow: 0 10px 30px rgba(240, 147, 251, 0.3);
+  }
+
+  .banner-icon-large {
+    font-size: 5rem;
+    flex-shrink: 0;
+  }
+
+  .banner-content-inline {
+    flex: 1;
+  }
+
+  .banner-content-inline h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
+
+  .banner-content-inline p {
+    margin: 0;
+    font-size: 1.125rem;
+    opacity: 0.95;
+  }
+
+  .quick-action-banner .btn {
+    flex-shrink: 0;
   }
 
   .status-card {
@@ -556,6 +737,22 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .action-card.highlight {
+    border: 2px solid var(--accent-color);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+    animation: glow 2s infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% {
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+    }
+    50% {
+      box-shadow: 0 4px 30px rgba(102, 126, 234, 0.4);
+    }
   }
 
   .action-icon {
@@ -705,6 +902,29 @@
 
     .actions-grid {
       grid-template-columns: 1fr;
+    }
+
+    .auto-init-banner,
+    .quick-action-banner {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .banner-content {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .banner-actions {
+      width: 100%;
+    }
+
+    .banner-actions .btn {
+      width: 100%;
+    }
+
+    .banner-content-inline {
+      text-align: center;
     }
   }
 </style>
