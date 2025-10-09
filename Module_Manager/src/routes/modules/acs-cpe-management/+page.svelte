@@ -177,6 +177,17 @@
       map._view = view;
       map._graphicsLayer = graphicsLayer;
 
+      // Add click handler to the view (not individual graphics)
+      view.on('click', async (event) => {
+        const response = await view.hitTest(event);
+        if (response.results.length > 0) {
+          const graphic = response.results[0].graphic;
+          if (graphic && graphic.attributes && graphic.attributes.device) {
+            handleCPEClick(graphic.attributes.device);
+          }
+        }
+      });
+
       // Add CPE device markers
       await addCPEMarkers();
 
@@ -258,11 +269,7 @@
             }
           });
 
-          // Add click handler
-          graphic.on('click', () => {
-            handleCPEClick(device);
-          });
-
+          // Note: Click handlers are added to MapView, not Graphics
           map._graphicsLayer.add(graphic);
         }
       });
