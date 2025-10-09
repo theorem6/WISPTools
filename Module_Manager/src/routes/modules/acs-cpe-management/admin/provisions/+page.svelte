@@ -56,17 +56,8 @@ if (device["InternetGatewayDevice.DeviceInfo.SoftwareVersion"] < "2.0") {
     try {
       console.log('Loading provisions from Firebase Functions...');
       
-      // Use environment variable for Functions URL
-      const functionsUrl = import.meta.env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      if (!functionsUrl) {
-        console.warn('PUBLIC_FIREBASE_FUNCTIONS_URL not configured, using sample data');
-        loadSampleProvisions();
-        isLoading = false;
-        return;
-      }
-      
-      const response = await fetch(`${functionsUrl}/getProvisions`, {
+      // Use SvelteKit API route (no Firebase Functions needed!)
+      const response = await fetch('/api/provisions', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -128,15 +119,13 @@ declare("InternetGatewayDevice.ManagementServer.Password", [], "acs-pass");`,
       try {
         console.log(`Deleting provision ${provision.id}...`);
         
-        // Try to delete via Firebase Functions
-        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
-        
-        const response = await fetch(`${functionsUrl}/deleteProvision/${provision.id}`, {
+        // Use SvelteKit API route
+        const response = await fetch('/api/provisions', {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
-          }
+          },
+          body: JSON.stringify({ id: provision.id })
         });
         
         if (response.ok) {
@@ -178,10 +167,8 @@ declare("InternetGatewayDevice.ManagementServer.Password", [], "acs-pass");`,
       try {
         console.log('Initializing sample provisions...');
         
-        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
-        
-        const response = await fetch(`${functionsUrl}/initializeSampleProvisions`, {
+        // Use MongoDB init route (provisions are created with database init)
+        const response = await fetch('/api/mongo/init', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

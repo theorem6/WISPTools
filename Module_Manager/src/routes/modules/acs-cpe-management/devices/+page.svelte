@@ -88,17 +88,8 @@
     try {
       console.log('Loading devices from Firebase Functions...');
       
-      // Use environment variable for Functions URL
-      const getCPEDevicesUrl = import.meta.env.PUBLIC_GET_CPE_DEVICES_URL;
-      
-      if (!getCPEDevicesUrl) {
-        console.warn('PUBLIC_GET_CPE_DEVICES_URL not configured, using sample data');
-        loadSampleDevices();
-        isLoading = false;
-        return;
-      }
-      
-      const response = await fetch(getCPEDevicesUrl, {
+      // Use SvelteKit API route (no Firebase Functions needed!)
+      const response = await fetch('/api/cpe/devices', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
