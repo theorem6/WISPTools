@@ -144,11 +144,13 @@ env:
   - variable: MONGODB_URI
     value: "mongodb+srv://genieacs-user:5UDFrunhXI8FfqPZ@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
     availability:
+      - BUILD
       - RUNTIME
 
   - variable: MONGODB_DATABASE
     value: "genieacs"
     availability:
+      - BUILD
       - RUNTIME
 
   # ==========================================

@@ -1,26 +1,31 @@
-import { sequence } from '@sveltejs/kit/hooks';
+// SvelteKit Server Hooks
+// Handles server-side initialization and error handling
+
 import type { Handle } from '@sveltejs/kit';
 
-// Handle static file serving for adapter-node on Cloud Run
-const handleStaticFiles: Handle = async ({ event, resolve }) => {
-	// SvelteKit will handle static files automatically via adapter-node
-	// This hook ensures proper headers and caching
-	const response = await resolve(event, {
-		transformPageChunk: ({ html }) => html
-	});
+export const handle: Handle = async ({ event, resolve }) => {
+  // Add CORS headers for API routes
+  if (event.url.pathname.startsWith('/api/')) {
+    // Handle preflight requests
+    if (event.request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      });
+    }
+  }
 
-	// Add cache headers for immutable assets
-	if (event.url.pathname.includes('/_app/immutable/')) {
-		response.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-	}
+  const response = await resolve(event);
 
-	return response;
+  // Add CORS headers to API responses
+  if (event.url.pathname.startsWith('/api/')) {
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+
+  return response;
 };
-
-// Validate environment variables on server startup
-const handleStartup: Handle = async ({ event, resolve }) => {
-	return resolve(event);
-};
-
-export const handle = sequence(handleStaticFiles, handleStartup);
-
