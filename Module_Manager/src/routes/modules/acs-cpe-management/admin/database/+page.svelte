@@ -26,15 +26,8 @@
     error = '';
     
     try {
-      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      if (!functionsUrl) {
-        error = 'Firebase Functions URL not configured';
-        isLoading = false;
-        return;
-      }
-      
-      const response = await fetch(`${functionsUrl}/checkMongoHealth`, {
+      // Use SvelteKit API route (no Firebase Functions needed!)
+      const response = await fetch('/api/mongo/health', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -70,15 +63,8 @@
     successMessage = '';
     
     try {
-      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      if (!functionsUrl) {
-        error = 'Firebase Functions URL not configured';
-        isLoading = false;
-        return;
-      }
-      
-      const response = await fetch(`${functionsUrl}/initializeMongoDatabase`, {
+      // Use SvelteKit API route (no Firebase Functions needed!)
+      const response = await fetch('/api/mongo/init', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -113,9 +99,7 @@
     successMessage = '';
     
     try {
-      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      const response = await fetch(`${functionsUrl}/initializeMongoPresets`, {
+      const response = await fetch('/api/mongo/init', {
         method: 'POST'
       });
       
@@ -144,9 +128,7 @@
     successMessage = '';
     
     try {
-      const functionsUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      const response = await fetch(`${functionsUrl}/initializeMongoFaults`, {
+      const response = await fetch('/api/mongo/init', {
         method: 'POST'
       });
       
