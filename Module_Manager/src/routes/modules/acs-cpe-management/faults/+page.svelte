@@ -75,19 +75,10 @@
   async function loadFaults() {
     isLoading = true;
     try {
-      console.log('Loading faults from Firebase Functions...');
+      console.log('Loading faults from MongoDB...');
       
-      // Use environment variable for Functions URL
-      const functionsUrl = import.meta.env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      if (!functionsUrl) {
-        console.warn('PUBLIC_FIREBASE_FUNCTIONS_URL not configured, using sample data');
-        loadSampleFaults();
-        isLoading = false;
-        return;
-      }
-      
-      const response = await fetch(`${functionsUrl}/getFaults`, {
+      // Use SvelteKit API route
+      const response = await fetch('/api/faults', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -96,20 +87,22 @@
       
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.faults.length > 0) {
-          console.log(`Loaded ${data.faults.length} faults from Firebase Functions`);
-          faults = data.faults;
+        if (data.success) {
+          console.log(`Loaded ${data.faults.length} faults from MongoDB`);
+          faults = data.faults.map(f => ({
+            ...f,
+            id: f._id || f.id
+          }));
           isLoading = false;
           return;
         }
       }
       
-      console.log('Firebase Functions not available, using sample data');
-      // Fallback to sample data
+      console.log('MongoDB not available, using sample data');
       loadSampleFaults();
       
     } catch (err) {
-      console.error('Failed to load faults from Firebase Functions:', err);
+      console.error('Failed to load faults from MongoDB:', err);
       console.log('Using sample data as fallback');
       loadSampleFaults();
     }
@@ -146,22 +139,22 @@
   }
 
   async function resolveFault(fault) {
-    if (confirm(`Mark fault "${fault.id}" as resolved?`)) {
+    const resolution = prompt('Enter resolution notes (optional):') || 'Fault resolved manually';
+    
+    if (resolution !== null) {
       try {
         console.log(`Resolving fault ${fault.id}...`);
         
-        // Try to resolve via Firebase Functions
-        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
-        
-        const response = await fetch(`${functionsUrl}/resolveFault/${fault.id}`, {
+        // Use SvelteKit API route
+        const response = await fetch('/api/faults', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            resolution: 'Fault resolved manually',
-            resolvedBy: 'current-user@example.com'
+            id: fault.id,
+            resolution: resolution,
+            resolvedBy: 'admin'
           })
         });
         
@@ -428,9 +421,12 @@
               </button>
               {#if fault.status === 'Open'}
                 <button class="btn btn-sm btn-success" on:click={() => resolveFault(fault)}>
-                  Mark Resolved
+                  ✅ Mark Resolved
                 </button>
               {/if}
+              <button class="btn btn-sm btn-danger" on:click={() => deleteFault(fault)}>
+                🗑️ Delete
+              </button>
             </div>
           </div>
         {/each}
