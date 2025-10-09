@@ -1,0 +1,43 @@
+# Firebase App Hosting Backend Configuration
+# This file tells Firebase to automatically deploy Functions along with the app
+# No manual CLI login needed - uses Firebase's built-in service account
+
+# Backend configuration
+backend:
+  # Root directory for the web app
+  rootDirectory: .
+  
+  # Build configuration
+  buildConfig:
+    buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=6144" npm run build
+    outputDirectory: build
+  
+  # Runtime configuration
+  runtime:
+    cpu: 1
+    memoryMiB: 2048
+    minInstances: 0
+    maxInstances: 5
+    concurrency: 80
+
+# Functions deployment (automatic!)
+functions:
+  # Deploy Functions from the parent directory
+  source: ../functions
+  runtime: nodejs20
+  
+  # These commands run automatically in Firebase cloud
+  predeploy:
+    - npm --prefix ../functions install
+    - npm --prefix ../functions run build
+  
+  # Environment variables for Functions (from runtime)
+  environmentVariables:
+    MONGODB_URI: ${MONGODB_URI}
+    MONGODB_DATABASE: ${MONGODB_DATABASE}
+    GENIEACS_ENABLE_FIRESTORE_SYNC: ${GENIEACS_ENABLE_FIRESTORE_SYNC}
+    NODE_ENV: ${NODE_ENV}
+
+# Environment variables (inherited from apphosting.yaml)
+# These are automatically available to both app and functions
+
