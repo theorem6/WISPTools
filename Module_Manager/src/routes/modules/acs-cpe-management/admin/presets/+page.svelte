@@ -93,19 +93,10 @@
   async function loadPresets() {
     isLoading = true;
     try {
-      console.log('Loading presets from Firebase Functions...');
+      console.log('Loading presets from MongoDB...');
       
-      // Use environment variable for Functions URL
-      const functionsUrl = import.meta.env.PUBLIC_FIREBASE_FUNCTIONS_URL;
-      
-      if (!functionsUrl) {
-        console.warn('PUBLIC_FIREBASE_FUNCTIONS_URL not configured, using sample data');
-        loadSamplePresets();
-        isLoading = false;
-        return;
-      }
-      
-      const response = await fetch(`${functionsUrl}/getPresets`, {
+      // Use SvelteKit API route
+      const response = await fetch('/api/presets', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -114,20 +105,22 @@
       
       if (response.ok) {
         const data = await response.json();
-        if (data.success && data.presets.length > 0) {
-          console.log(`Loaded ${data.presets.length} presets from Firebase Functions`);
-          presets = data.presets;
+        if (data.success) {
+          console.log(`Loaded ${data.presets.length} presets from MongoDB`);
+          presets = data.presets.map(p => ({
+            ...p,
+            id: p._id || p.id
+          }));
           isLoading = false;
           return;
         }
       }
       
-      console.log('Firebase Functions not available, using sample data');
-      // Fallback to sample data
+      console.log('MongoDB not available, using sample data');
       loadSamplePresets();
       
     } catch (err) {
-      console.error('Failed to load presets from Firebase Functions:', err);
+      console.error('Failed to load presets from MongoDB:', err);
       console.log('Using sample data as fallback');
       loadSamplePresets();
     }
@@ -173,15 +166,13 @@
       try {
         console.log(`Deleting preset ${preset.id}...`);
         
-        // Try to delete via Firebase Functions
-        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
-        
-        const response = await fetch(`${functionsUrl}/deletePreset/${preset.id}`, {
+        // Use SvelteKit API route
+        const response = await fetch('/api/presets', {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
-          }
+          },
+          body: JSON.stringify({ id: preset.id })
         });
         
         if (response.ok) {
