@@ -179,39 +179,52 @@
           const data = await response.json();
           if (data.success) {
             console.log(`Successfully deleted preset ${preset.id}`);
-            // Remove from local array
-            const index = presets.findIndex(p => p.id === preset.id);
-            if (index > -1) {
-              presets.splice(index, 1);
-              presets = [...presets];
-            }
+            alert('✅ Preset deleted!');
+            // Reload from database
+            await loadPresets();
             return;
           }
         }
         
-        console.log('Firebase Functions not available, using local delete');
-        // Fallback to local delete
-        const index = presets.findIndex(p => p.id === preset.id);
-        if (index > -1) {
-          presets.splice(index, 1);
-          presets = [...presets];
-        }
+        console.error('Failed to delete preset:', await response.text());
+        alert('❌ Failed to delete preset. Check console for details.');
         
       } catch (error) {
         console.error('Failed to delete preset:', error);
-        // Still remove from local array even if API call failed
-        const index = presets.findIndex(p => p.id === preset.id);
-        if (index > -1) {
-          presets.splice(index, 1);
-          presets = [...presets];
-        }
+        alert('❌ Failed to delete preset. Check console for details.');
       }
     }
   }
 
-  function togglePreset(preset) {
-    preset.enabled = !preset.enabled;
-    presets = [...presets];
+  async function togglePreset(preset) {
+    try {
+      console.log(`Toggling preset ${preset.id}...`);
+      
+      // Update in MongoDB
+      const response = await fetch('/api/presets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: preset.id,
+          enabled: !preset.enabled
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log(`Toggled preset ${preset.id}`);
+          // Reload from database
+          await loadPresets();
+        }
+      } else {
+        console.error('Failed to toggle preset:', await response.text());
+      }
+    } catch (err) {
+      console.error('Failed to toggle preset:', err);
+    }
   }
 
   function getStatusClass(status) {
