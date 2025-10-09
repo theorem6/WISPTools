@@ -1,3 +1,7 @@
+# GitHub Actions - Automatically Deploy Firebase Functions
+# Runs whenever you push to main branch
+# No CLI access needed - runs in GitHub cloud
+
 name: Deploy Firebase Functions
 
 on:
@@ -6,16 +10,13 @@ on:
       - main
     paths:
       - 'functions/**'
-      - 'firebase.json'
-      - 'firestore.rules'
-      - 'firestore.indexes.json'
-
-env:
-  PROJECT_ID: lte-pci-mapper-65450042-bbf71
+      - 'apphosting.yaml'
+      - 'Module_Manager/apphosting.yaml'
+      - '.github/workflows/deploy-functions.yml'
 
 jobs:
-  deploy-functions:
-    name: Deploy Firebase Functions
+  deploy:
+    name: Deploy Functions to Firebase
     runs-on: ubuntu-latest
     
     steps:
@@ -26,27 +27,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+          cache: 'npm'
+          cache-dependency-path: 'functions/package-lock.json'
 
       - name: Install Functions dependencies
-        working-directory: ./functions
-        run: npm ci
+        run: |
+          cd functions
+          npm ci
 
-      - name: Build Functions
-        working-directory: ./functions
-        run: npm run build
+      - name: Build Functions (TypeScript)
+        run: |
+          cd functions
+          npm run build
 
       - name: Deploy to Firebase
-        run: firebase deploy --only functions,firestore:rules,firestore:indexes --project ${{ env.PROJECT_ID }}
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only functions
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          PROJECT_ID: lte-pci-mapper-65450042-bbf71
 
-      - name: Deployment summary
+      - name: Verify Deployment
         run: |
-          echo "✅ Firebase Functions deployed successfully!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Project**: ${{ env.PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Region**: us-central1" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Functions deployed successfully!"
+          echo "Test URL: https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/checkMongoHealth"
 
+      - name: Comment on Commit
+        if: success()
+        run: |
+          echo "✅ Firebase Functions deployed successfully from commit ${{ github.sha }}"
