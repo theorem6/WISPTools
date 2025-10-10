@@ -206,10 +206,10 @@
       </p>
     </div>
     <div class="header-actions">
-      <button class="btn btn-secondary" on:click={initializeSampleFaults}>
+      <a href="/modules/acs-cpe-management/admin/database" class="btn btn-secondary">
         <span class="btn-icon">🗂️</span>
-        Initialize Sample Data
-      </button>
+        Initialize Faults in Database
+      </a>
       <button class="btn btn-primary" on:click={refreshFaults}>
         <span class="btn-icon">🔄</span>
         Refresh
