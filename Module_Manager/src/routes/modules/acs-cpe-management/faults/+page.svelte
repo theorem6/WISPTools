@@ -2,63 +2,8 @@
   import { onMount } from 'svelte';
   import MainMenu from '../components/MainMenu.svelte';
   
-  // Sample faults data
-  let faults = [
-    {
-      id: 'FAULT-001',
-      deviceId: 'CPE-003',
-      deviceName: 'ZTE MF920U 4G LTE',
-      timestamp: '2025-01-04T14:20:00Z',
-      severity: 'Critical',
-      code: '9001',
-      message: 'Device connection timeout',
-      description: 'Device failed to respond to TR-069 requests within timeout period',
-      status: 'Open',
-      parameters: {
-        'InternetGatewayDevice.ManagementServer.PeriodicInformInterval': '86400',
-        'InternetGatewayDevice.ManagementServer.ConnectionRequestURL': 'http://device.example.com:7547'
-      },
-      resolution: '',
-      resolvedBy: null,
-      resolvedAt: null
-    },
-    {
-      id: 'FAULT-002',
-      deviceId: 'CPE-001',
-      deviceName: 'Nokia FastMile 4G Gateway',
-      timestamp: '2025-01-03T09:15:00Z',
-      severity: 'Warning',
-      code: '9002',
-      message: 'Firmware update failed',
-      description: 'Attempted firmware update failed due to insufficient storage space',
-      status: 'Resolved',
-      parameters: {
-        'InternetGatewayDevice.DeviceInfo.SoftwareVersion': '2.1.2',
-        'InternetGatewayDevice.DeviceInfo.HardwareVersion': '1.0'
-      },
-      resolution: 'Cleared device storage and retried firmware update successfully',
-      resolvedBy: 'admin@example.com',
-      resolvedAt: '2025-01-03T11:30:00Z'
-    },
-    {
-      id: 'FAULT-003',
-      deviceId: 'CPE-002',
-      deviceName: 'Huawei 5G CPE Pro 2',
-      timestamp: '2025-01-02T16:45:00Z',
-      severity: 'Info',
-      code: '9003',
-      message: 'Configuration parameter mismatch',
-      description: 'Device reported different parameter value than expected',
-      status: 'Open',
-      parameters: {
-        'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceIPAddress': '192.168.1.101',
-        'InternetGatewayDevice.LANDevice.1.LANHostConfigManagement.IPInterface.1.IPInterfaceSubnetMask': '255.255.255.0'
-      },
-      resolution: '',
-      resolvedBy: null,
-      resolvedAt: null
-    }
-  ];
+  // Faults data from database
+  let faults = [];
 
   let isLoading = false;
   let selectedFault = null;
@@ -168,26 +113,16 @@
             fault.resolvedAt = data.fault.resolvedAt;
             fault.resolution = data.fault.resolution;
             faults = [...faults];
-            return;
+          } else {
+            alert('Failed to resolve fault: ' + (data.error || 'Unknown error'));
           }
+        } else {
+          alert('Failed to resolve fault: API returned ' + response.status);
         }
-        
-        console.log('Firebase Functions not available, using local resolve');
-        // Fallback to local resolve
-        fault.status = 'Resolved';
-        fault.resolvedBy = 'current-user@example.com';
-        fault.resolvedAt = new Date().toISOString();
-        fault.resolution = 'Fault resolved manually';
-        faults = [...faults];
         
       } catch (error) {
         console.error('Failed to resolve fault:', error);
-        // Still update locally even if API call failed
-        fault.status = 'Resolved';
-        fault.resolvedBy = 'current-user@example.com';
-        fault.resolvedAt = new Date().toISOString();
-        fault.resolution = 'Fault resolved manually';
-        faults = [...faults];
+        alert('Failed to resolve fault. Check console for details.');
       }
     }
   }
@@ -272,41 +207,6 @@
     return { total, open, resolved, critical };
   }
 
-  async function initializeSampleFaults() {
-    if (confirm('Initialize sample faults in the database? This will create 3 sample faults for testing.')) {
-      try {
-        console.log('Initializing sample faults...');
-        
-        const projectId = 'lte-pci-mapper'; // Replace with your actual project ID
-        const functionsUrl = `https://us-central1-${projectId}.cloudfunctions.net`;
-        
-        const response = await fetch(`${functionsUrl}/initializeSampleFaults`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            console.log(`Sample faults initialized: ${data.created} created, ${data.skipped} already existed`);
-            alert(`Sample faults initialized successfully!\n${data.created} created, ${data.skipped} already existed`);
-            // Reload faults to show the new data
-            await loadFaults();
-            return;
-          }
-        }
-        
-        console.log('Firebase Functions not available for initialization');
-        alert('Firebase Functions not available. Please deploy the functions first.');
-        
-      } catch (error) {
-        console.error('Failed to initialize sample faults:', error);
-        alert('Failed to initialize sample faults. Check console for details.');
-      }
-    }
-  }
 </script>
 
 <svelte:head>
