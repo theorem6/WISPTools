@@ -3,9 +3,9 @@
 # Environment-specific overrides go in apphosting.[environment].yaml
 
 # Build and run commands
-# Using 6GB heap for build to handle ArcGIS + Firebase + SvelteKit bundling
-buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
-runCommand: node server.js
+# Build runs from /Module_Manager directory due to rootDir setting in firebase.json
+buildCommand: npm install && npm run build
+runCommand: node build/index.js
 
 runConfig:
   # Optimized for SvelteKit + ArcGIS
@@ -256,4 +256,44 @@ env:
   - variable: ALLOWED_ORIGINS
     value: "https://lte-pci-mapper-65450042-bbf71.web.app,https://lte-pci-mapper-65450042-bbf71.firebaseapp.com"
     availability:
+      - RUNTIME
+
+  # ==========================================
+  # GCE BACKEND CONFIGURATION
+  # REPLACE <GCE-IP> WITH YOUR ACTUAL GCE EXTERNAL IP
+  # ==========================================
+  - variable: PUBLIC_BACKEND_API_URL
+    value: "http://<GCE-IP>/api"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_NBI_URL
+    value: "http://<GCE-IP>/nbi"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_CWMP_URL
+    value: "http://<GCE-IP>:7547"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_FS_URL
+    value: "http://<GCE-IP>/fs"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_UI_URL
+    value: "http://<GCE-IP>/admin"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_STUN_SERVER
+    value: "stun:<GCE-IP>:3478"
+    availability:
+      - BUILD
       - RUNTIME
