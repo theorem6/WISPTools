@@ -36,7 +36,7 @@ REGION="us-central1"
 MACHINE_TYPE="e2-standard-2"  # 2 vCPU, 8 GB RAM
 BOOT_DISK_SIZE="50GB"
 BOOT_DISK_TYPE="pd-balanced"  # Balance between performance and cost
-IMAGE_FAMILY="ubuntu-2004-lts"
+IMAGE_FAMILY="ubuntu-2204-lts"
 IMAGE_PROJECT="ubuntu-os-cloud"
 NETWORK_TIER="PREMIUM"
 
