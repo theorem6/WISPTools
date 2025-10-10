@@ -93,17 +93,6 @@
         description: 'Retrieve CPE device list from Firestore',
         icon: '📱'
       },
-      {
-        name: 'pci-analysis',
-        displayName: 'PCI Analysis',
-        endpoint: env.PUBLIC_PCI_ANALYSIS_URL || `${baseUrl}/analyzePCI`,
-        status: 'checking',
-        responseTime: null,
-        lastCheck: null,
-        error: null,
-        description: 'LTE PCI conflict analysis engine',
-        icon: '📊'
-      }
     ];
   }
   
@@ -415,7 +404,6 @@
           <li><strong>FS:</strong> Serves firmware and configuration files</li>
           <li><strong>Sync:</strong> Synchronizes devices from MongoDB to Firestore</li>
           <li><strong>Get Devices:</strong> Retrieves device data for UI display</li>
-          <li><strong>PCI Analysis:</strong> Analyzes LTE cell conflicts</li>
         </ul>
       </div>
     </div>
