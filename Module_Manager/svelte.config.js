@@ -11,17 +11,7 @@ const config = {
 			precompress: false,
 			envPrefix: '',
 			polyfill: true
-		}),
-		files: {
-			assets: 'static',
-			hooks: {
-				server: 'src/hooks.server'
-			},
-			lib: 'src/lib',
-			routes: 'src/routes',
-			serviceWorker: 'src/service-worker',
-			appTemplate: 'src/app.html'
-		}
+		})
 	}
 };
 
