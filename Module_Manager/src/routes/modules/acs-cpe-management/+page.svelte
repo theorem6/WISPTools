@@ -377,6 +377,14 @@
   <!-- Main Navigation -->
   <MainMenu />
   
+  <!-- Exit Button -->
+  <a href="/modules" class="exit-button" aria-label="Exit to Modules">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </a>
+
   <!-- Help Button -->
   <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -390,12 +398,6 @@
   <div class="module-header">
     <div class="header-content">
       <div class="module-info">
-        <a href="/modules" class="back-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to Modules
-        </a>
         <h1 class="module-title">
           <span class="module-icon">📡</span>
           {moduleData.title}
@@ -619,6 +621,31 @@
 </div>
 
 <style>
+  .exit-button {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1000;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .exit-button:hover {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+  }
+
   .help-button {
     position: fixed;
     bottom: 2rem;
