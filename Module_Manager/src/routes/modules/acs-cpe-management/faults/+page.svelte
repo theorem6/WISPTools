@@ -38,44 +38,20 @@
             ...f,
             id: f._id || f.id
           }));
-          isLoading = false;
-          return;
+        } else {
+          console.warn('Failed to load faults:', data.error);
+          faults = [];
         }
+      } else {
+        console.warn('Faults API returned error:', response.status);
+        faults = [];
       }
       
-      console.log('MongoDB not available, using sample data');
-      loadSampleFaults();
-      
-    } catch (err) {
-      console.error('Failed to load faults from MongoDB:', err);
-      console.log('Using sample data as fallback');
-      loadSampleFaults();
+    } catch (error) {
+      console.error('Failed to load faults:', error);
+      faults = [];
     }
     isLoading = false;
-  }
-
-  function loadSampleFaults() {
-    // Load sample faults (fallback)
-    faults = [
-      {
-        id: 'FAULT-001',
-        deviceId: 'CPE-003',
-        deviceName: 'ZTE MF920U 4G LTE',
-        timestamp: '2025-01-04T14:20:00Z',
-        severity: 'Critical',
-        code: '9001',
-        message: 'Device connection timeout',
-        description: 'Device failed to respond to TR-069 requests within timeout period',
-        status: 'Open',
-        parameters: {
-          'InternetGatewayDevice.ManagementServer.PeriodicInformInterval': '86400'
-        },
-        resolution: '',
-        resolvedBy: null,
-        resolvedAt: null
-      }
-    ];
-    console.log(`Loaded ${faults.length} sample faults (fallback)`);
   }
 
   function viewFault(fault) {
