@@ -10,6 +10,7 @@
   
   let autoInitialize = false;
   let showAutoInitDialog = false;
+  let activeTab = 'status'; // 'status' or 'reset'
   
   onMount(async () => {
     console.log('Database initialization page loaded');
@@ -160,17 +161,38 @@
     <div class="header-content">
       <h1 class="page-title">
         <span class="page-icon">🗄️</span>
-        MongoDB Database Initialization
+        MongoDB Database Management
       </h1>
       <p class="page-description">
-        Check database status and initialize with sample data
+        Monitor database status and manage system data
       </p>
     </div>
   </div>
+  
+  <!-- Tabs -->
+  <div class="tabs-container">
+    <button 
+      class="tab" 
+      class:active={activeTab === 'status'}
+      on:click={() => activeTab = 'status'}
+    >
+      📊 Database Status
+    </button>
+    <button 
+      class="tab tab-danger" 
+      class:active={activeTab === 'reset'}
+      on:click={() => activeTab = 'reset'}
+    >
+      ⚠️ Reset Systems
+    </button>
+  </div>
 
   <div class="content">
+    {#if activeTab === 'status'}
+      <!-- Database Status Tab -->
+    
     <!-- Auto-Initialize Dialog -->
-    {#if showAutoInitDialog}
+    {#if showAutoInitDialog && activeTab === 'status'}
       <div class="auto-init-banner">
         <div class="banner-content">
           <div class="banner-icon">🚀</div>
@@ -286,27 +308,38 @@
       </div>
     {/if}
 
-    <!-- Quick Actions Banner -->
-    {#if mongoStatus && (mongoStatus.collections.presets === 0 || mongoStatus.collections.faults === 0)}
-      <div class="quick-action-banner">
-        <div class="banner-icon-large">💡</div>
-        <div class="banner-content-inline">
-          <h3>Quick Start</h3>
-          <p>Initialize your database with sample data to get started immediately!</p>
-        </div>
-        <button class="btn btn-primary btn-xl" on:click={() => initializeDatabase()} disabled={isLoading}>
-          {#if isLoading}
-            <span class="spinner"></span>
-            Initializing...
-          {:else}
-            🚀 Initialize Database Now
-          {/if}
-        </button>
-      </div>
+    <!-- End of Status Tab -->
     {/if}
+    
+    {#if activeTab === 'reset'}
+      <!-- Reset Systems Tab -->
+      <div class="reset-warning-card">
+        <div class="warning-icon">⚠️</div>
+        <h2>Danger Zone</h2>
+        <p>These actions should only be used for testing and development. Use caution in production environments.</p>
+      </div>
+      
+      <!-- Quick Actions Banner -->
+      {#if mongoStatus && (mongoStatus.collections.presets === 0 || mongoStatus.collections.faults === 0)}
+        <div class="quick-action-banner">
+          <div class="banner-icon-large">💡</div>
+          <div class="banner-content-inline">
+            <h3>Quick Start</h3>
+            <p>Initialize your database with sample data to get started immediately!</p>
+          </div>
+          <button class="btn btn-primary btn-xl" on:click={() => initializeDatabase()} disabled={isLoading}>
+            {#if isLoading}
+              <span class="spinner"></span>
+              Initializing...
+            {:else}
+              🚀 Initialize Database Now
+            {/if}
+          </button>
+        </div>
+      {/if}
 
-    <!-- Initialization Actions -->
-    <div class="actions-grid">
+      <!-- Initialization Actions -->
+      <div class="actions-grid">
       <div class="action-card" class:highlight={mongoStatus && mongoStatus.collections.presets === 0 && mongoStatus.collections.faults === 0}>
         <div class="action-icon">🚀</div>
         <h3>Initialize All</h3>
@@ -401,10 +434,84 @@
         </ul>
       </div>
     </div>
+    {/if}
+    <!-- End of Reset Tab -->
   </div>
 </div>
 
 <style>
+  /* Tabs */
+  .tabs-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--border-color);
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 2rem;
+  }
+  
+  .tab {
+    padding: 1rem 2rem;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    bottom: -2px;
+  }
+  
+  .tab:hover {
+    color: var(--text-primary);
+    background: var(--hover-bg);
+  }
+  
+  .tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: 600;
+  }
+  
+  .tab.tab-danger {
+    color: var(--danger-color);
+  }
+  
+  .tab.tab-danger.active {
+    border-bottom-color: var(--danger-color);
+  }
+  
+  /* Reset Warning Card */
+  .reset-warning-card {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 0.75rem;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  
+  .warning-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  .reset-warning-card h2 {
+    margin: 0 0 1rem 0;
+    font-size: 1.75rem;
+    color: white;
+  }
+  
+  .reset-warning-card p {
+    margin: 0;
+    font-size: 1.125rem;
+    opacity: 0.95;
+  }
+  
   .database-page {
     min-height: 100vh;
     background: var(--bg-primary);
