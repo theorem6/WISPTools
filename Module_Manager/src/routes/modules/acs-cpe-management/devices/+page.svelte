@@ -296,6 +296,13 @@
                 <button class="btn btn-sm btn-primary" on:click={() => viewDevice(device)}>
                   View Details
                 </button>
+                <a 
+                  href="/modules/acs-cpe-management/monitoring?deviceId={device.id}"
+                  class="btn btn-sm btn-secondary"
+                  title="View TR-069 Monitoring"
+                >
+                  View Monitoring
+                </a>
               </div>
             </div>
           </div>
