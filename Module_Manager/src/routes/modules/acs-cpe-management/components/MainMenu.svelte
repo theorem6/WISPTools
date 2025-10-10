@@ -28,8 +28,15 @@
       id: 'monitoring',
       name: 'Monitoring',
       icon: '📈',
-      description: 'LTE/5G network performance and KPIs',
+      description: 'Per-device TR-069 metrics and analysis',
       path: '/modules/acs-cpe-management/monitoring'
+    },
+    {
+      id: 'graphs',
+      name: 'Graphs',
+      icon: '📊',
+      description: 'Multi-device comparison and charts',
+      path: '/modules/acs-cpe-management/graphs'
     },
     {
       id: 'admin',
