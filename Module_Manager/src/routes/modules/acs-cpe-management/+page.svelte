@@ -377,14 +377,6 @@
   <!-- Main Navigation -->
   <MainMenu />
   
-  <!-- Exit Button -->
-  <a href="/modules" class="exit-button" aria-label="Exit to Modules">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="18" y1="6" x2="6" y2="18"></line>
-      <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-  </a>
-
   <!-- Help Button -->
   <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -397,6 +389,14 @@
   <!-- Module Header -->
   <div class="module-header">
     <div class="header-content">
+      <div class="header-top">
+        <a href="/modules" class="back-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Modules
+        </a>
+      </div>
       <div class="module-info">
         <h1 class="module-title">
           <span class="module-icon">📡</span>
@@ -621,29 +621,32 @@
 </div>
 
 <style>
-  .exit-button {
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    z-index: 1000;
-    width: 3rem;
-    height: 3rem;
-    border-radius: 50%;
-    border: 2px solid var(--border-color);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    display: flex;
+  .back-button {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
+    gap: 0.5rem;
+    color: var(--text-secondary);
     text-decoration: none;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
   }
 
-  .exit-button:hover {
-    background: var(--accent-color);
+  .back-button:hover {
+    color: var(--accent-color);
+    background: var(--bg-secondary);
     border-color: var(--accent-color);
-    color: white;
+  }
+
+  .back-button svg {
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    margin-bottom: 1rem;
   }
 
   .help-button {
