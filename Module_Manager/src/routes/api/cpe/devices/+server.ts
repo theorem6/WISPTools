@@ -3,7 +3,10 @@
 
 import type { RequestHandler } from '@sveltejs/kit';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, MONGODB_DATABASE } from '$env/static/private';
+
+// Use process.env instead of $env/static/private for compatibility
+const MONGODB_URI = process.env.MONGODB_URI || '';
+const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'genieacs';
 
 // GET - Fetch all CPE devices
 export const GET: RequestHandler = async ({ url }) => {
