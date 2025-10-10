@@ -28,7 +28,7 @@
   export let metrics: any[] = [];
   export let title: string = 'Signal Strength';
 
-  $: config: ChartConfiguration = {
+  $: config = {
     type: 'line',
     data: {
     labels: metrics.map(m => {

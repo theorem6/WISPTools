@@ -32,7 +32,7 @@
     return m.earfcn !== metrics[i - 1].earfcn;
   });
 
-  $: config: ChartConfiguration = {
+  $: config = {
     type: 'line',
     data: {
     labels: metrics.map((m, i) => {

@@ -27,7 +27,7 @@
 
   export let metrics: TR069CellularMetrics[] = [];
 
-  $: config: ChartConfiguration = {
+  $: config = {
     type: 'line',
     data: {
     labels: metrics.map(m => {
