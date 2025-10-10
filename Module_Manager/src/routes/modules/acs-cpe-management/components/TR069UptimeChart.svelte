@@ -1,30 +1,8 @@
 <script lang="ts">
   import Chart from '$lib/components/Chart.svelte';
-  import {
-    Chart as ChartJS,
-    Title,
-    Tooltip,
-    Legend,
-    LineElement,
-    LinearScale,
-    PointElement,
-    CategoryScale,
-    Filler,
-    type ChartConfiguration
-  } from 'chart.js';
+  import type { ChartConfiguration } from '$lib/chartSetup';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { formatUptime } from '../lib/tr069MetricsService';
-
-  ChartJS.register(
-    Title,
-    Tooltip,
-    Legend,
-    LineElement,
-    LinearScale,
-    PointElement,
-    CategoryScale,
-    Filler
-  );
 
   export let metrics: TR069CellularMetrics[] = [];
 
