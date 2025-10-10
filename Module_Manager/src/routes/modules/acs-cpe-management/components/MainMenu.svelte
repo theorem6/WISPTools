@@ -82,18 +82,16 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    gap: 1rem;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
   }
 
   .menu-item {
-    flex-shrink: 0;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     transition: all 0.2s ease;
-    min-width: 200px;
   }
 
   .menu-item:hover {
@@ -135,35 +133,75 @@
   }
 
   .menu-name {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 0.25rem;
   }
 
   .menu-description {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-secondary);
     line-height: 1.3;
   }
 
   /* Responsive design */
+  @media (max-width: 1200px) {
+    .menu-items {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.5rem;
+    }
+
+    .menu-link {
+      padding: 0.75rem;
+      gap: 0.75rem;
+    }
+
+    .menu-icon {
+      font-size: 1.25rem;
+    }
+
+    .menu-name {
+      font-size: 0.875rem;
+    }
+
+    .menu-description {
+      font-size: 0.65rem;
+    }
+  }
+
   @media (max-width: 768px) {
     .menu-items {
-      flex-direction: column;
+      grid-template-columns: repeat(2, 1fr);
       gap: 0.5rem;
     }
     
-    .menu-item {
-      min-width: auto;
-    }
-    
     .menu-link {
-      padding: 0.75rem;
+      padding: 0.75rem 0.5rem;
+      gap: 0.5rem;
     }
     
     .menu-icon {
-      font-size: 1.25rem;
+      font-size: 1.125rem;
+    }
+
+    .menu-name {
+      font-size: 0.8rem;
+    }
+
+    .menu-description {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .menu-items {
+      grid-template-columns: 1fr;
+    }
+
+    .menu-description {
+      display: block;
+      font-size: 0.7rem;
     }
   }
 </style>
