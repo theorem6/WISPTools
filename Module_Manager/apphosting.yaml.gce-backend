@@ -1,0 +1,154 @@
+# Firebase App Hosting Configuration - GCE Backend Integration
+# This configuration connects the frontend to the GCE backend
+# Replace placeholders with your actual GCE IP/domain
+
+# Build and run commands
+buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
+runCommand: node server.js
+
+runConfig:
+  # Optimized for SvelteKit + ArcGIS
+  cpu: 1                # 1 CPU is sufficient for most web apps
+  memoryMiB: 2048       # 2 GB - needed for ArcGIS and startup stability
+  minInstances: 0       # Scale to zero when idle (saves cost during dev/testing)
+  maxInstances: 5       # Sufficient for initial deployment
+  concurrency: 80       # Standard concurrency per instance
+
+env:
+  # ==========================================
+  # FIREBASE CONFIGURATION
+  # ==========================================
+  - variable: PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "lte-pci-mapper-65450042-bbf71.firebaseapp.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_FIREBASE_PROJECT_ID
+    value: "lte-pci-mapper-65450042-bbf71"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "lte-pci-mapper-65450042-bbf71.firebasestorage.app"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "1044782186913"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_FIREBASE_APP_ID
+    value: "1:1044782186913:web:a5367441ce136118948be0"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # GCE BACKEND CONFIGURATION
+  # ==========================================
+  # IMPORTANT: Replace <YOUR-GCE-DOMAIN> with your actual domain or IP
+  # Example: https://genieacs.yourdomain.com
+  
+  - variable: PUBLIC_BACKEND_API_URL
+    value: "https://<YOUR-GCE-DOMAIN>/api"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_NBI_URL
+    value: "https://<YOUR-GCE-DOMAIN>/nbi"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  # CWMP must use HTTP and direct IP (TR-069 protocol requirement)
+  # Replace <YOUR-GCE-IP> with your GCE external IP
+  - variable: PUBLIC_GENIEACS_CWMP_URL
+    value: "http://<YOUR-GCE-IP>:7547"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_FS_URL
+    value: "https://<YOUR-GCE-DOMAIN>/fs"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: PUBLIC_GENIEACS_UI_URL
+    value: "https://<YOUR-GCE-DOMAIN>/admin"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # STUN SERVER CONFIGURATION
+  # ==========================================
+  # Replace <YOUR-GCE-IP> with your GCE external IP
+  - variable: PUBLIC_STUN_SERVER
+    value: "stun:<YOUR-GCE-IP>:3478"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # ARCGIS CONFIGURATION
+  # ==========================================
+  - variable: PUBLIC_ARCGIS_API_KEY
+    value: "AAPT85fOqywZsicJupSmVSCGrjWNNjURUpnE--wnh6GZUreHU00VSEoRGgbf0JZjKYEmLnUXJw8E5r8Nz55eqYvvfcecdjs2BjpjcShOZgei0o-Myxttbl5f1qu9-AfdJaw4w3ugB4-uH6dh9v0PNN--vklICR-vCwt8YjMxw7CBrsZ5vxsZjo_jp31mV5hlMSSxQMJsKtFh0ltDrN4YwuK_8ZLmHMdIp5w9_jZrqJVlC2I.AT2_12sjSDHZ"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # AI SERVICES CONFIGURATION
+  # ==========================================
+  - variable: PUBLIC_GEMINI_API_KEY
+    value: "AIzaSyAVBmH_eC98f6GCIpHZJ8B_y40TuoIjXOg"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_WOLFRAM_APP_ID
+    value: "WQPAJ72446"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # APPLICATION CONFIGURATION
+  # ==========================================
+  - variable: NODE_ENV
+    value: "production"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PORT
+    value: "8080"
+    availability:
+      - RUNTIME
+
+  - variable: PUBLIC_APP_URL
+    value: "https://lte-pci-mapper-65450042-bbf71.web.app"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PUBLIC_API_TIMEOUT
+    value: "30000"  # 30 seconds
+    availability:
+      - BUILD
+      - RUNTIME
+
