@@ -25,19 +25,6 @@
 
 <!-- Module Layout -->
 <div class="module-layout">
-  <!-- Module Navigation Breadcrumb -->
-  <nav class="module-nav">
-    <div class="breadcrumb">
-      <a href="/" class="breadcrumb-item">Home</a>
-      <span class="breadcrumb-separator">/</span>
-      <a href="/modules" class="breadcrumb-item">Modules</a>
-      <span class="breadcrumb-separator">/</span>
-      <a href="/modules/acs-cpe-management" class="breadcrumb-item">ACS CPE Management</a>
-      <span class="breadcrumb-separator">/</span>
-      <span class="breadcrumb-current">{moduleInfo.title}</span>
-    </div>
-  </nav>
-
   <!-- Module Content -->
   <main class="module-main">
     <slot />
@@ -65,40 +52,6 @@
     flex-direction: column;
     background: var(--bg-primary);
     color: var(--text-primary);
-  }
-
-  .module-nav {
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1rem 2rem;
-  }
-
-  .breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  .breadcrumb-item {
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: color 0.2s;
-  }
-
-  .breadcrumb-item:hover {
-    color: var(--accent-color);
-  }
-
-  .breadcrumb-separator {
-    color: var(--text-tertiary);
-  }
-
-  .breadcrumb-current {
-    color: var(--text-primary);
-    font-weight: 500;
   }
 
   .module-main {
@@ -154,7 +107,6 @@
 
   /* Responsive design */
   @media (max-width: 768px) {
-    .module-nav,
     .module-footer {
       padding: 1rem;
     }
@@ -163,10 +115,6 @@
       flex-direction: column;
       gap: 0.5rem;
       align-items: flex-start;
-    }
-
-    .breadcrumb {
-      flex-wrap: wrap;
     }
   }
 </style>
