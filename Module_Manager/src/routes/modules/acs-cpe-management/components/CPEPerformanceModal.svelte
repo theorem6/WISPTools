@@ -1,10 +1,36 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
+  import LTESignalChart from './LTESignalChart.svelte';
+  import LTEThroughputChart from './LTEThroughputChart.svelte';
+  import { generateLTEMetricsHistory, getCurrentLTEKPIs, getSignalQuality, type LTEMetrics } from '../lib/lteMetricsService';
   
   export let device: any = null;
   export let show: boolean = false;
   
   const dispatch = createEventDispatcher();
+  
+  let deviceMetrics: LTEMetrics[] = [];
+  let currentSignal = { rsrp: -75, rsrq: -10, sinr: 15 };
+
+  $: if (show && device) {
+    loadDeviceMetrics();
+  }
+
+  async function loadDeviceMetrics() {
+    // Generate last 6 hours of metrics for this device
+    deviceMetrics = generateLTEMetricsHistory(6);
+    
+    // Get current signal values (last metric)
+    if (deviceMetrics.length > 0) {
+      const latest = deviceMetrics[deviceMetrics.length - 1];
+      currentSignal = {
+        rsrp: latest.rsrp,
+        rsrq: latest.rsrq,
+        sinr: latest.sinr
+      };
+    }
+  }
 
   function handleClose() {
     dispatch('close');
@@ -15,6 +41,8 @@
       handleClose();
     }
   }
+
+  $: signalQuality = getSignalQuality(currentSignal.rsrp);
 </script>
 
 {#if show && device}
@@ -85,6 +113,41 @@
                     <span class="param-value">{JSON.stringify(value)}</span>
                   </div>
                 {/each}
+              </div>
+            </div>
+          {/if}
+
+          <!-- Real-Time Performance Metrics -->
+          <div class="info-section">
+            <h3>Real-Time Performance</h3>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-label">Signal Strength</div>
+                <div class="metric-value" style="color: {signalQuality.color}">
+                  {currentSignal.rsrp.toFixed(1)} dBm
+                </div>
+                <div class="metric-quality">{signalQuality.label}</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Signal Quality</div>
+                <div class="metric-value">{currentSignal.rsrq.toFixed(1)} dB</div>
+                <div class="metric-quality">RSRQ</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">SINR</div>
+                <div class="metric-value">{currentSignal.sinr.toFixed(1)} dB</div>
+                <div class="metric-quality">Interference Ratio</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Performance Charts -->
+          {#if deviceMetrics.length > 0}
+            <div class="info-section">
+              <h3>Last 6 Hours</h3>
+              <div class="charts-grid">
+                <LTESignalChart metrics={deviceMetrics} title="Signal Trends" />
+                <LTEThroughputChart metrics={deviceMetrics} />
               </div>
             </div>
           {/if}
@@ -280,6 +343,46 @@
     background: var(--bg-primary);
   }
 
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  .metric-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .metric-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .metric-quality {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .charts-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
   @media (max-width: 640px) {
     .modal-content {
       max-width: 100%;
@@ -288,6 +391,10 @@
     }
 
     .info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .metrics-grid {
       grid-template-columns: 1fr;
     }
   }

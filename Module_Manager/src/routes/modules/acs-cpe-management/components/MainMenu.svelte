@@ -25,6 +25,13 @@
       path: '/modules/acs-cpe-management/faults'
     },
     {
+      id: 'monitoring',
+      name: 'Monitoring',
+      icon: '📈',
+      description: 'LTE/5G network performance and KPIs',
+      path: '/modules/acs-cpe-management/monitoring'
+    },
+    {
       id: 'admin',
       name: 'Administration',
       icon: '⚙️',
