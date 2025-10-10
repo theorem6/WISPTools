@@ -4,7 +4,7 @@
 
 # Build and run commands
 # Build runs from /Module_Manager directory due to rootDir setting in firebase.json
-buildCommand: npm install && npm run build
+buildCommand: npm install && npx svelte-kit sync && npm run build
 runCommand: node build/index.js
 
 runConfig:
