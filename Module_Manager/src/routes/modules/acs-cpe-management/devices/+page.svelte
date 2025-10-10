@@ -181,16 +181,16 @@
     <table class="devices-table">
       <thead>
         <tr>
-          <th style="width: 40px;"></th>
-          <th style="width: 60px;">Status</th>
-          <th>Device ID</th>
-          <th>Manufacturer</th>
-          <th>Model</th>
-          <th>Serial Number</th>
-          <th>IP Address</th>
-          <th>Firmware</th>
-          <th>Last Contact</th>
-          <th style="width: 250px;">Actions</th>
+          <th class="col-expand"></th>
+          <th class="col-status">Status</th>
+          <th class="col-device-id">Device ID</th>
+          <th class="col-manufacturer">Manufacturer</th>
+          <th class="col-model">Model</th>
+          <th class="col-serial">Serial Number</th>
+          <th class="col-ip">IP Address</th>
+          <th class="col-firmware">Firmware</th>
+          <th class="col-contact">Last Contact</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -448,18 +448,72 @@
 
   .devices-table th {
     text-align: left;
-    padding: 1rem;
+    padding: 0.75rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     font-size: 0.75rem;
     letter-spacing: 0.05em;
+    white-space: nowrap;
   }
 
   .devices-table td {
-    padding: 1rem;
+    padding: 0.75rem;
     border-bottom: 1px solid var(--border-color);
     color: var(--text-primary);
+    vertical-align: middle;
+  }
+
+  /* Column widths */
+  .col-expand {
+    width: 50px;
+    text-align: center;
+  }
+
+  .col-status {
+    width: 80px;
+    text-align: center;
+  }
+
+  .col-device-id {
+    width: 150px;
+    min-width: 120px;
+  }
+
+  .col-manufacturer {
+    width: 140px;
+    min-width: 100px;
+  }
+
+  .col-model {
+    width: 180px;
+    min-width: 140px;
+  }
+
+  .col-serial {
+    width: 160px;
+    min-width: 120px;
+  }
+
+  .col-ip {
+    width: 140px;
+    min-width: 100px;
+  }
+
+  .col-firmware {
+    width: 100px;
+    min-width: 80px;
+  }
+
+  .col-contact {
+    width: 140px;
+    min-width: 120px;
+  }
+
+  .col-actions {
+    width: 260px;
+    min-width: 260px;
+    text-align: center;
   }
 
   .loading-cell, .empty-cell {
@@ -512,7 +566,20 @@
 
     .devices-table th,
     .devices-table td {
-      padding: 0.75rem 0.5rem;
+      padding: 0.625rem 0.5rem;
+    }
+
+    .col-model,
+    .col-serial {
+      min-width: 100px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    /* Hide less critical columns on smaller screens */
+    .col-model,
+    .col-serial {
+      display: none;
     }
   }
 

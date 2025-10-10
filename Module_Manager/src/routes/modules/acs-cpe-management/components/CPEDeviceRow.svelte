@@ -32,24 +32,24 @@
 </script>
 
 <tr class="device-row" class:expanded={isExpanded}>
-  <td>
+  <td class="col-expand">
     <button class="expand-btn" on:click={toggleExpand} aria-label="Expand details">
       {isExpanded ? '▼' : '▶'}
     </button>
   </td>
-  <td>
+  <td class="col-status">
     <span class="status-indicator" class:online={device.status === 'Online'} class:offline={device.status === 'Offline'}></span>
   </td>
-  <td class="device-id-cell">
+  <td class="col-device-id">
     <span class="device-id">{device.id}</span>
   </td>
-  <td>{device.manufacturer}</td>
-  <td>{device.model || 'N/A'}</td>
-  <td>{device.serialNumber || 'N/A'}</td>
-  <td>{device.ipAddress || 'N/A'}</td>
-  <td>{device.firmware || 'N/A'}</td>
-  <td>{device.lastContact ? new Date(device.lastContact).toLocaleTimeString() : 'Never'}</td>
-  <td class="actions-cell">
+  <td class="col-manufacturer">{device.manufacturer}</td>
+  <td class="col-model">{device.model || 'N/A'}</td>
+  <td class="col-serial">{device.serialNumber || 'N/A'}</td>
+  <td class="col-ip">{device.ipAddress || 'N/A'}</td>
+  <td class="col-firmware">{device.firmware || 'N/A'}</td>
+  <td class="col-contact">{device.lastContact ? new Date(device.lastContact).toLocaleTimeString() : 'Never'}</td>
+  <td class="col-actions">
     <div class="action-buttons">
       <button class="action-btn" on:click={handleMonitoring} title="View Monitoring Graphs">
         📈
