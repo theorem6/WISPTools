@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import MainMenu from './components/MainMenu.svelte';
+  import HelpModal from '$lib/components/HelpModal.svelte';
+  import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
   
   // Module data
   let moduleData = {
@@ -15,9 +17,13 @@
   let cpeDevices: any[] = [];
   let selectedCPE: any = null;
   let showPerformanceModal = false;
+  let showHelpModal = false;
   let isLoading = true;
   let error: string | null = null;
   let map: any = null;
+  
+  // Documentation content
+  const helpContent = acsCpeDocs;
 
   onMount(async () => {
     try {
@@ -364,6 +370,15 @@
   <!-- Main Navigation -->
   <MainMenu />
   
+  <!-- Help Button -->
+  <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+  </button>
+  
   <!-- Module Header -->
   <div class="module-header">
     <div class="header-content">
@@ -580,9 +595,46 @@
       </div>
     </div>
   {/if}
+  
+  <!-- Help Modal -->
+  <HelpModal 
+    show={showHelpModal}
+    title="ACS CPE Management Help"
+    content={helpContent}
+    on:close={() => showHelpModal = false}
+  />
 </div>
 
 <style>
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+  
+  .help-button svg {
+    width: 28px;
+    height: 28px;
+  }
+
   .acs-module {
     min-height: 100vh;
     background: var(--bg-primary);

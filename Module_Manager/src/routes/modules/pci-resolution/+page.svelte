@@ -41,6 +41,8 @@
   import VerticalMenu from '$lib/components/VerticalMenu.svelte';
   import SettingsMenu from '$lib/components/SettingsMenu.svelte';
   import BasemapSwitcher from '$lib/components/BasemapSwitcher.svelte';
+  import HelpModal from '$lib/components/HelpModal.svelte';
+  import { pciResolutionDocs } from '$lib/docs/pci-resolution-docs';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertLegacyToCellSite, convertCellSiteToLegacy } from '$lib/models/cellSite';
   
@@ -57,9 +59,13 @@
   let showContextMenu = false;
   let showTowerManager = false;
   let showExportModal = false;
+  let showHelpModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let selectedCell: Cell | null = null;
+  
+  // Documentation content
+  const helpContent = pciResolutionDocs;
   let selectedSite: CellSite | null = null;
   let isCreatingNewCell = false;
   let isCreatingNewSite = false;
@@ -595,6 +601,15 @@
   
   <!-- Bottom Right: Settings Gear Menu -->
   <SettingsMenu />
+  
+  <!-- Help Button -->
+  <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+  </button>
 
   <!-- Modular Components - Isolated and reusable -->
   <NetworkManager 
@@ -717,6 +732,14 @@
       </div>
     </div>
   {/if}
+  
+  <!-- Help Modal -->
+  <HelpModal 
+    show={showHelpModal}
+    title="PCI Resolution & Network Optimization Help"
+    content={helpContent}
+    on:close={() => showHelpModal = false}
+  />
   
         </div>
 
@@ -853,5 +876,35 @@
   .modal-body {
     overflow-y: auto;
     padding: 0;
+  }
+  
+  /* Help Button */
+  .help-button {
+    position: fixed;
+    bottom: 5rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+  
+  .help-button svg {
+    width: 28px;
+    height: 28px;
   }
 </style>
