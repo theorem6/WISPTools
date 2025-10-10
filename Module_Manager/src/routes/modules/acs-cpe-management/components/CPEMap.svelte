@@ -79,13 +79,15 @@
 
       view.ui.add(bgExpand, 'top-right');
 
-      // Handle click on markers
+      // Handle click on markers - navigate to monitoring page
       view.on('click', (event) => {
         view.hitTest(event).then((response) => {
           if (response.results.length > 0) {
             const graphic = response.results[0].graphic;
             if (graphic.attributes && graphic.attributes.device) {
-              dispatch('cpeClick', graphic.attributes.device);
+              const device = graphic.attributes.device;
+              // Navigate to monitoring page for this device
+              window.location.href = `/modules/acs-cpe-management/monitoring?deviceId=${device.id}`;
             }
           }
         });

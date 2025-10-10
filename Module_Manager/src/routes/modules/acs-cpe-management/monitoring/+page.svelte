@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { page } from '$app/stores';
   import MainMenu from '../components/MainMenu.svelte';
   import LTESignalChart from '../components/LTESignalChart.svelte';
   import TR069PCIChart from '../components/TR069PCIChart.svelte';
@@ -10,6 +11,7 @@
   import LTEKPICards from '../components/LTEKPICards.svelte';
   import { generateTR069MetricsHistory, type TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getCurrentLTEKPIs, type LTEKPIs } from '../lib/lteMetricsService';
+  import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
 
   let metrics: TR069CellularMetrics[] = [];
   let kpis: LTEKPIs;
@@ -18,8 +20,25 @@
   let refreshInterval: number | null = null;
   let lastUpdate: Date | null = null;
   let timeRange: '1h' | '6h' | '24h' | '7d' = '24h';
+  
+  // Device selection
+  let cpeDevices: CPEDevice[] = [];
+  let selectedDeviceId: string = '';
+  let selectedDevice: CPEDevice | null = null;
 
   onMount(async () => {
+    // Load available CPE devices
+    cpeDevices = await loadCPEDevices();
+    
+    // Check if deviceId is in URL query params
+    const urlDeviceId = $page.url.searchParams.get('deviceId');
+    if (urlDeviceId) {
+      selectedDeviceId = urlDeviceId;
+    } else if (cpeDevices.length > 0) {
+      // Default to first device
+      selectedDeviceId = cpeDevices[0].id;
+    }
+    
     await loadMetrics();
     startAutoRefresh();
   });
@@ -29,20 +48,33 @@
   });
 
   async function loadMetrics() {
+    if (!selectedDeviceId) return;
+    
     isLoading = true;
     
     try {
-      // TODO: Replace with real API call to /api/tr069/metrics
-      // This would query GenieACS/MongoDB for historical parameter values
+      // TODO: Replace with real API call to /api/tr069/metrics?deviceId={selectedDeviceId}&hours={hours}
+      // This would query GenieACS/MongoDB for historical parameter values for specific device
+      console.log(`Loading TR-069 metrics for device: ${selectedDeviceId}`);
+      
       const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 168;
-      metrics = generateTR069MetricsHistory(hours, 'CPE-001');
+      metrics = generateTR069MetricsHistory(hours, selectedDeviceId);
       kpis = getCurrentLTEKPIs();
       lastUpdate = new Date();
+      
+      // Find selected device details
+      selectedDevice = cpeDevices.find(d => d.id === selectedDeviceId) || null;
     } catch (error) {
       console.error('Failed to load TR-069 metrics:', error);
     } finally {
       isLoading = false;
     }
+  }
+  
+  async function handleDeviceChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    selectedDeviceId = target.value;
+    await loadMetrics();
   }
 
   function startAutoRefresh() {
@@ -71,6 +103,11 @@
     timeRange = range;
     await loadMetrics();
   }
+  
+  // Watch for selectedDeviceId changes
+  $: if (selectedDeviceId) {
+    loadMetrics();
+  }
 </script>
 
 <svelte:head>
@@ -94,13 +131,33 @@
       </div>
       <h1 class="page-title">
         <span class="page-icon">📈</span>
-        Network Monitoring (TR-069)
+        CPE Device Monitoring (TR-069)
       </h1>
       <p class="page-description">
-        Real-time LTE/5G metrics from CPE devices via TR-069/CWMP
+        {#if selectedDevice}
+          Monitoring: {selectedDevice.manufacturer} - {selectedDevice.id}
+        {:else}
+          Select a CPE device to view real-time TR-069 metrics
+        {/if}
       </p>
     </div>
     <div class="header-actions">
+      <!-- Device Selector -->
+      <div class="device-selector">
+        <label for="device-select" class="selector-label">Select CPE:</label>
+        <select 
+          id="device-select" 
+          bind:value={selectedDeviceId} 
+          on:change={handleDeviceChange}
+          class="device-select"
+        >
+          {#each cpeDevices as device}
+            <option value={device.id}>
+              {device.manufacturer} - {device.id} ({device.status})
+            </option>
+          {/each}
+        </select>
+      </div>
       <div class="time-range-selector">
         <button 
           class="time-btn" 
@@ -150,9 +207,17 @@
     </div>
   </div>
 
-  {#if lastUpdate}
+  {#if lastUpdate && selectedDevice}
     <div class="last-update">
-      Last updated: {lastUpdate.toLocaleTimeString()}
+      <span class="device-status" class:online={selectedDevice.status === 'Online'} class:offline={selectedDevice.status === 'Offline'}>
+        {selectedDevice.status}
+      </span>
+      <span>•</span>
+      <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+      {#if selectedDevice.location}
+        <span>•</span>
+        <span>📍 {selectedDevice.location.latitude.toFixed(4)}, {selectedDevice.location.longitude.toFixed(4)}</span>
+      {/if}
     </div>
   {/if}
 
@@ -168,9 +233,9 @@
 
       <!-- TR-069 Cellular Parameters Section -->
       <div class="section-header">
-        <h2>TR-069 Cellular Interface Metrics</h2>
+        <h2>TR-069 Cellular Interface Metrics - {selectedDevice ? selectedDevice.id : 'No Device Selected'}</h2>
         <p class="section-description">
-          Real-time monitoring of Device.Cellular.Interface parameters from CPE devices
+          Real-time monitoring of Device.Cellular.Interface parameters from selected CPE device
         </p>
       </div>
 
@@ -378,13 +443,68 @@
     font-size: 1rem;
   }
 
+  .device-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .selector-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .device-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    min-width: 250px;
+  }
+
+  .device-select:hover {
+    border-color: var(--accent-color);
+  }
+
+  .device-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
   .last-update {
     padding: 0.75rem 2rem;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 1rem;
     font-size: 0.875rem;
     color: var(--text-secondary);
+  }
+
+  .device-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .device-status.online {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+  }
+
+  .device-status.offline {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
   }
 
   .content {
@@ -531,14 +651,35 @@
     .header-actions {
       flex-direction: column;
       width: 100%;
+      gap: 0.75rem;
+    }
+
+    .device-selector {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+    }
+
+    .device-select {
+      width: 100%;
+      min-width: auto;
     }
 
     .time-range-selector {
       justify-content: center;
+      width: 100%;
     }
 
     .btn {
       justify-content: center;
+      width: 100%;
+    }
+
+    .last-update {
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: flex-start;
+      padding: 0.75rem 1rem;
     }
 
     .content {
