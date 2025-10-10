@@ -274,10 +274,17 @@
 
       // Fit map to show all markers if we have devices
       if (cpeDevices.length > 0 && map._view && map._graphicsLayer.graphics.length > 0) {
-        await map._view.goTo({
-          target: map._graphicsLayer.graphics,
-          padding: 50
-        });
+        try {
+          // Wait for view to be ready before animating
+          await map._view.when();
+          await map._view.goTo({
+            target: map._graphicsLayer.graphics,
+            padding: 50
+          });
+        } catch (goToError) {
+          console.warn('Could not animate to markers, skipping:', goToError);
+          // Continue without animation - not critical
+        }
       }
 
       console.log(`Added ${cpeDevices.length} CPE markers to ArcGIS map`);
