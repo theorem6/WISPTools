@@ -158,6 +158,12 @@
   
   <div class="page-header">
     <div class="header-content">
+      <a href="/modules/acs-cpe-management/admin" class="back-button">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Admin
+      </a>
       <h1 class="page-title">
         <span class="page-icon">⚙️</span>
         System Configuration
@@ -457,6 +463,28 @@
     min-height: 100vh;
     background: var(--bg-primary);
     color: var(--text-primary);
+  }
+
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+    margin-bottom: 0.5rem;
+  }
+
+  .back-button:hover {
+    color: var(--accent-color);
+    background: var(--bg-tertiary);
+  }
+
+  .back-button svg {
+    flex-shrink: 0;
   }
 
   .page-header {
