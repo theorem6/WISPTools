@@ -6,6 +6,8 @@ import {
   PointElement,
   LineElement,
   BarElement,
+  LineController,
+  BarController,
   Title,
   Tooltip,
   Legend,
@@ -14,12 +16,16 @@ import {
 } from 'chart.js';
 
 // Register all Chart.js components globally
+// IMPORTANT: Must register controllers (LineController, BarController)
+// in addition to elements (LineElement, BarElement)
 Chart.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
   BarElement,
+  LineController,
+  BarController,
   Title,
   Tooltip,
   Legend,
