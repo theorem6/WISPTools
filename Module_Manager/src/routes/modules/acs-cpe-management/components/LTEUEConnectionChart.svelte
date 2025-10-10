@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Line } from 'svelte-chartjs';
+  import Chart from '$lib/components/Chart.svelte';
   import {
     Chart as ChartJS,
     Title,
@@ -10,9 +10,8 @@
     PointElement,
     CategoryScale,
     Filler,
-    type ChartOptions
+    type ChartConfiguration
   } from 'chart.js';
-  import type { LTEMetrics } from '../lib/lteMetricsService';
 
   ChartJS.register(
     Title,
@@ -25,9 +24,11 @@
     Filler
   );
 
-  export let metrics: LTEMetrics[] = [];
+  export let metrics: any[] = [];
 
-  $: chartData = {
+  $: config: ChartConfiguration = {
+    type: 'line',
+    data: {
     labels: metrics.map(m => {
       const time = new Date(m.timestamp);
       return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -55,9 +56,8 @@
         yAxisID: 'y1'
       }
     ]
-  };
-
-  const options: ChartOptions<'line'> = {
+    },
+    options: {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -134,13 +134,14 @@
         }
       }
     }
+    }
   };
 </script>
 
 <div class="chart-container">
   <h3 class="chart-title">UE Connections & Resource Utilization</h3>
   <div class="chart-wrapper">
-    <Line data={chartData} options={options} />
+    <Chart {config} height={300} />
   </div>
 </div>
 

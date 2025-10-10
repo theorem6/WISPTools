@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Line } from 'svelte-chartjs';
+  import Chart from '$lib/components/Chart.svelte';
   import {
     Chart as ChartJS,
     Title,
@@ -10,7 +10,7 @@
     PointElement,
     CategoryScale,
     Filler,
-    type ChartOptions
+    type ChartConfiguration
   } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getSINRQuality } from '../lib/tr069MetricsService';
@@ -34,7 +34,9 @@
     return quality.color;
   });
 
-  $: chartData = {
+  $: config: ChartConfiguration = {
+    type: 'line',
+    data: {
     labels: metrics.map(m => {
       const time = new Date(m.timestamp);
       return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -63,9 +65,8 @@
         }
       }
     ]
-  };
-
-  const options: ChartOptions<'line'> = {
+    },
+    options: {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -120,6 +121,7 @@
         }
       }
     }
+    }
   };
 
   $: avgSINR = metrics.length > 0 
@@ -138,7 +140,7 @@
     </span>
   </div>
   <div class="chart-wrapper">
-    <Line data={chartData} options={options} />
+    <Chart {config} height={300} />
   </div>
   <div class="chart-info">
     <span class="info-item">📊 Current: {currentSINR.toFixed(1)} dB</span>

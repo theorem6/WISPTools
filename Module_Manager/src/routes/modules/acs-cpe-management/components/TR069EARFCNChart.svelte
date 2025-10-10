@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Line } from 'svelte-chartjs';
+  import Chart from '$lib/components/Chart.svelte';
   import {
     Chart as ChartJS,
     Title,
@@ -9,7 +9,7 @@
     LinearScale,
     PointElement,
     CategoryScale,
-    type ChartOptions
+    type ChartConfiguration
   } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getLTEBandName } from '../lib/tr069MetricsService';
@@ -32,7 +32,9 @@
     return m.earfcn !== metrics[i - 1].earfcn;
   });
 
-  $: chartData = {
+  $: config: ChartConfiguration = {
+    type: 'line',
+    data: {
     labels: metrics.map((m, i) => {
       const time = new Date(m.timestamp);
       const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -66,9 +68,8 @@
         yAxisID: 'y1'
       }
     ]
-  };
-
-  const options: ChartOptions<'line'> = {
+    },
+    options: {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -155,6 +156,7 @@
         }
       }
     }
+    }
   };
 
   $: frequencyChanges = earfcnChanges.filter(Boolean).length;
@@ -172,7 +174,7 @@
     {/if}
   </div>
   <div class="chart-wrapper">
-    <Line data={chartData} options={options} />
+    <Chart {config} height={300} />
   </div>
   <div class="chart-info">
     <span class="info-item">📡 Current EARFCN: {currentEARFCN}</span>

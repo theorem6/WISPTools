@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Line } from 'svelte-chartjs';
+  import Chart from '$lib/components/Chart.svelte';
   import {
     Chart as ChartJS,
     Title,
@@ -10,7 +10,7 @@
     PointElement,
     CategoryScale,
     Filler,
-    type ChartOptions
+    type ChartConfiguration
   } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
@@ -27,7 +27,9 @@
 
   export let metrics: TR069CellularMetrics[] = [];
 
-  $: chartData = {
+  $: config: ChartConfiguration = {
+    type: 'line',
+    data: {
     labels: metrics.map(m => {
       const time = new Date(m.timestamp);
       return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -54,9 +56,8 @@
         pointHoverRadius: 6
       }
     ]
-  };
-
-  const options: ChartOptions<'line'> = {
+    },
+    options: {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -108,13 +109,14 @@
         }
       }
     }
+    }
   };
 </script>
 
 <div class="chart-container">
   <h3 class="chart-title">RSSI & RSCP (TR-069 Parameters)</h3>
   <div class="chart-wrapper">
-    <Line data={chartData} options={options} />
+    <Chart {config} height={300} />
   </div>
   <div class="chart-legend-info">
     <div class="legend-item">
