@@ -2,12 +2,16 @@
   import { onMount, onDestroy } from 'svelte';
   import MainMenu from '../components/MainMenu.svelte';
   import LTESignalChart from '../components/LTESignalChart.svelte';
-  import LTEThroughputChart from '../components/LTEThroughputChart.svelte';
-  import LTEUEConnectionChart from '../components/LTEUEConnectionChart.svelte';
+  import TR069PCIChart from '../components/TR069PCIChart.svelte';
+  import TR069EARFCNChart from '../components/TR069EARFCNChart.svelte';
+  import TR069RSSIChart from '../components/TR069RSSIChart.svelte';
+  import TR069SINRChart from '../components/TR069SINRChart.svelte';
+  import TR069UptimeChart from '../components/TR069UptimeChart.svelte';
   import LTEKPICards from '../components/LTEKPICards.svelte';
-  import { generateLTEMetricsHistory, getCurrentLTEKPIs, type LTEMetrics, type LTEKPIs } from '../lib/lteMetricsService';
+  import { generateTR069MetricsHistory, type TR069CellularMetrics } from '../lib/tr069MetricsService';
+  import { getCurrentLTEKPIs, type LTEKPIs } from '../lib/lteMetricsService';
 
-  let metrics: LTEMetrics[] = [];
+  let metrics: TR069CellularMetrics[] = [];
   let kpis: LTEKPIs;
   let isLoading = true;
   let autoRefresh = true;
@@ -28,13 +32,14 @@
     isLoading = true;
     
     try {
-      // TODO: Replace with real API call to /api/lte/metrics
+      // TODO: Replace with real API call to /api/tr069/metrics
+      // This would query GenieACS/MongoDB for historical parameter values
       const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 168;
-      metrics = generateLTEMetricsHistory(hours);
+      metrics = generateTR069MetricsHistory(hours, 'CPE-001');
       kpis = getCurrentLTEKPIs();
       lastUpdate = new Date();
     } catch (error) {
-      console.error('Failed to load LTE metrics:', error);
+      console.error('Failed to load TR-069 metrics:', error);
     } finally {
       isLoading = false;
     }
@@ -89,10 +94,10 @@
       </div>
       <h1 class="page-title">
         <span class="page-icon">📈</span>
-        Network Monitoring
+        Network Monitoring (TR-069)
       </h1>
       <p class="page-description">
-        Real-time LTE/5G performance metrics and KPIs
+        Real-time LTE/5G metrics from CPE devices via TR-069/CWMP
       </p>
     </div>
     <div class="header-actions">
@@ -161,18 +166,32 @@
       <!-- KPI Cards -->
       <LTEKPICards {kpis} />
 
+      <!-- TR-069 Cellular Parameters Section -->
+      <div class="section-header">
+        <h2>TR-069 Cellular Interface Metrics</h2>
+        <p class="section-description">
+          Real-time monitoring of Device.Cellular.Interface parameters from CPE devices
+        </p>
+      </div>
+
       <!-- Charts Grid -->
       <div class="charts-grid">
-        <LTESignalChart {metrics} title="Signal Strength (RSRP/RSRQ)" />
-        <LTEThroughputChart {metrics} />
-        <LTEUEConnectionChart {metrics} />
-        <LTESINRChart {metrics} />
+        <TR069RSSIChart {metrics} />
+        <LTESignalChart metrics={metrics} title="RSRP/RSRQ (TR-069)" />
+        <TR069SINRChart {metrics} />
+        <TR069PCIChart {metrics} />
+        <TR069EARFCNChart {metrics} />
+        <TR069UptimeChart {metrics} />
       </div>
 
       <!-- Network Health Summary -->
       <div class="health-summary">
-        <h2>Network Health Summary</h2>
+        <h2>TR-069 Network Summary</h2>
         <div class="summary-grid">
+          <div class="summary-item">
+            <span class="summary-label">Average RSSI:</span>
+            <span class="summary-value">{(metrics.reduce((sum, m) => sum + m.rssi, 0) / metrics.length).toFixed(1)} dBm</span>
+          </div>
           <div class="summary-item">
             <span class="summary-label">Average RSRP:</span>
             <span class="summary-value">{(metrics.reduce((sum, m) => sum + m.rsrp, 0) / metrics.length).toFixed(1)} dBm</span>
@@ -182,20 +201,29 @@
             <span class="summary-value">{(metrics.reduce((sum, m) => sum + m.sinr, 0) / metrics.length).toFixed(1)} dB</span>
           </div>
           <div class="summary-item">
-            <span class="summary-label">Peak Throughput DL:</span>
-            <span class="summary-value">{Math.max(...metrics.map(m => m.throughputDL)).toFixed(1)} Mbps</span>
+            <span class="summary-label">Current PCI:</span>
+            <span class="summary-value">{metrics.length > 0 ? metrics[metrics.length - 1].pci : 'N/A'}</span>
           </div>
           <div class="summary-item">
-            <span class="summary-label">Peak UE Count:</span>
-            <span class="summary-value">{Math.max(...metrics.map(m => m.ueCount))}</span>
+            <span class="summary-label">Current EARFCN:</span>
+            <span class="summary-value">{metrics.length > 0 ? metrics[metrics.length - 1].earfcn : 'N/A'}</span>
           </div>
           <div class="summary-item">
-            <span class="summary-label">Avg PRB Utilization:</span>
-            <span class="summary-value">{(metrics.reduce((sum, m) => sum + m.prbUtilization, 0) / metrics.length).toFixed(1)}%</span>
+            <span class="summary-label">Connection Status:</span>
+            <span class="summary-value">{metrics.length > 0 ? metrics[metrics.length - 1].status : 'Unknown'}</span>
           </div>
-          <div class="summary-item">
-            <span class="summary-label">Network Availability:</span>
-            <span class="summary-value">99.8%</span>
+        </div>
+        
+        <div class="tr069-info">
+          <h3>📋 TR-069 Parameter Paths</h3>
+          <div class="path-grid">
+            <code>Device.Cellular.Interface.1.RSSI</code>
+            <code>Device.Cellular.Interface.1.RSRP</code>
+            <code>Device.Cellular.Interface.1.RSRQ</code>
+            <code>Device.Cellular.Interface.1.SINR</code>
+            <code>Device.Cellular.Interface.1.X_VENDOR_PhysicalCellID</code>
+            <code>Device.Cellular.Interface.1.X_VENDOR_EARFCN</code>
+            <code>Device.DeviceInfo.UpTime</code>
           </div>
         </div>
       </div>
@@ -440,6 +468,51 @@
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-primary);
+  }
+
+  .section-header {
+    margin: 2rem 0 1.5rem 0;
+  }
+
+  .section-header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .section-description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .tr069-info {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .tr069-info h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.125rem;
+    color: var(--text-primary);
+  }
+
+  .path-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .path-grid code {
+    background: var(--bg-tertiary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: var(--accent-color);
+    border: 1px solid var(--border-color);
   }
 
   @media (max-width: 1200px) {

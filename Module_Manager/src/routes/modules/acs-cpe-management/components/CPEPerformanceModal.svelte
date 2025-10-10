@@ -1,33 +1,47 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { onMount } from 'svelte';
-  import LTESignalChart from './LTESignalChart.svelte';
-  import LTEThroughputChart from './LTEThroughputChart.svelte';
-  import { generateLTEMetricsHistory, getCurrentLTEKPIs, getSignalQuality, type LTEMetrics } from '../lib/lteMetricsService';
+  import TR069RSSIChart from './TR069RSSIChart.svelte';
+  import TR069SINRChart from './TR069SINRChart.svelte';
+  import TR069PCIChart from './TR069PCIChart.svelte';
+  import TR069EARFCNChart from './TR069EARFCNChart.svelte';
+  import { 
+    generateTR069MetricsHistory, 
+    getRSSIQuality,
+    getRSRPQuality,
+    getSINRQuality,
+    formatUptime,
+    type TR069CellularMetrics 
+  } from '../lib/tr069MetricsService';
   
   export let device: any = null;
   export let show: boolean = false;
   
   const dispatch = createEventDispatcher();
   
-  let deviceMetrics: LTEMetrics[] = [];
-  let currentSignal = { rsrp: -75, rsrq: -10, sinr: 15 };
+  let deviceMetrics: TR069CellularMetrics[] = [];
+  let currentSignal = { rssi: -65, rsrp: -75, rsrq: -10, sinr: 15, pci: 156, earfcn: 5230, uptime: 0 };
 
   $: if (show && device) {
     loadDeviceMetrics();
   }
 
   async function loadDeviceMetrics() {
-    // Generate last 6 hours of metrics for this device
-    deviceMetrics = generateLTEMetricsHistory(6);
+    // TODO: Replace with real API call to /api/tr069/device-metrics?deviceId={device.id}
+    // Query GenieACS database for historical values of cellular parameters
+    deviceMetrics = generateTR069MetricsHistory(6, device.id);
     
     // Get current signal values (last metric)
     if (deviceMetrics.length > 0) {
       const latest = deviceMetrics[deviceMetrics.length - 1];
       currentSignal = {
+        rssi: latest.rssi,
         rsrp: latest.rsrp,
         rsrq: latest.rsrq,
-        sinr: latest.sinr
+        sinr: latest.sinr,
+        pci: latest.pci,
+        earfcn: latest.earfcn,
+        uptime: latest.uptime
       };
     }
   }
@@ -42,7 +56,9 @@
     }
   }
 
-  $: signalQuality = getSignalQuality(currentSignal.rsrp);
+  $: rssiQuality = getRSSIQuality(currentSignal.rssi);
+  $: rsrpQuality = getRSRPQuality(currentSignal.rsrp);
+  $: sinrQuality = getSINRQuality(currentSignal.sinr);
 </script>
 
 {#if show && device}
@@ -117,37 +133,64 @@
             </div>
           {/if}
 
-          <!-- Real-Time Performance Metrics -->
+          <!-- Real-Time TR-069 Metrics -->
           <div class="info-section">
-            <h3>Real-Time Performance</h3>
+            <h3>Real-Time TR-069 Cellular Metrics</h3>
             <div class="metrics-grid">
               <div class="metric-card">
-                <div class="metric-label">Signal Strength</div>
-                <div class="metric-value" style="color: {signalQuality.color}">
-                  {currentSignal.rsrp.toFixed(1)} dBm
+                <div class="metric-label">RSSI</div>
+                <div class="metric-value" style="color: {rssiQuality.color}">
+                  {currentSignal.rssi.toFixed(1)} dBm
                 </div>
-                <div class="metric-quality">{signalQuality.label}</div>
+                <div class="metric-quality">{rssiQuality.label}</div>
+                <div class="metric-path">Device.Cellular.Interface.1.RSSI</div>
               </div>
               <div class="metric-card">
-                <div class="metric-label">Signal Quality</div>
-                <div class="metric-value">{currentSignal.rsrq.toFixed(1)} dB</div>
-                <div class="metric-quality">RSRQ</div>
+                <div class="metric-label">RSRP</div>
+                <div class="metric-value" style="color: {rsrpQuality.color}">
+                  {currentSignal.rsrp.toFixed(1)} dBm
+                </div>
+                <div class="metric-quality">{rsrpQuality.label}</div>
+                <div class="metric-path">Device.Cellular.Interface.1.RSRP</div>
               </div>
               <div class="metric-card">
                 <div class="metric-label">SINR</div>
-                <div class="metric-value">{currentSignal.sinr.toFixed(1)} dB</div>
-                <div class="metric-quality">Interference Ratio</div>
+                <div class="metric-value" style="color: {sinrQuality.color}">
+                  {currentSignal.sinr.toFixed(1)} dB
+                </div>
+                <div class="metric-quality">{sinrQuality.label}</div>
+                <div class="metric-path">Device.Cellular.Interface.1.SINR</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Physical Cell ID</div>
+                <div class="metric-value">{currentSignal.pci}</div>
+                <div class="metric-quality">Mod3: {currentSignal.pci % 3}</div>
+                <div class="metric-path">X_VENDOR_PhysicalCellID</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">EARFCN</div>
+                <div class="metric-value">{currentSignal.earfcn}</div>
+                <div class="metric-quality">Frequency Channel</div>
+                <div class="metric-path">X_VENDOR_EARFCN</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Uptime</div>
+                <div class="metric-value">{formatUptime(currentSignal.uptime)}</div>
+                <div class="metric-quality">Connection Time</div>
+                <div class="metric-path">Device.DeviceInfo.UpTime</div>
               </div>
             </div>
           </div>
 
-          <!-- Performance Charts -->
+          <!-- TR-069 Performance Charts -->
           {#if deviceMetrics.length > 0}
             <div class="info-section">
-              <h3>Last 6 Hours</h3>
+              <h3>Last 6 Hours - TR-069 Parameter History</h3>
               <div class="charts-grid">
-                <LTESignalChart metrics={deviceMetrics} title="Signal Trends" />
-                <LTEThroughputChart metrics={deviceMetrics} />
+                <TR069RSSIChart metrics={deviceMetrics} />
+                <TR069SINRChart metrics={deviceMetrics} />
+                <TR069PCIChart metrics={deviceMetrics} />
+                <TR069EARFCNChart metrics={deviceMetrics} />
               </div>
             </div>
           {/if}
@@ -378,8 +421,19 @@
     color: var(--text-secondary);
   }
 
+  .metric-path {
+    font-size: 0.65rem;
+    color: var(--text-tertiary);
+    font-family: monospace;
+    margin-top: 0.25rem;
+    background: var(--bg-primary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+  }
+
   .charts-grid {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 1rem;
   }
 
