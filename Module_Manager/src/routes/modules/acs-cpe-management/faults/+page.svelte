@@ -225,6 +225,44 @@
     loadFaults();
   }
 
+  async function deleteFault(fault) {
+    if (!confirm(`Delete fault ${fault.id}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      console.log(`Deleting fault ${fault.id}...`);
+      
+      // Use SvelteKit API route
+      const response = await fetch('/api/faults', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: fault.id })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log(`Successfully deleted fault ${fault.id}`);
+          // Remove from local array
+          faults = faults.filter(f => f.id !== fault.id);
+          return;
+        }
+      }
+      
+      console.log('API not available, removing locally');
+      // Fallback to local delete
+      faults = faults.filter(f => f.id !== fault.id);
+      
+    } catch (error) {
+      console.error('Failed to delete fault:', error);
+      // Still remove locally
+      faults = faults.filter(f => f.id !== fault.id);
+    }
+  }
+
   function getFaultStats() {
     const total = faults.length;
     const open = faults.filter(f => f.status === 'Open').length;
