@@ -328,7 +328,7 @@
         </div>
       {/if}
 
-      {#if activeTab === 'connection'}
+      {#if activeTab === 'connection' && settings}
         <div class="settings-panel">
           <h2>Connection Information</h2>
           
@@ -349,13 +349,71 @@
             <p class="help-text">Unique identifier for your organization</p>
           </div>
 
+          <div class="info-box credentials-box">
+            <h3>ACS Authentication Credentials</h3>
+            <p class="help-text">Credentials that CPE devices must use to connect</p>
+            
+            <div class="form-group">
+              <label>
+                <input type="checkbox" bind:checked={settings.requireAuth} />
+                Require Authentication
+              </label>
+              <p class="help-text">If enabled, devices must provide username/password</p>
+            </div>
+
+            <div class="credentials-grid">
+              <div class="form-group">
+                <label for="acs-username">ACS Username</label>
+                <input
+                  id="acs-username"
+                  type="text"
+                  bind:value={settings.acsUsername}
+                  disabled={!settings.requireAuth}
+                  placeholder="admin"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="acs-password">ACS Password</label>
+                <div class="password-field">
+                  <input
+                    id="acs-password"
+                    type="text"
+                    bind:value={settings.acsPassword}
+                    disabled={!settings.requireAuth}
+                    placeholder="••••••••"
+                  />
+                  <button 
+                    class="generate-btn"
+                    on:click={() => settings.acsPassword = Math.random().toString(36).slice(-16)}
+                    disabled={!settings.requireAuth}
+                  >
+                    🔄 Generate
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              class="btn-primary" 
+              on:click={saveDeviceSettings}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save ACS Credentials'}
+            </button>
+          </div>
+
           <div class="info-box">
             <h3>Connection Instructions</h3>
             <ol class="instructions">
               <li>Access your device's TR-069 configuration</li>
-              <li>Set ACS URL to: <code>{tenant.cwmpUrl}</code></li>
-              <li>Set ACS Username (if required)</li>
-              <li>Set ACS Password (if required)</li>
+              <li>Set <strong>ACS URL</strong> to: <code>{tenant.cwmpUrl}</code></li>
+              {#if settings.requireAuth}
+                <li>Set <strong>ACS Username</strong> to: <code>{settings.acsUsername}</code></li>
+                <li>Set <strong>ACS Password</strong> to: <code>{settings.acsPassword}</code></li>
+              {:else}
+                <li>Authentication not required (optional)</li>
+              {/if}
               <li>Save and reboot the device</li>
               <li>Device should appear in your device list within 5 minutes</li>
             </ol>
@@ -745,6 +803,46 @@
 
   .dismiss-btn:hover {
     opacity: 1;
+  }
+
+  .credentials-box {
+    background: rgba(124, 58, 237, 0.05);
+  }
+
+  .credentials-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .password-field {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .password-field input {
+    flex: 1;
+  }
+
+  .generate-btn {
+    padding: 0.5rem 1rem;
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 0.875rem;
+  }
+
+  .generate-btn:hover:not(:disabled) {
+    background: var(--brand-primary-hover);
+  }
+
+  .generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   @media (max-width: 768px) {

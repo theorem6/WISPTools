@@ -13,17 +13,61 @@
   let error = '';
   let success = '';
   
-  // Invite form
+  // Add user form
+  let showAddUserForm = false;
+  let newUserEmail = '';
+  let newUserRole: TenantRole = 'operator';
+  let isAdding = false;
+  
+  // Invite form (for future email invitations)
   let showInviteForm = false;
   let inviteEmail = '';
   let inviteRole: TenantRole = 'operator';
   let isSending = false;
 
   const roleOptions: { value: TenantRole; label: string; description: string }[] = [
+    { value: 'owner', label: 'Owner', description: 'Full control (only one per tenant)' },
     { value: 'admin', label: 'Admin', description: 'Full access except owner rights' },
     { value: 'operator', label: 'Operator', description: 'Can manage devices and view reports' },
     { value: 'viewer', label: 'Viewer', description: 'Read-only access' }
   ];
+
+  async function handleAddUser() {
+    if (!newUserEmail) {
+      error = 'Please enter an email address';
+      return;
+    }
+
+    isAdding = true;
+    error = '';
+
+    try {
+      // For now, create a placeholder user ID from email
+      // In production, you'd look up or create the actual Firebase user
+      const userId = newUserEmail.replace('@', '_').replace(/\./g, '_');
+      
+      const result = await tenantService.addUserToTenant(
+        userId,
+        tenantId,
+        newUserRole
+      );
+
+      if (result.success) {
+        success = `User ${newUserEmail} added as ${newUserRole}!`;
+        newUserEmail = '';
+        newUserRole = 'operator';
+        showAddUserForm = false;
+        
+        await loadUsers();
+      } else {
+        error = result.error || 'Failed to add user';
+      }
+    } catch (err: any) {
+      error = err.message || 'Failed to add user';
+    } finally {
+      isAdding = false;
+    }
+  }
 
   onMount(async () => {
     if (!browser) return;
@@ -168,9 +212,11 @@
       <p class="subtitle">{tenantName}</p>
     </div>
 
-    <button class="btn-primary" on:click={() => showInviteForm = !showInviteForm}>
-      {showInviteForm ? '✕ Cancel' : '➕ Invite User'}
-    </button>
+    <div class="header-buttons">
+      <button class="btn-primary" on:click={() => showAddUserForm = !showAddUserForm}>
+        {showAddUserForm ? '✕ Cancel' : '➕ Add User'}
+      </button>
+    </div>
   </div>
 
   {#if error}
@@ -189,37 +235,40 @@
     </div>
   {/if}
 
-  {#if showInviteForm}
+  {#if showAddUserForm}
     <div class="invite-form">
-      <h2>Invite User to Organization</h2>
+      <h2>Add User to Organization</h2>
+      <p class="form-subtitle">Add an existing user or create a placeholder for a future user</p>
       
       <div class="form-group">
-        <label for="invite-email">Email Address</label>
+        <label for="user-email">Email Address</label>
         <input
-          id="invite-email"
+          id="user-email"
           type="email"
-          bind:value={inviteEmail}
+          bind:value={newUserEmail}
           placeholder="user@example.com"
         />
+        <p class="help-text">User will be granted access to this organization</p>
       </div>
 
       <div class="form-group">
-        <label for="invite-role">Role</label>
-        <select id="invite-role" bind:value={inviteRole}>
+        <label for="user-role">Role</label>
+        <select id="user-role" bind:value={newUserRole}>
           {#each roleOptions as role}
-            <option value={role.value}>
+            <option value={role.value} disabled={role.value === 'owner' && users.some(u => u.role === 'owner')}>
               {role.label} - {role.description}
             </option>
           {/each}
         </select>
+        <p class="help-text">Determines what this user can do in the organization</p>
       </div>
 
       <div class="form-actions">
-        <button class="btn-secondary" on:click={() => showInviteForm = false}>
+        <button class="btn-secondary" on:click={() => showAddUserForm = false}>
           Cancel
         </button>
-        <button class="btn-primary" on:click={handleInvite} disabled={isSending}>
-          {isSending ? 'Sending...' : 'Send Invitation'}
+        <button class="btn-primary" on:click={handleAddUser} disabled={isAdding}>
+          {isAdding ? 'Adding...' : 'Add User'}
         </button>
       </div>
     </div>
@@ -308,6 +357,16 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+  }
+
+  .header-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .form-subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
   }
 
   .back-btn {

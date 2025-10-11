@@ -30,6 +30,11 @@ export interface TenantSettings {
   cwmpPort?: number;
   informInterval: number; // Device inform interval in seconds (default 300)
   
+  // ACS Authentication (for CPE devices connecting to CWMP)
+  acsUsername: string;
+  acsPassword: string;
+  requireAuth: boolean; // Whether devices must authenticate
+  
   // Monitoring Settings
   enableAutoDiscovery: boolean;
   enablePCIMonitoring: boolean;
@@ -152,6 +157,9 @@ export function extractTenantFromCWMPUrl(url: string): string | null {
 // Default tenant settings
 export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   informInterval: 300, // 5 minutes
+  acsUsername: 'admin',
+  acsPassword: generateRandomPassword(),
+  requireAuth: false, // Default: no auth required
   enableAutoDiscovery: true,
   enablePCIMonitoring: true,
   enablePerformanceMonitoring: true,
@@ -159,6 +167,11 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   notificationEmails: [],
   dataRetentionDays: 90
 };
+
+// Helper to generate random password
+function generateRandomPassword(): string {
+  return Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+}
 
 // Default tenant limits (can be adjusted based on plan)
 export const DEFAULT_TENANT_LIMITS: TenantLimits = {
