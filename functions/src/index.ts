@@ -141,6 +141,17 @@ export {
   initializeMongoDatabase
 } from './mongoInitialization.js';
 
+// Export CBRS Management functions
+export {
+  getCBRSDevices,
+  saveCBRSDevice,
+  deleteCBRSDevice,
+  proxySASRequest,
+  logCBRSEvent,
+  getCBRSAnalytics,
+  cbrsWebhook
+} from './cbrsManagement.js';
+
 // Simple PCI conflict detection function (existing)
 function analyzeConflictsSimple(cells: any[]) {
   const conflicts: any[] = [];

@@ -44,13 +44,13 @@
       path: '/modules/acs-cpe-management'
     },
     {
-      id: 'ue-cpe-management',
-      name: 'UE/CPE Management',
-      description: 'User Equipment and Customer Premise Equipment management and monitoring',
-      icon: '📱',
-      color: '#059669',
-      status: 'coming-soon',
-      path: '/modules/ue-cpe-management'
+      id: 'cbrs-management',
+      name: 'CBRS Management',
+      description: 'Citizens Broadband Radio Service management with Google SAS and Federated Wireless API integration',
+      icon: '📡',
+      color: '#8b5cf6',
+      status: 'active',
+      path: '/modules/cbrs-management'
     },
     {
       id: 'coverage-planning',
