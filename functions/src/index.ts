@@ -82,6 +82,20 @@ export {
   genieacsUI
 } from './simpleGenieacsServices.js';
 
+// Export Multi-Tenant GenieACS functions
+export {
+  proxyGenieACSNBIMultitenant,
+  syncGenieACSDevicesMultitenant,
+  handleCWMPMultitenant,
+  getDeviceParametersMultitenant,
+  executeDeviceTaskMultitenant
+} from './genieacsBridgeMultitenant.js';
+
+export {
+  genieacsNBIMultitenant,
+  genieacsFSMultitenant
+} from './genieacsServicesMultitenant.js';
+
 
 // Export Firestore-based presets management (legacy - fallback)
 export {
