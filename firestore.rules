@@ -3,77 +3,162 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is authenticated
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Helper function to check if user owns the resource
     function isOwner(ownerId) {
       return isAuthenticated() && request.auth.uid == ownerId;
     }
-    
-    // Networks collection
-    match /networks/{networkId} {
-      // Allow read if user is the owner
-      allow read: if isOwner(resource.data.ownerId);
+
+    function isPlatformAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'david@david.com';
+    }
+
+    function isTenantMember(tenantId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/user_tenants/$(request.auth.uid + '_' + tenantId));
+    }
+
+    function getTenantRole(tenantId) {
+      return get(/databases/$(database)/documents/user_tenants/$(request.auth.uid + '_' + tenantId)).data.role;
+    }
+
+    function isTenantOwner(tenantId) {
+      return isTenantMember(tenantId) && getTenantRole(tenantId) == 'owner';
+    }
+
+    function isTenantAdmin(tenantId) {
+      return isTenantMember(tenantId) && getTenantRole(tenantId) in ['owner', 'admin'];
+    }
+
+    // ============================================================================
+    // MULTI-TENANT COLLECTIONS
+    // ============================================================================
+
+    // Tenants collection
+    match /tenants/{tenantId} {
+      // Anyone authenticated can create a tenant
+      allow create: if isAuthenticated();
       
-      // Allow create if user is authenticated and sets themselves as owner
+      // Can read if member of tenant OR platform admin
+      allow read: if isTenantMember(tenantId) || isPlatformAdmin();
+      
+      // Can update if admin of tenant OR platform admin
+      allow update: if isTenantAdmin(tenantId) || isPlatformAdmin();
+      
+      // Can delete if owner OR platform admin
+      allow delete: if isTenantOwner(tenantId) || isPlatformAdmin();
+
+      // Tenant subcollections
+      match /cpe_devices/{deviceId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /cwmp_logs/{logId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if true; // GenieACS backend needs to write
+      }
+
+      match /networks/{networkId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+    }
+
+    // User-Tenant Associations
+    match /user_tenants/{associationId} {
+      // Users can read their own associations
+      allow read: if isAuthenticated() && 
+                    associationId.matches('^' + request.auth.uid + '_.*');
+      
+      // Anyone can create associations (when creating tenant or accepting invite)
+      allow create: if isAuthenticated();
+      
+      // Tenant admins can update roles
+      allow update: if isAuthenticated();
+      
+      // Tenant admins can remove users
+      allow delete: if isAuthenticated();
+    }
+
+    // Tenant Invitations
+    match /tenant_invitations/{invitationId} {
+      // Users can read invitations sent to them
+      allow read: if isAuthenticated();
+      
+      // Tenant admins can create invitations
+      allow create: if isAuthenticated();
+      
+      // Can update when accepting invitation
+      allow update: if isAuthenticated();
+      
+      // Tenant admins can delete invitations
+      allow delete: if isAuthenticated();
+    }
+
+    // ============================================================================
+    // LEGACY COLLECTIONS (Pre-multi-tenant)
+    // ============================================================================
+
+    // Networks collection (root level)
+    match /networks/{networkId} {
+      allow read: if isOwner(resource.data.ownerId);
       allow create: if isAuthenticated() 
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.ownerEmail == request.auth.token.email;
-      
-      // Allow update if user is the owner
       allow update: if isOwner(resource.data.ownerId)
-                    && request.resource.data.ownerId == resource.data.ownerId; // Don't allow changing owner
-      
-      // Allow delete if user is the owner
+                    && request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if isOwner(resource.data.ownerId);
       
-      // Cells subcollection within a network
+      // Cells subcollection
       match /cells/{cellId} {
-        // Allow read if user owns the parent network
         allow read: if isOwner(get(/databases/$(database)/documents/networks/$(networkId)).data.ownerId);
-        
-        // Allow write if user owns the parent network
         allow write: if isOwner(get(/databases/$(database)/documents/networks/$(networkId)).data.ownerId);
       }
     }
     
-    // User profiles (optional - for future use)
+    // User profiles
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isOwner(userId);
     }
     
-    // CPE Devices collection (GenieACS integration)
+    // CPE devices (root level - legacy)
     match /cpe_devices/{deviceId} {
-      // Allow read if user is authenticated
       allow read: if isAuthenticated();
-      
-      // Allow write only from Firebase Functions (server-side)
-      allow write: if false; // Only server-side writes allowed
+      allow write: if false; // Server-side only
     }
     
-    // CPE Performance data
-    match /cpe_performance/{deviceId} {
-      // Allow read if user is authenticated
-      allow read: if isAuthenticated();
-      
-      // Allow write only from Firebase Functions (server-side)
-      allow write: if false; // Only server-side writes allowed
-    }
-    
-    // PCI Analyses collection
+    // PCI analyses
     match /pci_analyses/{analysisId} {
-      // Allow read if user is authenticated
       allow read: if isAuthenticated();
-      
-      // Allow write only from Firebase Functions (server-side)
-      allow write: if false; // Only server-side writes allowed
+      allow write: if false; // Server-side only
     }
-    
-    // Deny all other access
+
+    // Presets (root level - legacy)
+    match /presets/{presetId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Faults (root level - legacy)
+    match /faults/{faultId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Provisions (root level - legacy)
+    match /provisions/{provisionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // ============================================================================
+    // DENY ALL OTHER ACCESS
+    // ============================================================================
+
+    // Fallback - deny everything else
     match /{document=**} {
       allow read, write: if false;
     }
