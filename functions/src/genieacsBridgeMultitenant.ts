@@ -181,7 +181,7 @@ export const handleCWMPMultitenant = onRequest({
 }, async (req, res) => {
   try {
     // Extract tenant from URL (no authentication needed for device connections)
-    const tenantId = await extractTenantFromCWMPUrl(req.url);
+    const tenantId = await extractTenantFromCWMPUrl(req.url || '');
     
     if (!tenantId) {
       console.error('No tenant found in CWMP URL:', req.url);

@@ -204,10 +204,10 @@ export const initializeMongoPresets = onRequest({
         const existing = await presets.findOne({ _id: preset._id });
         
         if (!existing) {
-          await presets.insertOne(preset);
+          await presets.insertOne(preset as any);
           created++;
         } else if (req.query.overwrite === 'true') {
-          await presets.replaceOne({ _id: preset._id }, preset);
+          await presets.replaceOne({ _id: preset._id }, preset as any);
           updated++;
         } else {
           skipped++;
@@ -313,10 +313,10 @@ export const initializeMongoFaults = onRequest({
         const existing = await faults.findOne({ _id: fault._id });
         
         if (!existing) {
-          await faults.insertOne(fault);
+          await faults.insertOne(fault as any);
           created++;
         } else if (req.query.overwrite === 'true') {
-          await faults.replaceOne({ _id: fault._id }, fault);
+          await faults.replaceOne({ _id: fault._id }, fault as any);
           updated++;
         } else {
           skipped++;
@@ -431,7 +431,7 @@ export const initializeMongoDatabase = onRequest({
       for (const preset of presetsSample) {
         const existing = await presets.findOne({ _id: preset._id });
         if (!existing) {
-          await presets.insertOne(preset);
+          await presets.insertOne(preset as any);
           presetsCreated++;
         } else {
           presetsSkipped++;
@@ -444,7 +444,7 @@ export const initializeMongoDatabase = onRequest({
       for (const fault of faultsSample) {
         const existing = await faults.findOne({ _id: fault._id });
         if (!existing) {
-          await faults.insertOne(fault);
+          await faults.insertOne(fault as any);
           faultsCreated++;
         } else {
           faultsSkipped++;

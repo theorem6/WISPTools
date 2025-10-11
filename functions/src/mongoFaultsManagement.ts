@@ -214,7 +214,7 @@ export const createMongoFault = onRequest({
       // Generate fault ID
       const faultId = `FAULT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      const fault = {
+      const fault: any = {
         _id: faultId,
         deviceId: faultData.deviceId,
         deviceName: faultData.deviceName || 'Unknown Device',
@@ -232,7 +232,7 @@ export const createMongoFault = onRequest({
         updatedAt: new Date()
       };
       
-      await faults.insertOne(fault);
+      await faults.insertOne(fault as any);
       
       return res.json({
         success: true,

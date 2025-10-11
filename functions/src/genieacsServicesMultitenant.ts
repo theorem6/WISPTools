@@ -337,7 +337,7 @@ export const genieacsFSMultitenant = onRequest({
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     // For file uploads from devices, extract tenant from URL
-    const tenantId = await extractTenantFromCWMPUrl(req.url);
+    const tenantId = await extractTenantFromCWMPUrl(req.url || '');
     
     if (!tenantId) {
       return res.status(404).send('Tenant not found');
