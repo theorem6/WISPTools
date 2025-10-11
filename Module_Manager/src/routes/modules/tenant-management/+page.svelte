@@ -38,35 +38,16 @@
 
   async function loadAllTenants() {
     try {
-      // For admin, we need a function to get ALL tenants
-      // For now, we'll use the Firebase Admin SDK through a Cloud Function
-      const response = await fetch('/api/admin/tenants', {
-        headers: {
-          'Authorization': `Bearer ${await getUserToken()}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        tenants = data.tenants || [];
-      } else {
-        // Fallback: Load tenants from Firestore directly
-        // This would need proper permissions
-        console.log('Using fallback tenant loading');
-      }
+      console.log('Loading all tenants from Firestore...');
+      
+      // Use tenantService to get all tenants
+      tenants = await tenantService.getAllTenants();
+      
+      console.log(`Loaded ${tenants.length} tenants`);
     } catch (err: any) {
       console.error('Error loading tenants:', err);
-      error = err.message;
+      error = err.message || 'Failed to load tenants';
     }
-  }
-
-  async function getUserToken(): Promise<string> {
-    const { authService } = await import('$lib/services/authService');
-    const user = authService.getCurrentUser();
-    if (user) {
-      return await user.getIdToken();
-    }
-    return '';
   }
 
   async function handleCreateTenant() {

@@ -180,6 +180,29 @@ export class TenantService {
   }
 
   /**
+   * Get ALL tenants (admin only)
+   */
+  async getAllTenants(): Promise<Tenant[]> {
+    try {
+      const tenantsCollection = collection(this.getDb(), 'tenants');
+      const snapshot = await getDocs(tenantsCollection);
+      
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+          updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date()
+        } as Tenant;
+      });
+    } catch (error) {
+      console.error('Error getting all tenants:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get user's role in a tenant
    */
   async getUserRole(userId: string, tenantId: string): Promise<TenantRole | null> {

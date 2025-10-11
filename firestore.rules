@@ -42,6 +42,9 @@ service cloud.firestore {
       // Anyone authenticated can create a tenant
       allow create: if isAuthenticated();
       
+      // Platform admin can list all tenants
+      allow list: if isPlatformAdmin();
+      
       // Can read if member of tenant OR platform admin
       allow read: if isTenantMember(tenantId) || isPlatformAdmin();
       
