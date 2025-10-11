@@ -11,7 +11,11 @@ const config = {
 			precompress: false,
 			envPrefix: '',
 			polyfill: true
-		})
+		}),
+		alias: {
+			$lib: './src/lib',
+			'$lib/*': './src/lib/*'
+		}
 	}
 };
 

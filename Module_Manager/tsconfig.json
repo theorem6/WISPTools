@@ -13,13 +13,7 @@
 		"module": "ESNext",
 		"target": "ESNext",
 		"lib": ["ESNext", "DOM", "DOM.Iterable"],
-		"types": ["@sveltejs/kit", "vite/client"],
-		"paths": {
-			"$lib": ["./src/lib"],
-			"$lib/*": ["./src/lib/*"]
-		}
-	},
-	"include": ["src/**/*.ts", "src/**/*.svelte"],
-	"exclude": ["node_modules", "build", ".svelte-kit"]
+		"types": ["@sveltejs/kit", "vite/client"]
+	}
 }
 
