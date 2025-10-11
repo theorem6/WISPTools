@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
+  import { browser } from '$app/environment';
   import MainMenu from './components/MainMenu.svelte';
   import HelpModal from '$lib/components/HelpModal.svelte';
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
+  import { loadCPEDevices, syncCPEDevices } from './lib/cpeDataService';
   
   // Module data
   let moduleData = {
@@ -21,22 +23,34 @@
   let isLoading = true;
   let error: string | null = null;
   let map: any = null;
+  let isSyncing = false;
+  let syncMessage = '';
+  
+  // Multi-tenant state
+  let tenantName = '';
+  let tenantId = '';
   
   // Documentation content
   const helpContent = acsCpeDocs;
 
   onMount(async () => {
     try {
-      // Load sample CPE devices for demonstration
-      await loadSampleCPEDevices();
+      // Load tenant info
+      if (browser) {
+        tenantId = localStorage.getItem('selectedTenantId') || '';
+        tenantName = localStorage.getItem('selectedTenantName') || 'No Tenant Selected';
+      }
+      
+      // Load CPE devices using authenticated multi-tenant service
+      await loadDevices();
       
       // Initialize map
       await initializeMap();
       
       isLoading = false;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to initialize ACS module:', err);
-      error = err.message;
+      error = err?.message || 'Failed to initialize';
       isLoading = false;
     }
   });
@@ -47,36 +61,53 @@
     }
   });
 
-  async function loadSampleCPEDevices() {
+  async function loadDevices() {
     try {
-      // Try to load real CPE devices from Firebase Functions
-      console.log('Attempting to load CPE devices from Firebase Functions...');
+      console.log(`Loading devices for tenant: ${tenantName} (${tenantId})`);
       
-      // Use SvelteKit API route (no Firebase Functions needed!)
-      const response = await fetch('/api/cpe/devices', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      // Use multi-tenant authenticated service
+      cpeDevices = await loadCPEDevices();
       
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.devices.length > 0) {
-          console.log(`Loaded ${data.devices.length} real CPE devices from Firebase Functions`);
-          cpeDevices = data.devices;
-          return;
-        }
+      console.log(`Loaded ${cpeDevices.length} devices for tenant ${tenantName}`);
+      
+      // Show tenant info in console
+      if (cpeDevices.length > 0 && cpeDevices[0].tenantId) {
+        console.log('✓ Devices are tenant-filtered');
       }
       
-      console.log('Firebase Functions not available, using sample data');
-      // Fallback to sample data if Firebase Functions are not available
-      loadFallbackSampleData();
+    } catch (error: any) {
+      console.error('Error loading CPE devices:', error);
+      error = error?.message || 'Failed to load devices';
+    }
+  }
+
+  async function handleSync() {
+    isSyncing = true;
+    syncMessage = '';
+    
+    try {
+      console.log(`Syncing devices for tenant: ${tenantName}`);
+      const result = await syncCPEDevices();
       
-    } catch (error) {
-      console.error('Error loading CPE devices from Firebase Functions:', error);
-      console.log('Using sample data as fallback');
-      loadFallbackSampleData();
+      if (result.success) {
+        syncMessage = result.message;
+        cpeDevices = result.devices || [];
+        
+        // Reinitialize map with new devices
+        if (map) {
+          await initializeMap();
+        }
+        
+        setTimeout(() => {
+          syncMessage = '';
+        }, 3000);
+      } else {
+        syncMessage = `Error: ${result.message}`;
+      }
+    } catch (error: any) {
+      syncMessage = `Error: ${error?.message || 'Sync failed'}`;
+    } finally {
+      isSyncing = false;
     }
   }
 
@@ -95,7 +126,8 @@
         parameters: {
           SoftwareVersion: '1.2.3',
           HardwareVersion: 'HW-2.1'
-        }
+        },
+        tenantId: tenantId
       },
       {
         id: 'huawei-lte-cpe-002',
@@ -403,28 +435,43 @@
           {moduleData.title}
         </h1>
         <p class="module-description">{moduleData.description}</p>
+        
+        <!-- Multi-Tenant Info -->
+        {#if tenantName}
+          <div class="tenant-badge">
+            <span class="tenant-icon">🏢</span>
+            <span class="tenant-text">{tenantName}</span>
+            <span class="tenant-label">Organization</span>
+          </div>
+        {/if}
       </div>
       
       <div class="module-actions">
+        {#if syncMessage}
+          <div class="sync-message {syncMessage.includes('Error') ? 'error' : 'success'}">
+            {syncMessage}
+          </div>
+        {/if}
+        
         <button 
           class="btn btn-primary" 
-          on:click={syncCPEDevices}
-          disabled={isLoading}
+          on:click={handleSync}
+          disabled={isLoading || isSyncing}
         >
-          {#if isLoading}
+          {#if isSyncing}
             <span class="spinner"></span>
-            Syncing...
+            Syncing Tenant Devices...
           {:else}
-            🔄 Sync CPE Devices
+            🔄 Sync Devices from GenieACS
           {/if}
         </button>
         
         <button 
           class="btn btn-secondary" 
-          on:click={refreshCPEData}
-          disabled={isLoading}
+          on:click={loadDevices}
+          disabled={isLoading || isSyncing}
         >
-          🔄 Refresh Data
+          🔄 Refresh View
         </button>
       </div>
     </div>
@@ -445,6 +492,14 @@
   <div class="module-content">
     <!-- CPE Statistics -->
     <div class="stats-grid">
+      <div class="stat-card tenant-stat">
+        <div class="stat-icon">🏢</div>
+        <div class="stat-content">
+          <div class="stat-number">{tenantName || 'No Tenant'}</div>
+          <div class="stat-label">Current Organization</div>
+        </div>
+      </div>
+      
       <div class="stat-card">
         <div class="stat-icon">📱</div>
         <div class="stat-content">
@@ -716,6 +771,33 @@
     margin: 0;
   }
 
+  .tenant-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: 0.5rem;
+  }
+
+  .tenant-icon {
+    font-size: 1.25rem;
+  }
+
+  .tenant-text {
+    font-weight: 600;
+    color: var(--brand-primary);
+  }
+
+  .tenant-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
   .module-actions {
     display: flex;
     gap: 1rem;
@@ -755,6 +837,36 @@
   .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .sync-message {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .sync-message.success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+  }
+
+  .sync-message.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+  }
+
+  .stat-card.tenant-stat {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    border-color: rgba(124, 58, 237, 0.3);
+  }
+
+  .stat-card.tenant-stat .stat-number {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--brand-primary);
   }
 
   .error-banner {
