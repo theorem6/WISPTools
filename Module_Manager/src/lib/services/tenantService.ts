@@ -32,14 +32,19 @@ import {
 } from '../models/tenant';
 
 export class TenantService {
-  private db: Firestore;
   private baseUrl: string;
 
   constructor() {
-    this.db = db;
     // Get base URL from environment or construct it
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
+  }
+
+  /**
+   * Get Firestore instance (lazy)
+   */
+  private getDb(): Firestore {
+    return db(); // Call as function
   }
 
   /**
@@ -82,7 +87,7 @@ export class TenantService {
       };
 
       // Save to Firestore
-      await setDoc(doc(this.db, 'tenants', tenantId), {
+      await setDoc(doc(this.getDb(), 'tenants', tenantId), {
         ...tenant,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -103,7 +108,7 @@ export class TenantService {
    */
   async getTenant(tenantId: string): Promise<Tenant | null> {
     try {
-      const tenantDoc = await getDoc(doc(this.db, 'tenants', tenantId));
+      const tenantDoc = await getDoc(doc(this.getDb(), 'tenants', tenantId));
       if (!tenantDoc.exists()) return null;
       
       const data = tenantDoc.data();
@@ -125,7 +130,7 @@ export class TenantService {
   async getTenantBySubdomain(subdomain: string): Promise<Tenant | null> {
     try {
       const q = query(
-        collection(this.db, 'tenants'),
+        collection(this.getDb(), 'tenants'),
         where('subdomain', '==', subdomain)
       );
       const snapshot = await getDocs(q);
@@ -153,7 +158,7 @@ export class TenantService {
     try {
       // Get user-tenant associations
       const q = query(
-        collection(this.db, 'user_tenants'),
+        collection(this.getDb(), 'user_tenants'),
         where('userId', '==', userId)
       );
       const snapshot = await getDocs(q);
@@ -181,7 +186,7 @@ export class TenantService {
     try {
       const associationId = `${userId}_${tenantId}`;
       const associationDoc = await getDoc(
-        doc(this.db, 'user_tenants', associationId)
+        doc(this.getDb(), 'user_tenants', associationId)
       );
       
       if (!associationDoc.exists()) return null;
@@ -213,7 +218,7 @@ export class TenantService {
         invitedBy
       };
 
-      await setDoc(doc(this.db, 'user_tenants', associationId), {
+      await setDoc(doc(this.getDb(), 'user_tenants', associationId), {
         ...association,
         createdAt: serverTimestamp()
       });
@@ -234,7 +239,7 @@ export class TenantService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const associationId = `${userId}_${tenantId}`;
-      await deleteDoc(doc(this.db, 'user_tenants', associationId));
+      await deleteDoc(doc(this.getDb(), 'user_tenants', associationId));
       return { success: true };
     } catch (error) {
       console.error('Error removing user from tenant:', error);
@@ -252,7 +257,7 @@ export class TenantService {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const associationId = `${userId}_${tenantId}`;
-      await updateDoc(doc(this.db, 'user_tenants', associationId), {
+      await updateDoc(doc(this.getDb(), 'user_tenants', associationId), {
         role: newRole,
         permissions: DEFAULT_PERMISSIONS[newRole]
       });
@@ -269,7 +274,7 @@ export class TenantService {
   async getTenantUsers(tenantId: string): Promise<UserTenantAssociation[]> {
     try {
       const q = query(
-        collection(this.db, 'user_tenants'),
+        collection(this.getDb(), 'user_tenants'),
         where('tenantId', '==', tenantId)
       );
       const snapshot = await getDocs(q);
@@ -295,7 +300,7 @@ export class TenantService {
     settings: Partial<TenantSettings>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      await updateDoc(doc(this.db, 'tenants', tenantId), {
+      await updateDoc(doc(this.getDb(), 'tenants', tenantId), {
         settings: settings,
         updatedAt: serverTimestamp()
       });
@@ -314,7 +319,7 @@ export class TenantService {
     limits: Partial<TenantLimits>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      await updateDoc(doc(this.db, 'tenants', tenantId), {
+      await updateDoc(doc(this.getDb(), 'tenants', tenantId), {
         limits: limits,
         updatedAt: serverTimestamp()
       });
@@ -350,7 +355,7 @@ export class TenantService {
         status: 'pending'
       };
 
-      await setDoc(doc(this.db, 'tenant_invitations', invitationId), {
+      await setDoc(doc(this.getDb(), 'tenant_invitations', invitationId), {
         ...invitation,
         invitedAt: serverTimestamp(),
         expiresAt: expiresAt
@@ -372,7 +377,7 @@ export class TenantService {
   ): Promise<{ success: boolean; tenantId?: string; error?: string }> {
     try {
       const invitationDoc = await getDoc(
-        doc(this.db, 'tenant_invitations', invitationId)
+        doc(this.getDb(), 'tenant_invitations', invitationId)
       );
       
       if (!invitationDoc.exists()) {
@@ -393,7 +398,7 @@ export class TenantService {
       await this.addUserToTenant(userId, invitation.tenantId, invitation.role, invitation.invitedBy);
       
       // Update invitation status
-      await updateDoc(doc(this.db, 'tenant_invitations', invitationId), {
+      await updateDoc(doc(this.getDb(), 'tenant_invitations', invitationId), {
         status: 'accepted',
         acceptedAt: serverTimestamp(),
         acceptedBy: userId
@@ -435,7 +440,7 @@ export class TenantService {
     try {
       const associationId = `${userId}_${tenantId}`;
       const associationDoc = await getDoc(
-        doc(this.db, 'user_tenants', associationId)
+        doc(this.getDb(), 'user_tenants', associationId)
       );
       
       if (!associationDoc.exists()) return false;
