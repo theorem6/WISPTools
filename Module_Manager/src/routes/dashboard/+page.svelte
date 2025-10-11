@@ -252,22 +252,9 @@
     </div>
   </header>
 
-  <!-- Welcome Section -->
-  <section class="welcome">
-    <div class="container">
-      <div class="welcome-content">
-        <h2 class="welcome-title">Welcome to Your Dashboard</h2>
-        <p class="welcome-description">
-          Select a module below to begin managing your LTE network
-        </p>
-      </div>
-    </div>
-  </section>
-
   <!-- Modules Grid -->
   <section class="modules-section">
     <div class="container">
-      <h3 class="section-title">Your Modules</h3>
       
       <div class="modules-grid">
         {#each modules as module}
@@ -493,35 +480,10 @@
     background-color: var(--bg-hover);
   }
 
-  /* Welcome Section */
-  .welcome {
-    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-    color: white;
-    padding: 3rem 0;
-    text-align: center;
-  }
-
-  .welcome-title {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: white;
-  }
-
-  .welcome-description {
-    font-size: 1.125rem;
-    opacity: 0.95;
-  }
-
   /* Modules Section */
   .modules-section {
-    padding: 4rem 0;
+    padding: 2rem 0;
     flex: 1;
-  }
-
-  .section-title {
-    text-align: center;
-    margin-bottom: 3rem;
-    font-size: 2rem;
   }
 
   .modules-grid {
@@ -682,14 +644,6 @@
 
   /* Responsive */
   @media (max-width: 768px) {
-    .welcome-title {
-      font-size: 2rem;
-    }
-
-    .welcome-description {
-      font-size: 1rem;
-    }
-
     .modules-grid {
       grid-template-columns: 1fr;
     }
