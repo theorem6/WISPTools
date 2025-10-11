@@ -55,7 +55,8 @@ export class TenantService {
     displayName: string,
     contactEmail: string,
     createdBy: string,
-    subdomain?: string
+    subdomain?: string,
+    createOwnerAssociation: boolean = true
   ): Promise<{ success: boolean; tenantId?: string; error?: string }> {
     try {
       // Generate unique subdomain if not provided
@@ -93,8 +94,11 @@ export class TenantService {
         updatedAt: serverTimestamp()
       });
 
-      // Associate creator as owner
-      await this.addUserToTenant(createdBy, tenantId, 'owner');
+      // Only associate creator as owner if requested
+      // Platform admins should NOT be associated with tenants they create
+      if (createOwnerAssociation) {
+        await this.addUserToTenant(createdBy, tenantId, 'owner');
+      }
 
       return { success: true, tenantId };
     } catch (error) {

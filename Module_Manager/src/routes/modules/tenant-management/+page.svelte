@@ -65,12 +65,15 @@
         return;
       }
 
+      // Platform admin creates tenant WITHOUT becoming owner
+      // This keeps the admin separate from tenants
       const result = await tenantService.createTenant(
         newTenantName,
         newTenantDisplayName,
         newTenantEmail,
         currentUser.uid,
-        newTenantSubdomain || undefined
+        newTenantSubdomain || undefined,
+        false  // Don't create owner association for admin
       );
 
       if (result.success) {

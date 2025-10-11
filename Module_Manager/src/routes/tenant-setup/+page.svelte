@@ -81,12 +81,14 @@
     }
 
     try {
+      // Regular users creating their own tenant SHOULD become owner
       const result = await tenantService.createTenant(
         tenantName,
         displayName,
         contactEmail,
         currentUser.uid,
-        subdomain
+        subdomain,
+        true  // Create owner association for regular users
       );
 
       if (result.success && result.tenantId) {

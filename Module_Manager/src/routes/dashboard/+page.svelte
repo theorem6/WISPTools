@@ -112,30 +112,38 @@
     const selectedTenantId = localStorage.getItem('selectedTenantId');
     
     if (!selectedTenantId && currentUser) {
-      // Check if user has any tenants
-      console.log('Dashboard: No tenant selected, checking user tenants...');
-      
-      // Add a small delay to allow Firestore to sync after tenant creation
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const tenants = await tenantService.getUserTenants(currentUser.uid);
-      
-      if (tenants.length === 0) {
-        // No tenants, redirect to tenant setup
-        console.log('Dashboard: No tenants found, redirecting to setup');
-        await goto('/tenant-setup', { replaceState: true });
-        return;
-      } else if (tenants.length === 1) {
-        // Auto-select single tenant
-        console.log('Dashboard: Auto-selecting single tenant');
-        localStorage.setItem('selectedTenantId', tenants[0].id);
-        localStorage.setItem('selectedTenantName', tenants[0].displayName);
-        tenantName = tenants[0].displayName;
+      // Platform admins don't need a tenant selected
+      // They can use Tenant Management module instead
+      if (isAdmin) {
+        console.log('Dashboard: Platform admin - no tenant required');
+        tenantName = 'Platform Admin';
+        isLoadingTenant = false;
       } else {
-        // Multiple tenants, redirect to selector
-        console.log('Dashboard: Multiple tenants, redirecting to selector');
-        await goto('/tenant-selector', { replaceState: true });
-        return;
+        // Regular users need a tenant
+        console.log('Dashboard: No tenant selected, checking user tenants...');
+        
+        // Add a small delay to allow Firestore to sync after tenant creation
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const tenants = await tenantService.getUserTenants(currentUser.uid);
+        
+        if (tenants.length === 0) {
+          // No tenants, redirect to tenant setup
+          console.log('Dashboard: No tenants found, redirecting to setup');
+          await goto('/tenant-setup', { replaceState: true });
+          return;
+        } else if (tenants.length === 1) {
+          // Auto-select single tenant
+          console.log('Dashboard: Auto-selecting single tenant');
+          localStorage.setItem('selectedTenantId', tenants[0].id);
+          localStorage.setItem('selectedTenantName', tenants[0].displayName);
+          tenantName = tenants[0].displayName;
+        } else {
+          // Multiple tenants, redirect to selector
+          console.log('Dashboard: Multiple tenants, redirecting to selector');
+          await goto('/tenant-selector', { replaceState: true });
+          return;
+        }
       }
     } else if (selectedTenantId) {
       // Tenant already selected - verify it still exists
