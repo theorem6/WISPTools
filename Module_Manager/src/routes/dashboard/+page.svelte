@@ -114,6 +114,10 @@
     if (!selectedTenantId && currentUser) {
       // Check if user has any tenants
       console.log('Dashboard: No tenant selected, checking user tenants...');
+      
+      // Add a small delay to allow Firestore to sync after tenant creation
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const tenants = await tenantService.getUserTenants(currentUser.uid);
       
       if (tenants.length === 0) {
@@ -134,9 +138,19 @@
         return;
       }
     } else if (selectedTenantId) {
-      // Load tenant name
-      tenantName = localStorage.getItem('selectedTenantName') || 'Organization';
-      console.log('Dashboard: Tenant selected:', tenantName);
+      // Tenant already selected - verify it still exists
+      const tenant = await tenantService.getTenant(selectedTenantId);
+      if (tenant) {
+        tenantName = tenant.displayName;
+        console.log('Dashboard: Tenant loaded:', tenantName);
+      } else {
+        // Tenant no longer exists, clear selection and reload
+        console.log('Dashboard: Selected tenant not found, clearing selection');
+        localStorage.removeItem('selectedTenantId');
+        localStorage.removeItem('selectedTenantName');
+        window.location.reload();
+        return;
+      }
     }
 
     isLoadingTenant = false;

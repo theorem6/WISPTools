@@ -31,13 +31,22 @@
 
     contactEmail = currentUser.email || '';
 
+    // Check if a tenant was just selected (to prevent redirect loop)
+    const justCreatedTenant = localStorage.getItem('selectedTenantId');
+    if (justCreatedTenant) {
+      console.log('Tenant already selected, redirecting to dashboard');
+      await goto('/dashboard', { replaceState: true });
+      return;
+    }
+
     // Check if user already has tenants
     try {
       existingTenants = await tenantService.getUserTenants(currentUser.uid);
       
       if (existingTenants.length > 0) {
         // User already has tenants, redirect to tenant selection
-        await goto('/tenant-selector');
+        console.log('User has tenants, redirecting to selector');
+        await goto('/tenant-selector', { replaceState: true });
       }
     } catch (err) {
       console.error('Error loading tenants:', err);
@@ -80,14 +89,20 @@
         subdomain
       );
 
-      if (result.success) {
+      if (result.success && result.tenantId) {
         success = 'Tenant created successfully!';
+        
+        // IMPORTANT: Save tenant to localStorage IMMEDIATELY
+        // This prevents dashboard from redirecting back here
+        localStorage.setItem('selectedTenantId', result.tenantId);
+        localStorage.setItem('selectedTenantName', displayName);
+        
         step = 2;
         
-        // Wait a moment then redirect to dashboard
+        // Wait a moment for user to see success, then redirect
         setTimeout(() => {
-          goto('/dashboard');
-        }, 2000);
+          goto('/dashboard', { replaceState: true });
+        }, 1500);
       } else {
         error = result.error || 'Failed to create tenant';
       }
