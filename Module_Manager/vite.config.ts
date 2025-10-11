@@ -7,16 +7,20 @@ export default defineConfig({
 		port: 5173,
 		strictPort: false,
 	},
-	// Externalize Node.js modules that shouldn't be bundled
+	// Ensure chart.js is included in SSR bundle
 	ssr: {
-		noExternal: []
+		noExternal: ['chart.js']
 	},
 	build: {
 		rollupOptions: {
+			// Only externalize actual backend modules
 			external: [
 				'mongodb',
 				'@google-cloud/firestore'
 			]
 		}
+	},
+	optimizeDeps: {
+		include: ['chart.js']
 	}
 });
