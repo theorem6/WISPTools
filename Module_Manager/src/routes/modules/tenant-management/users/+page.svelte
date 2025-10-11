@@ -43,9 +43,29 @@
     }
 
     // Check if user has permission to manage users
-    const canManage = await tenantService.checkPermission(currentUser.uid, tenantId, 'canManageUsers');
-    if (!canManage) {
-      error = 'You do not have permission to manage users';
+    try {
+      const role = await tenantService.getUserRole(currentUser.uid, tenantId);
+      console.log('User role in tenant:', role);
+      
+      if (!role) {
+        error = 'You are not a member of this tenant';
+        setTimeout(() => goto('/dashboard'), 2000);
+        return;
+      }
+      
+      // Owners and admins can manage users
+      const canManage = role === 'owner' || role === 'admin';
+      
+      if (!canManage) {
+        error = `Your role (${role}) does not have permission to manage users`;
+        setTimeout(() => goto('/dashboard'), 2000);
+        return;
+      }
+      
+      console.log('Permission granted to manage users');
+    } catch (err: any) {
+      console.error('Permission check failed:', err);
+      error = 'Failed to verify permissions';
       setTimeout(() => goto('/dashboard'), 2000);
       return;
     }
@@ -87,7 +107,8 @@
         inviteEmail = '';
         showInviteForm = false;
         
-        setTimeout(() => success = '', 3000);
+        // Don't auto-dismiss - user can click X to dismiss
+        // setTimeout(() => success = '', 5000);
       } else {
         error = result.error || 'Failed to send invitation';
       }
@@ -109,7 +130,8 @@
       if (result.success) {
         success = 'User removed successfully';
         await loadUsers();
-        setTimeout(() => success = '', 3000);
+        // Don't auto-dismiss
+        // setTimeout(() => success = '', 5000);
       } else {
         error = result.error || 'Failed to remove user';
       }
@@ -125,7 +147,8 @@
       if (result.success) {
         success = 'Role updated successfully';
         await loadUsers();
-        setTimeout(() => success = '', 3000);
+        // Don't auto-dismiss
+        // setTimeout(() => success = '', 5000);
       } else {
         error = result.error || 'Failed to update role';
       }
@@ -153,14 +176,16 @@
   {#if error}
     <div class="error-message">
       <span>⚠️</span>
-      {error}
+      <span>{error}</span>
+      <button class="dismiss-btn" on:click={() => error = ''}>✕</button>
     </div>
   {/if}
 
   {#if success}
     <div class="success-message">
       <span>✅</span>
-      {success}
+      <span>{success}</span>
+      <button class="dismiss-btn" on:click={() => success = ''}>✕</button>
     </div>
   {/if}
 
@@ -501,6 +526,21 @@
     font-size: 4rem;
     display: block;
     margin-bottom: 1rem;
+  }
+
+  .dismiss-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    padding: 0.25rem;
+  }
+
+  .dismiss-btn:hover {
+    opacity: 1;
   }
 </style>
 

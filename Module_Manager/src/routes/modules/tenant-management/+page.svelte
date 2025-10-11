@@ -83,9 +83,8 @@
         
         await loadAllTenants();
         
-        // Don't auto-dismiss success message
-        // Let user manually dismiss or it will clear when they interact
-        setTimeout(() => success = '', 5000);
+        // Keep success message visible - user can manually dismiss
+        // setTimeout(() => success = '', 10000);
       } else {
         error = result.error || 'Failed to create tenant';
       }
@@ -170,14 +169,16 @@
   {#if error}
     <div class="error-message">
       <span class="error-icon">⚠️</span>
-      {error}
+      <span>{error}</span>
+      <button class="dismiss-btn" on:click={() => error = ''}>✕</button>
     </div>
   {/if}
 
   {#if success}
     <div class="success-message">
       <span class="success-icon">✅</span>
-      {success}
+      <span>{success}</span>
+      <button class="dismiss-btn" on:click={() => success = ''}>✕</button>
     </div>
   {/if}
 
@@ -478,6 +479,21 @@
     background: rgba(34, 197, 94, 0.1);
     border: 1px solid rgba(34, 197, 94, 0.3);
     color: #22c55e;
+  }
+
+  .dismiss-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    padding: 0.25rem;
+  }
+
+  .dismiss-btn:hover {
+    opacity: 1;
   }
 
   .create-form {
