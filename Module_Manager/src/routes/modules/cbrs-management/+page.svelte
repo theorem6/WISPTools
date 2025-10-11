@@ -1,0 +1,1166 @@
+<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
+  import type { CBSDDevice, CBSDCategory, CBSDState } from './lib/models/cbsdDevice';
+  import { CBRS_BAND } from './lib/models/cbsdDevice';
+  import { createCBRSService, type CBRSServiceConfig } from './lib/services/cbrsService';
+  import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, type CBRSConfig } from './lib/services/configService';
+  import DeviceList from './components/DeviceList.svelte';
+  import GrantStatus from './components/GrantStatus.svelte';
+  import SettingsModal from './components/SettingsModal.svelte';
+  
+  // State
+  let devices: CBSDDevice[] = [];
+  let selectedDevice: CBSDDevice | null = null;
+  let cbrsService: any = null;
+  let isLoading = true;
+  let error: string | null = null;
+  let mapContainer: HTMLDivElement;
+  let map: any = null;
+  let showAddDeviceModal = false;
+  let showGrantRequestModal = false;
+  let showSettingsModal = false;
+  
+  // Configuration
+  let cbrsConfig: CBRSConfig | null = null;
+  let configStatus = { status: 'missing' as const, message: '' };
+  
+  // Tenant info
+  let tenantId = '';
+  let tenantName = '';
+  
+  // Add device form
+  let newDevice = {
+    cbsdSerialNumber: '',
+    fccId: '',
+    cbsdCategory: 'A' as CBSDCategory,
+    sasProviderId: 'google' as 'google' | 'federated-wireless',
+    latitude: 40.7128,
+    longitude: -74.0060,
+    height: 10,
+    antennaGain: 5
+  };
+  
+  // Grant request form
+  let grantRequest = {
+    maxEirp: 20,
+    lowFrequency: 3550000000,
+    highFrequency: 3560000000
+  };
+  
+  onMount(async () => {
+    try {
+      if (browser) {
+        // Load tenant info
+        tenantId = localStorage.getItem('selectedTenantId') || '';
+        tenantName = localStorage.getItem('selectedTenantName') || '';
+        
+        if (!tenantId) {
+          console.error('No tenant selected');
+          await goto('/tenant-selector');
+          return;
+        }
+        
+        // Load configuration
+        cbrsConfig = await loadCBRSConfig(tenantId);
+        configStatus = getConfigStatus(cbrsConfig);
+        
+        if (cbrsConfig && configStatus.status === 'complete') {
+          // Initialize CBRS service with loaded configuration
+          const config: CBRSServiceConfig = {
+            provider: cbrsConfig.provider,
+            tenantId,
+            googleConfig: cbrsConfig.provider === 'google' || cbrsConfig.provider === 'both' ? {
+              apiEndpoint: cbrsConfig.googleApiEndpoint || 'https://sas.googleapis.com/v1',
+              apiKey: cbrsConfig.googleApiKey,
+              certificatePath: cbrsConfig.googleCertificatePath,
+              tenantId
+            } : undefined,
+            federatedConfig: cbrsConfig.provider === 'federated-wireless' || cbrsConfig.provider === 'both' ? {
+              apiEndpoint: cbrsConfig.federatedApiEndpoint || 'https://sas.federatedwireless.com/api/v1',
+              apiKey: cbrsConfig.federatedApiKey || '',
+              customerId: cbrsConfig.federatedCustomerId || '',
+              tenantId
+            } : undefined,
+            federatedEnhancements: {
+              analyticsEnabled: cbrsConfig.enableAnalytics,
+              autoOptimization: cbrsConfig.enableOptimization,
+              multiSiteCoordination: cbrsConfig.enableMultiSite,
+              interferenceMonitoring: cbrsConfig.enableInterferenceMonitoring
+            }
+          };
+          
+          cbrsService = createCBRSService(config);
+        }
+        
+        // Load devices
+        await loadDevices();
+        
+        // Initialize map
+        await initializeMap();
+      }
+      
+      isLoading = false;
+    } catch (err: any) {
+      console.error('Failed to initialize CBRS module:', err);
+      error = err?.message || 'Failed to initialize';
+      isLoading = false;
+    }
+  });
+  
+  onDestroy(() => {
+    if (cbrsService) {
+      cbrsService.cleanup();
+    }
+    if (map) {
+      map.remove();
+    }
+  });
+  
+  async function loadDevices() {
+    try {
+      if (!cbrsService) return;
+      devices = await cbrsService.getDevices();
+      console.log('Loaded', devices.length, 'CBRS devices');
+    } catch (err: any) {
+      console.error('Failed to load devices:', err);
+      error = err?.message || 'Failed to load devices';
+    }
+  }
+  
+  async function initializeMap() {
+    if (!mapContainer) return;
+
+    try {
+      const [
+        { default: Map },
+        { default: MapView },
+        { default: GraphicsLayer },
+        { default: SimpleMarkerSymbol },
+        { default: Graphic },
+        { default: Point }
+      ] = await Promise.all([
+        import('@arcgis/core/Map.js'),
+        import('@arcgis/core/views/MapView.js'),
+        import('@arcgis/core/layers/GraphicsLayer.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js')
+      ]);
+
+      const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+      const basemap = isDarkMode ? 'dark-gray-vector' : 'streets-navigation-vector';
+
+      map = new Map({ basemap });
+
+      const view = new MapView({
+        container: mapContainer,
+        map: map,
+        center: [-95.7129, 37.0902], // Center of US
+        zoom: 4
+      });
+
+      const graphicsLayer = new GraphicsLayer();
+      map.add(graphicsLayer);
+
+      map._view = view;
+      map._graphicsLayer = graphicsLayer;
+
+      // Add click handler
+      view.on('click', async (event) => {
+        const response = await view.hitTest(event);
+        if (response.results.length > 0) {
+          const graphic = response.results[0].graphic;
+          if (graphic && graphic.attributes && graphic.attributes.device) {
+            handleDeviceSelect(graphic.attributes.device);
+          }
+        }
+      });
+
+      await addDeviceMarkers();
+
+      console.log('ArcGIS map initialized');
+    } catch (err) {
+      console.error('Failed to initialize map:', err);
+    }
+  }
+  
+  async function addDeviceMarkers() {
+    if (!map || !map._graphicsLayer) return;
+
+    try {
+      const [
+        { default: Graphic },
+        { default: Point },
+        { default: SimpleMarkerSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js')
+      ]);
+
+      map._graphicsLayer.removeAll();
+
+      devices.forEach(device => {
+        const color = device.state === 'GRANTED' || device.state === 'AUTHORIZED' ? '#10b981' :
+                     device.state === 'REGISTERED' ? '#3b82f6' :
+                     device.state === 'SUSPENDED' ? '#f59e0b' : '#6b7280';
+
+        const symbol = new SimpleMarkerSymbol({
+          style: 'circle',
+          color: color,
+          size: device.cbsdCategory === 'B' ? '20px' : '16px',
+          outline: {
+            color: 'white',
+            width: 2
+          }
+        });
+
+        const point = new Point({
+          longitude: device.installationParam.longitude,
+          latitude: device.installationParam.latitude
+        });
+
+        const graphic = new Graphic({
+          geometry: point,
+          symbol: symbol,
+          attributes: {
+            id: device.id,
+            device: device
+          }
+        });
+
+        map._graphicsLayer.add(graphic);
+      });
+
+      if (devices.length > 0 && map._view && map._graphicsLayer.graphics.length > 0) {
+        try {
+          await map._view.when();
+          await map._view.goTo({
+            target: map._graphicsLayer.graphics,
+            padding: 50
+          });
+        } catch (goToError) {
+          console.warn('Could not animate to markers:', goToError);
+        }
+      }
+
+      console.log(`Added ${devices.length} device markers`);
+    } catch (err) {
+      console.error('Failed to add markers:', err);
+    }
+  }
+  
+  function handleDeviceSelect(device: CBSDDevice) {
+    selectedDevice = device;
+  }
+  
+  async function handleRegisterDevice(device: CBSDDevice) {
+    try {
+      if (!cbrsService) return;
+      await cbrsService.registerDevice(device);
+      await loadDevices();
+      await addDeviceMarkers();
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      error = err?.message || 'Registration failed';
+    }
+  }
+  
+  async function handleDeregisterDevice(device: CBSDDevice) {
+    try {
+      if (!cbrsService) return;
+      await cbrsService.deregisterDevice(device);
+      await loadDevices();
+      await addDeviceMarkers();
+      if (selectedDevice?.id === device.id) {
+        selectedDevice = null;
+      }
+    } catch (err: any) {
+      console.error('Deregistration failed:', err);
+      error = err?.message || 'Deregistration failed';
+    }
+  }
+  
+  async function handleAddDevice() {
+    try {
+      if (!cbrsService) return;
+      
+      const device: CBSDDevice = {
+        id: `cbsd-${Date.now()}`,
+        cbsdSerialNumber: newDevice.cbsdSerialNumber,
+        fccId: newDevice.fccId,
+        cbsdCategory: newDevice.cbsdCategory,
+        sasProviderId: newDevice.sasProviderId,
+        installationParam: {
+          latitude: newDevice.latitude,
+          longitude: newDevice.longitude,
+          height: newDevice.height,
+          heightType: 'AGL',
+          antennaGain: newDevice.antennaGain
+        },
+        state: 'UNREGISTERED' as CBSDState,
+        tenantId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      devices = [...devices, device];
+      await addDeviceMarkers();
+      showAddDeviceModal = false;
+      
+      // Reset form
+      newDevice = {
+        cbsdSerialNumber: '',
+        fccId: '',
+        cbsdCategory: 'A' as CBSDCategory,
+        sasProviderId: 'google' as 'google' | 'federated-wireless',
+        latitude: 40.7128,
+        longitude: -74.0060,
+        height: 10,
+        antennaGain: 5
+      };
+    } catch (err: any) {
+      console.error('Failed to add device:', err);
+      error = err?.message || 'Failed to add device';
+    }
+  }
+  
+  function handleRequestGrant(device: CBSDDevice) {
+    selectedDevice = device;
+    showGrantRequestModal = true;
+  }
+  
+  async function handleSubmitGrantRequest() {
+    try {
+      if (!cbrsService || !selectedDevice) return;
+      
+      await cbrsService.requestGrant(selectedDevice, grantRequest);
+      await loadDevices();
+      await addDeviceMarkers();
+      showGrantRequestModal = false;
+      
+      // Find updated device
+      selectedDevice = devices.find(d => d.id === selectedDevice!.id) || null;
+    } catch (err: any) {
+      console.error('Grant request failed:', err);
+      error = err?.message || 'Grant request failed';
+    }
+  }
+  
+  async function handleRelinquishGrant(device: CBSDDevice, grantId: string) {
+    try {
+      if (!cbrsService) return;
+      
+      await cbrsService.relinquishGrant(device, grantId);
+      await loadDevices();
+      await addDeviceMarkers();
+      
+      // Find updated device
+      selectedDevice = devices.find(d => d.id === device.id) || null;
+    } catch (err: any) {
+      console.error('Grant relinquishment failed:', err);
+      error = err?.message || 'Grant relinquishment failed';
+    }
+  }
+  
+  async function handleSaveSettings(event: CustomEvent) {
+    try {
+      const newConfig: CBRSConfig = {
+        ...event.detail,
+        tenantId
+      };
+      
+      await saveCBRSConfig(newConfig);
+      cbrsConfig = newConfig;
+      configStatus = getConfigStatus(cbrsConfig);
+      showSettingsModal = false;
+      
+      // Reinitialize service with new configuration
+      if (configStatus.status === 'complete') {
+        const config: CBRSServiceConfig = {
+          provider: cbrsConfig.provider,
+          tenantId,
+          googleConfig: cbrsConfig.provider === 'google' || cbrsConfig.provider === 'both' ? {
+            apiEndpoint: cbrsConfig.googleApiEndpoint || 'https://sas.googleapis.com/v1',
+            apiKey: cbrsConfig.googleApiKey,
+            certificatePath: cbrsConfig.googleCertificatePath,
+            tenantId
+          } : undefined,
+          federatedConfig: cbrsConfig.provider === 'federated-wireless' || cbrsConfig.provider === 'both' ? {
+            apiEndpoint: cbrsConfig.federatedApiEndpoint || 'https://sas.federatedwireless.com/api/v1',
+            apiKey: cbrsConfig.federatedApiKey || '',
+            customerId: cbrsConfig.federatedCustomerId || '',
+            tenantId
+          } : undefined,
+          federatedEnhancements: {
+            analyticsEnabled: cbrsConfig.enableAnalytics,
+            autoOptimization: cbrsConfig.enableOptimization,
+            multiSiteCoordination: cbrsConfig.enableMultiSite,
+            interferenceMonitoring: cbrsConfig.enableInterferenceMonitoring
+          }
+        };
+        
+        if (cbrsService) {
+          cbrsService.cleanup();
+        }
+        cbrsService = createCBRSService(config);
+        
+        // Reload devices with new service
+        await loadDevices();
+        await addDeviceMarkers();
+      }
+      
+      // Show success message
+      error = null;
+    } catch (err: any) {
+      console.error('Failed to save settings:', err);
+      error = 'Failed to save settings: ' + (err?.message || 'Unknown error');
+    }
+  }
+</script>
+
+<svelte:head>
+  <title>CBRS Management - LTE WISP Platform</title>
+  <meta name="description" content="Citizens Broadband Radio Service management with Google SAS and Federated Wireless integration" />
+</svelte:head>
+
+<div class="cbrs-module">
+  <!-- Header -->
+  <div class="module-header">
+    <div class="header-content">
+      <div class="header-left">
+        <a href="/dashboard" class="back-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Dashboard
+        </a>
+        <h1 class="module-title">
+          <span class="module-icon">📡</span>
+          CBRS Management
+        </h1>
+        <p class="module-description">Citizens Broadband Radio Service spectrum management</p>
+        
+        {#if tenantName}
+          <div class="tenant-badge">
+            <span class="tenant-icon">🏢</span>
+            <span class="tenant-text">{tenantName}</span>
+          </div>
+        {/if}
+      </div>
+      
+      <div class="header-actions">
+        <button class="btn btn-secondary" on:click={() => showSettingsModal = true} title="Configure SAS providers">
+          ⚙️ Settings
+        </button>
+        <button class="btn btn-primary" on:click={() => showAddDeviceModal = true}>
+          + Add CBSD Device
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {#if error}
+    <div class="error-banner">
+      <span class="error-icon">⚠️</span>
+      <span class="error-message">{error}</span>
+      <button class="btn btn-sm" on:click={() => error = null}>✕</button>
+    </div>
+  {/if}
+  
+  {#if configStatus.status !== 'complete'}
+    <div class="warning-banner">
+      <span class="warning-icon">⚠️</span>
+      <span class="warning-message">
+        {configStatus.message}
+        <button class="btn btn-link" on:click={() => showSettingsModal = true}>
+          Configure Now →
+        </button>
+      </span>
+    </div>
+  {/if}
+
+  <!-- Main Content -->
+  <div class="module-content">
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📡</div>
+        <div class="stat-content">
+          <div class="stat-number">{devices.length}</div>
+          <div class="stat-label">Total Devices</div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+          <div class="stat-number">{devices.filter(d => d.state === 'REGISTERED' || d.state === 'GRANTED' || d.state === 'AUTHORIZED').length}</div>
+          <div class="stat-label">Registered</div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-content">
+          <div class="stat-number">{devices.reduce((sum, d) => sum + (d.activeGrants?.length || 0), 0)}</div>
+          <div class="stat-label">Active Grants</div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🌐</div>
+        <div class="stat-content">
+          <div class="stat-number">{CBRS_BAND.BANDWIDTH / 1000000} MHz</div>
+          <div class="stat-label">CBRS Band</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-section">
+      <div class="map-header">
+        <h3>CBSD Device Map</h3>
+        <div class="legend">
+          <div class="legend-item">
+            <span class="legend-color" style="background: #10b981;"></span>
+            <span>Active</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color" style="background: #3b82f6;"></span>
+            <span>Registered</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color" style="background: #6b7280;"></span>
+            <span>Unregistered</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="map-container">
+        <div bind:this={mapContainer} class="arcgis-map"></div>
+        
+        {#if isLoading}
+          <div class="map-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading CBRS devices...</p>
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Device List and Grant Status -->
+    <div class="content-grid">
+      <div class="device-list-section">
+        <h3>CBSD Devices</h3>
+        <DeviceList 
+          {devices}
+          onDeviceSelect={handleDeviceSelect}
+          onRegister={handleRegisterDevice}
+          onDeregister={handleDeregisterDevice}
+        />
+      </div>
+      
+      {#if selectedDevice}
+        <div class="grant-status-section">
+          <GrantStatus 
+            device={selectedDevice}
+            onRequestGrant={handleRequestGrant}
+            onRelinquishGrant={handleRelinquishGrant}
+          />
+        </div>
+      {/if}
+    </div>
+  </div>
+</div>
+
+<!-- Add Device Modal -->
+{#if showAddDeviceModal}
+  <div class="modal-overlay" on:click={() => showAddDeviceModal = false}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>Add CBSD Device</h3>
+        <button class="modal-close" on:click={() => showAddDeviceModal = false}>✕</button>
+      </div>
+      <div class="modal-body">
+        <form on:submit|preventDefault={handleAddDevice}>
+          <div class="form-group">
+            <label>CBSD Serial Number</label>
+            <input type="text" bind:value={newDevice.cbsdSerialNumber} required />
+          </div>
+          
+          <div class="form-group">
+            <label>FCC ID</label>
+            <input type="text" bind:value={newDevice.fccId} required />
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Category</label>
+              <select bind:value={newDevice.cbsdCategory}>
+                <option value="A">Category A (Indoor)</option>
+                <option value="B">Category B (Outdoor)</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>SAS Provider</label>
+              <select bind:value={newDevice.sasProviderId}>
+                <option value="google">Google SAS</option>
+                <option value="federated-wireless">Federated Wireless</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Latitude</label>
+              <input type="number" step="0.0001" bind:value={newDevice.latitude} required />
+            </div>
+            
+            <div class="form-group">
+              <label>Longitude</label>
+              <input type="number" step="0.0001" bind:value={newDevice.longitude} required />
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Height (m)</label>
+              <input type="number" step="0.1" bind:value={newDevice.height} required />
+            </div>
+            
+            <div class="form-group">
+              <label>Antenna Gain (dBi)</label>
+              <input type="number" step="0.1" bind:value={newDevice.antennaGain} required />
+            </div>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" on:click={() => showAddDeviceModal = false}>
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary">
+              Add Device
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Grant Request Modal -->
+{#if showGrantRequestModal && selectedDevice}
+  <div class="modal-overlay" on:click={() => showGrantRequestModal = false}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>Request Spectrum Grant</h3>
+        <button class="modal-close" on:click={() => showGrantRequestModal = false}>✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="device-info-card">
+          <p><strong>Device:</strong> {selectedDevice.cbsdSerialNumber}</p>
+          <p><strong>FCC ID:</strong> {selectedDevice.fccId}</p>
+          <p><strong>Category:</strong> {selectedDevice.cbsdCategory}</p>
+        </div>
+        
+        <form on:submit|preventDefault={handleSubmitGrantRequest}>
+          <div class="form-group">
+            <label>Max EIRP (dBm/MHz)</label>
+            <input type="number" step="0.1" bind:value={grantRequest.maxEirp} required />
+            <span class="form-hint">Maximum Effective Isotropic Radiated Power</span>
+          </div>
+          
+          <div class="form-group">
+            <label>Low Frequency (Hz)</label>
+            <input type="number" bind:value={grantRequest.lowFrequency} required />
+            <span class="form-hint">Must be between 3550 MHz and 3700 MHz</span>
+          </div>
+          
+          <div class="form-group">
+            <label>High Frequency (Hz)</label>
+            <input type="number" bind:value={grantRequest.highFrequency} required />
+            <span class="form-hint">Must be between 3550 MHz and 3700 MHz</span>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" on:click={() => showGrantRequestModal = false}>
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary">
+              Request Grant
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Settings Modal -->
+<SettingsModal 
+  show={showSettingsModal}
+  config={cbrsConfig || {}}
+  on:close={() => showSettingsModal = false}
+  on:save={handleSaveSettings}
+/>
+
+<style>
+  .cbrs-module {
+    min-height: 100vh;
+    background: var(--bg-primary);
+  }
+  
+  .module-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+  }
+  
+  .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    transition: all 0.2s;
+    width: fit-content;
+  }
+  
+  .back-button:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+  }
+  
+  .module-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .module-icon {
+    font-size: 1.5rem;
+  }
+  
+  .module-description {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+  }
+  
+  .tenant-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 0.5rem;
+  }
+  
+  .tenant-icon {
+    font-size: 1rem;
+  }
+  
+  .tenant-text {
+    font-weight: 600;
+    color: #8b5cf6;
+    font-size: 0.875rem;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .btn {
+    padding: 0.625rem 1.25rem;
+    border: none;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+  }
+  
+  .btn-primary {
+    background: var(--accent-color);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: var(--accent-hover);
+  }
+  
+  .btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+  
+  .btn-secondary:hover {
+    background: var(--bg-hover);
+  }
+  
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+  }
+  
+  .error-banner {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .error-message {
+    flex: 1;
+  }
+  
+  .warning-banner {
+    background: #fef3c7;
+    border: 1px solid #fde047;
+    color: #a16207;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .warning-message {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .btn-link {
+    padding: 0;
+    background: none;
+    border: none;
+    color: #9333ea;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  
+  .btn-link:hover {
+    color: #7e22ce;
+  }
+  
+  .module-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+  
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .stat-icon {
+    font-size: 2.5rem;
+  }
+  
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    line-height: 1;
+  }
+  
+  .stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+  }
+  
+  .map-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .map-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+  }
+  
+  .map-container {
+    position: relative;
+    height: 500px;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  
+  .arcgis-map {
+    width: 100%;
+    height: 100%;
+  }
+  
+  .map-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background: var(--bg-primary);
+    padding: 2rem;
+    border-radius: 0.5rem;
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+  }
+  
+  .device-list-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .device-list-section h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .grant-status-section {
+    min-width: 400px;
+    max-width: 500px;
+  }
+  
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .modal-content {
+    background: var(--bg-primary);
+    border-radius: 0.5rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+  }
+  
+  .modal-close:hover {
+    background: var(--bg-hover);
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+  }
+  
+  .device-info-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .device-info-card p {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+  }
+  
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+  
+  .form-hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+  
+  @media (max-width: 1024px) {
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .grant-status-section {
+      min-width: auto;
+      max-width: none;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .map-container {
+      height: 400px;
+    }
+    
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
