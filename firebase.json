@@ -23,9 +23,8 @@
       ".git",
       "firebase-debug.log",
       "firebase-debug.*.log",
-      "functions",
-      "src",
-      "static"
+      ".svelte-kit",
+      "build"
     ]
   }
 }
