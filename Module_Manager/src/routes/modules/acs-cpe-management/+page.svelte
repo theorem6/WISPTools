@@ -5,7 +5,7 @@
   import MainMenu from './components/MainMenu.svelte';
   import HelpModal from '$lib/components/HelpModal.svelte';
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
-  import { loadCPEDevices, syncCPEDevices } from './lib/cpeDataService';
+  import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
   
   // Module data
   let moduleData = {
@@ -87,7 +87,7 @@
     
     try {
       console.log(`Syncing devices for tenant: ${tenantName}`);
-      const result = await syncCPEDevices();
+      const result = await syncCPEDevicesService();
       
       if (result.success) {
         syncMessage = result.message;
