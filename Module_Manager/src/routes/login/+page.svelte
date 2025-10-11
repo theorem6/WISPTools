@@ -61,13 +61,17 @@
       
       if (result.success) {
         console.log('Login page: Firebase auth successful!');
-        console.log('Login page: User:', result.user?.email);
+        console.log('Login page: User:', result.data?.email);
         
-        // Also set localStorage for backwards compatibility
+        // Set localStorage for authentication
         localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userEmail', result.data?.email || email);
         
-        // Navigate to dashboard
+        // Check for tenant - dashboard will handle the tenant selection flow
+        // Dashboard will redirect to:
+        // - /tenant-setup if no tenants
+        // - /tenant-selector if multiple tenants
+        // - stay on dashboard if single tenant
         await goto('/dashboard', { replaceState: true });
       } else {
         error = result.error || 'Authentication failed';

@@ -1,5 +1,7 @@
 // CPE Device Data Service
-// Handles loading and managing CPE device data
+// Handles loading and managing CPE device data with multi-tenant support
+
+import { apiService } from '$lib/services/apiService';
 
 export interface CPEDevice {
   id: string;
@@ -11,31 +13,29 @@ export interface CPEDevice {
   };
   lastContact: Date | string;
   parameters?: Record<string, any>;
+  tenantId?: string;
 }
 
 /**
- * Load CPE devices from the API
+ * Load CPE devices from the API (multi-tenant, authenticated)
  */
 export async function loadCPEDevices(): Promise<CPEDevice[]> {
   try {
-    console.log('Attempting to load CPE devices from API...');
+    console.log('Loading CPE devices from multi-tenant API...');
     
-    const response = await fetch('/api/cpe/devices', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
+    // Use authenticated API service with tenant context
+    const result = await apiService.getDevices();
     
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.devices.length > 0) {
-        console.log(`Loaded ${data.devices.length} real CPE devices from API`);
-        return data.devices;
+    if (result.success && result.data) {
+      const devices = Array.isArray(result.data) ? result.data : result.data.devices || [];
+      
+      if (devices.length > 0) {
+        console.log(`Loaded ${devices.length} tenant-specific devices`);
+        return devices.map(convertGenieACSDevice);
       }
     }
     
-    console.log('API not available, using sample data');
+    console.log('No devices found for tenant, using sample data');
     return getFallbackSampleData();
     
   } catch (error) {
@@ -43,6 +43,24 @@ export async function loadCPEDevices(): Promise<CPEDevice[]> {
     console.log('Using sample data as fallback');
     return getFallbackSampleData();
   }
+}
+
+/**
+ * Convert GenieACS device format to CPE format
+ */
+function convertGenieACSDevice(device: any): CPEDevice {
+  return {
+    id: device._id || device.id,
+    manufacturer: device.manufacturer || device.parameters?.['InternetGatewayDevice.DeviceInfo.Manufacturer'] || 'Unknown',
+    status: device.status || (device._lastInform ? 'Online' : 'Offline'),
+    location: device.location || {
+      latitude: 0,
+      longitude: 0
+    },
+    lastContact: device.lastContact || device._lastInform || new Date(),
+    parameters: device.parameters || {},
+    tenantId: device._tenantId || device.tenantId
+  };
 }
 
 /**
@@ -96,37 +114,32 @@ function getFallbackSampleData(): CPEDevice[] {
 }
 
 /**
- * Sync CPE devices with GenieACS
+ * Sync CPE devices with GenieACS (multi-tenant, authenticated)
  */
 export async function syncCPEDevices(): Promise<{ success: boolean; message: string; devices?: CPEDevice[] }> {
   try {
-    console.log('Starting CPE device sync...');
+    console.log('Starting tenant-specific device sync...');
     
-    const syncResponse = await fetch('/api/cpe/sync', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    // Use authenticated API service with tenant context
+    const result = await apiService.syncGenieACSDevices();
     
-    const syncData = await syncResponse.json();
-    
-    if (syncData.success) {
-      console.log(`Successfully synced ${syncData.deviceCount} CPE devices`);
+    if (result.success && result.data) {
+      const syncCount = result.data.synced || result.data.deviceCount || 0;
+      console.log(`Successfully synced ${syncCount} tenant devices`);
       
       // Reload devices after sync
       const devices = await loadCPEDevices();
       
       return {
         success: true,
-        message: `Successfully synced ${syncData.deviceCount} devices`,
+        message: result.data.message || `Successfully synced ${syncCount} devices`,
         devices
       };
     } else {
-      throw new Error(syncData.error || 'Sync failed');
+      throw new Error(result.error || 'Sync failed');
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to sync CPE devices:', error);
     return {
       success: false,

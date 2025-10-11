@@ -63,6 +63,8 @@
 
   let isDarkMode = false;
   let userEmail = '';
+  let tenantName = '';
+  let isLoadingTenant = true;
 
   onMount(async () => {
     if (!browser) return;
@@ -70,20 +72,57 @@
     console.log('Dashboard: Mounted');
     
     // Check authentication
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    console.log('Dashboard: isAuthenticated =', isAuthenticated);
+    const { authService } = await import('$lib/services/authService');
+    const currentUser = authService.getCurrentUser();
     
-    if (isAuthenticated !== 'true') {
-      console.log('Dashboard: Not authenticated, redirecting to login');
-      await goto('/login', { replaceState: true });
-      return;
+    if (!currentUser) {
+      const isAuthenticated = localStorage.getItem('isAuthenticated');
+      if (isAuthenticated !== 'true') {
+        console.log('Dashboard: Not authenticated, redirecting to login');
+        await goto('/login', { replaceState: true });
+        return;
+      }
     }
 
-    console.log('Dashboard: User is authenticated, loading dashboard');
+    console.log('Dashboard: User is authenticated');
 
     // Get user email
-    userEmail = localStorage.getItem('userEmail') || 'user@example.com';
+    userEmail = currentUser?.email || localStorage.getItem('userEmail') || 'user@example.com';
     console.log('Dashboard: User email =', userEmail);
+
+    // Check for tenant selection
+    const { tenantService } = await import('$lib/services/tenantService');
+    const selectedTenantId = localStorage.getItem('selectedTenantId');
+    
+    if (!selectedTenantId && currentUser) {
+      // Check if user has any tenants
+      console.log('Dashboard: No tenant selected, checking user tenants...');
+      const tenants = await tenantService.getUserTenants(currentUser.uid);
+      
+      if (tenants.length === 0) {
+        // No tenants, redirect to tenant setup
+        console.log('Dashboard: No tenants found, redirecting to setup');
+        await goto('/tenant-setup', { replaceState: true });
+        return;
+      } else if (tenants.length === 1) {
+        // Auto-select single tenant
+        console.log('Dashboard: Auto-selecting single tenant');
+        localStorage.setItem('selectedTenantId', tenants[0].id);
+        localStorage.setItem('selectedTenantName', tenants[0].displayName);
+        tenantName = tenants[0].displayName;
+      } else {
+        // Multiple tenants, redirect to selector
+        console.log('Dashboard: Multiple tenants, redirecting to selector');
+        await goto('/tenant-selector', { replaceState: true });
+        return;
+      }
+    } else if (selectedTenantId) {
+      // Load tenant name
+      tenantName = localStorage.getItem('selectedTenantName') || 'Organization';
+      console.log('Dashboard: Tenant selected:', tenantName);
+    }
+
+    isLoadingTenant = false;
 
     // Check for saved theme preference
     const savedTheme = localStorage.getItem('theme');
@@ -114,10 +153,22 @@
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    const { authService } = await import('$lib/services/authService');
+    await authService.signOut();
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('selectedTenantId');
+    localStorage.removeItem('selectedTenantName');
     goto('/login');
+  }
+
+  function handleTenantSettings() {
+    goto('/tenant-admin');
+  }
+
+  function handleSwitchTenant() {
+    goto('/tenant-selector');
   }
 </script>
 
@@ -135,6 +186,19 @@
         </div>
         
         <div class="header-actions">
+          {#if tenantName && !isLoadingTenant}
+            <div class="tenant-info">
+              <span class="tenant-icon">🏢</span>
+              <div class="tenant-details">
+                <span class="tenant-label">Organization</span>
+                <span class="tenant-name">{tenantName}</span>
+              </div>
+              <button class="tenant-menu-btn" on:click={handleSwitchTenant} title="Switch Organization">
+                ⚙️
+              </button>
+            </div>
+          {/if}
+
           <button class="theme-toggle" on:click={toggleTheme} aria-label="Toggle theme">
             {#if isDarkMode}
               ☀️
@@ -304,6 +368,53 @@
 
   .theme-toggle:hover {
     background-color: var(--bg-hover);
+  }
+
+  .tenant-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background-color: rgba(124, 58, 237, 0.1);
+    border-radius: 0.5rem;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+  }
+
+  .tenant-icon {
+    font-size: 1.25rem;
+  }
+
+  .tenant-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .tenant-label {
+    font-size: 0.625rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tenant-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--brand-primary);
+  }
+
+  .tenant-menu-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+
+  .tenant-menu-btn:hover {
+    opacity: 1;
   }
 
   .user-menu {
@@ -543,6 +654,14 @@
 
     .user-email {
       display: none;
+    }
+
+    .tenant-details {
+      display: none;
+    }
+
+    .tenant-info {
+      padding: 0.5rem;
     }
 
     .stats-grid {
