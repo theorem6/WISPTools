@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
+  import { isPlatformAdmin } from '$lib/services/adminService';
   import type { Tenant, TenantSettings, TenantLimits } from '$lib/models/tenant';
 
   let isLoading = true;
@@ -14,6 +15,7 @@
   let error = '';
   let success = '';
   let isSaving = false;
+  let isAdmin = false;
 
   // Editable fields
   let displayName = '';
@@ -38,6 +40,10 @@
       return;
     }
 
+    // Check if user is platform admin
+    isAdmin = isPlatformAdmin(currentUser.email);
+    console.log('Is platform admin:', isAdmin);
+
     // Load tenant data
     try {
       tenant = await tenantService.getTenant(tenantId);
@@ -46,12 +52,18 @@
         return;
       }
 
-      // Check if user has admin permissions
-      const role = await tenantService.getUserRole(currentUser.uid, tenantId);
-      if (role !== 'owner' && role !== 'admin') {
-        error = 'You do not have permission to access tenant settings';
-        setTimeout(() => goto('/dashboard'), 2000);
-        return;
+      // Check permissions: Platform admin OR tenant owner/admin
+      if (!isAdmin) {
+        const role = await tenantService.getUserRole(currentUser.uid, tenantId);
+        console.log('User role in tenant:', role);
+        
+        if (role !== 'owner' && role !== 'admin') {
+          error = 'You do not have permission to access tenant settings';
+          setTimeout(() => goto('/dashboard'), 2000);
+          return;
+        }
+      } else {
+        console.log('Platform admin access granted - full permissions');
       }
 
       // Initialize editable fields
@@ -73,10 +85,21 @@
     isSaving = true;
 
     try {
-      // Update tenant (would need to implement updateTenant in tenantService)
-      // For now, just show success message
-      success = 'Settings saved successfully!';
-      setTimeout(() => success = '', 3000);
+      // Update tenant basic info in Firestore
+      const { updateDoc, doc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('$lib/firebase');
+      
+      await updateDoc(doc(db(), 'tenants', tenantId), {
+        displayName: displayName,
+        contactEmail: contactEmail,
+        contactPhone: contactPhone || null,
+        updatedAt: serverTimestamp()
+      });
+      
+      success = 'General settings saved successfully!';
+      
+      // Reload tenant data
+      tenant = await tenantService.getTenant(tenantId);
     } catch (err: any) {
       error = err.message || 'Failed to save settings';
     } finally {
@@ -95,7 +118,8 @@
       const result = await tenantService.updateTenantSettings(tenantId, settings);
       if (result.success) {
         success = 'Device settings saved successfully!';
-        setTimeout(() => success = '', 3000);
+        // Reload tenant data
+        tenant = await tenantService.getTenant(tenantId);
       } else {
         error = result.error || 'Failed to save settings';
       }
@@ -117,7 +141,8 @@
       const result = await tenantService.updateTenantLimits(tenantId, limits);
       if (result.success) {
         success = 'Limits updated successfully!';
-        setTimeout(() => success = '', 3000);
+        // Reload tenant data
+        tenant = await tenantService.getTenant(tenantId);
       } else {
         error = result.error || 'Failed to update limits';
       }
@@ -201,19 +226,21 @@
         </button>
       </div>
 
-      {#if success}
-        <div class="success-message">
-          <span class="success-icon">✅</span>
-          {success}
-        </div>
-      {/if}
+  {#if success}
+    <div class="success-message">
+      <span class="success-icon">✅</span>
+      <span>{success}</span>
+      <button class="dismiss-btn" on:click={() => success = ''}>✕</button>
+    </div>
+  {/if}
 
-      {#if error && tenant}
-        <div class="error-message">
-          <span class="error-icon">⚠️</span>
-          {error}
-        </div>
-      {/if}
+  {#if error && tenant}
+    <div class="error-message">
+      <span class="error-icon">⚠️</span>
+      <span>{error}</span>
+      <button class="dismiss-btn" on:click={() => error = ''}>✕</button>
+    </div>
+  {/if}
 
       {#if activeTab === 'general'}
         <div class="settings-panel">
@@ -698,6 +725,21 @@
     font-size: 4rem;
     display: block;
     margin-bottom: 1rem;
+  }
+
+  .dismiss-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    padding: 0.25rem;
+  }
+
+  .dismiss-btn:hover {
+    opacity: 1;
   }
 
   @media (max-width: 768px) {
