@@ -2,10 +2,13 @@
 # This is the base configuration that applies to all environments
 # Environment-specific overrides go in apphosting.[environment].yaml
 
+# Root directory (. means current directory - Module_Manager)
+rootDirectory: .
+
 # Build and run commands
 # Using 6GB heap for build to handle ArcGIS + Firebase + SvelteKit bundling
 # Note: Functions must be deployed separately via Firebase Console → Functions
-buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
+buildCommand: npm install && npx svelte-kit sync && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
 runCommand: node server.js
 
 runConfig:

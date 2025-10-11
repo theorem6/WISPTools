@@ -2,8 +2,13 @@
 # This configuration connects the frontend to the GCE backend
 # Replace placeholders with your actual GCE IP/domain
 
+# Root directory where the app code is located (relative to project root)
+# NOTE: When this file is copied to the root, it will point to Module_Manager
+# When used from Module_Manager directory, use "." instead
+rootDirectory: .
+
 # Build and run commands
-buildCommand: npm install && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
+buildCommand: npm install && npx svelte-kit sync && NODE_OPTIONS="--max-old-space-size=6144" npm run build && ls -lh build/client/_app/immutable/entry/ || echo "⚠️  Build directory check failed"
 runCommand: node server.js
 
 runConfig:
