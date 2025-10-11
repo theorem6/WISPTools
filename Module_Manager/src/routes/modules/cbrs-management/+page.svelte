@@ -54,17 +54,19 @@
       if (browser) {
         // Load tenant info
         tenantId = localStorage.getItem('selectedTenantId') || '';
-        tenantName = localStorage.getItem('selectedTenantName') || '';
+        tenantName = localStorage.getItem('selectedTenantName') || 'No Tenant Selected';
         
-        if (!tenantId) {
-          console.error('No tenant selected');
-          await goto('/tenant-selector');
-          return;
+        // Load configuration (only if we have a tenant)
+        if (tenantId) {
+          cbrsConfig = await loadCBRSConfig(tenantId);
+          configStatus = getConfigStatus(cbrsConfig);
+        } else {
+          // No tenant selected - show warning
+          configStatus = { 
+            status: 'missing' as const, 
+            message: 'No tenant selected. Please select a tenant from the dashboard.' 
+          };
         }
-        
-        // Load configuration
-        cbrsConfig = await loadCBRSConfig(tenantId);
-        configStatus = getConfigStatus(cbrsConfig);
         
         if (cbrsConfig && configStatus.status === 'complete') {
           // Initialize CBRS service with loaded configuration
@@ -94,8 +96,10 @@
           cbrsService = createCBRSService(config);
         }
         
-        // Load devices
-        await loadDevices();
+        // Load devices (only if we have a tenant)
+        if (tenantId) {
+          await loadDevices();
+        }
         
         // Initialize map
         await initializeMap();
@@ -120,7 +124,14 @@
   
   async function loadDevices() {
     try {
-      if (!cbrsService) return;
+      if (!tenantId) {
+        console.warn('No tenant selected, skipping device load');
+        return;
+      }
+      if (!cbrsService) {
+        console.warn('CBRS service not initialized, skipping device load');
+        return;
+      }
       devices = await cbrsService.getDevices();
       console.log('Loaded', devices.length, 'CBRS devices');
     } catch (err: any) {
@@ -285,7 +296,10 @@
   
   async function handleAddDevice() {
     try {
-      if (!cbrsService) return;
+      if (!tenantId) {
+        error = 'Please select a tenant before adding devices.';
+        return;
+      }
       
       const device: CBSDDevice = {
         id: `cbsd-${Date.now()}`,
@@ -470,7 +484,16 @@
     </div>
   {/if}
   
-  {#if configStatus.status !== 'complete'}
+  {#if !tenantId}
+    <div class="error-banner">
+      <span class="error-icon">⚠️</span>
+      <span class="error-message">
+        No tenant selected. Please return to the 
+        <a href="/dashboard" class="inline-link">dashboard</a> 
+        and select a tenant first.
+      </span>
+    </div>
+  {:else if configStatus.status !== 'complete'}
     <div class="warning-banner">
       <span class="warning-icon">⚠️</span>
       <span class="warning-message">
@@ -874,6 +897,16 @@
   }
   
   .btn-link:hover {
+    color: #7e22ce;
+  }
+  
+  .inline-link {
+    color: #9333ea;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+  
+  .inline-link:hover {
     color: #7e22ce;
   }
   
