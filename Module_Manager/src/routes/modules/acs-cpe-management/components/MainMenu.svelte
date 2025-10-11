@@ -1,5 +1,14 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { isCurrentUserAdmin } from '$lib/services/adminService';
+  
+  let isAdmin = false;
+  
+  onMount(() => {
+    // Check if current user is platform admin
+    isAdmin = isCurrentUserAdmin();
+  });
   
   // Main menu items based on GenieACS structure
   const mainMenuItems = [
@@ -8,42 +17,48 @@
       name: 'Overview',
       icon: '📊',
       description: 'System overview and statistics',
-      path: '/modules/acs-cpe-management'
+      path: '/modules/acs-cpe-management',
+      adminOnly: false
     },
     {
       id: 'devices',
       name: 'Devices',
       icon: '📱',
       description: 'CPE device management and monitoring',
-      path: '/modules/acs-cpe-management/devices'
+      path: '/modules/acs-cpe-management/devices',
+      adminOnly: false
     },
     {
       id: 'faults',
       name: 'Faults',
       icon: '⚠️',
       description: 'Device faults and error management',
-      path: '/modules/acs-cpe-management/faults'
+      path: '/modules/acs-cpe-management/faults',
+      adminOnly: false
     },
     {
       id: 'monitoring',
       name: 'Monitoring',
       icon: '📈',
       description: 'Per-device TR-069 metrics and analysis',
-      path: '/modules/acs-cpe-management/monitoring'
+      path: '/modules/acs-cpe-management/monitoring',
+      adminOnly: false
     },
     {
       id: 'graphs',
       name: 'Graphs',
       icon: '📊',
       description: 'Multi-device comparison and charts',
-      path: '/modules/acs-cpe-management/graphs'
+      path: '/modules/acs-cpe-management/graphs',
+      adminOnly: false
     },
     {
       id: 'admin',
       name: 'Administration',
       icon: '⚙️',
-      description: 'System configuration and management',
-      path: '/modules/acs-cpe-management/admin'
+      description: 'System configuration (Admin Only)',
+      path: '/modules/acs-cpe-management/admin',
+      adminOnly: true
     }
   ];
 
@@ -56,15 +71,20 @@
 <nav class="main-menu">
   <ul class="menu-items">
     {#each mainMenuItems as item}
-      <li class="menu-item" class:active={isActive(item.path)}>
-        <a href={item.path} class="menu-link">
-          <div class="menu-icon">{item.icon}</div>
-          <div class="menu-content">
-            <div class="menu-name">{item.name}</div>
-            <div class="menu-description">{item.description}</div>
-          </div>
-        </a>
-      </li>
+      {#if !item.adminOnly || (item.adminOnly && isAdmin)}
+        <li class="menu-item" class:active={isActive(item.path)} class:admin-item={item.adminOnly}>
+          <a href={item.path} class="menu-link">
+            <div class="menu-icon">{item.icon}</div>
+            <div class="menu-content">
+              <div class="menu-name">{item.name}</div>
+              <div class="menu-description">{item.description}</div>
+            </div>
+            {#if item.adminOnly}
+              <div class="admin-badge">🔐</div>
+            {/if}
+          </a>
+        </li>
+      {/if}
     {/each}
   </ul>
 </nav>
@@ -111,6 +131,24 @@
 
   .menu-item.active .menu-description {
     color: rgba(255, 255, 255, 0.8);
+  }
+
+  .menu-item.admin-item {
+    border: 2px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .menu-item.admin-item:hover {
+    border-color: #ef4444;
+  }
+
+  .menu-item.admin-item.active {
+    border-color: #ef4444;
+    background: #ef4444;
+  }
+
+  .admin-badge {
+    font-size: 1rem;
+    opacity: 0.8;
   }
 
   .menu-link {
