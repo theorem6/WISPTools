@@ -104,6 +104,30 @@
     showEditModal = false;
   }
 
+  function handleOpenSettings() {
+    if (!selectedTenant) return;
+    localStorage.setItem('selectedTenantId', selectedTenant.id);
+    localStorage.setItem('selectedTenantName', selectedTenant.displayName);
+    closeEditModal();
+    goto('/tenant-admin');
+  }
+
+  function handleViewDevices() {
+    if (!selectedTenant) return;
+    localStorage.setItem('selectedTenantId', selectedTenant.id);
+    localStorage.setItem('selectedTenantName', selectedTenant.displayName);
+    closeEditModal();
+    goto('/modules/acs-cpe-management');
+  }
+
+  function handleManageUsers() {
+    if (!selectedTenant) return;
+    localStorage.setItem('selectedTenantId', selectedTenant.id);
+    localStorage.setItem('selectedTenantName', selectedTenant.displayName);
+    closeEditModal();
+    goto('/modules/tenant-management/users');
+  }
+
   function generateSubdomain() {
     if (newTenantName) {
       newTenantSubdomain = newTenantName
@@ -358,25 +382,13 @@
         <div class="info-section">
           <h3>Quick Actions</h3>
           <div class="quick-actions">
-            <button class="btn-action" on:click={() => {
-              localStorage.setItem('selectedTenantId', selectedTenant.id);
-              localStorage.setItem('selectedTenantName', selectedTenant.displayName);
-              goto('/tenant-admin');
-            }}>
+            <button class="btn-action" on:click={handleOpenSettings}>
               ⚙️ Open Tenant Settings
             </button>
-            <button class="btn-action" on:click={() => {
-              localStorage.setItem('selectedTenantId', selectedTenant.id);
-              localStorage.setItem('selectedTenantName', selectedTenant.displayName);
-              goto('/modules/acs-cpe-management');
-            }}>
+            <button class="btn-action" on:click={handleViewDevices}>
               📡 View Devices
             </button>
-            <button class="btn-action" on:click={() => {
-              localStorage.setItem('selectedTenantId', selectedTenant.id);
-              localStorage.setItem('selectedTenantName', selectedTenant.displayName);
-              goto('/modules/tenant-management/users');
-            }}>
+            <button class="btn-action" on:click={handleManageUsers}>
               👥 Manage Users
             </button>
           </div>
@@ -724,6 +736,150 @@
     font-size: 4rem;
     display: block;
     margin-bottom: 1rem;
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 2rem;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    border-radius: 1rem;
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 10;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.5rem;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .close-btn:hover {
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: 2rem;
+  }
+
+  .info-section {
+    margin-bottom: 2rem;
+  }
+
+  .info-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .info-section h3 {
+    margin-bottom: 1rem;
+    font-size: 1.125rem;
+    color: var(--text-primary);
+  }
+
+  .info-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+  }
+
+  .info-item strong {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .info-item span {
+    color: var(--text-primary);
+  }
+
+  .cwmp-url {
+    background: var(--bg-primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: var(--brand-primary);
+  }
+
+  .quick-actions {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .btn-action {
+    padding: 1rem 1.5rem;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .btn-action:hover {
+    background: var(--brand-primary);
+    color: white;
+    border-color: var(--brand-primary);
+    transform: translateX(5px);
+  }
+
+  .modal-footer {
+    padding: 1.5rem 2rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    position: sticky;
+    bottom: 0;
+    background: var(--card-bg);
   }
 
   @media (max-width: 768px) {
