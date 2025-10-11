@@ -83,7 +83,9 @@
         
         await loadAllTenants();
         
-        setTimeout(() => success = '', 3000);
+        // Don't auto-dismiss success message
+        // Let user manually dismiss or it will clear when they interact
+        setTimeout(() => success = '', 5000);
       } else {
         error = result.error || 'Failed to create tenant';
       }
@@ -290,6 +292,105 @@
     {/if}
   </div>
 </div>
+
+<!-- Edit Tenant Modal -->
+{#if showEditModal && selectedTenant}
+  <div class="modal-overlay" on:click={closeEditModal} role="dialog" aria-modal="true">
+    <div class="modal-content" on:click|stopPropagation role="document">
+      <div class="modal-header">
+        <h2>Manage Tenant: {selectedTenant.displayName}</h2>
+        <button class="close-btn" on:click={closeEditModal}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="info-section">
+          <h3>Tenant Information</h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <strong>Tenant ID:</strong>
+              <span>{selectedTenant.id}</span>
+            </div>
+            <div class="info-item">
+              <strong>Subdomain:</strong>
+              <span>{selectedTenant.subdomain}</span>
+            </div>
+            <div class="info-item">
+              <strong>Status:</strong>
+              <span class="status-badge status-{selectedTenant.status}">{selectedTenant.status}</span>
+            </div>
+            <div class="info-item">
+              <strong>Contact Email:</strong>
+              <span>{selectedTenant.contactEmail}</span>
+            </div>
+            <div class="info-item">
+              <strong>CWMP URL:</strong>
+              <code class="cwmp-url">{selectedTenant.cwmpUrl}</code>
+            </div>
+            <div class="info-item">
+              <strong>Created:</strong>
+              <span>{new Date(selectedTenant.createdAt).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <h3>Settings</h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <strong>Max Devices:</strong>
+              <span>{selectedTenant.limits.maxDevices}</span>
+            </div>
+            <div class="info-item">
+              <strong>Max Users:</strong>
+              <span>{selectedTenant.limits.maxUsers}</span>
+            </div>
+            <div class="info-item">
+              <strong>Storage Quota:</strong>
+              <span>{selectedTenant.limits.storageQuotaMB} MB</span>
+            </div>
+            <div class="info-item">
+              <strong>Inform Interval:</strong>
+              <span>{selectedTenant.settings.informInterval}s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <h3>Quick Actions</h3>
+          <div class="quick-actions">
+            <button class="btn-action" on:click={() => {
+              localStorage.setItem('selectedTenantId', selectedTenant.id);
+              localStorage.setItem('selectedTenantName', selectedTenant.displayName);
+              goto('/tenant-admin');
+            }}>
+              ⚙️ Open Tenant Settings
+            </button>
+            <button class="btn-action" on:click={() => {
+              localStorage.setItem('selectedTenantId', selectedTenant.id);
+              localStorage.setItem('selectedTenantName', selectedTenant.displayName);
+              goto('/modules/acs-cpe-management');
+            }}>
+              📡 View Devices
+            </button>
+            <button class="btn-action" on:click={() => {
+              localStorage.setItem('selectedTenantId', selectedTenant.id);
+              localStorage.setItem('selectedTenantName', selectedTenant.displayName);
+              goto('/modules/tenant-management/users');
+            }}>
+              👥 Manage Users
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={closeEditModal}>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .tenant-management-page {
