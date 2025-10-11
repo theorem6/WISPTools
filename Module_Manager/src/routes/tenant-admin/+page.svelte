@@ -153,11 +153,16 @@
     }
   }
 
-  function copyToClipboard(text: string) {
+  async function copyToClipboard(text: string) {
     if (browser) {
-      navigator.clipboard.writeText(text);
-      success = 'Copied to clipboard!';
-      setTimeout(() => success = '', 2000);
+      try {
+        await navigator.clipboard.writeText(text);
+        success = 'Copied to clipboard!';
+        // Auto-dismiss this one since it's just a copy confirmation
+        setTimeout(() => success = '', 2000);
+      } catch (err) {
+        error = 'Failed to copy to clipboard';
+      }
     }
   }
 </script>
@@ -206,7 +211,7 @@
         <button 
           class="tab" 
           class:active={activeTab === 'connection'}
-          on:click={() => activeTab === 'connection'}
+          on:click={() => activeTab = 'connection'}
         >
           Connection
         </button>
