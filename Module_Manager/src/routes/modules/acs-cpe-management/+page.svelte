@@ -325,60 +325,8 @@
     }
   }
 
-  async function syncCPEDevices() {
-    isLoading = true;
-    error = null;
-    
-    try {
-      console.log('Starting CPE device sync...');
-      
-      // Use SvelteKit API route (no Firebase Functions needed!)
-      const syncResponse = await fetch('/api/cpe/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (syncResponse.ok) {
-        const syncData = await syncResponse.json();
-        if (syncData.success) {
-          console.log(`Sync completed: ${syncData.synced} devices synced, ${syncData.errors} errors`);
-          
-          // Now load the updated devices
-          await loadSampleCPEDevices();
-          
-          // Update map markers
-          if (map) {
-            addCPEMarkers();
-          }
-          
-          console.log('CPE devices synced successfully from MongoDB');
-          return;
-        }
-      }
-      
-      console.log('Firebase Functions sync not available, using local sync');
-      // Fallback to local sync (just reload sample data)
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate sync delay
-      await loadSampleCPEDevices();
-      
-      // Update map markers
-      if (map) {
-        addCPEMarkers();
-      }
-      
-      console.log('CPE devices synced successfully (local)');
-      
-    } catch (err) {
-      console.error('Failed to sync CPE devices:', err);
-      error = err.message || 'Sync failed';
-    }
-    isLoading = false;
-  }
-
   async function refreshCPEData() {
-    await loadSampleCPEDevices();
+    await loadDevices();
     if (map) {
       addCPEMarkers();
     }
