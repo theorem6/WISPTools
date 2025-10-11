@@ -1,35 +1,37 @@
 // SvelteKit API Route - Presets CRUD Operations
-// Deploys automatically with App Hosting rollouts
+// Proxy to GCE GenieACS NBI API
 
-import type { RequestHandler } from '@sveltejs/kit';
-import { MongoClient } from 'mongodb';
-// Use process.env instead of $env/static/private for compatibility
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'genieacs';
+import type { RequestHandler} from '@sveltejs/kit';
 
-// GET - Fetch all presets
+// Get GenieACS NBI URL from environment
+const GENIEACS_NBI_URL = process.env.PUBLIC_GENIEACS_NBI_URL || 'http://localhost:7557';
+
+// GET - Fetch all presets from GenieACS NBI
 export const GET: RequestHandler = async () => {
   try {
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
+    // Fetch from GenieACS NBI on GCE backend
+    const response = await fetch(`${GENIEACS_NBI_URL}/presets`, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
     
-    const db = client.db(MONGODB_DATABASE || 'genieacs');
-    const presets = await db.collection('presets')
-      .find({})
-      .sort({ weight: 1 })
-      .toArray();
+    if (!response.ok) {
+      throw new Error(`GenieACS NBI error: ${response.status}`);
+    }
     
-    await client.close();
+    const presets = await response.json();
     
     return new Response(JSON.stringify({
       success: true,
       presets,
-      count: presets.length
+      count: Array.isArray(presets) ? presets.length : 0
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
+    console.error('GenieACS NBI fetch error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : String(error)
@@ -40,64 +42,34 @@ export const GET: RequestHandler = async () => {
   }
 };
 
-// POST - Create or Update preset
+// POST - Create or Update preset via GenieACS NBI
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const data = await request.json();
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
+    const presetId = data.id || data.name?.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
     
-    const db = client.db(MONGODB_DATABASE || 'genieacs');
-    const presetsCollection = db.collection('presets');
+    // PUT to GenieACS NBI (create or update)
+    const response = await fetch(`${GENIEACS_NBI_URL}/presets/${encodeURIComponent(presetId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
     
-    if (data.id) {
-      // Update existing preset
-      const { id, _id, ...updateData } = data;
-      updateData.updatedAt = new Date();
-      
-      await presetsCollection.updateOne(
-        { _id: id },
-        { $set: updateData }
-      );
-      
-      const updated = await presetsCollection.findOne({ _id: id });
-      await client.close();
-      
-      return new Response(JSON.stringify({
-        success: true,
-        preset: updated,
-        message: 'Preset updated successfully'
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
-    } else {
-      // Create new preset
-      const presetId = data.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
-      
-      const preset = {
-        _id: presetId,
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      await presetsCollection.insertOne(preset);
-      await client.close();
-      
-      return new Response(JSON.stringify({
-        success: true,
-        preset,
-        message: 'Preset created successfully'
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!response.ok) {
+      throw new Error(`GenieACS NBI error: ${response.status}`);
     }
     
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Preset saved successfully'
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
   } catch (error) {
+    console.error('GenieACS NBI error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : String(error)
@@ -108,28 +80,32 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 };
 
-// DELETE - Delete preset
+// DELETE - Delete preset via GenieACS NBI
 export const DELETE: RequestHandler = async ({ request }) => {
   try {
     const { id } = await request.json();
     
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
+    // DELETE from GenieACS NBI
+    const response = await fetch(`${GENIEACS_NBI_URL}/presets/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
     
-    const db = client.db(MONGODB_DATABASE || 'genieacs');
-    const result = await db.collection('presets').deleteOne({ _id: id });
-    
-    await client.close();
+    if (!response.ok) {
+      throw new Error(`GenieACS NBI error: ${response.status}`);
+    }
     
     return new Response(JSON.stringify({
       success: true,
-      message: 'Preset deleted successfully',
-      deletedCount: result.deletedCount
+      message: 'Preset deleted successfully'
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
+    console.error('GenieACS NBI error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : String(error)

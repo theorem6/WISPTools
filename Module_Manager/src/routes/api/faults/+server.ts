@@ -1,48 +1,47 @@
 // SvelteKit API Route - Faults CRUD Operations
-// Deploys automatically with App Hosting rollouts
+// Proxy to GCE GenieACS NBI API
 
 import type { RequestHandler } from '@sveltejs/kit';
-import { MongoClient } from 'mongodb';
-// Use process.env instead of $env/static/private for compatibility
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'genieacs';
 
-// GET - Fetch all faults
+// Get GenieACS NBI URL from environment
+const GENIEACS_NBI_URL = process.env.PUBLIC_GENIEACS_NBI_URL || 'http://localhost:7557';
+
+// GET - Fetch all faults from GenieACS NBI
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const severity = url.searchParams.get('severity');
     const status = url.searchParams.get('status');
     const limit = url.searchParams.get('limit');
     
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
+    // Build query for GenieACS NBI
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit);
     
-    const db = client.db(MONGODB_DATABASE || 'genieacs');
+    const queryString = params.toString() ? `?${params.toString()}` : '';
     
-    // Build query filter
-    const filter: any = {};
-    if (severity) filter.severity = severity;
-    if (status) filter.status = status;
+    // Fetch from GenieACS NBI on GCE backend
+    const response = await fetch(`${GENIEACS_NBI_URL}/faults${queryString}`, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
     
-    let query = db.collection('faults').find(filter).sort({ timestamp: -1 });
-    
-    if (limit) {
-      query = query.limit(parseInt(limit));
+    if (!response.ok) {
+      throw new Error(`GenieACS NBI error: ${response.status}`);
     }
     
-    const faults = await query.toArray();
-    
-    await client.close();
+    const faults = await response.json();
     
     return new Response(JSON.stringify({
       success: true,
       faults,
-      count: faults.length
+      count: Array.isArray(faults) ? faults.length : 0
     }), {
       headers: { 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
+    console.error('GenieACS NBI fetch error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : String(error)

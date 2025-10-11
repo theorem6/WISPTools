@@ -1,37 +1,37 @@
 // SvelteKit API Route - CPE Devices
-// Deploys automatically with App Hosting rollouts
+// Proxy to GCE GenieACS NBI API
 
 import type { RequestHandler } from '@sveltejs/kit';
-import { MongoClient } from 'mongodb';
 
-// Use process.env instead of $env/static/private for compatibility
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DATABASE = process.env.MONGODB_DATABASE || 'genieacs';
+// Get GenieACS NBI URL from environment
+const GENIEACS_NBI_URL = process.env.PUBLIC_GENIEACS_NBI_URL || 'http://localhost:7557';
 
-// GET - Fetch all CPE devices
+// GET - Fetch all CPE devices from GenieACS NBI
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const status = url.searchParams.get('status');
     const limit = url.searchParams.get('limit');
     
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
+    // Build query for GenieACS NBI
+    const query: any = {};
+    if (limit) query.limit = parseInt(limit);
     
-    const db = client.db(MONGODB_DATABASE || 'genieacs');
+    const queryString = Object.keys(query).length > 0 
+      ? '?' + new URLSearchParams(query).toString()
+      : '';
     
-    // Build query filter
-    const filter: any = {};
-    if (status) filter.status = status;
+    // Fetch from GenieACS NBI on GCE backend
+    const response = await fetch(`${GENIEACS_NBI_URL}/devices${queryString}`, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
     
-    let query = db.collection('devices').find(filter);
-    
-    if (limit) {
-      query = query.limit(parseInt(limit));
+    if (!response.ok) {
+      throw new Error(`GenieACS NBI error: ${response.status}`);
     }
     
-    const devices = await query.toArray();
-    
-    await client.close();
+    const devices = await response.json();
     
     return new Response(JSON.stringify({
       success: true,
@@ -42,6 +42,7 @@ export const GET: RequestHandler = async ({ url }) => {
     });
     
   } catch (error) {
+    console.error('GenieACS NBI fetch error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error instanceof Error ? error.message : String(error)

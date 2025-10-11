@@ -103,7 +103,9 @@ export interface GenieACSIntegrationConfig {
 // Default configuration
 export const DEFAULT_GENIEACS_CONFIG: GenieACSIntegrationConfig = {
   genieacs: {
-    baseUrl: 'http://localhost:7557',
+    baseUrl: typeof window !== 'undefined' && import.meta.env.PUBLIC_GENIEACS_NBI_URL 
+      ? import.meta.env.PUBLIC_GENIEACS_NBI_URL 
+      : 'http://localhost:7557',
     timeout: 30000
   },
 
@@ -212,7 +214,7 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
     case 'development':
       return {
         genieacs: {
-          baseUrl: 'http://localhost:7557',
+          baseUrl: import.meta.env.PUBLIC_GENIEACS_NBI_URL || 'http://localhost:7557',
           timeout: 30000
         },
         logging: {
@@ -225,7 +227,7 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
     case 'production':
       return {
         genieacs: {
-          baseUrl: process.env.GENIEACS_BASE_URL || 'https://genieacs.example.com:7557',
+          baseUrl: import.meta.env.PUBLIC_GENIEACS_NBI_URL || process.env.GENIEACS_BASE_URL || 'http://localhost:7557',
           timeout: 15000
         },
         security: {
@@ -244,7 +246,7 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
     case 'test':
       return {
         genieacs: {
-          baseUrl: 'http://localhost:7557',
+          baseUrl: import.meta.env.PUBLIC_GENIEACS_NBI_URL || 'http://localhost:7557',
           timeout: 5000
         },
         deviceManagement: {
