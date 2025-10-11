@@ -373,10 +373,11 @@
           <h2>User Management</h2>
           <p class="subtitle">Manage users and their roles in your organization</p>
           
-          <div class="coming-soon">
-            <span class="icon">🚧</span>
-            <h3>Coming Soon</h3>
-            <p>User management features will be available in the next update</p>
+          <div class="user-management-redirect">
+            <p>Manage your team members and their access levels</p>
+            <button class="btn-primary" on:click={() => goto('/modules/tenant-management/users')}>
+              👥 Manage Users
+            </button>
           </div>
         </div>
       {/if}
@@ -675,6 +676,16 @@
   .btn-primary:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+  }
+
+  .user-management-redirect {
+    text-align: center;
+    padding: 3rem 2rem;
+  }
+
+  .user-management-redirect p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
   }
 
   .coming-soon {

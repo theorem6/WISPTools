@@ -11,9 +11,20 @@
     color: string;
     status: 'active' | 'coming-soon';
     path: string;
+    adminOnly?: boolean;
   }
 
   const modules: Module[] = [
+    {
+      id: 'tenant-management',
+      name: 'Tenant Management',
+      description: 'Manage all customer organizations and tenant accounts (Admin Only)',
+      icon: '🏢',
+      color: '#ef4444',
+      status: 'active',
+      path: '/modules/tenant-management',
+      adminOnly: true
+    },
     {
       id: 'pci-resolution',
       name: 'PCI Resolution & Network Optimization',
@@ -65,6 +76,7 @@
   let userEmail = '';
   let tenantName = '';
   let isLoadingTenant = true;
+  let isAdmin = false;
 
   onMount(async () => {
     if (!browser) return;
@@ -89,6 +101,11 @@
     // Get user email
     userEmail = currentUser?.email || localStorage.getItem('userEmail') || 'user@example.com';
     console.log('Dashboard: User email =', userEmail);
+
+    // Check if user is platform admin
+    const { isPlatformAdmin } = await import('$lib/services/adminService');
+    isAdmin = isPlatformAdmin(userEmail);
+    console.log('Dashboard: Is admin =', isAdmin);
 
     // Check for tenant selection
     const { tenantService } = await import('$lib/services/tenantService');
@@ -240,37 +257,42 @@
       
       <div class="modules-grid">
         {#each modules as module}
-          <div 
-            class="module-card {module.status}"
-            class:clickable={module.status === 'active'}
-            on:click={() => handleModuleClick(module)}
-            on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
-            role="button"
-            tabindex="0"
-            style="--module-color: {module.color}"
-          >
-            <div class="module-header">
-              <div class="module-icon">{module.icon}</div>
-              {#if module.status === 'coming-soon'}
-                <span class="status-badge">Coming Soon</span>
+          {#if !module.adminOnly || (module.adminOnly && isAdmin)}
+            <div 
+              class="module-card {module.status}"
+              class:clickable={module.status === 'active'}
+              class:admin-module={module.adminOnly}
+              on:click={() => handleModuleClick(module)}
+              on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
+              role="button"
+              tabindex="0"
+              style="--module-color: {module.color}"
+            >
+              <div class="module-header">
+                <div class="module-icon">{module.icon}</div>
+                {#if module.adminOnly}
+                  <span class="status-badge admin">Admin Only</span>
+                {:else if module.status === 'coming-soon'}
+                  <span class="status-badge">Coming Soon</span>
+                {:else}
+                  <span class="status-badge active">Active</span>
+                {/if}
+              </div>
+              
+              <h4 class="module-name">{module.name}</h4>
+              <p class="module-description">{module.description}</p>
+              
+              {#if module.status === 'active'}
+                <div class="module-footer">
+                  <span class="launch-text">Launch Module →</span>
+                </div>
               {:else}
-                <span class="status-badge active">Active</span>
+                <div class="module-footer disabled">
+                  <span class="launch-text">In Development</span>
+                </div>
               {/if}
             </div>
-            
-            <h4 class="module-name">{module.name}</h4>
-            <p class="module-description">{module.description}</p>
-            
-            {#if module.status === 'active'}
-              <div class="module-footer">
-                <span class="launch-text">Launch Module →</span>
-              </div>
-            {:else}
-              <div class="module-footer disabled">
-                <span class="launch-text">In Development</span>
-              </div>
-            {/if}
-          </div>
+          {/if}
         {/each}
       </div>
     </div>
@@ -560,6 +582,20 @@
   .status-badge.active {
     background-color: rgba(16, 185, 129, 0.1);
     color: var(--status-success);
+  }
+
+  .status-badge.admin {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .module-card.admin-module {
+    border: 2px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .module-card.admin-module:hover {
+    border-color: #ef4444;
+    box-shadow: 0 10px 30px rgba(239, 68, 68, 0.2);
   }
 
   .module-name {
