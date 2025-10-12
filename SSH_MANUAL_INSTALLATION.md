@@ -324,7 +324,7 @@ tail -f /opt/genieacs/logs/genieacs-nbi.log
 ### Test Endpoints
 
 ```bash
-# Test NBI (should return empty array or devices)
+# Test NBI (should return empty array or devices)ogicm,
 curl http://localhost:7557/devices
 
 # Test CWMP (should return 405 Method Not Allowed for GET)

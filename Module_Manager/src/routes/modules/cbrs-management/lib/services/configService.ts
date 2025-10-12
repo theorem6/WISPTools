@@ -5,18 +5,58 @@
 
 import { browser } from '$app/environment';
 
+/**
+ * Deployment model for CBRS configuration
+ */
+export type CBRSDeploymentModel = 'shared-platform' | 'per-tenant';
+
+/**
+ * Platform-level CBRS configuration (admin-only)
+ * Shared API keys used by all tenants in shared-platform mode
+ */
+export interface PlatformCBRSConfig {
+  googleApiKey: string;
+  googleApiEndpoint: string;
+  googleCertificatePath?: string;
+  federatedApiKey: string;
+  federatedApiEndpoint: string;
+  federatedCertificatePath?: string;
+  sharedMode: boolean;
+  updatedAt?: Date;
+  updatedBy?: string;
+}
+
+/**
+ * Tenant-level CBRS configuration
+ * Supports both shared-platform and per-tenant models
+ */
 export interface CBRSConfig {
+  // Deployment model
+  deploymentModel: CBRSDeploymentModel;
+  
+  // Provider selection
   provider: 'google' | 'federated-wireless' | 'both';
+  
+  // Shared Platform Mode (Option A/C)
+  // Tenant only needs to configure their IDs
+  googleUserId?: string;           // Google SAS User ID for this tenant
+  federatedCustomerId?: string;    // Federated Wireless Customer ID
+  
+  // Per-Tenant Mode (Option B)
+  // Tenant provides their own API keys (overrides platform keys)
   googleApiEndpoint?: string;
   googleApiKey?: string;
   googleCertificatePath?: string;
   federatedApiEndpoint?: string;
   federatedApiKey?: string;
-  federatedCustomerId?: string;
+  
+  // Enhanced features (Federated Wireless)
   enableAnalytics?: boolean;
   enableOptimization?: boolean;
   enableMultiSite?: boolean;
   enableInterferenceMonitoring?: boolean;
+  
+  // Metadata
   tenantId: string;
   updatedAt?: Date;
   updatedBy?: string;
@@ -86,15 +126,73 @@ export async function loadCBRSConfig(tenantId: string): Promise<CBRSConfig | nul
 }
 
 /**
+ * Save platform-level CBRS configuration (admin only)
+ */
+export async function savePlatformCBRSConfig(config: PlatformCBRSConfig): Promise<void> {
+  try {
+    if (!browser) return;
+    
+    console.log('[CBRS Config] Saving platform configuration');
+    
+    const { db } = await import('$lib/firebase');
+    const { doc, setDoc } = await import('firebase/firestore');
+    
+    const configDoc = doc(db, 'cbrs_platform_config', 'platform');
+    
+    await setDoc(configDoc, {
+      ...config,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    
+    console.log('[CBRS Config] Platform configuration saved successfully');
+  } catch (error) {
+    console.error('[CBRS Config] Failed to save platform configuration:', error);
+    throw error;
+  }
+}
+
+/**
+ * Load platform-level CBRS configuration
+ */
+export async function loadPlatformCBRSConfig(): Promise<PlatformCBRSConfig | null> {
+  try {
+    if (!browser) return null;
+    
+    console.log('[CBRS Config] Loading platform configuration');
+    
+    const { db } = await import('$lib/firebase');
+    const { doc, getDoc } = await import('firebase/firestore');
+    
+    const configDoc = doc(db, 'cbrs_platform_config', 'platform');
+    const snapshot = await getDoc(configDoc);
+    
+    if (!snapshot.exists()) {
+      console.log('[CBRS Config] No platform configuration found');
+      return null;
+    }
+    
+    const data = snapshot.data();
+    const config: PlatformCBRSConfig = {
+      ...data,
+      updatedAt: data.updatedAt ? new Date(data.updatedAt) : undefined
+    } as PlatformCBRSConfig;
+    
+    console.log('[CBRS Config] Platform configuration loaded successfully');
+    return config;
+  } catch (error) {
+    console.error('[CBRS Config] Failed to load platform configuration:', error);
+    return null;
+  }
+}
+
+/**
  * Get default configuration
  */
 export function getDefaultConfig(tenantId: string): CBRSConfig {
   return {
+    deploymentModel: 'shared-platform', // Default to shared for cost savings
     provider: 'google',
-    googleApiEndpoint: 'https://sas.googleapis.com/v1',
-    googleApiKey: '',
-    federatedApiEndpoint: 'https://sas.federatedwireless.com/api/v1',
-    federatedApiKey: '',
+    googleUserId: '',
     federatedCustomerId: '',
     enableAnalytics: false,
     enableOptimization: false,
@@ -105,31 +203,74 @@ export function getDefaultConfig(tenantId: string): CBRSConfig {
 }
 
 /**
- * Validate configuration
+ * Validate configuration based on deployment model
  */
 export function validateConfig(config: CBRSConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Check provider-specific requirements
-  if (config.provider === 'google' || config.provider === 'both') {
-    if (!config.googleApiKey) {
-      errors.push('Google API key is required');
+  if (config.deploymentModel === 'shared-platform') {
+    // Shared Platform Mode - only need User IDs / Customer IDs
+    if (config.provider === 'google' || config.provider === 'both') {
+      if (!config.googleUserId) {
+        errors.push('Google User ID is required for shared platform mode');
+      }
     }
-    if (!config.googleApiEndpoint) {
-      errors.push('Google API endpoint is required');
+    
+    if (config.provider === 'federated-wireless' || config.provider === 'both') {
+      if (!config.federatedCustomerId) {
+        errors.push('Federated Wireless Customer ID is required');
+      }
+    }
+  } else {
+    // Per-Tenant Mode - need full API credentials
+    if (config.provider === 'google' || config.provider === 'both') {
+      if (!config.googleApiKey) {
+        errors.push('Google API key is required for per-tenant mode');
+      }
+      if (!config.googleApiEndpoint) {
+        errors.push('Google API endpoint is required');
+      }
+      if (!config.googleUserId) {
+        errors.push('Google User ID is required');
+      }
+    }
+    
+    if (config.provider === 'federated-wireless' || config.provider === 'both') {
+      if (!config.federatedApiKey) {
+        errors.push('Federated Wireless API key is required for per-tenant mode');
+      }
+      if (!config.federatedCustomerId) {
+        errors.push('Federated Wireless Customer ID is required');
+      }
+      if (!config.federatedApiEndpoint) {
+        errors.push('Federated Wireless API endpoint is required');
+      }
     }
   }
   
-  if (config.provider === 'federated-wireless' || config.provider === 'both') {
-    if (!config.federatedApiKey) {
-      errors.push('Federated Wireless API key is required');
-    }
-    if (!config.federatedCustomerId) {
-      errors.push('Federated Wireless Customer ID is required');
-    }
-    if (!config.federatedApiEndpoint) {
-      errors.push('Federated Wireless API endpoint is required');
-    }
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Validate platform configuration
+ */
+export function validatePlatformConfig(config: PlatformCBRSConfig): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!config.googleApiKey) {
+    errors.push('Google SAS API key is required');
+  }
+  if (!config.googleApiEndpoint) {
+    errors.push('Google SAS API endpoint is required');
+  }
+  if (!config.federatedApiKey) {
+    errors.push('Federated Wireless API key is required');
+  }
+  if (!config.federatedApiEndpoint) {
+    errors.push('Federated Wireless API endpoint is required');
   }
   
   return {

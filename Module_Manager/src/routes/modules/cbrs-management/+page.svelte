@@ -5,7 +5,7 @@
   import type { CBSDDevice, CBSDCategory, CBSDState } from './lib/models/cbsdDevice';
   import { CBRS_BAND } from './lib/models/cbsdDevice';
   import { createCBRSService, type CBRSServiceConfig } from './lib/services/cbrsService';
-  import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, type CBRSConfig } from './lib/services/configService';
+  import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig, type CBRSConfig, type PlatformCBRSConfig } from './lib/services/configService';
   import DeviceList from './components/DeviceList.svelte';
   import GrantStatus from './components/GrantStatus.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
@@ -24,6 +24,7 @@
   
   // Configuration
   let cbrsConfig: CBRSConfig | null = null;
+  let platformConfig: PlatformCBRSConfig | null = null;
   let configStatus = { status: 'missing' as const, message: '' };
   
   // Tenant info
@@ -56,9 +57,14 @@
         tenantId = localStorage.getItem('selectedTenantId') || '';
         tenantName = localStorage.getItem('selectedTenantName') || 'No Tenant Selected';
         
-        // Load configuration (only if we have a tenant)
+        // Load configurations
         if (tenantId) {
+          // Load tenant configuration
           cbrsConfig = await loadCBRSConfig(tenantId);
+          
+          // Load platform configuration (for shared-platform mode)
+          platformConfig = await loadPlatformCBRSConfig();
+          
           configStatus = getConfigStatus(cbrsConfig);
         } else {
           // No tenant selected - show warning
@@ -69,30 +75,8 @@
         }
         
         if (cbrsConfig && configStatus.status === 'complete') {
-          // Initialize CBRS service with loaded configuration
-          const config: CBRSServiceConfig = {
-            provider: cbrsConfig.provider,
-            tenantId,
-            googleConfig: cbrsConfig.provider === 'google' || cbrsConfig.provider === 'both' ? {
-              apiEndpoint: cbrsConfig.googleApiEndpoint || 'https://sas.googleapis.com/v1',
-              apiKey: cbrsConfig.googleApiKey,
-              certificatePath: cbrsConfig.googleCertificatePath,
-              tenantId
-            } : undefined,
-            federatedConfig: cbrsConfig.provider === 'federated-wireless' || cbrsConfig.provider === 'both' ? {
-              apiEndpoint: cbrsConfig.federatedApiEndpoint || 'https://sas.federatedwireless.com/api/v1',
-              apiKey: cbrsConfig.federatedApiKey || '',
-              customerId: cbrsConfig.federatedCustomerId || '',
-              tenantId
-            } : undefined,
-            federatedEnhancements: {
-              analyticsEnabled: cbrsConfig.enableAnalytics,
-              autoOptimization: cbrsConfig.enableOptimization,
-              multiSiteCoordination: cbrsConfig.enableMultiSite,
-              interferenceMonitoring: cbrsConfig.enableInterferenceMonitoring
-            }
-          };
-          
+          // Initialize CBRS service with hybrid configuration logic
+          const config = await buildServiceConfig(cbrsConfig, platformConfig, tenantId);
           cbrsService = createCBRSService(config);
         }
         
@@ -379,6 +363,64 @@
     }
   }
   
+  /**
+   * Build service configuration based on deployment model
+   * Selects between platform keys (shared) and tenant keys (private)
+   */
+  async function buildServiceConfig(
+    tenantConfig: CBRSConfig, 
+    platformConfig: PlatformCBRSConfig | null,
+    tenantId: string
+  ): Promise<CBRSServiceConfig> {
+    const isSharedMode = tenantConfig.deploymentModel === 'shared-platform';
+    
+    // Determine which API keys to use
+    let googleApiKey: string | undefined;
+    let googleApiEndpoint: string;
+    let federatedApiKey: string | undefined;
+    let federatedApiEndpoint: string;
+    
+    if (isSharedMode && platformConfig) {
+      // Use platform's shared API keys
+      console.log('[CBRS] Using shared platform API keys');
+      googleApiKey = platformConfig.googleApiKey;
+      googleApiEndpoint = platformConfig.googleApiEndpoint;
+      federatedApiKey = platformConfig.federatedApiKey;
+      federatedApiEndpoint = platformConfig.federatedApiEndpoint;
+    } else {
+      // Use tenant's private API keys
+      console.log('[CBRS] Using tenant-specific API keys');
+      googleApiKey = tenantConfig.googleApiKey;
+      googleApiEndpoint = tenantConfig.googleApiEndpoint || 'https://sas.googleapis.com/v1';
+      federatedApiKey = tenantConfig.federatedApiKey;
+      federatedApiEndpoint = tenantConfig.federatedApiEndpoint || 'https://sas.federatedwireless.com/api/v1';
+    }
+    
+    return {
+      provider: tenantConfig.provider,
+      tenantId,
+      googleConfig: tenantConfig.provider === 'google' || tenantConfig.provider === 'both' ? {
+        apiEndpoint: googleApiEndpoint,
+        apiKey: googleApiKey,
+        userId: tenantConfig.googleUserId, // Tenant's unique User ID
+        certificatePath: tenantConfig.googleCertificatePath,
+        tenantId
+      } : undefined,
+      federatedConfig: tenantConfig.provider === 'federated-wireless' || tenantConfig.provider === 'both' ? {
+        apiEndpoint: federatedApiEndpoint,
+        apiKey: federatedApiKey || '',
+        customerId: tenantConfig.federatedCustomerId || '',
+        tenantId
+      } : undefined,
+      federatedEnhancements: {
+        analyticsEnabled: tenantConfig.enableAnalytics,
+        autoOptimization: tenantConfig.enableOptimization,
+        multiSiteCoordination: tenantConfig.enableMultiSite,
+        interferenceMonitoring: tenantConfig.enableInterferenceMonitoring
+      }
+    };
+  }
+  
   async function handleSaveSettings(event: CustomEvent) {
     try {
       const newConfig: CBRSConfig = {
@@ -393,28 +435,7 @@
       
       // Reinitialize service with new configuration
       if (configStatus.status === 'complete') {
-        const config: CBRSServiceConfig = {
-          provider: cbrsConfig.provider,
-          tenantId,
-          googleConfig: cbrsConfig.provider === 'google' || cbrsConfig.provider === 'both' ? {
-            apiEndpoint: cbrsConfig.googleApiEndpoint || 'https://sas.googleapis.com/v1',
-            apiKey: cbrsConfig.googleApiKey,
-            certificatePath: cbrsConfig.googleCertificatePath,
-            tenantId
-          } : undefined,
-          federatedConfig: cbrsConfig.provider === 'federated-wireless' || cbrsConfig.provider === 'both' ? {
-            apiEndpoint: cbrsConfig.federatedApiEndpoint || 'https://sas.federatedwireless.com/api/v1',
-            apiKey: cbrsConfig.federatedApiKey || '',
-            customerId: cbrsConfig.federatedCustomerId || '',
-            tenantId
-          } : undefined,
-          federatedEnhancements: {
-            analyticsEnabled: cbrsConfig.enableAnalytics,
-            autoOptimization: cbrsConfig.enableOptimization,
-            multiSiteCoordination: cbrsConfig.enableMultiSite,
-            interferenceMonitoring: cbrsConfig.enableInterferenceMonitoring
-          }
-        };
+        const config = await buildServiceConfig(cbrsConfig, platformConfig, tenantId);
         
         if (cbrsService) {
           cbrsService.cleanup();

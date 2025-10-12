@@ -23,6 +23,7 @@ import type {
 export interface GoogleSASConfig {
   apiEndpoint: string; // Google SAS API endpoint
   apiKey?: string; // API key for authentication
+  userId?: string; // Google SAS User ID for this tenant
   certificatePath?: string; // Path to client certificate
   privateKeyPath?: string; // Path to private key
   tenantId: string;
@@ -52,7 +53,7 @@ export class GoogleSASClient {
           {
             cbsdSerialNumber: device.cbsdSerialNumber,
             fccId: device.fccId,
-            userId: device.userId,
+            userId: device.userId || this.config.userId, // Use device userId or config userId
             callSign: device.callSign,
             cbsdCategory: device.cbsdCategory,
             cbsdInfo: device.cbsdInfo,

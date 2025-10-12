@@ -164,9 +164,14 @@
       </div>
     </div>
     
-    <button class="btn-primary" on:click={() => showCreateForm = !showCreateForm}>
-      {showCreateForm ? '✕ Cancel' : '➕ Create New Tenant'}
-    </button>
+    <div class="header-actions">
+      <button class="btn-secondary" on:click={() => goto('/modules/tenant-management/cbrs-platform')}>
+        🔑 CBRS Platform Keys
+      </button>
+      <button class="btn-primary" on:click={() => showCreateForm = !showCreateForm}>
+        {showCreateForm ? '✕ Cancel' : '➕ Create New Tenant'}
+      </button>
+    </div>
   </div>
 
   {#if error}
@@ -422,6 +427,12 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 2rem;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
   }
 
   .back-btn {
