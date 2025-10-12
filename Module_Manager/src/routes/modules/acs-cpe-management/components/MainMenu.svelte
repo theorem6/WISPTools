@@ -53,9 +53,17 @@
       adminOnly: false
     },
     {
+      id: 'settings',
+      name: 'ACS Settings',
+      icon: '⚙️',
+      description: 'Device management configuration for your tenant',
+      path: '/modules/acs-cpe-management/settings',
+      adminOnly: false
+    },
+    {
       id: 'admin',
       name: 'Administration',
-      icon: '⚙️',
+      icon: '🔐',
       description: 'System configuration (Admin Only)',
       path: '/modules/acs-cpe-management/admin',
       adminOnly: true
