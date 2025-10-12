@@ -32,6 +32,8 @@ export class AdvancedPCIOptimizer {
    * - Goal: Assign colors to vertices such that no adjacent vertices share the same color
    * 
    * Constraint: PCIs must differ in Mod3 for cells with high interference
+   * 
+   * CRITICAL RULE: NEVER use the same PCI twice in the network (no collisions)
    */
   async optimizePCIAssignments(cells: Cell[], checkLOS: boolean = true): Promise<OptimizationResult> {
     const originalCells = JSON.parse(JSON.stringify(cells)) as Cell[];
@@ -39,6 +41,17 @@ export class AdvancedPCIOptimizer {
     
     const changes: PCIChange[] = [];
     const convergenceHistory: any[] = [];
+    
+    // STEP 1: Eliminate PCI collisions FIRST (highest priority)
+    console.log(`🚨 STEP 1: Detecting and eliminating PCI collisions...`);
+    const collisionChanges = await this.eliminatePCICollisions(currentCells);
+    changes.push(...collisionChanges);
+    
+    if (collisionChanges.length > 0) {
+      console.log(`✅ Eliminated ${collisionChanges.length} PCI collisions`);
+    } else {
+      console.log(`✅ No PCI collisions detected`);
+    }
     
     // Build interference graph
     await this.buildInterferenceGraph(currentCells, checkLOS);
@@ -122,6 +135,25 @@ export class AdvancedPCIOptimizer {
     const finalCriticalCount = finalConflicts.filter(c => c.severity === 'CRITICAL').length;
     const finalHighCount = finalConflicts.filter(c => c.severity === 'HIGH').length;
     
+    // FINAL VERIFICATION: Check for any remaining PCI collisions
+    const finalPCICounts = new Map<number, number>();
+    currentCells.forEach(cell => {
+      finalPCICounts.set(cell.pci, (finalPCICounts.get(cell.pci) || 0) + 1);
+    });
+    
+    const finalCollisions = Array.from(finalPCICounts.entries())
+      .filter(([pci, count]) => count > 1);
+    
+    if (finalCollisions.length > 0) {
+      console.error(`❌ ERROR: ${finalCollisions.length} PCI collisions detected in final result!`);
+      finalCollisions.forEach(([pci, count]) => {
+        const collidingCells = currentCells.filter(c => c.pci === pci);
+        console.error(`   PCI ${pci} used by ${count} cells: ${collidingCells.map(c => c.id).join(', ')}`);
+      });
+    } else {
+      console.log(`✅ VERIFIED: No PCI collisions in final result`);
+    }
+    
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     console.log(`🎨 Graph Coloring Optimization Complete`);
     console.log(`📊 Results:`);
@@ -143,6 +175,168 @@ export class AdvancedPCIOptimizer {
       changes,
       convergenceHistory
     };
+  }
+  
+  /**
+   * Eliminate PCI collisions (same PCI used twice)
+   * This is the HIGHEST PRIORITY - must be resolved before other conflicts
+   * 
+   * Algorithm:
+   * 1. Find all cells with duplicate PCIs
+   * 2. Keep the first cell with each PCI
+   * 3. Reassign all duplicates to unused PCIs
+   * 4. Prioritize PCIs that minimize mod-3/mod-6 conflicts
+   */
+  private async eliminatePCICollisions(cells: Cell[]): Promise<PCIChange[]> {
+    const changes: PCIChange[] = [];
+    const pciToCells = new Map<number, Cell[]>();
+    const usedPCIs = new Set<number>();
+    
+    // Group cells by PCI
+    for (const cell of cells) {
+      if (!pciToCells.has(cell.pci)) {
+        pciToCells.set(cell.pci, []);
+      }
+      pciToCells.get(cell.pci)!.push(cell);
+      usedPCIs.add(cell.pci);
+    }
+    
+    // Find collisions (PCIs used by multiple cells)
+    const collisions = Array.from(pciToCells.entries())
+      .filter(([pci, cells]) => cells.length > 1);
+    
+    if (collisions.length === 0) {
+      return changes;
+    }
+    
+    console.log(`🚨 Found ${collisions.length} PCI collisions:`);
+    collisions.forEach(([pci, cells]) => {
+      console.log(`   PCI ${pci} used by ${cells.length} cells: ${cells.map(c => c.id).join(', ')}`);
+    });
+    
+    // For each collision, reassign all but the first cell
+    for (const [pci, collidingCells] of collisions) {
+      // Keep the first cell, reassign the rest
+      for (let i = 1; i < collidingCells.length; i++) {
+        const cellToReassign = collidingCells[i];
+        const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
+        
+        if (cellIndex === -1) continue;
+        
+        // Find best available PCI (not used by any cell)
+        const newPCI = this.findUnusedPCI(cellToReassign, cells, usedPCIs);
+        
+        // Update cell
+        const oldPCI = cells[cellIndex].pci;
+        cells[cellIndex].pci = newPCI;
+        usedPCIs.add(newPCI);
+        
+        changes.push({
+          cellId: cellToReassign.id,
+          oldPCI,
+          newPCI,
+          reason: `🚨 COLLISION ELIMINATED: PCI ${oldPCI} was used by multiple cells`
+        });
+        
+        console.log(`   ✅ ${cellToReassign.id}: PCI ${oldPCI} → ${newPCI} (collision eliminated)`);
+      }
+    }
+    
+    // Verify no collisions remain
+    const finalPCICounts = new Map<number, number>();
+    cells.forEach(cell => {
+      finalPCICounts.set(cell.pci, (finalPCICounts.get(cell.pci) || 0) + 1);
+    });
+    
+    const remainingCollisions = Array.from(finalPCICounts.entries())
+      .filter(([pci, count]) => count > 1);
+    
+    if (remainingCollisions.length > 0) {
+      console.error(`❌ WARNING: ${remainingCollisions.length} collisions still remain!`);
+    }
+    
+    return changes;
+  }
+  
+  /**
+   * Find an unused PCI that minimizes conflicts with nearby cells
+   */
+  private findUnusedPCI(cell: Cell, allCells: Cell[], usedPCIs: Set<number>): number {
+    // Get nearby cells (within reasonable distance for conflict consideration)
+    const nearbyCells = allCells.filter(c => {
+      if (c.id === cell.id) return false;
+      const distance = this.calculateDistance(cell, c);
+      return distance < 50000; // Within 50km
+    });
+    
+    // Score each available PCI
+    const scores = new Map<number, number>();
+    
+    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
+      // Skip if already used by another cell
+      if (usedPCIs.has(pci)) continue;
+      
+      let score = 1000; // Start with high score
+      
+      // Evaluate against nearby cells
+      for (const nearbyCell of nearbyCells) {
+        const distance = this.calculateDistance(cell, nearbyCell);
+        const distanceFactor = Math.max(0, 1 - distance / 50000); // 0-1 based on distance
+        
+        // Penalize mod-3 conflicts (more severe for closer cells)
+        if (pci % 3 === nearbyCell.pci % 3) {
+          score -= 500 * distanceFactor;
+        }
+        
+        // Penalize mod-6 conflicts
+        if (pci % 6 === nearbyCell.pci % 6) {
+          score -= 200 * distanceFactor;
+        }
+        
+        // Penalize mod-12 conflicts
+        if (pci % 12 === nearbyCell.pci % 12) {
+          score -= 50 * distanceFactor;
+        }
+      }
+      
+      scores.set(pci, score);
+    }
+    
+    // Find best scoring PCI
+    const sortedPCIs = Array.from(scores.entries())
+      .sort((a, b) => b[1] - a[1]);
+    
+    if (sortedPCIs.length > 0) {
+      return sortedPCIs[0][0];
+    }
+    
+    // Fallback: find any unused PCI
+    for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
+      if (!usedPCIs.has(pci)) {
+        return pci;
+      }
+    }
+    
+    // Last resort: use a random PCI (shouldn't happen with 474 available PCIs)
+    return this.PCI_MIN + Math.floor(Math.random() * (this.PCI_MAX - this.PCI_MIN + 1));
+  }
+  
+  /**
+   * Calculate distance between two cells (Haversine formula)
+   */
+  private calculateDistance(cell1: Cell, cell2: Cell): number {
+    const R = 6371000; // Earth's radius in meters
+    const lat1 = cell1.latitude * Math.PI / 180;
+    const lat2 = cell2.latitude * Math.PI / 180;
+    const dLat = (cell2.latitude - cell1.latitude) * Math.PI / 180;
+    const dLon = (cell2.longitude - cell1.longitude) * Math.PI / 180;
+    
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
   
   /**
@@ -249,6 +443,7 @@ export class AdvancedPCIOptimizer {
    * Find best "color" (PCI) for a vertex (cell) using constraint satisfaction
    * 
    * Scoring based on:
+   * - PCI uniqueness (CRITICAL: never assign a used PCI)
    * - Mod3 conflicts (highest weight)
    * - Mod6 conflicts
    * - Distance to conflicting cells
@@ -272,13 +467,18 @@ export class AdvancedPCIOptimizer {
       }
     }
     
-    // Collect all used PCIs
-    allCells.forEach(c => usedPCIs.add(c.pci));
+    // Collect ALL used PCIs across the entire network
+    // CRITICAL: This prevents PCI collisions
+    allCells.forEach(c => {
+      if (c.id !== cell.id) { // Exclude current cell
+        usedPCIs.add(c.pci);
+      }
+    });
     
-    // Generate candidate PCIs
+    // Generate candidate PCIs - ONLY unused PCIs
     const candidates: number[] = [];
     
-    // Strategy 1: Find PCIs with different Mod3 from neighbors
+    // Strategy 1: Find UNUSED PCIs with different Mod3 from neighbors
     for (let mod3 = 0; mod3 < 3; mod3++) {
       // Check if any neighbor uses this Mod3
       const neighborsInMod3 = Array.from(neighborPCIs).filter(pci => pci % 3 === mod3);
@@ -286,15 +486,28 @@ export class AdvancedPCIOptimizer {
       if (neighborsInMod3.length === 0) {
         // This Mod3 group is clear of neighbor conflicts!
         for (let pci = mod3; pci <= this.PCI_MAX; pci += 3) {
-          if (pci >= this.PCI_MIN && !this.isTabu(cell.id, pci, iteration)) {
+          // CRITICAL: Only consider PCIs that are NOT used by ANY cell
+          if (pci >= this.PCI_MIN && !usedPCIs.has(pci) && !this.isTabu(cell.id, pci, iteration)) {
             candidates.push(pci);
           }
         }
       }
     }
     
-    // Strategy 2: If no clear Mod3, find least conflicting PCIs
+    // Strategy 2: If no clear Mod3, find any unused least conflicting PCIs
     if (candidates.length === 0) {
+      for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
+        // CRITICAL: Only consider PCIs that are NOT used by ANY cell
+        if (!usedPCIs.has(pci) && !this.isTabu(cell.id, pci, iteration)) {
+          candidates.push(pci);
+        }
+      }
+    }
+    
+    // Strategy 3: If still no candidates (network is saturated), allow any PCI
+    // This shouldn't happen with 474 available PCIs for typical networks
+    if (candidates.length === 0) {
+      console.warn(`⚠️ No unused PCIs available for ${cell.id}, allowing used PCIs`);
       for (let pci = this.PCI_MIN; pci <= this.PCI_MAX; pci++) {
         if (!this.isTabu(cell.id, pci, iteration)) {
           candidates.push(pci);
@@ -308,6 +521,11 @@ export class AdvancedPCIOptimizer {
     for (const candidatePCI of candidates) {
       let score = 1000; // Start with high score
       
+      // CRITICAL: Massive penalty for PCI collisions (same PCI used elsewhere)
+      if (usedPCIs.has(candidatePCI)) {
+        score -= 10000; // Absolutely avoid collisions
+      }
+      
       // Penalty for Mod3 conflicts with neighbors
       for (const neighborPCI of neighborPCIs) {
         if (candidatePCI % 3 === neighborPCI % 3) {
@@ -320,13 +538,13 @@ export class AdvancedPCIOptimizer {
           score -= 50;
         }
         if (candidatePCI === neighborPCI) {
-          score -= 1000; // Worst case
+          score -= 1000; // Collision with neighbor - worst case
         }
       }
       
       // Bonus for unused PCIs (spread out the assignments)
       if (!usedPCIs.has(candidatePCI)) {
-        score += 100;
+        score += 1000; // Strong bonus for uniqueness
       }
       
       // Penalty for recently tried PCIs (tabu)

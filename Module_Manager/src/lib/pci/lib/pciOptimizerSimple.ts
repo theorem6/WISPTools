@@ -14,6 +14,75 @@ export class SimplePCIOptimizer {
   private readonly MAX_SHAKEUPS = 3; // Maximum number of random shakeups before giving up
   
   /**
+   * Eliminate PCI collisions (same PCI used twice)
+   * HIGHEST PRIORITY - must be resolved before other conflicts
+   */
+  private eliminatePCICollisions(cells: Cell[]): PCIChange[] {
+    const changes: PCIChange[] = [];
+    const pciToCells = new Map<number, Cell[]>();
+    const usedPCIs = new Set<number>();
+    
+    // Group cells by PCI
+    for (const cell of cells) {
+      if (!pciToCells.has(cell.pci)) {
+        pciToCells.set(cell.pci, []);
+      }
+      pciToCells.get(cell.pci)!.push(cell);
+    }
+    
+    // Find collisions
+    const collisions = Array.from(pciToCells.entries())
+      .filter(([pci, cells]) => cells.length > 1);
+    
+    if (collisions.length === 0) {
+      return changes;
+    }
+    
+    console.log(`🚨 Found ${collisions.length} PCI collisions:`);
+    collisions.forEach(([pci, cells]) => {
+      console.log(`   PCI ${pci} used by ${cells.length} cells: ${cells.map(c => c.id).join(', ')}`);
+    });
+    
+    // Collect currently used PCIs
+    cells.forEach(c => usedPCIs.add(c.pci));
+    
+    // For each collision, reassign all but the first cell
+    for (const [pci, collidingCells] of collisions) {
+      for (let i = 1; i < collidingCells.length; i++) {
+        const cellToReassign = collidingCells[i];
+        const cellIndex = cells.findIndex(c => c.id === cellToReassign.id);
+        
+        if (cellIndex === -1) continue;
+        
+        // Find unused PCI
+        let newPCI = this.PCI_MIN;
+        for (let testPCI = this.PCI_MIN; testPCI <= this.PCI_MAX; testPCI++) {
+          if (!usedPCIs.has(testPCI)) {
+            newPCI = testPCI;
+            break;
+          }
+        }
+        
+        const oldPCI = cells[cellIndex].pci;
+        cells[cellIndex].pci = newPCI;
+        usedPCIs.delete(oldPCI); // Remove old PCI from used set
+        usedPCIs.add(newPCI);
+        
+        changes.push({
+          cellId: cellToReassign.id,
+          oldPCI,
+          newPCI,
+          reason: `🚨 COLLISION ELIMINATED: PCI ${oldPCI} was used by multiple cells`
+        });
+        
+        console.log(`   ✅ ${cellToReassign.id}: PCI ${oldPCI} → ${newPCI} (collision eliminated)`);
+      }
+    }
+    
+    return changes;
+  }
+  
+  /**
    * Calculate modulus quality score - higher is better
    * Only MOD3, MOD6, and MOD30 are considered per SON requirements
    * MOD3 = 3 (worst - most destructive)
@@ -43,6 +112,8 @@ export class SimplePCIOptimizer {
   /**
    * Simple, effective PCI optimization
    * Strategy: For each conflicting cell, pick a TRULY RANDOM PCI that works
+   * 
+   * CRITICAL RULE: NEVER use the same PCI twice in the network (no collisions)
    */
   async optimizePCIAssignments(cells: Cell[], checkLOS: boolean = true): Promise<OptimizationResult> {
     const originalCells = JSON.parse(JSON.stringify(cells)) as Cell[];
@@ -50,6 +121,17 @@ export class SimplePCIOptimizer {
     
     const allChanges: PCIChange[] = [];
     const convergenceHistory: any[] = [];
+    
+    // STEP 1: Eliminate PCI collisions FIRST (highest priority)
+    console.log(`🚨 STEP 1: Detecting and eliminating PCI collisions...`);
+    const collisionChanges = this.eliminatePCICollisions(currentCells);
+    allChanges.push(...collisionChanges);
+    
+    if (collisionChanges.length > 0) {
+      console.log(`✅ Eliminated ${collisionChanges.length} PCI collisions`);
+    } else {
+      console.log(`✅ No PCI collisions detected`);
+    }
     
     // Initial state
     let initialConflicts = await pciMapper.detectConflicts(currentCells, checkLOS);
@@ -512,6 +594,25 @@ export class SimplePCIOptimizer {
       console.log(`❌ OPTIMIZATION FAILED`);
       console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.log(`   No conflicts to optimize`);
+    }
+    
+    // FINAL VERIFICATION: Check for any remaining PCI collisions
+    const finalPCICounts = new Map<number, number>();
+    currentCells.forEach(cell => {
+      finalPCICounts.set(cell.pci, (finalPCICounts.get(cell.pci) || 0) + 1);
+    });
+    
+    const finalCollisions = Array.from(finalPCICounts.entries())
+      .filter(([pci, count]) => count > 1);
+    
+    if (finalCollisions.length > 0) {
+      console.error(`❌ ERROR: ${finalCollisions.length} PCI collisions detected in final result!`);
+      finalCollisions.forEach(([pci, count]) => {
+        const collidingCells = currentCells.filter(c => c.pci === pci);
+        console.error(`   PCI ${pci} used by ${count} cells: ${collidingCells.map(c => c.id).join(', ')}`);
+      });
+    } else {
+      console.log(`✅ VERIFIED: No PCI collisions in final result (all PCIs unique)`);
     }
     
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
