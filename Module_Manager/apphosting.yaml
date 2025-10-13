@@ -75,9 +75,8 @@ env:
     availability:
       - RUNTIME
   
-  # Uncomment when you have the secret configured
-  # - variable: GOOGLE_SAS_CLIENT_SECRET
-  #   secret: google-sas-client-secret
+  - variable: GOOGLE_SAS_CLIENT_SECRET
+    secret: google-sas-client-secret
   
   - variable: GOOGLE_SAS_API_ENDPOINT
     value: https://sas.googleapis.com/v1
