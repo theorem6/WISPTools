@@ -64,9 +64,10 @@ env:
       - BUILD
       - RUNTIME
   
-  # MongoDB Configuration (for GenieACS)
-  - variable: MONGODB_URI
-    secret: mongodb-uri
+  # MongoDB Configuration (for GenieACS - Optional)
+  # Uncomment when you have MongoDB configured
+  # - variable: MONGODB_URI
+  #   secret: mongodb-uri
   
   # Google SAS Platform Configuration (Shared Mode)
   - variable: GOOGLE_SAS_CLIENT_ID
@@ -74,8 +75,9 @@ env:
     availability:
       - RUNTIME
   
-  - variable: GOOGLE_SAS_CLIENT_SECRET
-    secret: google-sas-client-secret
+  # Uncomment when you have the secret configured
+  # - variable: GOOGLE_SAS_CLIENT_SECRET
+  #   secret: google-sas-client-secret
   
   - variable: GOOGLE_SAS_API_ENDPOINT
     value: https://sas.googleapis.com/v1
@@ -83,8 +85,9 @@ env:
       - RUNTIME
   
   # Federated Wireless Platform Configuration (Shared Mode)
-  - variable: FEDERATED_WIRELESS_API_KEY
-    secret: federated-wireless-api-key
+  # Uncomment when you have the secret configured
+  # - variable: FEDERATED_WIRELESS_API_KEY
+  #   secret: federated-wireless-api-key
   
   - variable: FEDERATED_WIRELESS_API_ENDPOINT
     value: https://sas.federatedwireless.com/api/v1
