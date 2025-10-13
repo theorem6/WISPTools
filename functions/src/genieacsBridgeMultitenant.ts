@@ -178,7 +178,7 @@ export const handleCWMPMultitenant = onRequest({
   region: 'us-central1',
   memory: '512MiB',
   timeoutSeconds: 30
-}, async (req, res) => {
+}, async (req: any, res: any) => {
   try {
     // Extract tenant from URL (no authentication needed for device connections)
     const tenantId = await extractTenantFromCWMPUrl(req.url || '');

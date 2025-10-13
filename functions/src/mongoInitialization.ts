@@ -67,7 +67,7 @@ export const initializeMongoPresets = onRequest({
     try {
       const { presets } = await getGenieACSCollections();
       
-      const samplePresets = [
+      const samplePresets: any[] = [
         {
           _id: 'default-provisioning',
           name: 'Default Provisioning',
@@ -242,7 +242,7 @@ export const initializeMongoFaults = onRequest({
     try {
       const { faults } = await getGenieACSCollections();
       
-      const sampleFaults = [
+      const sampleFaults: any[] = [
         {
           _id: 'FAULT-001',
           deviceId: 'CPE-003',

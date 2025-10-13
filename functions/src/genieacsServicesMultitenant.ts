@@ -334,7 +334,7 @@ export const genieacsFSMultitenant = onRequest({
   region: 'us-central1',
   memory: '512MiB',
   timeoutSeconds: 60
-}, async (req, res) => {
+}, async (req: any, res: any) => {
   return corsHandler(req, res, async () => {
     // For file uploads from devices, extract tenant from URL
     const tenantId = await extractTenantFromCWMPUrl(req.url || '');
