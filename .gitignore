@@ -44,8 +44,14 @@ ui-debug.log
 !tsconfig.json
 !firebase.json
 !apphosting*.yaml
+!firestore.*.json
+!cloudbuild.json
 gcloud-key*.json
 service-account*.json
+*-service-account.json
+google-sas-*.json
+lte-pci-mapper-*-*.json
+*-adminsdk-*.json
 
 # Chat recovery and backup files
 chat-sessions.csv
