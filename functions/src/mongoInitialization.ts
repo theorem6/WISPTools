@@ -201,13 +201,13 @@ export const initializeMongoPresets = onRequest({
       let updated = 0;
       
       for (const preset of samplePresets) {
-        const existing = await presets.findOne({ _id: preset._id });
+        const existing = await presets.findOne({ _id: preset._id } as any);
         
         if (!existing) {
           await presets.insertOne(preset as any);
           created++;
         } else if (req.query.overwrite === 'true') {
-          await presets.replaceOne({ _id: preset._id }, preset as any);
+          await presets.replaceOne({ _id: preset._id } as any, preset as any);
           updated++;
         } else {
           skipped++;
@@ -310,13 +310,13 @@ export const initializeMongoFaults = onRequest({
       let updated = 0;
       
       for (const fault of sampleFaults) {
-        const existing = await faults.findOne({ _id: fault._id });
+        const existing = await faults.findOne({ _id: fault._id } as any);
         
         if (!existing) {
           await faults.insertOne(fault as any);
           created++;
         } else if (req.query.overwrite === 'true') {
-          await faults.replaceOne({ _id: fault._id }, fault as any);
+          await faults.replaceOne({ _id: fault._id } as any, fault as any);
           updated++;
         } else {
           skipped++;
@@ -429,7 +429,7 @@ export const initializeMongoDatabase = onRequest({
       let presetsSkipped = 0;
       
       for (const preset of presetsSample) {
-        const existing = await presets.findOne({ _id: preset._id });
+        const existing = await presets.findOne({ _id: preset._id } as any);
         if (!existing) {
           await presets.insertOne(preset as any);
           presetsCreated++;
@@ -442,7 +442,7 @@ export const initializeMongoDatabase = onRequest({
       let faultsSkipped = 0;
       
       for (const fault of faultsSample) {
-        const existing = await faults.findOne({ _id: fault._id });
+        const existing = await faults.findOne({ _id: fault._id } as any);
         if (!existing) {
           await faults.insertOne(fault as any);
           faultsCreated++;
