@@ -77,6 +77,7 @@
   let tenantName = '';
   let isLoadingTenant = true;
   let isAdmin = false;
+  let error = '';
 
   onMount(async () => {
     if (!browser) return;
@@ -126,27 +127,68 @@
         // Regular users need a tenant
         console.log('Dashboard: No tenant selected, checking user tenants...');
         
-        // Small delay to allow Firestore to sync
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Prevent infinite redirect loop - check if we just came from setup
+        const redirectCount = sessionStorage.getItem('dashboardRedirectCount') || '0';
+        const redirectAttempts = parseInt(redirectCount);
         
-        const tenants = await tenantService.getUserTenants(currentUser.uid);
-        console.log('Dashboard: Found', tenants.length, 'tenants for user');
+        if (redirectAttempts >= 3) {
+          console.error('Dashboard: Too many redirects, stopping loop');
+          sessionStorage.removeItem('dashboardRedirectCount');
+          error = 'Unable to load tenant. Please refresh the page or contact support.';
+          isLoadingTenant = false;
+          return;
+        }
+        
+        // Increase delay and add retry logic for Firestore
+        console.log('Dashboard: Waiting for Firestore to sync...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        let tenants = [];
+        try {
+          tenants = await tenantService.getUserTenants(currentUser.uid);
+          console.log('Dashboard: Found', tenants.length, 'tenants for user');
+        } catch (err) {
+          console.error('Dashboard: Error loading tenants:', err);
+          error = 'Failed to load organizations. Please refresh the page.';
+          isLoadingTenant = false;
+          return;
+        }
         
         if (tenants.length === 0) {
           // No tenants found - check if just came from tenant setup
           const justCreated = sessionStorage.getItem('justCreatedTenant');
           if (justCreated === 'true') {
-            // Just created a tenant, reload tenants
+            // Just created a tenant, increment redirect count and reload
             console.log('Dashboard: Just created tenant, reloading...');
+            sessionStorage.setItem('dashboardRedirectCount', String(redirectAttempts + 1));
             sessionStorage.removeItem('justCreatedTenant');
-            window.location.reload();
+            
+            // Try one more time with longer delay
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            tenants = await tenantService.getUserTenants(currentUser.uid);
+            
+            if (tenants.length > 0) {
+              // Found the tenant after delay
+              console.log('Dashboard: Found tenant after delay:', tenants[0].displayName);
+              localStorage.setItem('selectedTenantId', tenants[0].id);
+              localStorage.setItem('selectedTenantName', tenants[0].displayName);
+              selectedTenantId = tenants[0].id;
+              tenantName = tenants[0].displayName;
+              sessionStorage.removeItem('dashboardRedirectCount');
+            } else {
+              // Still no tenant, something is wrong
+              console.error('Dashboard: Tenant created but not found in Firestore');
+              error = 'Organization created but not found. Please refresh the page.';
+              isLoadingTenant = false;
+              return;
+            }
+          } else {
+            // Genuinely no tenants, redirect to setup
+            console.log('Dashboard: No tenants found, redirecting to setup');
+            sessionStorage.setItem('dashboardRedirectCount', String(redirectAttempts + 1));
+            await goto('/tenant-setup', { replaceState: true });
             return;
           }
-          
-          // No tenants, redirect to tenant setup
-          console.log('Dashboard: No tenants found, redirecting to setup');
-          await goto('/tenant-setup', { replaceState: true });
-          return;
         } else if (tenants.length === 1) {
           // Auto-select single tenant
           console.log('Dashboard: Auto-selecting single tenant:', tenants[0].displayName);
@@ -154,9 +196,11 @@
           localStorage.setItem('selectedTenantName', tenants[0].displayName);
           selectedTenantId = tenants[0].id;
           tenantName = tenants[0].displayName;
+          sessionStorage.removeItem('dashboardRedirectCount');
         } else {
           // Multiple tenants, redirect to selector
           console.log('Dashboard: Multiple tenants found, redirecting to selector');
+          sessionStorage.removeItem('dashboardRedirectCount');
           await goto('/tenant-selector', { replaceState: true });
           return;
         }

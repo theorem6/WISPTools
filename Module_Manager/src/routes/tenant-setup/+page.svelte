@@ -22,9 +22,12 @@
   onMount(async () => {
     if (!browser) return;
 
+    console.log('Tenant Setup: Page loaded');
+
     // Check if user is authenticated
     currentUser = authService.getCurrentUser();
     if (!currentUser) {
+      console.log('Tenant Setup: User not authenticated, redirecting to login');
       await goto('/login');
       return;
     }
@@ -34,7 +37,8 @@
     // Check if a tenant was just selected (to prevent redirect loop)
     const justCreatedTenant = localStorage.getItem('selectedTenantId');
     if (justCreatedTenant) {
-      console.log('Tenant already selected, redirecting to dashboard');
+      console.log('Tenant Setup: Tenant already selected in localStorage, redirecting to dashboard');
+      sessionStorage.removeItem('dashboardRedirectCount');
       await goto('/dashboard', { replaceState: true });
       return;
     }
@@ -42,21 +46,30 @@
     // IMPORTANT: Enforce one tenant per user rule
     // Check if user already has a tenant
     try {
+      console.log('Tenant Setup: Checking if user already has tenants...');
       existingTenants = await tenantService.getUserTenants(currentUser.uid);
+      console.log('Tenant Setup: Found', existingTenants.length, 'existing tenants');
       
       if (existingTenants.length > 0) {
         // User already has an organization - redirect to dashboard
-        console.log('User already has an organization, redirecting to dashboard');
+        console.log('Tenant Setup: User already has an organization, redirecting to dashboard');
         
         // Auto-select their organization
         localStorage.setItem('selectedTenantId', existingTenants[0].id);
         localStorage.setItem('selectedTenantName', existingTenants[0].displayName);
         
+        // Clear any redirect counters
+        sessionStorage.removeItem('dashboardRedirectCount');
+        sessionStorage.removeItem('justCreatedTenant');
+        
         await goto('/dashboard', { replaceState: true });
         return;
       }
+      
+      console.log('Tenant Setup: No existing tenants, showing setup form');
     } catch (err) {
-      console.error('Error loading tenants:', err);
+      console.error('Tenant Setup: Error loading tenants:', err);
+      error = 'Failed to check existing organizations. Please refresh the page.';
     }
   });
 
@@ -101,6 +114,8 @@
       if (result.success && result.tenantId) {
         success = 'Tenant created successfully!';
         
+        console.log('Tenant Setup: Tenant created successfully:', result.tenantId);
+        
         // IMPORTANT: Save tenant to localStorage IMMEDIATELY
         // This prevents dashboard from redirecting back here
         localStorage.setItem('selectedTenantId', result.tenantId);
@@ -109,12 +124,18 @@
         // Set flag so dashboard knows a tenant was just created
         sessionStorage.setItem('justCreatedTenant', 'true');
         
+        // Clear any redirect counters to prevent loops
+        sessionStorage.removeItem('dashboardRedirectCount');
+        
+        console.log('Tenant Setup: localStorage and sessionStorage updated');
+        
         step = 2;
         
-        // Wait a moment for user to see success, then redirect
+        // Wait a moment for Firestore to sync and user to see success
         setTimeout(() => {
+          console.log('Tenant Setup: Redirecting to dashboard');
           goto('/dashboard', { replaceState: true });
-        }, 1500);
+        }, 2000);
       } else {
         error = result.error || 'Failed to create tenant';
       }
