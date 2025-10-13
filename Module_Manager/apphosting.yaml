@@ -75,8 +75,12 @@ env:
     availability:
       - RUNTIME
   
-  - variable: GOOGLE_SAS_CLIENT_SECRET
-    secret: google-sas-client-secret
+  # Secret requires permission grant - uncomment after granting access
+  # To grant access, run in deployment environment:
+  # firebase apphosting:secrets:grantaccess google-sas-client-secret
+  # Or use Google Cloud Console to add App Hosting service account
+  # - variable: GOOGLE_SAS_CLIENT_SECRET
+  #   secret: google-sas-client-secret
   
   - variable: GOOGLE_SAS_API_ENDPOINT
     value: https://sas.googleapis.com/v1
