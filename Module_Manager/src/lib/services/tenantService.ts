@@ -490,6 +490,57 @@ export class TenantService {
       return false;
     }
   }
+
+  /**
+   * Delete a tenant and all associated data (ADMIN ONLY)
+   * This performs a hard delete and removes:
+   * - The tenant document
+   * - All user-tenant associations
+   * - All pending invitations
+   * Note: Tenant-specific data (devices, configs) should be deleted separately if needed
+   */
+  async deleteTenant(tenantId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`Starting deletion of tenant: ${tenantId}`);
+      
+      // Verify tenant exists
+      const tenant = await this.getTenant(tenantId);
+      if (!tenant) {
+        return { success: false, error: 'Tenant not found' };
+      }
+
+      // Delete all user-tenant associations
+      const userAssociations = await this.getTenantUsers(tenantId);
+      console.log(`Deleting ${userAssociations.length} user associations...`);
+      
+      for (const association of userAssociations) {
+        const associationId = `${association.userId}_${tenantId}`;
+        await deleteDoc(doc(this.getDb(), 'user_tenants', associationId));
+      }
+
+      // Delete all pending invitations for this tenant
+      const invitationsQuery = query(
+        collection(this.getDb(), 'tenant_invitations'),
+        where('tenantId', '==', tenantId)
+      );
+      const invitationsSnapshot = await getDocs(invitationsQuery);
+      console.log(`Deleting ${invitationsSnapshot.docs.length} invitations...`);
+      
+      for (const invDoc of invitationsSnapshot.docs) {
+        await deleteDoc(invDoc.ref);
+      }
+
+      // Delete the tenant document itself
+      console.log(`Deleting tenant document...`);
+      await deleteDoc(doc(this.getDb(), 'tenants', tenantId));
+
+      console.log(`Tenant ${tenantId} deleted successfully`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting tenant:', error);
+      return { success: false, error: String(error) };
+    }
+  }
 }
 
 // Singleton instance

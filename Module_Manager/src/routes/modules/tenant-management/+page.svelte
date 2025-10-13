@@ -21,6 +21,11 @@
   // Selected tenant for editing
   let selectedTenant: Tenant | null = null;
   let showEditModal = false;
+  
+  // Delete confirmation
+  let showDeleteConfirm = false;
+  let tenantToDelete: Tenant | null = null;
+  let isDeleting = false;
 
   onMount(async () => {
     if (!browser) return;
@@ -147,6 +152,54 @@
       users: 0,
       devices: 0
     };
+  }
+
+  function handleDeleteClick(tenant: Tenant) {
+    tenantToDelete = tenant;
+    showDeleteConfirm = true;
+  }
+
+  function cancelDelete() {
+    tenantToDelete = null;
+    showDeleteConfirm = false;
+  }
+
+  async function confirmDelete() {
+    if (!tenantToDelete) return;
+
+    // Validate tenant name confirmation
+    const confirmInput = document.getElementById('deleteConfirmInput') as HTMLInputElement;
+    if (!confirmInput || confirmInput.value !== tenantToDelete.displayName) {
+      error = 'Please type the tenant name exactly to confirm deletion';
+      return;
+    }
+
+    isDeleting = true;
+    error = '';
+    success = '';
+
+    try {
+      const result = await tenantService.deleteTenant(tenantToDelete.id);
+
+      if (result.success) {
+        success = `Tenant "${tenantToDelete.displayName}" deleted successfully`;
+        
+        // Remove from local list
+        tenants = tenants.filter(t => t.id !== tenantToDelete.id);
+        
+        // Close modals
+        showDeleteConfirm = false;
+        showEditModal = false;
+        tenantToDelete = null;
+        selectedTenant = null;
+      } else {
+        error = result.error || 'Failed to delete tenant';
+      }
+    } catch (err: any) {
+      error = err.message || 'Failed to delete tenant';
+    } finally {
+      isDeleting = false;
+    }
   }
 </script>
 
@@ -318,6 +371,9 @@
               }}>
                 📊 Settings
               </button>
+              <button class="btn-small btn-danger" on:click={() => handleDeleteClick(tenant)}>
+                🗑️ Delete
+              </button>
             </div>
           </div>
         {/each}
@@ -402,11 +458,79 @@
             </button>
           </div>
         </div>
+
+        <div class="info-section danger-zone">
+          <h3>⚠️ Danger Zone</h3>
+          <p class="danger-description">
+            Deleting a tenant is permanent and cannot be undone. All associated data will be removed.
+          </p>
+          <button class="btn-danger-action" on:click={() => handleDeleteClick(selectedTenant)}>
+            🗑️ Delete Tenant
+          </button>
+        </div>
       </div>
 
       <div class="modal-footer">
         <button class="btn-secondary" on:click={closeEditModal}>
           Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Confirmation Dialog -->
+{#if showDeleteConfirm && tenantToDelete}
+  <div class="modal-overlay" on:click={cancelDelete} role="dialog" aria-modal="true">
+    <div class="modal-content delete-confirm-modal" on:click|stopPropagation role="document">
+      <div class="modal-header danger">
+        <h2>⚠️ Confirm Deletion</h2>
+        <button class="close-btn" on:click={cancelDelete}>✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="warning-box">
+          <div class="warning-icon">🚨</div>
+          <div class="warning-content">
+            <h3>This action cannot be undone!</h3>
+            <p>You are about to permanently delete:</p>
+            <div class="tenant-to-delete">
+              <strong>{tenantToDelete.displayName}</strong>
+              <span class="subdomain">({tenantToDelete.subdomain})</span>
+            </div>
+            <p class="consequences">This will remove:</p>
+            <ul class="deletion-list">
+              <li>✗ The tenant organization</li>
+              <li>✗ All user associations</li>
+              <li>✗ All pending invitations</li>
+              <li>✗ Access to tenant configurations</li>
+            </ul>
+            <p class="note">
+              <strong>Note:</strong> Users who owned this tenant will be able to create a new organization.
+            </p>
+          </div>
+        </div>
+
+        <div class="confirm-input">
+          <p>Type the tenant name <strong>{tenantToDelete.displayName}</strong> to confirm:</p>
+          <input 
+            type="text" 
+            placeholder="Enter tenant name to confirm"
+            id="deleteConfirmInput"
+          />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={cancelDelete} disabled={isDeleting}>
+          Cancel
+        </button>
+        <button 
+          class="btn-danger" 
+          on:click={confirmDelete}
+          disabled={isDeleting}
+        >
+          {isDeleting ? 'Deleting...' : 'Delete Tenant'}
         </button>
       </div>
     </div>
@@ -910,6 +1034,188 @@
     position: sticky;
     bottom: 0;
     background: var(--card-bg);
+  }
+
+  /* Danger Zone Styles */
+  .danger-zone {
+    border: 2px solid #ef4444;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    background: rgba(239, 68, 68, 0.05);
+  }
+
+  .danger-zone h3 {
+    color: #ef4444;
+    margin-bottom: 0.75rem;
+  }
+
+  .danger-description {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .btn-danger {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+
+  .btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-small.btn-danger {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .btn-danger-action {
+    width: 100%;
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .btn-danger-action:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+
+  /* Delete Confirmation Dialog */
+  .delete-confirm-modal {
+    max-width: 600px;
+  }
+
+  .modal-header.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-bottom-color: #ef4444;
+  }
+
+  .modal-header.danger h2 {
+    color: #ef4444;
+  }
+
+  .warning-box {
+    background: rgba(239, 68, 68, 0.05);
+    border: 2px solid #ef4444;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1rem;
+  }
+
+  .warning-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .warning-content h3 {
+    margin: 0 0 0.75rem 0;
+    color: #ef4444;
+    font-size: 1.125rem;
+  }
+
+  .warning-content p {
+    margin: 0.5rem 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .tenant-to-delete {
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin: 0.75rem 0;
+    text-align: center;
+  }
+
+  .tenant-to-delete strong {
+    display: block;
+    font-size: 1.125rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .tenant-to-delete .subdomain {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .consequences {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 1rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .deletion-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+  }
+
+  .deletion-list li {
+    padding: 0.5rem;
+    color: #ef4444;
+    font-weight: 500;
+  }
+
+  .note {
+    margin-top: 1rem !important;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary) !important;
+  }
+
+  .confirm-input {
+    margin-top: 1.5rem;
+  }
+
+  .confirm-input p {
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .confirm-input input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+  }
+
+  .confirm-input input:focus {
+    outline: none;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
   }
 
   @media (max-width: 768px) {
