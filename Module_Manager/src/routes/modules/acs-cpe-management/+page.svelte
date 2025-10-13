@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import MainMenu from './components/MainMenu.svelte';
@@ -35,10 +36,55 @@
 
   onMount(async () => {
     try {
-      // Load tenant info
       if (browser) {
+        console.log('[ACS Module] Initializing...');
+        
+        // Load tenant info from localStorage
         tenantId = localStorage.getItem('selectedTenantId') || '';
         tenantName = localStorage.getItem('selectedTenantName') || 'No Tenant Selected';
+        
+        console.log('[ACS Module] Tenant ID from localStorage:', tenantId);
+        console.log('[ACS Module] Tenant Name from localStorage:', tenantName);
+        
+        // If no tenant, try to load automatically
+        if (!tenantId) {
+          const isAuth = localStorage.getItem('isAuthenticated');
+          const userEmail = localStorage.getItem('userEmail');
+          console.log('[ACS Module] No tenant ID found');
+          console.log('[ACS Module] Is authenticated:', isAuth);
+          console.log('[ACS Module] User email:', userEmail);
+          
+          if (isAuth === 'true' && userEmail) {
+            try {
+              const { tenantService } = await import('$lib/services/tenantService');
+              const { authService } = await import('$lib/services/authService');
+              const currentUser = authService.getCurrentUser();
+              
+              if (currentUser) {
+                console.log('[ACS Module] Attempting to auto-load tenant for user:', currentUser.uid);
+                const tenants = await tenantService.getUserTenants(currentUser.uid);
+                
+                if (tenants.length === 1) {
+                  console.log('[ACS Module] Auto-selecting tenant:', tenants[0].displayName);
+                  localStorage.setItem('selectedTenantId', tenants[0].id);
+                  localStorage.setItem('selectedTenantName', tenants[0].displayName);
+                  tenantId = tenants[0].id;
+                  tenantName = tenants[0].displayName;
+                } else if (tenants.length > 1) {
+                  console.log('[ACS Module] Multiple tenants found, redirecting to selector');
+                  await goto('/tenant-selector');
+                  return;
+                } else {
+                  console.log('[ACS Module] No tenants found, redirecting to setup');
+                  await goto('/tenant-setup');
+                  return;
+                }
+              }
+            } catch (err) {
+              console.error('[ACS Module] Failed to auto-load tenant:', err);
+            }
+          }
+        }
       }
       
       // Load CPE devices using authenticated multi-tenant service

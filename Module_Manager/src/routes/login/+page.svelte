@@ -67,11 +67,39 @@
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', result.data?.email || email);
         
-        // Check for tenant - dashboard will handle the tenant selection flow
-        // Dashboard will redirect to:
-        // - /tenant-setup if no tenants
-        // - /tenant-selector if multiple tenants
-        // - stay on dashboard if single tenant
+        // Automatically load and set tenant for the user
+        try {
+          const { tenantService } = await import('$lib/services/tenantService');
+          const { isPlatformAdmin } = await import('$lib/services/adminService');
+          
+          const userEmail = result.data?.email || email;
+          const isAdmin = isPlatformAdmin(userEmail);
+          
+          // Platform admins don't need a tenant
+          if (!isAdmin) {
+            console.log('Login page: Loading user tenants...');
+            const tenants = await tenantService.getUserTenants(result.data?.uid || '');
+            
+            if (tenants.length === 1) {
+              // Auto-select single tenant immediately on login
+              console.log('Login page: Auto-selecting single tenant:', tenants[0].displayName);
+              localStorage.setItem('selectedTenantId', tenants[0].id);
+              localStorage.setItem('selectedTenantName', tenants[0].displayName);
+            } else if (tenants.length > 1) {
+              // Multiple tenants - will redirect to selector from dashboard
+              console.log('Login page: Multiple tenants found, dashboard will handle selection');
+            } else {
+              // No tenants - will redirect to setup from dashboard
+              console.log('Login page: No tenants found, dashboard will handle setup');
+            }
+          } else {
+            console.log('Login page: Platform admin login, no tenant needed');
+          }
+        } catch (err) {
+          console.warn('Login page: Could not load tenant info, dashboard will handle it:', err);
+        }
+        
+        // Go to dashboard (which now has tenant pre-selected if single tenant)
         await goto('/dashboard', { replaceState: true });
       } else {
         error = result.error || 'Authentication failed';
