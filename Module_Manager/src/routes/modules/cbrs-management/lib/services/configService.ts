@@ -190,10 +190,14 @@ export async function loadPlatformCBRSConfig(): Promise<PlatformCBRSConfig | nul
  */
 export function getDefaultConfig(tenantId: string): CBRSConfig {
   return {
-    deploymentModel: 'shared-platform', // Default to shared for cost savings
+    deploymentModel: 'per-tenant', // Default to per-tenant (each tenant has own keys)
     provider: 'google',
-    googleUserId: '',
-    federatedCustomerId: '',
+    googleUserId: tenantId, // Default User ID to tenant ID
+    federatedCustomerId: tenantId, // Default Customer ID to tenant ID
+    googleApiKey: '',
+    googleApiEndpoint: 'https://sas.googleapis.com/v1',
+    federatedApiKey: '',
+    federatedApiEndpoint: 'https://sas.federatedwireless.com/api/v1',
     enableAnalytics: false,
     enableOptimization: false,
     enableMultiSite: false,

@@ -8,7 +8,7 @@
   
   // Form state
   let formData = {
-    deploymentModel: config.deploymentModel || 'shared-platform',
+    deploymentModel: config.deploymentModel || 'per-tenant',
     provider: config.provider || 'google',
     
     // Shared platform mode (simpler)
@@ -98,37 +98,37 @@
             <h4>💡 Deployment Model</h4>
             
             <div class="deployment-cards">
-              <label class="deployment-card" class:selected={formData.deploymentModel === 'shared-platform'}>
-                <input type="radio" bind:group={formData.deploymentModel} value="shared-platform" />
-                <div class="card-header">
-                  <span class="card-icon">🏢</span>
-                  <span class="card-title">Shared Platform</span>
-                  <span class="card-badge recommended">Recommended</span>
-                </div>
-                <p class="card-description">
-                  Use platform's shared API keys. You only need to provide your unique User ID / Customer ID.
-                </p>
-                <div class="card-benefits">
-                  <span class="benefit">💰 Lower cost</span>
-                  <span class="benefit">⚡ Quick setup</span>
-                  <span class="benefit">✅ Tenant isolation via ID</span>
-                </div>
-              </label>
-              
               <label class="deployment-card" class:selected={formData.deploymentModel === 'per-tenant'}>
                 <input type="radio" bind:group={formData.deploymentModel} value="per-tenant" />
                 <div class="card-header">
                   <span class="card-icon">🔒</span>
                   <span class="card-title">Private Credentials</span>
-                  <span class="card-badge enterprise">Enterprise</span>
+                  <span class="card-badge recommended">Recommended</span>
                 </div>
                 <p class="card-description">
-                  Use your own SAS account and API keys for maximum security and isolation.
+                  Use your own SAS account and API keys. Full control and maximum security.
                 </p>
                 <div class="card-benefits">
-                  <span class="benefit">🔐 Maximum security</span>
+                  <span class="benefit">🔐 Your own credentials</span>
                   <span class="benefit">📊 Private quota</span>
-                  <span class="benefit">🏆 White-label ready</span>
+                  <span class="benefit">✅ Complete control</span>
+                </div>
+              </label>
+              
+              <label class="deployment-card" class:selected={formData.deploymentModel === 'shared-platform'}>
+                <input type="radio" bind:group={formData.deploymentModel} value="shared-platform" />
+                <div class="card-header">
+                  <span class="card-icon">🏢</span>
+                  <span class="card-title">Shared Platform</span>
+                  <span class="card-badge optional">Optional</span>
+                </div>
+                <p class="card-description">
+                  Use platform's shared API keys (if available). You only provide your User ID / Customer ID.
+                </p>
+                <div class="card-benefits">
+                  <span class="benefit">💰 Lower cost</span>
+                  <span class="benefit">⚡ Quick setup</span>
+                  <span class="benefit">📋 Requires platform config</span>
                 </div>
               </label>
             </div>
