@@ -7,8 +7,8 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { onCall } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import cors from 'cors';
+import { db } from './firebaseInit.js';
 
-const db = admin.firestore();
 const corsHandler = cors({ origin: true });
 
 /**
