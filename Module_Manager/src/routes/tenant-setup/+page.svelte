@@ -57,6 +57,7 @@
         // Auto-select their organization
         localStorage.setItem('selectedTenantId', existingTenants[0].id);
         localStorage.setItem('selectedTenantName', existingTenants[0].displayName);
+        localStorage.setItem('tenantSetupCompleted', 'true'); // Mark setup as completed
         
         // Clear any redirect counters
         sessionStorage.removeItem('dashboardRedirectCount');
@@ -120,6 +121,7 @@
         // This prevents dashboard from redirecting back here
         localStorage.setItem('selectedTenantId', result.tenantId);
         localStorage.setItem('selectedTenantName', displayName);
+        localStorage.setItem('tenantSetupCompleted', 'true'); // Mark setup as completed
         
         // Set flag so dashboard knows a tenant was just created
         sessionStorage.setItem('justCreatedTenant', 'true');
@@ -127,7 +129,7 @@
         // Clear any redirect counters to prevent loops
         sessionStorage.removeItem('dashboardRedirectCount');
         
-        console.log('Tenant Setup: localStorage and sessionStorage updated');
+        console.log('Tenant Setup: localStorage and sessionStorage updated, setup marked complete');
         
         step = 2;
         

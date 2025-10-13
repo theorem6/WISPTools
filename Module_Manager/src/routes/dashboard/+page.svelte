@@ -111,11 +111,46 @@
     // Check for tenant selection
     const { tenantService } = await import('$lib/services/tenantService');
     let selectedTenantId = localStorage.getItem('selectedTenantId');
+    const tenantSetupCompleted = localStorage.getItem('tenantSetupCompleted');
     
     console.log('Dashboard: Selected tenant ID from localStorage:', selectedTenantId);
+    console.log('Dashboard: Tenant setup completed flag:', tenantSetupCompleted);
     console.log('Dashboard: Current user:', currentUser?.email);
     console.log('Dashboard: Is admin:', isAdmin);
     
+    // If we have a tenant ID in localStorage, use it directly
+    if (selectedTenantId) {
+      console.log('Dashboard: Using tenant from localStorage:', selectedTenantId);
+      const tenant = await tenantService.getTenant(selectedTenantId);
+      if (tenant) {
+        tenantName = tenant.displayName;
+        console.log('Dashboard: Tenant verified and loaded:', tenantName);
+        isLoadingTenant = false;
+        
+        // Mark setup as completed
+        localStorage.setItem('tenantSetupCompleted', 'true');
+        sessionStorage.removeItem('dashboardRedirectCount');
+        sessionStorage.removeItem('justCreatedTenant');
+        
+        // Continue with rest of initialization
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') {
+          theme = savedTheme;
+          isDarkMode = theme === 'dark';
+          document.documentElement.classList.toggle('dark-mode', isDarkMode);
+        }
+        return; // Early exit - we're done!
+      } else {
+        // Tenant in localStorage doesn't exist in Firestore
+        console.warn('Dashboard: Tenant in localStorage not found in Firestore, clearing...');
+        localStorage.removeItem('selectedTenantId');
+        localStorage.removeItem('selectedTenantName');
+        localStorage.removeItem('tenantSetupCompleted');
+        selectedTenantId = null;
+      }
+    }
+    
+    // No tenant in localStorage, need to load from Firestore
     if (!selectedTenantId && currentUser) {
       // Platform admins don't need a tenant selected
       // They can use Tenant Management module instead
@@ -172,6 +207,7 @@
               console.log('Dashboard: Found tenant after delay:', tenants[0].displayName);
               localStorage.setItem('selectedTenantId', tenants[0].id);
               localStorage.setItem('selectedTenantName', tenants[0].displayName);
+              localStorage.setItem('tenantSetupCompleted', 'true');
               selectedTenantId = tenants[0].id;
               tenantName = tenants[0].displayName;
               sessionStorage.removeItem('dashboardRedirectCount');
@@ -194,6 +230,7 @@
           console.log('Dashboard: Auto-selecting single tenant:', tenants[0].displayName);
           localStorage.setItem('selectedTenantId', tenants[0].id);
           localStorage.setItem('selectedTenantName', tenants[0].displayName);
+          localStorage.setItem('tenantSetupCompleted', 'true');
           selectedTenantId = tenants[0].id;
           tenantName = tenants[0].displayName;
           sessionStorage.removeItem('dashboardRedirectCount');
@@ -226,6 +263,7 @@
             console.log('Dashboard: Auto-selecting available tenant:', tenants[0].displayName);
             localStorage.setItem('selectedTenantId', tenants[0].id);
             localStorage.setItem('selectedTenantName', tenants[0].displayName);
+            localStorage.setItem('tenantSetupCompleted', 'true');
             selectedTenantId = tenants[0].id;
             tenantName = tenants[0].displayName;
           } else if (tenants.length > 1) {
@@ -280,6 +318,8 @@
     localStorage.removeItem('userEmail');
     localStorage.removeItem('selectedTenantId');
     localStorage.removeItem('selectedTenantName');
+    localStorage.removeItem('tenantSetupCompleted');
+    sessionStorage.clear(); // Clear all session storage
     goto('/login');
   }
 

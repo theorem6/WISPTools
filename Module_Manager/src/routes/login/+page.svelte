@@ -85,6 +85,7 @@
               console.log('Login page: Auto-selecting single tenant:', tenants[0].displayName);
               localStorage.setItem('selectedTenantId', tenants[0].id);
               localStorage.setItem('selectedTenantName', tenants[0].displayName);
+              localStorage.setItem('tenantSetupCompleted', 'true');
             } else if (tenants.length > 1) {
               // Multiple tenants - will redirect to selector from dashboard
               console.log('Login page: Multiple tenants found, dashboard will handle selection');

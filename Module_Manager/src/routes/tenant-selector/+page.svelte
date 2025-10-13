@@ -44,6 +44,11 @@
     if (browser) {
       localStorage.setItem('selectedTenantId', tenant.id);
       localStorage.setItem('selectedTenantName', tenant.displayName);
+      localStorage.setItem('tenantSetupCompleted', 'true');
+      
+      // Clear any redirect counters
+      sessionStorage.removeItem('dashboardRedirectCount');
+      sessionStorage.removeItem('justCreatedTenant');
     }
     
     // Redirect to dashboard
