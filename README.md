@@ -1,184 +1,395 @@
 # LTE WISP Management Platform
 
+> Professional multi-tenant platform for managing LTE wireless networks, CBRS spectrum, CPE devices, and network optimization.
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Quick Start](#-quick-start)
+- [Documentation](#-documentation)
+- [Deployment](#-deployment)
+- [Contributing](#-contributing)
+- [License](#-license)
+
 ## 🎯 Overview
 
-Modern, modular platform for managing LTE WISP networks with integrated PCI conflict resolution, GenieACS device management, and ArcGIS mapping.
+The LTE WISP Management Platform is a comprehensive, enterprise-grade solution for wireless ISPs and network operators. Built with modern technologies and a modular architecture, it provides everything needed to manage LTE networks, CBRS spectrum, CPE devices, and optimize network performance.
+
+### Key Capabilities
+
+- **Multi-Tenant Architecture** - Isolate organizations with their own data and configurations
+- **CBRS Management** - Full integration with Google SAS and Federated Wireless APIs
+- **ACS/TR-069** - Complete CPE device management and monitoring
+- **PCI Planning** - Advanced LTE PCI conflict resolution and optimization
+- **User Management** - Role-based access control (Owner, Admin, Member, Viewer)
+- **Network Visualization** - Interactive maps with ArcGIS integration
+
+## ✨ Features
+
+### 🏢 Multi-Tenant Management
+- **Organization Isolation** - Complete data separation per tenant
+- **User Roles** - Fine-grained permission control
+- **One Tenant Per User** - Simplified account management
+- **Admin Console** - Platform-wide administration tools
+- **Tenant Switching** - Easy access to multiple organizations
+
+### 📡 CBRS Management Module
+- **Google SAS Integration** - Device registration, spectrum inquiry, grants
+- **Federated Wireless API** - Enhanced analytics and optimization
+- **Hybrid Deployment** - Shared or per-tenant API keys
+- **Grant Management** - Full grant lifecycle (request, heartbeat, relinquish)
+- **Device Monitoring** - Real-time CBSD status tracking
+- **Spectrum Visualization** - Available spectrum and grant status
+
+### 🌐 ACS/TR-069 CPE Management
+- **Device Provisioning** - Automated CPE onboarding
+- **Firmware Management** - Remote firmware upgrades
+- **Configuration Management** - Bulk configuration deployment
+- **Performance Monitoring** - Real-time device metrics
+- **Fault Management** - Automated fault detection and alerts
+- **TR-069 Compliance** - Full Broadband Forum standard support
+
+### 📶 PCI Planning & Optimization
+- **Automatic PCI Assignment** - Intelligent PCI allocation
+- **Conflict Detection** - Identify and resolve PCI collisions
+- **Neighbor Analysis** - Optimal PCI planning based on topology
+- **Visualization** - Interactive network maps
+- **Optimization Algorithms** - Simple and advanced optimization modes
+- **Zero Collision Guarantee** - Enhanced collision prevention
+
+### 🎨 User Experience
+- **Modern UI** - Clean, responsive interface
+- **Dark/Light Mode** - User preference theming
+- **Interactive Maps** - ArcGIS Maps SDK integration
+- **Real-time Updates** - Live data synchronization
+- **Mobile Responsive** - Works on all devices
+- **Intuitive Navigation** - Module-based architecture
+
+### 🔐 Security & Authentication
+- **Firebase Authentication** - Secure user authentication
+- **Role-Based Access** - Granular permissions
+- **API Key Management** - Secure credential storage
+- **Data Encryption** - At rest and in transit
+- **Audit Logging** - Track all administrative actions
 
 ## 🏗️ Architecture
 
-### Module Manager System (`/Module_Manager`)
-The **active application** with modular architecture:
-- **Login & Authentication** - Firebase Auth
-- **Dashboard** - Module tiles for easy navigation
-- **PCI Resolution Module** - Integrated PCI conflict manager
-- **Future Modules** - Easily add new functionality
+### Technology Stack
 
-### Supporting Services
-- **Firebase Functions** (`/functions`) - Backend API and GenieACS integration
-- **Firebase Hosting** - Static assets (if needed)
-- **Firebase App Hosting** - Cloud Run deployment for Module Manager
+**Frontend:**
+- SvelteKit 2.0 - Modern web framework
+- TypeScript - Type-safe development
+- ArcGIS Maps SDK - Interactive mapping
+- Firebase SDK - Client-side integration
 
-## 📁 Directory Structure
+**Backend:**
+- Firebase Functions - Serverless backend
+- Firebase App Hosting - Cloud Run deployment
+- Firestore - NoSQL database
+- Firebase Auth - Authentication
+
+**APIs & Integrations:**
+- Google SAS API - CBRS spectrum management
+- Federated Wireless API - Enhanced CBRS features
+- GenieACS - TR-069 ACS implementation
+- MongoDB - GenieACS data store
+
+### Project Structure
 
 ```
 lte-pci-mapper/
-├── Module_Manager/              ← ACTIVE APPLICATION
+├── Module_Manager/              ← Main Application
 │   ├── src/
 │   │   ├── routes/
 │   │   │   ├── login/          ← Authentication
 │   │   │   ├── dashboard/      ← Main dashboard
-│   │   │   └── modules/        ← Module system
-│   │   │       └── pci-resolution/
+│   │   │   ├── tenant-setup/   ← Organization setup
+│   │   │   └── modules/        ← Feature modules
+│   │   │       ├── pci-resolution/        ← PCI planning
+│   │   │       ├── cbrs-management/       ← CBRS module
+│   │   │       ├── acs-cpe-management/    ← ACS/TR-069
+│   │   │       └── tenant-management/     ← Admin tools
 │   │   └── lib/
-│   ├── Procfile
-│   ├── apphosting.yaml
+│   │       ├── firebase.ts     ← Firebase config
+│   │       ├── models/         ← Data models
+│   │       └── services/       ← Business logic
+│   ├── apphosting.yaml         ← App Hosting config
 │   └── package.json
 │
-├── functions/                   ← Firebase Functions (Backend)
+├── functions/                   ← Firebase Functions
 │   ├── src/
-│   │   ├── genieacsIntegration.ts
-│   │   ├── genieacsServices.ts
-│   │   └── index.ts
+│   │   ├── index.ts            ← Function exports
+│   │   ├── cbrsManagement.ts   ← CBRS functions
+│   │   ├── genieacsBridge*.ts  ← GenieACS bridge
+│   │   └── tenantMiddleware.ts ← Multi-tenant support
 │   └── package.json
 │
-├── src-OLD-standalone-pci-DEPRECATED/  ← Old standalone app (DO NOT USE)
-│   └── README_DEPRECATED.md
-│
-├── firebase.json                ← Points to Module_Manager
-├── package.json                 ← Root package (delegates to Module_Manager)
-└── README.md                    ← This file
+├── gce-backend/                 ← GCE backend service (optional)
+├── genieacs-fork/               ← Modified GenieACS
+├── firebase.json                ← Firebase configuration
+└── package.json                 ← Root package
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+
-- Firebase CLI: `npm install -g firebase-tools`
-- gcloud CLI (for Cloud Run)
 
-### Development
+- **Node.js** 20 or higher
+- **Firebase CLI**: `npm install -g firebase-tools`
+- **Git** for version control
+- **Google Cloud Account** for deployment
 
-```bash
-# Install dependencies
-cd Module_Manager
-npm install
+### Local Development
 
-# Run development server
-npm run dev
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/theorem6/lte-pci-mapper.git
+   cd lte-pci-mapper
+   ```
 
-# Build for production
-npm run build
-```
+2. **Install dependencies**
+   ```bash
+   cd Module_Manager
+   npm install
+   ```
 
-### Deployment
+3. **Configure Firebase**
+   ```bash
+   # Login to Firebase
+   firebase login
+
+   # Set Firebase project
+   firebase use lte-pci-mapper-65450042-bbf71
+   ```
+
+4. **Set up environment variables**
+   ```bash
+   # Copy example environment file
+   cp .env.example .env.local
+
+   # Edit .env.local with your Firebase config
+   # (See Module_Manager/FIREBASE_ENV_SETUP.md)
+   ```
+
+5. **Run development server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Open browser**
+   ```
+   http://localhost:5173
+   ```
+
+### First-Time Setup
+
+1. **Create your account**
+   - Navigate to `/login`
+   - Sign up with email/password or Google
+
+2. **Set up your organization**
+   - Fill out organization details
+   - System automatically creates your tenant
+
+3. **Explore modules**
+   - Dashboard shows all available modules
+   - Click any module to access features
+
+4. **Configure API keys** (if using CBRS)
+   - Navigate to CBRS Management
+   - Click Settings
+   - Enter your Google SAS or Federated Wireless API keys
+   - See [CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md)
+
+## 📚 Documentation
+
+### Core Documentation
+
+- **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** - Complete documentation index
+- **[BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)** - Build and deployment guide
+- **[MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md)** - Architecture overview
+- **[DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md)** - Database schema
+
+### Module Documentation
+
+- **[CBRS_MODULE_COMPLETE.md](CBRS_MODULE_COMPLETE.md)** - CBRS management
+- **[Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md)** - ACS/TR-069
+- **[PCI_COLLISION_PREVENTION.md](PCI_COLLISION_PREVENTION.md)** - PCI optimization
+
+### Admin Documentation
+
+- **[ADMIN_AND_USER_MANAGEMENT.md](ADMIN_AND_USER_MANAGEMENT.md)** - User management
+- **[TENANT_DELETION_GUIDE.md](TENANT_DELETION_GUIDE.md)** - Tenant administration
+- **[ONE_TENANT_PER_USER.md](ONE_TENANT_PER_USER.md)** - User policies
+
+### API & Integration
+
+- **[CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md)** - API key setup
+- **[CBRS_HYBRID_MODEL_GUIDE.md](CBRS_HYBRID_MODEL_GUIDE.md)** - Deployment models
+- **[TR069_FIRMWARE_UPGRADE_GUIDE.md](TR069_FIRMWARE_UPGRADE_GUIDE.md)** - Firmware management
+
+## 🚢 Deployment
+
+### Firebase App Hosting (Recommended)
+
+Deploy the entire platform to Google Cloud:
 
 ```bash
 # From project root
-
-# Deploy everything (Module Manager + Functions)
 firebase deploy
 
-# Deploy just App Hosting (Module Manager)
-firebase deploy --only apphosting
-
-# Deploy just Functions
-firebase deploy --only functions
-
-# After deployment, route traffic to latest
-gcloud run services update-traffic lte-pci-mapper \
-  --region=us-central1 \
-  --project=lte-pci-mapper-65450042-bbf71 \
-  --to-latest
+# Or deploy specific components
+firebase deploy --only apphosting  # Frontend
+firebase deploy --only functions    # Backend
 ```
+
+### Manual Cloud Run Deployment
+
+For advanced deployments:
+
+```bash
+# Build and push Docker image
+cd Module_Manager
+gcloud builds submit --tag gcr.io/PROJECT_ID/lte-pci-mapper
+
+# Deploy to Cloud Run
+gcloud run deploy lte-pci-mapper \
+  --image gcr.io/PROJECT_ID/lte-pci-mapper \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+### Environment Variables
+
+Configure secrets in Firebase App Hosting:
+
+- `FIREBASE_CONFIG` - Firebase configuration JSON
+- `MONGODB_URI` - MongoDB connection string (for GenieACS)
+- `GOOGLE_SAS_CLIENT_SECRET` - Google SAS OAuth secret (optional)
+- `FEDERATED_WIRELESS_API_KEY` - Federated Wireless API key (optional)
+
+See [setup-apphosting-secrets.md](setup-apphosting-secrets.md) for detailed instructions.
 
 ## 🔧 Configuration
 
-### Firebase App Hosting
-Configured in `Module_Manager/apphosting.yaml`:
-- **CPU**: 1 core
-- **Memory**: 2048 MiB (2 GB)
-- **Min Instances**: 0 (scale to zero)
-- **Max Instances**: 5
+### Firebase Configuration
 
-### Environment Variables
-All configured in `apphosting.yaml`:
-- Firebase credentials
-- ArcGIS API key
-- Gemini AI API key
-- Wolfram Alpha API key
-- MongoDB connection (for GenieACS)
+1. **Create Firebase project**
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Create new project or use existing
 
-## 📚 Modules
+2. **Enable services**
+   - Authentication (Email/Password, Google)
+   - Firestore Database
+   - Functions
+   - App Hosting
 
-### PCI Resolution Module
-- **Path**: `/Module_Manager/src/routes/modules/pci-resolution`
-- **Features**:
-  - Interactive ArcGIS map
-  - PCI conflict detection
-  - Automatic optimization
-  - Network management
-  - Export/reporting
+3. **Configure security rules**
+   ```bash
+   firebase deploy --only firestore:rules
+   firebase deploy --only storage:rules
+   ```
 
-### Future Modules
-The architecture supports easy addition of new modules:
-1. Create new route in `/Module_Manager/src/routes/modules/`
-2. Add tile to dashboard
-3. Implement module-specific functionality
+### Platform Admins
 
-## 🛠️ Technology Stack
+Add admin emails to `Module_Manager/src/lib/services/adminService.ts`:
 
-- **Frontend**: SvelteKit 5, TypeScript
-- **Mapping**: ArcGIS Maps SDK for JavaScript
-- **Backend**: Firebase Functions (Node.js 20)
-- **Database**: 
-  - Firestore (user data, networks)
-  - MongoDB Atlas (GenieACS devices)
-- **Hosting**: Firebase App Hosting (Cloud Run)
-- **Authentication**: Firebase Auth
-- **AI**: Google Gemini AI
-
-## 📖 Documentation
-
-- `DEPLOY_CORRECT_APP_FIX.md` - Deployment architecture
-- `ALL_ERRORS_FIXED_SUMMARY.md` - Deployment troubleshooting
-- `TRAFFIC_ROUTING_FIX.md` - Traffic management
-- `CLOUD_RUN_OPTIMIZATION.md` - Resource configuration
-- `Module_Manager/README.md` - Module Manager specific docs
-
-## ⚠️ Important Notes
-
-### Old Standalone App
-The `/src-OLD-standalone-pci-DEPRECATED` directory contains the old standalone PCI manager. **DO NOT USE**. It's kept for reference only.
-
-### Deployment Target
-Firebase App Hosting deploys from `/Module_Manager` as configured in `firebase.json`:
-```json
-"apphosting": {
-  "backendId": "lte-pci-mapper",
-  "rootDir": "/Module_Manager"
-}
+```typescript
+const ADMIN_EMAILS = [
+  'admin@yourcompany.com',
+  'support@yourcompany.com'
+];
 ```
 
-## 🔗 URLs
+## 👥 User Roles
 
-- **Production**: https://lte-pci-mapper-nfomthzoza-uc.a.run.app
-- **Firebase Console**: https://console.firebase.google.com/project/lte-pci-mapper-65450042-bbf71
-- **Cloud Run Console**: https://console.cloud.google.com/run/detail/us-central1/lte-pci-mapper
+| Role | Permissions |
+|------|-------------|
+| **Platform Admin** | Full system access, manage all tenants |
+| **Tenant Owner** | Full access within their organization |
+| **Tenant Admin** | Manage users and settings |
+| **Member** | Access modules and features |
+| **Viewer** | Read-only access |
 
 ## 🤝 Contributing
 
-1. All development happens in `/Module_Manager`
-2. Follow SvelteKit conventions
-3. Use TypeScript for type safety
-4. Test locally before deploying
-5. Use proper commit messages
+We welcome contributions! Please see:
 
-## 📝 License
+- **[genieacs-fork/CONTRIBUTING.md](genieacs-fork/CONTRIBUTING.md)** - Contributing to GenieACS fork
+- **Issues** - Report bugs or request features on GitHub
+- **Pull Requests** - Submit PRs with clear descriptions
 
-Private - LTE WISP Management Platform
+### Development Guidelines
+
+- Follow TypeScript best practices
+- Write tests for new features
+- Update documentation
+- Follow code style conventions
+- Create feature branches
+
+## 📄 License
+
+This project is proprietary software. All rights reserved.
+
+Third-party components:
+- **GenieACS**: AGPLv3 - See [genieacs-fork/README.md](genieacs-fork/README.md)
+- **SvelteKit**: MIT
+- **Firebase**: Google Terms of Service
+- **ArcGIS**: Esri License
+
+## 🆘 Support
+
+- **Documentation**: [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+- **Issues**: GitHub Issues
+- **Email**: support@yourcompany.com
+
+## 🙏 Acknowledgments
+
+- **GenieACS** - TR-069 ACS implementation
+- **WinnForum** - CBRS SAS specifications
+- **Broadband Forum** - TR-069 standard
+- **Firebase Team** - Backend infrastructure
+- **Svelte Team** - Frontend framework
 
 ---
 
-**Active App**: Module Manager (`/Module_Manager`)  
-**Status**: Production  
-**Last Updated**: 2025-10-08
+## 🎯 Key Modules
+
+### CBRS Management
+Manage CBRS devices and spectrum:
+- Device registration with SAS
+- Spectrum grants and heartbeats
+- Real-time monitoring
+- Analytics and reporting
+
+### ACS CPE Management
+TR-069 device management:
+- Automated provisioning
+- Firmware upgrades
+- Configuration management
+- Performance monitoring
+
+### PCI Resolution
+LTE network optimization:
+- Automatic PCI assignment
+- Conflict detection
+- Neighbor analysis
+- Network visualization
+
+### Tenant Management (Admin)
+Platform administration:
+- Create/delete tenants
+- Manage users
+- Configure platform keys
+- Monitor usage
+
+---
+
+**Built with ❤️ for WISP operators worldwide**
+
+**Version**: 2.0  
+**Last Updated**: October 2025  
+**Status**: Production Ready
