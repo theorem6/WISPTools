@@ -7,7 +7,7 @@ import { env } from '$env/dynamic/public';
 
 // Firebase configuration with fallbacks
 const firebaseConfig = {
-  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBkL5u-R9j3K9yYLfPuS3TaBzSMTjGzmZI',
+  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0',
   authDomain: env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'lte-pci-mapper-65450042-bbf71.firebaseapp.com',
   projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lte-pci-mapper-65450042-bbf71',
   storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'lte-pci-mapper-65450042-bbf71.firebasestorage.app',

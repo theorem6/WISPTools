@@ -8,7 +8,7 @@ runConfig:
 env:
   # Firebase Configuration
   - variable: VITE_FIREBASE_API_KEY
-    value: AIzaSyBkL5u-R9j3K9yYLfPuS3TaBzSMTjGzmZI
+    value: AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0
     availability:
       - BUILD
       - RUNTIME
