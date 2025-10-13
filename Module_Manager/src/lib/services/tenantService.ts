@@ -59,6 +59,17 @@ export class TenantService {
     createOwnerAssociation: boolean = true
   ): Promise<{ success: boolean; tenantId?: string; error?: string }> {
     try {
+      // IMPORTANT: Enforce one tenant per user (unless they're platform admin creating for others)
+      if (createOwnerAssociation) {
+        const userTenants = await this.getUserTenants(createdBy);
+        if (userTenants.length > 0) {
+          return { 
+            success: false, 
+            error: 'You already have an organization. Each account can only create one organization.' 
+          };
+        }
+      }
+
       // Generate unique subdomain if not provided
       if (!subdomain) {
         subdomain = this.generateSubdomain(name);

@@ -39,14 +39,21 @@
       return;
     }
 
-    // Check if user already has tenants
+    // IMPORTANT: Enforce one tenant per user rule
+    // Check if user already has a tenant
     try {
       existingTenants = await tenantService.getUserTenants(currentUser.uid);
       
       if (existingTenants.length > 0) {
-        // User already has tenants, redirect to tenant selection
-        console.log('User has tenants, redirecting to selector');
-        await goto('/tenant-selector', { replaceState: true });
+        // User already has an organization - redirect to dashboard
+        console.log('User already has an organization, redirecting to dashboard');
+        
+        // Auto-select their organization
+        localStorage.setItem('selectedTenantId', existingTenants[0].id);
+        localStorage.setItem('selectedTenantName', existingTenants[0].displayName);
+        
+        await goto('/dashboard', { replaceState: true });
+        return;
       }
     } catch (err) {
       console.error('Error loading tenants:', err);
@@ -138,6 +145,11 @@
 
         <h2>Organization Details</h2>
         <p class="subtitle">Tell us about your organization</p>
+
+        <div class="info-message">
+          <span class="info-icon">ℹ️</span>
+          <strong>Note:</strong> Each account can create one organization. You'll be the owner and can invite additional users.
+        </div>
 
         {#if error}
           <div class="error-message">
@@ -333,6 +345,25 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.875rem;
+  }
+
+  .info-message {
+    background-color: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #3b82f6;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .info-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
   }
 
   .form-group {
