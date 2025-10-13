@@ -1,7 +1,7 @@
 // Multi-Tenant GenieACS Bridge
 // Connects Firebase Functions to GenieACS with tenant isolation
 
-import { db } from './firebaseInit';
+import { db } from './firebaseInit.js';
 import { onRequest } from 'firebase-functions/v2/https';
 import { FieldValue } from 'firebase-admin/firestore';
 import cors from 'cors';
@@ -10,7 +10,7 @@ import {
   extractTenantFromCWMPUrl,
   addTenantFilter,
   addTenantToDocument
-} from './tenantMiddleware';
+} from './tenantMiddleware.js';
 
 const corsHandler = cors({ origin: true });
 

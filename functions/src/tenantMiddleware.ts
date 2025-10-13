@@ -1,7 +1,7 @@
 // Tenant Middleware for Firebase Functions
 // Extracts and validates tenant context from requests
 
-import { auth, db } from './firebaseInit';
+import { auth, db } from './firebaseInit.js';
 const adminAuth = auth;
 
 export interface TenantContext {

@@ -10,7 +10,7 @@ import {
   addTenantFilter,
   addTenantToDocument,
   type TenantContext
-} from './tenantMiddleware';
+} from './tenantMiddleware.js';
 
 const corsHandler = cors({ origin: true });
 let mongoClient: MongoClient | null = null;
