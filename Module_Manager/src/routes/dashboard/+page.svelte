@@ -109,7 +109,11 @@
 
     // Check for tenant selection
     const { tenantService } = await import('$lib/services/tenantService');
-    const selectedTenantId = localStorage.getItem('selectedTenantId');
+    let selectedTenantId = localStorage.getItem('selectedTenantId');
+    
+    console.log('Dashboard: Selected tenant ID from localStorage:', selectedTenantId);
+    console.log('Dashboard: Current user:', currentUser?.email);
+    console.log('Dashboard: Is admin:', isAdmin);
     
     if (!selectedTenantId && currentUser) {
       // Platform admins don't need a tenant selected
@@ -122,42 +126,75 @@
         // Regular users need a tenant
         console.log('Dashboard: No tenant selected, checking user tenants...');
         
-        // Add a small delay to allow Firestore to sync after tenant creation
+        // Small delay to allow Firestore to sync
         await new Promise(resolve => setTimeout(resolve, 500));
         
         const tenants = await tenantService.getUserTenants(currentUser.uid);
+        console.log('Dashboard: Found', tenants.length, 'tenants for user');
         
         if (tenants.length === 0) {
+          // No tenants found - check if just came from tenant setup
+          const justCreated = sessionStorage.getItem('justCreatedTenant');
+          if (justCreated === 'true') {
+            // Just created a tenant, reload tenants
+            console.log('Dashboard: Just created tenant, reloading...');
+            sessionStorage.removeItem('justCreatedTenant');
+            window.location.reload();
+            return;
+          }
+          
           // No tenants, redirect to tenant setup
           console.log('Dashboard: No tenants found, redirecting to setup');
           await goto('/tenant-setup', { replaceState: true });
           return;
         } else if (tenants.length === 1) {
           // Auto-select single tenant
-          console.log('Dashboard: Auto-selecting single tenant');
+          console.log('Dashboard: Auto-selecting single tenant:', tenants[0].displayName);
           localStorage.setItem('selectedTenantId', tenants[0].id);
           localStorage.setItem('selectedTenantName', tenants[0].displayName);
+          selectedTenantId = tenants[0].id;
           tenantName = tenants[0].displayName;
         } else {
           // Multiple tenants, redirect to selector
-          console.log('Dashboard: Multiple tenants, redirecting to selector');
+          console.log('Dashboard: Multiple tenants found, redirecting to selector');
           await goto('/tenant-selector', { replaceState: true });
           return;
         }
       }
     } else if (selectedTenantId) {
       // Tenant already selected - verify it still exists
+      console.log('Dashboard: Verifying selected tenant:', selectedTenantId);
       const tenant = await tenantService.getTenant(selectedTenantId);
       if (tenant) {
         tenantName = tenant.displayName;
-        console.log('Dashboard: Tenant loaded:', tenantName);
+        console.log('Dashboard: Tenant verified and loaded:', tenantName);
       } else {
-        // Tenant no longer exists, clear selection and reload
-        console.log('Dashboard: Selected tenant not found, clearing selection');
+        // Tenant no longer exists, reload user's tenants
+        console.log('Dashboard: Selected tenant not found, reloading tenants...');
         localStorage.removeItem('selectedTenantId');
         localStorage.removeItem('selectedTenantName');
-        window.location.reload();
-        return;
+        
+        // Try to load user's current tenants
+        if (currentUser && !isAdmin) {
+          const tenants = await tenantService.getUserTenants(currentUser.uid);
+          if (tenants.length === 1) {
+            // Auto-select the available tenant
+            console.log('Dashboard: Auto-selecting available tenant:', tenants[0].displayName);
+            localStorage.setItem('selectedTenantId', tenants[0].id);
+            localStorage.setItem('selectedTenantName', tenants[0].displayName);
+            selectedTenantId = tenants[0].id;
+            tenantName = tenants[0].displayName;
+          } else if (tenants.length > 1) {
+            await goto('/tenant-selector', { replaceState: true });
+            return;
+          } else {
+            await goto('/tenant-setup', { replaceState: true });
+            return;
+          }
+        } else {
+          window.location.reload();
+          return;
+        }
       }
     }
 

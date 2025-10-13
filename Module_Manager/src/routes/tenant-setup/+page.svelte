@@ -99,6 +99,9 @@
         localStorage.setItem('selectedTenantId', result.tenantId);
         localStorage.setItem('selectedTenantName', displayName);
         
+        // Set flag so dashboard knows a tenant was just created
+        sessionStorage.setItem('justCreatedTenant', 'true');
+        
         step = 2;
         
         // Wait a moment for user to see success, then redirect
