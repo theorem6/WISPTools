@@ -5,16 +5,26 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 
-// Firebase configuration
+// Firebase configuration with fallbacks
 const firebaseConfig = {
-  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: env.PUBLIC_FIREBASE_APP_ID || import.meta.env.VITE_FIREBASE_APP_ID || '',
+  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBkL5u-R9j3K9yYLfPuS3TaBzSMTjGzmZI',
+  authDomain: env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'lte-pci-mapper-65450042-bbf71.firebaseapp.com',
+  projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lte-pci-mapper-65450042-bbf71',
+  storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'lte-pci-mapper-65450042-bbf71.firebasestorage.app',
+  messagingSenderId: env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1044782186913',
+  appId: env.PUBLIC_FIREBASE_APP_ID || import.meta.env.VITE_FIREBASE_APP_ID || '1:1044782186913:web:e1d47cdb7b1d89bb0b6f9c',
   measurementId: env.PUBLIC_FIREBASE_MEASUREMENT_ID || import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ''
 };
+
+// Log configuration status (only in development)
+if (browser && typeof window !== 'undefined') {
+  console.log('🔥 Firebase Config:', {
+    apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing',
+    authDomain: firebaseConfig.authDomain ? '✅ Set' : '❌ Missing',
+    projectId: firebaseConfig.projectId ? '✅ Set' : '❌ Missing',
+    appId: firebaseConfig.appId ? '✅ Set' : '❌ Missing'
+  });
+}
 
 // Singleton instances
 let firebaseApp: FirebaseApp | null = null;
