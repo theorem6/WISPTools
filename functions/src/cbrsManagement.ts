@@ -246,21 +246,28 @@ export const proxySASRequest = onCall(async (request) => {
  * Called after Google OAuth to show user their authorized SAS entities
  */
 export const getSASUserIDs = onCall(async (request) => {
+  console.log('[getSASUserIDs] ===== FUNCTION INVOKED =====');
+  console.log('[getSASUserIDs] Request data:', JSON.stringify(request.data, null, 2));
+  
   try {
     const { tenantId, googleEmail, googleAccessToken } = request.data;
     
+    console.log('[getSASUserIDs] Validating input parameters...');
     if (!tenantId || !googleEmail || !googleAccessToken) {
+      console.error('[getSASUserIDs] Missing required parameters:', { tenantId: !!tenantId, googleEmail: !!googleEmail, googleAccessToken: !!googleAccessToken });
       throw new Error('tenantId, googleEmail, and googleAccessToken are required');
     }
     
     // Verify user authentication
+    console.log('[getSASUserIDs] Checking Firebase authentication...');
     if (!request.auth) {
+      console.error('[getSASUserIDs] No auth context found');
       throw new Error('Authentication required');
     }
 
     const userId = request.auth.uid;
-    
-    console.log(`[SAS Users] Fetching User IDs for ${googleEmail} (tenant: ${tenantId})`);
+    console.log(`[getSASUserIDs] Authenticated user: ${userId}`);
+    console.log(`[getSASUserIDs] Fetching User IDs for ${googleEmail} (tenant: ${tenantId})`);
 
     // Verify user has access to this tenant
     const userTenantDoc = await db.collection('user_tenants').doc(`${userId}_${tenantId}`).get();
@@ -282,6 +289,10 @@ export const getSASUserIDs = onCall(async (request) => {
       // Call SAS Portal REST API with user's OAuth token
       const sasPortalUrl = 'https://sasportal.googleapis.com/v1alpha1/customers';
       
+      console.log(`[getSASUserIDs] ===== CALLING GOOGLE SAS PORTAL API =====`);
+      console.log(`[getSASUserIDs] URL: ${sasPortalUrl}`);
+      console.log(`[getSASUserIDs] OAuth token (first 20 chars): ${googleAccessToken.substring(0, 20)}...`);
+      
       const response = await fetch(sasPortalUrl, {
         method: 'GET',
         headers: {
@@ -290,8 +301,16 @@ export const getSASUserIDs = onCall(async (request) => {
         }
       });
 
+      console.log(`[getSASUserIDs] API Response Status: ${response.status} ${response.statusText}`);
+      console.log(`[getSASUserIDs] API Response Headers:`, JSON.stringify([...response.headers.entries()], null, 2));
+
       if (!response.ok) {
-        console.error(`[SAS Users] Google SAS Portal API returned ${response.status}: ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error(`[getSASUserIDs] Google SAS Portal API Error:`, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody
+        });
         
         // Return user's actual SAS User IDs
         // TODO: Replace with actual Google SAS API call when endpoint is confirmed
@@ -326,11 +345,16 @@ export const getSASUserIDs = onCall(async (request) => {
       }
 
       // Parse the customers from the Google SAS Portal API response
-      const responseData = await response.json();
+      const responseBody = await response.text();
+      console.log(`[getSASUserIDs] API Response Body:`, responseBody);
+      
+      const responseData = JSON.parse(responseBody);
       // Response format from official API: { customers: [{ name: "customers/123", displayName: "ISP Supplies", sasUserIds: [...] }] }
       const customers = responseData.customers || [];
       
-      console.log(`[SAS Users] Found ${customers.length} authorized customers from Google SAS Portal API`);
+      console.log(`[getSASUserIDs] ===== API CALL SUCCESSFUL =====`);
+      console.log(`[getSASUserIDs] Found ${customers.length} authorized customers from Google SAS Portal API`);
+      console.log(`[getSASUserIDs] Customer data:`, JSON.stringify(customers, null, 2));
       
       // Transform Google SAS customers into our SASUserID format
       const userIds = customers.map((customer: any, index: number) => ({
@@ -341,7 +365,8 @@ export const getSASUserIDs = onCall(async (request) => {
         isPrimary: index === 0 // First one is considered primary
       }));
       
-      console.log(`[SAS Users] Successfully parsed ${userIds.length} User IDs from Google SAS Portal`);
+      console.log(`[getSASUserIDs] Successfully parsed ${userIds.length} User IDs from Google SAS Portal`);
+      console.log(`[getSASUserIDs] Returning User IDs:`, JSON.stringify(userIds, null, 2));
       
       return {
         success: true,
@@ -350,7 +375,14 @@ export const getSASUserIDs = onCall(async (request) => {
       };
       
     } catch (apiError: any) {
-      console.error('[SAS Users] Error calling Google SAS:', apiError);
+      console.error('[getSASUserIDs] ===== API CALL FAILED =====');
+      console.error('[getSASUserIDs] Error calling Google SAS Portal API:', apiError);
+      console.error('[getSASUserIDs] Error details:', {
+        message: apiError.message,
+        stack: apiError.stack
+      });
+      
+      console.log('[getSASUserIDs] Returning fallback User IDs for david@4gengineer.com');
       
       // Return user's actual SAS User IDs (fallback)
       // TODO: Replace with actual Google SAS API call when endpoint is confirmed
@@ -384,7 +416,13 @@ export const getSASUserIDs = onCall(async (request) => {
     }
     
   } catch (error: any) {
-    console.error('[SAS Users] Error:', error);
+    console.error('[getSASUserIDs] ===== FUNCTION ERROR =====');
+    console.error('[getSASUserIDs] Top-level error caught:', error);
+    console.error('[getSASUserIDs] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     throw new Error(error.message || 'Failed to fetch SAS User IDs');
   }
 });
