@@ -29,9 +29,9 @@
   let platformConfig: PlatformCBRSConfig | null = null;
   let configStatus = { status: 'missing' as const, message: '' };
   
-  // Tenant info - will be passed from TenantGuard slot props
-  let tenantId = '';
-  let tenantName = 'Loading...';
+  // Tenant info - use currentTenant store
+  $: tenantId = $currentTenant?.id || '';
+  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
   // Add device form (fixed to Google SAS only)
   let newDevice = {
@@ -490,29 +490,8 @@
   <meta name="description" content="Citizens Broadband Radio Service management with Google SAS and Federated Wireless integration" />
 </svelte:head>
 
-<TenantGuard let:tenant>
+<TenantGuard>
 <div class="cbrs-module">
-  {#if tenant}
-    {#if tenantId !== tenant.id}
-      <!-- Tenant changed, update local state -->
-      {#await (async () => {
-        tenantId = tenant.id;
-        tenantName = tenant.displayName || tenant.name || 'Unknown';
-        // Reload config and devices for new tenant
-        if (browser) {
-          cbrsConfig = await loadCBRSConfig(tenantId);
-          platformConfig = await loadPlatformCBRSConfig();
-          configStatus = getConfigStatus(cbrsConfig);
-          await loadDevices();
-        }
-      })()}
-        <!-- Loading tenant... -->
-      {:then}
-        <!-- Tenant loaded -->
-      {/await}
-    {/if}
-  {/if}
-
   <!-- Header -->
   <div class="module-header">
     <div class="header-content">
