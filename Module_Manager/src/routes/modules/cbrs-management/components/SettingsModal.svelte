@@ -1,5 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import UserIDSelector from './UserIDSelector.svelte';
+  import type { SASUserID } from '$lib/services/googleSASUserService';
   
   export let show = false;
   export let config: any = {};
@@ -8,6 +10,8 @@
   const dispatch = createEventDispatcher();
   let googleAuthState: any = null;
   let unsubscribe: any = null;
+  let showUserIDSelector = false;
+  let availableUserIDs: SASUserID[] = [];
   
   // Fixed to shared platform mode with Google SAS only
   let formData = {
@@ -56,6 +60,11 @@
       sessionStorage.removeItem('google_oauth_completed');
       console.log('[Settings] Returned from Google OAuth - reloading auth state');
       await googleAuthStore.initialize(tenantId);
+      
+      // Fetch available SAS User IDs after successful OAuth
+      if (googleAuthState?.isAuthenticated && googleAuthState?.accessToken) {
+        await fetchAndShowUserIDs();
+      }
     }
   });
   
@@ -80,12 +89,53 @@
     }
   }
   
+  async function fetchAndShowUserIDs() {
+    try {
+      console.log('[Settings] Fetching authorized SAS User IDs...');
+      
+      const { fetchAuthorizedSASUserIDs } = await import('$lib/services/googleSASUserService');
+      
+      availableUserIDs = await fetchAuthorizedSASUserIDs(
+        tenantId,
+        googleAuthState.googleEmail,
+        googleAuthState.accessToken
+      );
+      
+      console.log('[Settings] Found', availableUserIDs.length, 'User IDs');
+      
+      if (availableUserIDs.length === 1) {
+        // Auto-select if only one User ID
+        console.log('[Settings] Auto-selecting single User ID:', availableUserIDs[0].userId);
+        formData.googleUserId = availableUserIDs[0].userId;
+      } else if (availableUserIDs.length > 1) {
+        // Show selector for multiple User IDs
+        console.log('[Settings] Showing User ID selector');
+        showUserIDSelector = true;
+      } else {
+        console.log('[Settings] No User IDs found - user will enter manually');
+      }
+      
+    } catch (error: any) {
+      console.error('[Settings] Error fetching User IDs:', error);
+      // Allow user to continue and enter manually
+    }
+  }
+  
+  function handleUserIDSelect(event: CustomEvent<SASUserID>) {
+    const selectedUserId = event.detail;
+    console.log('[Settings] User ID selected:', selectedUserId.userId);
+    
+    formData.googleUserId = selectedUserId.userId;
+    showUserIDSelector = false;
+  }
+  
   async function handleSignOut() {
     try {
       const { googleAuthStore } = await import('$lib/services/googleOAuthService');
       googleAuthStore.signOut(tenantId);
       googleAuthState = null;
       formData.googleEmail = '';
+      formData.googleUserId = '';
     } catch (error: any) {
       console.error('[Settings] Sign out failed:', error);
     }
@@ -349,6 +399,15 @@
     </div>
   </div>
 {/if}
+
+<!-- User ID Selector Modal (shows after OAuth sign-in) -->
+<UserIDSelector
+  show={showUserIDSelector}
+  userIds={availableUserIDs}
+  googleEmail={googleAuthState?.googleEmail || ''}
+  on:select={handleUserIDSelect}
+  on:close={() => showUserIDSelector = false}
+/>
 
 <style>
   .modal-overlay {

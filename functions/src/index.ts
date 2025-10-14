@@ -147,6 +147,7 @@ export {
   saveCBRSDevice,
   deleteCBRSDevice,
   proxySASRequest,
+  getSASUserIDs,
   logCBRSEvent,
   getCBRSAnalytics,
   cbrsWebhook
