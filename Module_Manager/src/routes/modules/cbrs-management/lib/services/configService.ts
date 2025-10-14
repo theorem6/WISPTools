@@ -75,7 +75,8 @@ export async function saveCBRSConfig(config: CBRSConfig): Promise<void> {
     const { db } = await import('$lib/firebase');
     const { doc, setDoc } = await import('firebase/firestore');
     
-    const configDoc = doc(db, 'cbrs_config', config.tenantId);
+    // Call db() as a function to get Firestore instance
+    const configDoc = doc(db(), 'cbrs_config', config.tenantId);
     
     await setDoc(configDoc, {
       ...config,
@@ -102,7 +103,8 @@ export async function loadCBRSConfig(tenantId: string): Promise<CBRSConfig | nul
     const { db } = await import('$lib/firebase');
     const { doc, getDoc } = await import('firebase/firestore');
     
-    const configDoc = doc(db, 'cbrs_config', tenantId);
+    // Call db() as a function to get Firestore instance
+    const configDoc = doc(db(), 'cbrs_config', tenantId);
     const snapshot = await getDoc(configDoc);
     
     if (!snapshot.exists()) {
@@ -137,7 +139,8 @@ export async function savePlatformCBRSConfig(config: PlatformCBRSConfig): Promis
     const { db } = await import('$lib/firebase');
     const { doc, setDoc } = await import('firebase/firestore');
     
-    const configDoc = doc(db, 'cbrs_platform_config', 'platform');
+    // Call db() as a function to get Firestore instance
+    const configDoc = doc(db(), 'cbrs_platform_config', 'platform');
     
     await setDoc(configDoc, {
       ...config,
@@ -163,7 +166,8 @@ export async function loadPlatformCBRSConfig(): Promise<PlatformCBRSConfig | nul
     const { db } = await import('$lib/firebase');
     const { doc, getDoc } = await import('firebase/firestore');
     
-    const configDoc = doc(db, 'cbrs_platform_config', 'platform');
+    // Call db() as a function to get Firestore instance
+    const configDoc = doc(db(), 'cbrs_platform_config', 'platform');
     const snapshot = await getDoc(configDoc);
     
     if (!snapshot.exists()) {
