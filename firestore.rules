@@ -108,6 +108,22 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
+    // CBRS Configuration (tenant-level)
+    match /cbrs_config/{tenantId} {
+      // Users can read and write config for their own tenant
+      allow read, write: if isAuthenticated() && 
+                           (isTenantMember(tenantId) || isPlatformAdmin());
+    }
+
+    // CBRS Platform Configuration (admin-only)
+    match /cbrs_platform_config/{configId} {
+      // Only platform admins can manage platform config
+      allow read, write: if isPlatformAdmin();
+      
+      // Regular users can read platform config (for shared-platform mode)
+      allow read: if isAuthenticated();
+    }
+
     // ============================================================================
     // LEGACY COLLECTIONS (Pre-multi-tenant)
     // ============================================================================
