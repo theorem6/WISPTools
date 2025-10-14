@@ -29,9 +29,22 @@
       // Calculate expiration time
       const expiresAt = Date.now() + (parseInt(expiresIn || '3600') * 1000);
       
-      // Decode the JWT to get user email (access token is a JWT)
-      const payload = JSON.parse(atob(accessToken.split('.')[1]));
-      const email = payload.email || 'unknown@gmail.com';
+      // Get user email by calling Google's userinfo API
+      let email = 'unknown@gmail.com';
+      try {
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+        
+        if (userInfoResponse.ok) {
+          const userInfo = await userInfoResponse.json();
+          email = userInfo.email || 'unknown@gmail.com';
+        }
+      } catch (err) {
+        console.error('[Google OAuth] Failed to get user email:', err);
+      }
       
       console.log('[Google OAuth Callback] Success!', { email, expiresAt });
       

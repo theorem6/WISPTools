@@ -26,6 +26,12 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
+  
+  // Allow popup communication for OAuth callback
+  // Set Cross-Origin-Opener-Policy to allow window.opener access
+  if (event.url.pathname.startsWith('/oauth/')) {
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  }
 
   return response;
 };

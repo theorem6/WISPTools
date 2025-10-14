@@ -166,14 +166,32 @@ function createGoogleAuthStore() {
         
         window.addEventListener('message', handleMessage);
         
-        // Check if popup was closed
+        // Check if popup was closed (with error handling for COOP)
         const checkClosed = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', handleMessage);
-            reject(new Error('Sign-in cancelled'));
+          try {
+            if (popup.closed) {
+              clearInterval(checkClosed);
+              window.removeEventListener('message', handleMessage);
+              reject(new Error('Sign-in cancelled'));
+            }
+          } catch (err) {
+            // Ignore COOP errors - popup is still open
           }
-        }, 500);
+        }, 1000);
+        
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
+          if (popup && !popup.closed) {
+            try {
+              popup.close();
+            } catch (err) {
+              // Ignore errors
+            }
+          }
+          reject(new Error('Sign-in timeout - please try again'));
+        }, 300000); // 5 minutes
       });
     },
     
