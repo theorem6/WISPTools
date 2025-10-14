@@ -866,7 +866,7 @@
     border-top: 1px solid var(--border-color);
   }
   
-  .btn {
+  .modal-overlay .btn {
     padding: 0.625rem 1.25rem;
     border: none;
     border-radius: 0.5rem;
@@ -879,30 +879,30 @@
     gap: 0.5rem;
   }
   
-  .btn-primary {
+  .modal-overlay .btn-primary {
     background: var(--accent-color);
     color: white;
   }
   
-  .btn-primary:hover:not(:disabled) {
+  .modal-overlay .btn-primary:hover:not(:disabled) {
     background: var(--accent-hover);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
   }
   
-  .btn-primary:disabled {
+  .modal-overlay .btn-primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
   }
   
-  .btn-secondary {
+  .modal-overlay .btn-secondary {
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
   }
   
-  .btn-secondary:hover {
+  .modal-overlay .btn-secondary:hover {
     background: var(--bg-hover);
     border-color: var(--accent-color);
   }
