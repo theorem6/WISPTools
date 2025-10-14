@@ -219,6 +219,18 @@
               return;
             }
           } else {
+            // Genuinely no tenants - but check if setup was already completed
+            const setupAlreadyCompleted = localStorage.getItem('tenantSetupCompleted');
+            if (setupAlreadyCompleted === 'true') {
+              // Setup was completed but tenant not found - clear and retry
+              console.warn('Dashboard: Setup completed flag set but no tenant found, clearing flags');
+              localStorage.removeItem('tenantSetupCompleted');
+              sessionStorage.removeItem('dashboardRedirectCount');
+              error = 'Organization not found. Please refresh the page or create a new organization.';
+              isLoadingTenant = false;
+              return;
+            }
+            
             // Genuinely no tenants, redirect to setup
             console.log('Dashboard: No tenants found, redirecting to setup');
             sessionStorage.setItem('dashboardRedirectCount', String(redirectAttempts + 1));

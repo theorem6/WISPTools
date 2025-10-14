@@ -24,6 +24,23 @@
 
     console.log('Tenant Setup: Page loaded');
 
+    // CRITICAL: Check if setup was already completed - block access if true
+    const setupCompleted = localStorage.getItem('tenantSetupCompleted');
+    const selectedTenantId = localStorage.getItem('selectedTenantId');
+    
+    if (setupCompleted === 'true' || selectedTenantId) {
+      console.log('Tenant Setup: Setup already completed, BLOCKING access to setup page');
+      console.log('Tenant Setup: setupCompleted flag:', setupCompleted);
+      console.log('Tenant Setup: selectedTenantId:', selectedTenantId);
+      
+      // Clear redirect counters
+      sessionStorage.removeItem('dashboardRedirectCount');
+      sessionStorage.removeItem('justCreatedTenant');
+      
+      await goto('/dashboard', { replaceState: true });
+      return;
+    }
+
     // Check if user is authenticated
     currentUser = authService.getCurrentUser();
     if (!currentUser) {
@@ -33,15 +50,6 @@
     }
 
     contactEmail = currentUser.email || '';
-
-    // Check if a tenant was just selected (to prevent redirect loop)
-    const justCreatedTenant = localStorage.getItem('selectedTenantId');
-    if (justCreatedTenant) {
-      console.log('Tenant Setup: Tenant already selected in localStorage, redirecting to dashboard');
-      sessionStorage.removeItem('dashboardRedirectCount');
-      await goto('/dashboard', { replaceState: true });
-      return;
-    }
 
     // IMPORTANT: Enforce one tenant per user rule
     // Check if user already has a tenant
