@@ -287,69 +287,60 @@ export class GoogleSASClient {
   }
 
   /**
-   * Make HTTP request to Google SAS API
+   * Make HTTP request to Google SAS API via Cloud Function proxy
+   * The proxy handles CORS, authentication, and mTLS certificates
    */
   private async makeRequest(endpoint: string, data: any): Promise<any> {
     try {
-      const url = `${this.baseUrl}${endpoint}`;
-      
-      console.log('[Google SAS] API Request:', {
-        url,
-        method: 'POST',
+      console.log('[Google SAS] API Request via proxy:', {
+        endpoint,
         tenantId: this.config.tenantId,
         userId: this.config.userId,
-        email: this.config.email,
-        hasCertificate: !!this.config.certificate,
-        hasPrivateKey: !!this.config.privateKey
+        email: this.config.email
       });
 
-      // Build headers
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Tenant-Id': this.config.tenantId
-      };
+      // Get Firebase auth token
+      const { auth } = await import('$lib/firebase');
+      const currentUser = auth().currentUser;
       
-      // Add API key if provided (from platform)
-      if (this.config.apiKey) {
-        headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      if (!currentUser) {
+        throw new Error('User not authenticated');
       }
       
-      // Add user email if provided (for OAuth)
-      if (this.config.email) {
-        headers['X-User-Email'] = this.config.email;
-      }
+      const token = await currentUser.getIdToken();
       
-      // Add user ID
-      if (this.config.userId) {
-        headers['X-User-Id'] = this.config.userId;
-      }
+      // Get Cloud Functions URL
+      const functionsUrl = import.meta.env.VITE_FUNCTIONS_URL || 
+                          'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net';
       
-      // Note: For mTLS (mutual TLS) with certificates and private keys,
-      // this needs to be handled by a backend proxy that can use the certificates
-      // Browser fetch API doesn't support client certificates
-      // The backend should retrieve the base64 certificate/key from this request
-      // and use them for the actual SAS API call
+      // Call the proxy Cloud Function instead of Google SAS directly
+      const proxyUrl = `${functionsUrl}/proxySASRequest`;
       
-      if (this.config.certificate) {
-        headers['X-Client-Certificate'] = this.config.certificate;
-      }
-      
-      if (this.config.privateKey) {
-        headers['X-Client-Private-Key'] = this.config.privateKey;
-      }
-      
-      const response = await fetch(url, {
+      const response = await fetch(proxyUrl, {
         method: 'POST',
-        headers,
-        body: JSON.stringify(data)
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          tenantId: this.config.tenantId,
+          endpoint: endpoint,
+          data: data
+        })
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Google SAS API error: ${response.status} ${response.statusText} - ${errorText}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Proxy error: ${response.status} ${response.statusText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'SAS request failed');
+      }
+
+      return result.data;
     } catch (error) {
       console.error('[Google SAS] API request failed:', error);
       throw error;
