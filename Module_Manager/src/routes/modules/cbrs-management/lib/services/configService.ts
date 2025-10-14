@@ -187,17 +187,13 @@ export async function loadPlatformCBRSConfig(): Promise<PlatformCBRSConfig | nul
 
 /**
  * Get default configuration
+ * Fixed to shared-platform mode with Google SAS only
  */
 export function getDefaultConfig(tenantId: string): CBRSConfig {
   return {
-    deploymentModel: 'per-tenant', // Default to per-tenant (each tenant has own keys)
-    provider: 'google',
-    googleUserId: tenantId, // Default User ID to tenant ID
-    federatedCustomerId: tenantId, // Default Customer ID to tenant ID
-    googleApiKey: '',
-    googleApiEndpoint: 'https://sas.googleapis.com/v1',
-    federatedApiKey: '',
-    federatedApiEndpoint: 'https://sas.federatedwireless.com/api/v1',
+    deploymentModel: 'shared-platform', // Fixed to shared platform mode
+    provider: 'google', // Fixed to Google SAS only
+    googleUserId: '', // User must configure their Google User ID
     enableAnalytics: false,
     enableOptimization: false,
     enableMultiSite: false,
@@ -207,49 +203,14 @@ export function getDefaultConfig(tenantId: string): CBRSConfig {
 }
 
 /**
- * Validate configuration based on deployment model
+ * Validate configuration (fixed to shared-platform mode with Google SAS)
  */
 export function validateConfig(config: CBRSConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  if (config.deploymentModel === 'shared-platform') {
-    // Shared Platform Mode - only need User IDs / Customer IDs
-    if (config.provider === 'google' || config.provider === 'both') {
-      if (!config.googleUserId) {
-        errors.push('Google User ID is required for shared platform mode');
-      }
-    }
-    
-    if (config.provider === 'federated-wireless' || config.provider === 'both') {
-      if (!config.federatedCustomerId) {
-        errors.push('Federated Wireless Customer ID is required');
-      }
-    }
-  } else {
-    // Per-Tenant Mode - need full API credentials
-    if (config.provider === 'google' || config.provider === 'both') {
-      if (!config.googleApiKey) {
-        errors.push('Google API key is required for per-tenant mode');
-      }
-      if (!config.googleApiEndpoint) {
-        errors.push('Google API endpoint is required');
-      }
-      if (!config.googleUserId) {
-        errors.push('Google User ID is required');
-      }
-    }
-    
-    if (config.provider === 'federated-wireless' || config.provider === 'both') {
-      if (!config.federatedApiKey) {
-        errors.push('Federated Wireless API key is required for per-tenant mode');
-      }
-      if (!config.federatedCustomerId) {
-        errors.push('Federated Wireless Customer ID is required');
-      }
-      if (!config.federatedApiEndpoint) {
-        errors.push('Federated Wireless API endpoint is required');
-      }
-    }
+  // Only validate for shared-platform mode with Google SAS
+  if (!config.googleUserId) {
+    errors.push('Google User ID is required');
   }
   
   return {
@@ -320,7 +281,7 @@ export function getConfigStatus(config: CBRSConfig | null): { status: 'complete'
   if (!config) {
     return {
       status: 'missing',
-      message: 'No configuration found. Please configure SAS provider settings.'
+      message: 'No configuration found. Please configure your Google User ID.'
     };
   }
   
@@ -329,7 +290,7 @@ export function getConfigStatus(config: CBRSConfig | null): { status: 'complete'
   if (validation.valid) {
     return {
       status: 'complete',
-      message: `Configured for ${config.provider === 'both' ? 'both providers' : config.provider === 'google' ? 'Google SAS' : 'Federated Wireless'}`
+      message: `Configured for Google SAS (User ID: ${config.googleUserId})`
     };
   } else {
     return {
