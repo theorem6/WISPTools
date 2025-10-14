@@ -466,16 +466,67 @@
       if (result.success && result.installations) {
         console.log('[CBRS] Loaded', result.installations.length, 'installations from Google SAS');
         
+        // Convert installations to CBSD devices and update devices list
+        devices = convertInstallationsToCBSDs(result.installations);
+        console.log('[CBRS] Converted to', devices.length, 'CBSD devices');
+        
         // Add installations to map
         await addSASInstallationsToMap(result.installations);
       } else {
         console.warn('[CBRS] No installations found for this User ID');
+        devices = []; // Clear devices if none found
+        
+        if (map && map._graphicsLayer) {
+          map._graphicsLayer.removeAll();
+        }
       }
       
     } catch (err: any) {
       console.error('[CBRS] Failed to load SAS installations:', err);
       error = 'Failed to load SAS devices: ' + (err?.message || 'Unknown error');
     }
+  }
+  
+  function convertInstallationsToCBSDs(installations: any[]): CBSDDevice[] {
+    console.log('[CBRS] Converting', installations.length, 'installations to CBSD devices');
+    
+    return installations.map((installation: any, index: number) => {
+      const lat = installation.latitude || installation.location?.latitude || 0;
+      const lon = installation.longitude || installation.location?.longitude || 0;
+      
+      // Create a CBSD device from installation data
+      const device: CBSDDevice = {
+        id: installation.name || `sas-${index}`,
+        cbsdSerialNumber: installation.serialNumber || installation.name || `SAS-${index}`,
+        fccId: installation.fccId || 'UNKNOWN',
+        cbsdCategory: (installation.cbsdCategory || 'A') as CBSDCategory,
+        userId: installation.userId || currentUserID || 'unknown',
+        callSign: installation.callSign || '',
+        cbsdInfo: installation.cbsdInfo || '',
+        airInterface: installation.airInterface || { radioTechnology: 'E_UTRA' },
+        installationParam: {
+          latitude: lat,
+          longitude: lon,
+          height: installation.height || 10,
+          heightType: installation.heightType || 'AGL',
+          indoorDeployment: installation.indoorDeployment || false,
+          antennaAzimuth: installation.antennaAzimuth || 0,
+          antennaDowntilt: installation.antennaDowntilt || 0,
+          antennaGain: installation.antennaGain || 5,
+          antennaBeamwidth: installation.antennaBeamwidth || 360
+        },
+        measCapability: installation.measCapability || [],
+        groupingParam: installation.groupingParam || [],
+        state: (installation.state || 'REGISTERED') as CBSDState,
+        grantStates: installation.grantStates || [],
+        sasProviderId: 'google' as const,
+        tenantId,
+        createdAt: new Date(installation.createdAt || Date.now()),
+        updatedAt: new Date(installation.updatedAt || Date.now())
+      };
+      
+      return device;
+    }).filter(device => device.installationParam.latitude !== 0 && device.installationParam.longitude !== 0);
   }
   
   async function handleShowUserIDSelector() {
