@@ -8,7 +8,6 @@ import { onCall } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import cors from 'cors';
 import { db } from './firebaseInit.js';
-import { sasportal_v1alpha1 } from '@googleapis/sasportal';
 import { google } from 'googleapis';
 
 const corsHandler = cors({ origin: true });
@@ -270,11 +269,9 @@ export const getSASUserIDs = onCall(async (request) => {
       throw new Error('Forbidden - User does not have access to this tenant');
     }
 
-    // Load platform configuration (API key no longer needed for SAS Portal - uses OAuth token)
-    // Keeping for future compatibility with other SAS API endpoints
-    const platformConfigDoc = await db.collection('cbrs_platform_config').doc('platform').get();
-    const platformConfig = platformConfigDoc.exists ? platformConfigDoc.data() : null;
-
+    // Note: SAS Portal API uses OAuth token authentication directly
+    // No need to load platform config for this endpoint
+    
     console.log(`[SAS Users] Calling Google SAS Portal API to list authorized customers`);
     
     // Call Google SAS Portal API to get list of customers (User IDs) this user has access to
