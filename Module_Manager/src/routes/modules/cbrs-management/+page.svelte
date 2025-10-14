@@ -465,6 +465,10 @@
       
       if (result.success && result.installations) {
         console.log('[CBRS] Loaded', result.installations.length, 'installations from Google SAS');
+        console.log('[CBRS] Cloud Function returned:', result);
+        if (result.note) {
+          console.log('[CBRS] Note from Cloud Function:', result.note);
+        }
         
         // Convert installations to CBSD devices and update devices list
         devices = convertInstallationsToCBSDs(result.installations);
@@ -490,14 +494,28 @@
   function convertInstallationsToCBSDs(installations: any[]): CBSDDevice[] {
     console.log('[CBRS] Converting', installations.length, 'installations to CBSD devices');
     if (installations[0]) {
-      console.log('[CBRS] Sample installation structure:', installations[0]);
-      console.log('[CBRS] Sample installation keys:', Object.keys(installations[0]));
+      console.log('[CBRS] ===== SAMPLE INSTALLATION STRUCTURE =====');
+      console.log('[CBRS] Full object:', JSON.stringify(installations[0], null, 2));
+      console.log('[CBRS] Top-level keys:', Object.keys(installations[0]));
+      
       if (installations[0].activeConfig) {
         console.log('[CBRS] Has activeConfig with keys:', Object.keys(installations[0].activeConfig));
+        if (installations[0].activeConfig.installationParams) {
+          console.log('[CBRS] activeConfig.installationParams:', JSON.stringify(installations[0].activeConfig.installationParams, null, 2));
+        }
       }
       if (installations[0].preloadedConfig) {
         console.log('[CBRS] Has preloadedConfig with keys:', Object.keys(installations[0].preloadedConfig));
+        if (installations[0].preloadedConfig.installationParams) {
+          console.log('[CBRS] preloadedConfig.installationParams:', JSON.stringify(installations[0].preloadedConfig.installationParams, null, 2));
+        }
       }
+      
+      // Check if these are deployments (locations) or actual devices
+      if (installations[0].deploymentName || installations[0].deployment) {
+        console.log('[CBRS] ⚠️ These appear to be DEPLOYMENTS, not devices!');
+      }
+      console.log('[CBRS] =====================================');
     }
     
     return installations.map((installation: any, index: number) => {
