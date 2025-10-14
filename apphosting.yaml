@@ -185,7 +185,7 @@ env:
   # Authorized origins: https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app
   # Redirect URIs: https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app/oauth/google/callback
   - variable: PUBLIC_GOOGLE_OAUTH_CLIENT_ID
-    value: "1044782186913-REPLACEME.apps.googleusercontent.com"
+    value: "1044782186913-kehquaq56fcubedupb34611c0hm1ctob.apps.googleusercontent.com"
     availability:
       - BUILD
       - RUNTIME
