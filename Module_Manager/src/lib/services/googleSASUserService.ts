@@ -27,46 +27,29 @@ export async function fetchAuthorizedSASUserIDs(
   try {
     console.log('[SAS Users] Fetching authorized User IDs for:', googleEmail);
     
-    // Get Firebase auth token
-    const { auth } = await import('$lib/firebase');
-    const currentUser = auth().currentUser;
+    // Use Firebase Callable Functions (not HTTP endpoints)
+    const { functions } = await import('$lib/firebase');
+    const { httpsCallable } = await import('firebase/functions');
     
-    if (!currentUser) {
-      throw new Error('User not authenticated with Firebase');
-    }
+    const getSASUserIDs = httpsCallable(functions(), 'getSASUserIDs');
     
-    const firebaseToken = await currentUser.getIdToken();
-    
-    // Get Cloud Functions URL
-    const functionsUrl = import.meta.env.VITE_FUNCTIONS_URL || 
-                        'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net';
-    
-    // Call the proxy function to get User IDs from Google SAS
-    const response = await fetch(`${functionsUrl}/getSASUserIDs`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${firebaseToken}`
-      },
-      body: JSON.stringify({
-        tenantId,
-        googleEmail,
-        googleAccessToken: accessToken
-      })
+    // Call the Cloud Function
+    const response = await getSASUserIDs({
+      tenantId,
+      googleEmail,
+      googleAccessToken: accessToken
     });
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `Failed to fetch User IDs: ${response.status}`);
-    }
-    
-    const result = await response.json();
+    const result = response.data as any;
     
     if (!result.success || !result.userIds) {
       throw new Error(result.error || 'Failed to fetch User IDs');
     }
     
     console.log('[SAS Users] Found', result.userIds.length, 'authorized User IDs');
+    if (result.note) {
+      console.log('[SAS Users]', result.note);
+    }
     
     return result.userIds;
     
