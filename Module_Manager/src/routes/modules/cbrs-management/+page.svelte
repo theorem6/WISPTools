@@ -731,6 +731,7 @@
 <SettingsModal 
   show={showSettingsModal}
   config={cbrsConfig || {}}
+  tenantId={tenantId}
   on:close={() => showSettingsModal = false}
   on:save={handleSaveSettings}
 />
