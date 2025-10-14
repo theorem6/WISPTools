@@ -5,7 +5,7 @@
   let status = 'Processing Google Sign-In...';
   let error = '';
   
-  onMount(() => {
+  onMount(async () => {
     if (!browser) return;
     
     try {
