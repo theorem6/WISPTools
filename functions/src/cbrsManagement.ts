@@ -532,6 +532,66 @@ export const getSASInstallations = onCall(async (request) => {
       };
     }
     
+    console.log(`[getSASInstallations] ===== FOUND DEPLOYMENTS =====`);
+    console.log(`[getSASInstallations] Found ${installations.length} deployments from ${successfulEndpoint}`);
+    console.log(`[getSASInstallations] Sample deployment:`, JSON.stringify(installations[0], null, 2));
+    
+    // If we got deployments, we need to fetch devices within each deployment
+    if (successfulEndpoint.includes('/deployments')) {
+      console.log(`[getSASInstallations] These are deployments - fetching devices within them...`);
+      
+      const allDevices: any[] = [];
+      
+      for (const deployment of installations) {
+        const deploymentName = deployment.name; // e.g., "customers/123/deployments/456"
+        const devicesEndpoint = `https://sasportal.googleapis.com/v1alpha1/${deploymentName}/devices`;
+        
+        console.log(`[getSASInstallations] Fetching devices from: ${devicesEndpoint}`);
+        
+        try {
+          const devicesResponse = await fetch(devicesEndpoint, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${googleAccessToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (devicesResponse.ok) {
+            const devicesBody = await devicesResponse.text();
+            const devicesData = JSON.parse(devicesBody);
+            const devices = devicesData.devices || [];
+            
+            console.log(`[getSASInstallations] Found ${devices.length} devices in ${deployment.displayName || deploymentName}`);
+            
+            // Add deployment info to each device
+            devices.forEach((device: any) => {
+              device.deploymentName = deployment.displayName;
+              device.deploymentId = deploymentName;
+            });
+            
+            allDevices.push(...devices);
+          } else {
+            console.log(`[getSASInstallations] No devices found in ${deployment.displayName}`);
+          }
+        } catch (err: any) {
+          console.error(`[getSASInstallations] Error fetching devices from ${deploymentName}:`, err.message);
+        }
+      }
+      
+      console.log(`[getSASInstallations] ===== TOTAL DEVICES ACROSS ALL DEPLOYMENTS =====`);
+      console.log(`[getSASInstallations] Found ${allDevices.length} total devices`);
+      if (allDevices.length > 0) {
+        console.log(`[getSASInstallations] Sample device:`, JSON.stringify(allDevices[0], null, 2));
+      }
+      
+      return {
+        success: true,
+        installations: allDevices,
+        note: `Loaded ${allDevices.length} devices from ${installations.length} deployments`
+      };
+    }
+    
     console.log(`[getSASInstallations] ===== API CALL SUCCESSFUL =====`);
     console.log(`[getSASInstallations] Found ${installations.length} installations from ${successfulEndpoint}`);
     
