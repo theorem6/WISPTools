@@ -268,16 +268,10 @@ export const getSASUserIDs = onCall(async (request) => {
       throw new Error('Forbidden - User does not have access to this tenant');
     }
 
-    // Load platform configuration (for API key)
+    // Load platform configuration (API key no longer needed for SAS Portal - uses OAuth token)
+    // Keeping for future compatibility with other SAS API endpoints
     const platformConfigDoc = await db.collection('cbrs_platform_config').doc('platform').get();
     const platformConfig = platformConfigDoc.exists ? platformConfigDoc.data() : null;
-
-    const apiKey = platformConfig?.googleApiKey;
-    const apiEndpoint = platformConfig?.googleApiEndpoint || 'https://sas.googleapis.com/v1';
-
-    if (!apiKey) {
-      throw new Error('Platform Google SAS API key not configured. Contact administrator.');
-    }
 
     console.log(`[SAS Users] Calling Google SAS Portal API to list authorized customers`);
     
