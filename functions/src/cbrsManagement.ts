@@ -293,7 +293,6 @@ export const getSASUserIDs = onCall(async (request) => {
       ];
       
       let response: any = null;
-      let successfulUrl = '';
       
       for (const sasPortalUrl of apiUrls) {
         console.log(`[getSASUserIDs] ===== CALLING GOOGLE SAS PORTAL API =====`);
@@ -311,7 +310,6 @@ export const getSASUserIDs = onCall(async (request) => {
         console.log(`[getSASUserIDs] API Response Status: ${response.status} ${response.statusText}`);
         
         if (response.ok) {
-          successfulUrl = sasPortalUrl;
           console.log(`[getSASUserIDs] ✅ Success with ${sasPortalUrl}`);
           break;
         } else {
