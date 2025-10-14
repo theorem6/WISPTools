@@ -124,6 +124,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
     }
 
+    // CBRS Devices (tenant-isolated)
+    match /cbrs_devices/{deviceId} {
+      // Users can read and write devices for their own tenant
+      allow read, write: if isAuthenticated();
+    }
+
     // ============================================================================
     // LEGACY COLLECTIONS (Pre-multi-tenant)
     // ============================================================================

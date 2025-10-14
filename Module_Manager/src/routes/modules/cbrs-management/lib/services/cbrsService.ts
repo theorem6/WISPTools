@@ -411,7 +411,8 @@ export class CBRSService {
       const { db } = await import('$lib/firebase');
       const { doc, setDoc } = await import('firebase/firestore');
 
-      await setDoc(doc(db, 'cbrs_devices', device.id), {
+      // Call db() as a function to get Firestore instance
+      await setDoc(doc(db(), 'cbrs_devices', device.id), {
         ...device,
         createdAt: device.createdAt.toISOString(),
         updatedAt: device.updatedAt.toISOString(),
@@ -440,7 +441,8 @@ export class CBRSService {
       const { db } = await import('$lib/firebase');
       const { collection, query, where, getDocs } = await import('firebase/firestore');
 
-      const devicesRef = collection(db, 'cbrs_devices');
+      // Call db() as a function to get Firestore instance
+      const devicesRef = collection(db(), 'cbrs_devices');
       const q = query(devicesRef, where('tenantId', '==', this.config.tenantId));
       const snapshot = await getDocs(q);
 
