@@ -71,9 +71,10 @@ service cloud.firestore {
 
     // User-Tenant Associations
     match /user_tenants/{associationId} {
-      // Users can read their own associations
-      allow read: if isAuthenticated() && 
-                    associationId.matches('^' + request.auth.uid + '_.*');
+      // Users can read and list their own associations
+      allow read, list: if isAuthenticated() && 
+                          (associationId.matches('^' + request.auth.uid + '_.*') ||
+                           resource.data.userId == request.auth.uid);
       
       // Anyone can create associations (when creating tenant or accepting invite)
       allow create: if isAuthenticated();

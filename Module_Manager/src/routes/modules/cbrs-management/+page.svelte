@@ -56,56 +56,7 @@
     try {
       if (browser) {
         console.log('[CBRS Module] Initializing...');
-        
-        // Load tenant info from localStorage
-        tenantId = localStorage.getItem('selectedTenantId') || '';
-        tenantName = localStorage.getItem('selectedTenantName') || 'No Tenant Selected';
-        
-        console.log('[CBRS Module] Tenant ID from localStorage:', tenantId);
-        console.log('[CBRS Module] Tenant Name from localStorage:', tenantName);
-        
-        // If no tenant, check if user is logged in
-        if (!tenantId) {
-          const isAuth = localStorage.getItem('isAuthenticated');
-          const userEmail = localStorage.getItem('userEmail');
-          console.log('[CBRS Module] No tenant ID found');
-          console.log('[CBRS Module] Is authenticated:', isAuth);
-          console.log('[CBRS Module] User email:', userEmail);
-          
-          if (isAuth === 'true' && userEmail) {
-            // User is logged in but no tenant selected
-            // Try to load tenant automatically
-            try {
-              const { tenantService } = await import('$lib/services/tenantService');
-              const { authService } = await import('$lib/services/authService');
-              const currentUser = authService.getCurrentUser();
-              
-              if (currentUser) {
-                console.log('[CBRS Module] Attempting to auto-load tenant for user:', currentUser.uid);
-                const tenants = await tenantService.getUserTenants(currentUser.uid);
-                
-                if (tenants.length === 1) {
-                  // Auto-select the single tenant
-                  console.log('[CBRS Module] Auto-selecting tenant:', tenants[0].displayName);
-                  localStorage.setItem('selectedTenantId', tenants[0].id);
-                  localStorage.setItem('selectedTenantName', tenants[0].displayName);
-                  tenantId = tenants[0].id;
-                  tenantName = tenants[0].displayName;
-                } else if (tenants.length > 1) {
-                  console.log('[CBRS Module] Multiple tenants found, redirecting to selector');
-                  await goto('/tenant-selector');
-                  return;
-                } else {
-                  console.log('[CBRS Module] No tenants found, redirecting to setup');
-                  await goto('/tenant-setup');
-                  return;
-                }
-              }
-            } catch (err) {
-              console.error('[CBRS Module] Failed to auto-load tenant:', err);
-            }
-          }
-        }
+        console.log('[CBRS Module] Tenant:', tenantName);
         
         // Load configurations
         if (tenantId) {
