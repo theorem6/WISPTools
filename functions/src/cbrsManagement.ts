@@ -373,16 +373,44 @@ export const getSASUserIDs = onCall(async (request) => {
       console.log(`[getSASUserIDs] Found ${customers.length} authorized customers from Google SAS Portal API`);
       
       // Transform Google SAS customers into our SASUserID format
-      const userIds = customers.map((customer: any, index: number) => ({
-        userId: customer.sasUserIds?.[0] || customer.name?.split('/').pop() || customer.displayName?.toLowerCase().replace(/\s+/g, '-'),
-        displayName: customer.displayName || customer.name,
-        organizationName: customer.displayName || 'Unknown Organization',
-        registrationStatus: 'active',
-        isPrimary: index === 0 // First one is considered primary
-      }));
+      const userIds = customers
+        .map((customer: any, index: number) => {
+          // Extract numeric customer ID - try multiple sources
+          let userId = customer.sasUserIds?.[0];
+          
+          // If not in sasUserIds, extract from name field (e.g., "customers/1234567890")
+          if (!userId && customer.name) {
+            const nameParts = customer.name.split('/');
+            const extractedId = nameParts[nameParts.length - 1];
+            // Only use if it's numeric
+            if (extractedId && /^\d+$/.test(extractedId)) {
+              userId = extractedId;
+            }
+          }
+          
+          console.log(`[getSASUserIDs] Customer: ${customer.displayName || 'Unknown'} → ID: ${userId || 'NOT FOUND'}`);
+          console.log(`[getSASUserIDs]   - sasUserIds: ${JSON.stringify(customer.sasUserIds)}`);
+          console.log(`[getSASUserIDs]   - name: ${customer.name}`);
+          
+          return {
+            userId: userId,
+            displayName: customer.displayName || customer.name,
+            organizationName: customer.displayName || 'Unknown Organization',
+            registrationStatus: 'active',
+            isPrimary: index === 0,
+            _rawCustomer: customer // Keep for debugging
+          };
+        })
+        .filter(user => {
+          // Filter out customers without valid numeric IDs
+          if (!user.userId) {
+            console.warn(`[getSASUserIDs] ⚠️ Skipping customer "${user.displayName}" - no valid numeric ID found`);
+            return false;
+          }
+          return true;
+        });
       
       console.log(`[getSASUserIDs] Successfully parsed ${userIds.length} User IDs from Google SAS Portal`);
-      console.log(`[getSASUserIDs] Returning User IDs:`, JSON.stringify(userIds, null, 2));
       
       return {
         success: true,
