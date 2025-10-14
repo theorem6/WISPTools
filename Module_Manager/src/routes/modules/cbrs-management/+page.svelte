@@ -519,26 +519,33 @@
     }
     
     return installations.map((installation: any, index: number) => {
-      // Try multiple possible field names for coordinates - Google SAS Portal API structure
-      const lat = installation.activeConfig?.installationParams?.latitude ||
-                  installation.preloadedConfig?.installationParams?.latitude ||
-                  installation.currentConfiguration?.installationParams?.latitude ||
-                  installation.installationParams?.latitude ||
-                  installation.latitude || 
-                  installation.location?.latitude ||
-                  installation.lat ||
-                  installation.coordinates?.latitude ||
-                  0;
-      const lon = installation.activeConfig?.installationParams?.longitude ||
-                  installation.preloadedConfig?.installationParams?.longitude ||
-                  installation.currentConfiguration?.installationParams?.longitude ||
-                  installation.installationParams?.longitude ||
-                  installation.longitude || 
-                  installation.location?.longitude ||
-                  installation.lng || 
-                  installation.lon ||
-                  installation.coordinates?.longitude ||
-                  0;
+      // Extract coordinates from Google SAS Portal API device structure
+      let lat = 0;
+      let lon = 0;
+      let coordSource = 'none';
+      
+      // Check all possible locations for installationParams
+      if (installation.activeConfig?.installationParams?.latitude) {
+        lat = installation.activeConfig.installationParams.latitude;
+        lon = installation.activeConfig.installationParams.longitude;
+        coordSource = 'activeConfig.installationParams';
+      } else if (installation.preloadedConfig?.installationParams?.latitude) {
+        lat = installation.preloadedConfig.installationParams.latitude;
+        lon = installation.preloadedConfig.installationParams.longitude;
+        coordSource = 'preloadedConfig.installationParams';
+      } else if (installation.installationParams?.latitude) {
+        lat = installation.installationParams.latitude;
+        lon = installation.installationParams.longitude;
+        coordSource = 'installationParams';
+      } else if (installation.latitude) {
+        lat = installation.latitude;
+        lon = installation.longitude;
+        coordSource = 'top-level';
+      }
+      
+      if (index === 0 && lat && lon) {
+        console.log(`[CBRS] ✅ Found coordinates from: ${coordSource}`, { lat, lon });
+      }
       
       // Create a CBSD device from installation data
       const device: CBSDDevice = {
@@ -553,34 +560,33 @@
         installationParam: {
           latitude: lat,
           longitude: lon,
-          height: installation.activeConfig?.installationParams?.height || 
+          height: (installation.activeConfig?.installationParams?.height || 
                   installation.preloadedConfig?.installationParams?.height ||
-                  installation.installationParams?.height || 
-                  installation.height || 10,
-          heightType: installation.activeConfig?.installationParams?.heightType || 
+                  installation.installationParams?.height || 10),
+          heightType: (installation.activeConfig?.installationParams?.heightType || 
                       installation.preloadedConfig?.installationParams?.heightType ||
-                      installation.installationParams?.heightType || 
-                      installation.heightType || 'AGL',
+                      installation.installationParams?.heightType || 'AGL').replace('HEIGHT_TYPE_', ''),
           indoorDeployment: installation.activeConfig?.installationParams?.indoorDeployment || 
                            installation.preloadedConfig?.installationParams?.indoorDeployment ||
-                           installation.installationParams?.indoorDeployment || 
-                           installation.indoorDeployment || false,
+                           installation.installationParams?.indoorDeployment || false,
           antennaAzimuth: installation.activeConfig?.installationParams?.antennaAzimuth || 
                          installation.preloadedConfig?.installationParams?.antennaAzimuth ||
-                         installation.installationParams?.antennaAzimuth || 
-                         installation.antennaAzimuth || 0,
+                         installation.installationParams?.antennaAzimuth || 0,
           antennaDowntilt: installation.activeConfig?.installationParams?.antennaDowntilt || 
                           installation.preloadedConfig?.installationParams?.antennaDowntilt ||
-                          installation.installationParams?.antennaDowntilt || 
-                          installation.antennaDowntilt || 0,
+                          installation.installationParams?.antennaDowntilt || 0,
           antennaGain: installation.activeConfig?.installationParams?.antennaGain || 
                       installation.preloadedConfig?.installationParams?.antennaGain ||
-                      installation.installationParams?.antennaGain || 
-                      installation.antennaGain || 5,
+                      installation.installationParams?.antennaGain || 5,
           antennaBeamwidth: installation.activeConfig?.installationParams?.antennaBeamwidth || 
                            installation.preloadedConfig?.installationParams?.antennaBeamwidth ||
-                           installation.installationParams?.antennaBeamwidth || 
-                           installation.antennaBeamwidth || 360
+                           installation.installationParams?.antennaBeamwidth || 360,
+          horizontalAccuracy: installation.activeConfig?.installationParams?.horizontalAccuracy || 
+                             installation.preloadedConfig?.installationParams?.horizontalAccuracy ||
+                             installation.installationParams?.horizontalAccuracy || 50,
+          verticalAccuracy: installation.activeConfig?.installationParams?.verticalAccuracy || 
+                           installation.preloadedConfig?.installationParams?.verticalAccuracy ||
+                           installation.installationParams?.verticalAccuracy || 3
         },
         measCapability: installation.measCapability || [],
         groupingParam: installation.groupingParam || [],
@@ -599,9 +605,12 @@
           serialNumber: device.cbsdSerialNumber,
           extractedLat: lat,
           extractedLon: lon,
+          coordSource: coordSource,
           allFields: Object.keys(installation),
           hasActiveConfig: !!installation.activeConfig,
           hasPreloadedConfig: !!installation.preloadedConfig,
+          hasActiveConfigInstallationParams: !!installation.activeConfig?.installationParams,
+          hasPreloadedConfigInstallationParams: !!installation.preloadedConfig?.installationParams,
           installationName: installation.name || installation.displayName
         });
       }
@@ -711,23 +720,23 @@
 
       installations.forEach((installation: any, index: number) => {
         // Extract location from installation - Google SAS Portal API structure
-        const lat = installation.activeConfig?.installationParams?.latitude ||
-                   installation.preloadedConfig?.installationParams?.latitude ||
-                   installation.currentConfiguration?.installationParams?.latitude ||
-                   installation.installationParams?.latitude ||
-                   installation.latitude || 
-                   installation.location?.latitude ||
-                   installation.lat ||
-                   installation.coordinates?.latitude;
-        const lon = installation.activeConfig?.installationParams?.longitude ||
-                   installation.preloadedConfig?.installationParams?.longitude ||
-                   installation.currentConfiguration?.installationParams?.longitude ||
-                   installation.installationParams?.longitude ||
-                   installation.longitude || 
-                   installation.location?.longitude ||
-                   installation.lng || 
-                   installation.lon ||
-                   installation.coordinates?.longitude;
+        let lat = 0;
+        let lon = 0;
+        
+        // Check all possible locations for installationParams
+        if (installation.activeConfig?.installationParams?.latitude) {
+          lat = installation.activeConfig.installationParams.latitude;
+          lon = installation.activeConfig.installationParams.longitude;
+        } else if (installation.preloadedConfig?.installationParams?.latitude) {
+          lat = installation.preloadedConfig.installationParams.latitude;
+          lon = installation.preloadedConfig.installationParams.longitude;
+        } else if (installation.installationParams?.latitude) {
+          lat = installation.installationParams.latitude;
+          lon = installation.installationParams.longitude;
+        } else if (installation.latitude) {
+          lat = installation.latitude;
+          lon = installation.longitude;
+        }
         
         if (!lat || !lon) {
           console.warn('[CBRS] Installation missing coordinates - showing all fields:', {
