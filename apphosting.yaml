@@ -177,6 +177,31 @@ env:
       - RUNTIME
 
   # ==========================================
+  # GOOGLE OAUTH CONFIGURATION (for CBRS/Google SAS)
+  # ==========================================
+  # Create OAuth Client ID in Google Cloud Console:
+  # https://console.cloud.google.com/apis/credentials?project=lte-pci-mapper-65450042-bbf71
+  # Type: Web application
+  # Authorized origins: https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app
+  # Redirect URIs: https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app/oauth/google/callback
+  - variable: PUBLIC_GOOGLE_OAUTH_CLIENT_ID
+    value: "1044782186913-REPLACEME.apps.googleusercontent.com"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ==========================================
+  # CBRS / GOOGLE SAS PLATFORM CONFIGURATION (Admin Only)
+  # ==========================================
+  # These are stored in Firestore by platform admin
+  # Configure via: Tenant Management → CBRS Platform Keys
+  # Collection: cbrs_platform_config/platform
+  # 
+  # The platform Google SAS API key is managed through the admin UI
+  # and stored encrypted in Firestore, not as an environment variable
+  # This comment is for documentation only
+
+  # ==========================================
   # AI SERVICES CONFIGURATION
   # ==========================================
   - variable: PUBLIC_GEMINI_API_KEY
