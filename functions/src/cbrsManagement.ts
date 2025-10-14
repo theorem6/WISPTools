@@ -279,23 +279,21 @@ export const getSASUserIDs = onCall(async (request) => {
       throw new Error('Platform Google SAS API key not configured. Contact administrator.');
     }
 
-    console.log(`[SAS Users] Calling Google SAS API to list User IDs`);
+    console.log(`[SAS Users] Calling Google SAS Portal API to list authorized customers`);
     
-    // Call Google SAS API to get list of User IDs/entities for this Google account
-    // Note: The exact endpoint may vary - consult Google SAS API documentation
-    // This is a common pattern where the API returns entities the user manages
+    // Call Google SAS Portal API to get list of customers (User IDs) this user has access to
+    // This API returns all SAS User IDs/customers that the authenticated Google account can manage
+    // Endpoint: https://developers.google.com/spectrum-access-system/guides/customers-api
     
     try {
-      // Attempt to call Google SAS userinfo or entities endpoint
-      const url = `${apiEndpoint}/userinfo`;
+      // Use Google SAS Portal API to list customers
+      const sasPortalUrl = 'https://sasportal.googleapis.com/v1alpha1/customers';
       
-      const response = await fetch(url, {
+      const response = await fetch(sasPortalUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'X-User-Email': googleEmail,
-          'X-OAuth-Token': googleAccessToken
+          'Authorization': `Bearer ${googleAccessToken}` // Use the user's OAuth token for authentication
         }
       });
 
@@ -336,11 +334,22 @@ export const getSASUserIDs = onCall(async (request) => {
 
       const responseData = await response.json();
       
-      // Parse the User IDs from the response
-      // Format depends on Google SAS API structure
-      const userIds = responseData.userIds || responseData.entities || [];
+      // Parse the customers from the Google SAS Portal API response
+      // Response format: { customers: [{ name: "customers/123", displayName: "ISP Supplies", sasUserIds: [...] }] }
+      const customers = responseData.customers || [];
       
-      console.log(`[SAS Users] Found ${userIds.length} authorized User IDs`);
+      console.log(`[SAS Users] Found ${customers.length} authorized customers from Google SAS`);
+      
+      // Transform Google SAS customers into our SASUserID format
+      const userIds = customers.map((customer: any, index: number) => ({
+        userId: customer.sasUserIds?.[0] || customer.name?.split('/').pop() || customer.displayName?.toLowerCase().replace(/\s+/g, '-'),
+        displayName: customer.displayName || customer.name,
+        organizationName: customer.displayName || 'Unknown Organization',
+        registrationStatus: 'active',
+        isPrimary: index === 0 // First one is considered primary
+      }));
+      
+      console.log(`[SAS Users] Parsed ${userIds.length} User IDs from customers`);
       
       return {
         success: true,

@@ -29,7 +29,8 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID ||
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/cloud-platform', // For Google SAS API access
+  'https://www.googleapis.com/auth/cloud-platform', // For Google SAS Portal API access
+  'https://www.googleapis.com/auth/sasportal', // Specific scope for SAS Portal customers API
 ].join(' ');
 
 const REDIRECT_URI = browser ? `${window.location.origin}/oauth/google/callback` : '';
