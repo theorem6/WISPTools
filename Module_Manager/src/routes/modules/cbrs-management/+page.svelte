@@ -489,19 +489,34 @@
   
   function convertInstallationsToCBSDs(installations: any[]): CBSDDevice[] {
     console.log('[CBRS] Converting', installations.length, 'installations to CBSD devices');
-    console.log('[CBRS] Sample installation structure:', installations[0]);
+    if (installations[0]) {
+      console.log('[CBRS] Sample installation structure:', installations[0]);
+      console.log('[CBRS] Sample installation keys:', Object.keys(installations[0]));
+      if (installations[0].activeConfig) {
+        console.log('[CBRS] Has activeConfig with keys:', Object.keys(installations[0].activeConfig));
+      }
+      if (installations[0].preloadedConfig) {
+        console.log('[CBRS] Has preloadedConfig with keys:', Object.keys(installations[0].preloadedConfig));
+      }
+    }
     
     return installations.map((installation: any, index: number) => {
-      // Try multiple possible field names for coordinates
-      const lat = installation.latitude || 
-                  installation.location?.latitude || 
+      // Try multiple possible field names for coordinates - Google SAS Portal API structure
+      const lat = installation.activeConfig?.installationParams?.latitude ||
+                  installation.preloadedConfig?.installationParams?.latitude ||
+                  installation.currentConfiguration?.installationParams?.latitude ||
                   installation.installationParams?.latitude ||
+                  installation.latitude || 
+                  installation.location?.latitude ||
                   installation.lat ||
                   installation.coordinates?.latitude ||
                   0;
-      const lon = installation.longitude || 
-                  installation.location?.longitude || 
+      const lon = installation.activeConfig?.installationParams?.longitude ||
+                  installation.preloadedConfig?.installationParams?.longitude ||
+                  installation.currentConfiguration?.installationParams?.longitude ||
                   installation.installationParams?.longitude ||
+                  installation.longitude || 
+                  installation.location?.longitude ||
                   installation.lng || 
                   installation.lon ||
                   installation.coordinates?.longitude ||
@@ -520,13 +535,34 @@
         installationParam: {
           latitude: lat,
           longitude: lon,
-          height: installation.height || 10,
-          heightType: installation.heightType || 'AGL',
-          indoorDeployment: installation.indoorDeployment || false,
-          antennaAzimuth: installation.antennaAzimuth || 0,
-          antennaDowntilt: installation.antennaDowntilt || 0,
-          antennaGain: installation.antennaGain || 5,
-          antennaBeamwidth: installation.antennaBeamwidth || 360
+          height: installation.activeConfig?.installationParams?.height || 
+                  installation.preloadedConfig?.installationParams?.height ||
+                  installation.installationParams?.height || 
+                  installation.height || 10,
+          heightType: installation.activeConfig?.installationParams?.heightType || 
+                      installation.preloadedConfig?.installationParams?.heightType ||
+                      installation.installationParams?.heightType || 
+                      installation.heightType || 'AGL',
+          indoorDeployment: installation.activeConfig?.installationParams?.indoorDeployment || 
+                           installation.preloadedConfig?.installationParams?.indoorDeployment ||
+                           installation.installationParams?.indoorDeployment || 
+                           installation.indoorDeployment || false,
+          antennaAzimuth: installation.activeConfig?.installationParams?.antennaAzimuth || 
+                         installation.preloadedConfig?.installationParams?.antennaAzimuth ||
+                         installation.installationParams?.antennaAzimuth || 
+                         installation.antennaAzimuth || 0,
+          antennaDowntilt: installation.activeConfig?.installationParams?.antennaDowntilt || 
+                          installation.preloadedConfig?.installationParams?.antennaDowntilt ||
+                          installation.installationParams?.antennaDowntilt || 
+                          installation.antennaDowntilt || 0,
+          antennaGain: installation.activeConfig?.installationParams?.antennaGain || 
+                      installation.preloadedConfig?.installationParams?.antennaGain ||
+                      installation.installationParams?.antennaGain || 
+                      installation.antennaGain || 5,
+          antennaBeamwidth: installation.activeConfig?.installationParams?.antennaBeamwidth || 
+                           installation.preloadedConfig?.installationParams?.antennaBeamwidth ||
+                           installation.installationParams?.antennaBeamwidth || 
+                           installation.antennaBeamwidth || 360
         },
         measCapability: installation.measCapability || [],
         groupingParam: installation.groupingParam || [],
@@ -540,11 +576,15 @@
       
       // Log if coordinates are missing
       if (lat === 0 || lon === 0) {
-        console.warn('[CBRS] Device has no coordinates:', {
+        console.warn('[CBRS] Device has no valid coordinates:', {
           id: device.id,
           serialNumber: device.cbsdSerialNumber,
+          extractedLat: lat,
+          extractedLon: lon,
           allFields: Object.keys(installation),
-          installation: installation
+          hasActiveConfig: !!installation.activeConfig,
+          hasPreloadedConfig: !!installation.preloadedConfig,
+          installationName: installation.name || installation.displayName
         });
       }
       
@@ -652,15 +692,21 @@
       let addedCount = 0;
 
       installations.forEach((installation: any, index: number) => {
-        // Extract location from installation - try multiple field names
-        const lat = installation.latitude || 
-                   installation.location?.latitude || 
+        // Extract location from installation - Google SAS Portal API structure
+        const lat = installation.activeConfig?.installationParams?.latitude ||
+                   installation.preloadedConfig?.installationParams?.latitude ||
+                   installation.currentConfiguration?.installationParams?.latitude ||
                    installation.installationParams?.latitude ||
+                   installation.latitude || 
+                   installation.location?.latitude ||
                    installation.lat ||
                    installation.coordinates?.latitude;
-        const lon = installation.longitude || 
-                   installation.location?.longitude || 
+        const lon = installation.activeConfig?.installationParams?.longitude ||
+                   installation.preloadedConfig?.installationParams?.longitude ||
+                   installation.currentConfiguration?.installationParams?.longitude ||
                    installation.installationParams?.longitude ||
+                   installation.longitude || 
+                   installation.location?.longitude ||
                    installation.lng || 
                    installation.lon ||
                    installation.coordinates?.longitude;

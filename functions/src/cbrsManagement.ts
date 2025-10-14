@@ -286,8 +286,8 @@ export const getSASUserIDs = onCall(async (request) => {
     // Endpoint: https://developers.google.com/spectrum-access-system/guides/customers-api
     
     try {
-      // Call SAS Portal REST API with user's OAuth token
-      const sasPortalUrl = 'https://sasportal.googleapis.com/v1alpha1/customers';
+      // Call SAS Portal REST API with user's OAuth token (using v1 stable API)
+      const sasPortalUrl = 'https://sasportal.googleapis.com/v1/customers';
       
       console.log(`[getSASUserIDs] ===== CALLING GOOGLE SAS PORTAL API =====`);
       console.log(`[getSASUserIDs] URL: ${sasPortalUrl}`);
@@ -463,12 +463,12 @@ export const getSASInstallations = onCall(async (request) => {
 
     console.log(`[getSASInstallations] ===== CALLING GOOGLE SAS PORTAL API =====`);
     
-    // Try multiple endpoints to find devices/installations
+    // Try multiple endpoints to find devices/installations using v1 API
     const endpoints = [
-      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/deployments`,
-      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/devices`,
-      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/nodes`,
-      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`
+      `https://sasportal.googleapis.com/v1/customers/${userId}/deployments`,
+      `https://sasportal.googleapis.com/v1/customers/${userId}/devices`,
+      `https://sasportal.googleapis.com/v1/customers/${userId}/nodes`,
+      `https://sasportal.googleapis.com/v1/customers/${userId}/installations`
     ];
     
     let installations: any[] = [];
@@ -544,7 +544,7 @@ export const getSASInstallations = onCall(async (request) => {
       
       for (const deployment of installations) {
         const deploymentName = deployment.name; // e.g., "customers/123/deployments/456"
-        const devicesEndpoint = `https://sasportal.googleapis.com/v1alpha1/${deploymentName}/devices`;
+        const devicesEndpoint = `https://sasportal.googleapis.com/v1/${deploymentName}/devices`;
         
         console.log(`[getSASInstallations] Fetching devices from: ${devicesEndpoint}`);
         
