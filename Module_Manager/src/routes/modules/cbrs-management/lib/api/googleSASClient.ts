@@ -21,11 +21,14 @@ import type {
  * Google SAS API Configuration
  */
 export interface GoogleSASConfig {
-  apiEndpoint: string; // Google SAS API endpoint
-  apiKey?: string; // API key for authentication
-  userId?: string; // Google SAS User ID for this tenant
-  certificatePath?: string; // Path to client certificate
-  privateKeyPath?: string; // Path to private key
+  apiEndpoint: string;     // Google SAS API endpoint
+  apiKey?: string;         // API key for authentication (from platform)
+  userId?: string;         // Google SAS User ID for this tenant
+  email?: string;          // Google account email for OAuth
+  certificate?: string;    // Client certificate content (base64)
+  privateKey?: string;     // Private key content (base64)
+  certificatePath?: string; // Legacy: Path to client certificate
+  privateKeyPath?: string;  // Legacy: Path to private key
   tenantId: string;
 }
 
@@ -288,35 +291,62 @@ export class GoogleSASClient {
    */
   private async makeRequest(endpoint: string, data: any): Promise<any> {
     try {
-      // In a real implementation, this would make an authenticated HTTPS request
-      // to the Google SAS endpoint with proper certificate authentication
-      
-      // For now, we'll simulate the API call
-      // In production, this should use the actual Google SAS API
-      
       const url = `${this.baseUrl}${endpoint}`;
       
       console.log('[Google SAS] API Request:', {
         url,
         method: 'POST',
-        tenantId: this.config.tenantId
+        tenantId: this.config.tenantId,
+        userId: this.config.userId,
+        email: this.config.email,
+        hasCertificate: !!this.config.certificate,
+        hasPrivateKey: !!this.config.privateKey
       });
 
-      // Simulate API call - in production, replace with actual API call
-      // using fetch with proper authentication and certificates
+      // Build headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Tenant-Id': this.config.tenantId
+      };
+      
+      // Add API key if provided (from platform)
+      if (this.config.apiKey) {
+        headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      }
+      
+      // Add user email if provided (for OAuth)
+      if (this.config.email) {
+        headers['X-User-Email'] = this.config.email;
+      }
+      
+      // Add user ID
+      if (this.config.userId) {
+        headers['X-User-Id'] = this.config.userId;
+      }
+      
+      // Note: For mTLS (mutual TLS) with certificates and private keys,
+      // this needs to be handled by a backend proxy that can use the certificates
+      // Browser fetch API doesn't support client certificates
+      // The backend should retrieve the base64 certificate/key from this request
+      // and use them for the actual SAS API call
+      
+      if (this.config.certificate) {
+        headers['X-Client-Certificate'] = this.config.certificate;
+      }
+      
+      if (this.config.privateKey) {
+        headers['X-Client-Private-Key'] = this.config.privateKey;
+      }
       
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'X-Tenant-Id': this.config.tenantId
-        },
+        headers,
         body: JSON.stringify(data)
       });
 
       if (!response.ok) {
-        throw new Error(`Google SAS API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Google SAS API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       return await response.json();

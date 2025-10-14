@@ -28,29 +28,24 @@ export interface PlatformCBRSConfig {
 
 /**
  * Tenant-level CBRS configuration
- * Supports both shared-platform and per-tenant models
+ * Fixed to shared-platform mode with Google SAS only
  */
 export interface CBRSConfig {
-  // Deployment model
-  deploymentModel: CBRSDeploymentModel;
+  // Deployment model (fixed)
+  deploymentModel: 'shared-platform';
   
-  // Provider selection
-  provider: 'google' | 'federated-wireless' | 'both';
+  // Provider selection (fixed)
+  provider: 'google';
   
-  // Shared Platform Mode (Option A/C)
-  // Tenant only needs to configure their IDs
-  googleUserId?: string;           // Google SAS User ID for this tenant
-  federatedCustomerId?: string;    // Federated Wireless Customer ID
+  // Google SAS Authentication (shared platform)
+  googleUserId: string;              // Google SAS User ID (required)
+  googleEmail?: string;              // Google account email for OAuth
+  googleCertificate?: string;        // Client certificate content (base64)
+  googlePrivateKey?: string;         // Private key content (base64)
+  googleCertificateName?: string;    // Original certificate filename
+  googlePrivateKeyName?: string;     // Original private key filename
   
-  // Per-Tenant Mode (Option B)
-  // Tenant provides their own API keys (overrides platform keys)
-  googleApiEndpoint?: string;
-  googleApiKey?: string;
-  googleCertificatePath?: string;
-  federatedApiEndpoint?: string;
-  federatedApiKey?: string;
-  
-  // Enhanced features (Federated Wireless)
+  // Enhanced features
   enableAnalytics?: boolean;
   enableOptimization?: boolean;
   enableMultiSite?: boolean;
@@ -212,9 +207,27 @@ export function getDefaultConfig(tenantId: string): CBRSConfig {
 export function validateConfig(config: CBRSConfig): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  // Only validate for shared-platform mode with Google SAS
+  // Required fields for Google SAS
   if (!config.googleUserId) {
     errors.push('Google User ID is required');
+  }
+  
+  if (!config.googleEmail) {
+    errors.push('Google Account Email is required');
+  }
+  
+  // Validate email format
+  if (config.googleEmail && !config.googleEmail.includes('@')) {
+    errors.push('Google Account Email must be a valid email address');
+  }
+  
+  // Certificate and private key should be provided together
+  if (config.googleCertificate && !config.googlePrivateKey) {
+    errors.push('Private key is required when certificate is provided');
+  }
+  
+  if (config.googlePrivateKey && !config.googleCertificate) {
+    errors.push('Certificate is required when private key is provided');
   }
   
   return {
@@ -285,16 +298,17 @@ export function getConfigStatus(config: CBRSConfig | null): { status: 'complete'
   if (!config) {
     return {
       status: 'missing',
-      message: 'No configuration found. Please configure your Google User ID.'
+      message: 'No configuration found. Please configure your Google SAS credentials.'
     };
   }
   
   const validation = validateConfig(config);
   
   if (validation.valid) {
+    const certStatus = config.googleCertificate ? ' with mTLS' : '';
     return {
       status: 'complete',
-      message: `Configured for Google SAS (User ID: ${config.googleUserId})`
+      message: `Google SAS configured (${config.googleEmail})${certStatus}`
     };
   } else {
     return {

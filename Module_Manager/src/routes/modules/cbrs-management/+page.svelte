@@ -366,7 +366,7 @@
   
   /**
    * Build service configuration for shared platform mode with Google SAS
-   * Simplified - always uses platform API keys with tenant's User ID
+   * Uses platform API key with tenant's credentials and certificates
    */
   async function buildServiceConfig(
     tenantConfig: CBRSConfig, 
@@ -374,6 +374,9 @@
     tenantId: string
   ): Promise<CBRSServiceConfig> {
     console.log('[CBRS] Using shared platform mode with Google SAS');
+    console.log('[CBRS] User ID:', tenantConfig.googleUserId);
+    console.log('[CBRS] Email:', tenantConfig.googleEmail);
+    console.log('[CBRS] Has certificate:', !!tenantConfig.googleCertificate);
     
     // Use platform's Google SAS API key (if available)
     const googleApiKey = platformConfig?.googleApiKey;
@@ -386,6 +389,9 @@
         apiEndpoint: googleApiEndpoint,
         apiKey: googleApiKey,
         userId: tenantConfig.googleUserId, // Tenant's unique User ID
+        email: tenantConfig.googleEmail,   // Tenant's Google account email
+        certificate: tenantConfig.googleCertificate, // Client certificate (base64)
+        privateKey: tenantConfig.googlePrivateKey,   // Private key (base64)
         tenantId
       },
       federatedEnhancements: {

@@ -11,6 +11,11 @@
     deploymentModel: 'shared-platform', // Fixed
     provider: 'google', // Fixed
     googleUserId: config.googleUserId || '',
+    googleEmail: config.googleEmail || '',
+    googleCertificate: config.googleCertificate || '',
+    googlePrivateKey: config.googlePrivateKey || '',
+    googleCertificateName: config.googleCertificateName || '',
+    googlePrivateKeyName: config.googlePrivateKeyName || '',
     
     // Enhanced features
     enableAnalytics: config.enableAnalytics || false,
@@ -19,10 +24,47 @@
     enableInterferenceMonitoring: config.enableInterferenceMonitoring || false
   };
   
+  let certificateFile: File | null = null;
+  let privateKeyFile: File | null = null;
+  
   let isSaving = false;
   
   function handleClose() {
     dispatch('close');
+  }
+  
+  async function handleCertificateUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+      certificateFile = file;
+      formData.googleCertificateName = file.name;
+      
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        formData.googleCertificate = result.split(',')[1]; // Get base64 part
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+  
+  async function handlePrivateKeyUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) {
+      privateKeyFile = file;
+      formData.googlePrivateKeyName = file.name;
+      
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        formData.googlePrivateKey = result.split(',')[1]; // Get base64 part
+      };
+      reader.readAsDataURL(file);
+    }
   }
   
   async function handleSave() {
@@ -51,14 +93,14 @@
           <div class="info-banner">
             <span class="info-icon">🏢</span>
             <div class="info-content">
-              <strong>Shared Platform Mode</strong>
-              <p>You're using the platform's Google SAS API. Just provide your unique User ID to identify your organization in the SAS system.</p>
+              <strong>Shared Platform Mode - Google SAS</strong>
+              <p>You're using the platform's shared Google SAS API key. Provide your Google account credentials and User ID. Certificates are optional but recommended for enhanced security.</p>
             </div>
           </div>
           
           <!-- Google SAS Configuration -->
           <div class="form-section">
-            <h4>🔵 Google SAS User ID</h4>
+            <h4>🔵 Google SAS Configuration</h4>
             
             <div class="form-group">
               <label>
@@ -72,8 +114,55 @@
                 required
               />
               <span class="form-hint">
-                Your unique Google SAS User ID (e.g., "acme-wireless", "tenant-001").
-                This identifies your organization in the shared SAS system.
+                Your unique Google SAS User ID from FCC registration (e.g., "FRN-0123456789" or "acme-wireless").
+              </span>
+            </div>
+            
+            <div class="form-group">
+              <label>
+                Google Account Email
+                <span class="required">*</span>
+              </label>
+              <input 
+                type="email" 
+                bind:value={formData.googleEmail}
+                placeholder="your-google-account@gmail.com"
+                required
+              />
+              <span class="form-hint">
+                Google account email registered with Google SAS for API access.
+              </span>
+            </div>
+            
+            <div class="form-group">
+              <label>Client Certificate (.pem or .crt)</label>
+              <input 
+                type="file" 
+                accept=".pem,.crt,.cer"
+                on:change={handleCertificateUpload}
+                class="file-input"
+              />
+              {#if formData.googleCertificateName}
+                <span class="file-status">✅ {formData.googleCertificateName}</span>
+              {/if}
+              <span class="form-hint">
+                Client certificate for mTLS authentication with Google SAS (optional but recommended).
+              </span>
+            </div>
+            
+            <div class="form-group">
+              <label>Private Key (.key or .pem)</label>
+              <input 
+                type="file" 
+                accept=".key,.pem"
+                on:change={handlePrivateKeyUpload}
+                class="file-input"
+              />
+              {#if formData.googlePrivateKeyName}
+                <span class="file-status">✅ {formData.googlePrivateKeyName}</span>
+              {/if}
+              <span class="form-hint">
+                Private key corresponding to the client certificate (optional but recommended).
               </span>
             </div>
           </div>
@@ -119,7 +208,8 @@
           <div class="security-notice">
             <div class="notice-icon">🔒</div>
             <div class="notice-content">
-              <strong>Platform API Keys:</strong> The platform administrator manages the Google SAS API credentials.
+              <strong>Security:</strong> The platform administrator manages the shared Google SAS API key.
+              Your credentials (email, certificates, private keys) are encrypted and stored securely in Firestore.
               Your data is isolated using your unique User ID.
             </div>
           </div>
@@ -322,6 +412,30 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-style: italic;
+  }
+  
+  .file-input {
+    padding: 0.5rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .file-input:hover {
+    border-color: var(--accent-color);
+    background: rgba(139, 92, 246, 0.05);
+  }
+  
+  .file-status {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
   }
   
   .enhancement-section {
