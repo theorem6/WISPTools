@@ -489,10 +489,23 @@
   
   function convertInstallationsToCBSDs(installations: any[]): CBSDDevice[] {
     console.log('[CBRS] Converting', installations.length, 'installations to CBSD devices');
+    console.log('[CBRS] Sample installation structure:', installations[0]);
     
     return installations.map((installation: any, index: number) => {
-      const lat = installation.latitude || installation.location?.latitude || 0;
-      const lon = installation.longitude || installation.location?.longitude || 0;
+      // Try multiple possible field names for coordinates
+      const lat = installation.latitude || 
+                  installation.location?.latitude || 
+                  installation.installationParams?.latitude ||
+                  installation.lat ||
+                  installation.coordinates?.latitude ||
+                  0;
+      const lon = installation.longitude || 
+                  installation.location?.longitude || 
+                  installation.installationParams?.longitude ||
+                  installation.lng || 
+                  installation.lon ||
+                  installation.coordinates?.longitude ||
+                  0;
       
       // Create a CBSD device from installation data
       const device: CBSDDevice = {
@@ -525,8 +538,18 @@
         updatedAt: new Date(installation.updatedAt || Date.now())
       };
       
+      // Log if coordinates are missing
+      if (lat === 0 || lon === 0) {
+        console.warn('[CBRS] Device has no coordinates:', {
+          id: device.id,
+          serialNumber: device.cbsdSerialNumber,
+          allFields: Object.keys(installation),
+          installation: installation
+        });
+      }
+      
       return device;
-    }).filter(device => device.installationParam.latitude !== 0 && device.installationParam.longitude !== 0);
+    }); // Don't filter out - show all devices even without coordinates
   }
   
   async function handleShowUserIDSelector() {
@@ -628,14 +651,27 @@
       
       let addedCount = 0;
 
-      installations.forEach((installation: any) => {
-        // Extract location from installation
-        // Google SAS installations typically have: latitude, longitude
-        const lat = installation.latitude || installation.location?.latitude;
-        const lon = installation.longitude || installation.location?.longitude;
+      installations.forEach((installation: any, index: number) => {
+        // Extract location from installation - try multiple field names
+        const lat = installation.latitude || 
+                   installation.location?.latitude || 
+                   installation.installationParams?.latitude ||
+                   installation.lat ||
+                   installation.coordinates?.latitude;
+        const lon = installation.longitude || 
+                   installation.location?.longitude || 
+                   installation.installationParams?.longitude ||
+                   installation.lng || 
+                   installation.lon ||
+                   installation.coordinates?.longitude;
         
         if (!lat || !lon) {
-          console.warn('[CBRS] Installation missing coordinates:', installation);
+          console.warn('[CBRS] Installation missing coordinates - showing all fields:', {
+            index,
+            name: installation.name || installation.displayName,
+            allFields: Object.keys(installation),
+            fullObject: installation
+          });
           return;
         }
 
