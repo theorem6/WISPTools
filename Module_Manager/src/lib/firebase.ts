@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { getFunctions, type Functions } from 'firebase/functions';
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 
@@ -31,6 +32,7 @@ let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: Auth | null = null;
 let firebaseDb: Firestore | null = null;
 let firebaseStorage: FirebaseStorage | null = null;
+let firebaseFunctions: Functions | null = null;
 
 // Initialize Firebase app (lazy initialization, client-side only)
 function getFirebaseApp(): FirebaseApp {
@@ -96,6 +98,20 @@ export function getFirebaseStorage(): FirebaseStorage {
   return firebaseStorage;
 }
 
+// Get Functions instance (lazy initialization)
+export function getFirebaseFunctions(): Functions {
+  if (!browser) {
+    throw new Error('Firebase Functions can only be used on the client side');
+  }
+
+  if (!firebaseFunctions) {
+    firebaseFunctions = getFunctions(getFirebaseApp());
+    console.log('⚡ Firebase Functions initialized');
+  }
+
+  return firebaseFunctions;
+}
+
 // Backward compatibility: Explicit wrapper functions for lazy initialization
 // These ensure Firebase is only initialized when actually called, not when module loads
 
@@ -121,6 +137,14 @@ export function db(): Firestore {
  */
 export function storage(): FirebaseStorage {
   return getFirebaseStorage();
+}
+
+/**
+ * Get Functions instance - lazy initialization
+ * MUST be called as a function: functions()
+ */
+export function functions(): Functions {
+  return getFirebaseFunctions();
 }
 
 // Default export - lazy getter
