@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
+  import { tenantStore } from '$lib/stores/tenantStore';
 
   let isLoading = false;
   let error = '';
@@ -16,27 +17,28 @@
   let contactEmail = '';
   let contactPhone = '';
   let subdomain = '';
-  let existingTenants: any[] = [];
   let currentUser: any = null;
 
   onMount(async () => {
     if (!browser) return;
 
-    console.log('Tenant Setup: Page loaded');
+    console.log('[Tenant Setup] Page loaded');
 
-    // CRITICAL: Check if setup was already completed - block access if true
-    const setupCompleted = localStorage.getItem('tenantSetupCompleted');
-    const selectedTenantId = localStorage.getItem('selectedTenantId');
+    // CRITICAL: Initialize tenant store if not already initialized
+    await tenantStore.initialize();
     
-    if (setupCompleted === 'true' || selectedTenantId) {
-      console.log('Tenant Setup: Setup already completed, BLOCKING access to setup page');
-      console.log('Tenant Setup: setupCompleted flag:', setupCompleted);
-      console.log('Tenant Setup: selectedTenantId:', selectedTenantId);
+    // Get current tenant state
+    let tenantState: any = null;
+    const unsubscribe = tenantStore.subscribe((state: any) => {
+      tenantState = state;
+    });
+    
+    // Check if setup was already completed - block access if true
+    if (tenantState.currentTenant || tenantState.setupCompleted) {
+      console.log('[Tenant Setup] Setup already completed, BLOCKING access to setup page');
+      console.log('[Tenant Setup] Current tenant:', tenantState.currentTenant?.displayName);
       
-      // Clear redirect counters
-      sessionStorage.removeItem('dashboardRedirectCount');
-      sessionStorage.removeItem('justCreatedTenant');
-      
+      unsubscribe();
       await goto('/dashboard', { replaceState: true });
       return;
     }
@@ -44,7 +46,8 @@
     // Check if user is authenticated
     currentUser = authService.getCurrentUser();
     if (!currentUser) {
-      console.log('Tenant Setup: User not authenticated, redirecting to login');
+      console.log('[Tenant Setup] User not authenticated, redirecting to login');
+      unsubscribe();
       await goto('/login');
       return;
     }
@@ -54,32 +57,29 @@
     // IMPORTANT: Enforce one tenant per user rule
     // Check if user already has a tenant
     try {
-      console.log('Tenant Setup: Checking if user already has tenants...');
-      existingTenants = await tenantService.getUserTenants(currentUser.uid);
-      console.log('Tenant Setup: Found', existingTenants.length, 'existing tenants');
+      console.log('[Tenant Setup] Checking if user already has tenants...');
+      const existingTenants = await tenantStore.loadUserTenants(currentUser.uid);
+      console.log('[Tenant Setup] Found', existingTenants.length, 'existing tenants');
       
       if (existingTenants.length > 0) {
         // User already has an organization - redirect to dashboard
-        console.log('Tenant Setup: User already has an organization, redirecting to dashboard');
+        console.log('[Tenant Setup] User already has an organization, redirecting to dashboard');
         
-        // Auto-select their organization
-        localStorage.setItem('selectedTenantId', existingTenants[0].id);
-        localStorage.setItem('selectedTenantName', existingTenants[0].displayName);
-        localStorage.setItem('tenantSetupCompleted', 'true'); // Mark setup as completed
+        // Auto-select their organization using the store
+        tenantStore.setCurrentTenant(existingTenants[0]);
         
-        // Clear any redirect counters
-        sessionStorage.removeItem('dashboardRedirectCount');
-        sessionStorage.removeItem('justCreatedTenant');
-        
+        unsubscribe();
         await goto('/dashboard', { replaceState: true });
         return;
       }
       
-      console.log('Tenant Setup: No existing tenants, showing setup form');
+      console.log('[Tenant Setup] No existing tenants, showing setup form');
     } catch (err) {
-      console.error('Tenant Setup: Error loading tenants:', err);
+      console.error('[Tenant Setup] Error loading tenants:', err);
       error = 'Failed to check existing organizations. Please refresh the page.';
     }
+    
+    unsubscribe();
   });
 
   function generateSubdomain() {
@@ -123,27 +123,22 @@
       if (result.success && result.tenantId) {
         success = 'Tenant created successfully!';
         
-        console.log('Tenant Setup: Tenant created successfully:', result.tenantId);
+        console.log('[Tenant Setup] Tenant created successfully:', result.tenantId);
         
-        // IMPORTANT: Save tenant to localStorage IMMEDIATELY
-        // This prevents dashboard from redirecting back here
-        localStorage.setItem('selectedTenantId', result.tenantId);
-        localStorage.setItem('selectedTenantName', displayName);
-        localStorage.setItem('tenantSetupCompleted', 'true'); // Mark setup as completed
+        // Load the newly created tenant
+        const newTenant = await tenantService.getTenant(result.tenantId);
         
-        // Set flag so dashboard knows a tenant was just created
-        sessionStorage.setItem('justCreatedTenant', 'true');
-        
-        // Clear any redirect counters to prevent loops
-        sessionStorage.removeItem('dashboardRedirectCount');
-        
-        console.log('Tenant Setup: localStorage and sessionStorage updated, setup marked complete');
+        if (newTenant) {
+          // IMPORTANT: Set tenant in store - this handles all localStorage updates
+          tenantStore.setCurrentTenant(newTenant);
+          console.log('[Tenant Setup] Tenant set in store:', newTenant.displayName);
+        }
         
         step = 2;
         
-        // Wait a moment for Firestore to sync and user to see success
+        // Wait a moment for user to see success message
         setTimeout(() => {
-          console.log('Tenant Setup: Redirecting to dashboard');
+          console.log('[Tenant Setup] Redirecting to dashboard');
           goto('/dashboard', { replaceState: true });
         }, 2000);
       } else {

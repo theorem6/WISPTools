@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
-  import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
+  import { tenantStore } from '$lib/stores/tenantStore';
   import type { Tenant } from '$lib/models/tenant';
 
   let isLoading = true;
@@ -14,25 +14,35 @@
   onMount(async () => {
     if (!browser) return;
 
+    console.log('[Tenant Selector] Page loaded');
+
     // Check if user is authenticated
     currentUser = authService.getCurrentUser();
     if (!currentUser) {
+      console.log('[Tenant Selector] Not authenticated, redirecting to login');
       await goto('/login');
       return;
     }
 
+    // Initialize tenant store
+    await tenantStore.initialize();
+
     // Load user's tenants
     try {
-      tenants = await tenantService.getUserTenants(currentUser.uid);
+      tenants = await tenantStore.loadUserTenants(currentUser.uid);
+      console.log('[Tenant Selector] Loaded', tenants.length, 'tenants');
       
       if (tenants.length === 0) {
         // No tenants, redirect to tenant setup
+        console.log('[Tenant Selector] No tenants, redirecting to setup');
         await goto('/tenant-setup');
       } else if (tenants.length === 1) {
         // Only one tenant, auto-select and redirect
+        console.log('[Tenant Selector] Auto-selecting single tenant');
         selectTenant(tenants[0]);
       }
     } catch (err: any) {
+      console.error('[Tenant Selector] Error loading tenants:', err);
       error = err.message || 'Failed to load tenants';
     } finally {
       isLoading = false;
@@ -40,22 +50,17 @@
   });
 
   function selectTenant(tenant: Tenant) {
-    // Save selected tenant to local storage
-    if (browser) {
-      localStorage.setItem('selectedTenantId', tenant.id);
-      localStorage.setItem('selectedTenantName', tenant.displayName);
-      localStorage.setItem('tenantSetupCompleted', 'true');
-      
-      // Clear any redirect counters
-      sessionStorage.removeItem('dashboardRedirectCount');
-      sessionStorage.removeItem('justCreatedTenant');
-    }
+    console.log('[Tenant Selector] Tenant selected:', tenant.displayName);
+    
+    // Use tenant store to set current tenant
+    tenantStore.setCurrentTenant(tenant);
     
     // Redirect to dashboard
     goto('/dashboard');
   }
 
   async function createNewTenant() {
+    console.log('[Tenant Selector] Creating new tenant');
     await goto('/tenant-setup');
   }
 </script>

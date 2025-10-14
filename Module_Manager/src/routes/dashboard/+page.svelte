@@ -2,6 +2,10 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
+  import { authService } from '$lib/services/authService';
+  import { isPlatformAdmin } from '$lib/services/adminService';
 
   interface Module {
     id: string;
@@ -75,231 +79,36 @@
   let isDarkMode = false;
   let userEmail = '';
   let tenantName = '';
-  let isLoadingTenant = true;
   let isAdmin = false;
-  let error = '';
+
+  // Subscribe to tenant store
+  $: if ($currentTenant) {
+    tenantName = $currentTenant.displayName;
+  }
 
   onMount(async () => {
     if (!browser) return;
     
-    console.log('Dashboard: Mounted');
+    console.log('[Dashboard] Mounted');
     
-    // Check authentication
-    const { authService } = await import('$lib/services/authService');
-    const currentUser = authService.getCurrentUser();
-    
-    if (!currentUser) {
-      const isAuthenticated = localStorage.getItem('isAuthenticated');
-      if (isAuthenticated !== 'true') {
-        console.log('Dashboard: Not authenticated, redirecting to login');
-        await goto('/login', { replaceState: true });
-        return;
-      }
-    }
-
-    console.log('Dashboard: User is authenticated');
-
     // Get user email
+    const currentUser = authService.getCurrentUser();
     userEmail = currentUser?.email || localStorage.getItem('userEmail') || 'user@example.com';
-    console.log('Dashboard: User email =', userEmail);
 
     // Check if user is platform admin
-    const { isPlatformAdmin } = await import('$lib/services/adminService');
     isAdmin = isPlatformAdmin(userEmail);
-    console.log('Dashboard: Is admin =', isAdmin);
-
-    // Check for tenant selection
-    const { tenantService } = await import('$lib/services/tenantService');
-    let selectedTenantId = localStorage.getItem('selectedTenantId');
-    const tenantSetupCompleted = localStorage.getItem('tenantSetupCompleted');
     
-    console.log('Dashboard: Selected tenant ID from localStorage:', selectedTenantId);
-    console.log('Dashboard: Tenant setup completed flag:', tenantSetupCompleted);
-    console.log('Dashboard: Current user:', currentUser?.email);
-    console.log('Dashboard: Is admin:', isAdmin);
-    
-    // If we have a tenant ID in localStorage, use it directly
-    if (selectedTenantId) {
-      console.log('Dashboard: Using tenant from localStorage:', selectedTenantId);
-      const tenant = await tenantService.getTenant(selectedTenantId);
-      if (tenant) {
-        tenantName = tenant.displayName;
-        console.log('Dashboard: Tenant verified and loaded:', tenantName);
-        isLoadingTenant = false;
-        
-        // Mark setup as completed
-        localStorage.setItem('tenantSetupCompleted', 'true');
-        sessionStorage.removeItem('dashboardRedirectCount');
-        sessionStorage.removeItem('justCreatedTenant');
-        
-        // Continue with rest of initialization
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'light' || savedTheme === 'dark') {
-          theme = savedTheme;
-          isDarkMode = theme === 'dark';
-          document.documentElement.classList.toggle('dark-mode', isDarkMode);
-        }
-        return; // Early exit - we're done!
-      } else {
-        // Tenant in localStorage doesn't exist in Firestore
-        console.warn('Dashboard: Tenant in localStorage not found in Firestore, clearing...');
-        localStorage.removeItem('selectedTenantId');
-        localStorage.removeItem('selectedTenantName');
-        localStorage.removeItem('tenantSetupCompleted');
-        selectedTenantId = null;
-      }
-    }
-    
-    // No tenant in localStorage, need to load from Firestore
-    if (!selectedTenantId && currentUser) {
-      // Platform admins don't need a tenant selected
-      // They can use Tenant Management module instead
+    // Admins don't need a tenant
       if (isAdmin) {
-        console.log('Dashboard: Platform admin - no tenant required');
         tenantName = 'Platform Admin';
-        isLoadingTenant = false;
-      } else {
-        // Regular users need a tenant
-        console.log('Dashboard: No tenant selected, checking user tenants...');
-        
-        // Prevent infinite redirect loop - check if we just came from setup
-        const redirectCount = sessionStorage.getItem('dashboardRedirectCount') || '0';
-        const redirectAttempts = parseInt(redirectCount);
-        
-        if (redirectAttempts >= 3) {
-          console.error('Dashboard: Too many redirects, stopping loop');
-          sessionStorage.removeItem('dashboardRedirectCount');
-          error = 'Unable to load tenant. Please refresh the page or contact support.';
-          isLoadingTenant = false;
-          return;
-        }
-        
-        // Increase delay and add retry logic for Firestore
-        console.log('Dashboard: Waiting for Firestore to sync...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        let tenants = [];
-        try {
-          tenants = await tenantService.getUserTenants(currentUser.uid);
-          console.log('Dashboard: Found', tenants.length, 'tenants for user');
-        } catch (err) {
-          console.error('Dashboard: Error loading tenants:', err);
-          error = 'Failed to load organizations. Please refresh the page.';
-          isLoadingTenant = false;
-          return;
-        }
-        
-        if (tenants.length === 0) {
-          // No tenants found - check if just came from tenant setup
-          const justCreated = sessionStorage.getItem('justCreatedTenant');
-          if (justCreated === 'true') {
-            // Just created a tenant, increment redirect count and reload
-            console.log('Dashboard: Just created tenant, reloading...');
-            sessionStorage.setItem('dashboardRedirectCount', String(redirectAttempts + 1));
-            sessionStorage.removeItem('justCreatedTenant');
-            
-            // Try one more time with longer delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            tenants = await tenantService.getUserTenants(currentUser.uid);
-            
-            if (tenants.length > 0) {
-              // Found the tenant after delay
-              console.log('Dashboard: Found tenant after delay:', tenants[0].displayName);
-              localStorage.setItem('selectedTenantId', tenants[0].id);
-              localStorage.setItem('selectedTenantName', tenants[0].displayName);
-              localStorage.setItem('tenantSetupCompleted', 'true');
-              selectedTenantId = tenants[0].id;
-              tenantName = tenants[0].displayName;
-              sessionStorage.removeItem('dashboardRedirectCount');
-            } else {
-              // Still no tenant, something is wrong
-              console.error('Dashboard: Tenant created but not found in Firestore');
-              error = 'Organization created but not found. Please refresh the page.';
-              isLoadingTenant = false;
-              return;
-            }
-          } else {
-            // Genuinely no tenants - but check if setup was already completed
-            const setupAlreadyCompleted = localStorage.getItem('tenantSetupCompleted');
-            if (setupAlreadyCompleted === 'true') {
-              // Setup was completed but tenant not found - clear and retry
-              console.warn('Dashboard: Setup completed flag set but no tenant found, clearing flags');
-              localStorage.removeItem('tenantSetupCompleted');
-              sessionStorage.removeItem('dashboardRedirectCount');
-              error = 'Organization not found. Please refresh the page or create a new organization.';
-              isLoadingTenant = false;
-              return;
-            }
-            
-            // Genuinely no tenants, redirect to setup
-            console.log('Dashboard: No tenants found, redirecting to setup');
-            sessionStorage.setItem('dashboardRedirectCount', String(redirectAttempts + 1));
-            await goto('/tenant-setup', { replaceState: true });
-            return;
-          }
-        } else if (tenants.length === 1) {
-          // Auto-select single tenant
-          console.log('Dashboard: Auto-selecting single tenant:', tenants[0].displayName);
-          localStorage.setItem('selectedTenantId', tenants[0].id);
-          localStorage.setItem('selectedTenantName', tenants[0].displayName);
-          localStorage.setItem('tenantSetupCompleted', 'true');
-          selectedTenantId = tenants[0].id;
-          tenantName = tenants[0].displayName;
-          sessionStorage.removeItem('dashboardRedirectCount');
-        } else {
-          // Multiple tenants, redirect to selector
-          console.log('Dashboard: Multiple tenants found, redirecting to selector');
-          sessionStorage.removeItem('dashboardRedirectCount');
-          await goto('/tenant-selector', { replaceState: true });
-          return;
-        }
-      }
-    } else if (selectedTenantId) {
-      // Tenant already selected - verify it still exists
-      console.log('Dashboard: Verifying selected tenant:', selectedTenantId);
-      const tenant = await tenantService.getTenant(selectedTenantId);
-      if (tenant) {
-        tenantName = tenant.displayName;
-        console.log('Dashboard: Tenant verified and loaded:', tenantName);
-      } else {
-        // Tenant no longer exists, reload user's tenants
-        console.log('Dashboard: Selected tenant not found, reloading tenants...');
-        localStorage.removeItem('selectedTenantId');
-        localStorage.removeItem('selectedTenantName');
-        
-        // Try to load user's current tenants
-        if (currentUser && !isAdmin) {
-          const tenants = await tenantService.getUserTenants(currentUser.uid);
-          if (tenants.length === 1) {
-            // Auto-select the available tenant
-            console.log('Dashboard: Auto-selecting available tenant:', tenants[0].displayName);
-            localStorage.setItem('selectedTenantId', tenants[0].id);
-            localStorage.setItem('selectedTenantName', tenants[0].displayName);
-            localStorage.setItem('tenantSetupCompleted', 'true');
-            selectedTenantId = tenants[0].id;
-            tenantName = tenants[0].displayName;
-          } else if (tenants.length > 1) {
-            await goto('/tenant-selector', { replaceState: true });
-            return;
-          } else {
-            await goto('/tenant-setup', { replaceState: true });
-            return;
-          }
-        } else {
-          window.location.reload();
-          return;
-        }
-      }
     }
-
-    isLoadingTenant = false;
 
     // Check for saved theme preference
     const savedTheme = localStorage.getItem('theme');
     isDarkMode = savedTheme === 'dark';
     updateTheme();
     
-    console.log('Dashboard: Initialization complete');
+    console.log('[Dashboard] Initialization complete');
   });
 
   function toggleTheme() {
@@ -324,14 +133,10 @@
   }
 
   async function handleLogout() {
-    const { authService } = await import('$lib/services/authService');
     await authService.signOut();
+    tenantStore.clear(); // Clear all tenant state
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('userEmail');
-    localStorage.removeItem('selectedTenantId');
-    localStorage.removeItem('selectedTenantName');
-    localStorage.removeItem('tenantSetupCompleted');
-    sessionStorage.clear(); // Clear all session storage
     goto('/login');
   }
 
@@ -344,6 +149,7 @@
   }
 </script>
 
+<TenantGuard requireTenant={!isAdmin}>
 <div class="dashboard-page">
   <!-- Header -->
   <header class="header">
@@ -358,7 +164,7 @@
         </div>
         
         <div class="header-actions">
-          {#if tenantName && !isLoadingTenant}
+          {#if tenantName}
             <div class="tenant-info">
               <span class="tenant-icon">🏢</span>
               <div class="tenant-details">
@@ -469,6 +275,7 @@
     </div>
   </section>
 </div>
+</TenantGuard>
 
 <style>
   .dashboard-page {

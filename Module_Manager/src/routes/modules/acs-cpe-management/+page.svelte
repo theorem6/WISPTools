@@ -5,6 +5,8 @@
   import { browser } from '$app/environment';
   import MainMenu from './components/MainMenu.svelte';
   import HelpModal from '$lib/components/HelpModal.svelte';
+  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import { currentTenant } from '$lib/stores/tenantStore';
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
   
@@ -27,9 +29,9 @@
   let isSyncing = false;
   let syncMessage = '';
   
-  // Multi-tenant state
-  let tenantName = '';
-  let tenantId = '';
+  // Multi-tenant state - use tenant store
+  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
+  $: tenantId = $currentTenant?.id || '';
   
   // Documentation content
   const helpContent = acsCpeDocs;
@@ -38,53 +40,7 @@
     try {
       if (browser) {
         console.log('[ACS Module] Initializing...');
-        
-        // Load tenant info from localStorage
-        tenantId = localStorage.getItem('selectedTenantId') || '';
-        tenantName = localStorage.getItem('selectedTenantName') || 'No Tenant Selected';
-        
-        console.log('[ACS Module] Tenant ID from localStorage:', tenantId);
-        console.log('[ACS Module] Tenant Name from localStorage:', tenantName);
-        
-        // If no tenant, try to load automatically
-        if (!tenantId) {
-          const isAuth = localStorage.getItem('isAuthenticated');
-          const userEmail = localStorage.getItem('userEmail');
-          console.log('[ACS Module] No tenant ID found');
-          console.log('[ACS Module] Is authenticated:', isAuth);
-          console.log('[ACS Module] User email:', userEmail);
-          
-          if (isAuth === 'true' && userEmail) {
-            try {
-              const { tenantService } = await import('$lib/services/tenantService');
-              const { authService } = await import('$lib/services/authService');
-              const currentUser = authService.getCurrentUser();
-              
-              if (currentUser) {
-                console.log('[ACS Module] Attempting to auto-load tenant for user:', currentUser.uid);
-                const tenants = await tenantService.getUserTenants(currentUser.uid);
-                
-                if (tenants.length === 1) {
-                  console.log('[ACS Module] Auto-selecting tenant:', tenants[0].displayName);
-                  localStorage.setItem('selectedTenantId', tenants[0].id);
-                  localStorage.setItem('selectedTenantName', tenants[0].displayName);
-                  tenantId = tenants[0].id;
-                  tenantName = tenants[0].displayName;
-                } else if (tenants.length > 1) {
-                  console.log('[ACS Module] Multiple tenants found, redirecting to selector');
-                  await goto('/tenant-selector');
-                  return;
-                } else {
-                  console.log('[ACS Module] No tenants found, redirecting to setup');
-                  await goto('/tenant-setup');
-                  return;
-                }
-              }
-            } catch (err) {
-              console.error('[ACS Module] Failed to auto-load tenant:', err);
-            }
-          }
-        }
+        console.log('[ACS Module] Tenant:', tenantName);
       }
       
       // Load CPE devices using authenticated multi-tenant service
@@ -95,7 +51,7 @@
       
       isLoading = false;
     } catch (err: any) {
-      console.error('Failed to initialize ACS module:', err);
+      console.error('[ACS Module] Failed to initialize:', err);
       error = err?.message || 'Failed to initialize';
       isLoading = false;
     }
@@ -399,6 +355,7 @@
   <meta name="description" content="TR-069 device management and CPE monitoring with GPS mapping" />
 </svelte:head>
 
+<TenantGuard>
 <div class="acs-module">
   <!-- Main Navigation -->
   <MainMenu />
@@ -668,6 +625,7 @@
     on:close={() => showHelpModal = false}
   />
 </div>
+</TenantGuard>
 
 <style>
   .back-button {

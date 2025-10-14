@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
+  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import { currentTenant } from '$lib/stores/tenantStore';
   import type { CBSDDevice, CBSDCategory, CBSDState } from './lib/models/cbsdDevice';
   import { CBRS_BAND } from './lib/models/cbsdDevice';
   import { createCBRSService, type CBRSServiceConfig } from './lib/services/cbrsService';
@@ -27,9 +29,9 @@
   let platformConfig: PlatformCBRSConfig | null = null;
   let configStatus = { status: 'missing' as const, message: '' };
   
-  // Tenant info
-  let tenantId = '';
-  let tenantName = '';
+  // Tenant info - use tenant store
+  $: tenantId = $currentTenant?.id || '';
+  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
   // Add device form
   let newDevice = {
@@ -509,6 +511,7 @@
   <meta name="description" content="Citizens Broadband Radio Service management with Google SAS and Federated Wireless integration" />
 </svelte:head>
 
+<TenantGuard>
 <div class="cbrs-module">
   <!-- Header -->
   <div class="module-header">
@@ -799,6 +802,7 @@
   on:close={() => showSettingsModal = false}
   on:save={handleSaveSettings}
 />
+</TenantGuard>
 
 <style>
   .cbrs-module {
