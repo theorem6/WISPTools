@@ -286,22 +286,39 @@ export const getSASUserIDs = onCall(async (request) => {
     // Endpoint: https://developers.google.com/spectrum-access-system/guides/customers-api
     
     try {
-      // Call SAS Portal REST API with user's OAuth token (using v1 stable API)
-      const sasPortalUrl = 'https://sasportal.googleapis.com/v1/customers';
+      // Try both API versions for compatibility
+      const apiUrls = [
+        'https://sasportal.googleapis.com/v1alpha1/customers',
+        'https://sasportal.googleapis.com/v1/customers'
+      ];
       
-      console.log(`[getSASUserIDs] ===== CALLING GOOGLE SAS PORTAL API =====`);
-      console.log(`[getSASUserIDs] URL: ${sasPortalUrl}`);
-      console.log(`[getSASUserIDs] OAuth token (first 20 chars): ${googleAccessToken.substring(0, 20)}...`);
+      let response: any = null;
+      let successfulUrl = '';
       
-      const response = await fetch(sasPortalUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${googleAccessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      for (const sasPortalUrl of apiUrls) {
+        console.log(`[getSASUserIDs] ===== CALLING GOOGLE SAS PORTAL API =====`);
+        console.log(`[getSASUserIDs] URL: ${sasPortalUrl}`);
+        console.log(`[getSASUserIDs] OAuth token (first 20 chars): ${googleAccessToken.substring(0, 20)}...`);
+        
+        response = await fetch(sasPortalUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${googleAccessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      console.log(`[getSASUserIDs] API Response Status: ${response.status} ${response.statusText}`);
+        console.log(`[getSASUserIDs] API Response Status: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          successfulUrl = sasPortalUrl;
+          console.log(`[getSASUserIDs] ✅ Success with ${sasPortalUrl}`);
+          break;
+        } else {
+          console.log(`[getSASUserIDs] ❌ Failed with ${sasPortalUrl}, trying next...`);
+        }
+      }
+      
       console.log(`[getSASUserIDs] API Response Headers:`, JSON.stringify([...response.headers.entries()], null, 2));
 
       if (!response.ok) {
@@ -463,10 +480,15 @@ export const getSASInstallations = onCall(async (request) => {
 
     console.log(`[getSASInstallations] ===== CALLING GOOGLE SAS PORTAL API =====`);
     
-    // Try multiple endpoints to find devices/installations using v1 API
+    // Try multiple endpoints to find devices/installations
+    // Try both v1 and v1alpha1 APIs for compatibility
     const endpoints = [
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/deployments`,
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/devices`,
       `https://sasportal.googleapis.com/v1/customers/${userId}/deployments`,
       `https://sasportal.googleapis.com/v1/customers/${userId}/devices`,
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/nodes`,
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`,
       `https://sasportal.googleapis.com/v1/customers/${userId}/nodes`,
       `https://sasportal.googleapis.com/v1/customers/${userId}/installations`
     ];
@@ -544,7 +566,10 @@ export const getSASInstallations = onCall(async (request) => {
       
       for (const deployment of installations) {
         const deploymentName = deployment.name; // e.g., "customers/123/deployments/456"
-        const devicesEndpoint = `https://sasportal.googleapis.com/v1/${deploymentName}/devices`;
+        
+        // Determine API version from successful endpoint
+        const apiVersion = successfulEndpoint.includes('v1alpha1') ? 'v1alpha1' : 'v1';
+        const devicesEndpoint = `https://sasportal.googleapis.com/${apiVersion}/${deploymentName}/devices`;
         
         console.log(`[getSASInstallations] Fetching devices from: ${devicesEndpoint}`);
         
