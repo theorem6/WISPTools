@@ -361,7 +361,9 @@ export const getSASUserIDs = onCall(async (request) => {
 
       // Parse the customers from the Google SAS Portal API response
       const responseBody = await response.text();
-      console.log(`[getSASUserIDs] API Response Body:`, responseBody);
+      console.log(`[getSASUserIDs] ===== GOOGLE SAS API RESPONSE JSON =====`);
+      console.log(responseBody);
+      console.log(`[getSASUserIDs] ===== END API RESPONSE =====`);
       
       const responseData = JSON.parse(responseBody);
       // Response format from official API: { customers: [{ name: "customers/123", displayName: "ISP Supplies", sasUserIds: [...] }] }
@@ -369,7 +371,6 @@ export const getSASUserIDs = onCall(async (request) => {
       
       console.log(`[getSASUserIDs] ===== API CALL SUCCESSFUL =====`);
       console.log(`[getSASUserIDs] Found ${customers.length} authorized customers from Google SAS Portal API`);
-      console.log(`[getSASUserIDs] Customer data:`, JSON.stringify(customers, null, 2));
       
       // Transform Google SAS customers into our SASUserID format
       const userIds = customers.map((customer: any, index: number) => ({
@@ -448,7 +449,14 @@ export const getSASUserIDs = onCall(async (request) => {
  */
 export const getSASInstallations = onCall(async (request) => {
   console.log('[getSASInstallations] ===== FUNCTION INVOKED =====');
-  console.log('[getSASInstallations] Request data:', JSON.stringify(request.data, null, 2));
+  console.log('[getSASInstallations] ===== REQUEST JSON =====');
+  console.log(JSON.stringify({
+    tenantId: request.data.tenantId,
+    userId: request.data.userId,
+    googleEmail: request.data.googleEmail,
+    hasAccessToken: !!request.data.googleAccessToken
+  }, null, 2));
+  console.log('[getSASInstallations] ===== END REQUEST =====');
   
   try {
     const { tenantId, userId, googleEmail, googleAccessToken } = request.data;
@@ -554,7 +562,9 @@ export const getSASInstallations = onCall(async (request) => {
     
     console.log(`[getSASInstallations] ===== FOUND DEPLOYMENTS =====`);
     console.log(`[getSASInstallations] Found ${installations.length} deployments from ${successfulEndpoint}`);
-    console.log(`[getSASInstallations] Sample deployment:`, JSON.stringify(installations[0], null, 2));
+    console.log(`[getSASInstallations] ===== FULL API RESPONSE JSON =====`);
+    console.log(JSON.stringify(installations, null, 2));
+    console.log(`[getSASInstallations] ===== END API RESPONSE =====`);
     
     // If we got deployments, we need to fetch devices within each deployment
     if (successfulEndpoint.includes('/deployments')) {
@@ -586,6 +596,11 @@ export const getSASInstallations = onCall(async (request) => {
             const devices = devicesData.devices || [];
             
             console.log(`[getSASInstallations] Found ${devices.length} devices in ${deployment.displayName || deploymentName}`);
+            if (devices.length > 0) {
+              console.log(`[getSASInstallations] ===== DEVICES JSON (${deployment.displayName}) =====`);
+              console.log(JSON.stringify(devices, null, 2));
+              console.log(`[getSASInstallations] ===== END DEVICES JSON =====`);
+            }
             
             // Add deployment info to each device
             devices.forEach((device: any) => {
@@ -604,25 +619,34 @@ export const getSASInstallations = onCall(async (request) => {
       
       console.log(`[getSASInstallations] ===== TOTAL DEVICES ACROSS ALL DEPLOYMENTS =====`);
       console.log(`[getSASInstallations] Found ${allDevices.length} total devices`);
-      if (allDevices.length > 0) {
-        console.log(`[getSASInstallations] Sample device:`, JSON.stringify(allDevices[0], null, 2));
-      }
       
-      return {
+      const response = {
         success: true,
         installations: allDevices,
         note: `Loaded ${allDevices.length} devices from ${installations.length} deployments`
       };
+      
+      console.log(`[getSASInstallations] ===== FINAL RESPONSE JSON =====`);
+      console.log(JSON.stringify(response, null, 2));
+      console.log(`[getSASInstallations] ===== END FINAL RESPONSE =====`);
+      
+      return response;
     }
     
     console.log(`[getSASInstallations] ===== API CALL SUCCESSFUL =====`);
     console.log(`[getSASInstallations] Found ${installations.length} installations from ${successfulEndpoint}`);
     
-    return {
+    const response = {
       success: true,
       installations,
       note: `Loaded ${installations.length} installations from Google SAS Portal API`
     };
+    
+    console.log(`[getSASInstallations] ===== FINAL RESPONSE JSON =====`);
+    console.log(JSON.stringify(response, null, 2));
+    console.log(`[getSASInstallations] ===== END FINAL RESPONSE =====`);
+    
+    return response;
     
   } catch (error: any) {
     console.error('[getSASInstallations] ===== FUNCTION ERROR =====');
