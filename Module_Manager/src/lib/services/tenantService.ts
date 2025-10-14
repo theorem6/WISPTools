@@ -247,19 +247,20 @@ export class TenantService {
     try {
       const associationId = `${userId}_${tenantId}`;
       
-      const association: UserTenantAssociation = {
+      const association: any = {
         userId,
         tenantId,
         role,
         permissions: DEFAULT_PERMISSIONS[role],
-        createdAt: new Date(),
-        invitedBy
+        createdAt: serverTimestamp()
       };
 
-      await setDoc(doc(this.getDb(), 'user_tenants', associationId), {
-        ...association,
-        createdAt: serverTimestamp()
-      });
+      // Only add invitedBy if it's provided
+      if (invitedBy) {
+        association.invitedBy = invitedBy;
+      }
+
+      await setDoc(doc(this.getDb(), 'user_tenants', associationId), association);
 
       return { success: true };
     } catch (error) {

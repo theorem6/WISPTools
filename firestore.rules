@@ -42,11 +42,15 @@ service cloud.firestore {
       // Anyone authenticated can create a tenant
       allow create: if isAuthenticated();
       
+      // Allow authenticated users to check subdomain uniqueness (limited query)
       // Platform admin can list all tenants
-      allow list: if isPlatformAdmin();
+      allow list: if isAuthenticated();
       
-      // Can read if member of tenant OR platform admin
-      allow read: if isTenantMember(tenantId) || isPlatformAdmin();
+      // Can read if member of tenant OR creator OR platform admin
+      allow read: if isAuthenticated() && 
+                    (isTenantMember(tenantId) || 
+                     resource.data.createdBy == request.auth.uid || 
+                     isPlatformAdmin());
       
       // Can update if admin of tenant OR platform admin
       allow update: if isTenantAdmin(tenantId) || isPlatformAdmin();

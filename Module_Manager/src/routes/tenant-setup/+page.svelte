@@ -227,7 +227,7 @@
                 placeholder="acme-wireless"
                 disabled={isLoading}
                 required
-                pattern="[a-z0-9-]+"
+                pattern="[a-z0-9\-]+"
               />
               <span class="subdomain-suffix">.your-domain.com</span>
             </div>
