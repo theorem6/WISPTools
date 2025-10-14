@@ -8,6 +8,8 @@ import { onCall } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import cors from 'cors';
 import { db } from './firebaseInit.js';
+import { sasportal_v1alpha1 } from '@googleapis/sasportal';
+import { google } from 'googleapis';
 
 const corsHandler = cors({ origin: true });
 
@@ -277,22 +279,24 @@ export const getSASUserIDs = onCall(async (request) => {
     
     // Call Google SAS Portal API to get list of customers (User IDs) this user has access to
     // This API returns all SAS User IDs/customers that the authenticated Google account can manage
+    // Using official @googleapis/sasportal NPM module
     // Endpoint: https://developers.google.com/spectrum-access-system/guides/customers-api
     
     try {
-      // Use Google SAS Portal API to list customers
-      const sasPortalUrl = 'https://sasportal.googleapis.com/v1alpha1/customers';
+      // Initialize SAS Portal API client with user's OAuth token
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: googleAccessToken });
       
-      const response = await fetch(sasPortalUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${googleAccessToken}` // Use the user's OAuth token for authentication
-        }
+      const sasportal = google.sasportal({
+        version: 'v1alpha1',
+        auth: auth
       });
+      
+      // List customers the user has access to
+      const response = await sasportal.customers.list();
 
-      if (!response.ok) {
-        console.error(`[SAS Users] Google SAS API returned ${response.status}`);
+      if (!response.data || !response.data.customers) {
+        console.error(`[SAS Users] No customers found in response`);
         
         // Return user's actual SAS User IDs
         // TODO: Replace with actual Google SAS API call when endpoint is confirmed
@@ -326,13 +330,11 @@ export const getSASUserIDs = onCall(async (request) => {
         };
       }
 
-      const responseData = await response.json();
-      
       // Parse the customers from the Google SAS Portal API response
-      // Response format: { customers: [{ name: "customers/123", displayName: "ISP Supplies", sasUserIds: [...] }] }
-      const customers = responseData.customers || [];
+      // Response format from official API: { customers: [{ name: "customers/123", displayName: "ISP Supplies", sasUserIds: [...] }] }
+      const customers = response.data.customers || [];
       
-      console.log(`[SAS Users] Found ${customers.length} authorized customers from Google SAS`);
+      console.log(`[SAS Users] Found ${customers.length} authorized customers from Google SAS Portal API`);
       
       // Transform Google SAS customers into our SASUserID format
       const userIds = customers.map((customer: any, index: number) => ({
@@ -343,11 +345,12 @@ export const getSASUserIDs = onCall(async (request) => {
         isPrimary: index === 0 // First one is considered primary
       }));
       
-      console.log(`[SAS Users] Parsed ${userIds.length} User IDs from customers`);
+      console.log(`[SAS Users] Successfully parsed ${userIds.length} User IDs from Google SAS Portal`);
       
       return {
         success: true,
-        userIds
+        userIds,
+        note: 'User IDs fetched from Google SAS Portal API'
       };
       
     } catch (apiError: any) {
