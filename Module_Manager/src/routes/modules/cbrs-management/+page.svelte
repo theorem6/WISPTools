@@ -11,6 +11,8 @@
   import DeviceList from './components/DeviceList.svelte';
   import GrantStatus from './components/GrantStatus.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
+  import UserIDSelector from './components/UserIDSelector.svelte';
+  import type { SASUserID } from '$lib/services/googleSASUserService';
   
   // State
   let devices: CBSDDevice[] = [];
@@ -23,6 +25,10 @@
   let showAddDeviceModal = false;
   let showGrantRequestModal = false;
   let showSettingsModal = false;
+  let showUserIDSelector = false;
+  let availableUserIDs: SASUserID[] = [];
+  let currentUserID: string | null = null;
+  let currentUserIDDisplay: string | null = null;
   
   // Configuration
   let cbrsConfig: CBRSConfig | null = null;
@@ -472,6 +478,82 @@
     }
   }
   
+  async function handleShowUserIDSelector() {
+    try {
+      console.log('[CBRS] Opening User ID selector...');
+      
+      // Check if user has Google OAuth setup
+      if (!cbrsConfig?.googleEmail) {
+        error = 'Please configure Google SAS authentication in Settings first';
+        setTimeout(() => error = null, 5000);
+        return;
+      }
+      
+      // Import Google auth store
+      const { googleAuthStore } = await import('$lib/services/googleOAuthService');
+      await googleAuthStore.initialize(tenantId);
+      
+      // Check if authenticated
+      if (!googleAuthStore.isAuthenticated()) {
+        error = 'Please sign in with Google in Settings first';
+        setTimeout(() => error = null, 5000);
+        return;
+      }
+      
+      // Get access token
+      const accessToken = googleAuthStore.getAccessToken();
+      if (!accessToken) {
+        error = 'Google authentication expired. Please sign in again in Settings.';
+        setTimeout(() => error = null, 5000);
+        return;
+      }
+      
+      // Fetch User IDs
+      const { fetchAuthorizedSASUserIDs } = await import('$lib/services/googleSASUserService');
+      
+      availableUserIDs = await fetchAuthorizedSASUserIDs(
+        tenantId,
+        cbrsConfig.googleEmail,
+        accessToken
+      );
+      
+      if (availableUserIDs.length === 0) {
+        error = 'No SAS User IDs found for your account';
+        setTimeout(() => error = null, 5000);
+        return;
+      }
+      
+      console.log('[CBRS] Found', availableUserIDs.length, 'User IDs');
+      showUserIDSelector = true;
+      
+    } catch (err: any) {
+      console.error('[CBRS] Error opening User ID selector:', err);
+      error = 'Failed to load User IDs: ' + (err?.message || 'Unknown error');
+      setTimeout(() => error = null, 5000);
+    }
+  }
+  
+  async function handleMainUserIDSelect(event: CustomEvent<SASUserID>) {
+    const selectedUserId = event.detail;
+    console.log('[CBRS] User ID selected from main page:', selectedUserId.userId);
+    
+    currentUserID = selectedUserId.userId;
+    currentUserIDDisplay = selectedUserId.displayName || selectedUserId.userId;
+    showUserIDSelector = false;
+    
+    // Load installations for this User ID
+    await handleUserIdSelected({
+      detail: {
+        userId: selectedUserId.userId,
+        googleEmail: cbrsConfig?.googleEmail,
+        accessToken: await (async () => {
+          const { googleAuthStore } = await import('$lib/services/googleOAuthService');
+          return googleAuthStore.getAccessToken();
+        })()
+      }
+    } as CustomEvent);
+  }
+  
   async function addSASInstallationsToMap(installations: any[]) {
     if (!map || !map._graphicsLayer) return;
     
@@ -606,6 +688,36 @@
       </div>
       
       <div class="header-actions">
+        {#if currentUserID}
+          <button 
+            class="btn btn-network-selector active" 
+            on:click={handleShowUserIDSelector}
+            title="Switch network/User ID"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <span class="network-name">{currentUserIDDisplay}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+        {:else}
+          <button 
+            class="btn btn-network-selector" 
+            on:click={handleShowUserIDSelector}
+            title="Select network/User ID"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            Select Network
+          </button>
+        {/if}
         <button class="btn btn-secondary" on:click={() => showSettingsModal = true} title="Configure SAS providers">
           ⚙️ Settings
         </button>
@@ -872,6 +984,15 @@
   on:save={handleSaveSettings}
   on:userIdSelected={handleUserIdSelected}
 />
+
+<!-- User ID Selector Modal (Main Page) -->
+<UserIDSelector
+  show={showUserIDSelector}
+  userIds={availableUserIDs}
+  googleEmail={cbrsConfig?.googleEmail || ''}
+  on:select={handleMainUserIDSelect}
+  on:close={() => showUserIDSelector = false}
+/>
 </TenantGuard>
 
 <style>
@@ -972,6 +1093,42 @@
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.875rem;
+  }
+  
+  .btn-network-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.875rem;
+  }
+  
+  .btn-network-selector:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  .btn-network-selector.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+  
+  .btn-network-selector.active:hover {
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+  }
+  
+  .network-name {
+    font-weight: 600;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   
   .btn-primary {
