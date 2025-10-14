@@ -48,44 +48,44 @@
       
       console.log('[Google OAuth Callback] Success!', { email, expiresAt });
       
-      // Send success message to opener window
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'google_oauth_success',
-          token: {
-            accessToken,
-            expiresAt,
-            email,
-            state
-          }
-        }, window.location.origin);
-        
-        status = '✅ Sign-in successful! Closing window...';
-        
-        // Close popup after a short delay
-        setTimeout(() => {
-          window.close();
-        }, 1000);
-      } else {
-        status = '✅ Sign-in successful! You can close this window.';
-      }
+      // Save token to localStorage (redirect flow)
+      const tenantId = state || sessionStorage.getItem('oauth_tenant_id') || 'default';
+      
+      const token: any = {
+        accessToken,
+        expiresAt,
+        email
+      };
+      
+      localStorage.setItem(`google_oauth_${tenantId}`, JSON.stringify(token));
+      
+      status = '✅ Sign-in successful! Redirecting back...';
+      
+      // Get return URL
+      const returnUrl = sessionStorage.getItem('oauth_return_url') || '/modules/cbrs-management';
+      sessionStorage.removeItem('oauth_return_url');
+      sessionStorage.removeItem('oauth_tenant_id');
+      
+      // Redirect back to the page with a flag to show success
+      sessionStorage.setItem('google_oauth_completed', 'true');
+      
+      // Redirect after showing success message
+      setTimeout(() => {
+        window.location.href = returnUrl;
+      }, 1000);
       
     } catch (err: any) {
       console.error('[Google OAuth Callback] Error:', err);
       error = err.message || 'OAuth callback failed';
       status = '❌ Sign-in failed';
       
-      // Send error message to opener window
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'google_oauth_error',
-          error: err.message
-        }, window.location.origin);
-        
-        setTimeout(() => {
-          window.close();
-        }, 3000);
-      }
+      // Redirect back after error
+      setTimeout(() => {
+        const returnUrl = sessionStorage.getItem('oauth_return_url') || '/modules/cbrs-management';
+        sessionStorage.removeItem('oauth_return_url');
+        sessionStorage.removeItem('oauth_tenant_id');
+        window.location.href = returnUrl;
+      }, 3000);
     }
   });
 </script>

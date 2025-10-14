@@ -46,6 +46,14 @@
   onMount(async () => {
     // Initialize Google OAuth for this tenant
     await googleAuthStore.initialize(tenantId);
+    
+    // Check if we just returned from OAuth redirect
+    const oauthCompleted = sessionStorage.getItem('google_oauth_completed');
+    if (oauthCompleted === 'true') {
+      sessionStorage.removeItem('google_oauth_completed');
+      console.log('[Settings] Returned from Google OAuth - reloading auth state');
+      await googleAuthStore.initialize(tenantId);
+    }
   });
   
   import { onDestroy } from 'svelte';
@@ -56,12 +64,12 @@
   async function handleGoogleSignIn() {
     try {
       isSigningIn = true;
-      const token = await googleAuthStore.signInWithPopup(tenantId);
-      console.log('[Settings] Google sign-in successful:', token.email);
+      // Use redirect flow instead of popup (no COOP issues!)
+      await googleAuthStore.signInWithRedirect(tenantId);
+      // This will redirect away - no need to handle response here
     } catch (error: any) {
       console.error('[Settings] Google sign-in failed:', error);
-      alert(`Google sign-in failed: ${error.message}\n\nPlease allow popups and try again.`);
-    } finally {
+      alert(`Google sign-in failed: ${error.message}`);
       isSigningIn = false;
     }
   }

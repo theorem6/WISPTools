@@ -95,104 +95,27 @@ function createGoogleAuthStore() {
     },
     
     /**
-     * Sign in with Google (popup flow)
+     * Sign in with Google (redirect flow - more reliable than popup)
      */
-    async signInWithPopup(tenantId: string): Promise<GoogleOAuthToken> {
+    async signInWithRedirect(tenantId: string): Promise<void> {
       if (!browser) throw new Error('OAuth can only run in browser');
       
-      return new Promise((resolve, reject) => {
-        // Construct OAuth URL
-        const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-        authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
-        authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
-        authUrl.searchParams.set('response_type', 'token');
-        authUrl.searchParams.set('scope', GOOGLE_SCOPES);
-        authUrl.searchParams.set('state', tenantId); // Pass tenant ID as state
-        
-        console.log('[Google OAuth] Opening sign-in popup...');
-        
-        // Open popup
-        const width = 500;
-        const height = 600;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
-        
-        const popup = window.open(
-          authUrl.toString(),
-          'Google Sign-In',
-          `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
-        );
-        
-        if (!popup) {
-          reject(new Error('Failed to open popup. Please allow popups for this site.'));
-          return;
-        }
-        
-        // Listen for OAuth callback
-        const handleMessage = (event: MessageEvent) => {
-          // Verify origin
-          if (event.origin !== window.location.origin) return;
-          
-          if (event.data.type === 'google_oauth_success') {
-            window.removeEventListener('message', handleMessage);
-            
-            const token: GoogleOAuthToken = event.data.token;
-            
-            // Save to localStorage
-            localStorage.setItem(`google_oauth_${tenantId}`, JSON.stringify(token));
-            
-            // Update store
-            update(state => ({
-              ...state,
-              isAuthenticated: true,
-              googleEmail: token.email,
-              accessToken: token.accessToken,
-              expiresAt: token.expiresAt,
-              error: null
-            }));
-            
-            console.log('[Google OAuth] Sign-in successful:', token.email);
-            resolve(token);
-          } else if (event.data.type === 'google_oauth_error') {
-            window.removeEventListener('message', handleMessage);
-            
-            const error = event.data.error || 'OAuth failed';
-            update(state => ({ ...state, error }));
-            
-            console.error('[Google OAuth] Sign-in failed:', error);
-            reject(new Error(error));
-          }
-        };
-        
-        window.addEventListener('message', handleMessage);
-        
-        // Check if popup was closed (with error handling for COOP)
-        const checkClosed = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(checkClosed);
-              window.removeEventListener('message', handleMessage);
-              reject(new Error('Sign-in cancelled'));
-            }
-          } catch (err) {
-            // Ignore COOP errors - popup is still open
-          }
-        }, 1000);
-        
-        // Timeout after 5 minutes
-        setTimeout(() => {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', handleMessage);
-          if (popup && !popup.closed) {
-            try {
-              popup.close();
-            } catch (err) {
-              // Ignore errors
-            }
-          }
-          reject(new Error('Sign-in timeout - please try again'));
-        }, 300000); // 5 minutes
-      });
+      // Save current page and tenant ID to return after OAuth
+      sessionStorage.setItem('oauth_return_url', window.location.pathname);
+      sessionStorage.setItem('oauth_tenant_id', tenantId);
+      
+      // Construct OAuth URL
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+      authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+      authUrl.searchParams.set('response_type', 'token');
+      authUrl.searchParams.set('scope', GOOGLE_SCOPES);
+      authUrl.searchParams.set('state', tenantId);
+      
+      console.log('[Google OAuth] Redirecting to Google sign-in...');
+      
+      // Redirect to Google (same window - no COOP issues!)
+      window.location.href = authUrl.toString();
     },
     
     /**
