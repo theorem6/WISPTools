@@ -428,6 +428,99 @@ export const getSASUserIDs = onCall(async (request) => {
 });
 
 /**
+ * Get SAS installations for a User ID
+ * Called after User ID is selected to load all installations/devices
+ */
+export const getSASInstallations = onCall(async (request) => {
+  console.log('[getSASInstallations] ===== FUNCTION INVOKED =====');
+  console.log('[getSASInstallations] Request data:', JSON.stringify(request.data, null, 2));
+  
+  try {
+    const { tenantId, userId, googleEmail, googleAccessToken } = request.data;
+    
+    console.log('[getSASInstallations] Validating input parameters...');
+    if (!tenantId || !userId || !googleEmail || !googleAccessToken) {
+      console.error('[getSASInstallations] Missing required parameters');
+      throw new Error('tenantId, userId, googleEmail, and googleAccessToken are required');
+    }
+    
+    // Verify user authentication
+    console.log('[getSASInstallations] Checking Firebase authentication...');
+    if (!request.auth) {
+      console.error('[getSASInstallations] No auth context found');
+      throw new Error('Authentication required');
+    }
+
+    const authUserId = request.auth.uid;
+    console.log(`[getSASInstallations] Authenticated user: ${authUserId}`);
+    console.log(`[getSASInstallations] Fetching installations for User ID: ${userId}`);
+
+    // Verify user has access to this tenant
+    const userTenantDoc = await db.collection('user_tenants').doc(`${authUserId}_${tenantId}`).get();
+    if (!userTenantDoc.exists) {
+      throw new Error('Forbidden - User does not have access to this tenant');
+    }
+
+    console.log(`[getSASInstallations] ===== CALLING GOOGLE SAS PORTAL API =====`);
+    console.log(`[getSASInstallations] URL: https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`);
+    
+    // Call Google SAS Portal API to list installations for this User ID
+    const sasPortalUrl = `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`;
+    
+    const response = await fetch(sasPortalUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${googleAccessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log(`[getSASInstallations] API Response Status: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`[getSASInstallations] Google SAS Portal API Error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody
+      });
+      
+      // Return empty list if API fails
+      return {
+        success: true,
+        installations: [],
+        note: 'No installations found or API error'
+      };
+    }
+
+    const responseBody = await response.text();
+    console.log(`[getSASInstallations] API Response Body:`, responseBody);
+    
+    const responseData = JSON.parse(responseBody);
+    const installations = responseData.installations || [];
+    
+    console.log(`[getSASInstallations] ===== API CALL SUCCESSFUL =====`);
+    console.log(`[getSASInstallations] Found ${installations.length} installations`);
+    
+    return {
+      success: true,
+      installations,
+      note: `Loaded ${installations.length} installations from Google SAS Portal API`
+    };
+    
+  } catch (error: any) {
+    console.error('[getSASInstallations] ===== FUNCTION ERROR =====');
+    console.error('[getSASInstallations] Error:', error);
+    console.error('[getSASInstallations] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    throw new Error(error.message || 'Failed to fetch SAS installations');
+  }
+});
+
+/**
  * Log CBRS events for compliance and auditing
  */
 export const logCBRSEvent = onCall(async (request) => {

@@ -29,9 +29,9 @@
   let platformConfig: PlatformCBRSConfig | null = null;
   let configStatus = { status: 'missing' as const, message: '' };
   
-  // Tenant info - use tenant store
-  $: tenantId = $currentTenant?.id || '';
-  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
+  // Tenant info - will be passed from TenantGuard slot props
+  let tenantId = '';
+  let tenantName = 'Loading...';
   
   // Add device form (fixed to Google SAS only)
   let newDevice = {
@@ -436,6 +436,53 @@
       error = 'Failed to save settings: ' + (err?.message || 'Unknown error');
     }
   }
+  
+  async function handleUserIdSelected(event: CustomEvent) {
+    try {
+      const { userId, googleEmail, accessToken } = event.detail;
+      console.log('[CBRS] User ID selected, loading SAS devices:', userId);
+      
+      // Call Cloud Function to fetch installations from Google SAS
+      const { functions } = await import('$lib/firebase');
+      const { httpsCallable } = await import('firebase/functions');
+      
+      const getSASInstallations = httpsCallable(functions(), 'getSASInstallations');
+      
+      const response = await getSASInstallations({
+        tenantId,
+        userId,
+        googleEmail,
+        googleAccessToken: accessToken
+      });
+      
+      const result = response.data as any;
+      
+      if (result.success && result.installations) {
+        console.log('[CBRS] Loaded', result.installations.length, 'installations from Google SAS');
+        
+        // Add installations to map
+        await addSASInstallationsToMap(result.installations);
+      } else {
+        console.warn('[CBRS] No installations found for this User ID');
+      }
+      
+    } catch (err: any) {
+      console.error('[CBRS] Failed to load SAS installations:', err);
+      error = 'Failed to load SAS devices: ' + (err?.message || 'Unknown error');
+    }
+  }
+  
+  async function addSASInstallationsToMap(installations: any[]) {
+    if (!map) return;
+    
+    console.log('[CBRS] Adding', installations.length, 'installations to map');
+    
+    // TODO: Implement map markers for SAS installations
+    // For now, just log them
+    installations.forEach((installation: any) => {
+      console.log('[CBRS] Installation:', installation);
+    });
+  }
 </script>
 
 <svelte:head>
@@ -443,8 +490,29 @@
   <meta name="description" content="Citizens Broadband Radio Service management with Google SAS and Federated Wireless integration" />
 </svelte:head>
 
-<TenantGuard>
+<TenantGuard let:tenant>
 <div class="cbrs-module">
+  {#if tenant}
+    {#if tenantId !== tenant.id}
+      <!-- Tenant changed, update local state -->
+      {#await (async () => {
+        tenantId = tenant.id;
+        tenantName = tenant.displayName || tenant.name || 'Unknown';
+        // Reload config and devices for new tenant
+        if (browser) {
+          cbrsConfig = await loadCBRSConfig(tenantId);
+          platformConfig = await loadPlatformCBRSConfig();
+          configStatus = getConfigStatus(cbrsConfig);
+          await loadDevices();
+        }
+      })()}
+        <!-- Loading tenant... -->
+      {:then}
+        <!-- Tenant loaded -->
+      {/await}
+    {/if}
+  {/if}
+
   <!-- Header -->
   <div class="module-header">
     <div class="header-content">
@@ -734,6 +802,7 @@
   tenantId={tenantId}
   on:close={() => showSettingsModal = false}
   on:save={handleSaveSettings}
+  on:userIdSelected={handleUserIdSelected}
 />
 </TenantGuard>
 

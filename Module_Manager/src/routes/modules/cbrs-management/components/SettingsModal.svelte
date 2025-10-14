@@ -127,6 +127,13 @@
     
     formData.googleUserId = selectedUserId.userId;
     showUserIDSelector = false;
+    
+    // Dispatch event so parent component can load devices for this User ID
+    dispatch('userIdSelected', {
+      userId: selectedUserId.userId,
+      googleEmail: googleAuthState?.googleEmail,
+      accessToken: googleAuthState?.accessToken
+    });
   }
   
   async function handleSignOut() {
@@ -260,14 +267,52 @@
                 Google User ID
                 <span class="required">*</span>
               </label>
-              <input 
-                type="text" 
-                bind:value={formData.googleUserId}
-                placeholder="your-organization-id"
-                required
-              />
+              {#if formData.googleUserId}
+                <div class="user-id-display">
+                  <div class="user-id-value">
+                    <span class="user-id-icon">🆔</span>
+                    <strong>{formData.googleUserId}</strong>
+                  </div>
+                  <button 
+                    type="button"
+                    class="btn-change-user-id"
+                    on:click={async () => {
+                      if (googleAuthState?.isAuthenticated && googleAuthState?.accessToken) {
+                        await fetchAndShowUserIDs();
+                      } else {
+                        alert('Please sign in with Google first to select a User ID');
+                      }
+                    }}
+                  >
+                    Change
+                  </button>
+                </div>
+              {:else}
+                <button 
+                  type="button"
+                  class="btn-select-user-id"
+                  on:click={async () => {
+                    if (googleAuthState?.isAuthenticated && googleAuthState?.accessToken) {
+                      await fetchAndShowUserIDs();
+                    } else {
+                      alert('Please sign in with Google first to select a User ID');
+                    }
+                  }}
+                  disabled={!googleAuthState?.isAuthenticated}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4M12 8h.01"/>
+                  </svg>
+                  Select User ID from Your SAS Account
+                </button>
+              {/if}
               <span class="form-hint">
-                Your unique Google SAS User ID from FCC registration (e.g., "FRN-0123456789" or "acme-wireless").
+                {#if googleAuthState?.isAuthenticated}
+                  Click the button above to select from your authorized SAS User IDs
+                {:else}
+                  Sign in with Google above, then select your User ID
+                {/if}
               </span>
             </div>
             
@@ -684,6 +729,71 @@
     background: var(--bg-hover);
     border-color: #ef4444;
     color: #ef4444;
+  }
+  
+  .btn-select-user-id {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .btn-select-user-id:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  .btn-select-user-id:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .user-id-display {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 2px solid #10b981;
+    border-radius: 0.5rem;
+  }
+  
+  .user-id-value {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .user-id-icon {
+    font-size: 1.25rem;
+  }
+  
+  .btn-change-user-id {
+    padding: 0.5rem 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-change-user-id:hover {
+    background: var(--bg-hover);
+    border-color: #667eea;
+    color: #667eea;
   }
   
   .enhancement-section {
