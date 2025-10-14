@@ -33,12 +33,12 @@
   $: tenantId = $currentTenant?.id || '';
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
-  // Add device form
+  // Add device form (fixed to Google SAS only)
   let newDevice = {
     cbsdSerialNumber: '',
     fccId: '',
     cbsdCategory: 'A' as CBSDCategory,
-    sasProviderId: 'google' as 'google' | 'federated-wireless',
+    sasProviderId: 'google' as const, // Fixed to Google SAS
     latitude: 40.7128,
     longitude: -74.0060,
     height: 10,
@@ -314,7 +314,7 @@
         cbsdSerialNumber: '',
         fccId: '',
         cbsdCategory: 'A' as CBSDCategory,
-        sasProviderId: 'google' as 'google' | 'federated-wireless',
+        sasProviderId: 'google' as const, // Fixed to Google SAS
         latitude: 40.7128,
         longitude: -74.0060,
         height: 10,
@@ -365,59 +365,34 @@
   }
   
   /**
-   * Build service configuration based on deployment model
-   * Selects between platform keys (shared) and tenant keys (private)
+   * Build service configuration for shared platform mode with Google SAS
+   * Simplified - always uses platform API keys with tenant's User ID
    */
   async function buildServiceConfig(
     tenantConfig: CBRSConfig, 
     platformConfig: PlatformCBRSConfig | null,
     tenantId: string
   ): Promise<CBRSServiceConfig> {
-    const isSharedMode = tenantConfig.deploymentModel === 'shared-platform';
+    console.log('[CBRS] Using shared platform mode with Google SAS');
     
-    // Determine which API keys to use
-    let googleApiKey: string | undefined;
-    let googleApiEndpoint: string;
-    let federatedApiKey: string | undefined;
-    let federatedApiEndpoint: string;
-    
-    if (isSharedMode && platformConfig) {
-      // Use platform's shared API keys
-      console.log('[CBRS] Using shared platform API keys');
-      googleApiKey = platformConfig.googleApiKey;
-      googleApiEndpoint = platformConfig.googleApiEndpoint;
-      federatedApiKey = platformConfig.federatedApiKey;
-      federatedApiEndpoint = platformConfig.federatedApiEndpoint;
-    } else {
-      // Use tenant's private API keys
-      console.log('[CBRS] Using tenant-specific API keys');
-      googleApiKey = tenantConfig.googleApiKey;
-      googleApiEndpoint = tenantConfig.googleApiEndpoint || 'https://sas.googleapis.com/v1';
-      federatedApiKey = tenantConfig.federatedApiKey;
-      federatedApiEndpoint = tenantConfig.federatedApiEndpoint || 'https://sas.federatedwireless.com/api/v1';
-    }
+    // Use platform's Google SAS API key (if available)
+    const googleApiKey = platformConfig?.googleApiKey;
+    const googleApiEndpoint = platformConfig?.googleApiEndpoint || 'https://sas.googleapis.com/v1';
     
     return {
-      provider: tenantConfig.provider,
+      provider: 'google', // Fixed to Google only
       tenantId,
-      googleConfig: tenantConfig.provider === 'google' || tenantConfig.provider === 'both' ? {
+      googleConfig: {
         apiEndpoint: googleApiEndpoint,
         apiKey: googleApiKey,
         userId: tenantConfig.googleUserId, // Tenant's unique User ID
-        certificatePath: tenantConfig.googleCertificatePath,
         tenantId
-      } : undefined,
-      federatedConfig: tenantConfig.provider === 'federated-wireless' || tenantConfig.provider === 'both' ? {
-        apiEndpoint: federatedApiEndpoint,
-        apiKey: federatedApiKey || '',
-        customerId: tenantConfig.federatedCustomerId || '',
-        tenantId
-      } : undefined,
+      },
       federatedEnhancements: {
-        analyticsEnabled: tenantConfig.enableAnalytics,
-        autoOptimization: tenantConfig.enableOptimization,
-        multiSiteCoordination: tenantConfig.enableMultiSite,
-        interferenceMonitoring: tenantConfig.enableInterferenceMonitoring
+        analyticsEnabled: tenantConfig.enableAnalytics || false,
+        autoOptimization: tenantConfig.enableOptimization || false,
+        multiSiteCoordination: tenantConfig.enableMultiSite || false,
+        interferenceMonitoring: tenantConfig.enableInterferenceMonitoring || false
       }
     };
   }
@@ -653,10 +628,10 @@
             
             <div class="form-group">
               <label>SAS Provider</label>
-              <select bind:value={newDevice.sasProviderId}>
-                <option value="google">Google SAS</option>
-                <option value="federated-wireless">Federated Wireless</option>
-              </select>
+              <div class="readonly-field">
+                <span class="provider-badge">🔵 Google SAS</span>
+                <span class="provider-note">Shared Platform Mode</span>
+              </div>
             </div>
           </div>
           
@@ -1166,6 +1141,27 @@
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 0.875rem;
+  }
+  
+  .readonly-field {
+    padding: 0.625rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .provider-badge {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  
+  .provider-note {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-style: italic;
   }
   
   .form-hint {
