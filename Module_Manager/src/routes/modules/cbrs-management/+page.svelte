@@ -473,15 +473,104 @@
   }
   
   async function addSASInstallationsToMap(installations: any[]) {
-    if (!map) return;
+    if (!map || !map._graphicsLayer) return;
     
     console.log('[CBRS] Adding', installations.length, 'installations to map');
     
-    // TODO: Implement map markers for SAS installations
-    // For now, just log them
-    installations.forEach((installation: any) => {
-      console.log('[CBRS] Installation:', installation);
-    });
+    try {
+      const [
+        { default: Graphic },
+        { default: Point },
+        { default: SimpleMarkerSymbol },
+        { default: TextSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/TextSymbol.js')
+      ]);
+
+      // Clear existing markers
+      map._graphicsLayer.removeAll();
+      
+      let addedCount = 0;
+
+      installations.forEach((installation: any) => {
+        // Extract location from installation
+        // Google SAS installations typically have: latitude, longitude
+        const lat = installation.latitude || installation.location?.latitude;
+        const lon = installation.longitude || installation.location?.longitude;
+        
+        if (!lat || !lon) {
+          console.warn('[CBRS] Installation missing coordinates:', installation);
+          return;
+        }
+
+        // Create marker symbol - use purple/blue for SAS installations
+        const symbol = new SimpleMarkerSymbol({
+          style: 'diamond',
+          color: '#7c3aed', // Purple for SAS installations
+          size: '18px',
+          outline: {
+            color: 'white',
+            width: 2
+          }
+        });
+
+        const point = new Point({
+          longitude: lon,
+          latitude: lat
+        });
+
+        const graphic = new Graphic({
+          geometry: point,
+          symbol: symbol,
+          attributes: {
+            type: 'sas_installation',
+            name: installation.displayName || installation.name || 'SAS Installation',
+            installation: installation
+          },
+          popupTemplate: {
+            title: installation.displayName || installation.name || 'SAS Installation',
+            content: `
+              <b>Name:</b> ${installation.displayName || installation.name || 'N/A'}<br>
+              <b>Location:</b> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+              <b>Type:</b> SAS Installation<br>
+              ${installation.heightType ? `<b>Height Type:</b> ${installation.heightType}<br>` : ''}
+              ${installation.height ? `<b>Height:</b> ${installation.height}m<br>` : ''}
+            `
+          }
+        });
+
+        map._graphicsLayer.add(graphic);
+        addedCount++;
+      });
+
+      // Zoom to installations if any were added
+      if (addedCount > 0 && map._view && map._graphicsLayer.graphics.length > 0) {
+        try {
+          await map._view.when();
+          await map._view.goTo({
+            target: map._graphicsLayer.graphics,
+            padding: 80,
+            duration: 1500
+          });
+        } catch (goToError) {
+          console.warn('[CBRS] Could not animate to installations:', goToError);
+        }
+      }
+
+      console.log(`[CBRS] ✅ Added ${addedCount} SAS installations to map`);
+      
+      if (addedCount === 0 && installations.length > 0) {
+        console.warn('[CBRS] ⚠️ No installations added - they may be missing coordinates');
+        error = 'Installations loaded but none have valid coordinates to display on map';
+      }
+      
+    } catch (err: any) {
+      console.error('[CBRS] Error adding installations to map:', err);
+      error = 'Failed to display installations on map: ' + (err?.message || 'Unknown error');
+    }
   }
 </script>
 
