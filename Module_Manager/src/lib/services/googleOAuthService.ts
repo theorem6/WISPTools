@@ -23,7 +23,8 @@ interface GoogleAuthState {
 
 // Google OAuth configuration - from environment variables
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || 
-                        import.meta.env.PUBLIC_GOOGLE_OAUTH_CLIENT_ID || '';
+                        import.meta.env.PUBLIC_GOOGLE_OAUTH_CLIENT_ID || 
+                        '1044782186913-kehquaq56fcubedupb34611c0hm1ctob.apps.googleusercontent.com';
 
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
@@ -32,6 +33,12 @@ const GOOGLE_SCOPES = [
 ].join(' ');
 
 const REDIRECT_URI = browser ? `${window.location.origin}/oauth/google/callback` : '';
+
+// Debug logging
+if (browser) {
+  console.log('[Google OAuth] Client ID configured:', GOOGLE_CLIENT_ID ? '✅ Yes' : '❌ No');
+  console.log('[Google OAuth] Client ID value:', GOOGLE_CLIENT_ID.substring(0, 20) + '...');
+}
 
 // Store for Google OAuth state
 const initialState: GoogleAuthState = {
@@ -92,15 +99,6 @@ function createGoogleAuthStore() {
      */
     async signInWithPopup(tenantId: string): Promise<GoogleOAuthToken> {
       if (!browser) throw new Error('OAuth can only run in browser');
-      
-      // Check if Client ID is configured
-      if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('REPLACEME')) {
-        throw new Error(
-          'Google OAuth Client ID not configured.\n\n' +
-          'Please create an OAuth Client ID in Google Cloud Console and update apphosting.yaml:\n' +
-          'PUBLIC_GOOGLE_OAUTH_CLIENT_ID = your-client-id.apps.googleusercontent.com'
-        );
-      }
       
       return new Promise((resolve, reject) => {
         // Construct OAuth URL
