@@ -401,7 +401,7 @@ export const getSASUserIDs = onCall(async (request) => {
             _rawCustomer: customer // Keep for debugging
           };
         })
-        .filter(user => {
+        .filter((user: any) => {
           // Filter out customers without valid numeric IDs
           if (!user.userId) {
             console.warn(`[getSASUserIDs] ⚠️ Skipping customer "${user.displayName}" - no valid numeric ID found`);
