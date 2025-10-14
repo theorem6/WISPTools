@@ -462,45 +462,78 @@ export const getSASInstallations = onCall(async (request) => {
     }
 
     console.log(`[getSASInstallations] ===== CALLING GOOGLE SAS PORTAL API =====`);
-    console.log(`[getSASInstallations] URL: https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`);
     
-    // Call Google SAS Portal API to list installations for this User ID
-    const sasPortalUrl = `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`;
+    // Try multiple endpoints to find devices/installations
+    const endpoints = [
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/deployments`,
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/devices`,
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/nodes`,
+      `https://sasportal.googleapis.com/v1alpha1/customers/${userId}/installations`
+    ];
     
-    const response = await fetch(sasPortalUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${googleAccessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    console.log(`[getSASInstallations] API Response Status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`[getSASInstallations] Google SAS Portal API Error:`, {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorBody
-      });
+    let installations: any[] = [];
+    let successfulEndpoint = '';
+    
+    for (const endpoint of endpoints) {
+      console.log(`[getSASInstallations] Trying endpoint: ${endpoint}`);
       
-      // Return empty list if API fails
+      try {
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${googleAccessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log(`[getSASInstallations] Response Status: ${response.status} ${response.statusText}`);
+
+        if (response.ok) {
+          const responseBody = await response.text();
+          console.log(`[getSASInstallations] Response Body:`, responseBody);
+          
+          const responseData = JSON.parse(responseBody);
+          
+          // Check for various possible field names
+          const data = responseData.deployments || 
+                      responseData.devices || 
+                      responseData.nodes || 
+                      responseData.installations ||
+                      responseData.items ||
+                      [];
+          
+          if (data.length > 0) {
+            installations = data;
+            successfulEndpoint = endpoint;
+            console.log(`[getSASInstallations] ✅ Found ${data.length} items at ${endpoint}`);
+            break;
+          } else {
+            console.log(`[getSASInstallations] Endpoint returned empty array`);
+          }
+        } else {
+          const errorBody = await response.text();
+          console.log(`[getSASInstallations] Endpoint failed: ${response.status} - ${errorBody.substring(0, 200)}`);
+        }
+      } catch (err: any) {
+        console.log(`[getSASInstallations] Error trying endpoint ${endpoint}:`, err.message);
+      }
+    }
+    
+    if (installations.length === 0) {
+      console.warn(`[getSASInstallations] ⚠️ No installations found across all endpoints`);
+      console.log(`[getSASInstallations] User ID: ${userId}`);
+      console.log(`[getSASInstallations] Email: ${googleEmail}`);
+      
+      // Return empty with debugging info
       return {
         success: true,
         installations: [],
-        note: 'No installations found or API error'
+        note: 'No installations found across all API endpoints. Check User ID format or API access.'
       };
     }
-
-    const responseBody = await response.text();
-    console.log(`[getSASInstallations] API Response Body:`, responseBody);
-    
-    const responseData = JSON.parse(responseBody);
-    const installations = responseData.installations || [];
     
     console.log(`[getSASInstallations] ===== API CALL SUCCESSFUL =====`);
-    console.log(`[getSASInstallations] Found ${installations.length} installations`);
+    console.log(`[getSASInstallations] Found ${installations.length} installations from ${successfulEndpoint}`);
     
     return {
       success: true,
