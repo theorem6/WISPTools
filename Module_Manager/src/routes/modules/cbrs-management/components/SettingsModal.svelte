@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
-  import { googleAuthStore } from '$lib/services/googleOAuthService';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   
   export let show = false;
   export let config: any = {};
@@ -8,16 +7,7 @@
   
   const dispatch = createEventDispatcher();
   let googleAuthState: any = null;
-  
-  // Subscribe to Google auth state
-  const unsubscribe = googleAuthStore.subscribe(state => {
-    googleAuthState = state;
-    
-    // Auto-fill email if Google authenticated
-    if (state.isAuthenticated && state.googleEmail) {
-      formData.googleEmail = state.googleEmail;
-    }
-  });
+  let unsubscribe: any = null;
   
   // Fixed to shared platform mode with Google SAS only
   let formData = {
@@ -44,6 +34,19 @@
   let isSigningIn = false;
   
   onMount(async () => {
+    // Dynamically import googleAuthStore to avoid circular dependency
+    const { googleAuthStore } = await import('$lib/services/googleOAuthService');
+    
+    // Subscribe to Google auth state
+    unsubscribe = googleAuthStore.subscribe(state => {
+      googleAuthState = state;
+      
+      // Auto-fill email if Google authenticated
+      if (state.isAuthenticated && state.googleEmail) {
+        formData.googleEmail = state.googleEmail;
+      }
+    });
+    
     // Initialize Google OAuth for this tenant
     await googleAuthStore.initialize(tenantId);
     
@@ -56,14 +59,17 @@
     }
   });
   
-  import { onDestroy } from 'svelte';
   onDestroy(() => {
-    unsubscribe();
+    if (unsubscribe) {
+      unsubscribe();
+    }
   });
   
   async function handleGoogleSignIn() {
     try {
       isSigningIn = true;
+      // Dynamically import to avoid circular dependency
+      const { googleAuthStore } = await import('$lib/services/googleOAuthService');
       // Use redirect flow instead of popup (no COOP issues!)
       await googleAuthStore.signInWithRedirect(tenantId);
       // This will redirect away - no need to handle response here
@@ -71,6 +77,17 @@
       console.error('[Settings] Google sign-in failed:', error);
       alert(`Google sign-in failed: ${error.message}`);
       isSigningIn = false;
+    }
+  }
+  
+  async function handleSignOut() {
+    try {
+      const { googleAuthStore } = await import('$lib/services/googleOAuthService');
+      googleAuthStore.signOut(tenantId);
+      googleAuthState = null;
+      formData.googleEmail = '';
+    } catch (error: any) {
+      console.error('[Settings] Sign out failed:', error);
     }
   }
   
@@ -181,7 +198,7 @@
                 <button 
                   type="button"
                   class="btn-signout"
-                  on:click={() => googleAuthStore.signOut(tenantId)}
+                  on:click={handleSignOut}
                 >
                   Sign out
                 </button>
