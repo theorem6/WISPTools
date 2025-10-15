@@ -1,25 +1,19 @@
-# Production Deployment: GenieACS + rapid5gs HSS
-# Creates new Ubuntu 24.04 VM and installs both services
-# Run from Firebase Studio
+# Production Deployment - Simple Version
+# Creates Ubuntu 24.04 VM, uploads and runs installation script
 
 steps:
-  # Step 1: Create GCE instance with Ubuntu 24.04
+  # Step 1: Create VM
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'create-vm'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Creating GCE instance: acs-hss-server"
-        
-        # Create static IP
         gcloud compute addresses create acs-hss-ip --region=us-central1 2>/dev/null || true
         STATIC_IP=$$(gcloud compute addresses describe acs-hss-ip --region=us-central1 --format='get(address)')
         
-        # Firewall rules
-        gcloud compute firewall-rules create allow-acs-all --allow tcp:80,tcp:443,tcp:7547,tcp:3868,tcp:3000,tcp:7557,tcp:3333 --target-tags=acs-hss-server 2>/dev/null || true
+        gcloud compute firewall-rules create acs-hss-all --allow tcp:80,tcp:443,tcp:7547,tcp:3868,tcp:3000,tcp:7557,tcp:3333 --target-tags=acs-hss 2>/dev/null || true
         
-        # Create instance if doesn't exist
         if ! gcloud compute instances describe acs-hss-server --zone=us-central1-a &>/dev/null; then
           gcloud compute instances create acs-hss-server \
             --zone=us-central1-a \
@@ -27,175 +21,69 @@ steps:
             --image-family=ubuntu-2404-lts-amd64 \
             --image-project=ubuntu-os-cloud \
             --boot-disk-size=50GB \
-            --tags=acs-hss-server \
+            --tags=acs-hss \
             --address=$$STATIC_IP \
             --scopes=cloud-platform
           
-          echo "Waiting for instance to be ready (60s)..."
           sleep 60
         fi
         
-        echo "✅ Instance ready: $$STATIC_IP"
+        echo "VM ready: $$STATIC_IP"
 
-  # Step 2: Create installation script
+  # Step 2: Upload installation script from repo
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'create-install-script'
+    id: 'upload-script'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         MONGODB_URI=$$(gcloud secrets versions access latest --secret="mongodb-uri")
         
-        cat > /workspace/install-all.sh << 'INSTALLEOF'
+        # Create simple installation script
+        cat > /workspace/install.sh << 'EOF'
         #!/bin/bash
-        set -e
-        
-        echo "═══════════════════════════════════════════════════════════"
-        echo "  Installing GenieACS + rapid5gs HSS"
-        echo "═══════════════════════════════════════════════════════════"
-        
-        # Update system
         apt-get update
         DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-        
-        # Install Node.js 20
         curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt-get install -y nodejs git docker.io docker-compose nginx
-        
-        # Install GenieACS via Docker
-        mkdir -p /opt/genieacs
-        cd /opt/genieacs
-        
-        cat > docker-compose.yml << 'COMPOSE'
-        version: '3.8'
-        services:
-          genieacs-cwmp:
-            image: drumsergio/genieacs:latest
-            container_name: genieacs-cwmp
-            restart: always
-            network_mode: host
-            environment:
-              - GENIEACS_CWMP_PORT=7547
-              - GENIEACS_MONGODB_CONNECTION_URL=MONGODB_PLACEHOLDER
-            command: genieacs-cwmp
-          
-          genieacs-nbi:
-            image: drumsergio/genieacs:latest
-            container_name: genieacs-nbi
-            restart: always
-            network_mode: host
-            environment:
-              - GENIEACS_NBI_PORT=7557
-              - GENIEACS_MONGODB_CONNECTION_URL=MONGODB_PLACEHOLDER
-            command: genieacs-nbi
-          
-          genieacs-ui:
-            image: drumsergio/genieacs:latest
-            container_name: genieacs-ui
-            restart: always
-            network_mode: host
-            environment:
-              - GENIEACS_UI_PORT=3333
-              - GENIEACS_MONGODB_CONNECTION_URL=MONGODB_PLACEHOLDER
-            command: genieacs-ui
-        COMPOSE
-        
-        # Replace MongoDB placeholder
-        sed -i "s|MONGODB_PLACEHOLDER|MONGODB_URI_PLACEHOLDER|g" docker-compose.yml
-        
-        docker-compose up -d
-        
-        # Install rapid5gs
+        apt-get install -y nodejs git docker.io
+        systemctl enable docker
+        systemctl start docker
         cd /opt
         git clone https://github.com/joshualambert/rapid5gs.git
-        cd rapid5gs
-        chmod +x install.sh
+        echo "Rapid5GS cloned" > /var/log/install.log
+        EOF
         
-        # Modify install.sh to use cloud MongoDB
-        sed -i 's|mongodb://localhost|MONGODB_URI_PLACEHOLDER|g' install.sh || true
+        gsutil mb gs://temp-install-$BUILD_ID 2>/dev/null || true
+        gsutil cp /workspace/install.sh gs://temp-install-$BUILD_ID/
         
-        # Run rapid5gs installer (will prompt for inputs)
-        # For now, just install Open5GS HSS component
-        apt-get install -y software-properties-common
-        add-apt-repository -y ppa:open5gs/latest
-        apt-get update
-        apt-get install -y open5gs-hss
-        
-        # Configure Open5GS HSS for cloud MongoDB
-        mkdir -p /etc/open5gs
-        cat > /etc/open5gs/hss.yaml << 'HSSCONF'
-        db_uri: MONGODB_URI_PLACEHOLDER
-        
-        logger:
-          file: /var/log/open5gs/hss.log
-          level: info
-        
-        hss:
-          freeDiameter: /etc/freeDiameter/hss.conf
-        HSSCONF
-        
-        mkdir -p /etc/freeDiameter
-        cat > /etc/freeDiameter/hss.conf << 'DIAMCONF'
-        Identity = "hss.lte-pci-mapper.com";
-        Realm = "lte-pci-mapper.com";
-        ListenOn = "0.0.0.0";
-        Port = 3868;
-        No_SCTP;
-        LoadExtension = "dbg_msg_dumps.so" : "0x8888";
-        LoadExtension = "dict_rfc5777.so";
-        LoadExtension = "dict_mip6i.so";
-        LoadExtension = "dict_nasreq.so";
-        LoadExtension = "dict_dcca.so";
-        LoadExtension = "dict_dcca_3gpp.so";
-        DIAMCONF
-        
-        mkdir -p /var/log/open5gs
-        
-        systemctl daemon-reload
-        systemctl enable open5gs-hssd
-        systemctl start open5gs-hssd
-        
-        echo "Installation complete" > /var/log/install-complete.log
-        INSTALLEOF
-        
-        # Replace MongoDB URI placeholder
-        sed -i "s|MONGODB_URI_PLACEHOLDER|$$MONGODB_URI|g" /workspace/install-all.sh
-        
-        gsutil cp /workspace/install-all.sh gs://hss-deploy-${BUILD_ID}/install-all.sh
-
-  # Step 3: Execute installation
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'install'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
         gcloud compute instances add-metadata acs-hss-server --zone=us-central1-a \
-          --metadata startup-script-url=gs://hss-deploy-${BUILD_ID}/install-all.sh
+          --metadata startup-script-url=gs://temp-install-$BUILD_ID/install.sh
         
         gcloud compute instances reset acs-hss-server --zone=us-central1-a --quiet
         
-        echo "Waiting for installation (5 minutes)..."
-        sleep 300
+        sleep 120
+        
+        echo "Installation complete"
 
-  # Step 4: Verify
+  # Step 3: Report
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'verify'
+    id: 'report'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        EXTERNAL_IP=$$(gcloud compute instances describe acs-hss-server --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-        
+        IP=$$(gcloud compute instances describe acs-hss-server --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
         echo "════════════════════════════════════════════════"
-        echo "  ✅ DEPLOYMENT COMPLETE"
+        echo "  ✅ VM CREATED"
         echo "════════════════════════════════════════════════"
-        echo "IP: $$EXTERNAL_IP"
-        echo "GenieACS: http://$$EXTERNAL_IP:7557"
-        echo "HSS S6a: $$EXTERNAL_IP:3868"
+        echo "VM: acs-hss-server"
+        echo "IP: $$IP"
+        echo "OS: Ubuntu 24.04"
+        echo ""
+        echo "SSH: gcloud compute ssh acs-hss-server --zone=us-central1-a"
+        echo ""
+        echo "rapid5gs is in: /opt/rapid5gs"
+        echo "To complete: cd /opt/rapid5gs && chmod +x install.sh && ./install.sh"
         echo "════════════════════════════════════════════════"
-        
-        gsutil -m rm -r gs://hss-deploy-${BUILD_ID} 2>/dev/null || true
 
 timeout: 1800s
-
