@@ -321,7 +321,7 @@ env:
       - RUNTIME
   
   - variable: VITE_HSS_API_URL
-    value: "http://136.112.111.167:3000"
+    value: "https://136.112.111.167"
     availability:
       - BUILD
       - RUNTIME
