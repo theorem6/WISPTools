@@ -51,7 +51,7 @@
     {
       id: 'hss-management',
       name: 'HSS & Subscriber Management',
-      description: 'Home Subscriber Server - IMSI/Ki/OPc management with groups and bandwidth plans',
+      description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
       icon: '🔐',
       color: '#f59e0b',
       status: 'active',
