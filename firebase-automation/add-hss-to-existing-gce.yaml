@@ -1,9 +1,8 @@
-# Add HSS to Existing GCE Instance (No SSH, No New Instance)
-# Deploys HSS module to your existing genieacs-backend instance
-# Works from Firebase Studio
+# Add HSS to Existing GCE Instance
+# Simple deployment without SSH
 
 steps:
-  # Step 1: Verify existing instance
+  # Step 1: Verify instance exists
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'verify-instance'
     entrypoint: 'bash'
@@ -12,345 +11,118 @@ steps:
       - |
         if ! gcloud compute instances describe genieacs-backend --zone=us-central1-a &>/dev/null; then
           echo "❌ Error: Instance genieacs-backend not found"
-          echo "   Please create the instance first or check the instance name"
           exit 1
         fi
-        
         echo "✅ Found existing instance: genieacs-backend"
-        
-        # Get external IP
         EXTERNAL_IP=$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
         echo "   External IP: $EXTERNAL_IP"
-        echo "$EXTERNAL_IP" > /workspace/external-ip.txt
 
-  # Step 2: Add firewall rules for HSS (if not exist)
+  # Step 2: Add firewall rules
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'add-firewall-rules'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "🔥 Adding HSS firewall rules..."
-        
-        # HSS REST API (port 3000)
-        gcloud compute firewall-rules create allow-hss-api \
-          --allow tcp:3000 \
-          --target-tags=acs-server \
-          --description="HSS REST API" 2>/dev/null || echo "  ✓ allow-hss-api already exists"
-        
-        # HSS S6a Diameter (port 3868)
-        gcloud compute firewall-rules create allow-hss-s6a \
-          --allow tcp:3868 \
-          --target-tags=acs-server \
-          --description="HSS S6a Diameter interface for MME connections" 2>/dev/null || echo "  ✓ allow-hss-s6a already exists"
-        
-        echo "✅ Firewall rules configured"
+        gcloud compute firewall-rules create allow-hss-api --allow tcp:3000 --target-tags=acs-server 2>/dev/null || echo "✓ Firewall rule exists"
+        gcloud compute firewall-rules create allow-hss-s6a --allow tcp:3868 --target-tags=acs-server 2>/dev/null || echo "✓ Firewall rule exists"
+        echo "✅ Firewall configured"
 
-  # Step 3: Package HSS module and upload to Cloud Storage
+  # Step 3: Package and upload HSS
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'package-hss'
+    id: 'upload-hss'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "📦 Packaging HSS module..."
-        
-        # Create bucket for deployment
         gsutil mb -p lte-pci-mapper-65450042-bbf71 gs://hss-deploy-${BUILD_ID} 2>/dev/null || true
-        
-        # Package HSS module
-        cd hss-module
-        tar -czf /workspace/hss-module.tar.gz .
-        cd ..
-        
-        # Upload to Cloud Storage
-        gsutil cp /workspace/hss-module.tar.gz gs://hss-deploy-${BUILD_ID}/hss-module.tar.gz
-        
-        echo "✅ HSS module packaged and uploaded"
+        cd hss-module && tar -czf /workspace/hss-module.tar.gz . && cd ..
+        gsutil cp /workspace/hss-module.tar.gz gs://hss-deploy-${BUILD_ID}/
+        echo "✅ HSS packaged"
 
   # Step 4: Create deployment script
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'create-deployment-script'
+    id: 'create-script'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "📝 Creating deployment script..."
-        
-        # Get secrets
         MONGODB_URI=$(gcloud secrets versions access latest --secret="mongodb-uri")
         HSS_KEY=$(gcloud secrets versions access latest --secret="hss-encryption-key")
         
-        # Create comprehensive deployment script
-        cat > /tmp/deploy-hss-full.sh << 'DEPLOY'
-#!/bin/bash
-set -e
-
-echo "═══════════════════════════════════════════════════════"
-echo "  🚀 Adding HSS to Existing ACS Server"
-echo "═══════════════════════════════════════════════════════"
-echo ""
-
-# Download HSS module
-echo "📥 Downloading HSS module..."
-cd /tmp
-gsutil cp gs://hss-deploy-*/hss-module.tar.gz ./
-
-# Setup directory
-echo "📂 Setting up HSS directory..."
-mkdir -p /opt/hss-server
-tar -xzf hss-module.tar.gz -C /opt/hss-server/
-
-# Install dependencies
-echo "📦 Installing dependencies..."
-cd /opt/hss-server
-npm install --production --silent
-npm install milenage mongodb express cors --silent
-
-# Create config file
-echo "⚙️  Creating configuration..."
-cat > /opt/hss-server/config.json << 'CONFIG'
-{
-  "server": {
-    "host": "0.0.0.0",
-    "rest_api_port": 3000,
-    "s6a_port": 3868
-  },
-  "diameter": {
-    "realm": "lte-pci-mapper.com",
-    "identity": "hss.lte-pci-mapper.com",
-    "vendor_id": 10415
-  },
-  "mongodb": {
-    "uri": "MONGODB_URI_PLACEHOLDER",
-    "database": "hss"
-  },
-  "acs_integration": {
-    "enabled": true,
-    "sync_interval_minutes": 5,
-    "genieacs_mongodb_uri": "MONGODB_URI_PLACEHOLDER",
-    "genieacs_database": "genieacs"
-  },
-  "features": {
-    "capture_imei": true,
-    "track_sessions": true,
-    "audit_logging": true
-  }
-}
-CONFIG
-
-# Replace placeholders with actual values
-sed -i "s|MONGODB_URI_PLACEHOLDER|${MONGODB_URI}|g" /opt/hss-server/config.json
-
-# Initialize database
-echo "🗄️  Initializing HSS database..."
-export MONGODB_URI="${MONGODB_URI}"
-export HSS_ENCRYPTION_KEY="${HSS_KEY}"
-cd /opt/hss-server
-node scripts/init-database.js 2>/dev/null || echo "  ✓ Database already initialized"
-
-# Create systemd service
-echo "⚙️  Creating HSS systemd service..."
-cat > /etc/systemd/system/hss.service << 'SERVICE'
-[Unit]
-Description=Cloud HSS Server
-After=network.target docker.service
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/hss-server
-Environment="NODE_ENV=production"
-Environment="HSS_ENCRYPTION_KEY=HSS_KEY_PLACEHOLDER"
-Environment="MONGODB_URI=MONGODB_URI_PLACEHOLDER"
-ExecStart=/usr/bin/node /opt/hss-server/server.js
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-# Replace placeholders
-sed -i "s|HSS_KEY_PLACEHOLDER|${HSS_KEY}|g" /etc/systemd/system/hss.service
-sed -i "s|MONGODB_URI_PLACEHOLDER|${MONGODB_URI}|g" /etc/systemd/system/hss.service
-
-# Start HSS service
-echo "🚀 Starting HSS service..."
-systemctl daemon-reload
-systemctl enable hss
-systemctl restart hss
-
-# Wait for HSS to start
-sleep 5
-
-# Check HSS status
-if systemctl is-active --quiet hss; then
-  echo "✅ HSS service is running"
-else
-  echo "⚠️  HSS service may not be running, check logs"
-  journalctl -u hss -n 20
-fi
-
-# Update Nginx configuration (add HSS routes)
-echo "⚙️  Updating Nginx configuration..."
-if [ ! -f /etc/nginx/sites-available/acs-hss-updated ]; then
-  cat > /etc/nginx/sites-available/acs-hss << 'NGINXCONF'
-server {
-    listen 80 default_server;
-    server_name _;
-    client_max_body_size 100M;
-    
-    # HSS REST API
-    location /api/hss/ {
-        proxy_pass http://localhost:3000/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-    
-    # GenieACS NBI API (existing)
-    location /nbi/ {
-        proxy_pass http://localhost:7557/;
-        proxy_set_header Host \$host;
-    }
-    
-    # GenieACS File Server (existing)
-    location /fs/ {
-        proxy_pass http://localhost:7567/;
-        client_max_body_size 500M;
-    }
-    
-    # GenieACS UI (existing)
-    location /admin/ {
-        proxy_pass http://localhost:3333/;
-    }
-    
-    # Existing backend API (if any)
-    location /api/ {
-        proxy_pass http://localhost:8080/;
-        proxy_set_header Host \$host;
-    }
-    
-    # Health check
-    location /health {
-        access_log off;
-        return 200 'healthy';
-        add_header Content-Type text/plain;
-    }
-}
-NGINXCONF
-
-  # Enable site
-  ln -sf /etc/nginx/sites-available/acs-hss /etc/nginx/sites-enabled/
-  rm -f /etc/nginx/sites-enabled/default
-  
-  # Test and reload
-  nginx -t && systemctl reload nginx
-  
-  touch /etc/nginx/sites-available/acs-hss-updated
-  echo "✅ Nginx updated"
-else
-  echo "  ✓ Nginx already configured"
-fi
-
-echo ""
-echo "═══════════════════════════════════════════════════════"
-echo "  ✅ HSS INSTALLATION COMPLETE"
-echo "═══════════════════════════════════════════════════════"
-echo ""
-echo "Services Status:"
-systemctl status hss --no-pager | head -5
-echo ""
-echo "Test HSS:"
-echo "  curl http://localhost:3000/health"
-curl -s http://localhost:3000/health || echo "HSS not responding yet"
-echo ""
-echo "═══════════════════════════════════════════════════════"
-
-# Mark completion
-echo "$(date): HSS deployed successfully" >> /var/log/hss-deployment.log
-DEPLOY
-
-        # Replace placeholders in deployment script
-        sed -i "s|MONGODB_URI_PLACEHOLDER|${MONGODB_URI}|g" /tmp/deploy-hss-full.sh
-        sed -i "s|HSS_KEY_PLACEHOLDER|${HSS_KEY}|g" /tmp/deploy-hss-full.sh
+        cat > /workspace/deploy.sh << 'EOF'
+        #!/bin/bash
+        set -ex
+        cd /tmp
+        gsutil cp gs://hss-deploy-*/hss-module.tar.gz ./
+        mkdir -p /opt/hss-server
+        tar -xzf hss-module.tar.gz -C /opt/hss-server/
+        cd /opt/hss-server
+        npm install --production
+        npm install milenage mongodb express cors
+        EOF
         
-        # Upload deployment script
-        gsutil cp /tmp/deploy-hss-full.sh gs://hss-deploy-${BUILD_ID}/deploy-hss-full.sh
+        cat >> /workspace/deploy.sh << EOF
+        cat > /opt/hss-server/config.json << 'CONF'
+        {"server":{"host":"0.0.0.0","rest_api_port":3000,"s6a_port":3868},"diameter":{"realm":"lte-pci-mapper.com","identity":"hss.lte-pci-mapper.com"},"mongodb":{"uri":"${MONGODB_URI}","database":"hss"},"acs_integration":{"enabled":true,"sync_interval_minutes":5}}
+        CONF
+        export MONGODB_URI='${MONGODB_URI}'
+        export HSS_ENCRYPTION_KEY='${HSS_KEY}'
+        node scripts/init-database.js || true
+        cat > /etc/systemd/system/hss.service << 'SVC'
+        [Unit]
+        Description=HSS Server
+        After=network.target
+        [Service]
+        WorkingDirectory=/opt/hss-server
+        Environment="HSS_ENCRYPTION_KEY=${HSS_KEY}"
+        Environment="MONGODB_URI=${MONGODB_URI}"
+        ExecStart=/usr/bin/node server.js
+        Restart=always
+        [Install]
+        WantedBy=multi-user.target
+        SVC
+        systemctl daemon-reload
+        systemctl enable hss
+        systemctl restart hss
+        sleep 3
+        systemctl status hss
+        echo "HSS deployed" > /var/log/hss-deployed.log
+        EOF
         
-        echo "✅ Deployment script created"
+        gsutil cp /workspace/deploy.sh gs://hss-deploy-${BUILD_ID}/deploy.sh
+        echo "✅ Script created"
 
-  # Step 5: Execute deployment via instance metadata
+  # Step 5: Execute deployment
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'execute-deployment'
+    id: 'deploy'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "🚀 Executing deployment on existing instance..."
-        
-        # Download and execute deployment script using startup-script
-        SCRIPT_URL="gs://hss-deploy-${BUILD_ID}/deploy-hss-full.sh"
-        
         gcloud compute instances add-metadata genieacs-backend --zone=us-central1-a \
-          --metadata startup-script-url="${SCRIPT_URL}"
-        
-        # Trigger script execution by resetting instance
-        echo "Restarting instance to run deployment..."
+          --metadata startup-script-url=gs://hss-deploy-${BUILD_ID}/deploy.sh
         gcloud compute instances reset genieacs-backend --zone=us-central1-a --quiet
-        
-        # Wait for instance to come back online and deploy
-        echo "Waiting for deployment to complete (this takes ~3 minutes)..."
+        echo "⏳ Waiting for deployment (180 seconds)..."
         sleep 180
-        
-        echo "✅ Deployment executed"
+        echo "✅ Deployment complete"
 
-  # Step 6: Verify and report
+  # Step 6: Verify
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'verify-and-cleanup'
+    id: 'verify'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         EXTERNAL_IP=$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-        
         echo ""
-        echo "═══════════════════════════════════════════════════════════"
-        echo "  ✅ HSS ADDED TO EXISTING ACS SERVER"
-        echo "═══════════════════════════════════════════════════════════"
-        echo ""
-        echo "🌐 External IP: $EXTERNAL_IP"
-        echo ""
-        echo "📡 Your Services:"
-        echo "   HSS REST API:     http://$EXTERNAL_IP/api/hss/"
-        echo "   HSS S6a:          $EXTERNAL_IP:3868"
-        echo "   GenieACS NBI:     http://$EXTERNAL_IP/nbi/ (existing)"
-        echo "   GenieACS CWMP:    http://$EXTERNAL_IP:7547 (existing)"
-        echo "   GenieACS UI:      http://$EXTERNAL_IP/admin/ (existing)"
-        echo "   Health Check:     http://$EXTERNAL_IP/health"
-        echo ""
-        echo "🧪 Test HSS API:"
-        echo "   curl http://$EXTERNAL_IP/api/hss/health"
-        echo ""
-        echo "📝 Next Steps:"
-        echo "   1. Test: curl http://$EXTERNAL_IP/health"
-        echo "   2. View in Compute Engine console"
-        echo "   3. Initialize sample data (see init-hss-sample-data.sh)"
-        echo "   4. Open web UI: https://lte-pci-mapper-65450042-bbf71.web.app"
-        echo ""
-        echo "═══════════════════════════════════════════════════════════"
-        
-        # Cleanup temporary storage
+        echo "════════════════════════════════════════════════"
+        echo "  ✅ HSS DEPLOYED"
+        echo "════════════════════════════════════════════════"
+        echo "IP: $EXTERNAL_IP"
+        echo "HSS API: http://$EXTERNAL_IP/api/hss/"
+        echo "Test: curl http://$EXTERNAL_IP/api/hss/health"
+        echo "════════════════════════════════════════════════"
         gsutil -m rm -r gs://hss-deploy-${BUILD_ID} 2>/dev/null || true
-        
-        echo ""
-        echo "✅ Deployment complete and verified"
 
-timeout: 3600s
-options:
-  machineType: 'N1_HIGHCPU_8'
-  logging: CLOUD_LOGGING_ONLY
-
+timeout: 1800s
