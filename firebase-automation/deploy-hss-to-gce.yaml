@@ -1,0 +1,396 @@
+# Cloud Build Configuration for Automated HSS Deployment to GCE
+# Triggered automatically by Firebase App Hosting
+
+steps:
+  # Step 1: Create or update GCE instance for ACS/HSS server
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'create-or-update-gce-instance'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Check if instance exists
+        if gcloud compute instances describe genieacs-backend --zone=us-central1-a &>/dev/null; then
+          echo "✅ Instance genieacs-backend already exists"
+        else
+          echo "Creating new GCE instance: genieacs-backend"
+          
+          # Create static IP if doesn't exist
+          gcloud compute addresses create genieacs-backend-ip --region=us-central1 || true
+          
+          # Get the static IP
+          STATIC_IP=$(gcloud compute addresses describe genieacs-backend-ip --region=us-central1 --format='get(address)')
+          echo "Static IP: $STATIC_IP"
+          
+          # Create firewall rules
+          gcloud compute firewall-rules create allow-acs-http --allow tcp:80,tcp:443 --target-tags=acs-server || true
+          gcloud compute firewall-rules create allow-acs-tr069 --allow tcp:7547 --target-tags=acs-server || true
+          gcloud compute firewall-rules create allow-hss-api --allow tcp:3000 --target-tags=acs-server || true
+          gcloud compute firewall-rules create allow-hss-s6a --allow tcp:3868 --target-tags=acs-server || true
+          gcloud compute firewall-rules create allow-stun --allow udp:3478 --target-tags=acs-server || true
+          
+          # Create instance
+          gcloud compute instances create genieacs-backend \
+            --zone=us-central1-a \
+            --machine-type=e2-standard-2 \
+            --image-family=ubuntu-2204-lts \
+            --image-project=ubuntu-os-cloud \
+            --boot-disk-size=50GB \
+            --boot-disk-type=pd-balanced \
+            --tags=acs-server,http-server,https-server \
+            --address=$STATIC_IP \
+            --metadata=google-logging-enabled=true,google-monitoring-enabled=true \
+            --scopes=https://www.googleapis.com/auth/cloud-platform
+          
+          echo "✅ Instance created successfully"
+        fi
+  
+  # Step 2: Wait for instance to be ready
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'wait-for-instance'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "⏳ Waiting for instance to be ready..."
+        for i in {1..30}; do
+          if gcloud compute ssh genieacs-backend --zone=us-central1-a --command="echo ready" &>/dev/null; then
+            echo "✅ Instance is ready"
+            break
+          fi
+          echo "Attempt $i/30: Instance not ready yet..."
+          sleep 10
+        done
+  
+  # Step 3: Install Docker and base dependencies
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'install-dependencies'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud compute ssh genieacs-backend --zone=us-central1-a --command="
+          set -e
+          
+          # Update system
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+          
+          # Install Node.js 20
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          
+          # Install MongoDB client tools
+          wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+          echo 'deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse' | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          sudo apt-get update
+          sudo apt-get install -y mongodb-mongosh
+          
+          # Install Docker
+          sudo apt-get install -y docker.io docker-compose
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo usermod -aG docker \$USER
+          
+          # Install nginx
+          sudo apt-get install -y nginx
+          
+          echo '✅ Base dependencies installed'
+        "
+  
+  # Step 4: Copy HSS module to instance
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-hss-module'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Create tarball of HSS module
+        cd hss-module
+        tar -czf /workspace/hss-module.tar.gz .
+        cd ..
+        
+        # Copy to instance
+        gcloud compute scp /workspace/hss-module.tar.gz genieacs-backend:~ --zone=us-central1-a
+        
+        # Extract and setup
+        gcloud compute ssh genieacs-backend --zone=us-central1-a --command="
+          set -e
+          
+          # Create HSS directory
+          sudo mkdir -p /opt/hss-server
+          sudo chown \$USER:
+\$USER /opt/hss-server
+          
+          # Extract HSS module
+          tar -xzf hss-module.tar.gz -C /opt/hss-server/
+          
+          # Install dependencies
+          cd /opt/hss-server
+          npm install --production
+          npm install milenage
+          
+          echo '✅ HSS module deployed'
+        "
+  
+  # Step 5: Configure HSS
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'configure-hss'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Get MongoDB URI from Secret Manager
+        MONGODB_URI=$(gcloud secrets versions access latest --secret="mongodb-uri")
+        HSS_ENCRYPTION_KEY=$(gcloud secrets versions access latest --secret="hss-encryption-key" || echo "")
+        
+        # Generate encryption key if doesn't exist
+        if [ -z "$HSS_ENCRYPTION_KEY" ]; then
+          HSS_ENCRYPTION_KEY=$(openssl rand -hex 32)
+          echo -n "$HSS_ENCRYPTION_KEY" | gcloud secrets create hss-encryption-key --data-file=- || \
+          echo -n "$HSS_ENCRYPTION_KEY" | gcloud secrets versions add hss-encryption-key --data-file=-
+        fi
+        
+        # Create config file
+        cat > /tmp/hss-config.json <<'EOF'
+        {
+          "server": {
+            "host": "0.0.0.0",
+            "rest_api_port": 3000,
+            "s6a_port": 3868
+          },
+          "diameter": {
+            "realm": "lte-pci-mapper.com",
+            "identity": "hss.lte-pci-mapper.com",
+            "vendor_id": 10415,
+            "product_name": "Cloud HSS"
+          },
+          "mongodb": {
+            "uri": "${MONGODB_URI}",
+            "database": "hss"
+          },
+          "acs_integration": {
+            "enabled": true,
+            "sync_interval_minutes": 5,
+            "genieacs_mongodb_uri": "${MONGODB_URI}",
+            "genieacs_database": "genieacs"
+          }
+        }
+        EOF
+        
+        # Copy config and setup environment
+        gcloud compute scp /tmp/hss-config.json genieacs-backend:/opt/hss-server/config.json --zone=us-central1-a
+        
+        # Setup HSS service
+        gcloud compute ssh genieacs-backend --zone=us-central1-a --command="
+          # Create systemd service
+          sudo tee /etc/systemd/system/hss.service > /dev/null <<'SYSTEMD'
+        [Unit]
+        Description=Cloud HSS Server
+        After=network.target
+        
+        [Service]
+        Type=simple
+        User=\$USER
+        WorkingDirectory=/opt/hss-server
+        Environment=\"NODE_ENV=production\"
+        Environment=\"HSS_ENCRYPTION_KEY=$HSS_ENCRYPTION_KEY\"
+        Environment=\"MONGODB_URI=$MONGODB_URI\"
+        ExecStart=/usr/bin/node /opt/hss-server/server.js
+        Restart=always
+        RestartSec=10
+        StandardOutput=journal
+        StandardError=journal
+        
+        [Install]
+        WantedBy=multi-user.target
+        SYSTEMD
+          
+          # Initialize HSS database
+          cd /opt/hss-server
+          HSS_ENCRYPTION_KEY='$HSS_ENCRYPTION_KEY' MONGODB_URI='$MONGODB_URI' node scripts/init-database.js || true
+          
+          # Enable and start service
+          sudo systemctl daemon-reload
+          sudo systemctl enable hss
+          sudo systemctl start hss
+          
+          echo '✅ HSS service configured and started'
+        "
+  
+  # Step 6: Deploy GenieACS (if not already deployed)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-genieacs'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        MONGODB_URI=$(gcloud secrets versions access latest --secret="mongodb-uri")
+        
+        gcloud compute ssh genieacs-backend --zone=us-central1-a --command="
+          # Check if GenieACS is already running
+          if docker ps | grep -q genieacs; then
+            echo '✅ GenieACS already running'
+            exit 0
+          fi
+          
+          # Create GenieACS docker-compose
+          sudo mkdir -p /opt/genieacs
+          sudo tee /opt/genieacs/docker-compose.yml > /dev/null <<'COMPOSE'
+        version: '3.8'
+        services:
+          genieacs-cwmp:
+            image: drumsergio/genieacs:latest
+            container_name: genieacs-cwmp
+            restart: always
+            network_mode: host
+            environment:
+              - GENIEACS_CWMP_INTERFACE=0.0.0.0
+              - GENIEACS_CWMP_PORT=7547
+              - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
+            command: genieacs-cwmp
+          
+          genieacs-nbi:
+            image: drumsergio/genieacs:latest
+            container_name: genieacs-nbi
+            restart: always
+            network_mode: host
+            environment:
+              - GENIEACS_NBI_INTERFACE=0.0.0.0
+              - GENIEACS_NBI_PORT=7557
+              - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
+            command: genieacs-nbi
+          
+          genieacs-fs:
+            image: drumsergio/genieacs:latest
+            container_name: genieacs-fs
+            restart: always
+            network_mode: host
+            environment:
+              - GENIEACS_FS_INTERFACE=0.0.0.0
+              - GENIEACS_FS_PORT=7567
+              - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
+            command: genieacs-fs
+          
+          genieacs-ui:
+            image: drumsergio/genieacs:latest
+            container_name: genieacs-ui
+            restart: always
+            network_mode: host
+            environment:
+              - GENIEACS_UI_INTERFACE=0.0.0.0
+              - GENIEACS_UI_PORT=3333
+              - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
+            command: genieacs-ui
+        COMPOSE
+          
+          # Start GenieACS
+          cd /opt/genieacs
+          sudo docker-compose up -d
+          
+          echo '✅ GenieACS deployed'
+        "
+  
+  # Step 7: Configure Nginx reverse proxy
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'configure-nginx'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud compute ssh genieacs-backend --zone=us-central1-a --command="
+          sudo tee /etc/nginx/sites-available/acs-hss > /dev/null <<'NGINX'
+        server {
+            listen 80 default_server;
+            listen [::]:80 default_server;
+            
+            server_name _;
+            
+            # HSS REST API
+            location /api/hss/ {
+                proxy_pass http://localhost:3000/api/;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host \$host;
+                proxy_cache_bypass \$http_upgrade;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            }
+            
+            # GenieACS NBI API
+            location /nbi/ {
+                proxy_pass http://localhost:7557/;
+                proxy_http_version 1.1;
+                proxy_set_header Host \$host;
+            }
+            
+            # GenieACS File Server
+            location /fs/ {
+                proxy_pass http://localhost:7567/;
+                proxy_http_version 1.1;
+                proxy_set_header Host \$host;
+            }
+            
+            # GenieACS UI
+            location /admin/ {
+                proxy_pass http://localhost:3333/;
+                proxy_http_version 1.1;
+                proxy_set_header Host \$host;
+            }
+            
+            # Health check
+            location /health {
+                access_log off;
+                return 200 'healthy';
+                add_header Content-Type text/plain;
+            }
+        }
+        NGINX
+          
+          # Enable site
+          sudo ln -sf /etc/nginx/sites-available/acs-hss /etc/nginx/sites-enabled/
+          sudo rm -f /etc/nginx/sites-enabled/default
+          
+          # Test and reload nginx
+          sudo nginx -t && sudo systemctl reload nginx
+          
+          echo '✅ Nginx configured'
+        "
+  
+  # Step 8: Get external IP and update Firebase config
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'update-firebase-config'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        EXTERNAL_IP=$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        
+        echo "═══════════════════════════════════════════════════════════"
+        echo "  ✅ DEPLOYMENT COMPLETE"
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+        echo "🌐 External IP: $EXTERNAL_IP"
+        echo ""
+        echo "📡 Service Endpoints:"
+        echo "   HSS API:          http://$EXTERNAL_IP/api/hss/"
+        echo "   HSS S6a:          $EXTERNAL_IP:3868"
+        echo "   GenieACS NBI:     http://$EXTERNAL_IP/nbi/"
+        echo "   GenieACS CWMP:    http://$EXTERNAL_IP:7547"
+        echo "   GenieACS UI:      http://$EXTERNAL_IP/admin/"
+        echo ""
+        echo "📝 Update your apphosting.yaml with:"
+        echo "   VITE_HSS_API_URL: http://$EXTERNAL_IP/api/hss"
+        echo "   PUBLIC_GENIEACS_NBI_URL: http://$EXTERNAL_IP/nbi"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        
+        # Store IP in a file for next steps
+        echo "$EXTERNAL_IP" > /workspace/external-ip.txt
+
+timeout: 3600s  # 60 minutes timeout
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+

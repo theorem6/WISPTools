@@ -49,13 +49,13 @@
       path: '/modules/coverage-planning'
     },
     {
-      id: 'spectrum-management',
-      name: 'Spectrum Management',
-      description: 'Frequency planning and interference analysis',
-      icon: '🌐',
+      id: 'hss-management',
+      name: 'HSS & Subscriber Management',
+      description: 'Home Subscriber Server - IMSI/Ki/OPc management with groups and bandwidth plans',
+      icon: '🔐',
       color: '#f59e0b',
-      status: 'coming-soon',
-      path: '/modules/spectrum-management'
+      status: 'active',
+      path: '/modules/hss-management'
     }
   ];
 
