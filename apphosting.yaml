@@ -288,40 +288,46 @@ env:
 
   # ==========================================
   # GCE BACKEND CONFIGURATION
-  # REPLACE <GCE-IP> WITH YOUR ACTUAL GCE EXTERNAL IP
+  # Backend Server: 136.112.111.167
   # ==========================================
   - variable: PUBLIC_BACKEND_API_URL
-    value: "http://<GCE-IP>/api"
+    value: "http://136.112.111.167:3000/api"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_NBI_URL
-    value: "http://<GCE-IP>/nbi"
+    value: "http://136.112.111.167:7557"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_CWMP_URL
-    value: "http://<GCE-IP>:7547"
+    value: "http://136.112.111.167:7547"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_FS_URL
-    value: "http://<GCE-IP>/fs"
+    value: "http://136.112.111.167:7567"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_UI_URL
-    value: "http://<GCE-IP>/admin"
+    value: "http://136.112.111.167:3333"
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: VITE_HSS_API_URL
+    value: "http://136.112.111.167:3000"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: PUBLIC_STUN_SERVER
-    value: "stun:<GCE-IP>:3478"
+    value: "stun:136.112.111.167:3478"
     availability:
       - BUILD
       - RUNTIME
