@@ -12,7 +12,6 @@
   import GrantStatus from './components/GrantStatus.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import UserIDSelector from './components/UserIDSelector.svelte';
-  import type { SASUserID } from '$lib/services/googleSASUserService';
   
   // State
   let devices: CBSDDevice[] = [];
@@ -26,7 +25,6 @@
   let showGrantRequestModal = false;
   let showSettingsModal = false;
   let showUserIDSelector = false;
-  let availableUserIDs: SASUserID[] = [];
   let currentUserID: string | null = null;
   let currentUserIDDisplay: string | null = null;
   
@@ -624,77 +622,25 @@
   }
   
   async function handleShowUserIDSelector() {
-    try {
-      console.log('[CBRS] Opening User ID selector...');
-      
-      // Check if user has Google OAuth setup
-      if (!cbrsConfig?.googleEmail) {
-        error = 'Please configure Google SAS authentication in Settings first';
-        setTimeout(() => error = null, 5000);
-        return;
-      }
-      
-      // Import Google auth store
-      const { googleAuthStore } = await import('$lib/services/googleOAuthService');
-      await googleAuthStore.initialize(tenantId);
-      
-      // Check if authenticated
-      if (!googleAuthStore.isAuthenticated()) {
-        error = 'Please sign in with Google in Settings first';
-        setTimeout(() => error = null, 5000);
-        return;
-      }
-      
-      // Get access token
-      const accessToken = googleAuthStore.getAccessToken();
-      if (!accessToken) {
-        error = 'Google authentication expired. Please sign in again in Settings.';
-        setTimeout(() => error = null, 5000);
-        return;
-      }
-      
-      // Fetch User IDs
-      const { fetchAuthorizedSASUserIDs } = await import('$lib/services/googleSASUserService');
-      
-      availableUserIDs = await fetchAuthorizedSASUserIDs(
-        tenantId,
-        cbrsConfig.googleEmail,
-        accessToken
-      );
-      
-      if (availableUserIDs.length === 0) {
-        error = 'No SAS User IDs found for your account';
-        setTimeout(() => error = null, 5000);
-        return;
-      }
-      
-      console.log('[CBRS] Found', availableUserIDs.length, 'User IDs');
-      showUserIDSelector = true;
-      
-    } catch (err: any) {
-      console.error('[CBRS] Error opening User ID selector:', err);
-      error = 'Failed to load User IDs: ' + (err?.message || 'Unknown error');
-      setTimeout(() => error = null, 5000);
-    }
+    console.log('[CBRS] Opening User ID selector...');
+    // UserIDSelector will handle authentication and User ID fetching internally
+    showUserIDSelector = true;
   }
   
-  async function handleMainUserIDSelect(event: CustomEvent<SASUserID>) {
-    const selectedUserId = event.detail;
-    console.log('[CBRS] User ID selected from main page:', selectedUserId.userId);
+  async function handleMainUserIDSelect(event: CustomEvent) {
+    const { userId, googleEmail, accessToken } = event.detail;
+    console.log('[CBRS] User ID selected from main page:', userId);
     
-    currentUserID = selectedUserId.userId;
-    currentUserIDDisplay = selectedUserId.displayName || selectedUserId.userId;
+    currentUserID = userId;
+    currentUserIDDisplay = userId;
     showUserIDSelector = false;
     
     // Load installations for this User ID
     await handleUserIdSelected({
       detail: {
-        userId: selectedUserId.userId,
-        googleEmail: cbrsConfig?.googleEmail,
-        accessToken: await (async () => {
-          const { googleAuthStore } = await import('$lib/services/googleOAuthService');
-          return googleAuthStore.getAccessToken();
-        })()
+        userId,
+        googleEmail,
+        accessToken
       }
     } as CustomEvent);
   }
@@ -1252,14 +1198,12 @@
   tenantId={tenantId}
   on:close={() => showSettingsModal = false}
   on:save={handleSaveSettings}
-  on:userIdSelected={handleUserIdSelected}
 />
 
-<!-- User ID Selector Modal (Main Page) -->
+<!-- User ID / Network Selector Modal (includes Google login) -->
 <UserIDSelector
   show={showUserIDSelector}
-  userIds={availableUserIDs}
-  googleEmail={cbrsConfig?.googleEmail || ''}
+  tenantId={tenantId}
   on:select={handleMainUserIDSelect}
   on:close={() => showUserIDSelector = false}
 />
