@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { auth, db } from '$lib/firebase';
-  import { getCurrentTenantId } from '$lib/models/tenant';
+  import { auth } from '$lib/firebase';
   import SubscriberList from './components/SubscriberList.svelte';
   import GroupManagement from './components/GroupManagement.svelte';
   import BandwidthPlans from './components/BandwidthPlans.svelte';
@@ -10,7 +9,7 @@
   import BulkImport from './components/BulkImport.svelte';
   
   let activeTab = 'dashboard';
-  let tenantId = '';
+  let tenantId = 'tenant_001'; // Default tenant ID
   let stats: any = null;
   let loading = true;
   let error = '';
@@ -20,7 +19,11 @@
   
   onMount(async () => {
     try {
-      tenantId = await getCurrentTenantId();
+      // Get tenant ID from user if available
+      const user = auth.currentUser;
+      if (user) {
+        tenantId = user.uid; // Use user ID as tenant ID for now
+      }
       await loadStats();
     } catch (err: any) {
       error = err.message;
