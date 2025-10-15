@@ -248,34 +248,99 @@ npm install
 echo "⚙️ Creating service..."
 sudo tee /etc/systemd/system/hss.service > /dev/null << EOF
 [Unit]
-Description=HSS Server
+Description=Cloud HSS Server - Home Subscriber Server
 After=network.target
+
 [Service]
+Type=simple
+User=$USER
 WorkingDirectory=/opt/hss-server
+Environment="NODE_ENV=production"
 Environment="HSS_ENCRYPTION_KEY=$HSS_KEY"
 Environment="MONGODB_URI=$MONGODB_URI"
 ExecStart=/usr/bin/node server.js
 Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hss
+
 [Install]
 WantedBy=multi-user.target
 EOF
 
 # Start service
-echo "🚀 Starting HSS..."
+echo "🚀 Starting HSS daemon..."
 sudo systemctl daemon-reload
 sudo systemctl enable hss
 sudo systemctl start hss
-sleep 2
 
-# Test
+echo "⏳ Waiting for HSS to start (5 seconds)..."
+sleep 5
+
+# Verify service is running
 echo ""
-echo "✅ Installation complete!"
+echo "═══════════════════════════════════════════════════════════"
+if sudo systemctl is-active --quiet hss; then
+  echo "  ✅ HSS SERVICE IS RUNNING"
+else
+  echo "  ❌ HSS SERVICE FAILED TO START"
+  echo ""
+  echo "Error logs:"
+  sudo journalctl -u hss -n 20 --no-pager
+  exit 1
+fi
+echo "═══════════════════════════════════════════════════════════"
 echo ""
-sudo systemctl status hss --no-pager | head -10
+
+# Show service status
+echo "📊 Service Status:"
+sudo systemctl status hss --no-pager | head -15
 echo ""
-curl -s http://localhost:3000/health
+
+# Check port is listening
+echo "🔌 Port Check:"
+if sudo netstat -tulpn | grep -q ":3000"; then
+  echo "  ✅ HSS listening on port 3000"
+else
+  echo "  ⚠️  Port 3000 not listening yet"
+fi
 echo ""
-echo "🔑 Your encryption key: $HSS_KEY"
-echo "⚠️  SAVE THIS KEY!"
+
+# Test API
+echo "🧪 API Test:"
+HEALTH_RESPONSE=$(curl -s http://localhost:3000/health 2>&1)
+if echo "$HEALTH_RESPONSE" | grep -q "healthy"; then
+  echo "  ✅ HSS API responding: $HEALTH_RESPONSE"
+else
+  echo "  ⚠️  HSS API not responding yet"
+  echo "  Response: $HEALTH_RESPONSE"
+fi
+echo ""
+
+# Display important info
+echo "═══════════════════════════════════════════════════════════"
+echo "  ✅ HSS INSTALLATION COMPLETE"
+echo "═══════════════════════════════════════════════════════════"
+echo ""
+echo "🔑 Encryption Key (SAVE THIS!):"
+echo "   $HSS_KEY"
+echo ""
+echo "📡 HSS Endpoints:"
+echo "   REST API: http://localhost:3000/api/"
+echo "   Health:   http://localhost:3000/health"
+echo ""
+echo "🔧 Service Management:"
+echo "   Status:  sudo systemctl status hss"
+echo "   Start:   sudo systemctl start hss"
+echo "   Stop:    sudo systemctl stop hss"
+echo "   Restart: sudo systemctl restart hss"
+echo "   Logs:    sudo journalctl -u hss -f"
+echo ""
+echo "📊 Test API:"
+echo "   curl http://localhost:3000/health"
+echo "   curl http://localhost:3000/api/subscribers -H 'X-Tenant-ID: tenant_001'"
+echo ""
+echo "═══════════════════════════════════════════════════════════"
 echo ""
 
