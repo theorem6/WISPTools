@@ -36,53 +36,25 @@ cd /opt/genieacs
 
 # Create docker-compose.yml
 echo "⚙️  Creating GenieACS configuration..."
-cat > docker-compose.yml << EOF
+cat > docker-compose.yml << 'EOF'
 version: '3.8'
 
 services:
-  genieacs-cwmp:
+  genieacs:
     image: drumsergio/genieacs:latest
-    container_name: genieacs-cwmp
+    container_name: genieacs
     restart: always
-    network_mode: host
+    ports:
+      - "7547:7547"
+      - "7557:7557"
+      - "7567:7567"
+      - "3333:3000"
     environment:
-      - GENIEACS_CWMP_INTERFACE=0.0.0.0
+      - GENIEACS_MONGODB_CONNECTION_URL=mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - GENIEACS_CWMP_PORT=7547
-      - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
-    command: genieacs-cwmp
-
-  genieacs-nbi:
-    image: drumsergio/genieacs:latest
-    container_name: genieacs-nbi
-    restart: always
-    network_mode: host
-    environment:
-      - GENIEACS_NBI_INTERFACE=0.0.0.0
       - GENIEACS_NBI_PORT=7557
-      - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
-    command: genieacs-nbi
-
-  genieacs-fs:
-    image: drumsergio/genieacs:latest
-    container_name: genieacs-fs
-    restart: always
-    network_mode: host
-    environment:
-      - GENIEACS_FS_INTERFACE=0.0.0.0
       - GENIEACS_FS_PORT=7567
-      - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
-    command: genieacs-fs
-
-  genieacs-ui:
-    image: drumsergio/genieacs:latest
-    container_name: genieacs-ui
-    restart: always
-    network_mode: host
-    environment:
-      - GENIEACS_UI_INTERFACE=0.0.0.0
-      - GENIEACS_UI_PORT=3333
-      - GENIEACS_MONGODB_CONNECTION_URL=$MONGODB_URI
-    command: genieacs-ui
+      - GENIEACS_UI_PORT=3000
 EOF
 
 # Start GenieACS containers
