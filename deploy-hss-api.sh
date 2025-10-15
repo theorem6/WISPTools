@@ -272,11 +272,123 @@ app.get('/groups', async (req, res) => {
   }
 });
 
+// Create group
+app.post('/groups', async (req, res) => {
+  try {
+    const group = new Group(req.body);
+    await group.save();
+    res.status(201).json(group);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update group
+app.put('/groups/:group_id', async (req, res) => {
+  try {
+    const group = await Group.findOneAndUpdate(
+      { group_id: req.params.group_id },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    res.json(group);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete group
+app.delete('/groups/:group_id', async (req, res) => {
+  try {
+    const group = await Group.findOneAndDelete({ group_id: req.params.group_id });
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    res.json({ message: 'Group deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all bandwidth plans
 app.get('/bandwidth-plans', async (req, res) => {
   try {
     const plans = await BandwidthPlan.find().sort({ name: 1 });
     res.json(plans);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create bandwidth plan
+app.post('/bandwidth-plans', async (req, res) => {
+  try {
+    const plan = new BandwidthPlan(req.body);
+    await plan.save();
+    res.status(201).json(plan);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update bandwidth plan
+app.put('/bandwidth-plans/:plan_id', async (req, res) => {
+  try {
+    const plan = await BandwidthPlan.findOneAndUpdate(
+      { plan_id: req.params.plan_id },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!plan) {
+      return res.status(404).json({ error: 'Bandwidth plan not found' });
+    }
+    res.json(plan);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete bandwidth plan
+app.delete('/bandwidth-plans/:plan_id', async (req, res) => {
+  try {
+    const plan = await BandwidthPlan.findOneAndDelete({ plan_id: req.params.plan_id });
+    if (!plan) {
+      return res.status(404).json({ error: 'Bandwidth plan not found' });
+    }
+    res.json({ message: 'Bandwidth plan deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk import subscribers
+app.post('/subscribers/bulk', async (req, res) => {
+  try {
+    const { subscribers } = req.body;
+    if (!Array.isArray(subscribers) || subscribers.length === 0) {
+      return res.status(400).json({ error: 'No subscribers provided' });
+    }
+
+    const results = {
+      success: true,
+      imported: 0,
+      errors: []
+    };
+
+    for (const sub of subscribers) {
+      try {
+        const subscriber = new Subscriber(sub);
+        await subscriber.save();
+        results.imported++;
+      } catch (error) {
+        results.errors.push(\`IMSI \${sub.imsi}: \${error.message}\`);
+      }
+    }
+
+    res.json(results);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
