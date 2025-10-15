@@ -198,30 +198,29 @@ curl http://136.112.111.167:3000/dashboard/stats
 ### Access GenieACS UI:
 Open in browser: http://136.112.111.167:3333
 
-## Quick Setup Commands
+## Quick Setup Commands (Google Cloud)
 
-**On your local machine (Windows):**
-```powershell
-cd Module_Manager
+### Deploy Backend HSS API (On Server 136.112.111.167)
+```bash
+# SSH into your server
+ssh root@136.112.111.167
 
-# Create .env file with backend IP
-@"
-PUBLIC_GENIEACS_NBI_URL=http://136.112.111.167:7557
-PUBLIC_GENIEACS_CWMP_URL=http://136.112.111.167:7547
-PUBLIC_GENIEACS_FS_URL=http://136.112.111.167:7567
-PUBLIC_GENIEACS_UI_URL=http://136.112.111.167:3333
-VITE_HSS_API_URL=http://136.112.111.167:3000
-PUBLIC_BACKEND_API_URL=http://136.112.111.167:3000/api
-"@ | Out-File -FilePath .env -Encoding UTF8
-
-# Build and deploy
-npm run build
-firebase deploy --only hosting
+# Deploy HSS Management API
+bash deploy-hss-api.sh
 ```
 
-**On your server (to deploy HSS API):**
+### Deploy Frontend (Via Google Cloud Build)
 ```bash
-# SSH into 136.112.111.167 and run the HSS API deployment script above
+# From your development machine (with gcloud CLI)
+# This builds and deploys the frontend via Cloud Build
+bash deploy-frontend-now.sh
+
+# Or manually trigger Cloud Build:
+gcloud builds submit \
+  --config=deploy-frontend-production.yaml \
+  --project=lte-pci-mapper-65450042-bbf71 \
+  --region=us-central1 \
+  .
 ```
 
 ## Summary
