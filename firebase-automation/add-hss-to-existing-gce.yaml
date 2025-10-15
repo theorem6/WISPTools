@@ -14,8 +14,8 @@ steps:
           exit 1
         fi
         echo "✅ Found existing instance: genieacs-backend"
-        EXTERNAL_IP=$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
-        echo "   External IP: $EXTERNAL_IP"
+        EXTERNAL_IP=$$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        echo "   External IP: $$EXTERNAL_IP"
 
   # Step 2: Add firewall rules
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -35,9 +35,10 @@ steps:
     args:
       - '-c'
       - |
-        gsutil mb -p lte-pci-mapper-65450042-bbf71 gs://hss-deploy-${BUILD_ID} 2>/dev/null || true
+        BUILD_BUCKET="hss-deploy-$BUILD_ID"
+        gsutil mb -p lte-pci-mapper-65450042-bbf71 gs://$$BUILD_BUCKET 2>/dev/null || true
         cd hss-module && tar -czf /workspace/hss-module.tar.gz . && cd ..
-        gsutil cp /workspace/hss-module.tar.gz gs://hss-deploy-${BUILD_ID}/
+        gsutil cp /workspace/hss-module.tar.gz gs://$$BUILD_BUCKET/
         echo "✅ HSS packaged"
 
   # Step 4: Create deployment script
@@ -47,8 +48,9 @@ steps:
     args:
       - '-c'
       - |
-        MONGODB_URI=$(gcloud secrets versions access latest --secret="mongodb-uri")
-        HSS_KEY=$(gcloud secrets versions access latest --secret="hss-encryption-key")
+        MONGODB_URI=$$(gcloud secrets versions access latest --secret="mongodb-uri")
+        HSS_KEY=$$(gcloud secrets versions access latest --secret="hss-encryption-key")
+        BUILD_BUCKET="hss-deploy-$BUILD_ID"
         
         cat > /workspace/deploy.sh << 'EOF'
         #!/bin/bash
@@ -62,35 +64,35 @@ steps:
         npm install milenage mongodb express cors
         EOF
         
-        cat >> /workspace/deploy.sh << EOF
-        cat > /opt/hss-server/config.json << 'CONF'
-        {"server":{"host":"0.0.0.0","rest_api_port":3000,"s6a_port":3868},"diameter":{"realm":"lte-pci-mapper.com","identity":"hss.lte-pci-mapper.com"},"mongodb":{"uri":"${MONGODB_URI}","database":"hss"},"acs_integration":{"enabled":true,"sync_interval_minutes":5}}
-        CONF
-        export MONGODB_URI='${MONGODB_URI}'
-        export HSS_ENCRYPTION_KEY='${HSS_KEY}'
+        cat >> /workspace/deploy.sh << DEPLOYEOF
+        cat > /opt/hss-server/config.json << 'CONFEOF'
+        {"server":{"host":"0.0.0.0","rest_api_port":3000,"s6a_port":3868},"diameter":{"realm":"lte-pci-mapper.com","identity":"hss.lte-pci-mapper.com"},"mongodb":{"uri":"$$MONGODB_URI","database":"hss"},"acs_integration":{"enabled":true,"sync_interval_minutes":5}}
+        CONFEOF
+        export MONGODB_URI='$$MONGODB_URI'
+        export HSS_ENCRYPTION_KEY='$$HSS_KEY'
         node scripts/init-database.js || true
-        cat > /etc/systemd/system/hss.service << 'SVC'
+        cat > /etc/systemd/system/hss.service << 'SVCEOF'
         [Unit]
         Description=HSS Server
         After=network.target
         [Service]
         WorkingDirectory=/opt/hss-server
-        Environment="HSS_ENCRYPTION_KEY=${HSS_KEY}"
-        Environment="MONGODB_URI=${MONGODB_URI}"
+        Environment="HSS_ENCRYPTION_KEY=$$HSS_KEY"
+        Environment="MONGODB_URI=$$MONGODB_URI"
         ExecStart=/usr/bin/node server.js
         Restart=always
         [Install]
         WantedBy=multi-user.target
-        SVC
+        SVCEOF
         systemctl daemon-reload
         systemctl enable hss
         systemctl restart hss
         sleep 3
         systemctl status hss
         echo "HSS deployed" > /var/log/hss-deployed.log
-        EOF
+        DEPLOYEOF
         
-        gsutil cp /workspace/deploy.sh gs://hss-deploy-${BUILD_ID}/deploy.sh
+        gsutil cp /workspace/deploy.sh gs://$$BUILD_BUCKET/deploy.sh
         echo "✅ Script created"
 
   # Step 5: Execute deployment
@@ -100,8 +102,9 @@ steps:
     args:
       - '-c'
       - |
+        BUILD_BUCKET="hss-deploy-$BUILD_ID"
         gcloud compute instances add-metadata genieacs-backend --zone=us-central1-a \
-          --metadata startup-script-url=gs://hss-deploy-${BUILD_ID}/deploy.sh
+          --metadata startup-script-url=gs://$$BUILD_BUCKET/deploy.sh
         gcloud compute instances reset genieacs-backend --zone=us-central1-a --quiet
         echo "⏳ Waiting for deployment (180 seconds)..."
         sleep 180
@@ -114,15 +117,16 @@ steps:
     args:
       - '-c'
       - |
-        EXTERNAL_IP=$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        EXT_IP=$$(gcloud compute instances describe genieacs-backend --zone=us-central1-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+        BUILD_BUCKET="hss-deploy-$BUILD_ID"
         echo ""
         echo "════════════════════════════════════════════════"
         echo "  ✅ HSS DEPLOYED"
         echo "════════════════════════════════════════════════"
-        echo "IP: $EXTERNAL_IP"
-        echo "HSS API: http://$EXTERNAL_IP/api/hss/"
-        echo "Test: curl http://$EXTERNAL_IP/api/hss/health"
+        echo "IP: $$EXT_IP"
+        echo "HSS API: http://$$EXT_IP/api/hss/"
+        echo "Test: curl http://$$EXT_IP/api/hss/health"
         echo "════════════════════════════════════════════════"
-        gsutil -m rm -r gs://hss-deploy-${BUILD_ID} 2>/dev/null || true
+        gsutil -m rm -r gs://$$BUILD_BUCKET 2>/dev/null || true
 
 timeout: 1800s
