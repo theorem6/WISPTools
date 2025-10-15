@@ -15,7 +15,7 @@
   let error = '';
   
   // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'http://localhost:3000';
+  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'http://136.112.111.167:3000';
   
   onMount(async () => {
     try {
