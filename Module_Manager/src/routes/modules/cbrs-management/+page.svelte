@@ -731,11 +731,15 @@
   }
 
   async function addSASInstallationsToMap(installations: any[]) {
-    if (!map || !map._graphicsLayer) return;
+    if (!map || !map._graphicsLayer) {
+      console.error('[CBRS] Map or graphics layer not available');
+      return;
+    }
     
     console.log('[CBRS] Adding', installations.length, 'installations to map');
     
     try {
+      console.log('[CBRS] Importing ArcGIS modules...');
       const [
         { default: Graphic },
         { default: Point },
@@ -749,6 +753,8 @@
         import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
         import('@arcgis/core/symbols/SimpleFillSymbol.js')
       ]);
+      
+      console.log('[CBRS] ArcGIS modules loaded successfully');
 
       // Clear existing markers
       map._graphicsLayer.removeAll();
@@ -796,22 +802,40 @@
         const heightType = installParams.heightType?.replace('HEIGHT_TYPE_', '') ?? 'AGL';
         const gain = installParams.antennaGain ?? 5;
         
-        // Create sector polygon for antenna coverage
-        const sectorPoints = createSectorPolygon(lon, lat, azimuth, beamwidth, 0.5); // 0.5 km radius
+        // Create sector polygon for antenna coverage (only if beamwidth < 360)
+        let sectorGraphic = null;
         
-        const sectorPolygon = new Polygon({
-          rings: [sectorPoints],
-          spatialReference: { wkid: 4326 }
-        });
-        
-        // Sector fill symbol - semi-transparent purple
-        const sectorSymbol = new SimpleFillSymbol({
-          color: [124, 58, 237, 0.3], // Purple with 30% opacity
-          outline: {
-            color: [124, 58, 237, 0.8],
-            width: 2
+        try {
+          if (beamwidth < 360) {
+            const sectorPoints = createSectorPolygon(lon, lat, azimuth, beamwidth, 0.5); // 0.5 km radius
+            
+            const sectorPolygon = new Polygon({
+              rings: [sectorPoints],
+              spatialReference: { wkid: 4326 }
+            });
+            
+            // Sector fill symbol - semi-transparent purple
+            const sectorSymbol = new SimpleFillSymbol({
+              color: [124, 58, 237, 0.3], // Purple with 30% opacity
+              outline: {
+                color: [124, 58, 237, 0.8],
+                width: 2
+              }
+            });
+            
+            sectorGraphic = {
+              geometry: sectorPolygon,
+              symbol: sectorSymbol,
+              attributes: {
+                type: 'sas_sector',
+                name: installation.displayName || installation.name || 'SAS Installation',
+                installation: installation
+              }
+            };
           }
-        });
+        } catch (err) {
+          console.warn('[CBRS] Failed to create sector for device:', installation.serialNumber, err);
+        }
         
         // Create site center marker - circle
         const siteSymbol = new SimpleMarkerSymbol({
@@ -841,23 +865,22 @@
           <b>Deployment:</b> ${installation.deploymentName || 'N/A'}
         `;
 
-        // Add sector polygon
-        const sectorGraphic = new Graphic({
-          geometry: sectorPolygon,
-          symbol: sectorSymbol,
-          attributes: {
-            type: 'sas_sector',
-            name: installation.displayName || installation.name || 'SAS Installation',
-            installation: installation
-          },
-          popupTemplate: {
-            title: `${installation.displayName || installation.serialNumber || 'SAS Installation'} - Coverage`,
-            content: popupContent
-          }
-        });
+        // Add sector polygon if created
+        if (sectorGraphic) {
+          const sectorGraphicObj = new Graphic({
+            geometry: sectorGraphic.geometry,
+            symbol: sectorGraphic.symbol,
+            attributes: sectorGraphic.attributes,
+            popupTemplate: {
+              title: `${installation.displayName || installation.serialNumber || 'SAS Installation'} - Coverage`,
+              content: popupContent
+            }
+          });
+          map._graphicsLayer.add(sectorGraphicObj);
+        }
 
         // Add site center marker
-        const siteGraphic = new Graphic({
+        const siteGraphicObj = new Graphic({
           geometry: point,
           symbol: siteSymbol,
           attributes: {
@@ -871,8 +894,7 @@
           }
         });
 
-        map._graphicsLayer.add(sectorGraphic);
-        map._graphicsLayer.add(siteGraphic);
+        map._graphicsLayer.add(siteGraphicObj);
         addedCount++;
       });
 
