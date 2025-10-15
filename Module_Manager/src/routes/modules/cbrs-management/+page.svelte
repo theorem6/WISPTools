@@ -141,14 +141,18 @@
         { default: GraphicsLayer },
         { default: SimpleMarkerSymbol },
         { default: Graphic },
-        { default: Point }
+        { default: Point },
+        { default: Polygon },
+        { default: SimpleFillSymbol }
       ] = await Promise.all([
         import('@arcgis/core/Map.js'),
         import('@arcgis/core/views/MapView.js'),
         import('@arcgis/core/layers/GraphicsLayer.js'),
         import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
         import('@arcgis/core/Graphic.js'),
-        import('@arcgis/core/geometry/Point.js')
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/geometry/Polygon.js'),
+        import('@arcgis/core/symbols/SimpleFillSymbol.js')
       ]);
 
       const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -695,6 +699,37 @@
     } as CustomEvent);
   }
   
+  // Helper function to create a sector polygon for antenna coverage
+  function createSectorPolygon(centerLon: number, centerLat: number, azimuth: number, beamwidth: number, radiusKm: number = 0.5): number[][] {
+    const points: number[][] = [];
+    
+    // Start at center
+    points.push([centerLon, centerLat]);
+    
+    // Calculate start and end angles
+    const startAngle = azimuth - (beamwidth / 2);
+    const endAngle = azimuth + (beamwidth / 2);
+    
+    // Convert km to approximate degrees (rough approximation: 1 degree ≈ 111 km)
+    const radiusDegrees = radiusKm / 111;
+    
+    // Create arc points (30 points for smooth curve)
+    const numPoints = 30;
+    for (let i = 0; i <= numPoints; i++) {
+      const angle = startAngle + (endAngle - startAngle) * (i / numPoints);
+      const radians = (angle - 90) * Math.PI / 180; // -90 to make 0° = North
+      
+      const x = centerLon + radiusDegrees * Math.cos(radians);
+      const y = centerLat + radiusDegrees * Math.sin(radians);
+      points.push([x, y]);
+    }
+    
+    // Close the polygon back to center
+    points.push([centerLon, centerLat]);
+    
+    return points;
+  }
+
   async function addSASInstallationsToMap(installations: any[]) {
     if (!map || !map._graphicsLayer) return;
     
@@ -704,13 +739,15 @@
       const [
         { default: Graphic },
         { default: Point },
+        { default: Polygon },
         { default: SimpleMarkerSymbol },
-        { default: TextSymbol }
+        { default: SimpleFillSymbol }
       ] = await Promise.all([
         import('@arcgis/core/Graphic.js'),
         import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/geometry/Polygon.js'),
         import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
-        import('@arcgis/core/symbols/TextSymbol.js')
+        import('@arcgis/core/symbols/SimpleFillSymbol.js')
       ]);
 
       // Clear existing markers
@@ -748,11 +785,39 @@
           return;
         }
 
-        // Create marker symbol - use purple/blue for SAS installations
-        const symbol = new SimpleMarkerSymbol({
-          style: 'diamond',
+        // Extract antenna parameters
+        const installParams = installation.activeConfig?.installationParams || 
+                             installation.preloadedConfig?.installationParams || 
+                             installation.installationParams || {};
+        
+        const azimuth = installParams.antennaAzimuth ?? 0;
+        const beamwidth = installParams.antennaBeamwidth ?? 360;
+        const height = installParams.height ?? 10;
+        const heightType = installParams.heightType?.replace('HEIGHT_TYPE_', '') ?? 'AGL';
+        const gain = installParams.antennaGain ?? 5;
+        
+        // Create sector polygon for antenna coverage
+        const sectorPoints = createSectorPolygon(lon, lat, azimuth, beamwidth, 0.5); // 0.5 km radius
+        
+        const sectorPolygon = new Polygon({
+          rings: [sectorPoints],
+          spatialReference: { wkid: 4326 }
+        });
+        
+        // Sector fill symbol - semi-transparent purple
+        const sectorSymbol = new SimpleFillSymbol({
+          color: [124, 58, 237, 0.3], // Purple with 30% opacity
+          outline: {
+            color: [124, 58, 237, 0.8],
+            width: 2
+          }
+        });
+        
+        // Create site center marker - circle
+        const siteSymbol = new SimpleMarkerSymbol({
+          style: 'circle',
           color: '#7c3aed', // Purple for SAS installations
-          size: '18px',
+          size: '10px',
           outline: {
             color: 'white',
             width: 2
@@ -764,27 +829,50 @@
           latitude: lat
         });
 
-        const graphic = new Graphic({
+        // Popup content
+        const popupContent = `
+          <b>Serial Number:</b> ${installation.serialNumber || 'N/A'}<br>
+          <b>FCC ID:</b> ${installation.fccId || 'N/A'}<br>
+          <b>Location:</b> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+          <b>Height:</b> ${height}m ${heightType}<br>
+          <b>Antenna Azimuth:</b> ${azimuth}°<br>
+          <b>Antenna Beamwidth:</b> ${beamwidth}°<br>
+          <b>Antenna Gain:</b> ${gain} dBi<br>
+          <b>Deployment:</b> ${installation.deploymentName || 'N/A'}
+        `;
+
+        // Add sector polygon
+        const sectorGraphic = new Graphic({
+          geometry: sectorPolygon,
+          symbol: sectorSymbol,
+          attributes: {
+            type: 'sas_sector',
+            name: installation.displayName || installation.name || 'SAS Installation',
+            installation: installation
+          },
+          popupTemplate: {
+            title: `${installation.displayName || installation.serialNumber || 'SAS Installation'} - Coverage`,
+            content: popupContent
+          }
+        });
+
+        // Add site center marker
+        const siteGraphic = new Graphic({
           geometry: point,
-          symbol: symbol,
+          symbol: siteSymbol,
           attributes: {
             type: 'sas_installation',
             name: installation.displayName || installation.name || 'SAS Installation',
             installation: installation
           },
           popupTemplate: {
-            title: installation.displayName || installation.name || 'SAS Installation',
-            content: `
-              <b>Name:</b> ${installation.displayName || installation.name || 'N/A'}<br>
-              <b>Location:</b> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
-              <b>Type:</b> SAS Installation<br>
-              ${installation.heightType ? `<b>Height Type:</b> ${installation.heightType}<br>` : ''}
-              ${installation.height ? `<b>Height:</b> ${installation.height}m<br>` : ''}
-            `
+            title: installation.displayName || installation.serialNumber || 'SAS Installation',
+            content: popupContent
           }
         });
 
-        map._graphicsLayer.add(graphic);
+        map._graphicsLayer.add(sectorGraphic);
+        map._graphicsLayer.add(siteGraphic);
         addedCount++;
       });
 
