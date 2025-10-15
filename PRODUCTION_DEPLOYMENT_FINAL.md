@@ -8,20 +8,34 @@
 
 ---
 
-## 🎯 **One Command Deployment**
+## 🎯 **Two-Step Deployment**
+
+### **Step 1: Create VM and Download rapid5gs** (5 minutes)
 
 ```bash
 chmod +x deploy-production-now.sh && ./deploy-production-now.sh
 ```
 
-This will:
-1. ✅ Create new GCE VM: `acs-hss-server` (Ubuntu 24.04)
-2. ✅ Install GenieACS (ports 7547, 7557, 3333)
-3. ✅ Install rapid5gs Open5GS HSS (port 3868)
-4. ✅ Configure cloud MongoDB Atlas connection
-5. ✅ Start all services
+This creates:
+1. ✅ New GCE VM: `acs-hss-server` (Ubuntu 24.04)
+2. ✅ Downloads rapid5gs to `/opt/rapid5gs`
+3. ✅ Installs Node.js, Docker, Git
 
-**Time**: ~10 minutes  
+### **Step 2: SSH and Complete Installation** (10 minutes)
+
+```bash
+# SSH to server
+gcloud compute ssh acs-hss-server --zone=us-central1-a
+
+# Run rapid5gs installer
+cd /opt/rapid5gs
+chmod +x install.sh
+sudo ./install.sh
+```
+
+Follow the prompts to configure your EPC/HSS.
+
+**Total Time**: ~15 minutes  
 **Result**: Production ACS + HSS server ready for MME connections
 
 ---
