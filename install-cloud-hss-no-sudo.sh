@@ -22,16 +22,29 @@ HSS_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex')
 EXTERNAL_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo "unknown")
 
 echo "📋 Configuration:"
-echo "  MongoDB Atlas: cluster0.1radgkw.mongodb.net"
+echo "  MongoDB: ✅ Cloud Atlas (cluster0.1radgkw.mongodb.net)"
+echo "           No local MongoDB installation needed!"
 echo "  External IP: $EXTERNAL_IP"
 echo "  Database: open5gs"
 echo ""
 echo "🔑 Encryption Key: $HSS_KEY"
 echo "   ⚠️  SAVE THIS KEY!"
 echo ""
+echo "⚠️  This script does NOT install MongoDB"
+echo "   Using existing cloud MongoDB Atlas connection"
+echo ""
+
+# Test MongoDB connection
+echo "🧪 Testing MongoDB Atlas connection..."
+if command -v mongosh &> /dev/null; then
+  mongosh "$MONGODB_URI" --quiet --eval "db.adminCommand('ping')" 2>&1 | grep -q "ok" && echo "  ✅ MongoDB Atlas connected" || echo "  ⚠️  MongoDB connection test failed (will retry during install)"
+else
+  echo "  ⏭️  Skipping test (mongosh not installed)"
+fi
+echo ""
 
 # ============================================================================
-# PART 1: Install Open5GS HSS
+# PART 1: Install Open5GS HSS (No local MongoDB needed!)
 # ============================================================================
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "PART 1: Installing Open5GS HSS Daemon"
@@ -265,4 +278,5 @@ echo ""
 echo "🔑 Encryption Key: $HSS_KEY"
 echo ""
 echo "═══════════════════════════════════════════════════════════"
+
 
