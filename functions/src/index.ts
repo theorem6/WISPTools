@@ -215,7 +215,7 @@ export const hssProxy = onRequest({
   timeoutSeconds: 60
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
-    const backendUrl = 'http://34.36.231.142:3000';
+    const backendUrl = 'http://136.112.111.167:3000';
     const path = req.path || '';
     const url = `${backendUrl}${path}`;
     

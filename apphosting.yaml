@@ -288,34 +288,34 @@ env:
 
   # ==========================================
   # GCE BACKEND CONFIGURATION
-  # Backend Server: 34.36.231.142
+  # Backend Server: 136.112.111.167 (acs-h)
   # ==========================================
   - variable: PUBLIC_BACKEND_API_URL
-    value: "http://34.36.231.142:3000/api"
+    value: "http://136.112.111.167:3000/api"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_NBI_URL
-    value: "http://34.36.231.142:7557"
+    value: "http://136.112.111.167:7557"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_CWMP_URL
-    value: "http://34.36.231.142:7547"
+    value: "http://136.112.111.167:7547"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_FS_URL
-    value: "http://34.36.231.142:7567"
+    value: "http://136.112.111.167:7567"
     availability:
       - BUILD
       - RUNTIME
   
   - variable: PUBLIC_GENIEACS_UI_URL
-    value: "http://34.36.231.142:3333"
+    value: "http://136.112.111.167:3333"
     availability:
       - BUILD
       - RUNTIME
@@ -327,7 +327,7 @@ env:
       - RUNTIME
 
   - variable: PUBLIC_STUN_SERVER
-    value: "stun:34.36.231.142:3478"
+    value: "stun:136.112.111.167:3478"
     availability:
       - BUILD
       - RUNTIME
