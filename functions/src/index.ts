@@ -212,35 +212,52 @@ function toRadians(degrees: number): number {
 export const hssProxy = onRequest({
   region: 'us-central1',
   memory: '256MiB',
-  timeoutSeconds: 60
+  timeoutSeconds: 60,
+  cors: true
 }, async (req, res) => {
-  return corsHandler(req, res, async () => {
-    const backendUrl = 'http://136.112.111.167:3000';
-    const path = req.path || '';
-    const url = `${backendUrl}${path}`;
+  // Set CORS headers explicitly
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
+  res.set('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send('');
+  }
+  
+  const backendUrl = 'http://136.112.111.167:3000';
+  const path = req.path || '';
+  const url = `${backendUrl}${path}`;
+  
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
     
-    try {
-      const options: RequestInit = {
-        method: req.method,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      };
-      
-      if (req.method !== 'GET' && req.method !== 'HEAD') {
-        options.body = JSON.stringify(req.body);
-      }
-      
-      const response = await fetch(url, options);
-      const data = await response.json();
-      
-      return res.status(response.status).json(data);
-    } catch (error: any) {
-      console.error('HSS Proxy Error:', error);
-      return res.status(500).json({ 
-        error: 'Proxy error', 
-        message: error.message 
-      });
+    // Forward x-tenant-id if present
+    if (req.headers['x-tenant-id']) {
+      headers['x-tenant-id'] = req.headers['x-tenant-id'] as string;
     }
-  });
+    
+    const options: RequestInit = {
+      method: req.method,
+      headers
+    };
+    
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      options.body = JSON.stringify(req.body);
+    }
+    
+    const response = await fetch(url, options);
+    const data = await response.json();
+    
+    return res.status(response.status).json(data);
+  } catch (error: any) {
+    console.error('HSS Proxy Error:', error);
+    return res.status(500).json({ 
+      error: 'Proxy error', 
+      message: error.message 
+    });
+  }
 });
