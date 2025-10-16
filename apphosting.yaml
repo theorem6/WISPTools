@@ -289,6 +289,7 @@ env:
   # ==========================================
   # GCE BACKEND CONFIGURATION
   # Backend Server: 136.112.111.167 (acs-h)
+  # Using Firebase Functions proxy for HTTPS
   # ==========================================
   - variable: PUBLIC_BACKEND_API_URL
     value: "http://136.112.111.167:3000/api"
