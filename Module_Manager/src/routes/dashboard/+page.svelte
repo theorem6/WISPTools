@@ -73,6 +73,15 @@
       color: '#f59e0b',
       status: 'active',
       path: '/modules/hss-management'
+    },
+    {
+      id: 'monitoring',
+      name: 'Monitoring & Alerts',
+      description: 'Real-time system monitoring, alerting, and audit logging across all modules',
+      icon: '🔍',
+      color: '#06b6d4',
+      status: 'active',
+      path: '/modules/monitoring'
     }
   ];
 

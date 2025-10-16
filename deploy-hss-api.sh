@@ -394,10 +394,23 @@ app.post('/subscribers/bulk', async (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Monitoring endpoints
+app.use('/monitoring', require('./monitoring-api'));
+
+// Start monitoring service
+const monitoringService = require('./monitoring-service');
+monitoringService.startMonitoring();
+
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 HSS Management API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔍 Monitoring enabled with auto-refresh`);
 });
 
 // Graceful shutdown
