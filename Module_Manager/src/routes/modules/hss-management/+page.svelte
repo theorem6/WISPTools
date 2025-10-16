@@ -102,8 +102,8 @@
   <div class="header">
     <div class="header-content">
       <div class="header-main">
-        <button class="back-button" on:click={() => window.location.href = '/modules'}>
-          ← Back to Modules
+        <button class="back-button" on:click={() => window.location.href = '/dashboard'}>
+          ← Back to Dashboard
         </button>
         <div>
           <h1>🔐 HSS & Subscriber Management</h1>

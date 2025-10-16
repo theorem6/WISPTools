@@ -185,8 +185,8 @@
   <!-- Header -->
   <div class="header">
     <div class="header-left">
-      <button class="back-button" on:click={() => window.location.href = '/modules'}>
-        ← Back to Modules
+      <button class="back-button" on:click={() => window.location.href = '/dashboard'}>
+        ← Back to Dashboard
       </button>
       <div>
         <h1>🔍 Monitoring & Alerts</h1>
