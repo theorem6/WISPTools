@@ -223,7 +223,8 @@ export const hssProxy = onRequest({
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
-    return res.status(204).send('');
+    res.status(204).send('');
+    return;
   }
   
   const backendUrl = 'http://136.112.111.167:3000';
@@ -252,10 +253,10 @@ export const hssProxy = onRequest({
     const response = await fetch(url, options);
     const data = await response.json();
     
-    return res.status(response.status).json(data);
+    res.status(response.status).json(data);
   } catch (error: any) {
     console.error('HSS Proxy Error:', error);
-    return res.status(500).json({ 
+    res.status(500).json({ 
       error: 'Proxy error', 
       message: error.message 
     });
