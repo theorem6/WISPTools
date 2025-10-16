@@ -35,6 +35,17 @@ The LTE WISP Management Platform is a comprehensive, enterprise-grade solution f
 - **Admin Console** - Platform-wide administration tools
 - **Tenant Switching** - Easy access to multiple organizations
 
+### 🔐 HSS & Subscriber Management
+- **Open5GS HSS** - Production-grade Home Subscriber Server
+- **S6a/Diameter Interface** - Standard 3GPP MME authentication
+- **Subscriber Management** - Full CRUD with IMSI, Ki, OPc, AMF, SQN
+- **Bandwidth Plans** - Speed tiers and QoS management
+- **Subscriber Groups** - Organize users with group policies
+- **Bulk Import** - CSV-based mass subscriber provisioning
+- **IMEI Capture** - Track device identifiers
+- **Remote MME Support** - Connect multiple MME sites
+- **MongoDB Atlas** - Cloud-based subscriber database
+
 ### 📡 CBRS Management Module
 - **Google SAS Integration** - Device registration, spectrum inquiry, grants
 - **Federated Wireless API** - Enhanced analytics and optimization
@@ -205,30 +216,29 @@ lte-pci-mapper/
 
 ## 📚 Documentation
 
-### Core Documentation
+👉 **[Complete Documentation Index](docs/README.md)** - All guides organized by category
 
-- **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** - Complete documentation index
-- **[BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)** - Build and deployment guide
-- **[MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md)** - Architecture overview
-- **[DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md)** - Database schema
+### Quick Links
 
-### Module Documentation
+#### **🚀 Getting Started:**
+- **[COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md)** ⭐ Start here to deploy the system
+- **[FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md)** - Current system status
+- **[GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md)** - Cloud infrastructure
 
-- **[CBRS_MODULE_COMPLETE.md](CBRS_MODULE_COMPLETE.md)** - CBRS management
-- **[Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md)** - ACS/TR-069
-- **[PCI_COLLISION_PREVENTION.md](PCI_COLLISION_PREVENTION.md)** - PCI optimization
+#### **🔐 HSS & Subscriber Management:**
+- **[HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)** - Complete HSS documentation
+- **[MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md)** - Connect remote MMEs
+- **[HSS_DEPLOYMENT_COMPLETE.md](docs/hss/HSS_DEPLOYMENT_COMPLETE.md)** - HSS system overview
 
-### Admin Documentation
+#### **📖 Feature Guides:**
+- **[MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md)** - Multi-tenancy
+- **[CBRS_HYBRID_MODEL_GUIDE.md](docs/guides/CBRS_HYBRID_MODEL_GUIDE.md)** - CBRS/SAS
+- **[TR069_FIRMWARE_UPGRADE_GUIDE.md](docs/guides/TR069_FIRMWARE_UPGRADE_GUIDE.md)** - CPE management
+- **[DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md)** - Database schema
 
-- **[ADMIN_AND_USER_MANAGEMENT.md](ADMIN_AND_USER_MANAGEMENT.md)** - User management
-- **[TENANT_DELETION_GUIDE.md](TENANT_DELETION_GUIDE.md)** - Tenant administration
-- **[ONE_TENANT_PER_USER.md](ONE_TENANT_PER_USER.md)** - User policies
-
-### API & Integration
-
-- **[CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md)** - API key setup
-- **[CBRS_HYBRID_MODEL_GUIDE.md](CBRS_HYBRID_MODEL_GUIDE.md)** - Deployment models
-- **[TR069_FIRMWARE_UPGRADE_GUIDE.md](TR069_FIRMWARE_UPGRADE_GUIDE.md)** - Firmware management
+#### **👤 Administration:**
+- **[ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md)** - User roles
+- **[TENANT_DELETION_GUIDE.md](docs/guides/TENANT_DELETION_GUIDE.md)** - Tenant management
 
 ## 🚢 Deployment
 

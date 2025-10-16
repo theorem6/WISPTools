@@ -1,170 +1,218 @@
-# LTE WISP Management Platform - Documentation Index
+# 📚 Complete Documentation Index
 
-## 📚 Table of Contents
-
-### 🚀 Getting Started
-- **[README.md](README.md)** - Project overview, features, and quick start
-- **[BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md)** - How to build and run the application
-- **[Module_Manager/README.md](Module_Manager/README.md)** - Module Manager specific setup
-- **[Module_Manager/QUICK_START.md](Module_Manager/QUICK_START.md)** - Quick start guide for Module Manager
-
-### 🏗️ Architecture & Design
-- **[MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md)** - Complete multi-tenant system architecture
-- **[DATA_MODEL.md](DATA_MODEL.md)** - Data structures and models
-- **[DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md)** - Firestore database schema and organization
-- **[THEME_SYSTEM.md](THEME_SYSTEM.md)** - UI theming system (light/dark mode)
-- **[Module_Manager/AUTHENTICATION_FLOW.md](Module_Manager/AUTHENTICATION_FLOW.md)** - Authentication implementation
-
-### 👥 Multi-Tenant Management
-- **[MULTI_TENANT_SETUP_GUIDE.md](MULTI_TENANT_SETUP_GUIDE.md)** - Comprehensive tenant setup guide
-- **[ADMIN_AND_USER_MANAGEMENT.md](ADMIN_AND_USER_MANAGEMENT.md)** - Admin and user roles, permissions
-- **[ONE_TENANT_PER_USER.md](ONE_TENANT_PER_USER.md)** - One tenant per user policy
-- **[TENANT_DELETION_GUIDE.md](TENANT_DELETION_GUIDE.md)** - How to delete tenants (admin)
-
-### 📡 CBRS Management Module
-- **[CBRS_MODULE_COMPLETE.md](CBRS_MODULE_COMPLETE.md)** - Complete CBRS module documentation
-- **[CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md)** - How to obtain Google SAS and Federated Wireless API keys
-- **[CBRS_HYBRID_MODEL_GUIDE.md](CBRS_HYBRID_MODEL_GUIDE.md)** - Hybrid API key deployment model
-- **[create-google-sas-service-account.md](create-google-sas-service-account.md)** - Creating Google SAS service account
-- **[Module_Manager/src/routes/modules/cbrs-management/README.md](Module_Manager/src/routes/modules/cbrs-management/README.md)** - CBRS module technical documentation
-
-### 🌐 ACS/TR-069 CPE Management
-- **[Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md)** - ACS CPE Management module documentation
-- **[Module_Manager/src/routes/modules/acs-cpe-management/TR069_MONITORING_GUIDE.md](Module_Manager/src/routes/modules/acs-cpe-management/TR069_MONITORING_GUIDE.md)** - TR-069 monitoring guide
-- **[TR069_FIRMWARE_UPGRADE_GUIDE.md](TR069_FIRMWARE_UPGRADE_GUIDE.md)** - Firmware upgrade procedures
-
-### 📶 PCI Planning & Optimization
-- **[PCI_COLLISION_PREVENTION.md](PCI_COLLISION_PREVENTION.md)** - Enhanced PCI collision prevention
-- **[Module_Manager/PCI_MODULE_INTEGRATION.md](Module_Manager/PCI_MODULE_INTEGRATION.md)** - PCI module integration details
-
-### 🎨 User Interface
-- **[UI_TOOLTIPS_GUIDE.md](UI_TOOLTIPS_GUIDE.md)** - Tooltip system and usage
-
-### 🔐 Deployment & Configuration
-- **[setup-apphosting-secrets.md](setup-apphosting-secrets.md)** - Firebase App Hosting secrets configuration
-- **[grant-secret-access.md](grant-secret-access.md)** - Granting App Hosting access to secrets
-- **[Module_Manager/FIREBASE_ENV_SETUP.md](Module_Manager/FIREBASE_ENV_SETUP.md)** - Firebase environment configuration
-
-### 📦 Third-Party Integrations
-- **[gce-backend/README.md](gce-backend/README.md)** - GCE backend service
-- **[genieacs-fork/README.md](genieacs-fork/README.md)** - GenieACS fork documentation
-- **[genieacs-fork/CONTRIBUTING.md](genieacs-fork/CONTRIBUTING.md)** - Contributing to GenieACS fork
-- **[genieacs-fork/CHANGELOG.md](genieacs-fork/CHANGELOG.md)** - GenieACS changelog
-
-### 📱 Equipment-Specific
-- **[nokia/README.md](nokia/README.md)** - Nokia equipment specific documentation
+**Last Updated:** October 16, 2025  
+**Version:** 2.0 - Organized Structure
 
 ---
 
-## 🗂️ Documentation by Topic
+## 🎯 **Start Here**
 
-### For New Users
-Start here if you're new to the platform:
-1. [README.md](README.md) - Understand what the platform does
-2. [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) - Set up your development environment
-3. [Module_Manager/QUICK_START.md](Module_Manager/QUICK_START.md) - Get up and running quickly
-4. [MULTI_TENANT_SETUP_GUIDE.md](MULTI_TENANT_SETUP_GUIDE.md) - Create your first organization
+### **New to the Platform?**
+1. [README.md](README.md) - Platform overview and features
+2. [docs/deployment/COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) - Deploy the system
+3. [docs/hss/HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) - HSS operations
 
-### For Administrators
-Managing the platform and users:
-1. [ADMIN_AND_USER_MANAGEMENT.md](ADMIN_AND_USER_MANAGEMENT.md) - User roles and permissions
-2. [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md) - Understanding the architecture
-3. [TENANT_DELETION_GUIDE.md](TENANT_DELETION_GUIDE.md) - Managing tenants
-4. [ONE_TENANT_PER_USER.md](ONE_TENANT_PER_USER.md) - User limits and policies
+### **Deploying the System?**
+1. [docs/deployment/COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) ⭐ **Step-by-step**
+2. [docs/deployment/FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md) - Current status
+3. [docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md) - Cloud setup
 
-### For CBRS Operators
-Setting up and managing CBRS devices:
-1. [CBRS_MODULE_COMPLETE.md](CBRS_MODULE_COMPLETE.md) - Complete module overview
-2. [CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md) - Get your API keys
-3. [CBRS_HYBRID_MODEL_GUIDE.md](CBRS_HYBRID_MODEL_GUIDE.md) - Choose deployment model
-4. [create-google-sas-service-account.md](create-google-sas-service-account.md) - Google SAS setup
-
-### For WISP Operators
-Managing CPE devices and network:
-1. [Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md) - ACS module
-2. [TR069_FIRMWARE_UPGRADE_GUIDE.md](TR069_FIRMWARE_UPGRADE_GUIDE.md) - Firmware management
-3. [PCI_COLLISION_PREVENTION.md](PCI_COLLISION_PREVENTION.md) - Network optimization
-
-### For Developers
-Technical implementation details:
-1. [MULTI_TENANT_ARCHITECTURE.md](MULTI_TENANT_ARCHITECTURE.md) - System architecture
-2. [DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md) - Database schema
-3. [DATA_MODEL.md](DATA_MODEL.md) - Data models
-4. [Module_Manager/AUTHENTICATION_FLOW.md](Module_Manager/AUTHENTICATION_FLOW.md) - Authentication
-5. [Module_Manager/FIREBASE_ENV_SETUP.md](Module_Manager/FIREBASE_ENV_SETUP.md) - Environment setup
-
-### For DevOps
-Deployment and configuration:
-1. [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) - Building the application
-2. [setup-apphosting-secrets.md](setup-apphosting-secrets.md) - Secret management
-3. [grant-secret-access.md](grant-secret-access.md) - Permission management
-4. [Module_Manager/FIREBASE_ENV_SETUP.md](Module_Manager/FIREBASE_ENV_SETUP.md) - Firebase config
+### **Connecting an MME?**
+1. [docs/hss/MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) - Complete MME configuration
 
 ---
 
-## 🔍 Quick Reference
+## 📁 **Documentation by Category**
 
-### Common Tasks
+### **🔐 HSS & Subscriber Management** `docs/hss/`
 
-| Task | Documentation |
-|------|---------------|
-| Set up development environment | [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) |
-| Create your first tenant | [MULTI_TENANT_SETUP_GUIDE.md](MULTI_TENANT_SETUP_GUIDE.md) |
-| Add CBRS devices | [CBRS_MODULE_COMPLETE.md](CBRS_MODULE_COMPLETE.md) |
-| Manage CPE devices | [Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md) |
-| Optimize PCI assignments | [PCI_COLLISION_PREVENTION.md](PCI_COLLISION_PREVENTION.md) |
-| Configure API keys | [CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md) |
-| Delete a tenant | [TENANT_DELETION_GUIDE.md](TENANT_DELETION_GUIDE.md) |
-| Upgrade firmware | [TR069_FIRMWARE_UPGRADE_GUIDE.md](TR069_FIRMWARE_UPGRADE_GUIDE.md) |
-| Customize theme | [THEME_SYSTEM.md](THEME_SYSTEM.md) |
-| Deploy to Firebase | [setup-apphosting-secrets.md](setup-apphosting-secrets.md) |
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) | Complete HSS system guide | All users |
+| [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) | Remote MME configuration | Network engineers |
+| [HSS_DEPLOYMENT_COMPLETE.md](docs/hss/HSS_DEPLOYMENT_COMPLETE.md) | HSS master overview | Administrators |
 
-### Troubleshooting
-
-| Issue | Documentation |
-|-------|---------------|
-| Authentication problems | [Module_Manager/AUTHENTICATION_FLOW.md](Module_Manager/AUTHENTICATION_FLOW.md) |
-| Tenant not loading | [ONE_TENANT_PER_USER.md](ONE_TENANT_PER_USER.md) |
-| API key issues | [CBRS_API_KEY_SETUP_GUIDE.md](CBRS_API_KEY_SETUP_GUIDE.md) |
-| Secret access denied | [grant-secret-access.md](grant-secret-access.md) |
-| PCI conflicts | [PCI_COLLISION_PREVENTION.md](PCI_COLLISION_PREVENTION.md) |
+**Topics Covered:**
+- Open5GS HSS configuration
+- S6a/Diameter protocol
+- FreeDiameter setup
+- Subscriber management workflows
+- MongoDB schema
+- Security and TLS
+- Monitoring and troubleshooting
+- Multi-site MME deployment
 
 ---
 
-## 📝 Module-Specific Documentation
+### **🚀 Deployment & Setup** `docs/deployment/`
 
-Each major module has its own README with detailed information:
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) ⭐ | Step-by-step deployment | DevOps |
+| [FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md) | Current system status | All users |
+| [GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md) | GCP infrastructure | DevOps |
+| [BUILD_INSTRUCTIONS.md](docs/deployment/BUILD_INSTRUCTIONS.md) | Build process | Developers |
+| [DEPLOY_HSS_PROXY.md](docs/deployment/DEPLOY_HSS_PROXY.md) | Firebase Functions proxy | DevOps |
+| [SIMPLE_CLOUD_HTTPS_FIX.md](docs/deployment/SIMPLE_CLOUD_HTTPS_FIX.md) | HTTPS solutions | DevOps |
 
-- **CBRS Management**: [Module_Manager/src/routes/modules/cbrs-management/README.md](Module_Manager/src/routes/modules/cbrs-management/README.md)
-- **ACS CPE Management**: [Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md)
-- **PCI Planning**: [Module_Manager/PCI_MODULE_INTEGRATION.md](Module_Manager/PCI_MODULE_INTEGRATION.md)
-
----
-
-## 🤝 Contributing
-
-See individual module CONTRIBUTING.md files:
-- **GenieACS Fork**: [genieacs-fork/CONTRIBUTING.md](genieacs-fork/CONTRIBUTING.md)
-
----
-
-## 📜 License & Legal
-
-Project documentation and code are provided as-is. See individual module licenses for third-party components.
+**Topics Covered:**
+- Google Cloud setup
+- Firebase App Hosting
+- Cloud Build automation
+- Secret Manager
+- HTTPS/SSL configuration
+- Firebase Functions deployment
 
 ---
 
-## 🆘 Getting Help
+### **📘 Feature & Module Guides** `docs/guides/`
 
-1. Check this index for relevant documentation
-2. Search the documentation for keywords
-3. Review module-specific READMEs
-4. Check troubleshooting sections
-5. Contact platform administrators
+#### **Tenant Management:**
+| Document | Description |
+|----------|-------------|
+| [MULTI_TENANT_ARCHITECTURE.md](docs/guides/MULTI_TENANT_ARCHITECTURE.md) | Architecture overview |
+| [MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md) | Setup instructions |
+| [ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md) | Admin features |
+| [TENANT_DELETION_GUIDE.md](docs/guides/TENANT_DELETION_GUIDE.md) | Delete tenants |
+| [ONE_TENANT_PER_USER.md](docs/guides/ONE_TENANT_PER_USER.md) | User model |
+
+#### **CBRS & Spectrum:**
+| Document | Description |
+|----------|-------------|
+| [CBRS_HYBRID_MODEL_GUIDE.md](docs/guides/CBRS_HYBRID_MODEL_GUIDE.md) | CBRS implementation |
+| [CBRS_MODULE_COMPLETE.md](docs/guides/CBRS_MODULE_COMPLETE.md) | Module overview |
+| [CBRS_API_KEY_SETUP_GUIDE.md](docs/guides/CBRS_API_KEY_SETUP_GUIDE.md) | API configuration |
+| [GOOGLE_OAUTH_SETUP.md](docs/guides/GOOGLE_OAUTH_SETUP.md) | OAuth setup |
+| [SETUP_GOOGLE_OAUTH_CLIENTID.md](docs/guides/SETUP_GOOGLE_OAUTH_CLIENTID.md) | Client ID setup |
+
+#### **Network & Devices:**
+| Document | Description |
+|----------|-------------|
+| [PCI_COLLISION_PREVENTION.md](docs/guides/PCI_COLLISION_PREVENTION.md) | PCI management |
+| [TR069_FIRMWARE_UPGRADE_GUIDE.md](docs/guides/TR069_FIRMWARE_UPGRADE_GUIDE.md) | CPE firmware |
+
+#### **Data & UI:**
+| Document | Description |
+|----------|-------------|
+| [DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md) | Database schema |
+| [DATA_MODEL.md](docs/guides/DATA_MODEL.md) | Data models |
+| [THEME_SYSTEM.md](docs/guides/THEME_SYSTEM.md) | UI theming |
+| [UI_TOOLTIPS_GUIDE.md](docs/guides/UI_TOOLTIPS_GUIDE.md) | Tooltip system |
 
 ---
 
-**Last Updated**: October 2025  
-**Version**: 2.0  
-**Platform**: LTE WISP Management Platform
+### **🗂️ Module-Specific Documentation**
 
+#### **Frontend (Module_Manager/):**
+| Document | Description |
+|----------|-------------|
+| [Module_Manager/README.md](Module_Manager/README.md) | Frontend overview |
+| [Module_Manager/QUICK_START.md](Module_Manager/QUICK_START.md) | Quick start |
+| [Module_Manager/AUTHENTICATION_FLOW.md](Module_Manager/AUTHENTICATION_FLOW.md) | Auth flow |
+| [Module_Manager/FIREBASE_ENV_SETUP.md](Module_Manager/FIREBASE_ENV_SETUP.md) | Environment |
+| [Module_Manager/PCI_MODULE_INTEGRATION.md](Module_Manager/PCI_MODULE_INTEGRATION.md) | PCI module |
+
+#### **HSS Module:**
+| Document | Description |
+|----------|-------------|
+| [Module_Manager/src/routes/modules/hss-management/README.md](Module_Manager/src/routes/modules/hss-management/README.md) | HSS module docs |
+
+#### **CBRS Module:**
+| Document | Description |
+|----------|-------------|
+| [Module_Manager/src/routes/modules/cbrs-management/README.md](Module_Manager/src/routes/modules/cbrs-management/README.md) | CBRS module docs |
+
+#### **ACS/CPE Module:**
+| Document | Description |
+|----------|-------------|
+| [Module_Manager/src/routes/modules/acs-cpe-management/README.md](Module_Manager/src/routes/modules/acs-cpe-management/README.md) | ACS module docs |
+| [Module_Manager/src/routes/modules/acs-cpe-management/TR069_MONITORING_GUIDE.md](Module_Manager/src/routes/modules/acs-cpe-management/TR069_MONITORING_GUIDE.md) | TR-069 monitoring |
+
+---
+
+### **🗄️ Archived Documentation** `docs/archived/`
+
+Superseded documentation kept for reference:
+- SETUP_HSS_WITH_4GENGINEER.md
+- HTTPS_SETUP_OPTIONS.md
+- FRONTEND_BACKEND_CONNECTION.md
+- PRODUCTION_DEPLOYMENT_FINAL.md
+- COMPLETE_REFACTORING_SUMMARY.md
+- CBRS_CREDENTIALS_GUIDE.md
+- TENANT_SYSTEM_REFACTOR.md
+- COMPLETE_TENANT_SETUP_FIX.md
+- TENANT_SETUP_AUTHENTICATION_FIX.md
+
+---
+
+## 🔍 **Find Documentation By Task**
+
+| I want to... | Document |
+|--------------|----------|
+| Deploy the complete system | [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md) |
+| Understand the HSS | [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md) |
+| Connect an MME | [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md) |
+| Add subscribers | [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)#subscriber-management |
+| Create groups and plans | [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)#workflows |
+| Manage tenants | [MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md) |
+| Set up CBRS/SAS | [CBRS_HYBRID_MODEL_GUIDE.md](docs/guides/CBRS_HYBRID_MODEL_GUIDE.md) |
+| Manage CPE devices | [TR069_FIRMWARE_UPGRADE_GUIDE.md](docs/guides/TR069_FIRMWARE_UPGRADE_GUIDE.md) |
+| Optimize PCI | [PCI_COLLISION_PREVENTION.md](docs/guides/PCI_COLLISION_PREVENTION.md) |
+| Build from source | [BUILD_INSTRUCTIONS.md](docs/deployment/BUILD_INSTRUCTIONS.md) |
+| Deploy to Google Cloud | [GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md) |
+| Set up HTTPS | [SIMPLE_CLOUD_HTTPS_FIX.md](docs/deployment/SIMPLE_CLOUD_HTTPS_FIX.md) |
+| Understand the database | [DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md) |
+| Customize the UI | [THEME_SYSTEM.md](docs/guides/THEME_SYSTEM.md) |
+
+---
+
+## 📊 **Documentation Statistics**
+
+- **Total Documents:** 45+ files
+- **Total Lines:** ~15,000+ lines
+- **Categories:** 4 (HSS, Deployment, Guides, Archived)
+- **Modules:** 5 (HSS, CBRS, ACS/TR-069, PCI, Tenant Management)
+- **Deployment Guides:** 6
+- **Feature Guides:** 20+
+- **Archived:** 9
+
+---
+
+## 🏆 **Most Important Documents**
+
+### **Top 5 for Deployment:**
+1. [COMPLETE_DEPLOYMENT_NOW.md](docs/deployment/COMPLETE_DEPLOYMENT_NOW.md)
+2. [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)
+3. [GOOGLE_CLOUD_DEPLOYMENT.md](docs/deployment/GOOGLE_CLOUD_DEPLOYMENT.md)
+4. [FINAL_DEPLOYMENT_STATUS.md](docs/deployment/FINAL_DEPLOYMENT_STATUS.md)
+5. [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md)
+
+### **Top 5 for Operations:**
+1. [HSS_PRODUCTION_GUIDE.md](docs/hss/HSS_PRODUCTION_GUIDE.md)
+2. [MME_CONNECTION_GUIDE.md](docs/hss/MME_CONNECTION_GUIDE.md)
+3. [ADMIN_AND_USER_MANAGEMENT.md](docs/guides/ADMIN_AND_USER_MANAGEMENT.md)
+4. [DATABASE_STRUCTURE.md](docs/guides/DATABASE_STRUCTURE.md)
+5. [MULTI_TENANT_SETUP_GUIDE.md](docs/guides/MULTI_TENANT_SETUP_GUIDE.md)
+
+---
+
+## 🔄 **Document Maintenance**
+
+**How to Update:**
+1. Edit relevant .md file in `docs/` directory
+2. Update "Last Updated" timestamp
+3. Commit with descriptive message
+4. Update this index if adding new documents
+
+**Quality Standards:**
+- ✅ Clear headings and structure
+- ✅ Code examples with syntax highlighting
+- ✅ Step-by-step instructions
+- ✅ Troubleshooting sections
+- ✅ Links to related documents
+- ✅ Tables for quick reference
+- ✅ Command-line examples
+
+---
+
+**For the latest documentation, see: [docs/README.md](docs/README.md)**
