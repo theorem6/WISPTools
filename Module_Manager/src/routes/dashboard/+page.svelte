@@ -254,35 +254,6 @@
       </div>
     </div>
   </section>
-
-  <!-- Quick Stats -->
-  <section class="stats-section">
-    <div class="container">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">📊</div>
-          <div class="stat-content">
-            <div class="stat-value">2</div>
-            <div class="stat-label">Active Modules</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">🚀</div>
-          <div class="stat-content">
-            <div class="stat-value">3</div>
-            <div class="stat-label">Coming Soon</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">⚡</div>
-          <div class="stat-content">
-            <div class="stat-value">∞</div>
-            <div class="stat-label">Possibilities</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 </div>
 </TenantGuard>
 
@@ -559,46 +530,6 @@
     font-size: 0.875rem;
   }
 
-  /* Stats Section */
-  .stats-section {
-    background-color: var(--bg-secondary);
-    padding: 3rem 0;
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
-  .stat-card {
-    background-color: var(--card-bg);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    border: 1px solid var(--border-color);
-  }
-
-  .stat-icon {
-    font-size: 2.5rem;
-  }
-
-  .stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 0.25rem;
-  }
-
-  .stat-label {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
   /* Responsive */
   @media (max-width: 768px) {
     .modules-grid {
@@ -623,10 +554,6 @@
 
     .tenant-info {
       padding: 0.5rem;
-    }
-
-    .stats-grid {
-      grid-template-columns: 1fr;
     }
   }
 </style>
