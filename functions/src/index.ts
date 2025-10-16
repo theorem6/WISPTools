@@ -207,3 +207,42 @@ function calculateDistance(cell1: any, cell2: any): number {
 function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
+
+// HSS API Proxy - Provides HTTPS endpoint for HTTP backend
+export const hssProxy = onRequest({
+  region: 'us-central1',
+  memory: '256MiB',
+  timeoutSeconds: 60
+}, async (req, res) => {
+  return corsHandler(req, res, async () => {
+    const backendUrl = 'http://34.36.231.142:3000';
+    const path = req.path || '';
+    const url = `${backendUrl}${path}`;
+    
+    try {
+      const fetch = (await import('node-fetch')).default;
+      
+      const options: any = {
+        method: req.method,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        options.body = JSON.stringify(req.body);
+      }
+      
+      const response = await fetch(url, options);
+      const data = await response.json();
+      
+      return res.status(response.status).json(data);
+    } catch (error: any) {
+      console.error('HSS Proxy Error:', error);
+      return res.status(500).json({ 
+        error: 'Proxy error', 
+        message: error.message 
+      });
+    }
+  });
+});
