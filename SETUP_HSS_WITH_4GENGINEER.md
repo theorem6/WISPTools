@@ -7,7 +7,7 @@ Set up HSS API with proper HTTPS using `hss.4gengineer.com`
 
 ## 📋 **Step 1: Add Health Check Endpoint (On Server)**
 
-SSH to `136.112.111.167` and run:
+SSH to `34.36.231.142` and run:
 
 ```bash
 # Add health check endpoint
@@ -165,7 +165,7 @@ Frontend (Firebase App Hosting)
     ↓ HTTPS
 Google Cloud Load Balancer (hss.4gengineer.com)
     ↓ HTTP (internal)
-Backend Instance (136.112.111.167:3000)
+Backend Instance (34.36.231.142:3000)
     ↓
 MongoDB Atlas
 ```

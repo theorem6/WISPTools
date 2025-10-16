@@ -15,7 +15,7 @@
   let error = '';
   
   // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://136.112.111.167';
+  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://hss.4gengineer.com';
   
   onMount(async () => {
     try {
