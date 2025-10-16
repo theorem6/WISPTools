@@ -280,3 +280,5 @@ echo ""
 echo "═══════════════════════════════════════════════════════════"
 
 
+root@acs-hss-server:/opt/hss-api# curl -sL https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/quick-https-fix.sh
+404: Not Foundroot@acs-hss-server:/opt/hss-api# 
