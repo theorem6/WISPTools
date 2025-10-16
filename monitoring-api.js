@@ -455,5 +455,49 @@ router.post('/initialize-alerts', async (req, res) => {
   }
 });
 
+// ============================================
+// EMAIL CONFIGURATION & TESTING
+// ============================================
+
+// Test email configuration
+router.post('/test-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email address required' });
+    }
+
+    const emailService = require('./email-service');
+    const result = await emailService.sendTestEmail(email);
+
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: `Test email sent to ${email}` 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get email configuration status
+router.get('/email-config', (req, res) => {
+  const emailService = require('./email-service');
+  
+  res.json({
+    enabled: emailService.enabled,
+    from_email: emailService.fromEmail,
+    from_name: emailService.fromName,
+    provider: emailService.enabled ? 'SendGrid' : 'Not configured'
+  });
+});
+
 module.exports = router;
 

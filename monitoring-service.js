@@ -611,9 +611,12 @@ class MonitoringService {
   }
 
   async sendEmail(to, alert, rule) {
-    // TODO: Integrate with SendGrid, AWS SES, or similar
-    console.log(`Sending email to ${to}: ${alert.message}`);
-    // Placeholder for email sending logic
+    const emailService = require('./email-service');
+    const result = await emailService.sendAlertEmail(to, alert, rule, alert.tenant_id);
+    
+    if (!result.success) {
+      throw new Error(result.error);
+    }
   }
 
   async sendWebhook(url, alert, rule) {
@@ -640,8 +643,25 @@ class MonitoringService {
   }
 
   async sendResolutionNotification(alert, rule) {
-    console.log(`Alert resolved: ${alert.rule_name}`);
-    // TODO: Send resolution notifications
+    try {
+      // Send email notifications
+      if (rule.notifications?.email?.length > 0) {
+        const emailService = require('./email-service');
+        for (const email of rule.notifications.email) {
+          await emailService.sendResolutionEmail(
+            email, 
+            alert, 
+            rule, 
+            alert.tenant_id, 
+            alert.resolved_by || 'system'
+          );
+        }
+      }
+
+      console.log(`✅ Resolution notifications sent for: ${alert.rule_name}`);
+    } catch (error) {
+      console.error('Error sending resolution notification:', error);
+    }
   }
 
   // ============================================

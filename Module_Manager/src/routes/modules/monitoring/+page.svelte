@@ -183,9 +183,14 @@
 <div class="monitoring-page">
   <!-- Header -->
   <div class="header">
-    <div>
-      <h1>🔍 Monitoring & Alerts</h1>
-      <p>Real-time system monitoring and alerting across all modules</p>
+    <div class="header-left">
+      <button class="back-button" on:click={() => window.location.href = '/modules'}>
+        ← Back to Modules
+      </button>
+      <div>
+        <h1>🔍 Monitoring & Alerts</h1>
+        <p>Real-time system monitoring and alerting across all modules</p>
+      </div>
     </div>
     <button class="btn-refresh" on:click={loadDashboard}>
       🔄 Refresh
@@ -527,8 +532,32 @@
   .header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 2rem;
+  }
+
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .back-button {
+    background: none;
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    width: fit-content;
+    transition: all 0.2s;
+  }
+
+  .back-button:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--brand-primary);
   }
 
   .header h1 {

@@ -101,8 +101,15 @@
   <!-- Header -->
   <div class="header">
     <div class="header-content">
-      <h1>🔐 HSS & Subscriber Management</h1>
-      <p class="subtitle">Home Subscriber Server - Authentication & User Management</p>
+      <div class="header-main">
+        <button class="back-button" on:click={() => window.location.href = '/modules'}>
+          ← Back to Modules
+        </button>
+        <div>
+          <h1>🔐 HSS & Subscriber Management</h1>
+          <p class="subtitle">Home Subscriber Server - Authentication & User Management</p>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -180,6 +187,30 @@
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
+  }
+
+  .back-button {
+    background: none;
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    transition: all 0.2s;
+  }
+
+  .back-button:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--brand-primary);
+  }
+
+  .header-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
   
   .header {
