@@ -6,7 +6,21 @@ Complete guide to setting up email notifications for the monitoring system.
 
 ## 📧 **Overview**
 
-The monitoring system can send email notifications when alerts are triggered and resolved. This guide explains how to configure email using SendGrid (recommended for Firebase/Google Cloud).
+The monitoring system sends email notifications when alerts are triggered and resolved. 
+
+**Key Features:**
+- ✅ **Uses tenant email by default** - Alerts appear to come from your account
+- ✅ **Custom sender option** - Set a custom "from" address if needed
+- ✅ **Tenant branding** - Add your company logo and colors
+- ✅ **Multi-recipient support** - Different emails for different severity levels
+- ✅ **Beautiful HTML emails** - Professional templates with your branding
+- ✅ **SendGrid integration** - Reliable email delivery
+
+**How It Works:**
+1. Platform uses a shared SendGrid account
+2. Each tenant's alerts come from their own email address
+3. Tenants can optionally configure custom branding and sender
+4. No need for each tenant to have their own SendGrid account
 
 ---
 
@@ -80,6 +94,57 @@ curl -X POST http://136.112.111.167:3000/monitoring/test-email \
 
 # Check your inbox for the test email
 ```
+
+---
+
+## 👤 **Tenant Email Configuration (Web UI)**
+
+### **Default Behavior:**
+
+By default, alerts are sent **from the tenant owner's email address**. For example:
+- Tenant owner: `john@acme.com`
+- Alerts appear from: `john@acme.com`
+- Display name: `Acme Corp Alerts` (based on tenant name)
+
+### **Configure via Web UI:**
+
+1. **Go to Monitoring Module:**
+   ```
+   https://your-app.com/modules/monitoring
+   ```
+
+2. **Click "📧 Email Settings" tab**
+
+3. **Configure Sender:**
+   - ☑️ **Use my tenant email** (default) - Alerts from your account email
+   - ☐ **Use custom email** - Set a different sender (e.g., `alerts@yourcompany.com`)
+
+4. **Add Branding (Optional):**
+   - Company Name: `Your Company Name`
+   - Logo URL: `https://yoursite.com/logo.png`
+   - Primary Color: Pick your brand color
+   - Support Email: `support@yourcompany.com`
+   - Support Phone: `+1-555-0123`
+
+5. **Set Default Recipients:**
+   - **Critical Alerts:** `ops@example.com, oncall@example.com`
+   - **Error Alerts:** `ops@example.com`
+   - **Warning Alerts:** `team@example.com`
+
+6. **Test Configuration:**
+   - Enter your email
+   - Click "📧 Send Test"
+   - Check your inbox
+
+7. **Click "💾 Save Configuration"**
+
+### **Result:**
+
+Now when alerts trigger:
+- ✉️ **From:** Your configured email or tenant email
+- 📧 **To:** Recipients from alert rule or default recipients
+- 🎨 **Branding:** Your logo, colors, and company name
+- 📞 **Support:** Your support contact info in footer
 
 ---
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { auth } from '$lib/firebase';
+  import EmailSettings from './components/EmailSettings.svelte';
   
   // Monitoring API endpoint
   const MONITORING_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
@@ -226,6 +227,13 @@
       on:click={() => { activeTab = 'audit'; loadAuditLogs(); }}
     >
       📋 Audit Log
+    </button>
+    <button 
+      class="tab" 
+      class:active={activeTab === 'email'}
+      on:click={() => activeTab = 'email'}
+    >
+      📧 Email Settings
     </button>
   </div>
 
@@ -519,6 +527,10 @@
         </div>
       {/if}
     </div>
+    
+  {:else if activeTab === 'email'}
+    <!-- Email Settings Tab -->
+    <EmailSettings {tenantId} API_URL={MONITORING_API} />
   {/if}
 </div>
 

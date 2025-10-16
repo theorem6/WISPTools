@@ -2,53 +2,123 @@
 // Uses SendGrid for email delivery
 
 const sgMail = require('@sendgrid/mail');
+const TenantEmailConfig = require('./tenant-email-schema');
 
 class EmailService {
   constructor() {
-    // Initialize SendGrid with API key
-    const apiKey = process.env.SENDGRID_API_KEY;
-    if (apiKey) {
-      sgMail.setApiKey(apiKey);
+    // Platform-wide SendGrid API key (fallback)
+    this.platformApiKey = process.env.SENDGRID_API_KEY;
+    
+    if (this.platformApiKey) {
+      sgMail.setApiKey(this.platformApiKey);
       this.enabled = true;
-      console.log('✅ Email service initialized with SendGrid');
+      console.log('✅ Email service initialized with platform SendGrid key');
     } else {
       this.enabled = false;
       console.warn('⚠️  SENDGRID_API_KEY not set - email notifications disabled');
     }
     
-    this.fromEmail = process.env.ALERT_FROM_EMAIL || 'alerts@4gengineer.com';
-    this.fromName = process.env.ALERT_FROM_NAME || 'LTE WISP Alerts';
+    // Default platform sender
+    this.platformFromEmail = process.env.ALERT_FROM_EMAIL || 'alerts@4gengineer.com';
+    this.platformFromName = process.env.ALERT_FROM_NAME || 'LTE WISP Alerts';
+  }
+
+  /**
+   * Get tenant-specific email configuration
+   */
+  async getTenantEmailConfig(tenantId) {
+    try {
+      // First, try to get tenant's custom email config
+      const tenantConfig = await TenantEmailConfig.findOne({ tenant_id: tenantId });
+      
+      if (tenantConfig && !tenantConfig.sender.use_tenant_email && tenantConfig.sender.email) {
+        // Tenant has custom sender configured
+        return {
+          from_email: tenantConfig.sender.email,
+          from_name: tenantConfig.sender.name || tenantConfig.branding?.company_name || 'Alerts',
+          api_key: tenantConfig.sendgrid?.use_platform_key === false 
+            ? tenantConfig.sendgrid.api_key 
+            : this.platformApiKey,
+          branding: tenantConfig.branding || {}
+        };
+      }
+      
+      // Try to get tenant's email from user account
+      const mongoose = require('mongoose');
+      const db = mongoose.connection.db;
+      
+      // Get tenant owner email from Firebase users or tenant collection
+      const tenant = await db.collection('tenants').findOne({ tenant_id: tenantId });
+      
+      if (tenant?.owner_email) {
+        return {
+          from_email: tenant.owner_email,
+          from_name: tenant.displayName ? `${tenant.displayName} Alerts` : 'Network Alerts',
+          api_key: this.platformApiKey,
+          branding: tenantConfig?.branding || {
+            company_name: tenant.displayName || 'Your Network',
+            primary_color: '#2563eb'
+          }
+        };
+      }
+      
+      // Fallback to platform defaults
+      return {
+        from_email: this.platformFromEmail,
+        from_name: this.platformFromName,
+        api_key: this.platformApiKey,
+        branding: {}
+      };
+    } catch (error) {
+      console.error('Error getting tenant email config:', error);
+      // Fallback to platform defaults
+      return {
+        from_email: this.platformFromEmail,
+        from_name: this.platformFromName,
+        api_key: this.platformApiKey,
+        branding: {}
+      };
+    }
   }
 
   /**
    * Send alert notification email
    */
   async sendAlertEmail(to, alert, rule, tenantId) {
-    if (!this.enabled) {
+    if (!this.enabled && !this.platformApiKey) {
       console.log(`[DRY RUN] Would send alert email to ${to}: ${alert.message}`);
       return { success: false, error: 'Email service not configured' };
     }
 
     try {
+      // Get tenant-specific email configuration
+      const tenantConfig = await this.getTenantEmailConfig(tenantId);
+      
+      // Set API key (tenant's or platform's)
+      if (tenantConfig.api_key) {
+        sgMail.setApiKey(tenantConfig.api_key);
+      }
+
       const subject = this.formatSubject(alert);
-      const html = this.formatAlertHTML(alert, rule, tenantId);
+      const html = this.formatAlertHTML(alert, rule, tenantId, tenantConfig.branding);
       const text = this.formatAlertText(alert, rule);
 
       const msg = {
         to,
         from: {
-          email: this.fromEmail,
-          name: this.fromName
+          email: tenantConfig.from_email,
+          name: tenantConfig.from_name
         },
         subject,
         text,
-        html
+        html,
+        replyTo: tenantConfig.branding?.support_email || tenantConfig.from_email
       };
 
       await sgMail.send(msg);
       
-      console.log(`✅ Alert email sent to ${to}: ${alert.rule_name}`);
-      return { success: true };
+      console.log(`✅ Alert email sent to ${to} from ${tenantConfig.from_email}: ${alert.rule_name}`);
+      return { success: true, from: tenantConfig.from_email };
     } catch (error) {
       console.error(`❌ Error sending alert email to ${to}:`, error);
       return { success: false, error: error.message };
@@ -169,7 +239,7 @@ Automated Alert System
     `.trim();
   }
 
-  formatAlertHTML(alert, rule, tenantId) {
+  formatAlertHTML(alert, rule, tenantId, branding = {}) {
     const severityColors = {
       'critical': '#dc2626',
       'error': '#ef4444',
@@ -177,7 +247,9 @@ Automated Alert System
       'info': '#3b82f6'
     };
 
-    const color = severityColors[alert.severity];
+    const color = branding.primary_color || severityColors[alert.severity];
+    const companyName = branding.company_name || 'Your Network';
+    const logoUrl = branding.logo_url;
 
     return `
 <!DOCTYPE html>
@@ -286,6 +358,8 @@ Automated Alert System
     </div>
     
     <div class="content">
+      ${logoUrl ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${logoUrl}" alt="${companyName}" style="max-width: 200px; height: auto;"></div>` : ''}
+      
       <h2>${alert.rule_name}</h2>
       
       <div class="alert-message">
@@ -330,9 +404,10 @@ Automated Alert System
     </div>
     
     <div class="footer">
-      LTE WISP Management Platform - Automated Alert System<br>
-      Tenant: ${tenantId}<br>
-      This is an automated message. Do not reply to this email.
+      ${companyName} - Automated Alert System<br>
+      ${branding.support_email ? `Support: ${branding.support_email}<br>` : ''}
+      ${branding.support_phone ? `Phone: ${branding.support_phone}<br>` : ''}
+      This is an automated message.
     </div>
   </div>
 </body>

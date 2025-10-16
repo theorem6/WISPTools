@@ -488,15 +488,97 @@ router.post('/test-email', async (req, res) => {
 });
 
 // Get email configuration status
-router.get('/email-config', (req, res) => {
-  const emailService = require('./email-service');
-  
-  res.json({
-    enabled: emailService.enabled,
-    from_email: emailService.fromEmail,
-    from_name: emailService.fromName,
-    provider: emailService.enabled ? 'SendGrid' : 'Not configured'
-  });
+router.get('/email-config', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    const emailService = require('./email-service');
+    const TenantEmailConfig = require('./tenant-email-schema');
+    
+    // Get tenant config
+    const tenantConfig = await TenantEmailConfig.findOne({ tenant_id: tenantId });
+    const effectiveConfig = await emailService.getTenantEmailConfig(tenantId);
+    
+    res.json({
+      platform_enabled: emailService.enabled,
+      tenant_config: tenantConfig,
+      effective_sender: {
+        email: effectiveConfig.from_email,
+        name: effectiveConfig.from_name
+      },
+      provider: effectiveConfig.api_key ? 'SendGrid' : 'Not configured'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update tenant email configuration
+router.put('/email-config', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    const TenantEmailConfig = require('./tenant-email-schema');
+    const { v4: uuidv4 } = require('uuid');
+    
+    let config = await TenantEmailConfig.findOne({ tenant_id: tenantId });
+    
+    if (!config) {
+      // Create new config
+      config = new TenantEmailConfig({
+        config_id: uuidv4(),
+        tenant_id: tenantId,
+        ...req.body,
+        updated_at: new Date()
+      });
+    } else {
+      // Update existing
+      Object.assign(config, req.body);
+      config.updated_at = new Date();
+    }
+    
+    await config.save();
+    
+    // Log action
+    await monitoringService.logAction(
+      tenantId,
+      req.user?.uid || 'system',
+      config.isNew ? 'create' : 'update',
+      'email_config',
+      config.config_id,
+      { after: config },
+      'success',
+      null,
+      'monitoring',
+      req
+    );
+    
+    res.json(config);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get tenant information for email config
+router.get('/tenant-info', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    const mongoose = require('mongoose');
+    const db = mongoose.connection.db;
+    
+    const tenant = await db.collection('tenants').findOne({ tenant_id: tenantId });
+    
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+    
+    res.json({
+      tenant_id: tenant.tenant_id,
+      display_name: tenant.displayName,
+      owner_email: tenant.owner_email,
+      owner_name: tenant.ownerName
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;
