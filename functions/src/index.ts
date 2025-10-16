@@ -220,9 +220,7 @@ export const hssProxy = onRequest({
     const url = `${backendUrl}${path}`;
     
     try {
-      const fetch = (await import('node-fetch')).default;
-      
-      const options: any = {
+      const options: RequestInit = {
         method: req.method,
         headers: {
           'Content-Type': 'application/json'
