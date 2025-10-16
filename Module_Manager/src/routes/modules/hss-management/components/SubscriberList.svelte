@@ -6,13 +6,14 @@
   
   export let tenantId: string;
   export let HSS_API: string;
+  export let groups: any[] = [];
+  export let bandwidthPlans: any[] = [];
   
   let subscribers: any[] = [];
   let loading = true;
   let searchQuery = '';
   let statusFilter = 'all';
   let groupFilter = 'all';
-  let groups: any[] = [];
   
   let showAddModal = false;
   let selectedSubscriber: any = null;
@@ -241,8 +242,9 @@
     {tenantId} 
     {HSS_API}
     {groups}
+    {bandwidthPlans}
     on:close={() => showAddModal = false}
-    on:added={loadSubscribers}
+    on:success={loadSubscribers}
   />
 {/if}
 

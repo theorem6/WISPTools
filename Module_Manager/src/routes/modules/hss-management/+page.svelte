@@ -13,6 +13,8 @@
   let stats: any = null;
   let loading = true;
   let error = '';
+  let groups: any[] = [];
+  let bandwidthPlans: any[] = [];
   
   // HSS API endpoint
   const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
@@ -24,7 +26,11 @@
       if (user) {
         tenantId = user.uid; // Use user ID as tenant ID for now
       }
-      await loadStats();
+      await Promise.all([
+        loadStats(),
+        loadGroups(),
+        loadBandwidthPlans()
+      ]);
     } catch (err: any) {
       error = err.message;
     } finally {
@@ -51,6 +57,38 @@
       }
     } catch (err: any) {
       console.error('Error loading stats:', err);
+    }
+  }
+  
+  async function loadGroups() {
+    try {
+      const response = await fetch(`${HSS_API}/groups`, {
+        headers: {
+          'x-tenant-id': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        groups = await response.json();
+      }
+    } catch (err) {
+      console.error('Failed to load groups:', err);
+    }
+  }
+  
+  async function loadBandwidthPlans() {
+    try {
+      const response = await fetch(`${HSS_API}/bandwidth-plans`, {
+        headers: {
+          'x-tenant-id': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        bandwidthPlans = await response.json();
+      }
+    } catch (err) {
+      console.error('Failed to load bandwidth plans:', err);
     }
   }
   
@@ -123,7 +161,7 @@
       {#if activeTab === 'dashboard'}
         <HSSStats {stats} on:refresh={loadStats} />
       {:else if activeTab === 'subscribers'}
-        <SubscriberList {tenantId} {HSS_API} />
+        <SubscriberList {tenantId} {HSS_API} {groups} {bandwidthPlans} />
       {:else if activeTab === 'groups'}
         <GroupManagement {tenantId} {HSS_API} />
       {:else if activeTab === 'plans'}
