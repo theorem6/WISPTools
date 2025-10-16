@@ -106,6 +106,21 @@
   function switchTab(tab: string) {
     activeTab = tab;
   }
+  
+  function handleNavigate(event: CustomEvent<{ tab: string; action?: string }>) {
+    const { tab, action } = event.detail;
+    activeTab = tab;
+    
+    // Handle specific actions after tab switch
+    if (action) {
+      // Use setTimeout to ensure the tab has rendered
+      setTimeout(() => {
+        // Dispatch action to the appropriate component
+        const event = new CustomEvent('quick-action', { detail: { action } });
+        window.dispatchEvent(event);
+      }, 100);
+    }
+  }
 </script>
 
 <TenantGuard>
@@ -178,7 +193,7 @@
     <!-- Tab Content -->
     <div class="tab-content">
       {#if activeTab === 'dashboard'}
-        <HSSStats {stats} on:refresh={loadStats} />
+        <HSSStats {stats} on:refresh={loadStats} on:navigate={handleNavigate} />
       {:else if activeTab === 'subscribers'}
         <SubscriberList {tenantId} {HSS_API} {groups} {bandwidthPlans} />
       {:else if activeTab === 'groups'}

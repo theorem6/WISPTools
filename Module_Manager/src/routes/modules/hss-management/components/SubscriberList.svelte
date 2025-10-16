@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { auth } from '$lib/firebase';
   import AddSubscriberModal from './AddSubscriberModal.svelte';
   import SubscriberDetailsModal from './SubscriberDetailsModal.svelte';
@@ -19,9 +19,23 @@
   let selectedSubscriber: any = null;
   let showDetailsModal = false;
   
+  // Listen for quick actions
+  function handleQuickAction(event: CustomEvent) {
+    if (event.detail.action === 'add') {
+      showAddModal = true;
+    }
+  }
+  
   onMount(async () => {
     await loadGroups();
     await loadSubscribers();
+    
+    // Listen for quick action events
+    window.addEventListener('quick-action' as any, handleQuickAction as any);
+  });
+  
+  onDestroy(() => {
+    window.removeEventListener('quick-action' as any, handleQuickAction as any);
   });
   
   async function loadGroups() {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   export let tenantId: string;
   export let HSS_API: string;
   
@@ -14,9 +14,23 @@
     download_mbps: 100,
     upload_mbps: 50
   };
+  
+  // Listen for quick actions
+  function handleQuickAction(event: CustomEvent) {
+    if (event.detail.action === 'create') {
+      addPlan();
+    }
+  }
 
   onMount(() => {
     loadPlans();
+    
+    // Listen for quick action events
+    window.addEventListener('quick-action' as any, handleQuickAction as any);
+  });
+  
+  onDestroy(() => {
+    window.removeEventListener('quick-action' as any, handleQuickAction as any);
   });
 
   async function loadPlans() {

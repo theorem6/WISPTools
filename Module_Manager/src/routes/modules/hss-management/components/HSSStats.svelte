@@ -9,6 +9,10 @@
     dispatch('refresh');
   }
   
+  function navigateToTab(tab: string, action?: string) {
+    dispatch('navigate', { tab, action });
+  }
+  
   $: subscribers = stats?.subscribers || {};
   $: cpe = stats?.cpe_correlation || {};
   $: health = stats?.health || {};
@@ -118,18 +122,18 @@
   <div class="quick-actions">
     <h3>Quick Actions</h3>
     <div class="action-buttons">
-      <a href="/modules/hss-management?tab=subscribers&action=add" class="action-btn primary">
+      <button class="action-btn primary" on:click={() => navigateToTab('subscribers', 'add')}>
         ➕ Add Subscriber
-      </a>
-      <a href="/modules/hss-management?tab=import" class="action-btn">
+      </button>
+      <button class="action-btn" on:click={() => navigateToTab('import')}>
         📥 Bulk Import
-      </a>
-      <a href="/modules/hss-management?tab=groups&action=create" class="action-btn">
+      </button>
+      <button class="action-btn" on:click={() => navigateToTab('groups', 'create')}>
         📦 Create Group
-      </a>
-      <a href="/modules/hss-management?tab=plans&action=create" class="action-btn">
+      </button>
+      <button class="action-btn" on:click={() => navigateToTab('plans', 'create')}>
         🚀 New Plan
-      </a>
+      </button>
     </div>
   </div>
 </div>
@@ -302,6 +306,7 @@
   
   .action-btn {
     display: block;
+    width: 100%;
     padding: 0.75rem 1rem;
     background: white;
     color: #4b5563;
@@ -310,6 +315,7 @@
     border-radius: 6px;
     text-align: center;
     font-weight: 500;
+    cursor: pointer;
     transition: all 0.2s;
   }
   
