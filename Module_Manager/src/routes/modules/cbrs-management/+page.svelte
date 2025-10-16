@@ -37,6 +37,17 @@
   $: tenantId = $currentTenant?.id || '';
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
+  // Watch for tenant changes and reload
+  $: if (browser && tenantId && cbrsService === null) {
+    console.log('[CBRS Module] Tenant loaded:', tenantId);
+    loadCBRSConfig(tenantId).then(config => {
+      cbrsConfig = config;
+      if (config) {
+        loadDevices();
+      }
+    });
+  }
+  
   // Add device form (fixed to Google SAS only)
   let newDevice = {
     cbsdSerialNumber: '',

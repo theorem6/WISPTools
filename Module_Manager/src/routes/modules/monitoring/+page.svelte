@@ -1,14 +1,20 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { browser } from '$app/environment';
   import { auth } from '$lib/firebase';
+  import { currentTenant } from '$lib/stores/tenantStore';
+  import TenantGuard from '$lib/components/TenantGuard.svelte';
   import EmailSettings from './components/EmailSettings.svelte';
   
   // Monitoring API endpoint
   const MONITORING_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
   
-  let tenantId = '';
   let activeTab = 'overview';
   let loading = true;
+  
+  // Tenant info - use currentTenant store
+  $: tenantId = $currentTenant?.id || '';
+  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
   // Dashboard data
   let dashboardData: any = null;
@@ -26,16 +32,23 @@
   // Auto-refresh
   let refreshInterval: any = null;
   
+  // Watch for tenant changes and reload data
+  $: if (browser && tenantId) {
+    console.log('[Monitoring Module] Tenant loaded:', tenantId);
+    loadDashboard();
+  }
+  
   onMount(async () => {
-    const user = auth.currentUser;
-    if (user) {
-      tenantId = user.uid;
+    if (tenantId) {
+      await loadDashboard();
     }
     
-    await loadDashboard();
-    
     // Auto-refresh every 30 seconds
-    refreshInterval = setInterval(loadDashboard, 30000);
+    refreshInterval = setInterval(() => {
+      if (tenantId) {
+        loadDashboard();
+      }
+    }, 30000);
   });
   
   onDestroy(() => {
@@ -181,6 +194,7 @@
   });
 </script>
 
+<TenantGuard>
 <div class="monitoring-page">
   <!-- Header -->
   <div class="header">
@@ -533,6 +547,7 @@
     <EmailSettings {tenantId} API_URL={MONITORING_API} />
   {/if}
 </div>
+</TenantGuard>
 
 <style>
   .monitoring-page {

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
   import { auth } from '$lib/firebase';
+  import { currentTenant } from '$lib/stores/tenantStore';
+  import TenantGuard from '$lib/components/TenantGuard.svelte';
   import SubscriberList from './components/SubscriberList.svelte';
   import GroupManagement from './components/GroupManagement.svelte';
   import BandwidthPlans from './components/BandwidthPlans.svelte';
@@ -9,28 +12,36 @@
   import BulkImport from './components/BulkImport.svelte';
   
   let activeTab = 'dashboard';
-  let tenantId = 'tenant_001'; // Default tenant ID
   let stats: any = null;
   let loading = true;
   let error = '';
   let groups: any[] = [];
   let bandwidthPlans: any[] = [];
   
+  // Tenant info - use currentTenant store
+  $: tenantId = $currentTenant?.id || '';
+  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
+  
   // HSS API endpoint
   const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
   
+  // Watch for tenant changes and reload data
+  $: if (browser && tenantId) {
+    console.log('[HSS Module] Tenant loaded:', tenantId);
+    loadStats();
+    loadGroups();
+    loadBandwidthPlans();
+  }
+  
   onMount(async () => {
     try {
-      // Get tenant ID from user if available
-      const user = auth.currentUser;
-      if (user) {
-        tenantId = user.uid; // Use user ID as tenant ID for now
+      if (tenantId) {
+        await Promise.all([
+          loadStats(),
+          loadGroups(),
+          loadBandwidthPlans()
+        ]);
       }
-      await Promise.all([
-        loadStats(),
-        loadGroups(),
-        loadBandwidthPlans()
-      ]);
     } catch (err: any) {
       error = err.message;
     } finally {
@@ -97,6 +108,7 @@
   }
 </script>
 
+<TenantGuard>
 <div class="hss-management">
   <!-- Header -->
   <div class="header">
@@ -181,6 +193,7 @@
     </div>
   {/if}
 </div>
+</TenantGuard>
 
 <style>
   .hss-management {
