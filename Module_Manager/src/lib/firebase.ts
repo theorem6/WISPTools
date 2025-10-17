@@ -112,40 +112,48 @@ export function getFirebaseFunctions(): Functions {
   return firebaseFunctions;
 }
 
-// Backward compatibility: Explicit wrapper functions for lazy initialization
-// These ensure Firebase is only initialized when actually called, not when module loads
+// Export instances directly using lazy initialization
+// These are accessed as properties but initialize on first access
 
 /**
- * Get Firebase Auth instance - lazy initialization
- * MUST be called as a function: auth()
+ * Firebase Auth instance - auto-initialized on first access
+ * Use as: auth.currentUser, auth.onAuthStateChanged(), etc.
  */
-export function auth(): Auth {
-  return getFirebaseAuth();
-}
+export const auth: Auth = new Proxy({} as Auth, {
+  get(_target, prop) {
+    return (getFirebaseAuth() as any)[prop];
+  }
+});
 
 /**
- * Get Firestore instance - lazy initialization
- * MUST be called as a function: db()
+ * Firestore instance - auto-initialized on first access
+ * Use as: db, for firestore operations
  */
-export function db(): Firestore {
-  return getFirebaseDb();
-}
+export const db: Firestore = new Proxy({} as Firestore, {
+  get(_target, prop) {
+    return (getFirebaseDb() as any)[prop];
+  }
+});
 
 /**
- * Get Storage instance - lazy initialization
- * MUST be called as a function: storage()
+ * Firebase Storage instance - auto-initialized on first access
+ * Use as: storage, for storage operations
  */
-export function storage(): FirebaseStorage {
-  return getFirebaseStorage();
-}
+export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
+  get(_target, prop) {
+    return (getFirebaseStorage() as any)[prop];
+  }
+});
 
 /**
- * Get Functions instance - lazy initialization
- * MUST be called as a function: functions()
+ * Firebase Functions instance - auto-initialized on first access
+ * Use as: functions, for cloud functions
  */
-export function functions(): Functions {
-  return getFirebaseFunctions();
-}
+export const functions: Functions = new Proxy({} as Functions, {
+  get(_target, prop) {
+    return (getFirebaseFunctions() as any)[prop];
+  }
+});
 
 // Default export - lazy getter
 export default function getDefaultApp(): FirebaseApp | null {
