@@ -89,7 +89,7 @@ router.post('/epc/register', requireTenant, async (req, res) => {
       network_config,
       contact,
       metrics_config: metrics_config || {},
-      status: 'initializing'
+      status: 'registered' // Starts as 'registered', becomes 'online' on first heartbeat
     });
     
     await epc.save();
@@ -107,6 +107,347 @@ router.post('/epc/register', requireTenant, async (req, res) => {
     res.status(500).json({ error: 'Failed to register EPC', details: error.message });
   }
 });
+
+// Generate deployment script for a registered EPC
+router.get('/epc/:epc_id/deployment-script', requireTenant, async (req, res) => {
+  try {
+    const epc = await RemoteEPC.findOne({
+      epc_id: req.params.epc_id,
+      tenant_id: req.tenantId
+    });
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Generate the deployment script with embedded credentials
+    const script = generateDeploymentScript(epc);
+    
+    // Set headers for file download
+    res.setHeader('Content-Type', 'text/x-shellscript');
+    res.setHeader('Content-Disposition', `attachment; filename="deploy-epc-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh"`);
+    
+    res.send(script);
+  } catch (error) {
+    console.error('[Deployment Script] Error:', error);
+    res.status(500).json({ error: 'Failed to generate deployment script' });
+  }
+});
+
+// Helper function to generate deployment script
+function generateDeploymentScript(epc) {
+  const mcc = epc.network_config?.mcc || '001';
+  const mnc = epc.network_config?.mnc || '01';
+  const tac = epc.network_config?.tac || '1';
+  const apnName = 'internet'; // Default
+  const ipPool = '10.45.0.0/16'; // Default
+  
+  return `#!/bin/bash
+
+###############################################################################
+# Distributed EPC Deployment Script
+# Auto-generated for: ${epc.site_name}
+# Generated: ${new Date().toISOString()}
+###############################################################################
+
+set -e
+
+# Colors
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+NC='\\033[0m' # No Color
+
+# Pre-configured settings (DO NOT MODIFY)
+SITE_NAME="${epc.site_name}"
+EPC_ID="${epc.epc_id}"
+MCC="${mcc}"
+MNC="${mnc}"
+TAC="${tac}"
+APN_NAME="${apnName}"
+IP_POOL="${ipPool}"
+
+# Cloud API Configuration (DO NOT MODIFY)
+CLOUD_HSS_API="${process.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'}"
+AUTH_CODE="${epc.auth_code}"
+API_KEY="${epc.api_key}"
+SECRET_KEY="${epc.secret_key}"
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+  echo -e "\${RED}❌ Please run as root (use sudo)\\n   Example: sudo bash deploy-epc-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh\${NC}"
+  exit 1
+fi
+
+echo -e "\${BLUE}"
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║     Distributed EPC Deployment                           ║"
+echo "║     Site: ${epc.site_name.padEnd(48)} ║"
+echo "╚══════════════════════════════════════════════════════════╝"
+echo -e "\${NC}"
+
+echo -e "\${YELLOW}📍 Site Configuration:\${NC}"
+echo "   Site Name: \${SITE_NAME}"
+echo "   EPC ID: \${EPC_ID}"
+echo "   MCC/MNC: \${MCC}/\${MNC}"
+echo "   TAC: \${TAC}"
+${epc.location?.city ? `echo "   Location: ${epc.location.city}, ${epc.location.state || ''}"` : ''}
+${epc.location?.coordinates ? `echo "   Coordinates: ${epc.location.coordinates.latitude}, ${epc.location.coordinates.longitude}"` : ''}
+echo ""
+
+read -p "Press Enter to start installation, or Ctrl+C to cancel..."
+echo ""
+
+# Update system
+echo -e "\${BLUE}📦 Updating system packages...\${NC}"
+apt-get update -qq
+apt-get install -y software-properties-common curl wget gnupg2 >/dev/null 2>&1
+
+# Add Open5GS repository
+echo -e "\${BLUE}📦 Adding Open5GS repository...\${NC}"
+add-apt-repository -y ppa:open5gs/latest >/dev/null 2>&1
+apt-get update -qq
+
+# Install Open5GS core components
+echo -e "\${BLUE}📦 Installing Open5GS components...\${NC}"
+DEBIAN_FRONTEND=noninteractive apt-get install -y \\
+  open5gs-mme \\
+  open5gs-sgwc \\
+  open5gs-sgwu \\
+  open5gs-upf \\
+  open5gs-smf \\
+  open5gs-pcrf >/dev/null 2>&1
+
+# Install Node.js for metrics agent
+if ! command -v node &> /dev/null; then
+  echo -e "\${BLUE}📦 Installing Node.js...\${NC}"
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
+  apt-get install -y nodejs >/dev/null 2>&1
+fi
+
+# Download metrics agent
+echo -e "\${BLUE}🔧 Setting up metrics agent...\${NC}"
+mkdir -p /opt/open5gs-metrics-agent
+cd /opt/open5gs-metrics-agent
+
+# Download agent from GitHub
+curl -sL "https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/open5gs-metrics-agent.js" -o open5gs-metrics-agent.js
+chmod +x open5gs-metrics-agent.js
+
+# Install dependencies
+npm install node-fetch@2 >/dev/null 2>&1
+
+# Create environment file
+cat > /etc/open5gs/metrics-agent.env <<EOF
+EPC_API_URL=\${CLOUD_HSS_API}
+EPC_AUTH_CODE=\${AUTH_CODE}
+EPC_API_KEY=\${API_KEY}
+EPC_SECRET_KEY=\${SECRET_KEY}
+EPC_METRICS_INTERVAL=60
+EOF
+
+chmod 600 /etc/open5gs/metrics-agent.env
+
+# Install systemd service
+curl -sL "https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/open5gs-metrics-agent.service" -o /etc/systemd/system/open5gs-metrics-agent.service
+
+systemctl daemon-reload
+systemctl enable open5gs-metrics-agent >/dev/null 2>&1
+
+# Configure Open5GS
+echo -e "\${BLUE}🔧 Configuring Open5GS...\${NC}"
+
+# Get local IP
+LOCAL_IP=\$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split(\$2,a," ");print a[1]}')
+
+# Configure MME
+cat > /etc/open5gs/mme.yaml <<EOF
+logger:
+  file: /var/log/open5gs/mme.log
+  level: info
+
+mme:
+  freeDiameter: /etc/freeDiameter/mme.conf
+  s1ap:
+    server:
+      - address: \${LOCAL_IP}
+  gtpc:
+    server:
+      - address: \${LOCAL_IP}
+  gummei: 
+    - plmn_id:
+        mcc: \${MCC}
+        mnc: \${MNC}
+      mme_gid: 2
+      mme_code: 1
+  tai:
+    - plmn_id:
+        mcc: \${MCC}
+        mnc: \${MNC}
+      tac: \${TAC}
+  security:
+    integrity_order : [ EIA2, EIA1, EIA0 ]
+    ciphering_order : [ EEA0, EEA1, EEA2 ]
+
+sgwc:
+  gtpc:
+    client:
+      sgwc:
+        - address: 127.0.0.2
+
+smf:
+  gtpc:
+    client:
+      smf:
+        - address: 127.0.0.4
+EOF
+
+# Configure other components (SGWC, SGWU, SMF, UPF, PCRF)
+cat > /etc/open5gs/sgwc.yaml <<EOF
+logger:
+  file: /var/log/open5gs/sgwc.log
+sgwc:
+  gtpc:
+    server:
+      - address: 127.0.0.2
+  pfcp:
+    server:
+      - address: 127.0.0.2
+    client:
+      sgwu:
+        - address: 127.0.0.6
+EOF
+
+cat > /etc/open5gs/sgwu.yaml <<EOF
+logger:
+  file: /var/log/open5gs/sgwu.log
+sgwu:
+  pfcp:
+    server:
+      - address: 127.0.0.6
+  gtpu:
+    server:
+      - address: 127.0.0.6
+EOF
+
+cat > /etc/open5gs/smf.yaml <<EOF
+logger:
+  file: /var/log/open5gs/smf.log
+smf:
+  sbi:
+    server:
+      - address: 127.0.0.4
+        port: 7777
+  pfcp:
+    server:
+      - address: 127.0.0.4
+    client:
+      upf:
+        - address: 127.0.0.7
+  gtpc:
+    server:
+      - address: 127.0.0.4
+  subnet:
+    - addr: \${IP_POOL%%/*}
+      dnn: \${APN_NAME}
+  dns:
+    - 8.8.8.8
+    - 8.8.4.4
+EOF
+
+cat > /etc/open5gs/upf.yaml <<EOF
+logger:
+  file: /var/log/open5gs/upf.log
+upf:
+  pfcp:
+    server:
+      - address: 127.0.0.7
+  gtpu:
+    server:
+      - address: \${LOCAL_IP}
+  subnet:
+    - addr: \${IP_POOL%%/*}
+      dnn: \${APN_NAME}
+      dev: ogstun
+EOF
+
+# Setup OGSTUN interface
+echo -e "\${BLUE}🔧 Setting up OGSTUN interface...\${NC}"
+ip tuntap add name ogstun mode tun 2>/dev/null || true
+ip addr add \${IP_POOL%%/*}/\${IP_POOL##*/} dev ogstun 2>/dev/null || true
+ip link set ogstun up
+
+# Enable IP forwarding
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+sysctl -w net.ipv6.conf.all.forwarding=1 >/dev/null
+
+# Add NAT rules
+iptables -t nat -A POSTROUTING -s \${IP_POOL} ! -o ogstun -j MASQUERADE 2>/dev/null || true
+
+# Make persistent
+grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+grep -q "net.ipv6.conf.all.forwarding=1" /etc/sysctl.conf || echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
+
+# Save iptables rules
+if ! command -v iptables-save &> /dev/null; then
+  apt-get install -y iptables-persistent >/dev/null 2>&1
+fi
+netfilter-persistent save >/dev/null 2>&1 || true
+
+# Start Open5GS services
+echo -e "\${BLUE}🚀 Starting Open5GS services...\${NC}"
+systemctl enable open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-upfd open5gs-smfd open5gs-pcrfd >/dev/null 2>&1
+systemctl restart open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-upfd open5gs-smfd open5gs-pcrfd
+
+sleep 3
+
+# Start metrics agent
+echo -e "\${BLUE}🚀 Starting metrics agent...\${NC}"
+systemctl restart open5gs-metrics-agent
+
+sleep 2
+
+# Check status
+echo ""
+echo -e "\${BLUE}📊 Service Status:\${NC}"
+for service in mmed sgwcd sgwud upfd smfd pcrfd; do
+  if systemctl is-active --quiet open5gs-\${service}; then
+    echo -e "   ✅ open5gs-\${service}: \${GREEN}running\${NC}"
+  else
+    echo -e "   ❌ open5gs-\${service}: \${RED}stopped\${NC}"
+  fi
+done
+
+if systemctl is-active --quiet open5gs-metrics-agent; then
+  echo -e "   ✅ metrics-agent: \${GREEN}running\${NC}"
+else
+  echo -e "   ❌ metrics-agent: \${RED}stopped\${NC}"
+fi
+
+echo ""
+echo -e "\${GREEN}╔══════════════════════════════════════════════════════════╗\${NC}"
+echo -e "\${GREEN}║     ✅ Installation Complete!                           ║\${NC}"
+echo -e "\${GREEN}╚══════════════════════════════════════════════════════════╝\${NC}"
+echo ""
+echo -e "\${BLUE}📍 Site: \${SITE_NAME}\${NC}"
+echo -e "\${BLUE}🆔 EPC ID: \${EPC_ID}\${NC}"
+echo -e "\${BLUE}🌐 S1-MME IP: \${LOCAL_IP}:36412\${NC}"
+echo -e "\${BLUE}📊 Status: Check cloud dashboard in 1-2 minutes\${NC}"
+echo ""
+echo -e "\${YELLOW}📝 Next Steps:\${NC}"
+echo "   1. Verify site appears as 'Online' in cloud dashboard"
+echo "   2. Connect eNodeB to S1-MME: \${LOCAL_IP}:36412"
+echo "   3. Add subscribers via cloud HSS portal"
+echo "   4. Monitor real-time metrics in dashboard"
+echo ""
+echo -e "\${BLUE}🔧 Useful Commands:\${NC}"
+echo "   Status: systemctl status open5gs-mmed"
+echo "   Logs: tail -f /var/log/open5gs/mme.log"
+echo "   Agent: journalctl -u open5gs-metrics-agent -f"
+echo ""
+`;
+}
 
 // List EPCs for a tenant
 router.get('/epc/list', requireTenant, async (req, res) => {

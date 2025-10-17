@@ -41,8 +41,8 @@ const RemoteEPCSchema = new mongoose.Schema({
   // Connection Status
   status: { 
     type: String, 
-    enum: ['online', 'offline', 'error', 'initializing'],
-    default: 'offline',
+    enum: ['registered', 'online', 'offline', 'error'],
+    default: 'registered',
     index: true
   },
   last_heartbeat: { type: Date },
