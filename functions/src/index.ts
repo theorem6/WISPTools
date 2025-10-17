@@ -251,14 +251,33 @@ export const hssProxy = onRequest({
     }
     
     const response = await fetch(url, options);
-    const data = await response.json();
     
-    res.status(response.status).json(data);
+    // Check content type to determine how to handle response
+    const contentType = response.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } else if (contentType.includes('text/') || url.includes('deployment-script')) {
+      // Handle text responses (like shell scripts)
+      const text = await response.text();
+      res.status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
+    } else {
+      // Fallback: try JSON, then text
+      try {
+        const data = await response.json();
+        res.status(response.status).json(data);
+      } catch {
+        const text = await response.text();
+        res.status(response.status).send(text);
+      }
+    }
   } catch (error: any) {
     console.error('HSS Proxy Error:', error);
     res.status(500).json({ 
       error: 'Proxy error', 
-      message: error.message 
+      message: error.message,
+      details: error.toString()
     });
   }
 });
