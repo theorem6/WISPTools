@@ -1,0 +1,39 @@
+[Unit]
+Description=Open5GS Metrics Collection Agent
+Documentation=https://github.com/theorem6/lte-pci-mapper
+After=network.target open5gs-mmed.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/open5gs-metrics-agent
+
+# Environment variables (customize these)
+Environment="EPC_API_URL=https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy"
+Environment="EPC_AUTH_CODE=your_auth_code_here"
+Environment="EPC_API_KEY=your_api_key_here"
+Environment="EPC_SECRET_KEY=your_secret_key_here"
+Environment="EPC_METRICS_INTERVAL=60"
+
+# Or load from environment file
+EnvironmentFile=-/etc/open5gs/metrics-agent.env
+
+ExecStart=/usr/bin/node /opt/open5gs-metrics-agent/open5gs-metrics-agent.js
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=0
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=open5gs-metrics-agent
+
+# Security
+NoNewPrivileges=false
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
