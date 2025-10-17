@@ -9,10 +9,14 @@ import { onRequest } from 'firebase-functions/v2/https';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import UserManagementService from '../services/user-management';
+import epcManagementRouter from './epc-management';
 
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
+
+// Mount EPC Management routes
+app.use('/epc', epcManagementRouter);
 
 // Initialize services
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
