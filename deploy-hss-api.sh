@@ -437,17 +437,23 @@ PORT=3000
 NODE_ENV=production
 EOFENV
 
-# Copy distributed EPC files from repository
-echo "📦 Copying distributed EPC files..."
-if [ -f "../distributed-epc-schema.js" ]; then
-  cp ../distributed-epc-schema.js ./
-  cp ../distributed-epc-api.js ./
-  echo "✅ Distributed EPC files copied"
+# Copy distributed EPC files from /root
+echo "📦 Copying distributed EPC files from /root..."
+
+if [ -f "/root/distributed-epc-schema.js" ] && [ -f "/root/distributed-epc-api.js" ]; then
+  cp /root/distributed-epc-schema.js ./
+  cp /root/distributed-epc-api.js ./
+  echo "✅ Distributed EPC files copied successfully"
 else
-  echo "⚠️  Warning: Distributed EPC files not found in parent directory"
-  echo "   Make sure to copy these files manually:"
+  echo "❌ ERROR: Distributed EPC files not found in /root/"
+  echo ""
+  echo "   Please upload these files to /root/ first:"
   echo "   - distributed-epc-schema.js"
   echo "   - distributed-epc-api.js"
+  echo ""
+  echo "   You can use your web app to upload them."
+  echo ""
+  exit 1
 fi
 
 # Create systemd service
