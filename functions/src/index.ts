@@ -241,6 +241,11 @@ export const hssProxy = onRequest({
       headers['x-tenant-id'] = req.headers['x-tenant-id'] as string;
     }
     
+    // Forward Authorization header if present
+    if (req.headers['authorization']) {
+      headers['Authorization'] = req.headers['authorization'] as string;
+    }
+    
     const options: RequestInit = {
       method: req.method,
       headers
