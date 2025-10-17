@@ -33,7 +33,9 @@ cat > package.json << 'EOF'
     "mongoose": "^7.5.0",
     "cors": "^2.8.5",
     "body-parser": "^1.20.2",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0",
+    "@sendgrid/mail": "^7.7.0"
   }
 }
 EOF
