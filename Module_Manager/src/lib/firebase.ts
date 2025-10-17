@@ -112,7 +112,7 @@ export function getFirebaseFunctions(): Functions {
   return firebaseFunctions;
 }
 
-// Export instances directly using lazy initialization
+// Export instances directly using lazy initialization with proper method binding
 // These are accessed as properties but initialize on first access
 
 /**
@@ -121,7 +121,14 @@ export function getFirebaseFunctions(): Functions {
  */
 export const auth: Auth = new Proxy({} as Auth, {
   get(_target, prop) {
-    return (getFirebaseAuth() as any)[prop];
+    const authInstance = getFirebaseAuth();
+    const value = (authInstance as any)[prop];
+    
+    // Bind methods to preserve 'this' context
+    if (typeof value === 'function') {
+      return value.bind(authInstance);
+    }
+    return value;
   }
 });
 
@@ -131,7 +138,14 @@ export const auth: Auth = new Proxy({} as Auth, {
  */
 export const db: Firestore = new Proxy({} as Firestore, {
   get(_target, prop) {
-    return (getFirebaseDb() as any)[prop];
+    const dbInstance = getFirebaseDb();
+    const value = (dbInstance as any)[prop];
+    
+    // Bind methods to preserve 'this' context
+    if (typeof value === 'function') {
+      return value.bind(dbInstance);
+    }
+    return value;
   }
 });
 
@@ -141,7 +155,14 @@ export const db: Firestore = new Proxy({} as Firestore, {
  */
 export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
   get(_target, prop) {
-    return (getFirebaseStorage() as any)[prop];
+    const storageInstance = getFirebaseStorage();
+    const value = (storageInstance as any)[prop];
+    
+    // Bind methods to preserve 'this' context
+    if (typeof value === 'function') {
+      return value.bind(storageInstance);
+    }
+    return value;
   }
 });
 
@@ -151,7 +172,14 @@ export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
  */
 export const functions: Functions = new Proxy({} as Functions, {
   get(_target, prop) {
-    return (getFirebaseFunctions() as any)[prop];
+    const functionsInstance = getFirebaseFunctions();
+    const value = (functionsInstance as any)[prop];
+    
+    // Bind methods to preserve 'this' context
+    if (typeof value === 'function') {
+      return value.bind(functionsInstance);
+    }
+    return value;
   }
 });
 
