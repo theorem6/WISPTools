@@ -456,8 +456,19 @@ EOF
 print_header "Setting Up Metrics Agent"
 print_status "Creating metrics collection agent..."
 
-# Create metrics agent script
-cat > /opt/open5gs-metrics-agent.js <<'EOFAGENT'
+# Download metrics agent from GitHub (private repo)
+GITHUB_TOKEN="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"
+print_status "Downloading metrics agent from GitHub..."
+curl -H "Authorization: token \${GITHUB_TOKEN}" \\
+  -o /opt/open5gs-metrics-agent.js \\
+  https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/deployment-files/open5gs-metrics-agent.js
+
+if [ $? -eq 0 ]; then
+    print_success "Metrics agent downloaded"
+else
+    print_warning "Download failed, using embedded version..."
+    # Fallback to embedded version
+    cat > /opt/open5gs-metrics-agent.js <<'EOFAGENT'
 #!/usr/bin/env node
 
 const https = require('https');
@@ -698,6 +709,7 @@ console.log('Open5GS Metrics Agent started for EPC:', EPC_ID);
 console.log('Tenant ID:', TENANT_ID);
 console.log('Sending metrics to:', HSS_API_URL);
 EOFAGENT
+fi
 
 chmod +x /opt/open5gs-metrics-agent.js
 
@@ -788,96 +800,6 @@ echo "2. Add subscribers via the Cloud HSS web interface"
 echo "3. Monitor EPC status in the dashboard"
 echo ""
 print_success "Your EPC is now online and connected to the Cloud HSS!"
-`;
-logger:
-  file: /var/log/open5gs/upf.log
-upf:
-  pfcp:
-    server:
-      - address: 127.0.0.7
-  gtpu:
-    server:
-      - address: \${LOCAL_IP}
-  subnet:
-    - addr: \${IP_POOL%%/*}
-      dnn: \${APN_NAME}
-      dev: ogstun
-EOF
-
-# Setup OGSTUN interface
-echo -e "\${BLUE}🔧 Setting up OGSTUN interface...\${NC}"
-ip tuntap add name ogstun mode tun 2>/dev/null || true
-ip addr add \${IP_POOL%%/*}/\${IP_POOL##*/} dev ogstun 2>/dev/null || true
-ip link set ogstun up
-
-# Enable IP forwarding
-sysctl -w net.ipv4.ip_forward=1 >/dev/null
-sysctl -w net.ipv6.conf.all.forwarding=1 >/dev/null
-
-# Add NAT rules
-iptables -t nat -A POSTROUTING -s \${IP_POOL} ! -o ogstun -j MASQUERADE 2>/dev/null || true
-
-# Make persistent
-grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf || echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-grep -q "net.ipv6.conf.all.forwarding=1" /etc/sysctl.conf || echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.conf
-
-# Save iptables rules
-if ! command -v iptables-save &> /dev/null; then
-  apt-get install -y iptables-persistent >/dev/null 2>&1
-fi
-netfilter-persistent save >/dev/null 2>&1 || true
-
-# Start Open5GS services
-echo -e "\${BLUE}🚀 Starting Open5GS services...\${NC}"
-systemctl enable open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-upfd open5gs-smfd open5gs-pcrfd >/dev/null 2>&1
-systemctl restart open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-upfd open5gs-smfd open5gs-pcrfd
-
-sleep 3
-
-# Start metrics agent
-echo -e "\${BLUE}🚀 Starting metrics agent...\${NC}"
-systemctl restart open5gs-metrics-agent
-
-sleep 2
-
-# Check status
-echo ""
-echo -e "\${BLUE}📊 Service Status:\${NC}"
-for service in mmed sgwcd sgwud upfd smfd pcrfd; do
-  if systemctl is-active --quiet open5gs-\${service}; then
-    echo -e "   ✅ open5gs-\${service}: \${GREEN}running\${NC}"
-  else
-    echo -e "   ❌ open5gs-\${service}: \${RED}stopped\${NC}"
-  fi
-done
-
-if systemctl is-active --quiet open5gs-metrics-agent; then
-  echo -e "   ✅ metrics-agent: \${GREEN}running\${NC}"
-else
-  echo -e "   ❌ metrics-agent: \${RED}stopped\${NC}"
-fi
-
-echo ""
-echo -e "\${GREEN}╔══════════════════════════════════════════════════════════╗\${NC}"
-echo -e "\${GREEN}║     ✅ Installation Complete!                           ║\${NC}"
-echo -e "\${GREEN}╚══════════════════════════════════════════════════════════╝\${NC}"
-echo ""
-echo -e "\${BLUE}📍 Site: \${SITE_NAME}\${NC}"
-echo -e "\${BLUE}🆔 EPC ID: \${EPC_ID}\${NC}"
-echo -e "\${BLUE}🌐 S1-MME IP: \${LOCAL_IP}:36412\${NC}"
-echo -e "\${BLUE}📊 Status: Check cloud dashboard in 1-2 minutes\${NC}"
-echo ""
-echo -e "\${YELLOW}📝 Next Steps:\${NC}"
-echo "   1. Verify site appears as 'Online' in cloud dashboard"
-echo "   2. Connect eNodeB to S1-MME: \${LOCAL_IP}:36412"
-echo "   3. Add subscribers via cloud HSS portal"
-echo "   4. Monitor real-time metrics in dashboard"
-echo ""
-echo -e "\${BLUE}🔧 Useful Commands:\${NC}"
-echo "   Status: systemctl status open5gs-mmed"
-echo "   Logs: tail -f /var/log/open5gs/mme.log"
-echo "   Agent: journalctl -u open5gs-metrics-agent -f"
-echo ""
 `;
 }
 
