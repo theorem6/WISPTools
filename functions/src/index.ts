@@ -227,7 +227,7 @@ export const hssProxy = onRequest({
     return;
   }
   
-  const backendUrl = 'http://136.112.111.167:3001';
+  const backendUrl = 'http://136.112.111.167:3000';
   const path = req.path || '';
   const url = `${backendUrl}${path}`;
   
