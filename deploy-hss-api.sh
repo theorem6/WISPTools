@@ -402,6 +402,9 @@ app.get('/health', (req, res) => {
 // Monitoring endpoints
 app.use('/monitoring', require('./monitoring-api'));
 
+// Distributed EPC endpoints
+app.use('/api', require('./distributed-epc-api'));
+
 // Start monitoring service
 const monitoringService = require('./monitoring-service');
 monitoringService.startMonitoring();
@@ -411,6 +414,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 HSS Management API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
   console.log(`🔍 Monitoring enabled with auto-refresh`);
+  console.log(`🌐 Distributed EPC API enabled`);
 });
 
 // Graceful shutdown
@@ -432,6 +436,19 @@ MONGODB_URI=$MONGODB_URI
 PORT=3000
 NODE_ENV=production
 EOFENV
+
+# Copy distributed EPC files from repository
+echo "📦 Copying distributed EPC files..."
+if [ -f "../distributed-epc-schema.js" ]; then
+  cp ../distributed-epc-schema.js ./
+  cp ../distributed-epc-api.js ./
+  echo "✅ Distributed EPC files copied"
+else
+  echo "⚠️  Warning: Distributed EPC files not found in parent directory"
+  echo "   Make sure to copy these files manually:"
+  echo "   - distributed-epc-schema.js"
+  echo "   - distributed-epc-api.js"
+fi
 
 # Create systemd service
 cat > /etc/systemd/system/hss-api.service << 'EOFSVC'
