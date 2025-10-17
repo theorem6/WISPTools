@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { auth } from '$lib/firebase';
+  import EPCMonitor from './EPCMonitor.svelte';
   
   export let tenantId: string;
   export let HSS_API: string;
@@ -9,8 +10,11 @@
   let loading = true;
   let showAddModal = false;
   let showDetailsModal = false;
+  let showMonitorModal = false;
   let selectedEPC: any = null;
+  let monitoringEPCId: string = '';
   let statusFilter = 'all';
+  let viewMode = 'list'; // 'list' or 'monitor'
   
   // Form data for new EPC
   let formData = {
@@ -161,6 +165,21 @@
     showDetailsModal = true;
   }
   
+  function monitorEPC(epc: any) {
+    monitoringEPCId = epc.epc_id;
+    viewMode = 'monitor';
+  }
+  
+  function monitorAll() {
+    monitoringEPCId = 'all';
+    viewMode = 'monitor';
+  }
+  
+  function backToList() {
+    viewMode = 'list';
+    monitoringEPCId = '';
+  }
+  
   async function deleteEPC(epc: any) {
     if (!confirm(`Are you sure you want to delete EPC site "${epc.site_name}"?`)) {
       return;
@@ -233,15 +252,31 @@
 </script>
 
 <div class="remote-epcs">
-  <div class="header">
-    <div>
-      <h2>🌐 Remote EPC Sites</h2>
-      <p class="subtitle">Manage distributed EPC deployments</p>
+  {#if viewMode === 'monitor'}
+    <!-- Monitoring View -->
+    <div class="monitor-header">
+      <button class="back-btn" on:click={backToList}>
+        ← Back to List
+      </button>
+      <h2>📊 EPC Monitoring Dashboard</h2>
     </div>
-    <button class="add-btn" on:click={() => showAddModal = true}>
-      ➕ Register New EPC
-    </button>
-  </div>
+    <EPCMonitor {tenantId} {HSS_API} epcId={monitoringEPCId} />
+  {:else}
+    <!-- List View -->
+    <div class="header">
+      <div>
+        <h2>🌐 Remote EPC Sites</h2>
+        <p class="subtitle">Manage distributed EPC deployments</p>
+      </div>
+      <div class="header-actions">
+        <button class="monitor-all-btn" on:click={monitorAll}>
+          📊 Monitor All
+        </button>
+        <button class="add-btn" on:click={() => showAddModal = true}>
+          ➕ Register New EPC
+        </button>
+      </div>
+    </div>
   
   <!-- Summary Cards -->
   <div class="summary-grid">
@@ -343,19 +378,23 @@
           </div>
           
           <div class="epc-actions">
-            <button class="btn-primary" on:click={() => downloadDeploymentScript(epc)}>
-              📥 Download Script
+            <button class="btn-primary" on:click={() => monitorEPC(epc)}>
+              📊 Monitor
+            </button>
+            <button class="btn-secondary" on:click={() => downloadDeploymentScript(epc)}>
+              📥 Script
             </button>
             <button class="btn-secondary" on:click={() => viewEPCDetails(epc)}>
-              📊 Details
+              ℹ️ Details
             </button>
             <button class="btn-danger" on:click={() => deleteEPC(epc)}>
-              🗑️ Delete
+              🗑️
             </button>
           </div>
         </div>
       {/each}
     </div>
+  {/if}
   {/if}
 </div>
 
@@ -552,6 +591,52 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 2rem;
+  }
+  
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .monitor-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .monitor-header h2 {
+    margin: 0;
+  }
+  
+  .back-btn {
+    padding: 0.75rem 1.5rem;
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  
+  .back-btn:hover {
+    background: #e5e7eb;
+  }
+  
+  .monitor-all-btn {
+    padding: 0.75rem 1.5rem;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  
+  .monitor-all-btn:hover {
+    background: #2563eb;
   }
   
   .header h2 {
