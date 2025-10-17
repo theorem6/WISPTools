@@ -100,9 +100,27 @@
     }
     
     try {
-      const user = auth.currentUser;
+      // Wait for auth state to be ready (max 5 seconds)
+      let user = auth.currentUser;
       if (!user) {
-        alert('Not authenticated. Please log in again.');
+        console.log('[RemoteEPCs] Waiting for auth state...');
+        await new Promise(resolve => {
+          const unsubscribe = auth.onAuthStateChanged((authUser) => {
+            unsubscribe();
+            resolve(authUser);
+          });
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            unsubscribe();
+            resolve(null);
+          }, 5000);
+        });
+        user = auth.currentUser;
+      }
+      
+      if (!user) {
+        console.error('[RemoteEPCs] Still not authenticated after waiting');
+        alert('Authentication is still loading. Please wait a moment and try again.');
         return;
       }
       
