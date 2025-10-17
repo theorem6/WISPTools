@@ -10,6 +10,7 @@
   import HSSStats from './components/HSSStats.svelte';
   import MMEConnections from './components/MMEConnections.svelte';
   import BulkImport from './components/BulkImport.svelte';
+  import RemoteEPCs from './components/RemoteEPCs.svelte';
   
   let activeTab = 'dashboard';
   let stats: any = null;
@@ -188,6 +189,12 @@
       >
         📥 Bulk Import
       </button>
+      <button 
+        class:active={activeTab === 'remote-epcs'} 
+        on:click={() => switchTab('remote-epcs')}
+      >
+        🌐 Remote EPCs
+      </button>
     </div>
     
     <!-- Tab Content -->
@@ -204,6 +211,8 @@
         <MMEConnections {tenantId} {HSS_API} />
       {:else if activeTab === 'import'}
         <BulkImport {tenantId} {HSS_API} on:imported={loadStats} />
+      {:else if activeTab === 'remote-epcs'}
+        <RemoteEPCs {tenantId} {HSS_API} />
       {/if}
     </div>
   {/if}

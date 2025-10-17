@@ -1,0 +1,992 @@
+<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { auth } from '$lib/firebase';
+  
+  export let tenantId: string;
+  export let HSS_API: string;
+  
+  let epcs: any[] = [];
+  let loading = true;
+  let showAddModal = false;
+  let showDetailsModal = false;
+  let selectedEPC: any = null;
+  let statusFilter = 'all';
+  
+  // Form data for new EPC
+  let formData = {
+    site_name: '',
+    location: {
+      address: '',
+      city: '',
+      state: '',
+      country: 'USA',
+      coordinates: {
+        latitude: 0,
+        longitude: 0
+      }
+    },
+    network_config: {
+      mcc: '001',
+      mnc: '01',
+      tac: '1'
+    },
+    contact: {
+      name: '',
+      email: '',
+      phone: ''
+    }
+  };
+  
+  // Auto-refresh interval
+  let refreshInterval: any = null;
+  
+  onMount(async () => {
+    await loadEPCs();
+    
+    // Auto-refresh every 30 seconds
+    refreshInterval = setInterval(loadEPCs, 30000);
+  });
+  
+  onDestroy(() => {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+  });
+  
+  async function loadEPCs() {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const url = statusFilter === 'all' 
+        ? `${HSS_API}/api/epc/list`
+        : `${HSS_API}/api/epc/list?status=${statusFilter}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        epcs = data.epcs || [];
+      }
+    } catch (err: any) {
+      console.error('Error loading EPCs:', err);
+    } finally {
+      loading = false;
+    }
+  }
+  
+  async function registerEPC() {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`${HSS_API}/api/epc/register`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        showAddModal = false;
+        await loadEPCs();
+        
+        // Show the newly created EPC with credentials
+        const newEPC = epcs.find(e => e.epc_id === data.epc_id);
+        if (newEPC) {
+          selectedEPC = { ...newEPC, ...data };
+          showDetailsModal = true;
+        }
+        
+        // Reset form
+        resetForm();
+      } else {
+        const error = await response.json();
+        alert('Failed to register EPC: ' + (error.error || 'Unknown error'));
+      }
+    } catch (err: any) {
+      console.error('Error registering EPC:', err);
+      alert('Failed to register EPC: ' + err.message);
+    }
+  }
+  
+  async function downloadDeploymentScript(epc: any) {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`${HSS_API}/api/epc/${epc.epc_id}/deployment-script`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const script = await response.text();
+        const blob = new Blob([script], { type: 'text/x-shellscript' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `deploy-epc-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('Failed to generate deployment script');
+      }
+    } catch (err: any) {
+      console.error('Error downloading script:', err);
+      alert('Failed to download script: ' + err.message);
+    }
+  }
+  
+  function viewEPCDetails(epc: any) {
+    selectedEPC = epc;
+    showDetailsModal = true;
+  }
+  
+  async function deleteEPC(epc: any) {
+    if (!confirm(`Are you sure you want to delete EPC site "${epc.site_name}"?`)) {
+      return;
+    }
+    
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`${HSS_API}/api/epc/${epc.epc_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        await loadEPCs();
+      } else {
+        alert('Failed to delete EPC');
+      }
+    } catch (err: any) {
+      console.error('Error deleting EPC:', err);
+      alert('Failed to delete EPC: ' + err.message);
+    }
+  }
+  
+  function resetForm() {
+    formData = {
+      site_name: '',
+      location: {
+        address: '',
+        city: '',
+        state: '',
+        country: 'USA',
+        coordinates: {
+          latitude: 0,
+          longitude: 0
+        }
+      },
+      network_config: {
+        mcc: '001',
+        mnc: '01',
+        tac: '1'
+      },
+      contact: {
+        name: '',
+        email: '',
+        phone: ''
+      }
+    };
+  }
+  
+  function getStatusBadge(status: string) {
+    const badges: Record<string, { class: string; label: string }> = {
+      'registered': { class: 'status-registered', label: 'Registered' },
+      'online': { class: 'status-online', label: 'Online' },
+      'offline': { class: 'status-offline', label: 'Offline' },
+      'error': { class: 'status-error', label: 'Error' }
+    };
+    return badges[status] || badges['offline'];
+  }
+  
+  $: filteredEPCs = statusFilter === 'all' 
+    ? epcs 
+    : epcs.filter(e => e.status === statusFilter);
+</script>
+
+<div class="remote-epcs">
+  <div class="header">
+    <div>
+      <h2>🌐 Remote EPC Sites</h2>
+      <p class="subtitle">Manage distributed EPC deployments</p>
+    </div>
+    <button class="add-btn" on:click={() => showAddModal = true}>
+      ➕ Register New EPC
+    </button>
+  </div>
+  
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="summary-value">{epcs.length}</div>
+      <div class="summary-label">Total Sites</div>
+    </div>
+    <div class="summary-card online">
+      <div class="summary-value">{epcs.filter(e => e.status === 'online').length}</div>
+      <div class="summary-label">Online</div>
+    </div>
+    <div class="summary-card registered">
+      <div class="summary-value">{epcs.filter(e => e.status === 'registered').length}</div>
+      <div class="summary-label">Registered</div>
+    </div>
+    <div class="summary-card offline">
+      <div class="summary-value">{epcs.filter(e => e.status === 'offline').length}</div>
+      <div class="summary-label">Offline</div>
+    </div>
+  </div>
+  
+  <!-- Filters -->
+  <div class="filters">
+    <label>
+      <span>Status:</span>
+      <select bind:value={statusFilter} on:change={loadEPCs}>
+        <option value="all">All</option>
+        <option value="online">Online</option>
+        <option value="registered">Registered</option>
+        <option value="offline">Offline</option>
+        <option value="error">Error</option>
+      </select>
+    </label>
+    <button class="refresh-btn" on:click={loadEPCs}>
+      🔄 Refresh
+    </button>
+  </div>
+  
+  <!-- EPC List -->
+  {#if loading}
+    <div class="loading">Loading EPCs...</div>
+  {:else if filteredEPCs.length === 0}
+    <div class="empty-state">
+      <h3>No EPC sites found</h3>
+      <p>Register your first remote EPC to get started</p>
+      <button class="add-btn" on:click={() => showAddModal = true}>
+        ➕ Register New EPC
+      </button>
+    </div>
+  {:else}
+    <div class="epc-grid">
+      {#each filteredEPCs as epc}
+        <div class="epc-card">
+          <div class="epc-header">
+            <div>
+              <h3>{epc.site_name}</h3>
+              <div class="epc-id">ID: {epc.epc_id}</div>
+            </div>
+            <span class="status-badge {getStatusBadge(epc.status).class}">
+              {getStatusBadge(epc.status).label}
+            </span>
+          </div>
+          
+          <div class="epc-details">
+            {#if epc.location?.city}
+              <div class="detail-row">
+                <span class="icon">📍</span>
+                <span>{epc.location.city}, {epc.location.state || ''}</span>
+              </div>
+            {/if}
+            
+            {#if epc.location?.coordinates}
+              <div class="detail-row">
+                <span class="icon">🗺️</span>
+                <span>{epc.location.coordinates.latitude.toFixed(4)}, {epc.location.coordinates.longitude.toFixed(4)}</span>
+              </div>
+            {/if}
+            
+            {#if epc.network_config}
+              <div class="detail-row">
+                <span class="icon">📡</span>
+                <span>MCC: {epc.network_config.mcc} / MNC: {epc.network_config.mnc}</span>
+              </div>
+            {/if}
+            
+            {#if epc.last_seen}
+              <div class="detail-row">
+                <span class="icon">🕐</span>
+                <span>Last seen: {new Date(epc.last_seen).toLocaleString()}</span>
+              </div>
+            {/if}
+            
+            {#if epc.minutes_since_heartbeat !== undefined}
+              <div class="detail-row">
+                <span class="icon">💓</span>
+                <span>{epc.minutes_since_heartbeat} min since heartbeat</span>
+              </div>
+            {/if}
+          </div>
+          
+          <div class="epc-actions">
+            <button class="btn-primary" on:click={() => downloadDeploymentScript(epc)}>
+              📥 Download Script
+            </button>
+            <button class="btn-secondary" on:click={() => viewEPCDetails(epc)}>
+              📊 Details
+            </button>
+            <button class="btn-danger" on:click={() => deleteEPC(epc)}>
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+</div>
+
+<!-- Add EPC Modal -->
+{#if showAddModal}
+  <div class="modal-overlay" on:click={() => showAddModal = false}>
+    <div class="modal" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>Register New EPC Site</h2>
+        <button class="close-btn" on:click={() => showAddModal = false}>✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="form-section">
+          <h3>Site Information</h3>
+          <div class="form-group">
+            <label>Site Name *</label>
+            <input type="text" bind:value={formData.site_name} placeholder="e.g., Main Tower Site" required />
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" bind:value={formData.location.city} placeholder="City" />
+            </div>
+            <div class="form-group">
+              <label>State</label>
+              <input type="text" bind:value={formData.location.state} placeholder="State" />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" bind:value={formData.location.address} placeholder="Street address" />
+          </div>
+        </div>
+        
+        <div class="form-section">
+          <h3>GPS Coordinates (for map)</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Latitude *</label>
+              <input type="number" step="0.0001" bind:value={formData.location.coordinates.latitude} placeholder="40.7128" required />
+            </div>
+            <div class="form-group">
+              <label>Longitude *</label>
+              <input type="number" step="0.0001" bind:value={formData.location.coordinates.longitude} placeholder="-74.0060" required />
+            </div>
+          </div>
+          <small>Get coordinates from <a href="https://www.google.com/maps" target="_blank">Google Maps</a></small>
+        </div>
+        
+        <div class="form-section">
+          <h3>Network Configuration</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>MCC *</label>
+              <input type="text" bind:value={formData.network_config.mcc} placeholder="001" required />
+            </div>
+            <div class="form-group">
+              <label>MNC *</label>
+              <input type="text" bind:value={formData.network_config.mnc} placeholder="01" required />
+            </div>
+            <div class="form-group">
+              <label>TAC *</label>
+              <input type="text" bind:value={formData.network_config.tac} placeholder="1" required />
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-section">
+          <h3>Contact Information</h3>
+          <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" bind:value={formData.contact.name} placeholder="Site manager name" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" bind:value={formData.contact.email} placeholder="email@example.com" />
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" bind:value={formData.contact.phone} placeholder="+1 (555) 123-4567" />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={() => showAddModal = false}>Cancel</button>
+        <button class="btn-primary" on:click={registerEPC} disabled={!formData.site_name || !formData.location.coordinates.latitude}>
+          Register EPC
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- EPC Details Modal -->
+{#if showDetailsModal && selectedEPC}
+  <div class="modal-overlay" on:click={() => showDetailsModal = false}>
+    <div class="modal modal-large" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>📊 {selectedEPC.site_name}</h2>
+        <button class="close-btn" on:click={() => showDetailsModal = false}>✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="details-grid">
+          <div class="detail-section">
+            <h3>Status</h3>
+            <div class="status-large {getStatusBadge(selectedEPC.status).class}">
+              {getStatusBadge(selectedEPC.status).label}
+            </div>
+            {#if selectedEPC.last_heartbeat}
+              <p>Last heartbeat: {new Date(selectedEPC.last_heartbeat).toLocaleString()}</p>
+            {/if}
+          </div>
+          
+          {#if selectedEPC.auth_code || selectedEPC.api_key}
+            <div class="detail-section credentials">
+              <h3>🔐 Credentials (Keep Secure!)</h3>
+              <div class="credential-item">
+                <label>AUTH CODE:</label>
+                <code>{selectedEPC.auth_code}</code>
+              </div>
+              <div class="credential-item">
+                <label>API KEY:</label>
+                <code>{selectedEPC.api_key}</code>
+              </div>
+              {#if selectedEPC.secret_key}
+                <div class="credential-item">
+                  <label>SECRET KEY:</label>
+                  <code>{selectedEPC.secret_key}</code>
+                </div>
+              {/if}
+              <button class="btn-primary" on:click={() => downloadDeploymentScript(selectedEPC)}>
+                📥 Download Deployment Script
+              </button>
+            </div>
+          {/if}
+          
+          <div class="detail-section">
+            <h3>Location</h3>
+            <p><strong>Address:</strong> {selectedEPC.location?.address || 'N/A'}</p>
+            <p><strong>City:</strong> {selectedEPC.location?.city || 'N/A'}, {selectedEPC.location?.state || ''}</p>
+            {#if selectedEPC.location?.coordinates}
+              <p><strong>Coordinates:</strong> {selectedEPC.location.coordinates.latitude}, {selectedEPC.location.coordinates.longitude}</p>
+            {/if}
+          </div>
+          
+          <div class="detail-section">
+            <h3>Network Config</h3>
+            <p><strong>MCC:</strong> {selectedEPC.network_config?.mcc || 'N/A'}</p>
+            <p><strong>MNC:</strong> {selectedEPC.network_config?.mnc || 'N/A'}</p>
+            <p><strong>TAC:</strong> {selectedEPC.network_config?.tac || 'N/A'}</p>
+          </div>
+          
+          {#if selectedEPC.version}
+            <div class="detail-section">
+              <h3>Version Info</h3>
+              <p><strong>Open5GS:</strong> {selectedEPC.version.open5gs || 'N/A'}</p>
+              <p><strong>Agent:</strong> {selectedEPC.version.metrics_agent || 'N/A'}</p>
+              <p><strong>OS:</strong> {selectedEPC.version.os || 'N/A'}</p>
+            </div>
+          {/if}
+          
+          {#if selectedEPC.contact?.name || selectedEPC.contact?.email}
+            <div class="detail-section">
+              <h3>Contact</h3>
+              <p><strong>Name:</strong> {selectedEPC.contact.name || 'N/A'}</p>
+              <p><strong>Email:</strong> {selectedEPC.contact.email || 'N/A'}</p>
+              <p><strong>Phone:</strong> {selectedEPC.contact.phone || 'N/A'}</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={() => showDetailsModal = false}>Close</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .remote-epcs {
+    padding: 0;
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+  }
+  
+  .header h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+  }
+  
+  .subtitle {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+  
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .summary-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  
+  .summary-card.online {
+    border-left: 4px solid #10b981;
+  }
+  
+  .summary-card.registered {
+    border-left: 4px solid #3b82f6;
+  }
+  
+  .summary-card.offline {
+    border-left: 4px solid #ef4444;
+  }
+  
+  .summary-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1;
+  }
+  
+  .summary-label {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+  
+  .filters {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .filters label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .filters select {
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+  }
+  
+  .epc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .epc-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: box-shadow 0.2s;
+  }
+  
+  .epc-card:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  }
+  
+  .epc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  
+  .epc-header h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.125rem;
+  }
+  
+  .epc-id {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-family: monospace;
+  }
+  
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .status-registered {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  
+  .status-online {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .status-offline {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .status-error {
+    background: #fef3c7;
+    color: #92400e;
+  }
+  
+  .epc-details {
+    margin-bottom: 1rem;
+  }
+  
+  .detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: #4b5563;
+  }
+  
+  .detail-row .icon {
+    font-size: 1rem;
+  }
+  
+  .epc-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .epc-actions button {
+    flex: 1;
+    min-width: 100px;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+  
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .btn-secondary:hover {
+    background: #e5e7eb;
+  }
+  
+  .btn-danger {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .btn-danger:hover {
+    background: #fecaca;
+  }
+  
+  .add-btn, .refresh-btn {
+    padding: 0.75rem 1.5rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  
+  .add-btn:hover, .refresh-btn:hover {
+    background: #1d4ed8;
+  }
+  
+  .refresh-btn {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .refresh-btn:hover {
+    background: #e5e7eb;
+  }
+  
+  .loading, .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #6b7280;
+  }
+  
+  .empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: #1a1a1a;
+  }
+  
+  .empty-state p {
+    margin: 0 0 1.5rem 0;
+  }
+  
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+  
+  .modal {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .modal-large {
+    max-width: 800px;
+  }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #9ca3af;
+    padding: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .close-btn:hover {
+    color: #4b5563;
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+  
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+  }
+  
+  .form-section {
+    margin-bottom: 2rem;
+  }
+  
+  .form-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #1a1a1a;
+  }
+  
+  .form-group {
+    margin-bottom: 1rem;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 0.625rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+  }
+  
+  .form-group input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+  
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+  
+  .form-section small {
+    color: #6b7280;
+    font-size: 0.75rem;
+  }
+  
+  .form-section small a {
+    color: #2563eb;
+    text-decoration: none;
+  }
+  
+  .details-grid {
+    display: grid;
+    gap: 1.5rem;
+  }
+  
+  .detail-section {
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+  
+  .detail-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+  }
+  
+  .detail-section p {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+  }
+  
+  .status-large {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  
+  .credentials {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+  }
+  
+  .credential-item {
+    margin-bottom: 1rem;
+  }
+  
+  .credential-item label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 0.25rem;
+  }
+  
+  .credential-item code {
+    display: block;
+    padding: 0.5rem;
+    background: white;
+    border: 1px solid #fcd34d;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    word-break: break-all;
+  }
+  
+  @media (max-width: 768px) {
+    .epc-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .summary-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>
+
