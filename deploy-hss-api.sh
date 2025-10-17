@@ -384,7 +384,7 @@ app.post('/subscribers/bulk', async (req, res) => {
         await subscriber.save();
         results.imported++;
       } catch (error) {
-        results.errors.push(\`IMSI \${sub.imsi}: \${error.message}\`);
+        results.errors.push('IMSI ' + sub.imsi + ': ' + error.message);
       }
     }
 
