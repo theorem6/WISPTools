@@ -509,8 +509,17 @@
       </div>
       
       <div class="modal-footer">
-        <button class="btn-secondary" on:click={() => showAddModal = false}>Cancel</button>
-        <button class="btn-primary" on:click={registerEPC} disabled={!formData.site_name || !formData.location.coordinates.latitude}>
+        <button type="button" class="btn-secondary" on:click={() => showAddModal = false}>Cancel</button>
+        <button 
+          type="button"
+          class="btn-primary" 
+          on:click={() => {
+            console.log('[Register Button] Clicked!');
+            console.log('[Register Button] tenantId:', tenantId);
+            console.log('[Register Button] formData:', formData);
+            registerEPC();
+          }}
+        >
           Register EPC
         </button>
       </div>
