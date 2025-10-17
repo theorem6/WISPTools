@@ -424,8 +424,8 @@
 
 <!-- Add EPC Modal -->
 {#if showAddModal}
-  <div class="modal-overlay" on:click={() => showAddModal = false}>
-    <div class="modal" on:click|stopPropagation>
+  <div class="modal-overlay" on:click|self={() => showAddModal = false}>
+    <div class="modal">
       <div class="modal-header">
         <h2>Register New EPC Site</h2>
         <button class="close-btn" on:click={() => showAddModal = false}>✕</button>
@@ -520,8 +520,8 @@
 
 <!-- EPC Details Modal -->
 {#if showDetailsModal && selectedEPC}
-  <div class="modal-overlay" on:click={() => showDetailsModal = false}>
-    <div class="modal modal-large" on:click|stopPropagation>
+  <div class="modal-overlay" on:click|self={() => showDetailsModal = false}>
+    <div class="modal modal-large">
       <div class="modal-header">
         <h2>📊 {selectedEPC.site_name}</h2>
         <button class="close-btn" on:click={() => showDetailsModal = false}>✕</button>
