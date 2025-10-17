@@ -139,224 +139,480 @@ function generateDeploymentScript(epc) {
   const mcc = epc.network_config?.mcc || '001';
   const mnc = epc.network_config?.mnc || '01';
   const tac = epc.network_config?.tac || '1';
-  const apnName = 'internet'; // Default
-  const ipPool = '10.45.0.0/16'; // Default
   
   return `#!/bin/bash
-
-###############################################################################
-# Distributed EPC Deployment Script
-# Auto-generated for: ${epc.site_name}
+# 🚀 Complete EPC Deployment Script - Rapid5GS Style
+# Site: ${epc.site_name}
+# EPC ID: ${epc.epc_id}
 # Generated: ${new Date().toISOString()}
-###############################################################################
 
 set -e
 
-# Colors
+# Colors for output
 RED='\\033[0;31m'
 GREEN='\\033[0;32m'
 YELLOW='\\033[1;33m'
 BLUE='\\033[0;34m'
+PURPLE='\\033[0;35m'
+CYAN='\\033[0;36m'
 NC='\\033[0m' # No Color
 
-# Pre-configured settings (DO NOT MODIFY)
-SITE_NAME="${epc.site_name}"
-EPC_ID="${epc.epc_id}"
-MCC="${mcc}"
-MNC="${mnc}"
-TAC="${tac}"
-APN_NAME="${apnName}"
-IP_POOL="${ipPool}"
+# Function to print colored output
+print_status() {
+    echo -e "\\n\${BLUE}[INFO]\${NC} \$1"
+}
 
-# Cloud API Configuration (DO NOT MODIFY)
-CLOUD_HSS_API="${process.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'}"
-AUTH_CODE="${epc.auth_code}"
-API_KEY="${epc.api_key}"
-SECRET_KEY="${epc.secret_key}"
+print_success() {
+    echo -e "\\n\${GREEN}[SUCCESS]\${NC} \$1"
+}
+
+print_warning() {
+    echo -e "\\n\${YELLOW}[WARNING]\${NC} \$1"
+}
+
+print_error() {
+    echo -e "\\n\${RED}[ERROR]\${NC} \$1"
+}
+
+print_header() {
+    echo -e "\\n\${PURPLE}═══════════════════════════════════════════════════════════\${NC}"
+    echo -e "\${PURPLE}     \$1\${NC}"
+    echo -e "\${PURPLE}═══════════════════════════════════════════════════════════\${NC}"
+}
+
+# Interactive configuration
+print_header "Remote EPC Deployment - ${epc.site_name}"
+echo -e "\${CYAN}EPC ID:\${NC} ${epc.epc_id}"
+echo -e "\${CYAN}Location:\${NC} ${epc.location?.city || 'Not specified'}, ${epc.location?.state || 'Not specified'}"
+echo -e "\${CYAN}Coordinates:\${NC} ${epc.location?.coordinates?.latitude || 'N/A'}, ${epc.location?.coordinates?.longitude || 'N/A'}"
+echo -e "\${CYAN}Network:\${NC} MCC=${mcc} MNC=${mnc} TAC=${tac}"
+echo ""
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
-  echo -e "\${RED}❌ Please run as root (use sudo)\\n   Example: sudo bash deploy-epc-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh\${NC}"
+  print_error "Please run as root (use sudo)"
   exit 1
 fi
 
-echo -e "\${BLUE}"
-echo "╔══════════════════════════════════════════════════════════╗"
-echo "║     Distributed EPC Deployment                           ║"
-echo "║     Site: ${epc.site_name.padEnd(48)} ║"
-echo "╚══════════════════════════════════════════════════════════╝"
-echo -e "\${NC}"
-
-echo -e "\${YELLOW}📍 Site Configuration:\${NC}"
-echo "   Site Name: \${SITE_NAME}"
-echo "   EPC ID: \${EPC_ID}"
-echo "   MCC/MNC: \${MCC}/\${MNC}"
-echo "   TAC: \${TAC}"
-${epc.location?.city ? `echo "   Location: ${epc.location.city}, ${epc.location.state || ''}"` : ''}
-${epc.location?.coordinates ? `echo "   Coordinates: ${epc.location.coordinates.latitude}, ${epc.location.coordinates.longitude}"` : ''}
+# Interactive IP configuration
+print_header "Network Configuration"
+echo "Please provide the following network information:"
 echo ""
 
-read -p "Press Enter to start installation, or Ctrl+C to cancel..."
-echo ""
-
-# Update system
-echo -e "\${BLUE}📦 Updating system packages...\${NC}"
-apt-get update -qq
-apt-get install -y software-properties-common curl wget gnupg2 >/dev/null 2>&1
-
-# Add Open5GS repository
-echo -e "\${BLUE}📦 Adding Open5GS repository...\${NC}"
-add-apt-repository -y ppa:open5gs/latest >/dev/null 2>&1
-apt-get update -qq
-
-# Install Open5GS core components
-echo -e "\${BLUE}📦 Installing Open5GS components...\${NC}"
-DEBIAN_FRONTEND=noninteractive apt-get install -y \\
-  open5gs-mme \\
-  open5gs-sgwc \\
-  open5gs-sgwu \\
-  open5gs-upf \\
-  open5gs-smf \\
-  open5gs-pcrf >/dev/null 2>&1
-
-# Install Node.js for metrics agent
-if ! command -v node &> /dev/null; then
-  echo -e "\${BLUE}📦 Installing Node.js...\${NC}"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
-  apt-get install -y nodejs >/dev/null 2>&1
+# Get MME IP
+read -p "MME IP Address (S1AP interface) [default: auto-detect]: " MME_IP
+if [ -z "$MME_IP" ]; then
+    MME_IP=$(ip route get 8.8.8.8 | awk '{print $7; exit}')
+    print_status "Auto-detected MME IP: $MME_IP"
 fi
 
-# Download metrics agent
-echo -e "\${BLUE}🔧 Setting up metrics agent...\${NC}"
-mkdir -p /opt/open5gs-metrics-agent
-cd /opt/open5gs-metrics-agent
+# Get SGW-C IP
+read -p "SGW-C IP Address (S11 interface) [default: $MME_IP]: " SGWC_IP
+if [ -z "$SGWC_IP" ]; then
+    SGWC_IP="$MME_IP"
+fi
 
-# Download agent from GitHub
-curl -sL "https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/open5gs-metrics-agent.js" -o open5gs-metrics-agent.js
-chmod +x open5gs-metrics-agent.js
+# Get SGW-U IP
+read -p "SGW-U IP Address (S1-U interface) [default: $MME_IP]: " SGWU_IP
+if [ -z "$SGWU_IP" ]; then
+    SGWU_IP="$MME_IP"
+fi
 
-# Install dependencies
-npm install node-fetch@2 >/dev/null 2>&1
+# Get SMF IP
+read -p "SMF IP Address (N4 interface) [default: $MME_IP]: " SMF_IP
+if [ -z "$SMF_IP" ]; then
+    SMF_IP="$MME_IP"
+fi
 
-# Create environment file
-cat > /etc/open5gs/metrics-agent.env <<EOF
-EPC_API_URL=\${CLOUD_HSS_API}
-EPC_AUTH_CODE=\${AUTH_CODE}
-EPC_API_KEY=\${API_KEY}
-EPC_SECRET_KEY=\${SECRET_KEY}
-EPC_METRICS_INTERVAL=60
-EOF
+# Get UPF IP
+read -p "UPF IP Address (N3 interface) [default: $MME_IP]: " UPF_IP
+if [ -z "$UPF_IP" ]; then
+    UPF_IP="$MME_IP"
+fi
 
-chmod 600 /etc/open5gs/metrics-agent.env
+# Get Cloud HSS IP
+read -p "Cloud HSS IP Address [default: 136.112.111.167]: " HSS_IP
+if [ -z "$HSS_IP" ]; then
+    HSS_IP="136.112.111.167"
+fi
 
-# Install systemd service
-curl -sL "https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/open5gs-metrics-agent.service" -o /etc/systemd/system/open5gs-metrics-agent.service
+# Get DNS servers
+read -p "Primary DNS Server [default: 8.8.8.8]: " DNS_PRIMARY
+if [ -z "$DNS_PRIMARY" ]; then
+    DNS_PRIMARY="8.8.8.8"
+fi
 
-systemctl daemon-reload
-systemctl enable open5gs-metrics-agent >/dev/null 2>&1
+read -p "Secondary DNS Server [default: 8.8.4.4]: " DNS_SECONDARY
+if [ -z "$DNS_SECONDARY" ]; then
+    DNS_SECONDARY="8.8.4.4"
+fi
 
-# Configure Open5GS
-echo -e "\${BLUE}🔧 Configuring Open5GS...\${NC}"
+# Get APN configuration
+read -p "APN Name [default: internet]: " APN_NAME
+if [ -z "$APN_NAME" ]; then
+    APN_NAME="internet"
+fi
 
-# Get local IP
-LOCAL_IP=\$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split(\$2,a," ");print a[1]}')
+read -p "APN IP Pool (CIDR) [default: 10.45.0.0/16]: " APN_POOL
+if [ -z "$APN_POOL" ]; then
+    APN_POOL="10.45.0.0/16"
+fi
+
+echo ""
+print_status "Configuration Summary:"
+echo "  MME IP: $MME_IP"
+echo "  SGW-C IP: $SGWC_IP"
+echo "  SGW-U IP: $SGWU_IP"
+echo "  SMF IP: $SMF_IP"
+echo "  UPF IP: $UPF_IP"
+echo "  Cloud HSS IP: $HSS_IP"
+echo "  DNS: $DNS_PRIMARY, $DNS_SECONDARY"
+echo "  APN: $APN_NAME ($APN_POOL)"
+echo ""
+
+read -p "Continue with installation? [Y/n]: " CONFIRM
+if [[ $CONFIRM =~ ^[Nn]$ ]]; then
+    print_warning "Installation cancelled by user"
+    exit 0
+fi
+
+print_header "Installing Dependencies"
+print_status "Updating package lists..."
+apt-get update -qq
+
+print_status "Installing required packages..."
+apt-get install -y wget curl gnupg software-properties-common apt-transport-https ca-certificates
+
+print_header "Installing Open5GS"
+print_status "Adding Open5GS repository..."
+add-apt-repository -y ppa:open5gs/latest
+apt-get update -qq
+
+print_status "Installing Open5GS EPC components..."
+apt-get install -y open5gs-mme open5gs-sgwc open5gs-sgwu open5gs-smf open5gs-upf open5gs-pcrf
+
+print_header "Configuring EPC Components"
 
 # Configure MME
+print_status "Configuring MME..."
 cat > /etc/open5gs/mme.yaml <<EOF
-logger:
-  file: /var/log/open5gs/mme.log
-  level: info
-
 mme:
   freeDiameter: /etc/freeDiameter/mme.conf
   s1ap:
-    server:
-      - address: \${LOCAL_IP}
+    - addr: $MME_IP
   gtpc:
-    server:
-      - address: \${LOCAL_IP}
-  gummei: 
-    - plmn_id:
-        mcc: \${MCC}
-        mnc: \${MNC}
-      mme_gid: 2
-      mme_code: 1
+    - addr: $SGWC_IP
+  gummei:
+    plmn_id:
+      mcc: ${mcc}
+      mnc: ${mnc}
+    mme_gid: 2
+    mme_code: 1
   tai:
-    - plmn_id:
-        mcc: \${MCC}
-        mnc: \${MNC}
-      tac: \${TAC}
+    plmn_id:
+      mcc: ${mcc}
+      mnc: ${mnc}
+    tac: ${tac}
   security:
-    integrity_order : [ EIA2, EIA1, EIA0 ]
-    ciphering_order : [ EEA0, EEA1, EEA2 ]
-
-sgwc:
-  gtpc:
-    client:
-      sgwc:
-        - address: 127.0.0.2
-
-smf:
-  gtpc:
-    client:
-      smf:
-        - address: 127.0.0.4
+    integrity_order: [EIA2, EIA1, EIA0]
+    ciphering_order: [EEA0, EEA1, EEA2]
+  network_name:
+    full: "Cloud HSS EPC"
+    short: "CloudEPC"
+  guami:
+    plmn_id:
+      mcc: ${mcc}
+      mnc: ${mnc}
+    amf_id:
+      region: 2
+      set: 1
 EOF
 
-# Configure other components (SGWC, SGWU, SMF, UPF, PCRF)
+# Configure SGW-C
+print_status "Configuring SGW-C..."
 cat > /etc/open5gs/sgwc.yaml <<EOF
-logger:
-  file: /var/log/open5gs/sgwc.log
 sgwc:
   gtpc:
-    server:
-      - address: 127.0.0.2
+    - addr: $SGWC_IP
   pfcp:
-    server:
-      - address: 127.0.0.2
-    client:
-      sgwu:
-        - address: 127.0.0.6
+    - addr: $SGWC_IP
+  sgwu:
+    - addr: $SGWU_IP
 EOF
 
+# Configure SGW-U
+print_status "Configuring SGW-U..."
 cat > /etc/open5gs/sgwu.yaml <<EOF
-logger:
-  file: /var/log/open5gs/sgwu.log
 sgwu:
-  pfcp:
-    server:
-      - address: 127.0.0.6
   gtpu:
-    server:
-      - address: 127.0.0.6
-EOF
-
-cat > /etc/open5gs/smf.yaml <<EOF
-logger:
-  file: /var/log/open5gs/smf.log
-smf:
-  sbi:
-    server:
-      - address: 127.0.0.4
-        port: 7777
+    - addr: $SGWU_IP
   pfcp:
-    server:
-      - address: 127.0.0.4
-    client:
-      upf:
-        - address: 127.0.0.7
-  gtpc:
-    server:
-      - address: 127.0.0.4
-  subnet:
-    - addr: \${IP_POOL%%/*}
-      dnn: \${APN_NAME}
-  dns:
-    - 8.8.8.8
-    - 8.8.4.4
+    - addr: $SGWU_IP
+  sgwc:
+    - addr: $SGWC_IP
 EOF
 
+# Configure SMF
+print_status "Configuring SMF..."
+cat > /etc/open5gs/smf.yaml <<EOF
+smf:
+  gtpc:
+    - addr: $SMF_IP
+  pfcp:
+    - addr: $SMF_IP
+  upf:
+    - addr: $UPF_IP
+  dns:
+    - $DNS_PRIMARY
+    - $DNS_SECONDARY
+  subnet:
+    - addr: $APN_POOL
+  ue_pool:
+    - addr: $APN_POOL
+EOF
+
+# Configure UPF
+print_status "Configuring UPF..."
 cat > /etc/open5gs/upf.yaml <<EOF
+upf:
+  gtpu:
+    - addr: $UPF_IP
+  pfcp:
+    - addr: $UPF_IP
+  smf:
+    - addr: $SMF_IP
+EOF
+
+# Configure PCRF
+print_status "Configuring PCRF..."
+cat > /etc/open5gs/pcrf.yaml <<EOF
+pcrf:
+  freeDiameter: /etc/freeDiameter/pcrf.conf
+  gtpc:
+    - addr: 127.0.0.1
+EOF
+
+print_header "Configuring Diameter Connection to Cloud HSS"
+print_status "Setting up FreeDiameter MME configuration..."
+
+# Create FreeDiameter MME configuration
+cat > /etc/freeDiameter/mme.conf <<EOF
+# FreeDiameter MME Configuration for Cloud HSS
+Identity = "mme.${epc.site_name.replace(/[^a-zA-Z0-9]/g, '')}.local";
+Realm = "local";
+
+# TLS Configuration
+TLS_Cred = "/etc/freeDiameter/mme.cert.pem", "/etc/freeDiameter/mme.key.pem";
+TLS_CA = "/etc/freeDiameter/ca.cert.pem";
+
+# Connect to Cloud HSS
+ConnectPeer = "hss.cloud" { ConnectTo = "$HSS_IP"; No_TLS; };
+ConnectPeer = "pcrf.cloud" { ConnectTo = "$HSS_IP"; No_TLS; };
+
+# Application configuration
+AppServers = "mme.local";
+AppServers = "pcrf.local";
+
+# Security
+No_IPv6;
+No_SCTP;
+EOF
+
+print_status "Setting up FreeDiameter PCRF configuration..."
+cat > /etc/freeDiameter/pcrf.conf <<EOF
+# FreeDiameter PCRF Configuration for Cloud HSS
+Identity = "pcrf.${epc.site_name.replace(/[^a-zA-Z0-9]/g, '')}.local";
+Realm = "local";
+
+# TLS Configuration
+TLS_Cred = "/etc/freeDiameter/pcrf.cert.pem", "/etc/freeDiameter/pcrf.key.pem";
+TLS_CA = "/etc/freeDiameter/ca.cert.pem";
+
+# Connect to Cloud HSS
+ConnectPeer = "hss.cloud" { ConnectTo = "$HSS_IP"; No_TLS; };
+
+# Application configuration
+AppServers = "pcrf.local";
+
+# Security
+No_IPv6;
+No_SCTP;
+EOF
+
+print_header "Setting Up Metrics Agent"
+print_status "Creating metrics collection agent..."
+
+# Create metrics agent script
+cat > /opt/open5gs-metrics-agent.js <<'EOF'
+#!/usr/bin/env node
+
+const https = require('https');
+const os = require('os');
+
+const HSS_API_URL = '${process.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'}';
+const EPC_ID = '${epc.epc_id}';
+const TENANT_ID = '${epc.tenant_id}';
+
+// Function to collect system metrics
+function collectMetrics() {
+    const metrics = {
+        timestamp: new Date().toISOString(),
+        epc_id: EPC_ID,
+        tenant_id: TENANT_ID,
+        system: {
+            hostname: os.hostname(),
+            uptime: os.uptime(),
+            loadavg: os.loadavg(),
+            memory: {
+                total: os.totalmem(),
+                free: os.freemem(),
+                used: os.totalmem() - os.freemem()
+            },
+            cpus: os.cpus().length
+        },
+        services: {
+            mme: checkService('open5gs-mmed'),
+            sgwc: checkService('open5gs-sgwcd'),
+            sgwu: checkService('open5gs-sgwud'),
+            smf: checkService('open5gs-smfd'),
+            upf: checkService('open5gs-upfd'),
+            pcrf: checkService('open5gs-pcrfd')
+        }
+    };
+    
+    return metrics;
+}
+
+// Function to check service status
+function checkService(serviceName) {
+    try {
+        const { execSync } = require('child_process');
+        const status = execSync(\`systemctl is-active \${serviceName}\`, { encoding: 'utf8' }).trim();
+        return status === 'active';
+    } catch (error) {
+        return false;
+    }
+}
+
+// Function to send heartbeat
+function sendHeartbeat() {
+    const metrics = collectMetrics();
+    
+    const postData = JSON.stringify({
+        epc_id: EPC_ID,
+        tenant_id: TENANT_ID,
+        metrics: metrics,
+        status: 'online'
+    });
+    
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
+    
+    const req = https.request(HSS_API_URL + '/api/epc/' + EPC_ID + '/heartbeat', options, (res) => {
+        console.log(\`Heartbeat sent: \${res.statusCode}\`);
+    });
+    
+    req.on('error', (error) => {
+        console.error('Heartbeat failed:', error.message);
+    });
+    
+    req.write(postData);
+    req.end();
+}
+
+// Send heartbeat every 60 seconds
+setInterval(sendHeartbeat, 60000);
+
+// Send initial heartbeat
+sendHeartbeat();
+
+console.log('Open5GS Metrics Agent started for EPC:', EPC_ID);
+EOF
+
+chmod +x /opt/open5gs-metrics-agent.js
+
+# Create systemd service for metrics agent
+cat > /etc/systemd/system/open5gs-metrics-agent.service <<EOF
+[Unit]
+Description=Open5GS Metrics Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/node /opt/open5gs-metrics-agent.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+print_header "Starting Services"
+print_status "Enabling and starting Open5GS services..."
+
+systemctl daemon-reload
+systemctl enable open5gs-mmed
+systemctl enable open5gs-sgwcd
+systemctl enable open5gs-sgwud
+systemctl enable open5gs-smfd
+systemctl enable open5gs-upfd
+systemctl enable open5gs-pcrfd
+systemctl enable open5gs-metrics-agent
+
+print_status "Starting services..."
+systemctl start open5gs-mmed
+sleep 2
+systemctl start open5gs-sgwcd
+sleep 2
+systemctl start open5gs-sgwud
+sleep 2
+systemctl start open5gs-smfd
+sleep 2
+systemctl start open5gs-upfd
+sleep 2
+systemctl start open5gs-pcrfd
+sleep 2
+systemctl start open5gs-metrics-agent
+
+print_header "Verification"
+print_status "Checking service status..."
+
+services=("open5gs-mmed" "open5gs-sgwcd" "open5gs-sgwud" "open5gs-smfd" "open5gs-upfd" "open5gs-pcrfd" "open5gs-metrics-agent")
+
+for service in "\${services[@]}"; do
+    if systemctl is-active --quiet $service; then
+        print_success "$service is running"
+    else
+        print_error "$service failed to start"
+        systemctl status $service --no-pager
+    fi
+done
+
+print_header "Deployment Complete!"
+print_success "EPC deployment completed successfully!"
+echo ""
+echo -e "\${CYAN}EPC Configuration:\${NC}"
+echo "  Site: ${epc.site_name}"
+echo "  EPC ID: ${epc.epc_id}"
+echo "  MME IP: $MME_IP"
+echo "  Cloud HSS: $HSS_IP"
+echo ""
+echo -e "\${CYAN}Service Status:\${NC}"
+systemctl status open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd --no-pager
+echo ""
+echo -e "\${CYAN}Next Steps:\${NC}"
+echo "1. Configure your eNodeB to connect to MME at $MME_IP:36412"
+echo "2. Add subscribers via the Cloud HSS web interface"
+echo "3. Monitor EPC status in the dashboard"
+echo ""
+print_success "Your EPC is now online and connected to the Cloud HSS!"
+`;
 logger:
   file: /var/log/open5gs/upf.log
 upf:
