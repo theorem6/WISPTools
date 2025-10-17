@@ -52,7 +52,7 @@
   
   async function loadStats() {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();

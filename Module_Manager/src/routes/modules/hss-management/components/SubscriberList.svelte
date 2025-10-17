@@ -40,7 +40,7 @@
   
   async function loadGroups() {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -63,7 +63,7 @@
   async function loadSubscribers() {
     try {
       loading = true;
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -100,7 +100,7 @@
     if (!confirm(confirmMsg)) return;
     
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();

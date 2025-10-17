@@ -35,7 +35,7 @@
   
   async function loadDashboard() {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -64,7 +64,7 @@
     if (!epcId || epcId === 'all') return;
     
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -86,7 +86,7 @@
   
   async function loadSubscriberRoster() {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -112,7 +112,7 @@
   
   async function loadAttachDetachEvents() {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();

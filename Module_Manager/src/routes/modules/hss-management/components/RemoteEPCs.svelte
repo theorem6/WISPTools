@@ -59,7 +59,7 @@
   
   async function loadEPCs() {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -101,11 +101,11 @@
     
     try {
       // Wait for auth state to be ready (max 5 seconds)
-      let user = auth.currentUser;
+      let user = auth().currentUser;
       if (!user) {
         console.log('[RemoteEPCs] Waiting for auth state...');
         await new Promise(resolve => {
-          const unsubscribe = auth.onAuthStateChanged((authUser) => {
+          const unsubscribe = auth().onAuthStateChanged((authUser) => {
             unsubscribe();
             resolve(authUser);
           });
@@ -115,7 +115,7 @@
             resolve(null);
           }, 5000);
         });
-        user = auth.currentUser;
+        user = auth().currentUser;
       }
       
       if (!user) {
@@ -170,7 +170,7 @@
   
   async function downloadDeploymentScript(epc: any) {
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();
@@ -228,7 +228,7 @@
     }
     
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) return;
       
       const token = await user.getIdToken();

@@ -112,76 +112,41 @@ export function getFirebaseFunctions(): Functions {
   return firebaseFunctions;
 }
 
-// Export instances directly using lazy initialization with proper method binding
-// These are accessed as properties but initialize on first access
+// Backward compatibility: Explicit wrapper functions for lazy initialization
+// These ensure Firebase is only initialized when actually called, not when module loads
 
 /**
- * Firebase Auth instance - auto-initialized on first access
- * Use as: auth.currentUser, auth.onAuthStateChanged(), etc.
+ * Get Firebase Auth instance - lazy initialization
+ * MUST be called as a function: auth()
  */
-export const auth: Auth = new Proxy({} as Auth, {
-  get(_target, prop) {
-    const authInstance = getFirebaseAuth();
-    const value = (authInstance as any)[prop];
-    
-    // Bind methods to preserve 'this' context
-    if (typeof value === 'function') {
-      return value.bind(authInstance);
-    }
-    return value;
-  }
-});
+export function auth(): Auth {
+  return getFirebaseAuth();
+}
 
 /**
- * Firestore instance - auto-initialized on first access
- * Use as: db, for firestore operations
+ * Get Firestore instance - lazy initialization
+ * MUST be called as a function: db()
  */
-export const db: Firestore = new Proxy({} as Firestore, {
-  get(_target, prop) {
-    const dbInstance = getFirebaseDb();
-    const value = (dbInstance as any)[prop];
-    
-    // Bind methods to preserve 'this' context
-    if (typeof value === 'function') {
-      return value.bind(dbInstance);
-    }
-    return value;
-  }
-});
+export function db(): Firestore {
+  return getFirebaseDb();
+}
 
 /**
- * Firebase Storage instance - auto-initialized on first access
- * Use as: storage, for storage operations
+ * Get Storage instance - lazy initialization
+ * MUST be called as a function: storage()
  */
-export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
-  get(_target, prop) {
-    const storageInstance = getFirebaseStorage();
-    const value = (storageInstance as any)[prop];
-    
-    // Bind methods to preserve 'this' context
-    if (typeof value === 'function') {
-      return value.bind(storageInstance);
-    }
-    return value;
-  }
-});
+export function storage(): FirebaseStorage {
+  return getFirebaseStorage();
+}
 
 /**
- * Firebase Functions instance - auto-initialized on first access
- * Use as: functions, for cloud functions
+ * Get Functions instance - lazy initialization
+ * MUST be called as a function: functions()
  */
-export const functions: Functions = new Proxy({} as Functions, {
-  get(_target, prop) {
-    const functionsInstance = getFirebaseFunctions();
-    const value = (functionsInstance as any)[prop];
-    
-    // Bind methods to preserve 'this' context
-    if (typeof value === 'function') {
-      return value.bind(functionsInstance);
-    }
-    return value;
-  }
-});
+export function functions(): Functions {
+  return getFirebaseFunctions();
+}
+
 
 // Default export - lazy getter
 export default function getDefaultApp(): FirebaseApp | null {
