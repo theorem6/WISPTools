@@ -1,6 +1,7 @@
 # Firebase App Hosting Configuration - Default (Production)
 # This is the base configuration that applies to all environments
 # Environment-specific overrides go in apphosting.[environment].yaml
+# Updated: 2025-10-17 - Added Remote EPCs and Distributed EPC Monitoring
 
 # Root directory where the app code is located
 rootDirectory: Module_Manager
