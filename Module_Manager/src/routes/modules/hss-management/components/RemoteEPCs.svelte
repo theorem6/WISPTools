@@ -86,11 +86,28 @@
   }
   
   async function registerEPC() {
+    console.log('[RemoteEPCs] Registering EPC:', formData);
+    
+    // Validate required fields
+    if (!formData.site_name) {
+      alert('Site name is required');
+      return;
+    }
+    
+    if (!formData.location.coordinates.latitude || !formData.location.coordinates.longitude) {
+      alert('GPS coordinates (latitude and longitude) are required');
+      return;
+    }
+    
     try {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user) {
+        alert('Not authenticated. Please log in again.');
+        return;
+      }
       
       const token = await user.getIdToken();
+      console.log('[RemoteEPCs] Sending registration request...');
       
       const response = await fetch(`${HSS_API}/api/epc/register`, {
         method: 'POST',
@@ -102,8 +119,12 @@
         body: JSON.stringify(formData)
       });
       
+      console.log('[RemoteEPCs] Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('[RemoteEPCs] EPC registered:', data);
+        
         showAddModal = false;
         await loadEPCs();
         
@@ -116,13 +137,16 @@
         
         // Reset form
         resetForm();
+        
+        alert(`✅ EPC "${formData.site_name}" registered successfully!\n\nYour credentials are displayed in the details modal. Please save them securely.`);
       } else {
         const error = await response.json();
-        alert('Failed to register EPC: ' + (error.error || 'Unknown error'));
+        console.error('[RemoteEPCs] Registration failed:', error);
+        alert('Failed to register EPC: ' + (error.error || error.message || 'Unknown error'));
       }
     } catch (err: any) {
-      console.error('Error registering EPC:', err);
-      alert('Failed to register EPC: ' + err.message);
+      console.error('[RemoteEPCs] Error registering EPC:', err);
+      alert('Failed to register EPC: ' + err.message + '\n\nCheck console for details.');
     }
   }
   
