@@ -71,7 +71,7 @@
       name: 'Backend Management',
       description: 'Platform admin only - Monitor and control backend services, system resources, and VM operations',
       icon: '🖥️',
-      color: '#ef4444',
+      color: 'var(--danger-color)',
       status: 'active',
       path: '/modules/backend-management'
     }
