@@ -134,11 +134,11 @@
 <div class="admin-page">
   <div class="page-header">
     <div class="header-content">
-      <a href="/modules/tenant-management" class="back-link">
+      <a href="/dashboard" class="back-link">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
-        Back to Tenant Management
+        ← Back to Dashboard
       </a>
       
       <div class="header-title">

@@ -373,11 +373,11 @@
   <div class="module-header">
     <div class="header-content">
       <div class="header-top">
-        <a href="/modules" class="back-button">
+        <a href="/dashboard" class="back-button">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
-          Back to Modules
+          ← Back to Dashboard
         </a>
       </div>
       <div class="module-info">

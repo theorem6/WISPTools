@@ -84,7 +84,7 @@
     <div class="denied-icon">🔒</div>
     <h2>Access Denied</h2>
     <p>This module is restricted to platform administrators only.</p>
-    <a href="/modules" class="btn-primary">Return to Modules</a>
+    <a href="/dashboard" class="btn-primary">← Back to Dashboard</a>
   </div>
 {/if}
 
