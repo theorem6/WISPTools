@@ -1,8 +1,8 @@
 // Coverage Map Service - MongoDB Backend Version
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
 
-// Backend API URL
-const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://136.112.111.167:3000';
+// Backend API URL - goes through hssProxy Cloud Function
+const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
 export class CoverageMapService {
   
