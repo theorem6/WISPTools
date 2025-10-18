@@ -78,40 +78,56 @@
       return;
     }
 
+    // Check if user is system admin
+    const { isPlatformAdmin } = await import('$lib/services/adminService');
+    const isAdmin = isPlatformAdmin(currentUser.email || '');
+
     tenantId = localStorage.getItem('selectedTenantId') || '';
     tenantName = localStorage.getItem('selectedTenantName') || '';
 
-    if (!tenantId) {
+    // System admins don't need a tenant selected
+    if (!tenantId && !isAdmin) {
       await goto('/tenant-selector');
       return;
     }
 
-    // Check if user has permission to manage users
-    try {
-      const role = await tenantService.getUserRole(currentUser.uid, tenantId);
-      console.log('User role in tenant:', role);
-      
-      if (!role) {
-        error = 'You are not a member of this tenant';
-        setTimeout(() => goto('/dashboard'), 2000);
-        return;
-      }
-      
-      // Owners and admins can manage users
-      const canManage = role === 'owner' || role === 'admin';
-      
-      if (!canManage) {
-        error = `Your role (${role}) does not have permission to manage users`;
-        setTimeout(() => goto('/dashboard'), 2000);
-        return;
-      }
-      
-      console.log('Permission granted to manage users');
-    } catch (err: any) {
-      console.error('Permission check failed:', err);
-      error = 'Failed to verify permissions';
-      setTimeout(() => goto('/dashboard'), 2000);
+    if (!tenantId && isAdmin) {
+      error = 'System Admin: Please select a tenant to manage users';
+      isLoading = false;
       return;
+    }
+
+    // Check if user has permission to manage users
+    // System admins automatically have permission
+    if (!isAdmin) {
+      try {
+        const role = await tenantService.getUserRole(currentUser.uid, tenantId);
+        console.log('User role in tenant:', role);
+        
+        if (!role) {
+          error = 'You are not a member of this tenant';
+          setTimeout(() => goto('/dashboard'), 2000);
+          return;
+        }
+        
+        // Owners and admins can manage users
+        const canManage = role === 'owner' || role === 'admin';
+        
+        if (!canManage) {
+          error = `Your role (${role}) does not have permission to manage users`;
+          setTimeout(() => goto('/dashboard'), 2000);
+          return;
+        }
+        
+        console.log('Permission granted to manage users');
+      } catch (err: any) {
+        console.error('Permission check failed:', err);
+        error = 'Failed to verify permissions';
+        setTimeout(() => goto('/dashboard'), 2000);
+        return;
+      }
+    } else {
+      console.log('System admin - permission automatically granted');
     }
 
     await loadUsers();

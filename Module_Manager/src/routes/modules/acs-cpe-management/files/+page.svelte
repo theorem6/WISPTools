@@ -36,7 +36,27 @@
       return;
     }
 
+    // Check if user is system admin
+    const { isPlatformAdmin } = await import('$lib/services/adminService');
+    const isAdmin = isPlatformAdmin(currentUser.email || '');
+    
+    const tenantId = localStorage.getItem('selectedTenantId') || '';
     tenantName = localStorage.getItem('selectedTenantName') || 'Organization';
+
+    // System admins can access without tenant, but show a message
+    if (!tenantId && !isAdmin) {
+      error = 'No tenant selected. Please select a tenant.';
+      setTimeout(() => goto('/tenant-selector'), 2000);
+      isLoading = false;
+      return;
+    }
+
+    if (!tenantId && isAdmin) {
+      error = 'System Admin: Please select a tenant to manage files';
+      isLoading = false;
+      return;
+    }
+
     await loadFiles();
     isLoading = false;
   });

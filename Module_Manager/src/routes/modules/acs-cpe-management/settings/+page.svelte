@@ -27,28 +27,39 @@
       return;
     }
 
+    // Check if user is system admin
+    const { isPlatformAdmin } = await import('$lib/services/adminService');
+    const isAdmin = isPlatformAdmin(currentUser.email || '');
+
     tenantId = localStorage.getItem('selectedTenantId') || '';
     tenantName = localStorage.getItem('selectedTenantName') || '';
 
-    if (!tenantId) {
+    // System admins don't need a tenant selected
+    if (!tenantId && !isAdmin) {
       error = 'No tenant selected';
       setTimeout(() => goto('/tenant-selector'), 2000);
       return;
     }
 
-    // Load tenant data
-    try {
-      tenant = await tenantService.getTenant(tenantId);
-      if (!tenant) {
-        error = 'Tenant not found';
-        return;
-      }
+    // Load tenant data (if tenant is selected)
+    if (tenantId) {
+      try {
+        tenant = await tenantService.getTenant(tenantId);
+        if (!tenant) {
+          error = 'Tenant not found';
+          return;
+        }
 
-      // Initialize settings
-      settings = { ...tenant.settings };
-    } catch (err: any) {
-      error = err.message || 'Failed to load tenant';
-    } finally {
+        // Initialize settings
+        settings = { ...tenant.settings };
+      } catch (err: any) {
+        error = err.message || 'Failed to load tenant';
+      } finally {
+        isLoading = false;
+      }
+    } else {
+      // Admin without tenant selected - show message
+      error = 'System Admin: Please select a tenant to view/edit settings';
       isLoading = false;
     }
   });
