@@ -120,29 +120,7 @@ router.get('/services/status', requirePlatformAdmin, (req, res) => {
       }
     });
     
-    // Add MongoDB (special case - check if port is listening)
-    try {
-      const netstat = execSync('netstat -tlnp 2>/dev/null | grep :27017', { encoding: 'utf8' });
-      const isListening = netstat.trim().length > 0;
-      
-      services.push({
-        name: 'mongodb',
-        displayName: 'MongoDB',
-        status: isListening ? 'online' : 'offline',
-        port: 27017,
-        canControl: false,
-        type: 'external'
-      });
-    } catch (e) {
-      services.push({
-        name: 'mongodb',
-        displayName: 'MongoDB',
-        status: 'unknown',
-        port: 27017,
-        canControl: false,
-        type: 'external'
-      });
-    }
+    // MongoDB is cloud-based (MongoDB Atlas), not on this server
     
     console.log(`[Services Status] Returning ${services.length} services`);
     res.json({ success: true, services });

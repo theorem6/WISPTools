@@ -247,16 +247,23 @@
   
   .services-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: var(--spacing-lg);
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
   }
   
   .service-card {
     background: var(--bg-secondary);
     border: 2px solid var(--border-color);
     border-radius: var(--border-radius);
-    padding: var(--spacing-lg);
+    padding: var(--spacing-xl);
     transition: var(--transition);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .service-card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
   }
   
   .service-card.online {
@@ -271,21 +278,23 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
   }
   
   .service-header h3 {
     margin: 0;
     color: var(--text-primary);
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 600;
   }
   
   .service-meta {
     display: flex;
     gap: var(--spacing-md);
-    margin-top: var(--spacing-xs);
-    font-size: 0.75rem;
+    margin-top: var(--spacing-sm);
+    font-size: 0.875rem;
   }
   
   .port, .uptime {
@@ -324,9 +333,9 @@
   .service-metrics {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-md);
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-lg);
     background: var(--bg-primary);
     border-radius: var(--border-radius-sm);
   }
@@ -334,16 +343,18 @@
   .metric {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
   }
   
   .metric .label {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
   
   .metric .value {
-    font-size: 1rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: var(--text-primary);
     font-family: monospace;
@@ -351,16 +362,17 @@
   
   .service-actions {
     display: flex;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
   }
   
   .btn-action {
     flex: 1;
-    padding: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
     border: none;
     border-radius: var(--border-radius-sm);
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
   }
