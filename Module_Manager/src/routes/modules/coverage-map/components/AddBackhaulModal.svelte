@@ -22,22 +22,37 @@
     // Fixed Wireless fields
     azimuth: 0,
     beamwidth: 30,
-    frequency: 0,
+    frequency: 5800,
     bandwidth: 100,
     licenseType: '',
     licenseNumber: '',
+    licenseExpiration: '',
+    antennaHeight: 0,
+    antennaGain: 0,
+    txPower: 0,
     
     // Fiber fields
     provider: '',
     circuitId: '',
     handoffType: 'single-mode',
     connectorType: 'LC',
+    fiberCount: 2,
+    fiberSpeed: '1G',
+    demarcLocation: '',
     
     // Common
     capacity: 1000,
     upstreamSite: '',
+    remoteSiteLatitude: 0,
+    remoteSiteLongitude: 0,
+    remoteAddress: '',
+    equipmentManufacturer: '',
     equipmentModel: '',
     equipmentSerialNumber: '',
+    installDate: '',
+    monthlyRecurringCost: 0,
+    contractTermMonths: 12,
+    notes: '',
     status: 'active' as const
   };
   
@@ -65,37 +80,61 @@
         name: formData.name,
         type: 'backhaul',
         locationType: 'tower',
-        manufacturer: isWireless ? 'Wireless Equipment' : 'Fiber',
+        manufacturer: formData.equipmentManufacturer || (isWireless ? 'Wireless Equipment' : 'Fiber Provider'),
         model: formData.equipmentModel || 'N/A',
         serialNumber: formData.equipmentSerialNumber || `BH-${Date.now()}`,
         status: formData.status,
         location: sites.find(s => s.id === formData.siteId)?.location || { latitude: 0, longitude: 0 },
+        installDate: formData.installDate || undefined,
         
-        // Store backhaul-specific data in notes field
+        // Store backhaul-specific data in notes field as JSON
         notes: JSON.stringify({
           backhaulType: formData.backhaulType,
+          
+          // Wireless backhaul data
           ...(isWireless && {
             wireless: {
               azimuth: formData.azimuth,
               beamwidth: formData.beamwidth,
               frequency: formData.frequency,
               bandwidth: formData.bandwidth,
+              antennaHeight: formData.antennaHeight,
+              antennaGain: formData.antennaGain,
+              txPower: formData.txPower,
+              remoteSite: {
+                latitude: formData.remoteSiteLatitude || undefined,
+                longitude: formData.remoteSiteLongitude || undefined,
+                address: formData.remoteAddress || undefined
+              },
               licensing: formData.backhaulType === 'fixed-wireless-licensed' ? {
                 licenseType: formData.licenseType,
-                licenseNumber: formData.licenseNumber
+                licenseNumber: formData.licenseNumber,
+                expirationDate: formData.licenseExpiration || undefined
               } : undefined
             }
           }),
+          
+          // Fiber backhaul data
           ...(isFiber && {
             fiber: {
               provider: formData.provider,
               circuitId: formData.circuitId,
               handoffType: formData.handoffType,
-              connectorType: formData.connectorType
+              connectorType: formData.connectorType,
+              fiberCount: formData.fiberCount,
+              fiberSpeed: formData.fiberSpeed,
+              demarcLocation: formData.demarcLocation
             }
           }),
+          
+          // Common data
           capacity: formData.capacity,
-          upstreamSite: formData.upstreamSite
+          upstreamSite: formData.upstreamSite,
+          financial: {
+            monthlyRecurringCost: formData.monthlyRecurringCost || 0,
+            contractTermMonths: formData.contractTermMonths || 12
+          },
+          additionalNotes: formData.notes
         })
       };
       
@@ -164,16 +203,27 @@
       <!-- Fiber Specific Fields -->
       {#if isFiber}
         <div class="section fiber-section">
-          <h3>🌐 Fiber Details</h3>
+          <h3>🌐 Fiber Optic Details</h3>
+          
           <div class="form-grid">
             <div class="form-group">
-              <label>Fiber Provider</label>
-              <input type="text" bind:value={formData.provider} placeholder="AT&T, Verizon, etc." />
+              <label>Fiber Provider *</label>
+              <input type="text" bind:value={formData.provider} placeholder="AT&T, Verizon, Zayo, Crown Castle" />
             </div>
             
             <div class="form-group">
               <label>Circuit ID</label>
-              <input type="text" bind:value={formData.circuitId} placeholder="CIRCUIT-123456" />
+              <input type="text" bind:value={formData.circuitId} placeholder="CIRCUIT-123456-ABC" />
+            </div>
+            
+            <div class="form-group">
+              <label>Fiber Speed</label>
+              <select bind:value={formData.fiberSpeed}>
+                <option value="100M">100 Mbps</option>
+                <option value="1G">1 Gbps</option>
+                <option value="10G">10 Gbps</option>
+                <option value="100G">100 Gbps</option>
+              </select>
             </div>
           </div>
           
@@ -181,9 +231,10 @@
             <div class="form-group">
               <label>Handoff Type</label>
               <select bind:value={formData.handoffType}>
-                <option value="single-mode">Single-Mode Fiber</option>
-                <option value="multi-mode">Multi-Mode Fiber</option>
+                <option value="single-mode">Single-Mode Fiber (SMF)</option>
+                <option value="multi-mode">Multi-Mode Fiber (MMF)</option>
                 <option value="ethernet">Ethernet Handoff</option>
+                <option value="coax">Coax Handoff</option>
               </select>
             </div>
             
@@ -194,8 +245,21 @@
                 <option value="SC">SC (Subscriber Connector)</option>
                 <option value="ST">ST (Straight Tip)</option>
                 <option value="RJ45">RJ45 (Ethernet)</option>
+                <option value="MTP">MTP/MPO (Multi-fiber)</option>
               </select>
             </div>
+            
+            <div class="form-group">
+              <label>Fiber Count</label>
+              <input type="number" bind:value={formData.fiberCount} placeholder="2" />
+              <p class="help-text">Number of fiber strands</p>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Demarc Location</label>
+            <input type="text" bind:value={formData.demarcLocation} placeholder="Ground floor equipment room, Rack A3" />
+            <p class="help-text">Where fiber enters the building</p>
           </div>
         </div>
       {/if}
@@ -204,17 +268,26 @@
       {#if isWireless}
         <div class="section wireless-section">
           <h3>📡 Fixed Wireless Details</h3>
+          
+          <!-- RF Configuration -->
+          <h4>📻 RF Configuration</h4>
           <div class="form-grid">
             <div class="form-group">
               <label>Azimuth (degrees) *</label>
               <input type="number" min="0" max="360" bind:value={formData.azimuth} />
-              <p class="help-text">Direction link is pointing</p>
+              <p class="help-text">Direction link is pointing (0° = North)</p>
             </div>
             
             <div class="form-group">
               <label>Beamwidth (degrees)</label>
               <input type="number" bind:value={formData.beamwidth} />
-              <p class="help-text">Antenna beamwidth (typically 10-30°)</p>
+              <p class="help-text">Antenna beamwidth (10-30° typical for PTP)</p>
+            </div>
+            
+            <div class="form-group">
+              <label>Antenna Height (feet)</label>
+              <input type="number" bind:value={formData.antennaHeight} placeholder="150" />
+              <p class="help-text">Height above ground level</p>
             </div>
           </div>
           
@@ -222,29 +295,86 @@
             <div class="form-group">
               <label>Frequency (MHz) *</label>
               <input type="number" bind:value={formData.frequency} placeholder="5800" />
-              <p class="help-text">Operating frequency</p>
+              <p class="help-text">
+                {#if formData.backhaulType === 'fixed-wireless-unlicensed'}
+                  WiFi: 2412-2484, 5150-5850 MHz | 60 GHz: 57000-71000 MHz
+                {:else}
+                  Licensed bands: 6 GHz, 11 GHz, 18 GHz, 23 GHz, 80 GHz
+                {/if}
+              </p>
             </div>
             
             <div class="form-group">
               <label>Channel Bandwidth (MHz)</label>
               <input type="number" bind:value={formData.bandwidth} placeholder="40" />
+              <p class="help-text">20, 40, 80, 160 MHz</p>
             </div>
+            
+            <div class="form-group">
+              <label>Antenna Gain (dBi)</label>
+              <input type="number" bind:value={formData.antennaGain} placeholder="23" />
+            </div>
+          </div>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label>TX Power (dBm)</label>
+              <input type="number" bind:value={formData.txPower} placeholder="20" />
+              <p class="help-text">Transmit power</p>
+            </div>
+          </div>
+          
+          <!-- Remote Site Location -->
+          <h4>📍 Remote Site Location</h4>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Remote Latitude</label>
+              <input type="number" step="0.000001" bind:value={formData.remoteSiteLatitude} />
+            </div>
+            
+            <div class="form-group">
+              <label>Remote Longitude</label>
+              <input type="number" step="0.000001" bind:value={formData.remoteSiteLongitude} />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Remote Site Address</label>
+            <input type="text" bind:value={formData.remoteAddress} placeholder="123 Remote Tower Rd" />
           </div>
           
           {#if formData.backhaulType === 'fixed-wireless-licensed'}
             <div class="license-section">
-              <h4>📜 FCC Licensing</h4>
+              <h4>📜 FCC Licensing (Required for Licensed Spectrum)</h4>
               <div class="form-grid">
                 <div class="form-group">
-                  <label>License Type</label>
-                  <input type="text" bind:value={formData.licenseType} placeholder="Point-to-Point" />
+                  <label>License Type *</label>
+                  <select bind:value={formData.licenseType}>
+                    <option value="">-- Select Type --</option>
+                    <option value="point-to-point">Point-to-Point</option>
+                    <option value="point-to-multipoint">Point-to-Multipoint</option>
+                    <option value="multipoint">Multipoint</option>
+                  </select>
                 </div>
                 
                 <div class="form-group">
-                  <label>FCC License Number</label>
-                  <input type="text" bind:value={formData.licenseNumber} placeholder="FCC-ABC123" />
+                  <label>FCC License Number *</label>
+                  <input type="text" bind:value={formData.licenseNumber} placeholder="FCC-ABC123456" />
+                  <p class="help-text">FCC call sign or license number</p>
+                </div>
+                
+                <div class="form-group">
+                  <label>License Expiration Date</label>
+                  <input type="date" bind:value={formData.licenseExpiration} />
                 </div>
               </div>
+            </div>
+          {:else if formData.backhaulType === 'fixed-wireless-unlicensed'}
+            <div class="unlicensed-info">
+              <p class="info-text">
+                ℹ️ <strong>Unlicensed Spectrum:</strong> No FCC license required for WiFi (2.4/5 GHz) or 60 GHz bands.
+                Ensure compliance with Part 15 power limits.
+              </p>
             </div>
           {/if}
         </div>
@@ -255,8 +385,9 @@
         <h3>⚙️ Link Configuration</h3>
         <div class="form-grid">
           <div class="form-group">
-            <label>Link Capacity (Mbps)</label>
+            <label>Link Capacity (Mbps) *</label>
             <input type="number" bind:value={formData.capacity} placeholder="1000" />
+            <p class="help-text">Expected/guaranteed throughput</p>
           </div>
           
           <div class="form-group">
@@ -267,18 +398,7 @@
                 <option value={upstreamOption.id}>{upstreamOption.name}</option>
               {/each}
             </select>
-          </div>
-        </div>
-        
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Equipment Model</label>
-            <input type="text" bind:value={formData.equipmentModel} placeholder="Cisco ASR9000, Ubiquiti AirFiber" />
-          </div>
-          
-          <div class="form-group">
-            <label>Serial Number</label>
-            <input type="text" bind:value={formData.equipmentSerialNumber} placeholder="SN-123456" />
+            <p class="help-text">Network topology - which site this connects to</p>
           </div>
           
           <div class="form-group">
@@ -290,6 +410,67 @@
               <option value="planned">Planned</option>
             </select>
           </div>
+        </div>
+      </div>
+      
+      <!-- Equipment Details -->
+      <div class="section">
+        <h3>🔧 Equipment Details</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Equipment Manufacturer</label>
+            <input 
+              type="text" 
+              bind:value={formData.equipmentManufacturer} 
+              placeholder="{isWireless ? 'Ubiquiti, Cambium, Mimosa' : 'Cisco, Juniper, Adtran'}" 
+            />
+          </div>
+          
+          <div class="form-group">
+            <label>Equipment Model</label>
+            <input 
+              type="text" 
+              bind:value={formData.equipmentModel} 
+              placeholder="{isWireless ? 'AirFiber 60 LR, PTP 670' : 'ASR9000, MX480'}" 
+            />
+          </div>
+          
+          <div class="form-group">
+            <label>Serial Number</label>
+            <input type="text" bind:value={formData.equipmentSerialNumber} placeholder="SN-123456789" />
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Install Date</label>
+          <input type="date" bind:value={formData.installDate} />
+        </div>
+      </div>
+      
+      <!-- Financial/Contract -->
+      <div class="section">
+        <h3>💰 Financial Information</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Monthly Recurring Cost ($)</label>
+            <input type="number" bind:value={formData.monthlyRecurringCost} placeholder="{isFiber ? '500' : '0'}" />
+            <p class="help-text">{isFiber ? 'Monthly circuit fee' : 'Maintenance/licensing costs'}</p>
+          </div>
+          
+          <div class="form-group">
+            <label>Contract Term (months)</label>
+            <input type="number" bind:value={formData.contractTermMonths} placeholder="12" />
+            <p class="help-text">Length of service agreement</p>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea 
+            bind:value={formData.notes} 
+            placeholder="Installation notes, special requirements, escalation contacts..."
+            rows="3"
+          ></textarea>
         </div>
       </div>
     </div>
@@ -466,6 +647,38 @@
     background: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
+  }
+  
+  .unlicensed-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+  }
+  
+  .info-text {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+  
+  .section h4 {
+    margin: 1.5rem 0 1rem 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  
+  .section textarea {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    resize: vertical;
   }
 </style>
 
