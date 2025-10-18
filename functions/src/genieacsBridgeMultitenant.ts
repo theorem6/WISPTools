@@ -16,10 +16,10 @@ const corsHandler = cors({ origin: true });
 
 // Configuration
 const GENIEACS_CONFIG = {
-  NBI_URL: process.env.GENIEACS_NBI_URL || 'http://localhost:7557',
-  UI_URL: process.env.GENIEACS_UI_URL || 'http://localhost:8080',
-  CWMP_URL: process.env.GENIEACS_CWMP_URL || 'http://localhost:7547',
-  FS_URL: process.env.GENIEACS_FS_URL || 'http://localhost:7567'
+  NBI_URL: process.env.GENIEACS_NBI_URL || 'http://136.112.111.167:7557',
+  UI_URL: process.env.GENIEACS_UI_URL || 'http://136.112.111.167:8080',
+  CWMP_URL: process.env.GENIEACS_CWMP_URL || 'http://136.112.111.167:7547',
+  FS_URL: process.env.GENIEACS_FS_URL || 'http://136.112.111.167:7567'
 };
 
 /**
