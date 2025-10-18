@@ -6,7 +6,7 @@
   import TenantGuard from '$lib/components/TenantGuard.svelte';
   import CoverageMapView from './components/CoverageMapView.svelte';
   import FilterPanel from './components/FilterPanel.svelte';
-  import { coverageMapService } from './lib/coverageMapService.mongodb';  // MongoDB backend
+  import { coverageMapService } from './lib/coverageMapService';  // Firestore direct access
   import { reportGenerator } from './lib/reportGenerator';
   import type { 
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
