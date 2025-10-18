@@ -132,9 +132,9 @@ router.get('/services/status', requirePlatformAdmin, (req, res) => {
 
 /**
  * Get system resources
- * GET /system/resources
+ * GET /resources
  */
-router.get('/system/resources', requirePlatformAdmin, (req, res) => {
+router.get('/resources', requirePlatformAdmin, (req, res) => {
   try {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
