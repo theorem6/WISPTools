@@ -256,9 +256,10 @@
     background: var(--bg-secondary);
     border: 2px solid var(--border-color);
     border-radius: var(--border-radius);
-    padding: var(--spacing-xl);
+    padding: var(--spacing-xxl);
     transition: var(--transition);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: var(--spacing-lg);
   }
   
   .service-card:hover {
@@ -278,31 +279,35 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--spacing-lg);
-    padding-bottom: var(--spacing-md);
-    border-bottom: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--border-color);
   }
   
   .service-header h3 {
     margin: 0;
     color: var(--text-primary);
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
   
   .service-meta {
     display: flex;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-sm);
-    font-size: 0.875rem;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-md);
+    font-size: 0.9rem;
   }
   
   .port, .uptime {
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--border-radius);
     color: var(--text-secondary);
     font-family: monospace;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color);
   }
   
   .status-badge {
@@ -333,48 +338,66 @@
   .service-metrics {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-lg);
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-xl);
     background: var(--bg-primary);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
   }
   
   .metric {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
+    text-align: center;
   }
   
   .metric .label {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.75px;
+    font-weight: 600;
   }
   
   .metric .value {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.5rem;
+    font-weight: 700;
     color: var(--text-primary);
     font-family: monospace;
   }
   
   .service-actions {
     display: flex;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-sm);
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
   }
   
   .btn-action {
     flex: 1;
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--spacing-lg) var(--spacing-xl);
     border: none;
-    border-radius: var(--border-radius-sm);
-    font-size: 0.9rem;
-    font-weight: 600;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    font-weight: 700;
     cursor: pointer;
-    transition: var(--transition);
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn-action:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
   .btn-restart {
