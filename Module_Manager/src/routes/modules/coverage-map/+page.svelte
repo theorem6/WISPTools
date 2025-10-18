@@ -427,7 +427,7 @@
   
   <AddSectorModal 
     bind:show={showAddSectorModal}
-    {sites}
+    sites={towers}
     selectedSite={selectedSiteForSector}
     {tenantId}
     on:saved={handleModalSaved}
@@ -435,7 +435,7 @@
   
   <AddCPEModal 
     bind:show={showAddCPEModal}
-    {sites}
+    sites={towers}
     initialLatitude={contextMenuLat}
     initialLongitude={contextMenuLon}
     {tenantId}
