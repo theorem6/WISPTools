@@ -22,23 +22,121 @@ function requirePlatformAdmin(req, res, next) {
 }
 
 /**
- * Get all PM2 services status
+ * Get all services status (PM2 + systemd)
  * GET /services/status
  */
 router.get('/services/status', requirePlatformAdmin, (req, res) => {
   try {
-    const output = execSync('pm2 jlist', { encoding: 'utf8' });
-    const processes = JSON.parse(output);
+    const services = [];
     
-    const services = processes.map(p => ({
-      name: p.name,
-      status: p.pm2_env.status,
-      uptime: Date.now() - p.pm2_env.pm_uptime,
-      memory: p.monit.memory,
-      cpu: p.monit.cpu,
-      restarts: p.pm2_env.restart_time,
-      port: getServicePort(p.name)
-    }));
+    // Get PM2 services
+    try {
+      const pm2Output = execSync('pm2 jlist', { encoding: 'utf8' });
+      const pm2Processes = JSON.parse(pm2Output);
+      
+      pm2Processes.forEach(p => {
+        services.push({
+          name: p.name,
+          displayName: p.name,
+          status: p.pm2_env.status,
+          uptime: Date.now() - p.pm2_env.pm_uptime,
+          memory: p.monit.memory,
+          cpu: p.monit.cpu,
+          restarts: p.pm2_env.restart_time,
+          port: getServicePort(p.name),
+          canControl: true,
+          type: 'pm2'
+        });
+      });
+    } catch (e) {
+      console.error('Error getting PM2 services:', e);
+    }
+    
+    // Get systemd services (GenieACS)
+    const systemdServices = [
+      { name: 'genieacs-nbi', displayName: 'GenieACS NBI', port: 7557 },
+      { name: 'genieacs-cwmp', displayName: 'GenieACS CWMP', port: 7547 },
+      { name: 'genieacs-fs', displayName: 'GenieACS FS', port: 7567 },
+      { name: 'genieacs-ui', displayName: 'GenieACS UI', port: 8080 }
+    ];
+    
+    systemdServices.forEach(svc => {
+      try {
+        const status = execSync(`systemctl is-active ${svc.name}`, { encoding: 'utf8' }).trim();
+        const isActive = status === 'active';
+        
+        let uptime = 0;
+        let memory = 0;
+        
+        if (isActive) {
+          try {
+            // Get service uptime
+            const uptimeOutput = execSync(`systemctl show ${svc.name} --property=ActiveEnterTimestamp`, { encoding: 'utf8' });
+            const match = uptimeOutput.match(/ActiveEnterTimestamp=(.+)/);
+            if (match) {
+              const startTime = new Date(match[1]).getTime();
+              uptime = Date.now() - startTime;
+            }
+            
+            // Try to get memory usage
+            const memOutput = execSync(`systemctl show ${svc.name} --property=MemoryCurrent`, { encoding: 'utf8' });
+            const memMatch = memOutput.match(/MemoryCurrent=(\d+)/);
+            if (memMatch) {
+              memory = parseInt(memMatch[1]);
+            }
+          } catch (e) {
+            // Memory/uptime info not available
+          }
+        }
+        
+        services.push({
+          name: svc.name,
+          displayName: svc.displayName,
+          status: isActive ? 'online' : 'offline',
+          uptime: uptime,
+          memory: memory,
+          cpu: 0,
+          restarts: 0,
+          port: svc.port,
+          canControl: true,
+          type: 'systemd'
+        });
+      } catch (e) {
+        // Service doesn't exist or can't check status
+        services.push({
+          name: svc.name,
+          displayName: svc.displayName,
+          status: 'unknown',
+          port: svc.port,
+          canControl: false,
+          type: 'systemd'
+        });
+      }
+    });
+    
+    // Add MongoDB (special case - check if port is listening)
+    try {
+      const netstat = execSync('netstat -tlnp 2>/dev/null | grep :27017', { encoding: 'utf8' });
+      const isListening = netstat.trim().length > 0;
+      
+      services.push({
+        name: 'mongodb',
+        displayName: 'MongoDB',
+        status: isListening ? 'online' : 'offline',
+        port: 27017,
+        canControl: false,
+        type: 'external'
+      });
+    } catch (e) {
+      services.push({
+        name: 'mongodb',
+        displayName: 'MongoDB',
+        status: 'unknown',
+        port: 27017,
+        canControl: false,
+        type: 'external'
+      });
+    }
     
     res.json({ success: true, services });
   } catch (error) {
@@ -102,9 +200,15 @@ router.get('/system/resources', requirePlatformAdmin, (req, res) => {
 router.post('/services/:serviceName/restart', requirePlatformAdmin, (req, res) => {
   try {
     const { serviceName } = req.params;
+    const systemdServices = ['genieacs-nbi', 'genieacs-cwmp', 'genieacs-fs', 'genieacs-ui'];
     
     console.log(`[System Management] Restarting service: ${serviceName}`);
-    execSync(`pm2 restart ${serviceName}`, { encoding: 'utf8' });
+    
+    if (systemdServices.includes(serviceName)) {
+      execSync(`systemctl restart ${serviceName}`, { encoding: 'utf8' });
+    } else {
+      execSync(`pm2 restart ${serviceName}`, { encoding: 'utf8' });
+    }
     
     res.json({ success: true, message: `Service ${serviceName} restarted` });
   } catch (error) {
@@ -120,9 +224,15 @@ router.post('/services/:serviceName/restart', requirePlatformAdmin, (req, res) =
 router.post('/services/:serviceName/stop', requirePlatformAdmin, (req, res) => {
   try {
     const { serviceName } = req.params;
+    const systemdServices = ['genieacs-nbi', 'genieacs-cwmp', 'genieacs-fs', 'genieacs-ui'];
     
     console.log(`[System Management] Stopping service: ${serviceName}`);
-    execSync(`pm2 stop ${serviceName}`, { encoding: 'utf8' });
+    
+    if (systemdServices.includes(serviceName)) {
+      execSync(`systemctl stop ${serviceName}`, { encoding: 'utf8' });
+    } else {
+      execSync(`pm2 stop ${serviceName}`, { encoding: 'utf8' });
+    }
     
     res.json({ success: true, message: `Service ${serviceName} stopped` });
   } catch (error) {
@@ -138,9 +248,15 @@ router.post('/services/:serviceName/stop', requirePlatformAdmin, (req, res) => {
 router.post('/services/:serviceName/start', requirePlatformAdmin, (req, res) => {
   try {
     const { serviceName} = req.params;
+    const systemdServices = ['genieacs-nbi', 'genieacs-cwmp', 'genieacs-fs', 'genieacs-ui'];
     
     console.log(`[System Management] Starting service: ${serviceName}`);
-    execSync(`pm2 start ${serviceName}`, { encoding: 'utf8' });
+    
+    if (systemdServices.includes(serviceName)) {
+      execSync(`systemctl start ${serviceName}`, { encoding: 'utf8' });
+    } else {
+      execSync(`pm2 start ${serviceName}`, { encoding: 'utf8' });
+    }
     
     res.json({ success: true, message: `Service ${serviceName} started` });
   } catch (error) {
