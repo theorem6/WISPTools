@@ -38,6 +38,11 @@
     <span>Add Tower Site Here</span>
   </button>
   
+  <button class="menu-item" on:click={() => handleAction('add-noc')}>
+    <span class="menu-icon">🏢</span>
+    <span>Add NOC Site Here</span>
+  </button>
+  
   <button class="menu-item" on:click={() => handleAction('add-cpe')}>
     <span class="menu-icon">📱</span>
     <span>Add CPE Here</span>

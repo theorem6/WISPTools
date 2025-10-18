@@ -5,6 +5,7 @@
   export let show = false;
   export let initialLatitude: number | null = null;
   export let initialLongitude: number | null = null;
+  export let initialType: 'tower' | 'noc' | null = null;
   export let tenantId: string;
   
   const dispatch = createEventDispatcher();
@@ -17,7 +18,7 @@
   // Form data
   let formData = {
     name: '',
-    type: 'tower' as const,
+    type: (initialType || 'tower') as 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'other',
     latitude: initialLatitude || 40.7128,
     longitude: initialLongitude || -74.0060,
     address: '',

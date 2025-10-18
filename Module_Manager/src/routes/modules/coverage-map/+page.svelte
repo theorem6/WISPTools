@@ -48,6 +48,7 @@
   let selectedTowerForMenu: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
+  let initialSiteType: 'tower' | 'noc' | null = null;
   
   // Filters
   let filters: CoverageMapFilters = {
@@ -200,6 +201,13 @@
     
     switch (action) {
       case 'add-site':
+        initialSiteType = 'tower';
+        showAddSiteModal = true;
+        contextMenuLat = latitude;
+        contextMenuLon = longitude;
+        break;
+      case 'add-noc':
+        initialSiteType = 'noc';
         showAddSiteModal = true;
         contextMenuLat = latitude;
         contextMenuLon = longitude;
@@ -486,6 +494,7 @@
     bind:show={showAddSiteModal}
     initialLatitude={contextMenuLat}
     initialLongitude={contextMenuLon}
+    initialType={initialSiteType}
     {tenantId}
     on:saved={handleModalSaved}
   />
