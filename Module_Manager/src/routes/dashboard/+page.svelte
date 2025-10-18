@@ -82,6 +82,16 @@
       color: '#06b6d4',
       status: 'active',
       path: '/modules/monitoring'
+    },
+    {
+      id: 'backend-management',
+      name: 'Backend Management',
+      description: 'Platform admin only - Monitor and control backend services, system resources, and VM operations',
+      icon: '🖥️',
+      color: '#ef4444',
+      status: 'active',
+      path: '/modules/backend-management',
+      adminOnly: true
     }
   ];
 
