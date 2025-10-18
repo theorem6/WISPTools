@@ -168,13 +168,14 @@
           
           <div class="form-group">
             <label>Type</label>
-            <select bind:value={formData.type}>
-              <option value="tower">Tower</option>
-              <option value="rooftop">Rooftop</option>
-              <option value="monopole">Monopole</option>
-              <option value="warehouse">Warehouse</option>
-              <option value="other">Other</option>
-            </select>
+          <select bind:value={formData.type}>
+            <option value="tower">Tower</option>
+            <option value="rooftop">Rooftop</option>
+            <option value="monopole">Monopole</option>
+            <option value="warehouse">Warehouse</option>
+            <option value="noc">NOC (Network Operations Center)</option>
+            <option value="other">Other</option>
+          </select>
           </div>
           
           <div class="form-group">

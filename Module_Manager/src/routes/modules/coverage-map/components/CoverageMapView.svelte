@@ -15,7 +15,19 @@
   let map: any = null;
   let mapView: any = null;
   let graphicsLayer: any = null;
+  let backhaulLayer: any = null;
   let currentBasemap = 'streets-navigation-vector';
+  
+  // Extract backhaul links from equipment
+  $: backhaulLinks = equipment.filter(eq => {
+    if (eq.type !== 'backhaul') return false;
+    try {
+      const notes = JSON.parse(eq.notes || '{}');
+      return notes.fromSiteId && notes.toSiteId;
+    } catch {
+      return false;
+    }
+  });
 
   onMount(async () => {
     await initializeMap();
@@ -52,13 +64,14 @@
         esriConfig.default.apiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
       }
 
-      // Create graphics layer
+      // Create graphics layers
+      backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
       graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
 
-      // Create map
+      // Create map (backhaul layer first so it renders underneath)
       map = new Map({
         basemap: currentBasemap,
-        layers: [graphicsLayer]
+        layers: [backhaulLayer, graphicsLayer]
       });
 
       // Create view
@@ -136,7 +149,13 @@
       ]);
 
       graphicsLayer.removeAll();
-
+      if (backhaulLayer) backhaulLayer.removeAll();
+      
+      // Render backhaul links first (so they appear under other assets)
+      if (filters.showBackhaul && backhaulLinks.length > 0 && backhaulLayer) {
+        await renderBackhaulLinks();
+      }
+      
       // Render towers
       if (filters.showTowers) {
         towers.forEach(tower => {
@@ -364,12 +383,130 @@
     );
   }
 
+  async function renderBackhaulLinks() {
+    if (!backhaulLayer || !mapView) return;
+    
+    try {
+      const [
+        { default: Polyline },
+        { default: Graphic },
+        { default: SimpleLineSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/geometry/Polyline.js'),
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/symbols/SimpleLineSymbol.js')
+      ]);
+      
+      backhaulLinks.forEach(link => {
+        try {
+          const notes = JSON.parse(link.notes || '{}');
+          const backhaulType = notes.backhaulType;
+          
+          // Check type filters
+          if (backhaulType === 'fiber' && !filters.showFiber) return;
+          if (backhaulType === 'fixed-wireless-licensed' && !filters.showWirelessLicensed) return;
+          if (backhaulType === 'fixed-wireless-unlicensed' && !filters.showWirelessUnlicensed) return;
+          
+          const fromSite = towers.find(s => s.id === notes.fromSiteId);
+          const toSite = towers.find(s => s.id === notes.toSiteId);
+          
+          if (!fromSite || !toSite) return;
+          
+          // Determine line style based on backhaul type
+          let lineColor: [number, number, number, number];
+          let lineStyle: string;
+          let lineWidth: number;
+          
+          if (backhaulType === 'fiber') {
+            lineColor = [34, 197, 94, 0.8]; // Green
+            lineStyle = 'solid';
+            lineWidth = 3;
+          } else if (backhaulType === 'fixed-wireless-licensed') {
+            lineColor = [59, 130, 246, 0.8]; // Blue
+            lineStyle = 'dash';
+            lineWidth = 2;
+          } else {
+            lineColor = [251, 191, 36, 0.8]; // Yellow/Orange
+            lineStyle = 'dot';
+            lineWidth = 2;
+          }
+          
+          const polyline = new Polyline({
+            paths: [
+              [
+                [fromSite.location.longitude, fromSite.location.latitude],
+                [toSite.location.longitude, toSite.location.latitude]
+              ]
+            ],
+            spatialReference: { wkid: 4326 }
+          });
+          
+          const lineSymbol = new SimpleLineSymbol({
+            color: lineColor,
+            width: lineWidth,
+            style: lineStyle
+          });
+          
+          const graphic = new Graphic({
+            geometry: polyline,
+            symbol: lineSymbol,
+            attributes: {
+              id: link.id,
+              name: link.name,
+              type: 'backhaul',
+              backhaulType: backhaulType,
+              fromSite: fromSite.name,
+              toSite: toSite.name,
+              capacity: notes.capacity || 'N/A',
+              status: link.status
+            },
+            popupTemplate: {
+              title: '🔗 {name}',
+              content: createBackhaulPopupContent
+            }
+          });
+          
+          backhaulLayer.add(graphic);
+        } catch (err) {
+          console.error('Error rendering backhaul link:', err);
+        }
+      });
+    } catch (err) {
+      console.error('Failed to render backhaul links:', err);
+    }
+  }
+  
+  function createBackhaulPopupContent(feature: any): string {
+    const attrs = feature.graphic.attributes;
+    let typeIcon = '🌐';
+    let typeName = 'Fiber';
+    
+    if (attrs.backhaulType === 'fixed-wireless-licensed') {
+      typeIcon = '📡';
+      typeName = 'Licensed Wireless';
+    } else if (attrs.backhaulType === 'fixed-wireless-unlicensed') {
+      typeIcon = '📻';
+      typeName = 'Unlicensed Wireless';
+    }
+    
+    return `
+      <div class="popup-content">
+        <p><strong>Type:</strong> ${typeIcon} ${typeName}</p>
+        <p><strong>From:</strong> ${attrs.fromSite}</p>
+        <p><strong>To:</strong> ${attrs.toSite}</p>
+        <p><strong>Capacity:</strong> ${attrs.capacity} Mbps</p>
+        <p><strong>Status:</strong> ${attrs.status}</p>
+      </div>
+    `;
+  }
+  
   function getTowerColor(type: string): string {
     const colors: Record<string, string> = {
       tower: '#3b82f6',
       rooftop: '#8b5cf6',
       monopole: '#06b6d4',
       warehouse: '#f59e0b',
+      noc: '#ef4444',
       other: '#6b7280'
     };
     return colors[type] || colors.other;

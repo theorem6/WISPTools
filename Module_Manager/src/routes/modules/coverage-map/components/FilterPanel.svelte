@@ -28,6 +28,9 @@
       case 'equipment':
         filters.showEquipment = !filters.showEquipment;
         break;
+      case 'backhaul':
+        filters.showBackhaul = !filters.showBackhaul;
+        break;
     }
     dispatch('change', filters);
   }
@@ -116,8 +119,65 @@
         <span class="filter-icon">🔧</span>
         <span>Equipment</span>
       </label>
+      
+      <label class="filter-checkbox">
+        <input 
+          type="checkbox" 
+          checked={filters.showBackhaul}
+          on:change={() => toggleAssetType('backhaul')}
+        />
+        <span class="filter-icon">🔗</span>
+        <span>Backhaul Links</span>
+      </label>
     </div>
   </div>
+  
+  <!-- Backhaul Type Filters -->
+  {#if filters.showBackhaul}
+    <div class="filter-section">
+      <h4>Backhaul Types</h4>
+      <div class="filter-options">
+        <label class="filter-checkbox">
+          <input 
+            type="checkbox" 
+            checked={filters.showFiber}
+            on:change={() => {
+              filters.showFiber = !filters.showFiber;
+              dispatch('change', filters);
+            }}
+          />
+          <span class="filter-icon">🌐</span>
+          <span>Fiber</span>
+        </label>
+        
+        <label class="filter-checkbox">
+          <input 
+            type="checkbox" 
+            checked={filters.showWirelessLicensed}
+            on:change={() => {
+              filters.showWirelessLicensed = !filters.showWirelessLicensed;
+              dispatch('change', filters);
+            }}
+          />
+          <span class="filter-icon">📡</span>
+          <span>Licensed Wireless</span>
+        </label>
+        
+        <label class="filter-checkbox">
+          <input 
+            type="checkbox" 
+            checked={filters.showWirelessUnlicensed}
+            on:change={() => {
+              filters.showWirelessUnlicensed = !filters.showWirelessUnlicensed;
+              dispatch('change', filters);
+            }}
+          />
+          <span class="filter-icon">📻</span>
+          <span>Unlicensed Wireless</span>
+        </label>
+      </div>
+    </div>
+  {/if}
   
   <!-- Band/Technology Filters -->
   <div class="filter-section">

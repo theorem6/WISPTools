@@ -114,19 +114,33 @@ export interface CPEDevice {
 
 export interface BackhaulLink {
   id: string;
-  siteId: string; // Associated tower site
+  fromSiteId: string; // Site A
+  toSiteId: string; // Site B (can be another tower or NOC)
   name: string;
   
   // Backhaul Type
   backhaulType: 'fiber' | 'fixed-wireless-licensed' | 'fixed-wireless-unlicensed';
   
-  // For Fixed Wireless
-  azimuth?: number; // Pointing direction for wireless
-  beamwidth?: number; // Antenna beamwidth
+  // For Fixed Wireless (both endpoints)
+  siteA?: {
+    azimuth: number;
+    antennaHeight: number;
+    antennaGain: number;
+    txPower: number;
+  };
+  siteB?: {
+    azimuth: number;
+    antennaHeight: number;
+    antennaGain: number;
+    txPower: number;
+  };
+  
+  // Wireless Common
   frequency?: number; // MHz
   bandwidth?: number; // MHz
+  beamwidth?: number; // degrees
   licensing?: {
-    licenseType?: string; // FCC license type
+    licenseType?: string;
     licenseNumber?: string;
     expirationDate?: Date;
   };
@@ -135,22 +149,25 @@ export interface BackhaulLink {
   fiberDetails?: {
     provider?: string;
     circuitId?: string;
-    handoffType?: string; // single-mode, multi-mode
-    connectorType?: string; // LC, SC, etc.
+    handoffType?: string;
+    connectorType?: string;
+    fiberCount?: number;
+    fiberSpeed?: string;
+    demarcLocation?: string;
   };
   
   // Common Fields
   capacity?: number; // Mbps
-  upstreamSite?: string; // Where it connects to
-  location?: Location; // For wireless: remote end location
-  
-  // Equipment
+  equipmentManufacturer?: string;
   equipmentModel?: string;
   equipmentSerialNumber?: string;
+  monthlyRecurringCost?: number;
+  contractTermMonths?: number;
   
   // Status
   status: 'active' | 'inactive' | 'maintenance' | 'planned';
   installDate?: Date;
+  notes?: string;
   
   // Administrative
   tenantId: string;
@@ -211,6 +228,12 @@ export interface CoverageMapFilters {
   showSectors: boolean;
   showCPE: boolean;
   showEquipment: boolean;
+  showBackhaul: boolean;
+  
+  // Backhaul type filtering
+  showFiber: boolean;
+  showWirelessLicensed: boolean;
+  showWirelessUnlicensed: boolean;
   
   // Band filtering
   bandFilters: BandFilter[];

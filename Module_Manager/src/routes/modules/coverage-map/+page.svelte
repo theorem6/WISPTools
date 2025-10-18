@@ -9,7 +9,7 @@
   import AddSiteModal from './components/AddSiteModal.svelte';
   import AddSectorModal from './components/AddSectorModal.svelte';
   import AddCPEModal from './components/AddCPEModal.svelte';
-  import AddBackhaulModal from './components/AddBackhaulModal.svelte';
+  import AddBackhaulLinkModal from './components/AddBackhaulLinkModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';  // Backend API via hssProxy
@@ -55,6 +55,10 @@
     showSectors: true,
     showCPE: true,
     showEquipment: false,
+    showBackhaul: true,
+    showFiber: true,
+    showWirelessLicensed: true,
+    showWirelessUnlicensed: true,
     bandFilters: [],
     statusFilter: [],
     technologyFilter: [],
@@ -503,9 +507,9 @@
     on:saved={handleModalSaved}
   />
   
-  <AddBackhaulModal 
+  <AddBackhaulLinkModal 
     bind:show={showAddBackhaulModal}
-    site={selectedSiteForBackhaul}
+    fromSite={selectedSiteForBackhaul}
     sites={towers}
     {tenantId}
     on:saved={handleModalSaved}

@@ -37,7 +37,7 @@ const UnifiedSiteSchema = new mongoose.Schema({
   location: { type: LocationSchema, required: true },
   type: { 
     type: String, 
-    enum: ['tower', 'rooftop', 'monopole', 'warehouse', 'other'],
+    enum: ['tower', 'rooftop', 'monopole', 'warehouse', 'noc', 'other'],
     default: 'tower'
   },
   height: Number, // feet
