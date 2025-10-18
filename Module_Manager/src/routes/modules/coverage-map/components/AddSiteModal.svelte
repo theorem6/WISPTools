@@ -41,6 +41,7 @@
   
   $: if (initialLatitude !== null) formData.latitude = initialLatitude;
   $: if (initialLongitude !== null) formData.longitude = initialLongitude;
+  $: if (initialType) formData.type = initialType as 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'other';
   
   async function handleSearchAddress() {
     if (!searchAddress.trim()) {
