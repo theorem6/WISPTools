@@ -273,7 +273,7 @@
           // Create symbol based on status
           const symbol = new SimpleMarkerSymbol({
             style: 'circle',
-            color: device.status === 'Online' ? '#10b981' : '#ef4444',
+            color: device.status === 'Online' ? 'var(--success)' : 'var(--danger)',
             size: '16px',
             outline: {
               color: 'white',
@@ -799,15 +799,15 @@
   }
 
   .sync-message.success {
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #22c55e;
+    background: var(--success-light);
+    border: 1px solid var(--success);
+    color: var(--success);
   }
 
   .sync-message.error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
+    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    color: var(--danger);
   }
 
   .stat-card.tenant-stat {

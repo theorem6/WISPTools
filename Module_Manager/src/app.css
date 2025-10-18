@@ -17,20 +17,32 @@
   --hover-bg: #e2e8f0;
   --focus-bg: #cbd5e1;
   
-  /* Modern Accent Colors */
-  --primary-color: #3b82f6;
+  /* Modern Accent Colors - Unified Naming */
+  --primary: #3b82f6;
+  --primary-color: #3b82f6; /* Legacy support */
   --primary-hover: #2563eb;
   --primary-light: #dbeafe;
-  --secondary-color: #64748b;
+  --secondary: #64748b;
+  --secondary-color: #64748b; /* Legacy support */
   --secondary-hover: #475569;
-  --success-color: #10b981;
+  --success: #10b981;
+  --success-color: #10b981; /* Legacy support */
   --success-light: #d1fae5;
-  --warning-color: #f59e0b;
+  --warning: #f59e0b;
+  --warning-color: #f59e0b; /* Legacy support */
   --warning-light: #fef3c7;
-  --danger-color: #ef4444;
+  --danger: #ef4444;
+  --danger-color: #ef4444; /* Legacy support */
   --danger-light: #fee2e2;
-  --info-color: #06b6d4;
+  --info: #06b6d4;
+  --info-color: #06b6d4; /* Legacy support */
   --info-light: #cffafe;
+  
+  /* Additional Theme Variables */
+  --accent-color: #10b981;
+  --brand-primary: #3b82f6;
+  --brand-secondary: #7c3aed;
+  --brand-accent: #10b981;
   
   /* UI Elements */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -48,6 +60,7 @@
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+  --spacing-xxl: 2.5rem;
   --spacing-2xl: 3rem;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   
@@ -74,19 +87,31 @@
   --hover-bg: #334155;
   --focus-bg: #475569;
   
-  --primary-color: #60a5fa;
+  --primary: #60a5fa;
+  --primary-color: #60a5fa; /* Legacy support */
   --primary-hover: #3b82f6;
   --primary-light: #1e3a8a;
-  --secondary-color: #94a3b8;
+  --secondary: #94a3b8;
+  --secondary-color: #94a3b8; /* Legacy support */
   --secondary-hover: #cbd5e1;
-  --success-color: #34d399;
+  --success: #34d399;
+  --success-color: #34d399; /* Legacy support */
   --success-light: #065f46;
-  --warning-color: #fbbf24;
+  --warning: #fbbf24;
+  --warning-color: #fbbf24; /* Legacy support */
   --warning-light: #92400e;
-  --danger-color: #f87171;
+  --danger: #f87171;
+  --danger-color: #f87171; /* Legacy support */
   --danger-light: #991b1b;
-  --info-color: #22d3ee;
+  --info: #22d3ee;
+  --info-color: #22d3ee; /* Legacy support */
   --info-light: #164e63;
+  
+  /* Additional Theme Variables */
+  --accent-color: #34d399;
+  --brand-primary: #60a5fa;
+  --brand-secondary: #a78bfa;
+  --brand-accent: #34d399;
   
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);

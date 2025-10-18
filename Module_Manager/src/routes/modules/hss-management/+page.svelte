@@ -257,12 +257,12 @@
   .header-content h1 {
     margin: 0;
     font-size: 2rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
   
   .subtitle {
     margin: 0.5rem 0 0 0;
-    color: #666;
+    color: var(--text-secondary);
     font-size: 1rem;
   }
   
@@ -278,8 +278,8 @@
   .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #2563eb;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -301,7 +301,7 @@
   .tabs {
     display: flex;
     gap: 0.5rem;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid var(--border-color);
     margin-bottom: 2rem;
     overflow-x: auto;
   }
@@ -313,19 +313,19 @@
     border-bottom: 3px solid transparent;
     cursor: pointer;
     font-size: 1rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     transition: all 0.2s;
     white-space: nowrap;
   }
   
   .tabs button:hover {
-    color: #2563eb;
-    background: #f9fafb;
+    color: var(--primary);
+    background: var(--hover-bg);
   }
   
   .tabs button.active {
-    color: #2563eb;
-    border-bottom-color: #2563eb;
+    color: var(--primary);
+    border-bottom-color: var(--primary);
     font-weight: 600;
   }
   

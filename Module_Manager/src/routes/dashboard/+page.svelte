@@ -24,7 +24,7 @@
       name: 'Tenant Management',
       description: 'Manage all customer organizations and tenant accounts (Admin Only)',
       icon: '🏢',
-      color: '#ef4444',
+      color: 'var(--danger)',
       status: 'active',
       path: '/modules/tenant-management',
       adminOnly: true
@@ -34,7 +34,7 @@
       name: 'PCI Resolution & Network Optimization',
       description: 'Physical Cell ID conflict detection, SON optimization, and network self-organization',
       icon: '📊',
-      color: '#2563eb',
+      color: 'var(--primary)',
       status: 'active',
       path: '/modules/pci-resolution'
     },
@@ -43,7 +43,7 @@
       name: 'ACS CPE Management',
       description: 'TR-069 device management and CPE monitoring with GPS mapping',
       icon: '📡',
-      color: '#10b981',
+      color: 'var(--success)',
       status: 'active',
       path: '/modules/acs-cpe-management'
     },
@@ -70,7 +70,7 @@
       name: 'HSS & Subscriber Management',
       description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
       icon: '🔐',
-      color: '#f59e0b',
+      color: 'var(--warning)',
       status: 'active',
       path: '/modules/hss-management'
     },
@@ -88,7 +88,7 @@
       name: 'Backend Management',
       description: 'Platform admin only - Monitor and control backend services, system resources, and VM operations',
       icon: '🖥️',
-      color: '#ef4444',
+      color: 'var(--danger)',
       status: 'active',
       path: '/modules/backend-management',
       adminOnly: true
@@ -500,7 +500,7 @@
 
   .status-badge.admin {
     background-color: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    color: var(--danger);
   }
 
   .module-card.admin-module {
@@ -508,7 +508,7 @@
   }
 
   .module-card.admin-module:hover {
-    border-color: #ef4444;
+    border-color: var(--danger);
     box-shadow: 0 10px 30px rgba(239, 68, 68, 0.2);
   }
 

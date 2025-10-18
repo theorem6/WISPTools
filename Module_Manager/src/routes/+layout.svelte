@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { tenantStore } from '$lib/stores/tenantStore';
-  import '../styles/theme.css';
+  import '../app.css';
   
   // Initialize tenant store on app load
   onMount(async () => {

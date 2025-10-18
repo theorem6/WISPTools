@@ -662,9 +662,9 @@
   
   .back-btn {
     padding: 0.75rem 1.5rem;
-    background: #f3f4f6;
-    color: #374151;
-    border: 1px solid #e5e7eb;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
@@ -672,12 +672,12 @@
   }
   
   .back-btn:hover {
-    background: #e5e7eb;
+    background: var(--border-color);
   }
   
   .monitor-all-btn {
     padding: 0.75rem 1.5rem;
-    background: #3b82f6;
+    background: var(--primary);
     color: white;
     border: none;
     border-radius: 6px;
@@ -687,7 +687,7 @@
   }
   
   .monitor-all-btn:hover {
-    background: #2563eb;
+    background: var(--primary-hover);
   }
   
   .header h2 {
@@ -696,7 +696,7 @@
   }
   
   .subtitle {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 0.875rem;
     margin: 0;
   }
@@ -710,35 +710,35 @@
   
   .summary-card {
     background: white;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
     text-align: center;
   }
   
   .summary-card.online {
-    border-left: 4px solid #10b981;
+    border-left: 4px solid var(--success);
   }
   
   .summary-card.registered {
-    border-left: 4px solid #3b82f6;
+    border-left: 4px solid var(--primary);
   }
   
   .summary-card.offline {
-    border-left: 4px solid #ef4444;
+    border-left: 4px solid var(--danger);
   }
   
   .summary-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text-primary);
     line-height: 1;
   }
   
   .summary-label {
     margin-top: 0.5rem;
     font-size: 0.875rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .filters {
@@ -757,7 +757,7 @@
   
   .filters select {
     padding: 0.5rem;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
   }
   
@@ -769,7 +769,7 @@
   
   .epc-card {
     background: white;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
     transition: box-shadow 0.2s;
@@ -785,7 +785,7 @@
     align-items: flex-start;
     margin-bottom: 1rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-light);
   }
   
   .epc-header h3 {
@@ -795,7 +795,7 @@
   
   .epc-id {
     font-size: 0.75rem;
-    color: #9ca3af;
+    color: var(--text-muted);
     font-family: monospace;
   }
   
@@ -808,8 +808,8 @@
   }
   
   .status-registered {
-    background: #dbeafe;
-    color: #1e40af;
+    background: var(--primary-light);
+    color: var(--primary);
   }
   
   .status-online {
@@ -862,7 +862,7 @@
   }
   
   .btn-primary {
-    background: #2563eb;
+    background: var(--primary-hover);
     color: white;
   }
   
@@ -871,13 +871,13 @@
   }
   
   .btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
-    border: 1px solid #e5e7eb;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
   
   .btn-secondary:hover {
-    background: #e5e7eb;
+    background: var(--border-color);
   }
   
   .btn-danger {
@@ -891,7 +891,7 @@
   
   .add-btn, .refresh-btn {
     padding: 0.75rem 1.5rem;
-    background: #2563eb;
+    background: var(--primary-hover);
     color: white;
     border: none;
     border-radius: 6px;
@@ -905,24 +905,24 @@
   }
   
   .refresh-btn {
-    background: #f3f4f6;
-    color: #374151;
-    border: 1px solid #e5e7eb;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
   
   .refresh-btn:hover {
-    background: #e5e7eb;
+    background: var(--border-color);
   }
   
   .loading, .empty-state {
     text-align: center;
     padding: 3rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .empty-state h3 {
     margin: 0 0 0.5rem 0;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
   
   .empty-state p {
@@ -977,7 +977,7 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #9ca3af;
+    color: var(--text-muted);
     padding: 0;
     width: 2rem;
     height: 2rem;
@@ -1011,7 +1011,7 @@
   .form-section h3 {
     margin: 0 0 1rem 0;
     font-size: 1rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
   
   .form-group {
@@ -1023,7 +1023,7 @@
     margin-bottom: 0.5rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #374151;
+    color: var(--text-primary);
   }
   
   .form-group input,
@@ -1048,7 +1048,7 @@
   }
   
   .form-section small {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 0.75rem;
   }
   

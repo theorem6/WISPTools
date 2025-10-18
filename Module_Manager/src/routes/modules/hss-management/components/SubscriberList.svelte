@@ -279,7 +279,7 @@
     background: white;
     padding: 1.5rem;
     border-radius: 8px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
   }
   
   .list-header {
@@ -292,12 +292,12 @@
   .list-header h2 {
     margin: 0;
     font-size: 1.5rem;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
   
   .add-btn {
     padding: 0.625rem 1.25rem;
-    background: #2563eb;
+    background: var(--primary);
     color: white;
     border: none;
     border-radius: 6px;
@@ -308,7 +308,7 @@
   }
   
   .add-btn:hover {
-    background: #1d4ed8;
+    background: var(--primary-hover);
   }
   
   .filters {
@@ -320,14 +320,14 @@
   .search-input {
     flex: 1;
     padding: 0.625rem 1rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 0.875rem;
   }
   
   .filter-select {
     padding: 0.625rem 1rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 0.875rem;
     background: white;
@@ -337,7 +337,7 @@
   .loading {
     text-align: center;
     padding: 3rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .empty-state {
@@ -352,12 +352,12 @@
   
   .empty-state h3 {
     margin: 0 0 0.5rem 0;
-    color: #1a1a1a;
+    color: var(--text-primary);
   }
   
   .empty-state p {
     margin: 0 0 1.5rem 0;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .table-container {
@@ -370,8 +370,8 @@
   }
   
   thead {
-    background: #f9fafb;
-    border-bottom: 2px solid #e5e7eb;
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border-color);
   }
   
   th {
@@ -379,18 +379,18 @@
     text-align: left;
     font-weight: 600;
     font-size: 0.875rem;
-    color: #4b5563;
+    color: var(--text-secondary);
     white-space: nowrap;
   }
   
   td {
     padding: 1rem;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-light);
     font-size: 0.875rem;
   }
   
   tr:hover {
-    background: #f9fafb;
+    background: var(--bg-secondary);
   }
   
   .imsi {
@@ -402,7 +402,7 @@
   .imei {
     font-family: 'Courier New', monospace;
     font-size: 0.8125rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .status-badge {
@@ -454,7 +454,7 @@
   
   .text-small {
     font-size: 0.8125rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .actions {
