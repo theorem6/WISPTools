@@ -478,7 +478,9 @@
         dispatch('asset-click', {
           type: graphic.attributes.type,
           id: graphic.attributes.id,
-          data: graphic.attributes
+          data: graphic.attributes,
+          screenX: event.x,
+          screenY: event.y
         });
       }
     }

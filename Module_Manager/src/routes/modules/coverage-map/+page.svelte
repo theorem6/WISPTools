@@ -9,7 +9,9 @@
   import AddSiteModal from './components/AddSiteModal.svelte';
   import AddSectorModal from './components/AddSectorModal.svelte';
   import AddCPEModal from './components/AddCPEModal.svelte';
+  import AddBackhaulModal from './components/AddBackhaulModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
+  import TowerActionsMenu from './components/TowerActionsMenu.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';  // Backend API via hssProxy
   import { reportGenerator } from './lib/reportGenerator';
   import type { 
@@ -34,12 +36,18 @@
   let showAddSiteModal = false;
   let showAddSectorModal = false;
   let showAddCPEModal = false;
+  let showAddBackhaulModal = false;
   let showContextMenu = false;
+  let showTowerActionsMenu = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat = 0;
   let contextMenuLon = 0;
   let selectedSiteForSector: TowerSite | null = null;
+  let selectedSiteForBackhaul: TowerSite | null = null;
+  let selectedTowerForMenu: TowerSite | null = null;
+  let towerMenuX = 0;
+  let towerMenuY = 0;
   
   // Filters
   let filters: CoverageMapFilters = {
@@ -208,7 +216,7 @@
   }
   
   function handleAssetClick(event: CustomEvent) {
-    const { type, id, data } = event.detail;
+    const { type, id, data, screenX, screenY } = event.detail;
     console.log(`Clicked ${type}:`, id, data);
     
     // Check if this is a read-only item from ACS or CBRS
@@ -218,7 +226,60 @@
       return;
     }
     
-    // TODO: Open edit modal for Coverage Map managed assets
+    // Handle tower clicks - show actions menu
+    if (type === 'tower') {
+      const tower = towers.find(t => t.id === id);
+      if (tower) {
+        selectedTowerForMenu = tower;
+        towerMenuX = screenX;
+        towerMenuY = screenY;
+        showTowerActionsMenu = true;
+      }
+    }
+    
+    // TODO: Handle sector and CPE clicks
+  }
+  
+  function handleTowerAction(event: CustomEvent) {
+    const { action, tower } = event.detail;
+    
+    switch (action) {
+      case 'edit-site':
+        // TODO: Open edit modal
+        success = 'Edit functionality coming soon';
+        setTimeout(() => success = '', 3000);
+        break;
+      case 'add-sector':
+        selectedSiteForSector = tower;
+        showAddSectorModal = true;
+        break;
+      case 'add-backhaul':
+        selectedSiteForBackhaul = tower;
+        showAddBackhaulModal = true;
+        break;
+      case 'view-details':
+        // TODO: Open details view
+        success = `Viewing ${tower.name}`;
+        setTimeout(() => success = '', 3000);
+        break;
+      case 'delete-site':
+        if (confirm(`Delete ${tower.name}?`)) {
+          deleteTowerSite(tower.id);
+        }
+        break;
+    }
+  }
+  
+  async function deleteTowerSite(siteId: string) {
+    try {
+      await coverageMapService.deleteTowerSite(tenantId, siteId);
+      success = 'Tower site deleted';
+      setTimeout(() => success = '', 3000);
+      await loadAllData();
+    } catch (err: any) {
+      error = err.message || 'Failed to delete site';
+      setTimeout(() => error = '', 5000);
+    }
   }
   
   function handleAddSite() {
@@ -442,7 +503,15 @@
     on:saved={handleModalSaved}
   />
   
-  <!-- Context Menu -->
+  <AddBackhaulModal 
+    bind:show={showAddBackhaulModal}
+    site={selectedSiteForBackhaul}
+    sites={towers}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <!-- Context Menus -->
   <MapContextMenu 
     bind:show={showContextMenu}
     x={contextMenuX}
@@ -450,6 +519,14 @@
     latitude={contextMenuLat}
     longitude={contextMenuLon}
     on:action={handleContextMenuAction}
+  />
+  
+  <TowerActionsMenu 
+    bind:show={showTowerActionsMenu}
+    tower={selectedTowerForMenu}
+    x={towerMenuX}
+    y={towerMenuY}
+    on:action={handleTowerAction}
   />
 </div>
 </TenantGuard>

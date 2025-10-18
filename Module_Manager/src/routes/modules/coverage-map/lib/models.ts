@@ -112,6 +112,52 @@ export interface CPEDevice {
   updatedAt: Date;
 }
 
+export interface BackhaulLink {
+  id: string;
+  siteId: string; // Associated tower site
+  name: string;
+  
+  // Backhaul Type
+  backhaulType: 'fiber' | 'fixed-wireless-licensed' | 'fixed-wireless-unlicensed';
+  
+  // For Fixed Wireless
+  azimuth?: number; // Pointing direction for wireless
+  beamwidth?: number; // Antenna beamwidth
+  frequency?: number; // MHz
+  bandwidth?: number; // MHz
+  licensing?: {
+    licenseType?: string; // FCC license type
+    licenseNumber?: string;
+    expirationDate?: Date;
+  };
+  
+  // For Fiber
+  fiberDetails?: {
+    provider?: string;
+    circuitId?: string;
+    handoffType?: string; // single-mode, multi-mode
+    connectorType?: string; // LC, SC, etc.
+  };
+  
+  // Common Fields
+  capacity?: number; // Mbps
+  upstreamSite?: string; // Where it connects to
+  location?: Location; // For wireless: remote end location
+  
+  // Equipment
+  equipmentModel?: string;
+  equipmentSerialNumber?: string;
+  
+  // Status
+  status: 'active' | 'inactive' | 'maintenance' | 'planned';
+  installDate?: Date;
+  
+  // Administrative
+  tenantId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface NetworkEquipment {
   id: string;
   siteId?: string; // Optional site association
@@ -122,7 +168,7 @@ export interface NetworkEquipment {
   locationType: 'tower' | 'rooftop' | 'warehouse' | 'vehicle' | 'customer-site' | 'other';
   
   // Equipment Details
-  type: 'router' | 'switch' | 'antenna' | 'radio' | 'cpe' | 'power' | 'battery' | 'cable' | 'other';
+  type: 'router' | 'switch' | 'antenna' | 'radio' | 'cpe' | 'power' | 'battery' | 'cable' | 'backhaul' | 'other';
   manufacturer: string;
   model: string;
   serialNumber: string;
