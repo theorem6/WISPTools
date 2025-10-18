@@ -1,133 +1,19 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import AdminMenu from '../components/AdminMenu.svelte';
   
-  // Module data
-  let moduleData = {
-    title: 'ACS Administration',
-    description: 'System configuration and device management',
-    icon: '⚙️'
-  };
-
-  onMount(async () => {
-    console.log('ACS Administration module loaded');
+  onMount(() => {
+    // Redirect to services page (only admin page now)
+    goto('/modules/acs-cpe-management/admin/services');
   });
 </script>
 
 <svelte:head>
   <title>ACS Administration - LTE WISP Management Platform</title>
-  <meta name="description" content="ACS system configuration and management" />
 </svelte:head>
 
-<div class="acs-admin-module">
-  <!-- Module Header -->
-  <div class="module-header">
-    <div class="header-content">
-      <div class="header-top">
-        <a href="/modules/acs-cpe-management" class="back-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to ACS CPE Management
-        </a>
-      </div>
-      <div class="module-info">
-        <h1 class="module-title">
-          <span class="module-icon">⚙️</span>
-          {moduleData.title}
-        </h1>
-        <p class="module-description">{moduleData.description}</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Module Content -->
-  <div class="module-content">
-    <!-- Administration Menu -->
-    <AdminMenu />
-    
-    <!-- Quick Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">⚙️</div>
-        <div class="stat-content">
-          <div class="stat-number">8</div>
-          <div class="stat-label">Admin Modules</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">📜</div>
-        <div class="stat-content">
-          <div class="stat-number">12</div>
-          <div class="stat-label">Active Presets</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">🔧</div>
-        <div class="stat-content">
-          <div class="stat-number">8</div>
-          <div class="stat-label">Virtual Parameters</div>
-        </div>
-      </div>
-      
-      <div class="stat-card">
-        <div class="stat-icon">📁</div>
-        <div class="stat-content">
-          <div class="stat-number">24</div>
-          <div class="stat-label">Configuration Files</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- System Information -->
-    <div class="system-info">
-      <div class="info-card">
-        <h3>System Status</h3>
-        <div class="status-items">
-          <div class="status-item">
-            <span class="status-label">ACS Server:</span>
-            <span class="status-value online">Online</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">Database:</span>
-            <span class="status-value online">Connected</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">TR-069 Service:</span>
-            <span class="status-value online">Running</span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">File Server:</span>
-            <span class="status-value online">Active</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="info-card">
-        <h3>Configuration Summary</h3>
-        <div class="config-items">
-          <div class="config-item">
-            <span class="config-label">Management Server URL:</span>
-            <span class="config-value">https://acs.example.com/cwmp</span>
-          </div>
-          <div class="config-item">
-            <span class="config-label">Authentication Method:</span>
-            <span class="config-value">Digest + SSL</span>
-          </div>
-          <div class="config-item">
-            <span class="config-label">Default Provisioning:</span>
-            <span class="config-value">Enabled</span>
-          </div>
-          <div class="config-item">
-            <span class="config-label">Firmware Management:</span>
-            <span class="config-value">Automated</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="redirect-page">
+  <p>Redirecting to Service Management...</p>
 </div>
 
 <style>

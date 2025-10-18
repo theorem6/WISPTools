@@ -1,844 +1,444 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import MainMenu from '../../components/MainMenu.svelte';
-  import { env } from '$env/dynamic/public';
+  import { onMount } from 'svelte';
+  import { auth } from '$lib/firebase';
   
   interface ServiceStatus {
     name: string;
     displayName: string;
-    endpoint: string;
-    status: 'checking' | 'online' | 'offline' | 'degraded';
-    responseTime: number | null;
-    lastCheck: Date | null;
-    error: string | null;
-    description: string;
-    icon: string;
+    status: 'online' | 'offline' | 'unknown';
+    port: number;
+    canRestart: boolean;
+    lastChecked?: Date;
   }
   
-  let services: ServiceStatus[] = [];
-  let isRefreshing = false;
-  let autoRefresh = false;
-  let refreshInterval: number | null = null;
-  let lastRefreshTime: Date | null = null;
+  let services: ServiceStatus[] = [
+    { name: 'genieacs-nbi', displayName: 'GenieACS NBI', status: 'unknown', port: 7557, canRestart: true },
+    { name: 'genieacs-cwmp', displayName: 'GenieACS CWMP (TR-069)', status: 'unknown', port: 7547, canRestart: true },
+    { name: 'genieacs-fs', displayName: 'GenieACS File Server', status: 'unknown', port: 7567, canRestart: true },
+    { name: 'genieacs-ui', displayName: 'GenieACS Web UI', status: 'unknown', port: 8080, canRestart: true },
+    { name: 'hss-api', displayName: 'HSS API', status: 'unknown', port: 3000, canRestart: true },
+    { name: 'mongodb', displayName: 'MongoDB', status: 'unknown', port: 27017, canRestart: false }
+  ];
   
-  // Initialize services
-  onMount(async () => {
-    console.log('Services monitoring page loaded');
-    initializeServices();
-    await checkAllServices();
+  let isLoading = false;
+  let error: string | null = null;
+  
+  onMount(() => {
+    checkAllServices();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(checkAllServices, 30000);
+    return () => clearInterval(interval);
   });
   
-  onDestroy(() => {
-    if (refreshInterval) {
-      clearInterval(refreshInterval);
-    }
-  });
-  
-  function initializeServices() {
-    const baseUrl = env.PUBLIC_FIREBASE_FUNCTIONS_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net';
+  async function checkAllServices() {
+    isLoading = true;
+    error = null;
     
-    services = [
-      {
-        name: 'genieacs-cwmp',
-        displayName: 'GenieACS CWMP',
-        endpoint: env.PUBLIC_GENIEACS_CWMP_URL || `${baseUrl}/genieacsCWMP`,
-        status: 'checking',
-        responseTime: null,
-        lastCheck: null,
-        error: null,
-        description: 'TR-069 CWMP server for device management (Port 7547)',
-        icon: '🌐'
-      },
-      {
-        name: 'genieacs-nbi',
-        displayName: 'GenieACS NBI',
-        endpoint: env.PUBLIC_GENIEACS_NBI_URL || `${baseUrl}/genieacsNBI`,
-        status: 'checking',
-        responseTime: null,
-        lastCheck: null,
-        error: null,
-        description: 'North Bound Interface API (Port 7557)',
-        icon: '🔌'
-      },
-      {
-        name: 'genieacs-fs',
-        displayName: 'GenieACS FS',
-        endpoint: env.PUBLIC_GENIEACS_FS_URL || `${baseUrl}/genieacsFS`,
-        status: 'checking',
-        responseTime: null,
-        lastCheck: null,
-        error: null,
-        description: 'File Server for firmware and configs (Port 7567)',
-        icon: '📁'
-      },
-      {
-        name: 'sync-devices',
-        displayName: 'Sync CPE Devices',
-        endpoint: env.PUBLIC_SYNC_CPE_DEVICES_URL || `${baseUrl}/syncCPEDevices`,
-        status: 'checking',
-        responseTime: null,
-        lastCheck: null,
-        error: null,
-        description: 'Device synchronization from MongoDB to Firestore',
-        icon: '🔄'
-      },
-      {
-        name: 'get-devices',
-        displayName: 'Get CPE Devices',
-        endpoint: env.PUBLIC_GET_CPE_DEVICES_URL || `${baseUrl}/getCPEDevices`,
-        status: 'checking',
-        responseTime: null,
-        lastCheck: null,
-        error: null,
-        description: 'Retrieve CPE device list from Firestore',
-        icon: '📱'
-      },
-    ];
+    for (const service of services) {
+      await checkServiceStatus(service);
+    }
+    
+    isLoading = false;
   }
   
-  async function checkServiceHealth(service: ServiceStatus): Promise<void> {
-    const startTime = performance.now();
+  async function checkServiceStatus(service: ServiceStatus) {
+    try {
+      const user = auth().currentUser;
+      if (!user) {
+        service.status = 'unknown';
+        return;
+      }
+      
+      const token = await user.getIdToken();
+      
+      // Try to fetch from the service endpoint
+      const response = await fetch(`https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/services/${service.name}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        service.status = data.status === 'online' || data.running ? 'online' : 'offline';
+      } else {
+        // Service endpoint doesn't exist, try basic health check
+        service.status = 'unknown';
+      }
+      
+      service.lastChecked = new Date();
+    } catch (err) {
+      console.error(`Error checking ${service.name}:`, err);
+      service.status = 'unknown';
+    }
+  }
+  
+  async function handleServiceAction(service: ServiceStatus, action: 'restart' | 'stop' | 'start') {
+    if (!confirm(`Are you sure you want to ${action} ${service.displayName}?`)) {
+      return;
+    }
+    
+    isLoading = true;
+    error = null;
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const user = auth().currentUser;
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
       
-      const response = await fetch(service.endpoint, {
-        method: 'GET',
-        signal: controller.signal,
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/services/${service.name}/${action}`, {
+        method: 'POST',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
-      clearTimeout(timeoutId);
-      const endTime = performance.now();
-      
-      service.responseTime = Math.round(endTime - startTime);
-      service.lastCheck = new Date();
-      
       if (response.ok) {
-        service.status = service.responseTime > 5000 ? 'degraded' : 'online';
-        service.error = null;
+        alert(`✅ ${service.displayName} ${action} command sent successfully`);
+        // Wait a moment then refresh status
+        setTimeout(() => checkServiceStatus(service), 2000);
       } else {
-        service.status = 'degraded';
-        service.error = `HTTP ${response.status}: ${response.statusText}`;
+        const data = await response.json();
+        throw new Error(data.error || `Failed to ${action} service`);
       }
-    } catch (error) {
-      const endTime = performance.now();
-      service.responseTime = Math.round(endTime - startTime);
-      service.lastCheck = new Date();
-      service.status = 'offline';
-      
-      if (error.name === 'AbortError') {
-        service.error = 'Request timeout (>10s)';
-      } else {
-        service.error = error.message || 'Connection failed';
-      }
+    } catch (err: any) {
+      console.error(`Error ${action}ing service:`, err);
+      error = err.message || `Failed to ${action} ${service.displayName}`;
+      alert(`❌ ${error}`);
+    } finally {
+      isLoading = false;
     }
   }
-  
-  async function checkAllServices() {
-    isRefreshing = true;
-    lastRefreshTime = new Date();
-    
-    // Check all services in parallel
-    await Promise.all(services.map(service => checkServiceHealth(service)));
-    
-    // Trigger reactivity
-    services = [...services];
-    isRefreshing = false;
-  }
-  
-  async function restartService(service: ServiceStatus) {
-    if (confirm(`Restart ${service.displayName}?\n\nThis will trigger a health check and attempt to wake up the service if it's cold.`)) {
-      service.status = 'checking';
-      services = [...services];
-      
-      await checkServiceHealth(service);
-      services = [...services];
-      
-      alert(`✅ ${service.displayName} health check completed.\nStatus: ${service.status}\nResponse time: ${service.responseTime}ms`);
-    }
-  }
-  
-  function toggleAutoRefresh() {
-    autoRefresh = !autoRefresh;
-    
-    if (autoRefresh) {
-      // Refresh every 30 seconds
-      refreshInterval = setInterval(() => {
-        checkAllServices();
-      }, 30000);
-    } else {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-      }
-    }
-  }
-  
-  function getStatusColor(status: ServiceStatus['status']): string {
-    switch (status) {
-      case 'online': return '#10b981';
-      case 'degraded': return '#f59e0b';
-      case 'offline': return '#ef4444';
-      case 'checking': return '#6b7280';
-      default: return '#6b7280';
-    }
-  }
-  
-  function getStatusIcon(status: ServiceStatus['status']): string {
-    switch (status) {
-      case 'online': return '✅';
-      case 'degraded': return '⚠️';
-      case 'offline': return '❌';
-      case 'checking': return '🔄';
-      default: return '❓';
-    }
-  }
-  
-  function formatResponseTime(ms: number | null): string {
-    if (ms === null) return 'N/A';
-    if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(2)}s`;
-  }
-  
-  function formatLastCheck(date: Date | null): string {
-    if (!date) return 'Never';
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-  }
-  
-  $: overallHealth = services.length > 0 
-    ? services.filter(s => s.status === 'online').length / services.length * 100
-    : 0;
-  
-  $: onlineCount = services.filter(s => s.status === 'online').length;
-  $: degradedCount = services.filter(s => s.status === 'degraded').length;
-  $: offlineCount = services.filter(s => s.status === 'offline').length;
 </script>
 
 <svelte:head>
-  <title>Service Status - ACS Administration</title>
-  <meta name="description" content="GenieACS service monitoring and control" />
+  <title>Service Management - ACS Administration</title>
 </svelte:head>
 
 <div class="services-page">
-  <MainMenu />
-  
   <div class="page-header">
-    <div class="header-content">
-      <div class="header-top">
-        <a href="/modules/acs-cpe-management/admin" class="back-button">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to Admin
-        </a>
-      </div>
-      <h1 class="page-title">
-        <span class="page-icon">🔧</span>
-        Service Status & Monitoring
-      </h1>
-      <p class="page-description">
-        Monitor and manage all GenieACS services and Firebase Functions
-      </p>
+    <div>
+      <h2>Service Management</h2>
+      <p class="description">Monitor and control backend services</p>
     </div>
+    <button class="btn-refresh" on:click={checkAllServices} disabled={isLoading}>
+      {isLoading ? '🔄 Checking...' : '🔄 Refresh Status'}
+    </button>
   </div>
-
-  <div class="content">
-    <!-- Overall Health Dashboard -->
-    <div class="health-dashboard">
-      <div class="health-card overall">
-        <div class="health-icon">💚</div>
-        <div class="health-content">
-          <div class="health-label">System Health</div>
-          <div class="health-value">{overallHealth.toFixed(0)}%</div>
-          <div class="health-progress">
-            <div class="health-progress-bar" style="width: {overallHealth}%"></div>
+  
+  {#if error}
+    <div class="error-banner">
+      <span>⚠️</span>
+      <span>{error}</span>
+    </div>
+  {/if}
+  
+  <div class="services-grid">
+    {#each services as service}
+      <div class="service-card" class:online={service.status === 'online'} class:offline={service.status === 'offline'}>
+        <div class="service-header">
+          <div class="service-info">
+            <h3>{service.displayName}</h3>
+            <span class="service-port">Port {service.port}</span>
+          </div>
+          <div class="service-status status-{service.status}">
+            {service.status === 'online' ? '🟢' : service.status === 'offline' ? '🔴' : '⚪'}
+            {service.status.toUpperCase()}
           </div>
         </div>
-      </div>
-      
-      <div class="health-card online">
-        <div class="health-icon">✅</div>
-        <div class="health-content">
-          <div class="health-label">Online</div>
-          <div class="health-value">{onlineCount}</div>
-          <div class="health-subtitle">{onlineCount} of {services.length} services</div>
-        </div>
-      </div>
-      
-      <div class="health-card degraded">
-        <div class="health-icon">⚠️</div>
-        <div class="health-content">
-          <div class="health-label">Degraded</div>
-          <div class="health-value">{degradedCount}</div>
-          <div class="health-subtitle">Slow response time</div>
-        </div>
-      </div>
-      
-      <div class="health-card offline">
-        <div class="health-icon">❌</div>
-        <div class="health-content">
-          <div class="health-label">Offline</div>
-          <div class="health-value">{offlineCount}</div>
-          <div class="health-subtitle">Not responding</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Control Panel -->
-    <div class="control-panel">
-      <div class="control-left">
-        {#if lastRefreshTime}
-          <span class="last-refresh">
-            Last refresh: {formatLastCheck(lastRefreshTime)}
-          </span>
-        {/if}
-      </div>
-      
-      <div class="control-right">
-        <label class="auto-refresh-toggle">
-          <input type="checkbox" bind:checked={autoRefresh} on:change={toggleAutoRefresh} />
-          <span>Auto-refresh (30s)</span>
-        </label>
         
-        <button class="btn btn-primary" on:click={checkAllServices} disabled={isRefreshing}>
-          {#if isRefreshing}
-            <span class="spinner"></span>
-            Checking...
-          {:else}
-            🔄 Refresh All
-          {/if}
-        </button>
-      </div>
-    </div>
-
-    <!-- Services List -->
-    <div class="services-list">
-      {#each services as service (service.name)}
-        <div class="service-card" style="border-left: 4px solid {getStatusColor(service.status)}">
-          <div class="service-header">
-            <div class="service-title-area">
-              <span class="service-icon">{service.icon}</span>
-              <div class="service-title-content">
-                <h3 class="service-title">{service.displayName}</h3>
-                <p class="service-description">{service.description}</p>
-              </div>
-            </div>
-            
-            <div class="service-status-badge" style="background: {getStatusColor(service.status)}20; color: {getStatusColor(service.status)}">
-              {getStatusIcon(service.status)} {service.status.toUpperCase()}
-            </div>
+        {#if service.lastChecked}
+          <div class="last-checked">
+            Last checked: {service.lastChecked.toLocaleTimeString()}
           </div>
-          
-          <div class="service-details">
-            <div class="service-detail">
-              <span class="detail-label">Endpoint:</span>
-              <span class="detail-value endpoint">{service.endpoint}</span>
-            </div>
-            
-            <div class="service-metrics">
-              <div class="metric">
-                <span class="metric-label">Response Time</span>
-                <span class="metric-value" class:slow={service.responseTime && service.responseTime > 3000}>
-                  {formatResponseTime(service.responseTime)}
-                </span>
-              </div>
-              
-              <div class="metric">
-                <span class="metric-label">Last Check</span>
-                <span class="metric-value">{formatLastCheck(service.lastCheck)}</span>
-              </div>
-            </div>
-            
-            {#if service.error}
-              <div class="service-error">
-                <span class="error-icon">⚠️</span>
-                <span class="error-text">{service.error}</span>
-              </div>
-            {/if}
-          </div>
-          
+        {/if}
+        
+        {#if service.canRestart}
           <div class="service-actions">
             <button 
-              class="btn btn-sm btn-secondary" 
-              on:click={() => checkServiceHealth(service)}
-              disabled={service.status === 'checking'}
-            >
-              {#if service.status === 'checking'}
-                <span class="spinner-sm"></span>
-              {:else}
-                🔍
-              {/if}
-              Check Health
-            </button>
-            
-            <button 
-              class="btn btn-sm btn-primary" 
-              on:click={() => restartService(service)}
-              disabled={service.status === 'checking'}
+              class="btn-action btn-restart" 
+              on:click={() => handleServiceAction(service, 'restart')}
+              disabled={isLoading}
             >
               🔄 Restart
             </button>
+            {#if service.status === 'online'}
+              <button 
+                class="btn-action btn-stop" 
+                on:click={() => handleServiceAction(service, 'stop')}
+                disabled={isLoading}
+              >
+                ⏹️ Stop
+              </button>
+            {:else if service.status === 'offline'}
+              <button 
+                class="btn-action btn-start" 
+                on:click={() => handleServiceAction(service, 'start')}
+                disabled={isLoading}
+              >
+                ▶️ Start
+              </button>
+            {/if}
           </div>
-        </div>
-      {/each}
-    </div>
-
-    <!-- Information Panel -->
-    <div class="info-panel">
-      <h3>📋 Service Information</h3>
-      <div class="info-content">
-        <p><strong>About Service Monitoring:</strong></p>
-        <ul>
-          <li>All services are Firebase Cloud Functions deployed in us-central1</li>
-          <li>Health checks ping each endpoint to verify availability</li>
-          <li>Response times over 5 seconds are considered degraded</li>
-          <li>Cold starts may cause slower initial responses</li>
-          <li>"Restart" triggers a health check to wake up cold functions</li>
-        </ul>
-        
-        <p><strong>Service Roles:</strong></p>
-        <ul>
-          <li><strong>CWMP:</strong> Handles TR-069 device communication</li>
-          <li><strong>NBI:</strong> Provides REST API for device management</li>
-          <li><strong>FS:</strong> Serves firmware and configuration files</li>
-          <li><strong>Sync:</strong> Synchronizes devices from MongoDB to Firestore</li>
-          <li><strong>Get Devices:</strong> Retrieves device data for UI display</li>
-        </ul>
+        {:else}
+          <div class="service-note">
+            <small>⚠️ Service management handled externally</small>
+          </div>
+        {/if}
       </div>
+    {/each}
+  </div>
+  
+  <div class="info-box">
+    <h4>ℹ️ Service Information</h4>
+    <ul>
+      <li><strong>GenieACS NBI:</strong> Northbound Interface for device management API</li>
+      <li><strong>GenieACS CWMP:</strong> TR-069 Auto Configuration Server</li>
+      <li><strong>GenieACS FS:</strong> File server for firmware and configurations</li>
+      <li><strong>GenieACS UI:</strong> Web-based management interface</li>
+      <li><strong>HSS API:</strong> Home Subscriber Server REST API</li>
+      <li><strong>MongoDB:</strong> Database for GenieACS and HSS data</li>
+    </ul>
+    
+    <div class="warning-box">
+      <strong>⚠️ Important:</strong> Stopping critical services may affect network operations. 
+      Use caution when managing services during active operations.
     </div>
   </div>
 </div>
 
 <style>
   .services-page {
-    min-height: 100vh;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-size: 0.875rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    transition: all 0.2s;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-  }
-
-  .back-button:hover {
-    color: var(--accent-color);
-    background: var(--bg-tertiary);
-    border-color: var(--accent-color);
-  }
-
-  .back-button svg {
-    flex-shrink: 0;
-  }
-
-  .header-top {
-    margin-bottom: 1rem;
-  }
-
-  .page-header {
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1.5rem 2rem;
-  }
-
-  .page-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0 0 0.5rem 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .page-icon {
-    font-size: 1.25rem;
-  }
-
-  .page-description {
-    color: var(--text-secondary);
-    margin: 0;
-  }
-
-  .content {
+    padding: var(--spacing-xl);
     max-width: 1400px;
     margin: 0 auto;
-    padding: 2rem;
   }
-
-  /* Health Dashboard */
-  .health-dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-  }
-
-  .health-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .health-icon {
-    font-size: 2.5rem;
-    flex-shrink: 0;
-  }
-
-  .health-content {
-    flex: 1;
-  }
-
-  .health-label {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-bottom: 0.25rem;
-  }
-
-  .health-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .health-subtitle {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    margin-top: 0.25rem;
-  }
-
-  .health-progress {
-    width: 100%;
-    height: 8px;
-    background: var(--bg-tertiary);
-    border-radius: 4px;
-    margin-top: 0.75rem;
-    overflow: hidden;
-  }
-
-  .health-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #10b981, #22c55e);
-    transition: width 0.3s ease;
-  }
-
-  /* Control Panel */
-  .control-panel {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    padding: 1rem 1.5rem;
-    margin-bottom: 2rem;
+  
+  .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: var(--spacing-xl);
   }
-
-  .control-left {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
-  .control-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .auto-refresh-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-size: 0.875rem;
+  
+  .page-header h2 {
+    margin: 0;
     color: var(--text-primary);
+    font-size: 1.75rem;
+    font-weight: 600;
   }
-
-  .auto-refresh-toggle input {
+  
+  .description {
+    color: var(--text-secondary);
+    margin: var(--spacing-xs) 0 0 0;
+  }
+  
+  .btn-refresh {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-weight: 500;
     cursor: pointer;
+    transition: var(--transition);
   }
-
-  /* Services List */
-  .services-list {
+  
+  .btn-refresh:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  
+  .btn-refresh:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .error-banner {
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    color: var(--danger-color);
+  }
+  
+  .services-grid {
     display: grid;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
   }
-
+  
   .service-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    padding: 1.5rem;
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    transition: var(--transition);
   }
-
+  
+  .service-card.online {
+    border-color: var(--success-color);
+  }
+  
+  .service-card.offline {
+    border-color: var(--danger-color);
+  }
+  
   .service-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-md);
   }
-
-  .service-title-area {
-    display: flex;
-    gap: 1rem;
-    flex: 1;
-  }
-
-  .service-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
-  }
-
-  .service-title {
-    margin: 0 0 0.25rem 0;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .service-description {
+  
+  .service-info h3 {
     margin: 0;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
-  .service-status-badge {
-    padding: 0.375rem 0.75rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .service-details {
-    margin-bottom: 1rem;
-  }
-
-  .service-detail {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-  }
-
-  .detail-label {
-    font-weight: 500;
-    color: var(--text-secondary);
-  }
-
-  .detail-value {
     color: var(--text-primary);
-  }
-
-  .detail-value.endpoint {
-    font-family: monospace;
-    font-size: 0.8125rem;
-    word-break: break-all;
-  }
-
-  .service-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-    padding: 1rem;
-    background: var(--bg-tertiary);
-    border-radius: 0.375rem;
-  }
-
-  .metric {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .metric-label {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .metric-value {
     font-size: 1.125rem;
     font-weight: 600;
-    color: var(--text-primary);
   }
-
-  .metric-value.slow {
-    color: #f59e0b;
+  
+  .service-port {
+    display: inline-block;
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: monospace;
   }
-
-  .service-error {
+  
+  .service-status {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: #fee2e2;
-    border: 1px solid #ef4444;
-    border-radius: 0.375rem;
-    margin-top: 1rem;
-    font-size: 0.875rem;
-    color: #dc2626;
+    gap: var(--spacing-xs);
   }
-
+  
+  .status-online {
+    background: var(--success-light);
+    color: var(--success-color);
+  }
+  
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-color);
+  }
+  
+  .status-unknown {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+  }
+  
+  .last-checked {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-md);
+  }
+  
   .service-actions {
     display: flex;
-    gap: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
+    gap: var(--spacing-sm);
   }
-
-  /* Info Panel */
-  .info-panel {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-  }
-
-  .info-panel h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 1rem 0;
-    color: var(--text-primary);
-  }
-
-  .info-content {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
-  .info-content p {
-    margin: 0 0 0.5rem 0;
-  }
-
-  .info-content ul {
-    margin: 0.5rem 0 1rem 1.5rem;
-    padding: 0;
-  }
-
-  .info-content li {
-    margin-bottom: 0.375rem;
-  }
-
-  /* Buttons */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
+  
+  .btn-action {
+    flex: 1;
+    padding: var(--spacing-sm);
     border: none;
-    border-radius: 0.375rem;
+    border-radius: var(--border-radius-sm);
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: var(--transition);
   }
-
-  .btn-primary {
-    background: var(--accent-color);
+  
+  .btn-restart {
+    background: var(--primary-color);
     color: white;
   }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--accent-hover);
+  
+  .btn-restart:hover:not(:disabled) {
+    background: var(--primary-hover);
   }
-
-  .btn-secondary {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+  
+  .btn-stop {
+    background: var(--danger-color);
+    color: white;
   }
-
-  .btn-secondary:hover:not(:disabled) {
-    background: var(--bg-hover);
+  
+  .btn-stop:hover:not(:disabled) {
+    background: #dc2626;
   }
-
-  .btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
+  
+  .btn-start {
+    background: var(--success-color);
+    color: white;
   }
-
-  .btn:disabled {
+  
+  .btn-start:hover:not(:disabled) {
+    background: #059669;
+  }
+  
+  .btn-action:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-
-  .spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid transparent;
-    border-top: 2px solid currentColor;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  
+  .service-note {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
   }
-
-  .spinner-sm {
-    width: 12px;
-    height: 12px;
-    border: 2px solid transparent;
-    border-top: 2px solid currentColor;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  
+  .info-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
   }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  
+  .info-box h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
   }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    .content {
-      padding: 1rem;
-    }
-
-    .health-dashboard {
-      grid-template-columns: 1fr;
-    }
-
-    .control-panel {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: stretch;
-    }
-
-    .control-right {
-      justify-content: space-between;
-    }
-
-    .service-header {
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .service-actions {
-      flex-direction: column;
-    }
+  
+  .info-box ul {
+    margin: 0 0 var(--spacing-lg) 0;
+    padding-left: var(--spacing-lg);
+    color: var(--text-secondary);
+  }
+  
+  .info-box li {
+    margin-bottom: var(--spacing-sm);
+    line-height: 1.5;
+  }
+  
+  .warning-box {
+    background: var(--warning-light);
+    border: 1px solid var(--warning-color);
+    border-radius: var(--border-radius-sm);
+    padding: var(--spacing-md);
+    color: #92400e;
+  }
+  
+  .warning-box strong {
+    display: block;
+    margin-bottom: var(--spacing-xs);
   }
 </style>
-
