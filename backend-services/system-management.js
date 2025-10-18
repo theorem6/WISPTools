@@ -27,6 +27,7 @@ function requirePlatformAdmin(req, res, next) {
  */
 router.get('/services/status', requirePlatformAdmin, (req, res) => {
   try {
+    console.log('[Services Status] Fetching all services...');
     const services = [];
     
     // Get PM2 services
@@ -62,7 +63,7 @@ router.get('/services/status', requirePlatformAdmin, (req, res) => {
     
     systemdServices.forEach(svc => {
       try {
-        const status = execSync(`systemctl is-active ${svc.name}`, { encoding: 'utf8' }).trim();
+        const status = execSync(`systemctl is-active ${svc.name} 2>/dev/null || echo "inactive"`, { encoding: 'utf8' }).trim();
         const isActive = status === 'active';
         
         let uptime = 0;
@@ -71,28 +72,32 @@ router.get('/services/status', requirePlatformAdmin, (req, res) => {
         if (isActive) {
           try {
             // Get service uptime
-            const uptimeOutput = execSync(`systemctl show ${svc.name} --property=ActiveEnterTimestamp`, { encoding: 'utf8' });
+            const uptimeOutput = execSync(`systemctl show ${svc.name} --property=ActiveEnterTimestamp 2>/dev/null`, { encoding: 'utf8' });
             const match = uptimeOutput.match(/ActiveEnterTimestamp=(.+)/);
-            if (match) {
+            if (match && match[1] && match[1] !== 'n/a') {
               const startTime = new Date(match[1]).getTime();
-              uptime = Date.now() - startTime;
+              if (!isNaN(startTime)) {
+                uptime = Date.now() - startTime;
+              }
             }
             
             // Try to get memory usage
-            const memOutput = execSync(`systemctl show ${svc.name} --property=MemoryCurrent`, { encoding: 'utf8' });
+            const memOutput = execSync(`systemctl show ${svc.name} --property=MemoryCurrent 2>/dev/null`, { encoding: 'utf8' });
             const memMatch = memOutput.match(/MemoryCurrent=(\d+)/);
             if (memMatch) {
               memory = parseInt(memMatch[1]);
             }
           } catch (e) {
-            // Memory/uptime info not available
+            console.log(`[systemd] Could not get metrics for ${svc.name}:`, e.message);
           }
         }
+        
+        console.log(`[systemd] Service ${svc.name}: status=${status}, isActive=${isActive}`);
         
         services.push({
           name: svc.name,
           displayName: svc.displayName,
-          status: isActive ? 'online' : 'offline',
+          status: isActive ? 'online' : (status === 'inactive' ? 'offline' : 'unknown'),
           uptime: uptime,
           memory: memory,
           cpu: 0,
@@ -102,7 +107,8 @@ router.get('/services/status', requirePlatformAdmin, (req, res) => {
           type: 'systemd'
         });
       } catch (e) {
-        // Service doesn't exist or can't check status
+        console.error(`[systemd] Error checking ${svc.name}:`, e.message);
+        // Service doesn't exist or can't check status - still add it with unknown status
         services.push({
           name: svc.name,
           displayName: svc.displayName,
@@ -138,6 +144,7 @@ router.get('/services/status', requirePlatformAdmin, (req, res) => {
       });
     }
     
+    console.log(`[Services Status] Returning ${services.length} services`);
     res.json({ success: true, services });
   } catch (error) {
     console.error('[Services Status] Error:', error);
