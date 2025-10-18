@@ -25,7 +25,7 @@ export class CoverageMapService {
       throw new Error('No tenant selected');
     }
     
-    const response = await fetch(`${API_URL}/api/coverage-map/${endpoint}`, {
+    const response = await fetch(`${API_URL}/api/network/${endpoint}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -43,23 +43,23 @@ export class CoverageMapService {
     return await response.json();
   }
   
-  // ========== Tower Sites ==========
+  // ========== Unified Sites ==========
   
   async createTowerSite(tenantId: string, site: Omit<TowerSite, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<TowerSite> {
-    return await this.apiCall('tower-sites', {
+    return await this.apiCall('sites', {
       method: 'POST',
       body: JSON.stringify(site)
     });
   }
   
   async getTowerSites(tenantId: string): Promise<TowerSite[]> {
-    const sites = await this.apiCall('tower-sites');
+    const sites = await this.apiCall('sites');
     return sites.map((s: any) => ({ ...s, id: s._id }));
   }
   
   async getTowerSite(tenantId: string, siteId: string): Promise<TowerSite | null> {
     try {
-      const site = await this.apiCall(`tower-sites/${siteId}`);
+      const site = await this.apiCall(`sites/${siteId}`);
       return { ...site, id: site._id };
     } catch {
       return null;
@@ -67,14 +67,14 @@ export class CoverageMapService {
   }
   
   async updateTowerSite(tenantId: string, siteId: string, updates: Partial<TowerSite>): Promise<void> {
-    await this.apiCall(`tower-sites/${siteId}`, {
+    await this.apiCall(`sites/${siteId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
   }
   
   async deleteTowerSite(tenantId: string, siteId: string): Promise<void> {
-    await this.apiCall(`tower-sites/${siteId}`, {
+    await this.apiCall(`sites/${siteId}`, {
       method: 'DELETE'
     });
   }
@@ -116,29 +116,29 @@ export class CoverageMapService {
     });
   }
   
-  // ========== CPE Devices ==========
+  // ========== Unified CPE ==========
   
   async createCPE(tenantId: string, cpe: Omit<CPEDevice, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<CPEDevice> {
-    return await this.apiCall('cpe-devices', {
+    return await this.apiCall('cpe', {
       method: 'POST',
       body: JSON.stringify(cpe)
     });
   }
   
   async getCPEDevices(tenantId: string): Promise<CPEDevice[]> {
-    const devices = await this.apiCall('cpe-devices');
+    const devices = await this.apiCall('cpe');
     return devices.map((d: any) => ({ ...d, id: d._id }));
   }
   
   async updateCPE(tenantId: string, cpeId: string, updates: Partial<CPEDevice>): Promise<void> {
-    await this.apiCall(`cpe-devices/${cpeId}`, {
+    await this.apiCall(`cpe/${cpeId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
   }
   
   async deleteCPE(tenantId: string, cpeId: string): Promise<void> {
-    await this.apiCall(`cpe-devices/${cpeId}`, {
+    await this.apiCall(`cpe/${cpeId}`, {
       method: 'DELETE'
     });
   }
