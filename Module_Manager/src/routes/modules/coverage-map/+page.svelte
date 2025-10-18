@@ -10,6 +10,7 @@
   import AddSectorModal from './components/AddSectorModal.svelte';
   import AddCPEModal from './components/AddCPEModal.svelte';
   import AddBackhaulLinkModal from './components/AddBackhaulLinkModal.svelte';
+  import AddInventoryModal from './components/AddInventoryModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';  // Backend API via hssProxy
@@ -37,6 +38,7 @@
   let showAddSectorModal = false;
   let showAddCPEModal = false;
   let showAddBackhaulModal = false;
+  let showAddInventoryModal = false;
   let showContextMenu = false;
   let showTowerActionsMenu = false;
   let contextMenuX = 0;
@@ -45,6 +47,7 @@
   let contextMenuLon = 0;
   let selectedSiteForSector: TowerSite | null = null;
   let selectedSiteForBackhaul: TowerSite | null = null;
+  let selectedSiteForInventory: TowerSite | null = null;
   let selectedTowerForMenu: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
@@ -268,6 +271,10 @@
       case 'add-backhaul':
         selectedSiteForBackhaul = tower;
         showAddBackhaulModal = true;
+        break;
+      case 'add-inventory':
+        selectedSiteForInventory = tower;
+        showAddInventoryModal = true;
         break;
       case 'view-details':
         // TODO: Open details view
@@ -520,6 +527,13 @@
     bind:show={showAddBackhaulModal}
     fromSite={selectedSiteForBackhaul}
     sites={towers}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddInventoryModal 
+    bind:show={showAddInventoryModal}
+    site={selectedSiteForInventory}
     {tenantId}
     on:saved={handleModalSaved}
   />

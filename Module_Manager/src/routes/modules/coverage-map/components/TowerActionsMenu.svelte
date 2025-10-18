@@ -48,6 +48,11 @@
     <span>Add Backhaul Link</span>
   </button>
   
+  <button class="menu-item" on:click={() => handleAction('add-inventory')}>
+    <span class="menu-icon">📦</span>
+    <span>Add Equipment Inventory</span>
+  </button>
+  
   <div class="menu-divider"></div>
   
   <button class="menu-item" on:click={() => handleAction('view-details')}>
