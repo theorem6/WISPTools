@@ -1,85 +1,11 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
 
-  interface Module {
-    id: string;
-    name: string;
-    description: string;
-    icon: string;
-    color: string;
-    status: 'active' | 'coming-soon';
-    path: string;
-  }
-
-  const modules: Module[] = [
-    {
-      id: 'pci-resolution',
-      name: 'PCI Resolution & Network Optimization',
-      description: 'Physical Cell ID conflict detection, SON optimization, and network self-organization',
-      icon: '📊',
-      color: '#2563eb',
-      status: 'active',
-      path: '/modules/pci-resolution'
-    },
-    {
-      id: 'acs-cpe-management',
-      name: 'ACS CPE Management',
-      description: 'TR-069 device management and CPE monitoring with GPS mapping',
-      icon: '📡',
-      color: '#10b981',
-      status: 'active',
-      path: '/modules/acs-cpe-management'
-    },
-    {
-      id: 'cbrs-management',
-      name: 'CBRS Management',
-      description: 'Citizens Broadband Radio Service management with Google SAS and Federated Wireless API integration',
-      icon: '📡',
-      color: '#8b5cf6',
-      status: 'active',
-      path: '/modules/cbrs-management'
-    },
-    {
-      id: 'coverage-planning',
-      name: 'Coverage Planning',
-      description: 'RF coverage analysis and site planning tools',
-      icon: '📡',
-      color: '#7c3aed',
-      status: 'coming-soon',
-      path: '/modules/coverage-planning'
-    },
-    {
-      id: 'hss-management',
-      name: 'HSS & Subscriber Management',
-      description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
-      icon: '🔐',
-      color: '#f59e0b',
-      status: 'active',
-      path: '/modules/hss-management'
-    },
-    {
-      id: 'monitoring',
-      name: 'Monitoring & Alerts',
-      description: 'Real-time system monitoring, alerting, and audit logging across all modules',
-      icon: '🔍',
-      color: '#06b6d4',
-      status: 'active',
-      path: '/modules/monitoring'
-    },
-    {
-      id: 'backend-management',
-      name: 'Backend Management',
-      description: 'Platform admin only - Monitor and control backend services, system resources, and VM operations',
-      icon: '🖥️',
-      color: 'var(--danger-color)',
-      status: 'active',
-      path: '/modules/backend-management'
-    }
-  ];
-
-  function navigateToModule(path: string) {
-    goto(path);
-  }
+  // Redirect to dashboard - this page is deprecated
+  onMount(() => {
+    goto('/dashboard');
+  });
 </script>
 
 <svelte:head>

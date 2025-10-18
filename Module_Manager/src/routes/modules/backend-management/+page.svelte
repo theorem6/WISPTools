@@ -25,7 +25,7 @@
     
     if (!isPlatformAdmin) {
       alert('⛔ Access Denied: Platform Admin only');
-      goto('/modules');
+      goto('/dashboard');
       return;
     }
     
@@ -56,8 +56,8 @@
         <h1>🖥️ Backend Server Management</h1>
         <p class="subtitle">Monitor and control backend services on 136.112.111.167</p>
       </div>
-      <a href="/modules" class="btn-back">
-        ← Back to Modules
+      <a href="/dashboard" class="btn-back">
+        ← Back to Dashboard
       </a>
     </div>
     
