@@ -84,11 +84,21 @@
         event.stopPropagation();
       });
 
-      // Listen for right-click context menu
-      mapView.on('click', (event: any) => {
-        if (event.button === 2) { // Right click
-          event.stopPropagation();
-          handleRightClick(event);
+      // Disable default right-click context menu
+      mapView.container.addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault();
+      });
+      
+      // Listen for right-click
+      mapView.on('pointer-down', (event: any) => {
+        if (event.button === 2) { // Right mouse button
+          const point = mapView.toMap(event);
+          dispatch('map-right-click', {
+            latitude: point.latitude,
+            longitude: point.longitude,
+            screenX: event.x,
+            screenY: event.y
+          });
         }
       });
 
@@ -384,6 +394,7 @@
 
   function createTowerPopupContent(feature: any): string {
     const attrs = feature.graphic.attributes;
+    const isReadOnly = attrs.modules?.pci || attrs.modules?.cbrs;
     return `
       <div class="popup-content">
         <p><strong>Type:</strong> ${attrs.type}</p>
@@ -391,13 +402,15 @@
         ${attrs.fccId ? `<p><strong>FCC ID:</strong> ${attrs.fccId}</p>` : ''}
         ${attrs.towerOwner ? `<p><strong>Owner:</strong> ${attrs.towerOwner}</p>` : ''}
         ${attrs.gateCode ? `<p><strong>Gate Code:</strong> ${attrs.gateCode}</p>` : ''}
-        <button onclick="window.dispatchEvent(new CustomEvent('edit-tower', {detail: '${attrs.id}'}))">Edit</button>
+        ${isReadOnly ? '<p style="color: #f59e0b;">🔒 Read-only (managed by other module)</p>' : ''}
       </div>
     `;
   }
 
   function createSectorPopupContent(feature: any): string {
     const attrs = feature.graphic.attributes;
+    const isReadOnly = attrs.modules?.pci || attrs.modules?.cbrs;
+    const managedBy = attrs.modules?.pci ? 'PCI Module' : attrs.modules?.cbrs ? 'CBRS Module' : null;
     return `
       <div class="popup-content">
         <p><strong>Technology:</strong> ${attrs.technology}</p>
@@ -406,13 +419,15 @@
         <p><strong>Beamwidth:</strong> ${attrs.beamwidth}°</p>
         <p><strong>Status:</strong> ${attrs.status}</p>
         ${attrs.antennaModel ? `<p><strong>Antenna:</strong> ${attrs.antennaModel}</p>` : ''}
-        <button onclick="window.dispatchEvent(new CustomEvent('edit-sector', {detail: '${attrs.id}'}))">Edit</button>
+        ${isReadOnly ? `<p style="color: #f59e0b;">🔒 Read-only (${managedBy})</p>` : ''}
       </div>
     `;
   }
 
   function createCPEPopupContent(feature: any): string {
     const attrs = feature.graphic.attributes;
+    const isReadOnly = attrs.modules?.acs || attrs.modules?.hss;
+    const managedBy = attrs.modules?.acs ? 'ACS Module' : attrs.modules?.hss ? 'HSS Module' : null;
     return `
       <div class="popup-content">
         <p><strong>Manufacturer:</strong> ${attrs.manufacturer}</p>
@@ -421,7 +436,7 @@
         <p><strong>Status:</strong> ${attrs.status}</p>
         ${attrs.subscriberName ? `<p><strong>Subscriber:</strong> ${attrs.subscriberName}</p>` : ''}
         ${attrs.azimuth ? `<p><strong>Pointing:</strong> ${attrs.azimuth}°</p>` : ''}
-        <button onclick="window.dispatchEvent(new CustomEvent('edit-cpe', {detail: '${attrs.id}'}))">Edit</button>
+        ${isReadOnly ? `<p style="color: #f59e0b;">🔒 Read-only (${managedBy})</p>` : ''}
       </div>
     `;
   }

@@ -6,6 +6,10 @@
   import TenantGuard from '$lib/components/TenantGuard.svelte';
   import CoverageMapView from './components/CoverageMapView.svelte';
   import FilterPanel from './components/FilterPanel.svelte';
+  import AddSiteModal from './components/AddSiteModal.svelte';
+  import AddSectorModal from './components/AddSectorModal.svelte';
+  import AddCPEModal from './components/AddCPEModal.svelte';
+  import MapContextMenu from './components/MapContextMenu.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';  // Backend API via hssProxy
   import { reportGenerator } from './lib/reportGenerator';
   import type { 
@@ -24,8 +28,18 @@
   let error = '';
   let success = '';
   let showFilters = true;
-  let showAddMenu = false;
   let currentBasemap = 'streets-navigation-vector';
+  
+  // Modals
+  let showAddSiteModal = false;
+  let showAddSectorModal = false;
+  let showAddCPEModal = false;
+  let showContextMenu = false;
+  let contextMenuX = 0;
+  let contextMenuY = 0;
+  let contextMenuLat = 0;
+  let contextMenuLon = 0;
+  let selectedSiteForSector: TowerSite | null = null;
   
   // Filters
   let filters: CoverageMapFilters = {
@@ -160,15 +174,74 @@
   function handleMapRightClick(event: CustomEvent) {
     const { latitude, longitude, screenX, screenY } = event.detail;
     console.log('Right-click at:', latitude, longitude);
-    // Show context menu for adding equipment at this location
-    showAddMenu = true;
-    // TODO: Implement context menu positioning
+    
+    // Show context menu
+    showContextMenu = true;
+    contextMenuX = screenX;
+    contextMenuY = screenY;
+    contextMenuLat = latitude;
+    contextMenuLon = longitude;
+  }
+  
+  function handleContextMenuAction(event: CustomEvent) {
+    const { action, latitude, longitude } = event.detail;
+    
+    switch (action) {
+      case 'add-site':
+        showAddSiteModal = true;
+        contextMenuLat = latitude;
+        contextMenuLon = longitude;
+        break;
+      case 'add-cpe':
+        showAddCPEModal = true;
+        contextMenuLat = latitude;
+        contextMenuLon = longitude;
+        break;
+      case 'copy-coords':
+        navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        success = 'Coordinates copied to clipboard';
+        setTimeout(() => success = '', 3000);
+        break;
+    }
+    
+    showContextMenu = false;
   }
   
   function handleAssetClick(event: CustomEvent) {
     const { type, id, data } = event.detail;
     console.log(`Clicked ${type}:`, id, data);
-    // TODO: Open edit modal for the asset
+    
+    // Check if this is a read-only item from ACS or CBRS
+    if (data.modules?.acs || data.modules?.cbrs) {
+      success = `This ${type} is managed by the ${data.modules.acs ? 'ACS' : 'CBRS'} module (read-only)`;
+      setTimeout(() => success = '', 5000);
+      return;
+    }
+    
+    // TODO: Open edit modal for Coverage Map managed assets
+  }
+  
+  function handleAddSite() {
+    contextMenuLat = null;
+    contextMenuLon = null;
+    showAddSiteModal = true;
+  }
+  
+  function handleAddSector(site: TowerSite | null = null) {
+    selectedSiteForSector = site;
+    showAddSectorModal = true;
+  }
+  
+  function handleAddCPE() {
+    contextMenuLat = null;
+    contextMenuLon = null;
+    showAddCPEModal = true;
+  }
+  
+  async function handleModalSaved() {
+    success = 'Equipment added successfully';
+    setTimeout(() => success = '', 3000);
+    await loadAllData();
   }
 </script>
 
@@ -215,13 +288,31 @@
         </button>
       </div>
       
+      <!-- Add Equipment Actions -->
+      <div class="dropdown">
+        <button class="btn-primary">
+          ➕ Add Equipment
+        </button>
+        <div class="dropdown-content">
+          <button on:click={handleAddSite}>
+            📡 Add Tower Site
+          </button>
+          <button on:click={() => handleAddSector(null)}>
+            📶 Add Sector
+          </button>
+          <button on:click={handleAddCPE}>
+            📱 Add CPE Device
+          </button>
+        </div>
+      </div>
+      
       <!-- Actions -->
       <button class="btn-secondary" on:click={() => showFilters = !showFilters}>
         {showFilters ? '✕' : '🔍'} Filters
       </button>
       
       <div class="dropdown">
-        <button class="btn-primary">
+        <button class="btn-secondary">
           📥 Import
         </button>
         <div class="dropdown-content">
@@ -231,7 +322,7 @@
       </div>
       
       <div class="dropdown">
-        <button class="btn-primary">
+        <button class="btn-secondary">
           📊 Export Report
         </button>
         <div class="dropdown-content">
@@ -324,6 +415,42 @@
       </main>
     </div>
   {/if}
+  
+  <!-- Modals -->
+  <AddSiteModal 
+    bind:show={showAddSiteModal}
+    initialLatitude={contextMenuLat}
+    initialLongitude={contextMenuLon}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddSectorModal 
+    bind:show={showAddSectorModal}
+    {sites}
+    selectedSite={selectedSiteForSector}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddCPEModal 
+    bind:show={showAddCPEModal}
+    {sites}
+    initialLatitude={contextMenuLat}
+    initialLongitude={contextMenuLon}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <!-- Context Menu -->
+  <MapContextMenu 
+    bind:show={showContextMenu}
+    x={contextMenuX}
+    y={contextMenuY}
+    latitude={contextMenuLat}
+    longitude={contextMenuLon}
+    on:action={handleContextMenuAction}
+  />
 </div>
 </TenantGuard>
 
