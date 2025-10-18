@@ -1,0 +1,160 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import MainMenu from '../../components/MainMenu.svelte';
+  
+  let isLoading = false;
+  
+  onMount(async () => {
+    console.log('Virtual Parameters page loaded');
+  });
+</script>
+
+<svelte:head>
+  <title>Virtual Parameters - ACS Administration</title>
+  <meta name="description" content="Custom parameter definitions for device management" />
+</svelte:head>
+
+<div class="virtual-parameters-page">
+  <MainMenu />
+  
+  <div class="page-header">
+    <div class="header-content">
+      <div class="header-top">
+        <a href="/modules/acs-cpe-management/admin" class="back-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Admin
+        </a>
+      </div>
+      <h1 class="page-title">
+        <span class="page-icon">🔧</span>
+        Virtual Parameters
+      </h1>
+      <p class="page-description">
+        Custom parameter definitions beyond standard TR-069
+      </p>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="placeholder">
+      <div class="placeholder-icon">🔧</div>
+      <h2>Virtual Parameters Management</h2>
+      <p>This section will contain custom parameter definitions, computed values, and dynamic parameter generation.</p>
+      <div class="features">
+        <div class="feature">✨ Custom parameter definitions</div>
+        <div class="feature">🧮 Computed values from device data</div>
+        <div class="feature">⚡ Dynamic parameter generation</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .virtual-parameters-page {
+    min-height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .back-button:hover {
+    color: var(--accent-color);
+    background: var(--bg-tertiary);
+    border-color: var(--accent-color);
+  }
+
+  .back-button svg {
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    margin-bottom: 1rem;
+  }
+
+  .page-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 2rem;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .page-icon {
+    font-size: 1.25rem;
+  }
+
+  .page-description {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .placeholder {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+  }
+
+  .placeholder-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .placeholder h2 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+  }
+
+  .placeholder p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .feature {
+    background: var(--bg-primary);
+    padding: 1rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+  }
+</style>
