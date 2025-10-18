@@ -141,12 +141,12 @@
       if (filters.showTowers) {
         towers.forEach(tower => {
           const symbol = new SimpleMarkerSymbol({
-            style: tower.type === 'tower' ? 'triangle' : 'square',
+            style: 'circle',
             color: getTowerColor(tower.type),
-            size: '24px',
+            size: '20px',
             outline: {
               color: 'white',
-              width: 2
+              width: 3
             }
           });
 
@@ -301,10 +301,24 @@
 
       // Fit map to show all graphics
       if (graphicsLayer.graphics.length > 0) {
-        await mapView.goTo({
-          target: graphicsLayer.graphics,
-          padding: 50
-        });
+        try {
+          await mapView.when(); // Ensure view is fully loaded
+          await mapView.goTo({
+            target: graphicsLayer.graphics,
+            padding: 50
+          }).catch(err => {
+            console.warn('Could not fit map to graphics:', err);
+            // Fallback: just center on first graphic
+            if (graphicsLayer.graphics.length > 0) {
+              const firstGraphic = graphicsLayer.graphics.getItemAt(0);
+              if (firstGraphic && firstGraphic.geometry) {
+                mapView.center = firstGraphic.geometry;
+              }
+            }
+          });
+        } catch (err) {
+          console.warn('Map animation error:', err);
+        }
       }
 
       console.log(`Rendered ${graphicsLayer.graphics.length} assets on map`);
