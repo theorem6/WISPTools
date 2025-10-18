@@ -57,13 +57,13 @@
       path: '/modules/cbrs-management'
     },
     {
-      id: 'coverage-planning',
-      name: 'Coverage Planning',
-      description: 'RF coverage analysis and site planning tools',
-      icon: '📡',
+      id: 'coverage-map',
+      name: 'Coverage Map',
+      description: 'Comprehensive network asset mapping with towers, sectors, CPE, and equipment inventory management',
+      icon: '🗺️',
       color: '#7c3aed',
-      status: 'coming-soon',
-      path: '/modules/coverage-planning'
+      status: 'active',
+      path: '/modules/coverage-map'
     },
     {
       id: 'hss-management',
