@@ -15,16 +15,16 @@ export {
   saveCBRSDevice,
   deleteCBRSDevice,
   logCBRSEvent
-} from './device-management';
+} from './device-management.js';
 
 export {
   proxySASRequest,
   getSASUserIDs,
   getSASInstallations
-} from './sas-proxy';
+} from './sas-proxy.js';
 
 export {
   getCBRSAnalytics,
   cbrsWebhook
-} from './analytics';
+} from './analytics.js';
 
