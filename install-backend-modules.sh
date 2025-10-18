@@ -47,14 +47,16 @@ fi
 # Extract the new files to temp directory
 echo ""
 echo "📦 Extracting new files..."
-rm -rf /tmp/backend-update
-mkdir -p /tmp/backend-update
-cd /tmp/backend-update
-unzip -q /home/david/backend-update.zip
+sudo rm -rf /tmp/backend-update
+sudo mkdir -p /tmp/backend-update
+unzip -q /home/david/backend-update.zip -d /tmp/backend-update
 
 # Copy files to /opt/hss-api/
 echo ""
 echo "📝 Installing new files to /opt/hss-api/..."
+
+# Change to temp directory
+cd /tmp/backend-update
 
 # Copy main API file
 if [ -f distributed-epc-api.js ]; then
@@ -88,6 +90,9 @@ if [ -d deployment-files ]; then
     sudo cp -r deployment-files/* /opt/hss-api/deployment-files/
     echo "   ✅ Installed deployment-files/ (2 files)"
 fi
+
+# Return to safe directory before PM2 operations
+cd /opt/hss-api
 
 # Fix permissions
 echo ""
