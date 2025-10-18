@@ -1,63 +1,14 @@
 <script lang="ts">
   import { page } from '$app/stores';
   
-  // Admin menu items based on GenieACS structure
+  // Admin menu items - Only service management (backend handles the rest)
   const adminMenuItems = [
     {
-      id: 'database',
-      name: 'Database',
-      icon: '🗄️',
-      description: 'Initialize and check MongoDB status',
-      path: '/modules/acs-cpe-management/admin/database'
-    },
-    {
       id: 'services',
-      name: 'Service Status',
+      name: 'Service Management',
       icon: '🔧',
-      description: 'Monitor and manage all services',
+      description: 'Monitor and control backend services (GenieACS, HSS, MongoDB)',
       path: '/modules/acs-cpe-management/admin/services'
-    },
-    {
-      id: 'config',
-      name: 'Configuration',
-      icon: '🔨',
-      description: 'System configuration settings',
-      path: '/modules/acs-cpe-management/admin/config'
-    },
-    {
-      id: 'presets',
-      name: 'Presets',
-      icon: '⚙️',
-      description: 'Device provisioning presets and templates',
-      path: '/modules/acs-cpe-management/admin/presets'
-    },
-    {
-      id: 'provisions',
-      name: 'Provisions',
-      icon: '📜',
-      description: 'JavaScript provisioning scripts',
-      path: '/modules/acs-cpe-management/admin/provisions'
-    },
-    {
-      id: 'virtualParameters',
-      name: 'Virtual Parameters',
-      icon: '🧮',
-      description: 'Custom parameter definitions',
-      path: '/modules/acs-cpe-management/admin/virtual-parameters'
-    },
-    {
-      id: 'files',
-      name: 'Files',
-      icon: '📁',
-      description: 'Firmware and configuration files',
-      path: '/modules/acs-cpe-management/admin/files'
-    },
-    {
-      id: 'users',
-      name: 'Users',
-      icon: '👥',
-      description: 'User management and permissions',
-      path: '/modules/acs-cpe-management/admin/users'
     }
   ];
 
