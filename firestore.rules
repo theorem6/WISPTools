@@ -71,6 +71,23 @@ service cloud.firestore {
       match /networks/{networkId} {
         allow read, write: if isTenantMember(tenantId);
       }
+
+      // Coverage Map collections
+      match /towerSites/{siteId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /sectors/{sectorId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /cpeDevices/{cpeId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /networkEquipment/{equipmentId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
     }
 
     // User-Tenant Associations
