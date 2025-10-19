@@ -4,7 +4,6 @@
 const express = require('express');
 const router = express.Router();
 const { InventoryItem } = require('./inventory-schema');
-const { requireModule, checkLimit } = require('./module-auth');
 
 // ============================================================================
 // MIDDLEWARE
@@ -21,9 +20,6 @@ const requireTenant = (req, res, next) => {
 };
 
 router.use(requireTenant);
-
-// Check if inventory module is enabled for this tenant
-router.use(requireModule('inventory'));
 
 // ============================================================================
 // CRUD OPERATIONS
