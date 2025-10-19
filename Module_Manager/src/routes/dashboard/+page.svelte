@@ -6,6 +6,7 @@
   import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
+  import { availableModules, modulePermissions } from '$lib/stores/modulePermissions';
 
   interface Module {
     id: string;
@@ -112,6 +113,37 @@
   // Subscribe to tenant store
   $: if ($currentTenant) {
     tenantName = $currentTenant.displayName;
+  }
+  
+  // Filter modules based on permissions and admin status
+  $: displayedModules = modules.filter(module => {
+    // Admin-only modules
+    if (module.adminOnly) {
+      return isAdmin;
+    }
+    
+    // Check module permissions
+    const permissionKey = getPermissionKey(module.id);
+    if (permissionKey && $modulePermissions) {
+      return $modulePermissions[permissionKey];
+    }
+    
+    // Default: show module
+    return true;
+  });
+  
+  function getPermissionKey(moduleId: string): keyof typeof $modulePermissions | null {
+    const map: Record<string, string> = {
+      'pci-resolution': 'pciResolution',
+      'acs-cpe-management': 'acsManagement',
+      'cbrs-management': 'cbrsManagement',
+      'coverage-map': 'coverageMap',
+      'inventory': 'inventory',
+      'hss-management': 'hssManagement',
+      'monitoring': 'monitoring',
+      'backend-management': 'backendManagement'
+    };
+    return map[moduleId] as any || null;
   }
 
   onMount(async () => {
