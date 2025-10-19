@@ -1,7 +1,7 @@
 // Tenant Module Configuration
 // Controls which modules are enabled for each tenant
 
-import { firestore } from './firebase-admin';
+import { db } from './firebaseInit';
 
 export interface TenantModuleConfig {
   // Module Access Control
@@ -198,7 +198,7 @@ export const SUBSCRIPTION_TIERS = {
  */
 export async function getTenantConfig(tenantId: string): Promise<TenantModuleConfig | null> {
   try {
-    const doc = await firestore.collection('tenants').doc(tenantId).get();
+    const doc = await db.collection('tenants').doc(tenantId).get();
     
     if (!doc.exists) {
       return null;
@@ -221,7 +221,7 @@ export async function updateTenantConfig(
   updatedBy?: string
 ): Promise<void> {
   try {
-    await firestore.collection('tenants').doc(tenantId).update({
+    await db.collection('tenants').doc(tenantId).update({
       config: {
         ...config,
         updatedAt: new Date(),
@@ -252,7 +252,7 @@ export async function initializeTenantConfig(
       updatedAt: new Date()
     };
     
-    await firestore.collection('tenants').doc(tenantId).set({
+    await db.collection('tenants').doc(tenantId).set({
       config
     }, { merge: true });
   } catch (error) {
