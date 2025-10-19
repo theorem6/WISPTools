@@ -69,19 +69,30 @@
   $: isWireless = formData.backhaulType.includes('wireless');
   $: isFiber = formData.backhaulType === 'fiber';
   
-  // Auto-calculate pointing angles when sites are selected
-  $: if (formData.fromSiteId && formData.toSiteId && isWireless) {
-    const siteA = sites.find(s => s.id === formData.fromSiteId);
-    const siteB = sites.find(s => s.id === formData.toSiteId);
-    if (siteA && siteB) {
-      formData.siteA_azimuth = calculateAzimuth(
-        siteA.location.latitude, siteA.location.longitude,
-        siteB.location.latitude, siteB.location.longitude
-      );
-      formData.siteB_azimuth = calculateAzimuth(
-        siteB.location.latitude, siteB.location.longitude,
-        siteA.location.latitude, siteA.location.longitude
-      );
+  // Track when we need to recalculate azimuths
+  let lastFromSiteId = '';
+  let lastToSiteId = '';
+  
+  // Auto-calculate pointing angles when sites change
+  $: {
+    if (formData.fromSiteId && formData.toSiteId && isWireless) {
+      // Only recalculate if sites actually changed
+      if (formData.fromSiteId !== lastFromSiteId || formData.toSiteId !== lastToSiteId) {
+        const siteA = sites.find(s => s.id === formData.fromSiteId);
+        const siteB = sites.find(s => s.id === formData.toSiteId);
+        if (siteA && siteB) {
+          formData.siteA_azimuth = calculateAzimuth(
+            siteA.location.latitude, siteA.location.longitude,
+            siteB.location.latitude, siteB.location.longitude
+          );
+          formData.siteB_azimuth = calculateAzimuth(
+            siteB.location.latitude, siteB.location.longitude,
+            siteA.location.latitude, siteA.location.longitude
+          );
+          lastFromSiteId = formData.fromSiteId;
+          lastToSiteId = formData.toSiteId;
+        }
+      }
     }
   }
   
