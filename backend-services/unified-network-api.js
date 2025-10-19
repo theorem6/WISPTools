@@ -5,6 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('./unified-network-schema');
+const { requireModule } = require('./module-auth');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -17,6 +18,9 @@ const requireTenant = (req, res, next) => {
 };
 
 router.use(requireTenant);
+
+// Check if coverageMap module is enabled
+router.use(requireModule('coverageMap'));
 
 // ========== UNIFIED SITES ==========
 
