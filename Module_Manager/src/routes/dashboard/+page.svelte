@@ -66,6 +66,15 @@
       path: '/modules/coverage-map'
     },
     {
+      id: 'inventory',
+      name: 'Inventory Management',
+      description: 'Centralized asset tracking with location management, maintenance history, and warranty tracking',
+      icon: '📦',
+      color: '#10b981',
+      status: 'active',
+      path: '/modules/inventory'
+    },
+    {
       id: 'hss-management',
       name: 'HSS & Subscriber Management',
       description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
