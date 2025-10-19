@@ -264,8 +264,7 @@
     <div class="container">
       
       <div class="modules-grid">
-        {#each modules as module}
-          {#if !module.adminOnly || (module.adminOnly && isAdmin)}
+        {#each displayedModules as module}
             <div 
               class="module-card {module.status}"
               class:clickable={module.status === 'active'}
@@ -300,8 +299,16 @@
                 </div>
               {/if}
             </div>
-          {/if}
         {/each}
+        
+        {#if displayedModules.length === 0 && !isAdmin}
+          <div class="empty-modules">
+            <div class="empty-icon">📦</div>
+            <h3>No Modules Available</h3>
+            <p>Your subscription doesn't include any modules yet.</p>
+            <p class="help-text">Contact support to activate modules for your account.</p>
+          </div>
+        {/if}
       </div>
     </div>
   </section>
