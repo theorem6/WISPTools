@@ -293,6 +293,21 @@
       isSaving = false;
     }
   }
+  
+  function getLocationIcon(type: string): string {
+    const icons: Record<string, string> = {
+      tower: '📡',
+      rooftop: '🏢',
+      monopole: '📍',
+      warehouse: '🏭',
+      noc: '🖥️',
+      vehicle: '🚚',
+      rma: '🔧',
+      vendor: '🏪',
+      other: '📍'
+    };
+    return icons[type] || icons.other;
+  }
 </script>
 
 <TenantGuard>

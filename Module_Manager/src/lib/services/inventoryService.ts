@@ -1,9 +1,7 @@
 // Inventory Service - Frontend API interaction
 // Communicates with backend inventory API
 
-import { auth } from '$lib/firebase';
-
-const API_URL = import.meta.env.VITE_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
 export interface InventoryItem {
   _id?: string;
@@ -106,11 +104,12 @@ export interface InventoryStats {
 
 class InventoryService {
   private async getAuthToken(): Promise<string> {
-    const user = auth.currentUser;
-    if (!user) {
+    const { auth } = await import('$lib/firebase');
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
       throw new Error('Not authenticated');
     }
-    return await user.getIdToken();
+    return await currentUser.getIdToken();
   }
   
   private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
