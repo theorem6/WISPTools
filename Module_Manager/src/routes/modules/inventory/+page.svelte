@@ -5,6 +5,7 @@
   import TenantGuard from '$lib/components/TenantGuard.svelte';
   import { inventoryService, type InventoryItem, type InventoryFilters } from '$lib/services/inventoryService';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   
   // Data
   let items: InventoryItem[] = [];
@@ -84,6 +85,17 @@
   ];
   
   $: tenantId = $currentTenant?.id || '';
+  
+  // Check for URL parameters (e.g., from Coverage Map)
+  $: if (browser && $page.url.searchParams.has('siteId')) {
+    const siteId = $page.url.searchParams.get('siteId');
+    const siteName = $page.url.searchParams.get('siteName');
+    if (siteId) {
+      filters.locationId = siteId;
+      filters.locationType = 'tower';
+      success = `Showing equipment at: ${siteName || siteId}`;
+    }
+  }
   
   onMount(async () => {
     if (tenantId) {

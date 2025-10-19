@@ -53,6 +53,11 @@
     <span>Add Equipment Inventory</span>
   </button>
   
+  <button class="menu-item" on:click={() => handleAction('view-inventory')}>
+    <span class="menu-icon">📋</span>
+    <span>View All Equipment</span>
+  </button>
+  
   <div class="menu-divider"></div>
   
   <button class="menu-item" on:click={() => handleAction('view-details')}>

@@ -276,6 +276,10 @@
         selectedSiteForInventory = tower;
         showAddInventoryModal = true;
         break;
+      case 'view-inventory':
+        // Navigate to inventory module filtered by this site
+        goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+        break;
       case 'view-details':
         // TODO: Open details view
         success = `Viewing ${tower.name}`;
