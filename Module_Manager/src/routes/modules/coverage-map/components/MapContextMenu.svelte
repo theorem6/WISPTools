@@ -33,19 +33,44 @@
     </span>
   </div>
   
-  <button class="menu-item" on:click={() => handleAction('add-site')}>
-    <span class="menu-icon">📡</span>
-    <span>Add Tower Site Here</span>
-  </button>
+  <div class="menu-section">
+    <div class="section-label">Network Infrastructure</div>
+    <button class="menu-item" on:click={() => handleAction('add-site')}>
+      <span class="menu-icon">📡</span>
+      <span>Add Tower Site</span>
+    </button>
+    
+    <button class="menu-item" on:click={() => handleAction('add-noc')}>
+      <span class="menu-icon">🖥️</span>
+      <span>Add NOC</span>
+    </button>
+  </div>
   
-  <button class="menu-item" on:click={() => handleAction('add-noc')}>
-    <span class="menu-icon">🏢</span>
-    <span>Add NOC Site Here</span>
-  </button>
+  <div class="menu-divider"></div>
+  
+  <div class="menu-section">
+    <div class="section-label">Inventory Locations</div>
+    <button class="menu-item" on:click={() => handleAction('add-warehouse')}>
+      <span class="menu-icon">🏭</span>
+      <span>Add Warehouse</span>
+    </button>
+    
+    <button class="menu-item" on:click={() => handleAction('add-vehicle')}>
+      <span class="menu-icon">🚚</span>
+      <span>Add Service Vehicle</span>
+    </button>
+    
+    <button class="menu-item" on:click={() => handleAction('add-rma')}>
+      <span class="menu-icon">🔧</span>
+      <span>Add RMA Center</span>
+    </button>
+  </div>
+  
+  <div class="menu-divider"></div>
   
   <button class="menu-item" on:click={() => handleAction('add-cpe')}>
     <span class="menu-icon">📱</span>
-    <span>Add CPE Here</span>
+    <span>Add CPE Device</span>
   </button>
   
   <div class="menu-divider"></div>
@@ -106,7 +131,20 @@
   .menu-divider {
     height: 1px;
     background: var(--border-color);
-    margin: 0.25rem 0;
+    margin: 0.5rem 0;
+  }
+  
+  .menu-section {
+    padding: 0.5rem 0;
+  }
+  
+  .section-label {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 </style>
 

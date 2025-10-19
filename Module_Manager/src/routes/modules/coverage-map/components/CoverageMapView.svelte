@@ -502,14 +502,32 @@
   
   function getTowerColor(type: string): string {
     const colors: Record<string, string> = {
-      tower: '#3b82f6',
-      rooftop: '#8b5cf6',
-      monopole: '#06b6d4',
-      warehouse: '#f59e0b',
-      noc: '#ef4444',
-      other: '#6b7280'
+      tower: '#3b82f6',        // Blue
+      rooftop: '#8b5cf6',      // Purple
+      monopole: '#06b6d4',     // Cyan
+      warehouse: '#f59e0b',    // Orange
+      noc: '#ef4444',          // Red
+      vehicle: '#10b981',      // Green
+      rma: '#f97316',          // Dark Orange
+      vendor: '#6366f1',       // Indigo
+      other: '#6b7280'         // Gray
     };
     return colors[type] || colors.other;
+  }
+  
+  function getLocationIcon(type: string): string {
+    const icons: Record<string, string> = {
+      tower: '📡',
+      rooftop: '🏢',
+      monopole: '📍',
+      warehouse: '🏭',
+      noc: '🖥️',
+      vehicle: '🚚',
+      rma: '🔧',
+      vendor: '🏪',
+      other: '📍'
+    };
+    return icons[type] || icons.other;
   }
 
   function getBandColor(band: string): string {

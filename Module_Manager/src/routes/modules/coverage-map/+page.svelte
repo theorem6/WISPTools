@@ -202,19 +202,25 @@
   function handleContextMenuAction(event: CustomEvent) {
     const { action, latitude, longitude } = event.detail;
     
+    // Set site type based on action
+    const typeMap: Record<string, any> = {
+      'add-site': 'tower',
+      'add-noc': 'noc',
+      'add-warehouse': 'warehouse',
+      'add-vehicle': 'vehicle',
+      'add-rma': 'rma',
+      'add-vendor': 'vendor'
+    };
+    
+    if (typeMap[action]) {
+      initialSiteType = typeMap[action];
+      showAddSiteModal = true;
+      contextMenuLat = latitude;
+      contextMenuLon = longitude;
+      return;
+    }
+    
     switch (action) {
-      case 'add-site':
-        initialSiteType = 'tower';
-        showAddSiteModal = true;
-        contextMenuLat = latitude;
-        contextMenuLon = longitude;
-        break;
-      case 'add-noc':
-        initialSiteType = 'noc';
-        showAddSiteModal = true;
-        contextMenuLat = latitude;
-        contextMenuLon = longitude;
-        break;
       case 'add-cpe':
         showAddCPEModal = true;
         contextMenuLat = latitude;

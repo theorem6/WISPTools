@@ -3,11 +3,33 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/TenantGuard.svelte';
   import { inventoryService } from '$lib/services/inventoryService';
+  import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
+  import { onMount } from 'svelte';
   
   let isSaving = false;
+  let isLoading = true;
   let error = '';
+  let availableLocations: any[] = [];
   
   $: tenantId = $currentTenant?.id || '';
+  
+  onMount(async () => {
+    if (tenantId) {
+      await loadLocations();
+    }
+    isLoading = false;
+  });
+  
+  async function loadLocations() {
+    try {
+      // Load all sites from Coverage Map
+      const sites = await coverageMapService.getTowerSites(tenantId);
+      availableLocations = sites;
+    } catch (err) {
+      console.error('Error loading locations:', err);
+      error = 'Failed to load locations. Please add locations in Coverage Map first.';
+    }
+  }
   
   // Equipment categories (matching backend schema)
   const equipmentCategories = {
@@ -149,9 +171,11 @@
     serialNumber: '',
     
     // Location
+    locationSiteId: '',
     locationType: 'warehouse' as 'warehouse' | 'tower' | 'noc' | 'vehicle' | 'customer' | 'rma' | 'other',
-    warehouseName: '',
     warehouseSection: '',
+    rackLocation: '',
+    rackUnit: '',
     
     // Status
     status: 'available' as const,
@@ -182,6 +206,13 @@
   $: availableTypes = equipmentCategories[formData.category as keyof typeof equipmentCategories] || [];
   $: useCustomType = formData.equipmentType === 'Other/Custom';
   
+  $: selectedLocation = availableLocations.find(loc => loc.id === formData.locationSiteId);
+  $: filteredLocations = availableLocations.filter(loc => 
+    formData.locationType === 'customer' || formData.locationType === 'other' 
+      ? true 
+      : loc.type === formData.locationType
+  );
+  
   async function handleSave() {
     const finalType = useCustomType ? formData.customType : formData.equipmentType;
     
@@ -192,6 +223,11 @@
     
     if (!formData.serialNumber.trim()) {
       error = 'Serial number is required';
+      return;
+    }
+    
+    if (!formData.locationSiteId && formData.locationType !== 'customer' && formData.locationType !== 'other') {
+      error = 'Please select a location from the map, or add the location in Coverage Map first';
       return;
     }
     
@@ -209,9 +245,15 @@
         
         currentLocation: {
           type: formData.locationType,
+          siteId: formData.locationSiteId || undefined,
+          siteName: selectedLocation?.name || undefined,
           warehouse: formData.locationType === 'warehouse' ? {
-            name: formData.warehouseName,
+            name: selectedLocation?.name,
             section: formData.warehouseSection
+          } : undefined,
+          tower: (formData.locationType === 'tower' || formData.locationType === 'noc') ? {
+            rack: formData.rackLocation,
+            rackUnit: formData.rackUnit
           } : undefined
         },
         
@@ -340,7 +382,7 @@
       
       <!-- Location -->
       <div class="section">
-        <h3>📍 Location</h3>
+        <h3>📍 Location (from Coverage Map)</h3>
         <div class="form-grid">
           <div class="form-group">
             <label>Location Type *</label>
@@ -349,24 +391,58 @@
               <option value="tower">Tower Site</option>
               <option value="noc">NOC</option>
               <option value="vehicle">Service Vehicle</option>
+              <option value="rma">RMA/Repair Center</option>
               <option value="customer">Customer Premises</option>
-              <option value="rma">RMA/Repair</option>
               <option value="other">Other</option>
             </select>
           </div>
           
+          <div class="form-group">
+            <label>Select Location *</label>
+            <select bind:value={formData.locationSiteId} required>
+              <option value="">-- Select from map --</option>
+              {#each filteredLocations as location}
+                <option value={location.id}>
+                  {getLocationIcon(location.type)} {location.name} ({location.type})
+                </option>
+              {/each}
+            </select>
+            {#if filteredLocations.length === 0}
+              <p class="help-text warning">
+                ⚠️ No {formData.locationType} locations found. 
+                <button type="button" class="link-button" on:click={() => goto('/modules/coverage-map')}>
+                  Add in Coverage Map →
+                </button>
+              </p>
+            {:else}
+              <p class="help-text">
+                Selected location must exist on Coverage Map
+              </p>
+            {/if}
+          </div>
+        </div>
+        
+        <!-- Specific location details based on type -->
+        {#if formData.locationSiteId}
           {#if formData.locationType === 'warehouse'}
             <div class="form-group">
-              <label>Warehouse Name</label>
-              <input type="text" bind:value={formData.warehouseName} />
+              <label>Warehouse Section/Aisle</label>
+              <input type="text" bind:value={formData.warehouseSection} placeholder="A-5, Shelf 3, Bin 12" />
             </div>
-            
-            <div class="form-group">
-              <label>Section/Aisle</label>
-              <input type="text" bind:value={formData.warehouseSection} placeholder="A-5, Shelf 3" />
+          {:else if formData.locationType === 'tower' || formData.locationType === 'noc'}
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Rack/Cabinet</label>
+                <input type="text" bind:value={formData.rackLocation} placeholder="Rack A" />
+              </div>
+              
+              <div class="form-group">
+                <label>Rack Unit (RU)</label>
+                <input type="text" bind:value={formData.rackUnit} placeholder="10-15" />
+              </div>
             </div>
           {/if}
-        </div>
+        {/if}
         
         <div class="form-grid">
           <div class="form-group">
@@ -599,6 +675,32 @@
   
   .form-group textarea {
     resize: vertical;
+  }
+  
+  .help-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+  
+  .help-text.warning {
+    color: #f59e0b;
+    font-weight: 500;
+  }
+  
+  .link-button {
+    background: none;
+    border: none;
+    color: var(--brand-primary);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+    margin-left: 0.5rem;
+  }
+  
+  .link-button:hover {
+    color: var(--brand-primary-hover);
   }
   
   .form-actions {
