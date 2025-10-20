@@ -699,13 +699,6 @@
     });
   }
 
-  export async function changeBasemap(basemapId: string) {
-    if (map) {
-      currentBasemap = basemapId;
-      map.basemap = basemapId;
-    }
-  }
-
   // Reactive statement to re-render when data changes
   $: if (mapView && graphicsLayer) {
     renderAllAssets();
