@@ -11,6 +11,7 @@ export interface ModulePermissions {
   hssManagement: boolean;
   coverageMap: boolean;
   inventory: boolean;
+  workOrders: boolean;
   distributedEpc: boolean;
   monitoring: boolean;
   backendManagement: boolean;
@@ -24,6 +25,7 @@ const DEFAULT_PERMISSIONS: ModulePermissions = {
   hssManagement: true,
   coverageMap: true,
   inventory: true,
+  workOrders: true,
   distributedEpc: true,
   monitoring: true,
   backendManagement: false
@@ -53,6 +55,7 @@ export const modulePermissions = derived(
       hssManagement: enabledModules.hssManagement ?? true,
       coverageMap: enabledModules.coverageMap ?? true,
       inventory: enabledModules.inventory ?? true,
+      workOrders: enabledModules.workOrders ?? true,
       distributedEpc: enabledModules.distributedEpc ?? false,
       monitoring: enabledModules.monitoring ?? true,
       backendManagement: enabledModules.backendManagement ?? false
@@ -117,6 +120,15 @@ export const MODULE_DEFINITIONS = [
     icon: '📦',
     color: '#10b981',
     path: '/modules/inventory'
+  },
+  {
+    id: 'work-orders',
+    permissionKey: 'workOrders' as keyof ModulePermissions,
+    name: 'Work Orders & Tickets',
+    description: 'Field operations management, trouble tickets, installations, and SLA tracking',
+    icon: '📋',
+    color: '#f59e0b',
+    path: '/modules/work-orders'
   },
   {
     id: 'hss-management',
