@@ -78,34 +78,47 @@
     error = '';
     
     try {
-      const siteData = {
+      const siteData: any = {
         name: formData.name,
         type: formData.type,
         location: {
           latitude: formData.latitude,
-          longitude: formData.longitude,
-          address: formData.address || undefined,
-          city: formData.city || undefined,
-          state: formData.state || undefined,
-          zipCode: formData.zipCode || undefined
+          longitude: formData.longitude
         },
-        height: formData.height || undefined,
-        fccId: formData.fccId || undefined,
-        towerOwner: formData.towerOwner || undefined,
-        towerContact: formData.towerContactName ? {
-          name: formData.towerContactName,
-          phone: formData.towerContactPhone,
-          email: formData.towerContactEmail
-        } : undefined,
-        siteContact: formData.siteContactName ? {
-          name: formData.siteContactName,
-          phone: formData.siteContactPhone,
-          email: formData.siteContactEmail
-        } : undefined,
-        gateCode: formData.gateCode || undefined,
-        accessInstructions: formData.accessInstructions || undefined,
-        safetyNotes: formData.safetyNotes || undefined
+        tenantId
       };
+      
+      // Add optional location fields only if they have values
+      if (formData.address?.trim()) siteData.location.address = formData.address.trim();
+      if (formData.city?.trim()) siteData.location.city = formData.city.trim();
+      if (formData.state?.trim()) siteData.location.state = formData.state.trim();
+      if (formData.zipCode?.trim()) siteData.location.zipCode = formData.zipCode.trim();
+      
+      // Add tower-specific fields only if provided
+      if (formData.height) siteData.height = formData.height;
+      if (formData.fccId?.trim()) siteData.fccId = formData.fccId.trim();
+      if (formData.towerOwner?.trim()) siteData.towerOwner = formData.towerOwner.trim();
+      if (formData.gateCode?.trim()) siteData.gateCode = formData.gateCode.trim();
+      if (formData.accessInstructions?.trim()) siteData.accessInstructions = formData.accessInstructions.trim();
+      if (formData.safetyNotes?.trim()) siteData.safetyNotes = formData.safetyNotes.trim();
+      
+      // Add tower contact only if name is provided
+      if (formData.towerContactName?.trim()) {
+        siteData.towerContact = {
+          name: formData.towerContactName.trim(),
+          phone: formData.towerContactPhone?.trim() || '',
+          email: formData.towerContactEmail?.trim() || ''
+        };
+      }
+      
+      // Add site contact only if name is provided
+      if (formData.siteContactName?.trim()) {
+        siteData.siteContact = {
+          name: formData.siteContactName.trim(),
+          phone: formData.siteContactPhone?.trim() || '',
+          email: formData.siteContactEmail?.trim() || ''
+        };
+      }
       
       await coverageMapService.createTowerSite(tenantId, siteData);
       
