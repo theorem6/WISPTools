@@ -47,27 +47,16 @@
     try {
       console.log('Initializing Coverage Map with ArcGIS...');
       
-      // Import ArcGIS modules
+      // Import ArcGIS modules (same as working modules - no config needed)
       const [
         { default: Map },
         { default: MapView },
-        { default: GraphicsLayer },
-        { default: esriConfig }
+        { default: GraphicsLayer }
       ] = await Promise.all([
         import('@arcgis/core/Map.js'),
         import('@arcgis/core/views/MapView.js'),
-        import('@arcgis/core/layers/GraphicsLayer.js'),
-        import('@arcgis/core/config.js')
+        import('@arcgis/core/layers/GraphicsLayer.js')
       ]);
-
-      // Set API key if available (try both VITE_ and PUBLIC_ prefixes)
-      const apiKey = import.meta.env.VITE_ARCGIS_API_KEY || import.meta.env.PUBLIC_ARCGIS_API_KEY;
-      if (apiKey && esriConfig) {
-        esriConfig.apiKey = apiKey;
-        console.log('ArcGIS API key configured');
-      } else {
-        console.log('No ArcGIS API key - using default configuration');
-      }
 
       // Create graphics layers
       backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
