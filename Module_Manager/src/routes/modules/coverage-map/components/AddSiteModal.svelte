@@ -189,10 +189,12 @@
           </select>
           </div>
           
+          {#if formData.type !== 'noc' && formData.type !== 'warehouse' && formData.type !== 'vehicle' && formData.type !== 'rma'}
           <div class="form-group">
             <label>Height (feet)</label>
             <input type="number" bind:value={formData.height} placeholder="100" />
           </div>
+          {/if}
           
           <div class="form-group">
             <label>FCC ID</label>

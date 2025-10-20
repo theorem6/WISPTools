@@ -159,15 +159,32 @@
       // Render towers
       if (filters.showTowers) {
         towers.forEach(tower => {
-          const symbol = new SimpleMarkerSymbol({
-            style: 'circle',
-            color: getTowerColor(tower.type),
-            size: '20px',
-            outline: {
-              color: 'white',
-              width: 3
-            }
-          });
+          // Use different symbol for NOC
+          let symbol;
+          
+          if (tower.type === 'noc') {
+            // NOC gets a square building icon
+            symbol = new SimpleMarkerSymbol({
+              style: 'square',
+              color: getTowerColor('noc'),
+              size: '24px',
+              outline: {
+                color: 'white',
+                width: 3
+              }
+            });
+          } else {
+            // Other locations use circles
+            symbol = new SimpleMarkerSymbol({
+              style: 'circle',
+              color: getTowerColor(tower.type),
+              size: '20px',
+              outline: {
+                color: 'white',
+                width: 3
+              }
+            });
+          }
 
           const point = new Point({
             longitude: tower.location.longitude,
