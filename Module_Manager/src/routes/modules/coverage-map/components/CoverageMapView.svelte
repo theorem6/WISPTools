@@ -60,20 +60,34 @@
         import('@arcgis/core/config.js')
       ]);
 
-      // Set API key if available
-      if (import.meta.env.PUBLIC_ARCGIS_API_KEY) {
-        esriConfig.default.apiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      // Set API key if available (try both VITE_ and PUBLIC_ prefixes)
+      const apiKey = import.meta.env.VITE_ARCGIS_API_KEY || import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      if (apiKey) {
+        esriConfig.default.apiKey = apiKey;
+        console.log('ArcGIS API key configured');
+      } else {
+        console.warn('No ArcGIS API key found - map may have limited functionality');
       }
 
       // Create graphics layers
       backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
       graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
 
-      // Create map (backhaul layer first so it renders underneath)
-      map = new Map({
-        basemap: currentBasemap,
-        layers: [backhaulLayer, graphicsLayer]
-      });
+      // Create map with fallback basemap
+      try {
+        map = new Map({
+          basemap: currentBasemap,
+          layers: [backhaulLayer, graphicsLayer]
+        });
+      } catch (basemapError) {
+        console.warn('Failed to load basemap, trying fallback...', basemapError);
+        // Fallback to a simpler basemap
+        map = new Map({
+          basemap: 'gray-vector',
+          layers: [backhaulLayer, graphicsLayer]
+        });
+        currentBasemap = 'gray-vector';
+      }
 
       // Create view
       mapView = new MapView({
@@ -89,6 +103,15 @@
           }
         }
       });
+
+      // Wait for view to be ready before adding handlers
+      try {
+        await mapView.when();
+        console.log('MapView ready');
+      } catch (viewError) {
+        console.error('MapView failed to initialize:', viewError);
+        // Still try to set up handlers
+      }
 
       // Add click handler for map interactions
       mapView.on('click', handleMapClick);
@@ -116,7 +139,6 @@
         }
       });
 
-      await mapView.when();
       console.log('Coverage Map initialized');
       
       // Render all assets
