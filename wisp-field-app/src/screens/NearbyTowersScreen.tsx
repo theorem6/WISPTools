@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
-import Geolocation from 'react-native-geolocation-service';
+import Geolocation from '@react-native-community/geolocation';
 import { useNavigation } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
 

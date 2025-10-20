@@ -1,9 +1,9 @@
 /**
  * QR Code Scanner Screen
- * Scan asset tags and equipment QR codes
+ * Scan asset tags and equipment QR codes using Vision Camera
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,20 +13,39 @@ import {
   ActivityIndicator,
   Vibration
 } from 'react-native';
-import QRCodeScanner from 'react-native-qrcode-scanner';
-import { RNCamera } from 'react-native-camera';
+import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
 import { useNavigation } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
 
 export default function QRScannerScreen() {
   const [isScanning, setIsScanning] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
   const navigation = useNavigation();
+  const device = useCameraDevice('back');
 
-  const handleScan = async (event: any) => {
-    if (!isScanning || isLoading) return;
+  useEffect(() => {
+    checkCameraPermission();
+  }, []);
 
-    const scannedData = event.data;
+  const checkCameraPermission = async () => {
+    const permission = await Camera.requestCameraPermission();
+    setHasPermission(permission === 'granted');
+  };
+
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr', 'ean-13', 'code-128'],
+    onCodeScanned: (codes) => {
+      if (!isScanning || isLoading || codes.length === 0) return;
+      
+      const scannedData = codes[0].value;
+      if (scannedData) {
+        handleScan(scannedData);
+      }
+    },
+  });
+
+  const handleScan = async (scannedData: string) => {
     console.log('Scanned:', scannedData);
 
     // Vibrate on successful scan
@@ -59,7 +78,7 @@ export default function QRScannerScreen() {
           Alert.alert(
             'Not Found',
             `Asset tag ${parsedData.assetTag} not found in inventory`,
-            [{ text: 'Scan Again', onPress: () => setIsScanning(true) }]
+            [{ text: 'Scan Again', onPress: () => { setIsScanning(true); setIsLoading(false); } }]
           );
         }
       } else if (parsedData.serialNumber) {
@@ -101,6 +120,34 @@ export default function QRScannerScreen() {
     }
   };
 
+  if (!hasPermission) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.permissionContainer}>
+          <Text style={styles.permissionIcon}>📷</Text>
+          <Text style={styles.permissionText}>Camera Permission Required</Text>
+          <Text style={styles.permissionSubtext}>
+            Please grant camera access to scan QR codes
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={checkCameraPermission}
+          >
+            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!device) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>No camera device found</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {isLoading ? (
@@ -110,49 +157,49 @@ export default function QRScannerScreen() {
         </View>
       ) : (
         <>
-          <QRCodeScanner
-            onRead={handleScan}
-            reactivate={isScanning}
-            reactivateTimeout={2000}
-            showMarker={true}
-            markerStyle={styles.marker}
-            cameraStyle={styles.camera}
-            topContent={
-              <View style={styles.topContent}>
-                <Text style={styles.title}>Scan QR Code</Text>
-                <Text style={styles.subtitle}>
-                  Point camera at equipment QR code or asset tag
-                </Text>
-              </View>
-            }
-            bottomContent={
-              <View style={styles.bottomContent}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.manualButton}
-                  onPress={() => {
-                    Alert.prompt(
-                      'Manual Entry',
-                      'Enter asset tag or serial number',
-                      async (text) => {
-                        if (text) {
-                          handleScan({ data: text });
-                        }
-                      }
-                    );
-                  }}
-                >
-                  <Text style={styles.manualText}>⌨️ Manual Entry</Text>
-                </TouchableOpacity>
-              </View>
-            }
+          <View style={styles.topContent}>
+            <Text style={styles.title}>Scan QR Code</Text>
+            <Text style={styles.subtitle}>
+              Point camera at equipment QR code or asset tag
+            </Text>
+          </View>
+
+          <Camera
+            style={styles.camera}
+            device={device}
+            isActive={isScanning && !isLoading}
+            codeScanner={codeScanner}
           />
+
+          <View style={styles.overlay}>
+            <View style={styles.scanFrame} />
+          </View>
+
+          <View style={styles.bottomContent}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.manualButton}
+              onPress={() => {
+                Alert.prompt(
+                  'Manual Entry',
+                  'Enter asset tag or serial number',
+                  async (text) => {
+                    if (text) {
+                      handleScan(text);
+                    }
+                  }
+                );
+              }}
+            >
+              <Text style={styles.manualText}>⌨️ Manual Entry</Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
     </View>
@@ -165,13 +212,65 @@ const styles = StyleSheet.create({
     backgroundColor: '#000'
   },
   camera: {
-    height: '100%',
-    overflow: 'hidden'
+    flex: 1
   },
-  marker: {
-    borderColor: '#7c3aed',
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#1f2937'
+  },
+  permissionIcon: {
+    fontSize: 80,
+    marginBottom: 20
+  },
+  permissionText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center'
+  },
+  permissionSubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 30,
+    textAlign: 'center'
+  },
+  permissionButton: {
+    backgroundColor: '#7c3aed',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 8
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 100
+  },
+  overlay: {
+    position: 'absolute',
+    top: 120,
+    left: 0,
+    right: 0,
+    bottom: 200,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
     borderWidth: 3,
-    borderRadius: 10
+    borderColor: '#7c3aed',
+    borderRadius: 20,
+    backgroundColor: 'transparent'
   },
   loadingContainer: {
     flex: 1,
