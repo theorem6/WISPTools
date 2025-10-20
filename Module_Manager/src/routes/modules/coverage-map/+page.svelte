@@ -7,6 +7,10 @@
   import CoverageMapView from './components/CoverageMapView.svelte';
   import FilterPanel from './components/FilterPanel.svelte';
   import AddSiteModal from './components/AddSiteModal.svelte';
+  import AddNOCModal from './components/AddNOCModal.svelte';
+  import AddWarehouseModal from './components/AddWarehouseModal.svelte';
+  import AddVehicleModal from './components/AddVehicleModal.svelte';
+  import AddRMAModal from './components/AddRMAModal.svelte';
   import AddSectorModal from './components/AddSectorModal.svelte';
   import AddCPEModal from './components/AddCPEModal.svelte';
   import AddBackhaulLinkModal from './components/AddBackhaulLinkModal.svelte';
@@ -35,6 +39,10 @@
   
   // Modals
   let showAddSiteModal = false;
+  let showAddNOCModal = false;
+  let showAddWarehouseModal = false;
+  let showAddVehicleModal = false;
+  let showAddRMAModal = false;
   let showAddSectorModal = false;
   let showAddCPEModal = false;
   let showAddBackhaulModal = false;
@@ -202,29 +210,28 @@
   function handleContextMenuAction(event: CustomEvent) {
     const { action, latitude, longitude } = event.detail;
     
-    // Set site type based on action
-    const typeMap: Record<string, any> = {
-      'add-site': 'tower',
-      'add-noc': 'noc',
-      'add-warehouse': 'warehouse',
-      'add-vehicle': 'vehicle',
-      'add-rma': 'rma',
-      'add-vendor': 'vendor'
-    };
-    
-    if (typeMap[action]) {
-      initialSiteType = typeMap[action];
-      showAddSiteModal = true;
-      contextMenuLat = latitude;
-      contextMenuLon = longitude;
-      return;
-    }
+    contextMenuLat = latitude;
+    contextMenuLon = longitude;
     
     switch (action) {
+      case 'add-site':
+        initialSiteType = 'tower';
+        showAddSiteModal = true;
+        break;
+      case 'add-noc':
+        showAddNOCModal = true;
+        break;
+      case 'add-warehouse':
+        showAddWarehouseModal = true;
+        break;
+      case 'add-vehicle':
+        showAddVehicleModal = true;
+        break;
+      case 'add-rma':
+        showAddRMAModal = true;
+        break;
       case 'add-cpe':
         showAddCPEModal = true;
-        contextMenuLat = latitude;
-        contextMenuLon = longitude;
         break;
       case 'copy-coords':
         navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
@@ -512,6 +519,38 @@
     initialLatitude={contextMenuLat}
     initialLongitude={contextMenuLon}
     initialType={initialSiteType}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddNOCModal 
+    bind:show={showAddNOCModal}
+    initialLatitude={contextMenuLat}
+    initialLongitude={contextMenuLon}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddWarehouseModal 
+    bind:show={showAddWarehouseModal}
+    initialLatitude={contextMenuLat}
+    initialLongitude={contextMenuLon}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddVehicleModal 
+    bind:show={showAddVehicleModal}
+    initialLatitude={contextMenuLat}
+    initialLongitude={contextMenuLon}
+    {tenantId}
+    on:saved={handleModalSaved}
+  />
+  
+  <AddRMAModal 
+    bind:show={showAddRMAModal}
+    initialLatitude={contextMenuLat}
+    initialLongitude={contextMenuLon}
     {tenantId}
     on:saved={handleModalSaved}
   />
