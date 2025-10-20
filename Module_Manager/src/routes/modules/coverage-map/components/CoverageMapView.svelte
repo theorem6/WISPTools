@@ -62,11 +62,11 @@
 
       // Set API key if available (try both VITE_ and PUBLIC_ prefixes)
       const apiKey = import.meta.env.VITE_ARCGIS_API_KEY || import.meta.env.PUBLIC_ARCGIS_API_KEY;
-      if (apiKey) {
-        esriConfig.default.apiKey = apiKey;
+      if (apiKey && esriConfig) {
+        esriConfig.apiKey = apiKey;
         console.log('ArcGIS API key configured');
       } else {
-        console.warn('No ArcGIS API key found - map may have limited functionality');
+        console.log('No ArcGIS API key - using default configuration');
       }
 
       // Create graphics layers
