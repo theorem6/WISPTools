@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import type { TowerSite, Sector, CPEDevice, NetworkEquipment, CoverageMapFilters } from '../lib/models';
+  import { createLocationIcon } from '$lib/mapIcons';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -156,25 +157,22 @@
         await renderBackhaulLinks();
       }
       
-      // Render towers
+      // Render towers and locations
       if (filters.showTowers) {
+        // Load PictureMarkerSymbol for custom icons
+        const { default: PictureMarkerSymbol } = await import('@arcgis/core/symbols/PictureMarkerSymbol.js');
+        
         towers.forEach(tower => {
-          // Use different symbol for NOC
           let symbol;
           
-          if (tower.type === 'noc') {
-            // NOC gets a square building icon
-            symbol = new SimpleMarkerSymbol({
-              style: 'square',
-              color: getTowerColor('noc'),
-              size: '24px',
-              outline: {
-                color: 'white',
-                width: 3
-              }
-            });
+          // Use custom SVG icons for specific location types
+          const customIcon = createLocationIcon(tower.type, 40);
+          
+          if (customIcon) {
+            // NOC, Warehouse, Vehicle, RMA, Vendor - use custom SVG
+            symbol = new PictureMarkerSymbol(customIcon);
           } else {
-            // Other locations use circles
+            // Towers, rooftops, monopoles - use colored circles
             symbol = new SimpleMarkerSymbol({
               style: 'circle',
               color: getTowerColor(tower.type),
