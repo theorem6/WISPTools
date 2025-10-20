@@ -59,23 +59,25 @@ export default function HomeScreen() {
           <Text style={styles.menuSubtext}>Scan equipment tags</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate('NearbyTowers' as never)}
-        >
-          <Text style={styles.menuIcon}>📡</Text>
-          <Text style={styles.menuText}>Nearby Towers</Text>
-          <Text style={styles.menuSubtext}>Find sites near you</Text>
-        </TouchableOpacity>
+        <View style={styles.menuRow}>
+          <TouchableOpacity
+            style={[styles.menuButton, styles.halfWidth]}
+            onPress={() => navigation.navigate('Checkout' as never)}
+          >
+            <Text style={styles.menuIcon}>📤</Text>
+            <Text style={styles.menuTextSmall}>Checkout</Text>
+            <Text style={styles.menuSubtextSmall}>Load vehicle</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate('VehicleInventory' as never)}
-        >
-          <Text style={styles.menuIcon}>🚚</Text>
-          <Text style={styles.menuText}>Vehicle Inventory</Text>
-          <Text style={styles.menuSubtext}>Equipment in truck</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.menuButton, styles.halfWidth]}
+            onPress={() => navigation.navigate('DeploymentWizard' as never)}
+          >
+            <Text style={styles.menuIcon}>🚀</Text>
+            <Text style={styles.menuTextSmall}>Deploy</Text>
+            <Text style={styles.menuSubtextSmall}>Install equipment</Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.menuButton}
@@ -83,8 +85,28 @@ export default function HomeScreen() {
         >
           <Text style={styles.menuIcon}>📋</Text>
           <Text style={styles.menuText}>Work Orders</Text>
-          <Text style={styles.menuSubtext}>Today's tasks</Text>
+          <Text style={styles.menuSubtext}>Tickets & installations</Text>
         </TouchableOpacity>
+
+        <View style={styles.menuRow}>
+          <TouchableOpacity
+            style={[styles.menuButton, styles.halfWidth]}
+            onPress={() => navigation.navigate('NearbyTowers' as never)}
+          >
+            <Text style={styles.menuIcon}>📡</Text>
+            <Text style={styles.menuTextSmall}>Towers</Text>
+            <Text style={styles.menuSubtextSmall}>Near you</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuButton, styles.halfWidth]}
+            onPress={() => navigation.navigate('VehicleInventory' as never)}
+          >
+            <Text style={styles.menuIcon}>🚚</Text>
+            <Text style={styles.menuTextSmall}>Vehicle</Text>
+            <Text style={styles.menuSubtextSmall}>My inventory</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -149,6 +171,23 @@ const styles = StyleSheet.create({
   },
   menuSubtext: {
     fontSize: 14,
+    color: '#9ca3af'
+  },
+  menuRow: {
+    flexDirection: 'row',
+    gap: 15
+  },
+  halfWidth: {
+    flex: 1
+  },
+  menuTextSmall: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4
+  },
+  menuSubtextSmall: {
+    fontSize: 12,
     color: '#9ca3af'
   },
   logoutButton: {

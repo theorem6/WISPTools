@@ -16,6 +16,9 @@ import AssetDetailsScreen from './src/screens/AssetDetailsScreen';
 import NearbyTowersScreen from './src/screens/NearbyTowersScreen';
 import VehicleInventoryScreen from './src/screens/VehicleInventoryScreen';
 import TowerDetailsScreen from './src/screens/TowerDetailsScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
+import DeploymentWizardScreen from './src/screens/DeploymentWizardScreen';
+import WorkOrdersScreen from './src/screens/WorkOrdersScreen';
 
 const Stack = createStackNavigator();
 
@@ -93,6 +96,21 @@ export default function App() {
               name="TowerDetails"
               component={TowerDetailsScreen}
               options={{ title: 'Tower Details' }}
+            />
+            <Stack.Screen
+              name="Checkout"
+              component={CheckoutScreen}
+              options={{ title: 'Checkout Equipment' }}
+            />
+            <Stack.Screen
+              name="DeploymentWizard"
+              component={DeploymentWizardScreen}
+              options={{ title: 'Deploy Equipment' }}
+            />
+            <Stack.Screen
+              name="WorkOrders"
+              component={WorkOrdersScreen}
+              options={{ title: 'Work Orders' }}
             />
           </>
         )}
