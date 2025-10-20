@@ -3,6 +3,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { TowerSite, Sector, CPEDevice, NetworkEquipment, CoverageMapFilters } from '../lib/models';
   import { createLocationIcon } from '$lib/mapIcons';
+  import BasemapSwitcher from '$lib/components/BasemapSwitcher.svelte';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -138,13 +139,18 @@
     }
   }
 
-  // Export function to change basemap from parent component
+  // Export function to change basemap from parent component or widget
   export function changeBasemap(basemapId: string) {
     if (map) {
       currentBasemap = basemapId;
       map.basemap = basemapId;
       console.log('Basemap changed to:', basemapId);
     }
+  }
+
+  // Handle basemap change from widget
+  function handleBasemapChange(event: CustomEvent<string>) {
+    changeBasemap(event.detail);
   }
 
   async function renderAllAssets() {
@@ -694,13 +700,18 @@
   }
 </script>
 
-<div class="map-container" bind:this={mapContainer}></div>
+<div class="map-container" bind:this={mapContainer}>
+  {#if mapView}
+    <BasemapSwitcher {currentBasemap} on:change={handleBasemapChange} />
+  {/if}
+</div>
 
 <style>
   .map-container {
     width: 100%;
     height: 100%;
     min-height: 600px;
+    position: relative;
   }
 </style>
 
