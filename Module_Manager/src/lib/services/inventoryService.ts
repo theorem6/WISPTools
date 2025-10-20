@@ -73,6 +73,23 @@ export interface InventoryItem {
     managementUrl?: string;
   };
   
+  // Module Integration (tracks which module manages this item)
+  modules?: {
+    acs?: {
+      deviceId: string;
+      lastSync?: Date | string;
+      managedByACS?: boolean;
+    };
+    cbrs?: {
+      cbsdId: string;
+      lastSync?: Date | string;
+    };
+    coverageMap?: {
+      siteId: string;
+      lastSync?: Date | string;
+    };
+  };
+  
   // Metadata
   notes?: string;
   tenantId: string;
@@ -156,6 +173,13 @@ class InventoryService {
   
   async getItem(id: string): Promise<InventoryItem> {
     return await this.apiCall(`/${id}`);
+  }
+  
+  async searchInventory(tenantId: string, serialNumber: string): Promise<InventoryItem[]> {
+    const result = await this.getInventory({ search: serialNumber });
+    return result.items.filter(item => 
+      item.serialNumber?.toLowerCase() === serialNumber.toLowerCase()
+    );
   }
   
   async createItem(item: Partial<InventoryItem>): Promise<InventoryItem> {
@@ -255,6 +279,22 @@ class InventoryService {
   
   async getBySite(siteId: string): Promise<InventoryItem[]> {
     return await this.apiCall(`/by-site/${siteId}`);
+  }
+  
+  // ============================================================================
+  // Convenience Aliases
+  // ============================================================================
+  
+  async createInventory(tenantId: string, item: Partial<InventoryItem>): Promise<InventoryItem> {
+    return await this.createItem(item);
+  }
+  
+  async updateInventory(tenantId: string, id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> {
+    return await this.updateItem(id, updates);
+  }
+  
+  async getInventoryByLocation(tenantId: string, locationType: string, locationId?: string): Promise<InventoryItem[]> {
+    return await this.getByLocation(locationType, locationId);
   }
   
   // ============================================================================

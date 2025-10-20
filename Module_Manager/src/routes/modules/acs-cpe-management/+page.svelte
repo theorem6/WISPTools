@@ -9,6 +9,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
+  import { syncACSCPEToInventory } from '$lib/services/acsInventorySync';
   
   // Module data
   let moduleData = {
@@ -28,6 +29,8 @@
   let map: any = null;
   let isSyncing = false;
   let syncMessage = '';
+  let isSyncingInventory = false;
+  let inventorySyncMessage = '';
   
   // Multi-tenant state - use tenant store
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
@@ -110,6 +113,44 @@
       syncMessage = `Error: ${error?.message || 'Sync failed'}`;
     } finally {
       isSyncing = false;
+    }
+  }
+
+  async function handleSyncToInventory() {
+    if (!tenantId) {
+      inventorySyncMessage = 'Error: No tenant selected';
+      return;
+    }
+
+    if (cpeDevices.length === 0) {
+      inventorySyncMessage = 'Error: No CPE devices to sync. Please sync from GenieACS first.';
+      return;
+    }
+
+    isSyncingInventory = true;
+    inventorySyncMessage = '';
+    
+    try {
+      console.log(`[ACS] Syncing ${cpeDevices.length} CPE devices to inventory for tenant: ${tenantName}`);
+      const result = await syncACSCPEToInventory(tenantId, cpeDevices);
+      
+      if (result.success) {
+        inventorySyncMessage = `✅ Success! Created: ${result.created}, Updated: ${result.updated}, Skipped: ${result.skipped}`;
+      } else {
+        inventorySyncMessage = `⚠️ Completed with errors: ${result.errors.length} failures. Synced: ${result.synced}/${cpeDevices.length}`;
+      }
+      
+      console.log('[ACS] Inventory sync result:', result);
+      
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        inventorySyncMessage = '';
+      }, 5000);
+    } catch (error: any) {
+      inventorySyncMessage = `❌ Error: ${error?.message || 'Inventory sync failed'}`;
+      console.error('[ACS] Inventory sync error:', error);
+    } finally {
+      isSyncingInventory = false;
     }
   }
 
@@ -404,6 +445,12 @@
           </div>
         {/if}
         
+        {#if inventorySyncMessage}
+          <div class="sync-message {inventorySyncMessage.includes('❌') || inventorySyncMessage.includes('Error') ? 'error' : 'success'}">
+            {inventorySyncMessage}
+          </div>
+        {/if}
+        
         <button 
           class="btn btn-primary" 
           on:click={handleSync}
@@ -414,6 +461,20 @@
             Syncing Tenant Devices...
           {:else}
             🔄 Sync Devices from GenieACS
+          {/if}
+        </button>
+        
+        <button 
+          class="btn btn-primary" 
+          on:click={handleSyncToInventory}
+          disabled={isLoading || isSyncingInventory || cpeDevices.length === 0}
+          title={cpeDevices.length === 0 ? 'Sync from GenieACS first' : 'Sync CPE devices to inventory'}
+        >
+          {#if isSyncingInventory}
+            <span class="spinner"></span>
+            Syncing to Inventory...
+          {:else}
+            📦 Sync to Inventory
           {/if}
         </button>
         
