@@ -60,26 +60,23 @@ export class BarcodeService {
 
   /**
    * Generate QR code as Data URL (for display)
+   * Uses online API for QR code generation
    */
   async generateQRCodeDataURL(value: string, options: QRCodeOptions = {}): Promise<string> {
-    try {
-      // Dynamic import of qrcode library if available
-      const QRCode = await import('qrcode').catch(() => null);
-      
-      if (QRCode) {
-        return await QRCode.default.toDataURL(value, {
-          width: options.size || 200,
-          errorCorrectionLevel: options.errorCorrectionLevel || 'M',
-          margin: options.includeMargin ? 2 : 0
-        });
-      }
-    } catch (error) {
-      console.warn('QRCode library not available, using fallback');
-    }
+    const size = options.size || 200;
     
-    // Fallback: create a simple SVG data URL
-    const svg = this.generateQRCodeSVG(value, options);
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
+    try {
+      // Use free QR code API (no library needed)
+      const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}`;
+      
+      // Return the API URL directly as the image source
+      return apiUrl;
+    } catch (error) {
+      console.warn('QR Code API not available, using fallback');
+      // Fallback: create a simple SVG data URL
+      const svg = this.generateQRCodeSVG(value, options);
+      return `data:image/svg+xml;base64,${btoa(svg)}`;
+    }
   }
 
   /**
