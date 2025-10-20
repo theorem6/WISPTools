@@ -39,27 +39,37 @@
     error = '';
     
     try {
-      const siteData = {
+      const siteData: any = {
         name: formData.name,
         type: 'warehouse',
         location: {
           latitude: formData.latitude,
-          longitude: formData.longitude,
-          address: formData.address || undefined,
-          city: formData.city || undefined,
-          state: formData.state || undefined,
-          zipCode: formData.zipCode || undefined
+          longitude: formData.longitude
         },
-        siteContact: formData.contactName ? {
-          name: formData.contactName,
-          phone: formData.contactPhone,
-          email: formData.contactEmail
-        } : undefined,
-        accessInstructions: formData.notes || undefined,
         tenantId
       };
       
-      await coverageMapService.createTowerSite(tenantId, siteData as any);
+      // Add optional location fields only if they have values
+      if (formData.address?.trim()) siteData.location.address = formData.address.trim();
+      if (formData.city?.trim()) siteData.location.city = formData.city.trim();
+      if (formData.state?.trim()) siteData.location.state = formData.state.trim();
+      if (formData.zipCode?.trim()) siteData.location.zipCode = formData.zipCode.trim();
+      
+      // Add optional contact only if name is provided
+      if (formData.contactName?.trim()) {
+        siteData.siteContact = {
+          name: formData.contactName.trim(),
+          phone: formData.contactPhone?.trim() || '',
+          email: formData.contactEmail?.trim() || ''
+        };
+      }
+      
+      // Add notes if provided
+      if (formData.notes?.trim()) {
+        siteData.accessInstructions = formData.notes.trim();
+      }
+      
+      await coverageMapService.createTowerSite(tenantId, siteData);
       
       dispatch('saved');
       handleClose();

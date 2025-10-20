@@ -34,20 +34,34 @@
     error = '';
     
     try {
-      const siteData = {
+      const siteData: any = {
         name: formData.name,
         type: 'vehicle',
-        location: { latitude: formData.latitude, longitude: formData.longitude },
-        siteContact: formData.driver ? {
-          name: formData.driver,
-          phone: formData.driverPhone,
-          role: 'Driver'
-        } : undefined,
-        accessInstructions: `Vehicle #${formData.vehicleNumber || 'N/A'}. ${formData.notes}`.trim(),
+        location: { 
+          latitude: formData.latitude, 
+          longitude: formData.longitude 
+        },
         tenantId
       };
       
-      await coverageMapService.createTowerSite(tenantId, siteData as any);
+      // Add driver contact if provided
+      if (formData.driver?.trim()) {
+        siteData.siteContact = {
+          name: formData.driver.trim(),
+          phone: formData.driverPhone?.trim() || '',
+          role: 'Driver'
+        };
+      }
+      
+      // Build access instructions
+      const instructions = [];
+      if (formData.vehicleNumber?.trim()) instructions.push(`Vehicle #${formData.vehicleNumber.trim()}`);
+      if (formData.notes?.trim()) instructions.push(formData.notes.trim());
+      if (instructions.length > 0) {
+        siteData.accessInstructions = instructions.join('. ');
+      }
+      
+      await coverageMapService.createTowerSite(tenantId, siteData);
       dispatch('saved');
       handleClose();
     } catch (err: any) {
