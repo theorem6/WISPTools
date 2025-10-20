@@ -17,7 +17,7 @@
   let mapView: any = null;
   let graphicsLayer: any = null;
   let backhaulLayer: any = null;
-  let currentBasemap = 'streets-navigation-vector';
+  let currentBasemap = 'topo-vector'; // Use valid ArcGIS basemap ID
   
   // Extract backhaul links from equipment
   $: backhaulLinks = equipment.filter(eq => {
@@ -146,6 +146,15 @@
     } catch (err) {
       console.error('Failed to initialize Coverage Map:', err);
       throw err;
+    }
+  }
+
+  // Export function to change basemap from parent component
+  export function changeBasemap(basemapId: string) {
+    if (map) {
+      currentBasemap = basemapId;
+      map.basemap = basemapId;
+      console.log('Basemap changed to:', basemapId);
     }
   }
 

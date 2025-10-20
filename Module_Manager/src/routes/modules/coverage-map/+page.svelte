@@ -35,7 +35,7 @@
   let error = '';
   let success = '';
   let showFilters = true;
-  let currentBasemap = 'streets-navigation-vector';
+  let currentBasemap = 'topo-vector'; // Valid ArcGIS basemap ID
   
   // Modals
   let showAddSiteModal = false;
@@ -361,8 +361,8 @@
       <div class="basemap-switcher">
         <button 
           class="basemap-btn" 
-          class:active={currentBasemap === 'streets-navigation-vector'}
-          on:click={() => changeBasemap('streets-navigation-vector')}
+          class:active={currentBasemap === 'streets-vector'}
+          on:click={() => changeBasemap('streets-vector')}
           title="Streets View"
         >
           🛣️
