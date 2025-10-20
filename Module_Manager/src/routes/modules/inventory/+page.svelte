@@ -4,6 +4,8 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/TenantGuard.svelte';
   import { inventoryService, type InventoryItem, type InventoryFilters } from '$lib/services/inventoryService';
+  import { barcodeService } from '$lib/services/barcodeService';
+  import AssetTagViewer from './components/AssetTagViewer.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   
@@ -12,6 +14,10 @@
   let isLoading = true;
   let error = '';
   let success = '';
+  
+  // Asset Tag
+  let showAssetTag = false;
+  let selectedItemForTag: InventoryItem | null = null;
   
   // Filters
   let filters: InventoryFilters = {
@@ -187,6 +193,37 @@
     }
   }
   
+  function handlePrintTag(item: InventoryItem) {
+    selectedItemForTag = item;
+    showAssetTag = true;
+  }
+  
+  async function handleScanBarcode() {
+    try {
+      const scannedValue = await barcodeService.scanCode();
+      const parsedData = barcodeService.parseQRCode(scannedValue);
+      
+      if (parsedData.assetTag) {
+        searchQuery = parsedData.assetTag;
+        applyFilters();
+      } else if (parsedData.serialNumber) {
+        searchQuery = parsedData.serialNumber;
+        applyFilters();
+      } else {
+        searchQuery = scannedValue;
+        applyFilters();
+      }
+      
+      success = 'Barcode scanned successfully';
+      setTimeout(() => success = '', 3000);
+    } catch (err: any) {
+      if (err.message !== 'Scan cancelled') {
+        error = err.message || 'Scan failed';
+        setTimeout(() => error = '', 3000);
+      }
+    }
+  }
+  
   function getStatusColor(status: string): string {
     const colors: Record<string, string> = {
       available: '#10b981',
@@ -239,8 +276,14 @@
     </div>
     
     <div class="header-actions">
+      <button class="btn-secondary" on:click={handleScanBarcode}>
+        📷 Scan Barcode
+      </button>
+      <button class="btn-secondary" on:click={() => goto('/modules/inventory/reports')}>
+        📊 View Reports
+      </button>
       <button class="btn-secondary" on:click={handleExport}>
-        📊 Export CSV
+        📥 Export CSV
       </button>
       <button class="btn-primary" on:click={() => goto('/modules/inventory/add')}>
         ➕ Add Item
@@ -412,6 +455,13 @@
                   <div class="action-buttons">
                     <button 
                       class="btn-icon" 
+                      title="Print Asset Tag"
+                      on:click={() => handlePrintTag(item)}
+                    >
+                      🏷️
+                    </button>
+                    <button 
+                      class="btn-icon" 
                       title="View Details"
                       on:click={() => goto(`/modules/inventory/${item._id}`)}
                     >
@@ -458,6 +508,11 @@
         </button>
       </div>
     {/if}
+  {/if}
+  
+  <!-- Asset Tag Viewer -->
+  {#if selectedItemForTag}
+    <AssetTagViewer bind:show={showAssetTag} item={selectedItemForTag} />
   {/if}
 </div>
 </TenantGuard>
