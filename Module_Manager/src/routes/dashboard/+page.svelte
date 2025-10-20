@@ -76,6 +76,15 @@
       path: '/modules/inventory'
     },
     {
+      id: 'work-orders',
+      name: 'Work Orders & Tickets',
+      description: 'Field operations management, trouble tickets, installations, and SLA tracking',
+      icon: '📋',
+      color: '#f59e0b',
+      status: 'active',
+      path: '/modules/work-orders'
+    },
+    {
       id: 'hss-management',
       name: 'HSS & Subscriber Management',
       description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
@@ -139,6 +148,7 @@
       'cbrs-management': 'cbrsManagement',
       'coverage-map': 'coverageMap',
       'inventory': 'inventory',
+      'work-orders': 'workOrders',
       'hss-management': 'hssManagement',
       'monitoring': 'monitoring',
       'backend-management': 'backendManagement'
