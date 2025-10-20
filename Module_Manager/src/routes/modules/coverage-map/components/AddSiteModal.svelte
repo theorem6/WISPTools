@@ -241,6 +241,8 @@
         </div>
       </div>
       
+      <!-- Tower-Specific Sections (only for actual towers) -->
+      {#if formData.type === 'tower' || formData.type === 'rooftop' || formData.type === 'monopole'}
       <!-- Tower Contact -->
       <div class="section">
         <h3>🏢 Tower Owner Contact</h3>
@@ -311,6 +313,20 @@
             bind:value={formData.safetyNotes} 
             placeholder="High voltage equipment. PPE required. Confined space."
             rows="2"
+          ></textarea>
+        </div>
+      </div>
+      {/if}
+      
+      <!-- General Notes (for all types) -->
+      <div class="section">
+        <h3>📝 Additional Notes</h3>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea 
+            bind:value={formData.accessInstructions}
+            placeholder="General notes about this location..."
+            rows="3"
           ></textarea>
         </div>
       </div>
