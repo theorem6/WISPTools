@@ -85,6 +85,24 @@
       path: '/modules/work-orders'
     },
     {
+      id: 'help-desk',
+      name: 'Help Desk',
+      description: 'Customer support ticketing with equipment lookup and quick actions',
+      icon: '🎧',
+      color: '#06b6d4',
+      status: 'active',
+      path: '/modules/help-desk'
+    },
+    {
+      id: 'user-management',
+      name: 'User Management',
+      description: 'Manage users, roles, and permissions for your organization',
+      icon: '👥',
+      color: '#8b5cf6',
+      status: 'active',
+      path: '/modules/user-management'
+    },
+    {
       id: 'hss-management',
       name: 'HSS & Subscriber Management',
       description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
