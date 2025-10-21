@@ -62,10 +62,8 @@ dependencies {
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
 
-    // React Native Firebase
-    implementation project(':@react-native-firebase_app')
-    implementation project(':@react-native-firebase_auth')
-    implementation project(':@react-native-firebase_firestore')
+    // React Native Firebase (auto-linked by React Native CLI)
+    // These are included automatically via native_modules.gradle
 
     // ML Kit for Barcode Scanning (required by vision-camera-code-scanner)
     implementation 'com.google.mlkit:barcode-scanning:17.2.0'
