@@ -184,11 +184,6 @@
     </div>
   </div>
   
-  <!-- Mobile App Download -->
-  <div class="apk-section">
-    <APKDownload />
-  </div>
-  
   <!-- Filters -->
   <div class="filters-section">
     <div class="filters-row">
