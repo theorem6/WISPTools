@@ -65,6 +65,9 @@ dependencies {
     // React Native Firebase (auto-linked by React Native CLI)
     // These are included automatically via native_modules.gradle
 
+    // React Native Camera (for QR/barcode scanning)
+    implementation project(':react-native-camera')
+
     debugImplementation("com.facebook.flipper:flipper:${FLIPPER_VERSION}")
     debugImplementation("com.facebook.flipper:flipper-network-plugin:${FLIPPER_VERSION}") {
         exclude group:'com.squareup.okhttp3', module:'okhttp'
