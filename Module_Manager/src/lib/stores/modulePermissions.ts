@@ -12,9 +12,12 @@ export interface ModulePermissions {
   coverageMap: boolean;
   inventory: boolean;
   workOrders: boolean;
+  helpDesk: boolean;
+  userManagement: boolean;
   distributedEpc: boolean;
   monitoring: boolean;
   backendManagement: boolean;
+  tenantManagement: boolean;
 }
 
 // Default permissions (if no config exists)
@@ -26,9 +29,12 @@ const DEFAULT_PERMISSIONS: ModulePermissions = {
   coverageMap: true,
   inventory: true,
   workOrders: true,
+  helpDesk: true,
+  userManagement: true,
   distributedEpc: true,
   monitoring: true,
-  backendManagement: false
+  backendManagement: false,
+  tenantManagement: false
 };
 
 // Derive module permissions from current tenant
@@ -56,9 +62,12 @@ export const modulePermissions = derived(
       coverageMap: enabledModules.coverageMap ?? true,
       inventory: enabledModules.inventory ?? true,
       workOrders: enabledModules.workOrders ?? true,
+      helpDesk: enabledModules.helpDesk ?? true,
+      userManagement: enabledModules.userManagement ?? true,
       distributedEpc: enabledModules.distributedEpc ?? false,
       monitoring: enabledModules.monitoring ?? true,
-      backendManagement: enabledModules.backendManagement ?? false
+      backendManagement: enabledModules.backendManagement ?? false,
+      tenantManagement: enabledModules.tenantManagement ?? false
     };
   }
 );
@@ -131,6 +140,15 @@ export const MODULE_DEFINITIONS = [
     path: '/modules/work-orders'
   },
   {
+    id: 'help-desk',
+    permissionKey: 'helpDesk' as keyof ModulePermissions,
+    name: 'Help Desk',
+    description: 'Customer support ticketing with equipment lookup and quick actions',
+    icon: '🎧',
+    color: '#06b6d4',
+    path: '/modules/help-desk'
+  },
+  {
     id: 'hss-management',
     permissionKey: 'hssManagement' as keyof ModulePermissions,
     name: 'HSS & Subscriber Management',
@@ -138,6 +156,15 @@ export const MODULE_DEFINITIONS = [
     icon: '🔐',
     color: 'var(--warning)',
     path: '/modules/hss-management'
+  },
+  {
+    id: 'user-management',
+    permissionKey: 'userManagement' as keyof ModulePermissions,
+    name: 'User Management',
+    description: 'Manage users, roles, and permissions for your organization',
+    icon: '👥',
+    color: '#8b5cf6',
+    path: '/modules/user-management'
   },
   {
     id: 'monitoring',
