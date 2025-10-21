@@ -33,6 +33,26 @@ service cloud.firestore {
       return isTenantMember(tenantId) && getTenantRole(tenantId) in ['owner', 'admin'];
     }
 
+    function getUserStatus(tenantId) {
+      return get(/databases/$(database)/documents/user_tenants/$(request.auth.uid + '_' + tenantId)).data.status;
+    }
+
+    function isActiveTenantMember(tenantId) {
+      return isTenantMember(tenantId) && getUserStatus(tenantId) == 'active';
+    }
+
+    function isEngineer(tenantId) {
+      return isTenantMember(tenantId) && getTenantRole(tenantId) == 'engineer';
+    }
+
+    function isInstaller(tenantId) {
+      return isTenantMember(tenantId) && getTenantRole(tenantId) == 'installer';
+    }
+
+    function isHelpDesk(tenantId) {
+      return isTenantMember(tenantId) && getTenantRole(tenantId) == 'helpdesk';
+    }
+
     // ============================================================================
     // MULTI-TENANT COLLECTIONS
     // ============================================================================
@@ -88,26 +108,85 @@ service cloud.firestore {
       match /networkEquipment/{equipmentId} {
         allow read, write: if isTenantMember(tenantId);
       }
+
+      // Tenant Configuration (role-based module access)
+      match /config/{configId} {
+        // Members can read config
+        allow read: if isTenantMember(tenantId);
+        // Only owner/admin can modify config
+        allow write: if isTenantAdmin(tenantId) || isPlatformAdmin();
+      }
+    }
+
+    // Work Orders (role-based access)
+    match /work_orders/{workOrderId} {
+      // Platform admin can do anything
+      allow read, write: if isPlatformAdmin();
+      
+      // Owners, admins, engineers, helpdesk can view all tickets
+      allow read: if isAuthenticated() && (
+        isTenantAdmin(resource.data.tenantId) ||
+        isEngineer(resource.data.tenantId) ||
+        isHelpDesk(resource.data.tenantId) ||
+        // Installers can only view their assigned tickets
+        (isInstaller(resource.data.tenantId) && resource.data.assignedTo == request.auth.uid)
+      );
+      
+      // Owners, admins, engineers, helpdesk can create tickets
+      allow create: if isAuthenticated() && (
+        isTenantAdmin(request.resource.data.tenantId) ||
+        isEngineer(request.resource.data.tenantId) ||
+        isHelpDesk(request.resource.data.tenantId)
+      );
+      
+      // Owners, admins, engineers, helpdesk can update tickets
+      // Installers can update only their assigned tickets
+      allow update: if isAuthenticated() && (
+        isTenantAdmin(resource.data.tenantId) ||
+        isEngineer(resource.data.tenantId) ||
+        isHelpDesk(resource.data.tenantId) ||
+        (isInstaller(resource.data.tenantId) && resource.data.assignedTo == request.auth.uid)
+      );
+      
+      // Only owners and admins can delete tickets
+      allow delete: if isTenantAdmin(resource.data.tenantId) || isPlatformAdmin();
+    }
+
+    // Work Order Notifications
+    match /work_order_notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.recipientUserId == request.auth.uid;
+      // Server-side only write
+      allow write: if false;
     }
 
     // User-Tenant Associations
     match /user_tenants/{associationId} {
-      // Users can read their own associations (by document ID pattern)
+      // Users can read their own associations
       allow read: if isAuthenticated() && 
                     associationId.matches('^' + request.auth.uid + '_.*');
       
+      // Tenant admins can read all associations for their tenant
+      allow read: if isAuthenticated() && isTenantAdmin(associationId.split('_')[1]);
+      
       // Users can query/list their own associations
-      // This allows queries with where('userId', '==', currentUser.uid)
       allow list: if isAuthenticated();
       
       // Anyone can create associations (when creating tenant or accepting invite)
       allow create: if isAuthenticated();
       
-      // Tenant admins can update roles
-      allow update: if isAuthenticated();
+      // Tenant admins can update user roles
+      // Users cannot update their own role
+      allow update: if isAuthenticated() && (
+        isTenantAdmin(resource.data.tenantId) ||
+        isPlatformAdmin()
+      ) && request.auth.uid != resource.data.userId;
       
-      // Tenant admins can remove users
-      allow delete: if isAuthenticated();
+      // Tenant admins can remove users (except owner)
+      allow delete: if isAuthenticated() && (
+        (isTenantAdmin(resource.data.tenantId) && resource.data.role != 'owner') ||
+        isPlatformAdmin()
+      );
     }
 
     // Tenant Invitations

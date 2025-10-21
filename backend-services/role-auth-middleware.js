@@ -1,0 +1,593 @@
+/**
+ * Role-Based Authentication Middleware
+ * 
+ * Provides middleware functions to enforce role-based access control
+ * for API endpoints and module access.
+ */
+
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin if not already done
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const db = admin.firestore();
+
+// ============================================================================
+// ROLE DEFINITIONS (must match frontend TypeScript)
+// ============================================================================
+
+const VALID_ROLES = [
+  'platform_admin',
+  'owner',
+  'admin',
+  'engineer',
+  'installer',
+  'helpdesk',
+  'viewer'
+];
+
+// Module access configuration per role
+const DEFAULT_MODULE_ACCESS = {
+  platform_admin: {
+    pciResolution: true,
+    cbrsManagement: true,
+    acsManagement: true,
+    hssManagement: true,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: true,
+    distributedEpc: true,
+    monitoring: true,
+    userManagement: true,
+    tenantSettings: true,
+    backendManagement: true,
+    billing: true,
+    tenantManagement: true
+  },
+  owner: {
+    pciResolution: true,
+    cbrsManagement: true,
+    acsManagement: true,
+    hssManagement: true,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: true,
+    distributedEpc: true,
+    monitoring: true,
+    userManagement: true,
+    tenantSettings: true,
+    backendManagement: false,
+    billing: true,
+    tenantManagement: false
+  },
+  admin: {
+    pciResolution: true,
+    cbrsManagement: true,
+    acsManagement: true,
+    hssManagement: true,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: true,
+    distributedEpc: true,
+    monitoring: true,
+    userManagement: true,
+    tenantSettings: true,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false
+  },
+  engineer: {
+    pciResolution: true,
+    cbrsManagement: true,
+    acsManagement: true,
+    hssManagement: true,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: false,
+    distributedEpc: true,
+    monitoring: true,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false
+  },
+  installer: {
+    pciResolution: false,
+    cbrsManagement: false,
+    acsManagement: false,
+    hssManagement: false,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: false,
+    distributedEpc: false,
+    monitoring: false,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false
+  },
+  helpdesk: {
+    pciResolution: false,
+    cbrsManagement: false,
+    acsManagement: true,
+    hssManagement: false,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: true,
+    distributedEpc: false,
+    monitoring: true,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false
+  },
+  viewer: {
+    pciResolution: true,
+    cbrsManagement: true,
+    acsManagement: true,
+    hssManagement: true,
+    coverageMap: true,
+    inventory: true,
+    workOrders: true,
+    helpDesk: true,
+    distributedEpc: true,
+    monitoring: true,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false
+  }
+};
+
+// Work order permissions per role
+const WORK_ORDER_PERMISSIONS = {
+  platform_admin: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: true,
+    canAssign: true,
+    canReassign: true,
+    canClose: true,
+    canDelete: true,
+    canEscalate: true
+  },
+  owner: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: true,
+    canAssign: true,
+    canReassign: true,
+    canClose: true,
+    canDelete: true,
+    canEscalate: true
+  },
+  admin: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: true,
+    canAssign: true,
+    canReassign: true,
+    canClose: true,
+    canDelete: true,
+    canEscalate: true
+  },
+  engineer: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: true,
+    canAssign: false,
+    canReassign: false,
+    canClose: true,
+    canDelete: false,
+    canEscalate: true
+  },
+  installer: {
+    canViewAll: false,
+    canViewAssigned: true,
+    canCreate: false,
+    canAssign: false,
+    canReassign: false,
+    canClose: true,
+    canDelete: false,
+    canEscalate: false
+  },
+  helpdesk: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: true,
+    canAssign: true,
+    canReassign: true,
+    canClose: true,
+    canDelete: false,
+    canEscalate: true
+  },
+  viewer: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: false,
+    canAssign: false,
+    canReassign: false,
+    canClose: false,
+    canDelete: false,
+    canEscalate: false
+  }
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Get user's role in a specific tenant
+ * @param {string} userId - Firebase Auth UID
+ * @param {string} tenantId - Tenant ID
+ * @returns {Promise<string|null>} User role or null if not found
+ */
+async function getUserTenantRole(userId, tenantId) {
+  try {
+    const userTenantId = `${userId}_${tenantId}`;
+    const userTenantDoc = await db.collection('user_tenants').doc(userTenantId).get();
+    
+    if (!userTenantDoc.exists) {
+      return null;
+    }
+    
+    const data = userTenantDoc.data();
+    
+    // Check if user is suspended
+    if (data.status === 'suspended') {
+      return null;
+    }
+    
+    return data.role || null;
+  } catch (error) {
+    console.error('Error getting user tenant role:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if user is platform admin
+ * @param {string} email - User email
+ * @returns {boolean}
+ */
+function isPlatformAdmin(email) {
+  return email === 'david@david.com';
+}
+
+/**
+ * Get module access for a role with optional tenant overrides
+ * @param {string} role - User role
+ * @param {string} tenantId - Tenant ID
+ * @returns {Promise<Object>} Module access object
+ */
+async function getModuleAccess(role, tenantId) {
+  try {
+    // Get tenant config
+    const tenantConfigDoc = await db.collection('tenants').doc(tenantId).collection('config').doc('modules').get();
+    
+    if (tenantConfigDoc.exists) {
+      const config = tenantConfigDoc.data();
+      
+      // Check for role-specific overrides
+      if (config.roleModuleAccess && config.roleModuleAccess[role]) {
+        return config.roleModuleAccess[role];
+      }
+    }
+    
+    // Return default access for role
+    return DEFAULT_MODULE_ACCESS[role] || {};
+  } catch (error) {
+    console.error('Error getting module access:', error);
+    return DEFAULT_MODULE_ACCESS[role] || {};
+  }
+}
+
+/**
+ * Get work order permissions for a role
+ * @param {string} role - User role
+ * @returns {Object} Work order permissions
+ */
+function getWorkOrderPermissions(role) {
+  return WORK_ORDER_PERMISSIONS[role] || WORK_ORDER_PERMISSIONS.viewer;
+}
+
+// ============================================================================
+// MIDDLEWARE FUNCTIONS
+// ============================================================================
+
+/**
+ * Verify Firebase authentication token
+ * Attaches user info to req.user
+ */
+async function verifyAuth(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Missing or invalid authorization header'
+      });
+    }
+    
+    const token = authHeader.substring(7);
+    
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        isPlatformAdmin: isPlatformAdmin(decodedToken.email)
+      };
+      
+      next();
+    } catch (tokenError) {
+      console.error('Token verification failed:', tokenError);
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired token'
+      });
+    }
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Authentication failed'
+    });
+  }
+}
+
+/**
+ * Extract tenant ID from request
+ * Checks X-Tenant-ID header or tenantId in body/params
+ */
+function extractTenantId(req, res, next) {
+  const tenantId = req.headers['x-tenant-id'] || 
+                   req.body?.tenantId || 
+                   req.params?.tenantId ||
+                   req.query?.tenantId;
+  
+  if (!tenantId) {
+    return res.status(400).json({
+      error: 'Bad Request',
+      message: 'Missing tenant ID'
+    });
+  }
+  
+  req.tenantId = tenantId;
+  next();
+}
+
+/**
+ * Require specific role(s)
+ * @param {string|string[]} roles - Required role(s)
+ */
+function requireRole(roles) {
+  const requiredRoles = Array.isArray(roles) ? roles : [roles];
+  
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Authentication required'
+        });
+      }
+      
+      if (!req.tenantId) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Tenant ID required'
+        });
+      }
+      
+      // Platform admin bypasses role checks
+      if (req.user.isPlatformAdmin) {
+        req.userRole = 'platform_admin';
+        return next();
+      }
+      
+      // Get user's role in tenant
+      const userRole = await getUserTenantRole(req.user.uid, req.tenantId);
+      
+      if (!userRole) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Not a member of this tenant or account suspended'
+        });
+      }
+      
+      // Check if user has required role
+      if (!requiredRoles.includes(userRole)) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: `Requires one of: ${requiredRoles.join(', ')}`
+        });
+      }
+      
+      req.userRole = userRole;
+      next();
+    } catch (error) {
+      console.error('Role check error:', error);
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Role verification failed'
+      });
+    }
+  };
+}
+
+/**
+ * Require access to a specific module
+ * @param {string} moduleName - Module name (e.g., 'pciResolution')
+ */
+function requireModule(moduleName) {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Authentication required'
+        });
+      }
+      
+      if (!req.tenantId) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Tenant ID required'
+        });
+      }
+      
+      // Platform admin bypasses module checks
+      if (req.user.isPlatformAdmin) {
+        req.userRole = 'platform_admin';
+        return next();
+      }
+      
+      // Get user's role
+      const userRole = await getUserTenantRole(req.user.uid, req.tenantId);
+      
+      if (!userRole) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Not a member of this tenant'
+        });
+      }
+      
+      // Get module access for this role
+      const moduleAccess = await getModuleAccess(userRole, req.tenantId);
+      
+      if (!moduleAccess[moduleName]) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: `Module '${moduleName}' not enabled for your role`
+        });
+      }
+      
+      req.userRole = userRole;
+      req.moduleAccess = moduleAccess;
+      next();
+    } catch (error) {
+      console.error('Module check error:', error);
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Module access verification failed'
+      });
+    }
+  };
+}
+
+/**
+ * Require specific work order permission
+ * @param {string} permission - Permission name (e.g., 'canAssign')
+ */
+function requireWorkOrderPermission(permission) {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Authentication required'
+        });
+      }
+      
+      if (!req.tenantId) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Tenant ID required'
+        });
+      }
+      
+      // Platform admin bypasses permission checks
+      if (req.user.isPlatformAdmin) {
+        req.userRole = 'platform_admin';
+        return next();
+      }
+      
+      // Get user's role
+      const userRole = await getUserTenantRole(req.user.uid, req.tenantId);
+      
+      if (!userRole) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Not a member of this tenant'
+        });
+      }
+      
+      // Get work order permissions for this role
+      const permissions = getWorkOrderPermissions(userRole);
+      
+      if (!permissions[permission]) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: `Work order permission '${permission}' not granted for your role`
+        });
+      }
+      
+      req.userRole = userRole;
+      req.workOrderPermissions = permissions;
+      next();
+    } catch (error) {
+      console.error('Work order permission check error:', error);
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Permission verification failed'
+      });
+    }
+  };
+}
+
+/**
+ * Filter work orders based on role
+ * Installers should only see their assigned tickets
+ */
+function filterWorkOrdersByRole(req, res, next) {
+  // If installer, add filter for assigned tickets only
+  if (req.userRole === 'installer') {
+    req.workOrderFilter = {
+      assignedTo: req.user.uid
+    };
+  }
+  
+  next();
+}
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+module.exports = {
+  // Middleware
+  verifyAuth,
+  extractTenantId,
+  requireRole,
+  requireModule,
+  requireWorkOrderPermission,
+  filterWorkOrdersByRole,
+  
+  // Helper functions
+  getUserTenantRole,
+  isPlatformAdmin,
+  getModuleAccess,
+  getWorkOrderPermissions,
+  
+  // Constants
+  VALID_ROLES,
+  DEFAULT_MODULE_ACCESS,
+  WORK_ORDER_PERMISSIONS
+};
+
