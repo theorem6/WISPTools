@@ -3,11 +3,12 @@
  * React Native app for field technicians
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, StatusBar, LogBox } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import auth from '@react-native-firebase/auth';
+import notificationService from './src/services/notificationService';
 
 // Screens
 import SplashScreen from './src/screens/SplashScreen';
@@ -34,6 +35,7 @@ export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const navigationRef = useRef<any>(null);
 
   // Handle user state changes
   useEffect(() => {
@@ -66,6 +68,30 @@ export default function App() {
     };
   }, [isReady]);
 
+  // Setup push notifications
+  useEffect(() => {
+    if (!isReady || !user) return;
+
+    // Request notification permissions
+    notificationService.requestPermission();
+    
+    // Setup handlers
+    notificationService.setupForegroundHandler();
+    notificationService.setupBackgroundHandler();
+    
+    // Setup navigation listener for notification taps
+    if (navigationRef.current) {
+      notificationService.setupNotificationOpenedListener(navigationRef.current);
+    }
+    
+    // Cleanup on logout
+    return () => {
+      if (!auth().currentUser) {
+        notificationService.unregisterDevice();
+      }
+    };
+  }, [isReady, user]);
+
   // Show splash screen during initialization
   if (!isReady) {
     return <SplashScreen onReady={() => setIsReady(true)} />;
@@ -83,7 +109,7 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor="#1f2937" />
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName={user ? 'Home' : 'Login'}
           screenOptions={{

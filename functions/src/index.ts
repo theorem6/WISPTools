@@ -4,6 +4,9 @@
 // Import shared Firebase initialization (must be first)
 import { db } from './firebaseInit.js';
 
+// Export notification functions
+export { onWorkOrderAssigned } from './notifications.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
 import { FieldValue } from 'firebase-admin/firestore';
