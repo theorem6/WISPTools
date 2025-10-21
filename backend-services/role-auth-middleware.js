@@ -393,13 +393,54 @@ function requireRole(roles) {
       }
       
       // Get user's role in tenant from MongoDB
-      const userRole = await getUserTenantRole(req.user.uid, req.tenantId);
+      let userRole = await getUserTenantRole(req.user.uid, req.tenantId);
       
+      // AUTO-FIX: If user not in MongoDB, check Firestore and migrate if they're the owner
       if (!userRole) {
-        return res.status(403).json({
-          error: 'Forbidden',
-          message: 'Not a member of this tenant or account suspended'
-        });
+        console.log(`⚠️ User ${req.user.email} not in MongoDB for tenant ${req.tenantId}. Checking Firestore...`);
+        
+        try {
+          const admin = require('firebase-admin');
+          const firestore = admin.firestore();
+          const tenantDoc = await firestore.collection('tenants').doc(req.tenantId).get();
+          
+          if (tenantDoc.exists()) {
+            const tenantData = tenantDoc.data();
+            
+            // Check if this user is the tenant creator
+            if (tenantData.createdBy === req.user.uid) {
+              console.log(`✅ User ${req.user.email} is tenant creator. Auto-creating owner record...`);
+              
+              // Create owner record in MongoDB
+              const { UserTenant } = require('./user-schema');
+              const ownerRecord = new UserTenant({
+                userId: req.user.uid,
+                tenantId: req.tenantId,
+                role: 'owner',
+                status: 'active',
+                invitedBy: req.user.uid,
+                invitedAt: new Date(),
+                acceptedAt: new Date(),
+                addedAt: new Date()
+              });
+              
+              await ownerRecord.save();
+              userRole = 'owner';
+              
+              console.log(`✅ Auto-created owner record for ${req.user.email}`);
+            }
+          }
+        } catch (migrateError) {
+          console.error('Error auto-migrating user:', migrateError);
+        }
+        
+        // If still no role, they're not a member
+        if (!userRole) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'Not a member of this tenant or account suspended'
+          });
+        }
       }
       
       // Check if user has required role
