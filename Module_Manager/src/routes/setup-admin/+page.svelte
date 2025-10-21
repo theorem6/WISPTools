@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { auth } from '$lib/firebase';
+  import { auth, db } from '$lib/firebase';
+  import { collection, getDocs } from 'firebase/firestore';
   import { onMount } from 'svelte';
   
   let loading = false;
@@ -14,24 +15,34 @@
     success = false;
     
     try {
-      const user = auth.currentUser;
+      const user = auth().currentUser;
       if (!user) {
-        error = 'Not logged in. Please login first.';
+        error = 'Not logged in. Please go to the dashboard first to login, then come back here.';
         loading = false;
         return;
       }
       
       result = `Logged in as: ${user.email}\n\n`;
-      result += 'Calling setupAdmin function...\n';
+      result += 'Finding your tenants...\n';
+      
+      // Get all tenants
+      const tenantsSnapshot = await getDocs(collection(db(), 'tenants'));
+      const tenantIds = tenantsSnapshot.docs.map(doc => doc.id);
+      
+      result += `Found ${tenantIds.length} tenant(s): ${tenantIds.join(', ')}\n\n`;
+      result += 'Calling setup-admin endpoint...\n';
       
       const token = await user.getIdToken();
       
-      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/setupAdmin', {
+      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/setup-admin', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          tenantIds
+        })
       });
       
       const data = await response.json();
