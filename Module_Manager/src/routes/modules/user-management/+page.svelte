@@ -26,13 +26,20 @@
   });
 
   async function loadUsers() {
-    if (!$currentTenant) return;
+    if (!$currentTenant) {
+      loading = false;
+      error = 'No tenant selected. Please select a tenant from the dashboard.';
+      console.error('No tenant selected');
+      return;
+    }
     
     loading = true;
     error = '';
     
     try {
+      console.log('Loading users for tenant:', $currentTenant.id);
       users = await getTenantUsers($currentTenant.id);
+      console.log('Loaded users:', users);
       applyFilters();
     } catch (err: any) {
       error = err.message || 'Failed to load users';
