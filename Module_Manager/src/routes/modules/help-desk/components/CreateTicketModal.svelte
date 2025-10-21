@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { createWorkOrder } from '$lib/services/workOrderService';
+  import { workOrderService } from '$lib/services/workOrderService';
   
   const dispatch = createEventDispatcher();
   
@@ -26,7 +26,7 @@
     error = '';
     
     try {
-      await createWorkOrder({
+      await workOrderService.createWorkOrder({
         tenantId: $currentTenant.id,
         title,
         description,

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { getWorkOrders, type WorkOrder } from '$lib/services/workOrderService';
+  import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
   import CreateTicketModal from './components/CreateTicketModal.svelte';
   import TicketDetailsModal from './components/TicketDetailsModal.svelte';
   import CustomerLookupModal from './components/CustomerLookupModal.svelte';
@@ -39,7 +39,7 @@
     error = '';
     
     try {
-      tickets = await getWorkOrders($currentTenant.id);
+      tickets = await workOrderService.getWorkOrders();
       calculateStats();
       applyFilters();
     } catch (err: any) {
