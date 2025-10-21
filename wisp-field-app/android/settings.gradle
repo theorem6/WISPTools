@@ -3,10 +3,5 @@ apply from: file("../node_modules/@react-native-community/cli-platform-android/n
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
 
-// React Native Camera (older library, needs manual linking)
-include ':react-native-camera'
-project(':react-native-camera').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-camera/android')
-
-// React Native Firebase modules are auto-included by applyNativeModulesSettingsGradle above
-// DO NOT manually include them here or you'll get duplicate module errors
+// All React Native modules are auto-included by applyNativeModulesSettingsGradle above
 

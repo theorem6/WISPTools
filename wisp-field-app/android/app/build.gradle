@@ -62,11 +62,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
 
-    // React Native Firebase (auto-linked by React Native CLI)
-    // These are included automatically via native_modules.gradle
-
-    // React Native Camera (for QR/barcode scanning)
-    implementation project(':react-native-camera')
+    // All React Native modules auto-linked via native_modules.gradle
 
     debugImplementation("com.facebook.flipper:flipper:${FLIPPER_VERSION}")
     debugImplementation("com.facebook.flipper:flipper-network-plugin:${FLIPPER_VERSION}") {
