@@ -58,7 +58,7 @@
     // Check if user already has a tenant
     try {
       console.log('[Tenant Setup] Checking if user already has tenants...');
-      const existingTenants = await tenantStore.loadUserTenants(currentUser.uid);
+      const existingTenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
       console.log('[Tenant Setup] Found', existingTenants.length, 'existing tenants');
       
       if (existingTenants.length > 0) {

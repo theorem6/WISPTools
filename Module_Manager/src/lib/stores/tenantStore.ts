@@ -119,8 +119,9 @@ function createTenantStore() {
     
     /**
      * Load all tenants for a user
+     * Auto-selects the tenant if user has exactly one (non-admin users)
      */
-    async loadUserTenants(userId: string): Promise<Tenant[]> {
+    async loadUserTenants(userId: string, userEmail?: string): Promise<Tenant[]> {
       if (!browser) return [];
       
       update(state => ({ ...state, isLoading: true }));
@@ -129,12 +130,37 @@ function createTenantStore() {
         const { tenantService } = await import('../services/tenantService');
         const tenants = await tenantService.getUserTenants(userId);
         
-        update(state => ({
-          ...state,
-          userTenants: tenants,
-          isLoading: false,
-          error: null
-        }));
+        // Auto-select tenant for non-admin users with exactly one tenant
+        const isPlatformAdmin = userEmail === 'david@david.com';
+        const currentState = get({ subscribe });
+        
+        if (tenants.length === 1 && !isPlatformAdmin && !currentState.currentTenant) {
+          // Regular user with one tenant - auto-select it
+          const tenant = tenants[0];
+          console.log('[TenantStore] Auto-selecting single tenant:', tenant.displayName);
+          
+          update(state => ({
+            ...state,
+            userTenants: tenants,
+            currentTenant: tenant,
+            setupCompleted: true,
+            isLoading: false,
+            error: null
+          }));
+          
+          // Save to localStorage
+          localStorage.setItem('selectedTenantId', tenant.id);
+          localStorage.setItem('selectedTenantName', tenant.displayName);
+          localStorage.setItem('tenantSetupCompleted', 'true');
+        } else {
+          // Platform admin or multi-tenant user - manual selection required
+          update(state => ({
+            ...state,
+            userTenants: tenants,
+            isLoading: false,
+            error: null
+          }));
+        }
         
         console.log('[TenantStore] Loaded', tenants.length, 'tenants for user');
         return tenants;

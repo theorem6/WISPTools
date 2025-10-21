@@ -29,7 +29,7 @@
 
     // Load user's tenants
     try {
-      tenants = await tenantStore.loadUserTenants(currentUser.uid);
+      tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
       console.log('[Tenant Selector] Loaded', tenants.length, 'tenants');
       
       if (tenants.length === 0) {
