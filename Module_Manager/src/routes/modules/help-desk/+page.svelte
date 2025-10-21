@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
   import CreateTicketModal from './components/CreateTicketModal.svelte';
@@ -178,6 +179,10 @@
 
 <div class="help-desk-container">
   <div class="header">
+    <button class="btn-back" on:click={() => goto('/dashboard')}>
+      ← Back to Modules
+    </button>
+    
     <div class="title-section">
       <h1>🎧 Help Desk</h1>
       <p class="subtitle">Customer support and ticket management for {$currentTenant?.name || 'your organization'}</p>
@@ -233,11 +238,6 @@
         <div class="stat-label">Avg Resolution</div>
       </div>
     </div>
-  </div>
-  
-  <!-- Mobile App Download -->
-  <div style="margin-bottom: 2rem;">
-    <APKDownload />
   </div>
   
   <div class="filters">
@@ -367,6 +367,25 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    gap: 1.5rem;
+  }
+  
+  .btn-back {
+    padding: 0.75rem 1.25rem;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  
+  .btn-back:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--primary);
   }
   
   .title-section h1 {
