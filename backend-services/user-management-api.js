@@ -52,10 +52,49 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
     const { tenantId } = req.params;
     
     // Query UserTenant collection from MongoDB
-    const userTenants = await UserTenant.find({ tenantId }).lean();
+    let userTenants = await UserTenant.find({ tenantId }).lean();
     
+    // AUTO-FIX: If this tenant has NO users in MongoDB, check Firestore and migrate owner
     if (!userTenants || userTenants.length === 0) {
-      return res.json([]);
+      console.log(`⚠️ Tenant ${tenantId} has no users in MongoDB. Checking Firestore...`);
+      
+      try {
+        const firestore = admin.firestore();
+        const tenantDoc = await firestore.collection('tenants').doc(tenantId).get();
+        
+        if (tenantDoc.exists()) {
+          const tenantData = tenantDoc.data();
+          const createdBy = tenantData.createdBy;
+          
+          if (createdBy) {
+            console.log(`✅ Found tenant creator: ${createdBy}. Creating owner record in MongoDB...`);
+            
+            // Create owner record in MongoDB
+            const ownerRecord = new UserTenant({
+              userId: createdBy,
+              tenantId,
+              role: 'owner',
+              status: 'active',
+              invitedBy: createdBy,
+              invitedAt: new Date(),
+              acceptedAt: new Date(),
+              addedAt: new Date()
+            });
+            
+            await ownerRecord.save();
+            userTenants = [ownerRecord.toObject()]; // Return the new owner
+            
+            console.log(`✅ Auto-created owner record for ${createdBy} in tenant ${tenantId}`);
+          }
+        }
+      } catch (firestoreError) {
+        console.error('Error auto-creating owner from Firestore:', firestoreError);
+      }
+      
+      // If still no users, return empty array
+      if (!userTenants || userTenants.length === 0) {
+        return res.json([]);
+      }
     }
     
     // Get full user profiles from Firebase Auth
