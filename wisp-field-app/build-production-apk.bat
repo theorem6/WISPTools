@@ -14,7 +14,9 @@ echo.
 
 REM Set JAVA_HOME to the JDK 17 installation
 set JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.13.11-hotspot
-set PATH=%JAVA_HOME%\bin;%PATH%
+
+REM Add Node.js to PATH (adjust if installed elsewhere)
+set PATH=%JAVA_HOME%\bin;C:\Program Files\nodejs;%PATH%
 
 cd /d "%~dp0\android"
 
