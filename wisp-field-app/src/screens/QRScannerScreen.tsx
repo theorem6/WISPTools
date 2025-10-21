@@ -1,7 +1,6 @@
 /**
  * QR Code Scanner Screen
- * Simple manual entry for asset tags and serial numbers
- * Camera view for visual reference
+ * Simple barcode/QR scanning with react-native-camera-kit
  */
 
 import React, { useState } from 'react';
@@ -13,33 +12,43 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  ScrollView
+  Modal
 } from 'react-native';
+import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
 
 export default function QRScannerScreen() {
   const [isLoading, setIsLoading] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualInput, setManualInput] = useState('');
+  const [hasScanned, setHasScanned] = useState(false);
   const navigation = useNavigation();
 
-  const handleSearch = async () => {
-    if (!searchInput.trim()) {
-      Alert.alert('Error', 'Please enter an asset tag or serial number');
-      return;
-    }
+  const handleBarCodeRead = async (event: any) => {
+    if (hasScanned || isLoading) return;
+    
+    setHasScanned(true);
+    const scannedData = event.nativeEvent.codeStringValue;
+    
+    console.log('Scanned:', scannedData);
+    await processScannedData(scannedData);
+    
+    // Reset after 3 seconds to allow scanning again
+    setTimeout(() => setHasScanned(false), 3000);
+  };
 
-    console.log('Searching for:', searchInput);
+  const processScannedData = async (data: string) => {
     setIsLoading(true);
 
     try {
       // Parse input data
       let parsedData;
       try {
-        parsedData = JSON.parse(searchInput);
+        parsedData = JSON.parse(data);
       } catch {
         // Not JSON - treat as plain serial number or asset tag
-        parsedData = { value: searchInput.trim() };
+        parsedData = { value: data.trim() };
       }
 
       console.log('Parsed data:', parsedData);
@@ -72,7 +81,7 @@ export default function QRScannerScreen() {
         }
       } else {
         // Generic search
-        const searchTerm = parsedData.value || searchInput.trim();
+        const searchTerm = parsedData.value || data.trim();
         const items = await apiService.getInventoryItems(searchTerm);
         
         if (items.length > 0) {
@@ -85,7 +94,7 @@ export default function QRScannerScreen() {
         }
       }
     } catch (error: any) {
-      console.error('Search error:', error);
+      console.error('Scan processing error:', error);
       Alert.alert(
         'Error',
         error.message || 'Failed to lookup equipment'
@@ -95,129 +104,230 @@ export default function QRScannerScreen() {
     }
   };
 
+  const handleManualSearch = async () => {
+    if (!manualInput.trim()) {
+      Alert.alert('Error', 'Please enter an asset tag or serial number');
+      return;
+    }
+
+    setShowManualEntry(false);
+    await processScannedData(manualInput);
+    setManualInput('');
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.header}>
-        <Text style={styles.icon}>📷</Text>
-        <Text style={styles.title}>Equipment Lookup</Text>
-        <Text style={styles.subtitle}>
-          Enter asset tag, serial number, or scan QR code
-        </Text>
-      </View>
+    <View style={styles.container}>
+      {/* Camera View */}
+      <Camera
+        style={styles.camera}
+        cameraType={CameraType.Back}
+        scanBarcode={true}
+        onReadCode={handleBarCodeRead}
+        showFrame={true}
+        laserColor="rgba(124, 58, 237, 0.5)"
+        frameColor="rgba(124, 58, 237, 0.8)"
+      />
 
-      <View style={styles.searchSection}>
-        <Text style={styles.label}>Asset Tag / Serial Number</Text>
-        <TextInput
-          style={styles.input}
-          value={searchInput}
-          onChangeText={setSearchInput}
-          placeholder="Enter asset tag or serial number"
-          placeholderTextColor="#9ca3af"
-          autoCapitalize="characters"
-          autoCorrect={false}
-        />
-
-        <TouchableOpacity
-          style={styles.searchButton}
-          onPress={handleSearch}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.searchButtonText}>🔍 Search Equipment</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>💡 Quick Tips</Text>
-        
-        <View style={styles.tipItem}>
-          <Text style={styles.tipIcon}>📦</Text>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>Asset Tags</Text>
-            <Text style={styles.tipText}>
-              Enter the barcode number from equipment labels
-            </Text>
-          </View>
+      {/* Overlay UI */}
+      <View style={styles.overlay}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Scan Equipment</Text>
+          <TouchableOpacity
+            style={styles.manualButton}
+            onPress={() => setShowManualEntry(true)}
+          >
+            <Text style={styles.manualButtonText}>✏️ Manual</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.tipItem}>
-          <Text style={styles.tipIcon}>🔢</Text>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>Serial Numbers</Text>
-            <Text style={styles.tipText}>
-              Search by manufacturer serial numbers
-            </Text>
-          </View>
+        <View style={styles.instructions}>
+          <Text style={styles.instructionText}>
+            📷 Point camera at barcode or QR code
+          </Text>
+          <Text style={styles.instructionSubtext}>
+            Supports barcodes, QR codes, and asset tags
+          </Text>
         </View>
 
-        <View style={styles.tipItem}>
-          <Text style={styles.tipIcon}>📋</Text>
-          <View style={styles.tipContent}>
-            <Text style={styles.tipTitle}>QR Codes</Text>
-            <Text style={styles.tipText}>
-              Paste QR code data for instant lookup
-            </Text>
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#7c3aed" />
+              <Text style={styles.loadingText}>Looking up equipment...</Text>
+            </View>
           </View>
-        </View>
+        )}
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.cancelText}>← Back to Home</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      {/* Manual Entry Modal */}
+      <Modal
+        visible={showManualEntry}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowManualEntry(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Manual Entry</Text>
+            <Text style={styles.modalSubtitle}>
+              Enter asset tag or serial number
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              value={manualInput}
+              onChangeText={setManualInput}
+              placeholder="Asset tag or serial number"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoFocus={true}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowManualEntry(false);
+                  setManualInput('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={handleManualSearch}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.searchButtonText}>🔍 Search</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827'
+    backgroundColor: '#000'
   },
-  contentContainer: {
-    padding: 20
+  camera: {
+    flex: 1
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'space-between'
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
-    paddingTop: 20
+    padding: 20,
+    paddingTop: 50,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)'
   },
-  icon: {
-    fontSize: 60,
-    marginBottom: 16
+  backButton: {
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff'
+  },
+  manualButton: {
+    padding: 10,
+    backgroundColor: 'rgba(124, 58, 237, 0.8)',
+    borderRadius: 8
+  },
+  manualButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  instructions: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 16,
+    margin: 20
+  },
+  instructionText: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 8
+    marginBottom: 8,
+    textAlign: 'center'
   },
-  subtitle: {
+  instructionSubtext: {
+    fontSize: 14,
+    color: '#d1d5db',
+    textAlign: 'center'
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loadingBox: {
+    backgroundColor: '#1f2937',
+    padding: 30,
+    borderRadius: 16,
+    alignItems: 'center'
+  },
+  loadingText: {
+    color: '#fff',
     fontSize: 16,
-    color: '#9ca3af',
-    textAlign: 'center',
-    paddingHorizontal: 20
+    marginTop: 16,
+    fontWeight: '600'
   },
-  searchSection: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
     backgroundColor: '#1f2937',
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 24
+    padding: 24,
+    width: '100%',
+    maxWidth: 400
   },
-  label: {
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  modalSubtitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#d1d5db',
-    marginBottom: 8
+    color: '#9ca3af',
+    marginBottom: 20,
+    textAlign: 'center'
   },
   input: {
     backgroundColor: '#374151',
@@ -225,11 +335,28 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: '#fff',
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 2,
     borderColor: '#4b5563'
   },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#374151',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
   searchButton: {
+    flex: 1,
     backgroundColor: '#7c3aed',
     padding: 16,
     borderRadius: 12,
@@ -238,58 +365,7 @@ const styles = StyleSheet.create({
   },
   searchButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold'
-  },
-  infoSection: {
-    backgroundColor: '#1f2937',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 16
-  },
-  tipItem: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    alignItems: 'flex-start'
-  },
-  tipIcon: {
-    fontSize: 24,
-    marginRight: 12,
-    marginTop: 2
-  },
-  tipContent: {
-    flex: 1
-  },
-  tipTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 4
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    lineHeight: 20
-  },
-  actions: {
-    marginTop: 'auto',
-    paddingBottom: 20
-  },
-  cancelButton: {
-    backgroundColor: '#374151',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  cancelText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600'
   }
 });
