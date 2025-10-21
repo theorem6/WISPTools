@@ -58,10 +58,14 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
-    // Firebase
-    implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    // Firebase - Using BOM for version management
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
     implementation 'com.google.firebase:firebase-auth'
     implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-analytics'
+    
+    // React Native Firebase (auto-linked, but ensure compatible versions)
+    // @react-native-firebase/app, auth, firestore are linked via package.json
 
     // All React Native modules auto-linked via native_modules.gradle
 
