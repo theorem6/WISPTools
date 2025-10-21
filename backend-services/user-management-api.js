@@ -7,10 +7,13 @@
  * - Update module access
  * - Suspend/activate users
  * - Remove users from tenant
+ * 
+ * Uses Firebase Auth for authentication, MongoDB Atlas for data storage
  */
 
 const express = require('express');
 const admin = require('firebase-admin');
+const { UserTenant } = require('./user-schema');
 const { 
   verifyAuth, 
   extractTenantId, 
@@ -24,7 +27,6 @@ if (!admin.apps.length) {
 }
 
 const router = express.Router();
-const db = admin.firestore();
 
 // ============================================================================
 // MIDDLEWARE
@@ -49,31 +51,26 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     
-    // Query user_tenants collection for this tenant
-    const userTenantsSnapshot = await db.collection('user_tenants')
-      .where('tenantId', '==', tenantId)
-      .get();
+    // Query UserTenant collection from MongoDB
+    const userTenants = await UserTenant.find({ tenantId }).lean();
     
-    if (userTenantsSnapshot.empty) {
+    if (!userTenants || userTenants.length === 0) {
       return res.json([]);
     }
     
-    // Get full user profiles
+    // Get full user profiles from Firebase Auth
     const users = [];
-    for (const doc of userTenantsSnapshot.docs) {
-      const userTenant = doc.data();
-      
-      // Get user profile
-      const userDoc = await db.collection('users').doc(userTenant.userId).get();
-      
-      if (userDoc.exists) {
-        const userData = userDoc.data();
+    for (const userTenant of userTenants) {
+      try {
+        // Get user from Firebase Auth
+        const userRecord = await admin.auth().getUser(userTenant.userId);
+        
         users.push({
           uid: userTenant.userId,
-          email: userData.email,
-          displayName: userData.displayName || '',
-          photoURL: userData.photoURL || '',
-          phoneNumber: userData.phoneNumber || '',
+          email: userRecord.email || '',
+          displayName: userRecord.displayName || '',
+          photoURL: userRecord.photoURL || '',
+          phoneNumber: userRecord.phoneNumber || '',
           role: userTenant.role,
           status: userTenant.status,
           invitedBy: userTenant.invitedBy || '',
@@ -81,10 +78,13 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
           acceptedAt: userTenant.acceptedAt || null,
           addedAt: userTenant.addedAt,
           lastAccessAt: userTenant.lastAccessAt || null,
-          lastLoginAt: userData.lastLoginAt || null,
+          lastLoginAt: userRecord.metadata?.lastSignInTime || null,
           moduleAccess: userTenant.moduleAccess || null,
           workOrderPermissions: userTenant.workOrderPermissions || null
         });
+      } catch (authError) {
+        console.error(`User ${userTenant.userId} not found in Firebase Auth:`, authError.message);
+        // Skip users that don't exist in Firebase Auth
       }
     }
     
@@ -93,7 +93,7 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
     console.error('Error listing tenant users:', error);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to list users'
+      message: error.message || 'Failed to list users'
     });
   }
 });

@@ -3,16 +3,19 @@
  * 
  * Provides middleware functions to enforce role-based access control
  * for API endpoints and module access.
+ * 
+ * Architecture:
+ * - Firebase Auth: User authentication (login, tokens, SSO)
+ * - MongoDB Atlas: User-tenant relationships, roles, permissions
  */
 
 const admin = require('firebase-admin');
+const { UserTenant } = require('./user-schema');
 
 // Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
   admin.initializeApp();
 }
-
-const db = admin.firestore();
 
 // ============================================================================
 // ROLE DEFINITIONS (must match frontend TypeScript)
@@ -237,21 +240,18 @@ const WORK_ORDER_PERMISSIONS = {
  */
 async function getUserTenantRole(userId, tenantId) {
   try {
-    const userTenantId = `${userId}_${tenantId}`;
-    const userTenantDoc = await db.collection('user_tenants').doc(userTenantId).get();
+    const userTenant = await UserTenant.findOne({ userId, tenantId }).lean();
     
-    if (!userTenantDoc.exists) {
+    if (!userTenant) {
       return null;
     }
-    
-    const data = userTenantDoc.data();
     
     // Check if user is suspended
-    if (data.status === 'suspended') {
+    if (userTenant.status === 'suspended') {
       return null;
     }
     
-    return data.role || null;
+    return userTenant.role || null;
   } catch (error) {
     console.error('Error getting user tenant role:', error);
     return null;
@@ -275,19 +275,8 @@ function isPlatformAdmin(email) {
  */
 async function getModuleAccess(role, tenantId) {
   try {
-    // Get tenant config
-    const tenantConfigDoc = await db.collection('tenants').doc(tenantId).collection('config').doc('modules').get();
-    
-    if (tenantConfigDoc.exists) {
-      const config = tenantConfigDoc.data();
-      
-      // Check for role-specific overrides
-      if (config.roleModuleAccess && config.roleModuleAccess[role]) {
-        return config.roleModuleAccess[role];
-      }
-    }
-    
-    // Return default access for role
+    // For now, just return default access
+    // TODO: Implement tenant-specific module config in MongoDB if needed
     return DEFAULT_MODULE_ACCESS[role] || {};
   } catch (error) {
     console.error('Error getting module access:', error);
