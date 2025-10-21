@@ -32,28 +32,42 @@
     slaResolutionHours: 24
   };
   
+  let sitesLoaded = false;
+  
   onMount(async () => {
-    if (show) {
+    if (show && !sitesLoaded) {
       await loadSites();
     }
   });
   
-  $: if (show) {
+  $: if (show && !sitesLoaded) {
     loadSites();
   }
   
   async function loadSites() {
+    if (sitesLoaded) return; // Prevent duplicate loads
+    
     try {
       sites = await coverageMapService.getTowerSites(tenantId);
+      sitesLoaded = true;
     } catch (err) {
       console.error('Failed to load sites:', err);
+      sites = [];
     }
   }
   
-  $: if (formData.location.siteId) {
-    const site = sites.find(s => s.id === formData.location.siteId);
-    if (site) {
-      formData.location.siteName = site.name;
+  function handleSiteChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    const siteId = target.value;
+    formData.location.siteId = siteId;
+    
+    if (siteId) {
+      const site = sites.find(s => s.id === siteId);
+      if (site) {
+        formData.location.siteName = site.name;
+      }
+    } else {
+      formData.location.siteName = '';
     }
   }
   
@@ -129,6 +143,7 @@
   function handleClose() {
     show = false;
     error = '';
+    sitesLoaded = false; // Reset for next time modal opens
     // Reset form
     formData = {
       type: 'troubleshoot',
@@ -230,7 +245,7 @@
         
         <div class="form-group">
           <label>Site</label>
-          <select bind:value={formData.location.siteId}>
+          <select value={formData.location.siteId} on:change={handleSiteChange}>
             <option value="">Select site...</option>
             {#each sites as site}
               <option value={site.id}>{site.name} ({site.type})</option>
