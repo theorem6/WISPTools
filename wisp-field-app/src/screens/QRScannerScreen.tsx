@@ -3,7 +3,7 @@
  * Simple barcode/QR scanning with react-native-camera-kit
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  Modal
+  Modal,
+  PermissionsAndroid,
+  Platform
 } from 'react-native';
 import { Camera, CameraType } from 'react-native-camera-kit';
 import { useNavigation } from '@react-navigation/native';
@@ -23,7 +25,46 @@ export default function QRScannerScreen() {
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualInput, setManualInput] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
   const navigation = useNavigation();
+
+  useEffect(() => {
+    requestCameraPermission();
+  }, []);
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'This app needs camera access to scan QR codes and barcodes',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        setHasPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+        
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert(
+            'Camera Permission Required',
+            'Please enable camera permission in settings to use the scanner, or use manual entry.',
+            [
+              { text: 'Manual Entry', onPress: () => setShowManualEntry(true) },
+              { text: 'OK' }
+            ]
+          );
+        }
+      } catch (err) {
+        console.warn(err);
+        setHasPermission(false);
+      }
+    } else {
+      setHasPermission(true); // iOS handles permissions differently
+    }
+  };
 
   const handleBarCodeRead = async (event: any) => {
     if (hasScanned || isLoading) return;
@@ -118,15 +159,37 @@ export default function QRScannerScreen() {
   return (
     <View style={styles.container}>
       {/* Camera View */}
-      <Camera
-        style={styles.camera}
-        cameraType={CameraType.Back}
-        scanBarcode={true}
-        onReadCode={handleBarCodeRead}
-        showFrame={true}
-        laserColor="rgba(124, 58, 237, 0.5)"
-        frameColor="rgba(124, 58, 237, 0.8)"
-      />
+      {hasPermission ? (
+        <Camera
+          style={styles.camera}
+          cameraType={CameraType.Back}
+          scanBarcode={true}
+          onReadCode={handleBarCodeRead}
+          showFrame={true}
+          laserColor="rgba(124, 58, 237, 0.5)"
+          frameColor="rgba(124, 58, 237, 0.8)"
+        />
+      ) : (
+        <View style={styles.noPermissionView}>
+          <Text style={styles.noPermissionIcon}>📷</Text>
+          <Text style={styles.noPermissionText}>Camera Permission Required</Text>
+          <Text style={styles.noPermissionSubtext}>
+            Grant camera access to scan barcodes
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestCameraPermission}
+          >
+            <Text style={styles.permissionButtonText}>Request Permission</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.manualEntryButton}
+            onPress={() => setShowManualEntry(true)}
+          >
+            <Text style={styles.manualEntryButtonText}>Use Manual Entry Instead</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Overlay UI */}
       <View style={styles.overlay}>
@@ -227,6 +290,53 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1
+  },
+  noPermissionView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    padding: 20
+  },
+  noPermissionIcon: {
+    fontSize: 80,
+    marginBottom: 20
+  },
+  noPermissionText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  noPermissionSubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 30,
+    textAlign: 'center'
+  },
+  permissionButton: {
+    backgroundColor: '#7c3aed',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginBottom: 12
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
+  manualEntryButton: {
+    backgroundColor: '#374151',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8
+  },
+  manualEntryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600'
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
