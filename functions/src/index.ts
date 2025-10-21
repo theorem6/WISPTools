@@ -7,6 +7,9 @@ import { db } from './firebaseInit.js';
 // Export notification functions
 export { onWorkOrderAssigned } from './notifications.js';
 
+// Export admin setup function
+export { setupAdmin } from './setupAdmin.js';
+
 import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
 import { FieldValue } from 'firebase-admin/firestore';
