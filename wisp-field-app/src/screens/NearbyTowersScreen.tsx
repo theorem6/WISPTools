@@ -46,7 +46,13 @@ export default function NearbyTowersScreen() {
       );
 
       // Load all towers
-      const sites = await apiService.getSites();
+      let sites = [];
+      try {
+        sites = await apiService.getSites();
+      } catch (error) {
+        console.log('Sites API error:', error);
+        sites = [];
+      }
       
       // Calculate distances if we have current location
       const towersWithDistance = sites.map((site: any) => {

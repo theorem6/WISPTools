@@ -36,10 +36,14 @@ export default function VehicleInventoryScreen() {
 
       // Load inventory items in this vehicle
       const items = await apiService.getVehicleInventory(vehicleId);
-      setInventory(items);
+      setInventory(items || []);
     } catch (error: any) {
       console.error('Failed to load vehicle inventory:', error);
-      Alert.alert('Error', error.message || 'Failed to load inventory');
+      // Gracefully handle 404 - just show empty state
+      setInventory([]);
+      if (error.response?.status !== 404) {
+        console.log('Vehicle inventory not available - showing empty state');
+      }
     } finally {
       setIsLoading(false);
     }

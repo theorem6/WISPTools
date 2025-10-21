@@ -141,12 +141,52 @@ class APIService {
   }
 
   // ============================================================================
-  // WORK ORDERS (Future)
+  // WORK ORDERS
   // ============================================================================
 
   async getWorkOrders() {
-    // TODO: Implement work order API
-    return [];
+    try {
+      const response = await this.client.get('/api/work-orders');
+      return response.data;
+    } catch (error) {
+      console.log('Work orders API not available yet');
+      return [];
+    }
+  }
+
+  async getMyTickets(userId: string) {
+    try {
+      const response = await this.client.get('/api/work-orders', {
+        params: { assignedTo: userId }
+      });
+      return response.data;
+    } catch (error) {
+      console.log('Work orders API not available yet');
+      return [];
+    }
+  }
+
+  async getWorkOrder(id: string) {
+    try {
+      const response = await this.client.get(`/api/work-orders/${id}`);
+      return response.data;
+    } catch (error) {
+      console.log('Work order not found');
+      return null;
+    }
+  }
+
+  async updateWorkOrderStatus(id: string, status: string, notes?: string) {
+    const response = await this.client.put(`/api/work-orders/${id}`, {
+      status,
+      notes
+    });
+    return response.data;
+  }
+
+  async addWorkLog(workOrderId: string, log: any) {
+    const response = await this.client.post(`/api/work-orders/${workOrderId}/logs`, log);
+    return response.data;
   }
 }
 

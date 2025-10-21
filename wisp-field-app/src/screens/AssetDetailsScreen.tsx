@@ -76,7 +76,7 @@ export default function AssetDetailsScreen() {
       <View style={styles.card}>
         <Text style={styles.assetTag}>{item.assetTag || 'No Asset Tag'}</Text>
         
-        <View style={styles.statusBadge} style={{ backgroundColor: getStatusColor(item.status) }}>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.statusText}>{item.status?.toUpperCase()}</Text>
         </View>
       </View>
