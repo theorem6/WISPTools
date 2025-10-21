@@ -7,25 +7,27 @@
  * - Work order is escalated
  */
 
-import * as functions from 'firebase-functions';
+import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 
 /**
  * Cloud Function: Send notification when work order is assigned
  */
-export const onWorkOrderAssigned = functions.firestore
-  .document('work_orders/{workOrderId}')
-  .onUpdate(async (change, context) => {
+export const onWorkOrderAssigned = onDocumentUpdated('work_orders/{workOrderId}', async (event) => {
+    const change = event.data;
+    if (!change) return;
+    
     const before = change.before.data();
     const after = change.after.data();
+    const workOrderId = event.params.workOrderId;
     
     // Check if assignedTo changed (new assignment)
     if (before.assignedTo !== after.assignedTo && after.assignedTo) {
       await sendWorkOrderNotification(
         after.assignedTo,
         after.tenantId,
-        context.params.workOrderId,
-        after.ticketNumber || context.params.workOrderId,
+        workOrderId,
+        after.ticketNumber || workOrderId,
         after.title || after.type,
         after.priority,
         'assigned'
@@ -37,8 +39,8 @@ export const onWorkOrderAssigned = functions.firestore
       await sendWorkOrderNotification(
         after.assignedTo,
         after.tenantId,
-        context.params.workOrderId,
-        after.ticketNumber || context.params.workOrderId,
+        workOrderId,
+        after.ticketNumber || workOrderId,
         after.title || after.type,
         after.priority,
         'status_changed',
@@ -48,13 +50,15 @@ export const onWorkOrderAssigned = functions.firestore
     
     // Check if priority escalated
     if (before.priority !== after.priority && after.assignedTo) {
-      const priorityOrder = { low: 0, medium: 1, high: 2, critical: 3 };
-      if (priorityOrder[after.priority] > priorityOrder[before.priority]) {
+      const priorityOrder: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+      const beforePriority = priorityOrder[before.priority] || 0;
+      const afterPriority = priorityOrder[after.priority] || 0;
+      if (afterPriority > beforePriority) {
         await sendWorkOrderNotification(
           after.assignedTo,
           after.tenantId,
-          context.params.workOrderId,
-          after.ticketNumber || context.params.workOrderId,
+          workOrderId,
+          after.ticketNumber || workOrderId,
           after.title || after.type,
           after.priority,
           'escalated',
