@@ -5,6 +5,7 @@
   import CreateTicketModal from './components/CreateTicketModal.svelte';
   import TicketDetailsModal from './components/TicketDetailsModal.svelte';
   import CustomerLookupModal from './components/CustomerLookupModal.svelte';
+  import APKDownload from '$lib/components/APKDownload.svelte';
   
   let tickets: WorkOrder[] = [];
   let filteredTickets: WorkOrder[] = [];
@@ -232,6 +233,11 @@
         <div class="stat-label">Avg Resolution</div>
       </div>
     </div>
+  </div>
+  
+  <!-- Mobile App Download -->
+  <div style="margin-bottom: 2rem;">
+    <APKDownload />
   </div>
   
   <div class="filters">

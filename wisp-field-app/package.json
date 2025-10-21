@@ -1,7 +1,7 @@
 {
-  "name": "wisp-field-app",
+  "name": "wisp-multitool-mobile",
   "version": "1.0.0",
-  "description": "WISP Field Technician Mobile App",
+  "description": "WISP Multitool - Complete Field Operations Platform",
   "main": "index.js",
   "scripts": {
     "android": "react-native run-android",

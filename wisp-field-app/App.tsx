@@ -22,6 +22,7 @@ import TowerDetailsScreen from './src/screens/TowerDetailsScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import DeploymentWizardScreen from './src/screens/DeploymentWizardScreen';
 import WorkOrdersScreen from './src/screens/WorkOrdersScreen';
+import HelpScreen from './src/screens/HelpScreen';
 
 // Ignore specific warnings
 LogBox.ignoreLogs([
@@ -179,6 +180,11 @@ export default function App() {
                 name="WorkOrders"
                 component={WorkOrdersScreen}
                 options={{ title: 'Work Orders' }}
+              />
+              <Stack.Screen
+                name="Help"
+                component={HelpScreen}
+                options={{ title: 'Help & Documentation' }}
               />
             </>
           )}

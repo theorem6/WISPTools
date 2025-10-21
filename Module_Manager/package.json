@@ -1,7 +1,7 @@
 {
-  "name": "lte-wisp-management-platform",
+  "name": "wisp-multitool",
   "version": "1.0.0",
-  "description": "LTE WISP Management Platform - Main Module Manager",
+  "description": "WISP Multitool - Complete wireless ISP management platform",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

@@ -7,6 +7,7 @@
   import { workOrderService, type WorkOrder, type WorkOrderFilters } from '$lib/services/workOrderService';
   import CreateWorkOrderModal from './components/CreateWorkOrderModal.svelte';
   import WorkOrderCard from './components/WorkOrderCard.svelte';
+  import APKDownload from '$lib/components/APKDownload.svelte';
   
   let workOrders: WorkOrder[] = [];
   let isLoading = true;
@@ -181,6 +182,11 @@
         <div class="stat-label">Avg Resolution</div>
       </div>
     </div>
+  </div>
+  
+  <!-- Mobile App Download -->
+  <div class="apk-section">
+    <APKDownload />
   </div>
   
   <!-- Filters -->

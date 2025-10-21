@@ -44,7 +44,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#1f2937" />
       
       <View style={styles.header}>
-        <Text style={styles.title}>WISP Field App</Text>
+        <Text style={styles.title}>WISP Multitool</Text>
         <Text style={styles.subtitle}>📡 {tenantName}</Text>
         <Text style={styles.userEmail}>{userEmail}</Text>
       </View>
@@ -107,6 +107,15 @@ export default function HomeScreen() {
             <Text style={styles.menuSubtextSmall}>My inventory</Text>
           </TouchableOpacity>
         </View>
+        
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={() => navigation.navigate('Help' as never)}
+        >
+          <Text style={styles.menuIcon}>📖</Text>
+          <Text style={styles.menuText}>Help & Documentation</Text>
+          <Text style={styles.menuSubtext}>Guides and troubleshooting</Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -189,6 +198,15 @@ const styles = StyleSheet.create({
   menuSubtextSmall: {
     fontSize: 12,
     color: '#9ca3af'
+  },
+  helpButton: {
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 10,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#8b5cf6'
   },
   logoutButton: {
     margin: 15,

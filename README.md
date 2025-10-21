@@ -1,6 +1,7 @@
-# LTE WISP Management Platform
+# WISP Multitool
 
-> Professional multi-tenant platform for managing LTE wireless networks, CBRS spectrum, CPE devices, and network optimization.
+> **The Complete Wireless ISP Management Platform**  
+> Professional multi-tenant solution for LTE/5G network operations, field technicians, customer support, and network optimization.
 
 ## 📋 Table of Contents
 
@@ -15,7 +16,7 @@
 
 ## 🎯 Overview
 
-The LTE WISP Management Platform is a comprehensive, enterprise-grade solution for wireless ISPs and network operators. Built with modern technologies and a modular architecture, it provides everything needed to manage LTE networks, CBRS spectrum, CPE devices, and optimize network performance.
+**WISP Multitool** is a comprehensive, enterprise-grade platform for wireless ISPs and network operators. Built with modern technologies and a modular architecture, it combines network planning, field operations, customer support, and system monitoring into one powerful platform.
 
 ### Key Capabilities
 

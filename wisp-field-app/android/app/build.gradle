@@ -30,7 +30,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
-        setProperty("archivesBaseName", "WISP-Field-App-v$versionName")
+        setProperty("archivesBaseName", "WISP-Multitool-v$versionName")
     }
 
     signingConfigs {
