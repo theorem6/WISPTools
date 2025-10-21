@@ -29,31 +29,25 @@ export default function QRScannerScreen() {
   const navigation = useNavigation();
 
   useEffect(() => {
-    requestCameraPermission();
+    checkCameraPermission();
   }, []);
 
-  const requestCameraPermission = async () => {
+  const checkCameraPermission = async () => {
     if (Platform.OS === 'android') {
       try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          {
-            title: 'Camera Permission',
-            message: 'This app needs camera access to scan QR codes and barcodes',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.CAMERA
         );
-        setHasPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+        setHasPermission(hasPermission);
         
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        if (!hasPermission) {
+          // Offer to request permission if not granted at startup
           Alert.alert(
-            'Camera Permission Required',
-            'Please enable camera permission in settings to use the scanner, or use manual entry.',
+            'Camera Permission Needed',
+            'Camera access is required to scan barcodes. Grant permission or use manual entry.',
             [
               { text: 'Manual Entry', onPress: () => setShowManualEntry(true) },
-              { text: 'OK' }
+              { text: 'Grant Permission', onPress: requestCameraPermission }
             ]
           );
         }
@@ -62,7 +56,26 @@ export default function QRScannerScreen() {
         setHasPermission(false);
       }
     } else {
-      setHasPermission(true); // iOS handles permissions differently
+      setHasPermission(true);
+    }
+  };
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'WISP Field needs camera access to scan equipment barcodes and QR codes',
+            buttonPositive: 'Allow',
+          }
+        );
+        setHasPermission(granted === PermissionsAndroid.RESULTS.GRANTED);
+      } catch (err) {
+        console.warn(err);
+        setHasPermission(false);
+      }
     }
   };
 
