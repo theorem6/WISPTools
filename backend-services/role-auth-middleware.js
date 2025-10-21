@@ -384,13 +384,15 @@ function requireRole(roles) {
         });
       }
       
-      // Platform admin bypasses role checks
-      if (req.user.isPlatformAdmin) {
+      // Platform admin bypasses ALL role checks
+      if (isPlatformAdmin(req.user.email)) {
         req.userRole = 'platform_admin';
+        req.user.isPlatformAdmin = true;
+        console.log(`✅ Platform admin access granted: ${req.user.email}`);
         return next();
       }
       
-      // Get user's role in tenant
+      // Get user's role in tenant from MongoDB
       const userRole = await getUserTenantRole(req.user.uid, req.tenantId);
       
       if (!userRole) {
@@ -404,7 +406,7 @@ function requireRole(roles) {
       if (!requiredRoles.includes(userRole)) {
         return res.status(403).json({
           error: 'Forbidden',
-          message: `Requires one of: ${requiredRoles.join(', ')}`
+          message: `Requires one of: ${requiredRoles.join(', ')}. You have: ${userRole}`
         });
       }
       
