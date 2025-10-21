@@ -18,7 +18,8 @@ export const setupAdmin = onRequest(
       // Verify the request has authorization
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Unauthorized - Please login first' });
+        res.status(401).json({ error: 'Unauthorized - Please login first' });
+        return;
       }
 
       const token = authHeader.substring(7);
@@ -27,7 +28,8 @@ export const setupAdmin = onRequest(
       try {
         decodedToken = await admin.auth().verifyIdToken(token);
       } catch (error) {
-        return res.status(401).json({ error: 'Invalid token - Please login again' });
+        res.status(401).json({ error: 'Invalid token - Please login again' });
+        return;
       }
 
       const userId = decodedToken.uid;
@@ -39,10 +41,11 @@ export const setupAdmin = onRequest(
       const tenantsSnapshot = await admin.firestore().collection('tenants').get();
 
       if (tenantsSnapshot.empty) {
-        return res.status(404).json({ 
+        res.status(404).json({ 
           error: 'No tenants found',
           message: 'Please create a tenant from the web app first'
         });
+        return;
       }
 
       const results = [];
@@ -59,7 +62,7 @@ export const setupAdmin = onRequest(
           .doc(userTenantId)
           .get();
 
-        if (existingDoc.exists()) {
+        if (existingDoc.exists) {
           results.push({
             tenantId,
             tenantName: tenantData.name || tenantData.displayName,
@@ -112,7 +115,7 @@ export const setupAdmin = onRequest(
 
       console.log('User profile updated');
 
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
         message: `Successfully set up ${userEmail} as owner of ${results.length} tenant(s)`,
         user: {
@@ -131,7 +134,7 @@ export const setupAdmin = onRequest(
 
     } catch (error: any) {
       console.error('Setup admin error:', error);
-      return res.status(500).json({
+      res.status(500).json({
         error: 'Internal server error',
         message: error.message
       });
