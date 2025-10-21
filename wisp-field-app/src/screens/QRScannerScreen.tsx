@@ -1,9 +1,9 @@
 /**
  * QR Code Scanner Screen
- * Scan asset tags and equipment QR codes using Vision Camera
+ * Scan asset tags and equipment QR codes using React Native Camera
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,39 +11,29 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Vibration
+  Vibration,
+  TextInput,
+  Modal
 } from 'react-native';
-import { Camera, useCameraDevice, useCodeScanner } from 'react-native-vision-camera';
+import { RNCamera } from 'react-native-camera';
 import { useNavigation } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
 
 export default function QRScannerScreen() {
   const [isScanning, setIsScanning] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualInput, setManualInput] = useState('');
   const navigation = useNavigation();
-  const device = useCameraDevice('back');
 
-  useEffect(() => {
-    checkCameraPermission();
-  }, []);
-
-  const checkCameraPermission = async () => {
-    const permission = await Camera.requestCameraPermission();
-    setHasPermission(permission === 'granted');
+  const onBarCodeRead = (scanResult: any) => {
+    if (!isScanning || isLoading) return;
+    
+    const scannedData = scanResult.data;
+    if (scannedData) {
+      handleScan(scannedData);
+    }
   };
-
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13', 'code-128'],
-    onCodeScanned: (codes) => {
-      if (!isScanning || isLoading || codes.length === 0) return;
-      
-      const scannedData = codes[0].value;
-      if (scannedData) {
-        handleScan(scannedData);
-      }
-    },
-  });
 
   const handleScan = async (scannedData: string) => {
     console.log('Scanned:', scannedData);
@@ -120,34 +110,6 @@ export default function QRScannerScreen() {
     }
   };
 
-  if (!hasPermission) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Text style={styles.permissionIcon}>📷</Text>
-          <Text style={styles.permissionText}>Camera Permission Required</Text>
-          <Text style={styles.permissionSubtext}>
-            Please grant camera access to scan QR codes
-          </Text>
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={checkCameraPermission}
-          >
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  if (!device) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>No camera device found</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       {isLoading ? (
@@ -164,16 +126,21 @@ export default function QRScannerScreen() {
             </Text>
           </View>
 
-          <Camera
+          <RNCamera
             style={styles.camera}
-            device={device}
-            isActive={isScanning && !isLoading}
-            codeScanner={codeScanner}
-          />
-
-          <View style={styles.overlay}>
-            <View style={styles.scanFrame} />
-          </View>
+            type={RNCamera.Constants.Type.back}
+            onBarCodeRead={onBarCodeRead}
+            barCodeTypes={[
+              RNCamera.Constants.BarCodeType.qr,
+              RNCamera.Constants.BarCodeType.code128,
+              RNCamera.Constants.BarCodeType.ean13
+            ]}
+            captureAudio={false}
+          >
+            <View style={styles.overlay}>
+              <View style={styles.scanFrame} />
+            </View>
+          </RNCamera>
 
           <View style={styles.bottomContent}>
             <TouchableOpacity
@@ -185,21 +152,58 @@ export default function QRScannerScreen() {
             
             <TouchableOpacity
               style={styles.manualButton}
-              onPress={() => {
-                Alert.prompt(
-                  'Manual Entry',
-                  'Enter asset tag or serial number',
-                  async (text) => {
-                    if (text) {
-                      handleScan(text);
-                    }
-                  }
-                );
-              }}
+              onPress={() => setShowManualEntry(true)}
             >
               <Text style={styles.manualText}>⌨️ Manual Entry</Text>
             </TouchableOpacity>
           </View>
+
+          <Modal
+            visible={showManualEntry}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowManualEntry(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Manual Entry</Text>
+                <Text style={styles.modalSubtitle}>
+                  Enter asset tag or serial number
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  value={manualInput}
+                  onChangeText={setManualInput}
+                  placeholder="Asset tag or serial number"
+                  placeholderTextColor="#9ca3af"
+                  autoFocus
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalCancelButton}
+                    onPress={() => {
+                      setShowManualEntry(false);
+                      setManualInput('');
+                    }}
+                  >
+                    <Text style={styles.modalCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalSubmitButton}
+                    onPress={() => {
+                      if (manualInput.trim()) {
+                        handleScan(manualInput.trim());
+                        setShowManualEntry(false);
+                        setManualInput('');
+                      }
+                    }}
+                  >
+                    <Text style={styles.modalSubmitText}>Search</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </>
       )}
     </View>
@@ -327,6 +331,67 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   manualText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: '#1f2937',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginBottom: 20
+  },
+  input: {
+    backgroundColor: '#374151',
+    borderRadius: 8,
+    padding: 15,
+    fontSize: 16,
+    color: '#fff',
+    marginBottom: 20
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#374151',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  modalCancelText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  modalSubmitButton: {
+    flex: 1,
+    backgroundColor: '#7c3aed',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+  modalSubmitText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600'
