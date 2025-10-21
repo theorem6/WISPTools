@@ -37,7 +37,8 @@ router.get('/', async (req, res) => {
     
     res.json(workOrders);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch work orders' });
+    console.error('Error fetching work orders:', error);
+    res.status(500).json({ error: 'Failed to fetch work orders', message: error.message });
   }
 });
 
