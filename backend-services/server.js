@@ -52,8 +52,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
-// ==========
+// API Routes - Only include files that actually exist
+// ==================================================
 
 // Core User Management APIs
 const userManagementAPI = require('./user-management-api');
@@ -70,7 +70,6 @@ const unifiedNetworkAPI = require('./unified-network-api');
 // System APIs
 const monitoringAPI = require('./monitoring-api');
 const distributedEpcAPI = require('./distributed-epc-api');
-const systemManagementRouter = require('./system-management');
 
 // Setup endpoint
 const setupAdminEndpoint = require('./setup-admin-endpoint');
@@ -84,7 +83,6 @@ app.use('/api/inventory', inventoryAPI);
 app.use('/api/network', unifiedNetworkAPI);
 app.use('/api/monitoring', monitoringAPI);
 app.use('/api/epc', distributedEpcAPI);
-app.use('/api/system', systemManagementRouter);
 
 // Admin routes
 app.use('/admin', adminTenantAPI);
