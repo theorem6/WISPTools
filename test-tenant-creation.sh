@@ -9,10 +9,7 @@ cd /opt/hss-api
 echo "1. Checking if david@tenant.com exists in Firebase Auth..."
 node -e "
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+admin.initializeApp();
 
 admin.auth().getUserByEmail('david@tenant.com')
   .then(user => {
