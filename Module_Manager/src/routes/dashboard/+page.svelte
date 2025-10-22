@@ -23,11 +23,11 @@
     {
       id: 'tenant-management',
       name: 'Tenant Management',
-      description: 'Manage all customer organizations and tenant accounts (Admin Only)',
+      description: 'Create and manage organization tenants (Platform Admin Only)',
       icon: '🏢',
       color: 'var(--danger)',
       status: 'active',
-      path: '/modules/tenant-management',
+      path: '/admin/tenant-management',
       adminOnly: true
     },
     {
@@ -253,8 +253,8 @@
         
         <div class="header-actions">
           {#if isAdmin}
-            <button class="btn-create-tenant" on:click={() => goto('/tenant-setup')} title="Create New Organization">
-              ➕ Create Tenant
+            <button class="btn-create-tenant" on:click={() => goto('/admin/tenant-management')} title="Manage Tenants (Platform Admin)">
+              🏢 Manage Tenants
             </button>
           {/if}
           
