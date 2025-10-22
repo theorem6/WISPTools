@@ -1,21 +1,8 @@
-// Tenant Management Service
-// Handles tenant CRUD operations and user-tenant associations
+// Unified Tenant Management Service
+// Uses backend API instead of direct Firestore for consistency with MongoDB user-tenant associations
 
 import { browser } from '$app/environment';
-import { db, type Firestore } from '../firebase';
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  serverTimestamp,
-  type Timestamp
-} from 'firebase/firestore';
+import { auth } from '../firebase';
 import type {
   Tenant,
   UserTenantAssociation,
@@ -24,27 +11,34 @@ import type {
   TenantSettings,
   TenantLimits
 } from '../models/tenant';
-import {
-  DEFAULT_PERMISSIONS,
-  DEFAULT_TENANT_SETTINGS,
-  DEFAULT_TENANT_LIMITS,
-  getCWMPUrl
-} from '../models/tenant';
 
 export class TenantService {
   private baseUrl: string;
+  private apiBaseUrl: string;
 
   constructor() {
     // Get base URL from environment or construct it
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
+    
+    // Backend API URL via hssProxy Cloud Function
+    this.apiBaseUrl = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
   }
 
   /**
-   * Get Firestore instance (lazy)
+   * Get authentication headers for API calls
    */
-  private getDb(): Firestore {
-    return db(); // Call as function
+  private async getAuthHeaders(): Promise<HeadersInit> {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
+    const token = await user.getIdToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
   }
 
   /**
@@ -56,53 +50,31 @@ export class TenantService {
     contactEmail: string,
     createdBy: string,
     subdomain?: string,
-    createOwnerAssociation: boolean = false
+    createOwnerAssociation: boolean = false,
+    ownerEmail?: string
   ): Promise<{ success: boolean; tenantId?: string; error?: string }> {
     try {
-      // No restriction on tenant creation - only platform admin can access this function anyway
-
-      // Generate unique subdomain if not provided
-      if (!subdomain) {
-        subdomain = this.generateSubdomain(name);
-      }
-
-      // Check if subdomain is already taken
-      const existingTenant = await this.getTenantBySubdomain(subdomain);
-      if (existingTenant) {
-        return { success: false, error: 'Subdomain already taken' };
-      }
-
-      const tenantId = `tenant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const headers = await this.getAuthHeaders();
       
-      const tenant: Tenant = {
-        id: tenantId,
-        name,
-        displayName,
-        subdomain,
-        cwmpUrl: getCWMPUrl({ subdomain } as Tenant, this.baseUrl),
-        contactEmail,
-        settings: DEFAULT_TENANT_SETTINGS,
-        limits: DEFAULT_TENANT_LIMITS,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy,
-        status: 'active'
-      };
-
-      // Save to Firestore
-      await setDoc(doc(this.getDb(), 'tenants', tenantId), {
-        ...tenant,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name,
+          displayName,
+          contactEmail,
+          subdomain,
+          ownerEmail: createOwnerAssociation ? ownerEmail : undefined
+        })
       });
 
-      // Only associate creator as owner if requested
-      // Platform admins should NOT be associated with tenants they create
-      if (createOwnerAssociation) {
-        await this.addUserToTenant(createdBy, tenantId, 'owner');
+      if (!response.ok) {
+        const error = await response.json();
+        return { success: false, error: error.message || 'Failed to create tenant' };
       }
 
-      return { success: true, tenantId };
+      const result = await response.json();
+      return { success: true, tenantId: result.tenant.id };
     } catch (error) {
       console.error('Error creating tenant:', error);
       return { success: false, error: String(error) };
@@ -114,16 +86,20 @@ export class TenantService {
    */
   async getTenant(tenantId: string): Promise<Tenant | null> {
     try {
-      const tenantDoc = await getDoc(doc(this.getDb(), 'tenants', tenantId));
-      if (!tenantDoc.exists()) return null;
+      const headers = await this.getAuthHeaders();
       
-      const data = tenantDoc.data();
-      return {
-        ...data,
-        id: tenantDoc.id,
-        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date()
-      } as Tenant;
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`Failed to get tenant: ${response.statusText}`);
+      }
+
+      const tenant = await response.json();
+      return this.mapApiTenantToTenant(tenant);
     } catch (error) {
       console.error('Error getting tenant:', error);
       return null;
@@ -131,110 +107,23 @@ export class TenantService {
   }
 
   /**
-   * Get tenant by subdomain
-   */
-  async getTenantBySubdomain(subdomain: string): Promise<Tenant | null> {
-    try {
-      const q = query(
-        collection(this.getDb(), 'tenants'),
-        where('subdomain', '==', subdomain)
-      );
-      const snapshot = await getDocs(q);
-      
-      if (snapshot.empty) return null;
-      
-      const doc = snapshot.docs[0];
-      const data = doc.data();
-      return {
-        ...data,
-        id: doc.id,
-        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date()
-      } as Tenant;
-    } catch (error) {
-      console.error('Error getting tenant by subdomain:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get all tenants for a user
-   * Now queries MongoDB via backend API instead of Firestore
-   */
-  async getUserTenants(userId: string): Promise<Tenant[]> {
-    try {
-      // Get Firebase auth token
-      const { auth } = await import('../firebase');
-      const currentUser = auth().currentUser;
-      
-      if (!currentUser) {
-        console.error('[TenantService] No authenticated user');
-        return [];
-      }
-      
-      const token = await currentUser.getIdToken();
-      
-      // Query backend API for user's tenant memberships
-      const hssProxyUrl = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
-      const response = await fetch(`${hssProxyUrl}/api/user-tenants/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        console.error('[TenantService] Failed to fetch user tenants:', response.statusText);
-        return [];
-      }
-      
-      const userTenants = await response.json();
-      
-      if (!Array.isArray(userTenants) || userTenants.length === 0) {
-        console.log('[TenantService] User has no tenant associations');
-        return [];
-      }
-      
-      // Get tenant details from Firestore for each tenantId
-      const tenants: Tenant[] = [];
-      for (const userTenant of userTenants) {
-        if (userTenant.status !== 'active') {
-          console.log(`[TenantService] Skipping inactive tenant: ${userTenant.tenantId}`);
-          continue;
-        }
-        
-        const tenant = await this.getTenant(userTenant.tenantId);
-        if (tenant) {
-          tenants.push(tenant);
-        }
-      }
-      
-      console.log(`[TenantService] Found ${tenants.length} active tenants for user`);
-      return tenants;
-    } catch (error) {
-      console.error('[TenantService] Error getting user tenants:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get ALL tenants (admin only)
+   * Get all tenants (admin only)
    */
   async getAllTenants(): Promise<Tenant[]> {
     try {
-      const tenantsCollection = collection(this.getDb(), 'tenants');
-      const snapshot = await getDocs(tenantsCollection);
+      const headers = await this.getAuthHeaders();
       
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-          updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date()
-        } as Tenant;
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants`, {
+        method: 'GET',
+        headers
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get tenants: ${response.statusText}`);
+      }
+
+      const tenants = await response.json();
+      return tenants.map((tenant: any) => this.mapApiTenantToTenant(tenant));
     } catch (error) {
       console.error('Error getting all tenants:', error);
       return [];
@@ -242,113 +131,99 @@ export class TenantService {
   }
 
   /**
-   * Get user's role in a tenant
+   * Update a tenant
    */
-  async getUserRole(userId: string, tenantId: string): Promise<TenantRole | null> {
-    try {
-      const associationId = `${userId}_${tenantId}`;
-      const associationDoc = await getDoc(
-        doc(this.getDb(), 'user_tenants', associationId)
-      );
-      
-      if (!associationDoc.exists()) return null;
-      return associationDoc.data().role as TenantRole;
-    } catch (error) {
-      console.error('Error getting user role:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Add user to tenant
-   */
-  async addUserToTenant(
-    userId: string,
-    tenantId: string,
-    role: TenantRole,
-    invitedBy?: string
+  async updateTenant(
+    tenantId: string, 
+    updates: Partial<Tenant>
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const associationId = `${userId}_${tenantId}`;
+      const headers = await this.getAuthHeaders();
       
-      const association: any = {
-        userId,
-        tenantId,
-        role,
-        permissions: DEFAULT_PERMISSIONS[role],
-        createdAt: serverTimestamp()
-      };
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updates)
+      });
 
-      // Only add invitedBy if it's provided
-      if (invitedBy) {
-        association.invitedBy = invitedBy;
+      if (!response.ok) {
+        const error = await response.json();
+        return { success: false, error: error.message || 'Failed to update tenant' };
       }
 
-      await setDoc(doc(this.getDb(), 'user_tenants', associationId), association);
-
       return { success: true };
     } catch (error) {
-      console.error('Error adding user to tenant:', error);
+      console.error('Error updating tenant:', error);
       return { success: false, error: String(error) };
     }
   }
 
   /**
-   * Remove user from tenant
+   * Delete a tenant (admin only)
    */
-  async removeUserFromTenant(
-    userId: string,
-    tenantId: string
-  ): Promise<{ success: boolean; error?: string }> {
+  async deleteTenant(tenantId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const associationId = `${userId}_${tenantId}`;
-      await deleteDoc(doc(this.getDb(), 'user_tenants', associationId));
-      return { success: true };
-    } catch (error) {
-      console.error('Error removing user from tenant:', error);
-      return { success: false, error: String(error) };
-    }
-  }
-
-  /**
-   * Update user role in tenant
-   */
-  async updateUserRole(
-    userId: string,
-    tenantId: string,
-    newRole: TenantRole
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const associationId = `${userId}_${tenantId}`;
-      await updateDoc(doc(this.getDb(), 'user_tenants', associationId), {
-        role: newRole,
-        permissions: DEFAULT_PERMISSIONS[newRole]
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating user role:', error);
-      return { success: false, error: String(error) };
-    }
-  }
-
-  /**
-   * Get all users in a tenant
-   */
-  async getTenantUsers(tenantId: string): Promise<UserTenantAssociation[]> {
-    try {
-      const q = query(
-        collection(this.getDb(), 'user_tenants'),
-        where('tenantId', '==', tenantId)
-      );
-      const snapshot = await getDocs(q);
+      const headers = await this.getAuthHeaders();
       
-      return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          createdAt: (data.createdAt as Timestamp)?.toDate() || new Date()
-        } as UserTenantAssociation;
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}`, {
+        method: 'DELETE',
+        headers
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return { success: false, error: error.message || 'Failed to delete tenant' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting tenant:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Assign owner to a tenant
+   */
+  async assignOwner(tenantId: string, email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}/assign-owner`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return { success: false, error: error.message || 'Failed to assign owner' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error assigning owner:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Get users in a tenant
+   */
+  async getTenantUsers(tenantId: string): Promise<any[]> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}/users`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get tenant users: ${response.statusText}`);
+      }
+
+      return await response.json();
     } catch (error) {
       console.error('Error getting tenant users:', error);
       return [];
@@ -356,218 +231,137 @@ export class TenantService {
   }
 
   /**
-   * Update tenant settings
+   * Get user tenants (for regular users)
    */
-  async updateTenantSettings(
-    tenantId: string,
-    settings: Partial<TenantSettings>
-  ): Promise<{ success: boolean; error?: string }> {
+  async getUserTenants(userId: string): Promise<Tenant[]> {
     try {
-      await updateDoc(doc(this.getDb(), 'tenants', tenantId), {
-        settings: settings,
-        updatedAt: serverTimestamp()
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating tenant settings:', error);
-      return { success: false, error: String(error) };
-    }
-  }
-
-  /**
-   * Update tenant limits
-   */
-  async updateTenantLimits(
-    tenantId: string,
-    limits: Partial<TenantLimits>
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      await updateDoc(doc(this.getDb(), 'tenants', tenantId), {
-        limits: limits,
-        updatedAt: serverTimestamp()
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('Error updating tenant limits:', error);
-      return { success: false, error: String(error) };
-    }
-  }
-
-  /**
-   * Create tenant invitation
-   */
-  async createInvitation(
-    tenantId: string,
-    email: string,
-    role: TenantRole,
-    invitedBy: string
-  ): Promise<{ success: boolean; invitationId?: string; error?: string }> {
-    try {
-      const invitationId = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+      const headers = await this.getAuthHeaders();
       
-      const invitation: TenantInvitation = {
-        id: invitationId,
-        tenantId,
-        email,
-        role,
-        invitedBy,
-        invitedAt: new Date(),
-        expiresAt,
-        status: 'pending'
-      };
-
-      await setDoc(doc(this.getDb(), 'tenant_invitations', invitationId), {
-        ...invitation,
-        invitedAt: serverTimestamp(),
-        expiresAt: expiresAt
+      const response = await fetch(`${this.apiBaseUrl}/api/user-tenants/${userId}`, {
+        method: 'GET',
+        headers
       });
 
-      return { success: true, invitationId };
-    } catch (error) {
-      console.error('Error creating invitation:', error);
-      return { success: false, error: String(error) };
-    }
-  }
+      if (!response.ok) {
+        throw new Error(`Failed to get user tenants: ${response.statusText}`);
+      }
 
-  /**
-   * Accept tenant invitation
-   */
-  async acceptInvitation(
-    invitationId: string,
-    userId: string
-  ): Promise<{ success: boolean; tenantId?: string; error?: string }> {
-    try {
-      const invitationDoc = await getDoc(
-        doc(this.getDb(), 'tenant_invitations', invitationId)
-      );
+      const userTenants = await response.json();
       
-      if (!invitationDoc.exists()) {
-        return { success: false, error: 'Invitation not found' };
+      // Get tenant details for each user-tenant association
+      const tenants: Tenant[] = [];
+      for (const userTenant of userTenants) {
+        const tenant = await this.getTenant(userTenant.tenantId);
+        if (tenant) {
+          tenants.push(tenant);
+        }
       }
       
-      const invitation = invitationDoc.data() as TenantInvitation;
-      
-      if (invitation.status !== 'pending') {
-        return { success: false, error: 'Invitation already used or expired' };
-      }
-      
-      if (new Date() > invitation.expiresAt) {
-        return { success: false, error: 'Invitation has expired' };
-      }
-      
-      // Add user to tenant
-      await this.addUserToTenant(userId, invitation.tenantId, invitation.role, invitation.invitedBy);
-      
-      // Update invitation status
-      await updateDoc(doc(this.getDb(), 'tenant_invitations', invitationId), {
-        status: 'accepted',
-        acceptedAt: serverTimestamp(),
-        acceptedBy: userId
-      });
-      
-      return { success: true, tenantId: invitation.tenantId };
+      return tenants;
     } catch (error) {
-      console.error('Error accepting invitation:', error);
-      return { success: false, error: String(error) };
+      console.error('Error getting user tenants:', error);
+      return [];
     }
   }
 
   /**
-   * Generate a unique subdomain from tenant name
+   * Map API tenant response to Tenant model
+   */
+  private mapApiTenantToTenant(apiTenant: any): Tenant {
+    return {
+      id: apiTenant.id,
+      name: apiTenant.name,
+      displayName: apiTenant.displayName,
+      subdomain: apiTenant.subdomain,
+      cwmpUrl: apiTenant.cwmpUrl,
+      contactEmail: apiTenant.contactEmail,
+      settings: apiTenant.settings || {
+        allowSelfRegistration: false,
+        requireEmailVerification: true,
+        maxUsers: 50,
+        maxDevices: 1000,
+        features: {
+          acs: true,
+          hss: true,
+          pci: true,
+          helpDesk: true,
+          userManagement: true,
+          customerManagement: true
+        }
+      },
+      limits: apiTenant.limits || {
+        maxUsers: 50,
+        maxDevices: 1000,
+        maxNetworks: 10,
+        maxTowerSites: 100
+      },
+      createdAt: new Date(apiTenant.createdAt),
+      updatedAt: new Date(apiTenant.updatedAt),
+      createdBy: apiTenant.createdBy,
+      status: apiTenant.status || 'active'
+    };
+  }
+
+  /**
+   * Generate subdomain from name
    */
   private generateSubdomain(name: string): string {
-    // Convert to lowercase, remove special chars, replace spaces with hyphens
-    let subdomain = name
+    return name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .trim();
-    
-    // Add random suffix to ensure uniqueness
-    subdomain += `-${Math.random().toString(36).substr(2, 6)}`;
-    
-    return subdomain;
   }
 
   /**
-   * Check if user has permission in tenant
+   * Get tenant by subdomain
+   */
+  async getTenantBySubdomain(subdomain: string): Promise<Tenant | null> {
+    try {
+      const tenants = await this.getAllTenants();
+      return tenants.find(t => t.subdomain === subdomain) || null;
+    } catch (error) {
+      console.error('Error getting tenant by subdomain:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Add user to tenant (legacy method - now handled by user management API)
+   */
+  async addUserToTenant(
+    userId: string, 
+    tenantId: string, 
+    role: TenantRole
+  ): Promise<{ success: boolean; error?: string }> {
+    console.warn('addUserToTenant is deprecated - use user management API instead');
+    return { success: false, error: 'Use user management API instead' };
+  }
+
+  /**
+   * Remove user from tenant (legacy method - now handled by user management API)
+   */
+  async removeUserFromTenant(
+    userId: string, 
+    tenantId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    console.warn('removeUserFromTenant is deprecated - use user management API instead');
+    return { success: false, error: 'Use user management API instead' };
+  }
+
+  /**
+   * Check if user has permission in tenant (legacy method)
    */
   async checkPermission(
     userId: string,
     tenantId: string,
     permission: keyof import('../models/tenant').TenantPermissions
   ): Promise<boolean> {
-    try {
-      const associationId = `${userId}_${tenantId}`;
-      const associationDoc = await getDoc(
-        doc(this.getDb(), 'user_tenants', associationId)
-      );
-      
-      if (!associationDoc.exists()) return false;
-      
-      const association = associationDoc.data() as UserTenantAssociation;
-      return association.permissions[permission];
-    } catch (error) {
-      console.error('Error checking permission:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Delete a tenant and all associated data (ADMIN ONLY)
-   * This performs a hard delete and removes:
-   * - The tenant document
-   * - All user-tenant associations
-   * - All pending invitations
-   * Note: Tenant-specific data (devices, configs) should be deleted separately if needed
-   */
-  async deleteTenant(tenantId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      console.log(`Starting deletion of tenant: ${tenantId}`);
-      
-      // Verify tenant exists
-      const tenant = await this.getTenant(tenantId);
-      if (!tenant) {
-        return { success: false, error: 'Tenant not found' };
-      }
-
-      // Delete all user-tenant associations
-      const userAssociations = await this.getTenantUsers(tenantId);
-      console.log(`Deleting ${userAssociations.length} user associations...`);
-      
-      for (const association of userAssociations) {
-        const associationId = `${association.userId}_${tenantId}`;
-        await deleteDoc(doc(this.getDb(), 'user_tenants', associationId));
-      }
-
-      // Delete all pending invitations for this tenant
-      const invitationsQuery = query(
-        collection(this.getDb(), 'tenant_invitations'),
-        where('tenantId', '==', tenantId)
-      );
-      const invitationsSnapshot = await getDocs(invitationsQuery);
-      console.log(`Deleting ${invitationsSnapshot.docs.length} invitations...`);
-      
-      for (const invDoc of invitationsSnapshot.docs) {
-        await deleteDoc(invDoc.ref);
-      }
-
-      // Delete the tenant document itself
-      console.log(`Deleting tenant document...`);
-      await deleteDoc(doc(this.getDb(), 'tenants', tenantId));
-
-      console.log(`Tenant ${tenantId} deleted successfully`);
-      return { success: true };
-    } catch (error) {
-      console.error('Error deleting tenant:', error);
-      return { success: false, error: String(error) };
-    }
+    console.warn('checkPermission is deprecated - use role-based access control instead');
+    return false;
   }
 }
 
-// Singleton instance
+// Export singleton instance
 export const tenantService = new TenantService();
-
