@@ -13,7 +13,7 @@ const { UserTenant } = require('./user-schema');
  * Get all tenant memberships for a user
  * Used during login to determine which tenants the user has access to
  */
-router.get('/:userId', verifyAuth(), async (req, res) => {
+router.get('/:userId', verifyAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     
