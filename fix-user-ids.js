@@ -5,33 +5,30 @@
 
 const admin = require('firebase-admin');
 const mongoose = require('mongoose');
+const { UserTenant } = require('./user-schema');
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin (check if already initialized by server.js)
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-  });
+  // Load service account from environment or file
+  const serviceAccount = process.env.GOOGLE_APPLICATION_CREDENTIALS 
+    ? require(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+    : null;
+  
+  if (serviceAccount) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  } else {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault()
+    });
+  }
 }
 
-// MongoDB connection
-const MONGODB_URI = 'mongodb+srv://admin:WJANdi3M9qLGhxdT@cluster0.vwchurv.mongodb.net/hss_management?retryWrites=true&w=majority';
+// MongoDB connection - use same as server.js
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:WJANdi3M9qLGhxdT@cluster0.vwchurv.mongodb.net/hss_management?retryWrites=true&w=majority&appName=hss-api';
 
-// User-Tenant schema
-const userTenantSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
-  tenantId: { type: String, required: true },
-  role: { type: String, required: true },
-  status: { type: String, default: 'active' },
-  invitedBy: String,
-  invitedAt: Date,
-  acceptedAt: Date,
-  addedAt: { type: Date, default: Date.now },
-  lastAccessAt: Date,
-  moduleAccess: Object,
-  workOrderPermissions: Object
-}, { collection: 'user_tenants' });
-
-const UserTenant = mongoose.model('UserTenant', userTenantSchema);
+// UserTenant model is imported from user-schema.js
 
 async function fixUserIds() {
   try {
