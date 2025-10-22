@@ -58,25 +58,19 @@ service cloud.firestore {
     // ============================================================================
 
     // Tenants collection
+    // NOTE: User-tenant associations are now in MongoDB, not Firestore
+    // Access control is enforced by backend API, Firestore just stores tenant metadata
     match /tenants/{tenantId} {
       // Anyone authenticated can create a tenant
       allow create: if isAuthenticated();
       
-      // Allow authenticated users to check subdomain uniqueness (limited query)
-      // Platform admin can list all tenants
-      allow list: if isAuthenticated();
+      // Anyone authenticated can list/read tenants
+      // Backend API will enforce proper access control
+      allow list, read: if isAuthenticated();
       
-      // Can read if member of tenant OR creator OR platform admin
-      allow read: if isAuthenticated() && 
-                    (isTenantMember(tenantId) || 
-                     resource.data.createdBy == request.auth.uid || 
-                     isPlatformAdmin());
-      
-      // Can update if admin of tenant OR platform admin
-      allow update: if isTenantAdmin(tenantId) || isPlatformAdmin();
-      
-      // Can delete if owner OR platform admin
-      allow delete: if isTenantOwner(tenantId) || isPlatformAdmin();
+      // Platform admin can update/delete
+      // Regular users should use backend API which enforces MongoDB-based permissions
+      allow update, delete: if isPlatformAdmin();
 
       // Tenant subcollections
       match /cpe_devices/{deviceId} {
