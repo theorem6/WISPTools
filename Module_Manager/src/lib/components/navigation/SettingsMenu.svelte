@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import ThemeSwitcher from './ThemeSwitcher.svelte';
+  import ThemeSwitcher from '../common/ThemeSwitcher.svelte';
   
   const dispatch = createEventDispatcher();
   

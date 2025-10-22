@@ -4,8 +4,8 @@
   import { currentNetwork } from '../stores/networkStore';
   import { convertLegacyToCellSite, convertCellSiteToLegacy, type CellSite } from '../models/cellSite';
   import type { Cell } from '../pciMapper';
-  import SiteEditor from './SiteEditor.svelte';
-  import ImportWizard from './ImportWizard.svelte';
+  import SiteEditor from '../forms/SiteEditor.svelte';
+  import ImportWizard from '../forms/ImportWizard.svelte';
   
   export let show = false;
   

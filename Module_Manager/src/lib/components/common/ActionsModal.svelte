@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import ManualImport from './ManualImport.svelte';
-  import ConflictReportExport from './ConflictReportExport.svelte';
+  import ManualImport from '../forms/ManualImport.svelte';
+  import ConflictReportExport from '../data-display/ConflictReportExport.svelte';
   import type { Cell, PCIConflict } from '../pciMapper';
   
   export let show = false;

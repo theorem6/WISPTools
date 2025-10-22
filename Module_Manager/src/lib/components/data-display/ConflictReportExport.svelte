@@ -1,7 +1,7 @@
 <script lang="ts">
   import { reportGenerator, type ConflictReport } from '$lib/reportGenerator';
   import type { Cell, PCIConflict } from '$lib/pciMapper';
-  import NokiaConfig from './NokiaConfig.svelte';
+  import NokiaConfig from '../acs/NokiaConfig.svelte';
 
   export let cells: Cell[] = [];
   export let conflicts: PCIConflict[] = [];

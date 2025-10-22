@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
-  import ConflictReportExport from './ConflictReportExport.svelte';
+  import ConflictReportExport from '../data-display/ConflictReportExport.svelte';
   import type { Cell, PCIConflict } from '../pciMapper';
   
   export let cells: Cell[] = [];
