@@ -2,9 +2,9 @@
  * User Management System API Server
  * 
  * PORT ALLOCATION:
- * - Port 3000: GenieACS UI (DO NOT USE)
- * - Port 3001: User Management System API (THIS SERVICE)
- * - Port 3002: Open5GS HSS (DO NOT USE)
+ * - Port 3000: User Management System API (THIS SERVICE)
+ * - Port 3001: Open5GS HSS (DO NOT USE)
+ * - Port 3002: GenieACS UI (DO NOT USE)
  * 
  * This server handles:
  * - User-tenant associations
@@ -21,7 +21,7 @@ require('dotenv').config();
 
 // Initialize Express
 const app = express();
-const PORT = process.env.PORT || 3001; // User Management System
+const PORT = process.env.PORT || 3000; // User Management System
 
 // Middleware
 app.use(cors());
@@ -48,7 +48,7 @@ app.get('/health', (req, res) => {
     port: PORT,
     timestamp: new Date().toISOString(),
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    note: 'User Management System API - Port 3001'
+    note: 'User Management System API - Port 3000'
   });
 });
 
@@ -93,8 +93,8 @@ app.use('/setup-admin', setupAdminEndpoint);
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 User Management System API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔍 Service: User Management System (Port 3001)`);
-  console.log(`⚠️  Note: GenieACS UI uses port 3000, Open5GS HSS uses port 3002`);
+  console.log(`🔍 Service: User Management System (Port 3000)`);
+  console.log(`⚠️  Note: Open5GS HSS uses port 3001, GenieACS UI uses port 3002`);
 });
 
 // Graceful shutdown
