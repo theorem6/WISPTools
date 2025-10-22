@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Chart from '$lib/components/Chart.svelte';
+  import Chart from '$lib/components/data-display/Chart.svelte';
   import {
     Chart as ChartJS,
     Title,

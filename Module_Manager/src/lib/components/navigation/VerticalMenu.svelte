@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { authStore, currentUser, isAuthenticated } from '../stores/authStore';
-  import { authService } from '../services/authService';
-  import { networkStore, currentNetwork } from '../stores/networkStore';
-  import { resetAllStores } from '../stores/appState';
+  import { authStore, currentUser, isAuthenticated } from '../../stores/authStore';
+  import { authService } from '../../services/authService';
+  import { networkStore, currentNetwork } from '../../stores/networkStore';
+  import { resetAllStores } from '../../stores/appState';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   

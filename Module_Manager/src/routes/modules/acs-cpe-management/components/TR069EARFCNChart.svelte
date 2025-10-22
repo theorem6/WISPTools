@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Chart from '$lib/components/Chart.svelte';
+  import Chart from '$lib/components/data-display/Chart.svelte';
   import type { ChartConfiguration } from '$lib/chartSetup';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getLTEBandName } from '../lib/tr069MetricsService';
