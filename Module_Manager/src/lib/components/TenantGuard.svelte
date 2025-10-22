@@ -75,7 +75,7 @@
           // No tenant selected - load user's tenants
           if (currentUser) {
             console.log('[TenantGuard] No tenant selected, loading user tenants...');
-            const tenants = await tenantStore.loadUserTenants(currentUser.uid);
+            const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
             
             if (tenants.length === 0) {
               // No tenants at all - redirect to setup
