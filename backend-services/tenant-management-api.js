@@ -182,10 +182,13 @@ router.post('/', async (req, res) => {
     
     await tenant.save();
     
-    // If ownerEmail is provided, create owner association
-    if (ownerEmail) {
+    // Use contactEmail as owner if ownerEmail is not explicitly provided
+    const finalOwnerEmail = ownerEmail || contactEmail;
+    
+    // Create owner association for the contact/owner email
+    if (finalOwnerEmail) {
       try {
-        const firebaseUser = await admin.auth().getUserByEmail(ownerEmail);
+        const firebaseUser = await admin.auth().getUserByEmail(finalOwnerEmail);
         
         const userTenant = new UserTenant({
           userId: firebaseUser.uid,
@@ -200,9 +203,10 @@ router.post('/', async (req, res) => {
         
         await userTenant.save();
         
-        console.log(`✅ Created tenant "${displayName}" with owner ${ownerEmail}`);
+        console.log(`✅ Created tenant "${displayName}" with owner ${finalOwnerEmail}`);
       } catch (error) {
-        console.error(`⚠️ Created tenant but failed to assign owner ${ownerEmail}:`, error.message);
+        console.error(`⚠️ Created tenant but failed to assign owner ${finalOwnerEmail}:`, error.message);
+        // Note: If the user doesn't exist in Firebase yet, they can log in later and will be auto-assigned
       }
     }
     
