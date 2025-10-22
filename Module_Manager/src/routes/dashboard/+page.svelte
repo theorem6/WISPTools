@@ -252,6 +252,12 @@
         </div>
         
         <div class="header-actions">
+          {#if isAdmin}
+            <button class="btn-create-tenant" on:click={() => goto('/tenant-setup')} title="Create New Organization">
+              ➕ Create Tenant
+            </button>
+          {/if}
+          
           {#if tenantName}
             <div class="tenant-info">
               <span class="tenant-icon">🏢</span>
@@ -391,6 +397,24 @@
     display: flex;
     align-items: center;
     gap: 1.5rem;
+  }
+
+  .btn-create-tenant {
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-create-tenant:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
   }
 
   .theme-toggle {

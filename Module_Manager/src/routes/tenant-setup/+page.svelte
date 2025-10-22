@@ -24,62 +24,25 @@
 
     console.log('[Tenant Setup] Page loaded');
 
-    // CRITICAL: Initialize tenant store if not already initialized
-    await tenantStore.initialize();
-    
-    // Get current tenant state
-    let tenantState: any = null;
-    const unsubscribe = tenantStore.subscribe((state: any) => {
-      tenantState = state;
-    });
-    
-    // Check if setup was already completed - block access if true
-    if (tenantState.currentTenant || tenantState.setupCompleted) {
-      console.log('[Tenant Setup] Setup already completed, BLOCKING access to setup page');
-      console.log('[Tenant Setup] Current tenant:', tenantState.currentTenant?.displayName);
-      
-      unsubscribe();
-      await goto('/dashboard', { replaceState: true });
-      return;
-    }
-
     // Check if user is authenticated
     currentUser = authService.getCurrentUser();
     if (!currentUser) {
       console.log('[Tenant Setup] User not authenticated, redirecting to login');
-      unsubscribe();
       await goto('/login');
       return;
     }
 
-    contactEmail = currentUser.email || '';
-
-    // IMPORTANT: Enforce one tenant per user rule
-    // Check if user already has a tenant
-    try {
-      console.log('[Tenant Setup] Checking if user already has tenants...');
-      const existingTenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
-      console.log('[Tenant Setup] Found', existingTenants.length, 'existing tenants');
-      
-      if (existingTenants.length > 0) {
-        // User already has an organization - redirect to dashboard
-        console.log('[Tenant Setup] User already has an organization, redirecting to dashboard');
-        
-        // Auto-select their organization using the store
-        tenantStore.setCurrentTenant(existingTenants[0]);
-        
-        unsubscribe();
-        await goto('/dashboard', { replaceState: true });
-        return;
-      }
-      
-      console.log('[Tenant Setup] No existing tenants, showing setup form');
-    } catch (err) {
-      console.error('[Tenant Setup] Error loading tenants:', err);
-      error = 'Failed to check existing organizations. Please refresh the page.';
+    // CRITICAL: Only platform admin can create tenants
+    const isPlatformAdmin = currentUser.email === 'david@david.com';
+    if (!isPlatformAdmin) {
+      console.log('[Tenant Setup] ACCESS DENIED - Only platform admin can create tenants');
+      error = 'Access Denied: Only platform administrators can create new organizations.';
+      await goto('/dashboard', { replaceState: true });
+      return;
     }
-    
-    unsubscribe();
+
+    console.log('[Tenant Setup] Platform admin access confirmed');
+    contactEmail = currentUser.email || '';
   });
 
   function generateSubdomain() {
@@ -110,14 +73,15 @@
     }
 
     try {
-      // Regular users creating their own tenant SHOULD become owner
+      // Platform admin creating tenant should NOT be added as owner
+      // They will assign an owner separately via the admin panel
       const result = await tenantService.createTenant(
         tenantName,
         displayName,
         contactEmail,
         currentUser.uid,
         subdomain,
-        true  // Create owner association for regular users
+        false  // Do NOT create owner association for platform admin
       );
 
       if (result.success && result.tenantId) {
