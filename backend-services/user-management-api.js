@@ -194,12 +194,10 @@ router.post('/invite', requireAdmin, async (req, res) => {
     
     const userId = userRecord ? userRecord.uid : null;
     
-    // Check if user is already in this tenant
+    // Check if user already exists in MongoDB
     if (userId) {
-      const userTenantId = `${userId}_${tenantId}`;
-      const existingDoc = await db.collection('user_tenants').doc(userTenantId).get();
-      
-      if (existingDoc.exists) {
+      const existing = await UserTenant.findOne({ userId, tenantId });
+      if (existing) {
         return res.status(409).json({
           error: 'Conflict',
           message: 'User is already a member of this tenant'
@@ -207,37 +205,42 @@ router.post('/invite', requireAdmin, async (req, res) => {
       }
     }
     
-    // Create invitation record
-    const invitationId = db.collection('tenant_invitations').doc().id;
-    const invitation = {
-      id: invitationId,
-      tenantId,
-      email,
-      role,
-      customModuleAccess: customModuleAccess || null,
-      invitedBy: req.user.uid,
-      invitedAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: 'pending',
-      expiresAt: admin.firestore.Timestamp.fromDate(
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-      )
-    };
-    
-    await db.collection('tenant_invitations').doc(invitationId).set(invitation);
-    
-    // If user exists, also create user_tenant record
+    // If user exists in Firebase, create active record immediately in MongoDB
     if (userId) {
-      const userTenantId = `${userId}_${tenantId}`;
-      await db.collection('user_tenants').doc(userTenantId).set({
+      const userTenant = new UserTenant({
         userId,
         tenantId,
         role,
         moduleAccess: customModuleAccess || null,
-        status: 'pending_invitation',
+        status: 'active', // Active immediately since user exists
+        invitedBy: req.user.uid,
+        invitedAt: new Date(),
+        acceptedAt: new Date(),
+        addedAt: new Date()
+      });
+      
+      await userTenant.save();
+      console.log(`✅ Created active user-tenant record for ${email} (${userId})`);
+    } else {
+      // User doesn't exist - store invitation in Firestore for now
+      // When they sign up, we'll create the MongoDB record
+      const invitationId = `inv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const invitation = {
+        id: invitationId,
+        tenantId,
+        email,
+        role,
+        customModuleAccess: customModuleAccess || null,
         invitedBy: req.user.uid,
         invitedAt: admin.firestore.FieldValue.serverTimestamp(),
-        addedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+        status: 'pending',
+        expiresAt: admin.firestore.Timestamp.fromDate(
+          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        )
+      };
+      
+      await admin.firestore().collection('tenant_invitations').doc(invitationId).set(invitation);
+      console.log(`📧 Created invitation for ${email} (user doesn't exist yet)`);
     }
     
     // TODO: Send invitation email
@@ -292,18 +295,15 @@ router.put('/:userId/role', requireAdmin, async (req, res) => {
       });
     }
     
-    // Get user_tenant record
-    const userTenantId = `${userId}_${tenantId}`;
-    const userTenantDoc = await db.collection('user_tenants').doc(userTenantId).get();
+    // Get user_tenant record from MongoDB
+    const userTenant = await UserTenant.findOne({ userId, tenantId });
     
-    if (!userTenantDoc.exists) {
+    if (!userTenant) {
       return res.status(404).json({
         error: 'Not Found',
         message: 'User not found in tenant'
       });
     }
-    
-    const userTenant = userTenantDoc.data();
     
     // Cannot change owner role
     if (userTenant.role === 'owner') {
@@ -313,12 +313,11 @@ router.put('/:userId/role', requireAdmin, async (req, res) => {
       });
     }
     
-    // Update role
-    await db.collection('user_tenants').doc(userTenantId).update({
-      role,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedBy: req.user.uid
-    });
+    // Update role in MongoDB
+    userTenant.role = role;
+    userTenant.updatedAt = new Date();
+    userTenant.updatedBy = req.user.uid;
+    await userTenant.save();
     
     res.json({
       message: 'User role updated successfully',
