@@ -70,6 +70,7 @@ const unifiedNetworkAPI = require('./unified-network-api');
 // System APIs
 const monitoringAPI = require('./monitoring-api');
 const distributedEpcAPI = require('./distributed-epc-api');
+const systemManagementAPI = require('./system-management'); // System management for service control
 
 // Setup endpoint
 const setupAdminEndpoint = require('./setup-admin-endpoint');
@@ -88,6 +89,9 @@ app.use('/api/epc', distributedEpcAPI);
 app.use('/admin', adminTenantAPI);
 app.use('/admin/tenants', tenantManagementAPI);
 app.use('/setup-admin', setupAdminEndpoint);
+
+// System management routes (platform admin only)
+app.use('/api/system', systemManagementAPI);
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {

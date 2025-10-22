@@ -24,8 +24,9 @@
     { name: 'genieacs-cwmp', displayName: 'GenieACS CWMP (7547)', port: 7547, canControl: true },
     { name: 'genieacs-fs', displayName: 'GenieACS FS (7567)', port: 7567, canControl: true },
     { name: 'genieacs-ui', displayName: 'GenieACS UI (8080)', port: 8080, canControl: true },
-    { name: 'hss-api', displayName: 'HSS API (3000)', port: 3000, canControl: true },
-    { name: 'mongodb', displayName: 'MongoDB (27017)', port: 27017, canControl: false }
+    { name: 'hss-api', displayName: 'User Management API (3000)', port: 3000, canControl: true },
+    { name: 'open5gs-hss', displayName: 'Open5GS HSS (3001)', port: 3001, canControl: false },
+    { name: 'mongodb', displayName: 'MongoDB Atlas (27017)', port: 27017, canControl: false }
   ];
   
   onMount(() => {
