@@ -1,10 +1,17 @@
 /**
- * HSS Management API Server
- * Unified backend for WISP Multitool platform
+ * User Management System API Server
  * 
- * Port: 3001 (GenieACS UI uses 3000)
- * MongoDB: Atlas cluster
- * Firebase: Auth + Cloud Functions
+ * PORT ALLOCATION:
+ * - Port 3000: GenieACS UI (DO NOT USE)
+ * - Port 3001: User Management System API (THIS SERVICE)
+ * - Port 3002: Open5GS HSS (DO NOT USE)
+ * 
+ * This server handles:
+ * - User-tenant associations
+ * - Role-based access control
+ * - Tenant management (platform admin)
+ * - Work orders, customers, inventory
+ * - All business logic APIs
  */
 
 const express = require('express');
@@ -14,7 +21,7 @@ require('dotenv').config();
 
 // Initialize Express
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3001; // User Management System
 
 // Middleware
 app.use(cors());
@@ -37,37 +44,47 @@ mongoose.connect(MONGODB_URI)
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'distributed-epc-api',
+    service: 'user-management-system',
+    port: PORT,
     timestamp: new Date().toISOString(),
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    note: 'User Management System API - Port 3001'
   });
 });
 
 // API Routes
 // ==========
 
-// Core APIs
-const distributedEpcAPI = require('./distributed-epc-api');
-const monitoringAPI = require('./monitoring-api');
+// Core User Management APIs
 const userManagementAPI = require('./user-management-api');
 const userTenantApi = require('./user-tenant-api');
+const tenantManagementAPI = require('./tenant-management-api');
+const adminTenantAPI = require('./admin-tenant-api');
+
+// Business Logic APIs
 const workOrderAPI = require('./work-order-api');
 const customerAPI = require('./customer-api');
+const inventoryAPI = require('./inventory-api');
+const unifiedNetworkAPI = require('./unified-network-api');
 
-// Admin APIs
-const adminTenantAPI = require('./admin-tenant-api');
-const tenantManagementAPI = require('./tenant-management-api');
+// System APIs
+const monitoringAPI = require('./monitoring-api');
+const distributedEpcAPI = require('./distributed-epc-api');
+const systemManagementRouter = require('./system-management');
 
 // Setup endpoint
 const setupAdminEndpoint = require('./setup-admin-endpoint');
 
 // Register Routes
-app.use('/api/epc', distributedEpcAPI);
-app.use('/api/monitoring', monitoringAPI);
 app.use('/api/users', userManagementAPI);
 app.use('/api/user-tenants', userTenantApi);
 app.use('/api/work-orders', workOrderAPI);
 app.use('/api/customers', customerAPI);
+app.use('/api/inventory', inventoryAPI);
+app.use('/api/network', unifiedNetworkAPI);
+app.use('/api/monitoring', monitoringAPI);
+app.use('/api/epc', distributedEpcAPI);
+app.use('/api/system', systemManagementRouter);
 
 // Admin routes
 app.use('/admin', adminTenantAPI);
@@ -76,9 +93,10 @@ app.use('/setup-admin', setupAdminEndpoint);
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 HSS Management API running on port ${PORT}`);
+  console.log(`🚀 User Management System API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔍 Monitoring enabled with auto-refresh`);
+  console.log(`🔍 Service: User Management System (Port 3001)`);
+  console.log(`⚠️  Note: GenieACS UI uses port 3000, Open5GS HSS uses port 3002`);
 });
 
 // Graceful shutdown
