@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import { networkStore, currentNetwork, allNetworks, isNetworkLoading } from '../stores/networkStore';
-  import { currentUser } from '../stores/authStore';
-  import { networkService } from '../services/networkService';
-  import type { CreateNetworkDTO } from '../models/network';
+  import { networkStore, currentNetwork, allNetworks, isNetworkLoading } from '../../stores/networkStore';
+  import { currentUser } from '../../stores/authStore';
+  import { networkService } from '../../services/networkService';
+  import type { CreateNetworkDTO } from '../../models/network';
   
   export let show = false;
   
