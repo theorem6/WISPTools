@@ -82,9 +82,34 @@ export class TenantService {
   }
 
   /**
-   * Get tenant by ID
+   * Get tenant by ID (for regular users)
    */
   async getTenant(tenantId: string): Promise<Tenant | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      const response = await fetch(`${this.apiBaseUrl}/api/tenants/${tenantId}`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`Failed to get tenant: ${response.statusText}`);
+      }
+
+      const tenant = await response.json();
+      return this.mapApiTenantToTenant(tenant);
+    } catch (error) {
+      console.error('Error getting tenant:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get tenant by ID (admin only)
+   */
+  async getTenantAdmin(tenantId: string): Promise<Tenant | null> {
     try {
       const headers = await this.getAuthHeaders();
       
@@ -131,7 +156,7 @@ export class TenantService {
   }
 
   /**
-   * Update a tenant
+   * Update a tenant (admin only)
    */
   async updateTenant(
     tenantId: string, 

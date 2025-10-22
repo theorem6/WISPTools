@@ -78,6 +78,7 @@ const setupAdminEndpoint = require('./setup-admin-endpoint');
 // Register Routes
 app.use('/api/users', userManagementAPI);
 app.use('/api/user-tenants', userTenantApi);
+app.use('/api/tenants', require('./user-tenant-details-api')); // User tenant details
 app.use('/api/work-orders', workOrderAPI);
 app.use('/api/customers', customerAPI);
 app.use('/api/inventory', inventoryAPI);
