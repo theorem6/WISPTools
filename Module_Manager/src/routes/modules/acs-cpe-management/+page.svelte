@@ -4,8 +4,8 @@
   import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import MainMenu from './components/MainMenu.svelte';
-  import HelpModal from '$lib/components/HelpModal.svelte';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';

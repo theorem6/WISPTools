@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
   
   let workOrder: WorkOrder | null = null;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { inventoryService } from '$lib/services/inventoryService';
   import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
   import { onMount } from 'svelte';

@@ -3,7 +3,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { TowerSite, Sector, CPEDevice, NetworkEquipment, CoverageMapFilters } from '../lib/models';
   import { createLocationIcon } from '$lib/mapIcons';
-  import BasemapSwitcher from '$lib/components/BasemapSwitcher.svelte';
+  import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];

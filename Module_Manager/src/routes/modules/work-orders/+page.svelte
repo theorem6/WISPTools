@@ -3,11 +3,11 @@
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { workOrderService, type WorkOrder, type WorkOrderFilters } from '$lib/services/workOrderService';
   import CreateWorkOrderModal from './components/CreateWorkOrderModal.svelte';
   import WorkOrderCard from './components/WorkOrderCard.svelte';
-  import APKDownload from '$lib/components/APKDownload.svelte';
+  import APKDownload from '$lib/components/common/APKDownload.svelte';
   
   let workOrders: WorkOrder[] = [];
   let isLoading = true;

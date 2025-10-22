@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import type { CBSDDevice, CBSDCategory, CBSDState } from './lib/models/cbsdDevice';
   import { CBRS_BAND } from './lib/models/cbsdDevice';

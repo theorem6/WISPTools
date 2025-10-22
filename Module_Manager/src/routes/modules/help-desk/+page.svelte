@@ -6,7 +6,7 @@
   import CreateTicketModal from './components/CreateTicketModal.svelte';
   import TicketDetailsModal from './components/TicketDetailsModal.svelte';
   import CustomerLookupModal from './components/CustomerLookupModal.svelte';
-  import APKDownload from '$lib/components/APKDownload.svelte';
+  import APKDownload from '$lib/components/common/APKDownload.svelte';
   
   let tickets: WorkOrder[] = [];
   let filteredTickets: WorkOrder[] = [];

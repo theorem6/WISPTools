@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { inventoryService, type InventoryItem, type InventoryFilters } from '$lib/services/inventoryService';
   import { barcodeService } from '$lib/services/barcodeService';
   import AssetTagViewer from './components/AssetTagViewer.svelte';

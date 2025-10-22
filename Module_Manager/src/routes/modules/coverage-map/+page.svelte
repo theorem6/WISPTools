@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import CoverageMapView from './components/CoverageMapView.svelte';
   import FilterPanel from './components/FilterPanel.svelte';
   import AddSiteModal from './components/AddSiteModal.svelte';

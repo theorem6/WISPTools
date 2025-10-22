@@ -3,7 +3,7 @@
   import { browser } from '$app/environment';
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import EmailSettings from './components/EmailSettings.svelte';
   
   // Monitoring API endpoint

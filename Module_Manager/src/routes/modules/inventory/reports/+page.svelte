@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import TenantGuard from '$lib/components/TenantGuard.svelte';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { inventoryService } from '$lib/services/inventoryService';
   import { reportGenerator } from '$lib/services/inventoryReports';
   import type { InventoryReport, ChartData } from '$lib/services/inventoryReports';
