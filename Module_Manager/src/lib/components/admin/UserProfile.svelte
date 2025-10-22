@@ -2,8 +2,8 @@
   import { createEventDispatcher, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
-  import { authStore, currentUser, isAuthenticated } from '../stores/authStore';
-  import { authService } from '../services/authService';
+  import { authStore, currentUser, isAuthenticated } from '../../stores/authStore';
+  import { authService } from '../../services/authService';
   
   const dispatch = createEventDispatcher();
   
