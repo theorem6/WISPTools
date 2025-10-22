@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import { cellsStore } from '../stores/appState';
-  import { currentNetwork } from '../stores/networkStore';
-  import { convertLegacyToCellSite, convertCellSiteToLegacy, type CellSite } from '../models/cellSite';
-  import type { Cell } from '../pciMapper';
+  import { cellsStore } from '../../stores/appState';
+  import { currentNetwork } from '../../stores/networkStore';
+  import { convertLegacyToCellSite, convertCellSiteToLegacy, type CellSite } from '../../models/cellSite';
+  import type { Cell } from '../../pciMapper';
   import SiteEditor from '../forms/SiteEditor.svelte';
   import ImportWizard from '../forms/ImportWizard.svelte';
   
