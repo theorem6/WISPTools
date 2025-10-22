@@ -159,28 +159,61 @@ export class TenantService {
 
   /**
    * Get all tenants for a user
+   * Now queries MongoDB via backend API instead of Firestore
    */
   async getUserTenants(userId: string): Promise<Tenant[]> {
     try {
-      // Get user-tenant associations
-      const q = query(
-        collection(this.getDb(), 'user_tenants'),
-        where('userId', '==', userId)
-      );
-      const snapshot = await getDocs(q);
+      // Get Firebase auth token
+      const { auth } = await import('../firebase');
+      const currentUser = auth().currentUser;
       
-      const tenantIds = snapshot.docs.map(doc => doc.data().tenantId);
-      
-      // Get all tenants
-      const tenants: Tenant[] = [];
-      for (const tenantId of tenantIds) {
-        const tenant = await this.getTenant(tenantId);
-        if (tenant) tenants.push(tenant);
+      if (!currentUser) {
+        console.error('[TenantService] No authenticated user');
+        return [];
       }
       
+      const token = await currentUser.getIdToken();
+      
+      // Query backend API for user's tenant memberships
+      const hssProxyUrl = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+      const response = await fetch(`${hssProxyUrl}/api/user-tenants/${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('[TenantService] Failed to fetch user tenants:', response.statusText);
+        return [];
+      }
+      
+      const userTenants = await response.json();
+      
+      if (!Array.isArray(userTenants) || userTenants.length === 0) {
+        console.log('[TenantService] User has no tenant associations');
+        return [];
+      }
+      
+      // Get tenant details from Firestore for each tenantId
+      const tenants: Tenant[] = [];
+      for (const userTenant of userTenants) {
+        if (userTenant.status !== 'active') {
+          console.log(`[TenantService] Skipping inactive tenant: ${userTenant.tenantId}`);
+          continue;
+        }
+        
+        const tenant = await this.getTenant(userTenant.tenantId);
+        if (tenant) {
+          tenants.push(tenant);
+        }
+      }
+      
+      console.log(`[TenantService] Found ${tenants.length} active tenants for user`);
       return tenants;
     } catch (error) {
-      console.error('Error getting user tenants:', error);
+      console.error('[TenantService] Error getting user tenants:', error);
       return [];
     }
   }
