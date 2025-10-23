@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { authService } from '$lib/services/authService';
+  import { isPlatformAdmin } from '$lib/services/adminService';
 
   interface DeployFeature {
     id: string;
@@ -12,6 +14,7 @@
     icon: string;
     path: string;
     status: 'active' | 'coming-soon';
+    features: string[];
   }
 
   const deployFeatures: DeployFeature[] = [
@@ -19,51 +22,67 @@
       id: 'pci-resolution',
       name: 'PCI Resolution',
       description: 'Automated PCI conflict detection and resolution',
-      icon: '📊',
-      path: '/modules/deploy/pci-resolution',
-      status: 'active'
+      icon: '🔧',
+      path: '/modules/pci-resolution',
+      status: 'active',
+      features: ['Conflict Detection', 'Automated Resolution', 'PCI Optimization', 'Interference Analysis']
     },
     {
       id: 'acs-cpe-management',
       name: 'ACS CPE Management',
       description: 'Customer premise equipment configuration and management',
       icon: '📡',
-      path: '/modules/deploy/acs-cpe',
-      status: 'active'
+      path: '/modules/acs-cpe-management',
+      status: 'active',
+      features: ['Device Configuration', 'TR069 Management', 'Firmware Updates', 'Performance Monitoring']
     },
     {
       id: 'work-orders',
       name: 'Work Orders',
       description: 'Deployment task management and tracking',
       icon: '📋',
-      path: '/modules/deploy/work-orders',
-      status: 'active'
+      path: '/modules/work-orders',
+      status: 'active',
+      features: ['Task Management', 'Deployment Tracking', 'Technician Scheduling', 'Progress Monitoring']
     },
     {
       id: 'installation-management',
       name: 'Installation Management',
       description: 'Technician scheduling and progress tracking',
       icon: '👷',
-      path: '/modules/deploy/installations',
-      status: 'coming-soon'
+      path: '/modules/work-orders', // Reuse work orders for installation management
+      status: 'active',
+      features: ['Technician Scheduling', 'Installation Tracking', 'Quality Control', 'Documentation']
     },
     {
       id: 'equipment-configuration',
       name: 'Equipment Configuration',
       description: 'Automated device provisioning and setup',
       icon: '⚙️',
-      path: '/modules/deploy/configuration',
-      status: 'coming-soon'
+      path: '/modules/acs-cpe-management', // Link to ACS for equipment config
+      status: 'active',
+      features: ['Auto Provisioning', 'Device Setup', 'Configuration Templates', 'Zero-Touch Deployment']
     },
     {
       id: 'quality-assurance',
       name: 'Quality Assurance',
       description: 'Post-deployment testing and validation',
       icon: '✅',
-      path: '/modules/deploy/qa',
-      status: 'coming-soon'
+      path: '/modules/monitor', // Link to monitoring for QA
+      status: 'active',
+      features: ['Post-Deployment Testing', 'Performance Validation', 'Quality Metrics', 'Issue Tracking']
     }
   ];
+
+  let isAdmin = false;
+  let currentUser: any = null;
+
+  onMount(async () => {
+    if (browser) {
+      currentUser = await authService.getCurrentUser();
+      isAdmin = isPlatformAdmin(currentUser?.email || null);
+    }
+  });
 
   function handleFeatureClick(feature: DeployFeature) {
     if (feature.status === 'active') {
@@ -76,7 +95,7 @@
   }
 </script>
 
-<TenantGuard>
+<TenantGuard requireTenant={false}>
   <div class="deploy-module">
     <!-- Header -->
     <div class="module-header">
@@ -89,9 +108,10 @@
           <h1>🚀 Deploy Module</h1>
           <p>Implementation and deployment tools for network rollouts</p>
         </div>
-        <div class="tenant-info">
-          {#if $currentTenant}
-            <span class="tenant-name">{$currentTenant.displayName}</span>
+        <div class="user-info">
+          {#if currentUser}
+            <span class="user-name">{currentUser.email}</span>
+            <span class="user-role">{$currentTenant?.name || 'No Tenant'}</span>
           {/if}
         </div>
       </div>
@@ -102,56 +122,78 @@
       <!-- Overview -->
       <div class="overview-section">
         <h2>Deployment Overview</h2>
-        <p>The Deploy module provides comprehensive tools for implementing and deploying your planned network infrastructure. From PCI resolution and CPE management to work order tracking and quality assurance, streamline your deployment process for maximum efficiency.</p>
+        <p>The Deploy module provides comprehensive tools for implementing and deploying network infrastructure, including PCI resolution, ACS CPE management, work order tracking, installation management, equipment configuration, and quality assurance. This module ensures smooth and efficient network rollouts.</p>
       </div>
 
       <!-- Features Grid -->
       <div class="features-section">
         <h2>Deployment Features</h2>
         <div class="features-grid">
-          {#each deployFeatures as feature}
-            <div 
-              class="feature-card" 
-              class:active={feature.status === 'active'}
-              class:coming-soon={feature.status === 'coming-soon'}
-              on:click={() => handleFeatureClick(feature)}
-              on:keydown={(e) => e.key === 'Enter' && handleFeatureClick(feature)}
-              role="button"
-              tabindex="0"
-            >
-              <div class="feature-icon">{feature.icon}</div>
-              <div class="feature-info">
-                <h3 class="feature-name">{feature.name}</h3>
-                <p class="feature-description">{feature.description}</p>
+          {#each deployFeatures as feature (feature.id)}
+            <div class="feature-card" on:click={() => handleFeatureClick(feature)}>
+              <div class="feature-header">
+                <span class="feature-icon">{feature.icon}</span>
+                <div class="feature-info">
+                  <h3 class="feature-name">{feature.name}</h3>
+                  <p class="feature-description">{feature.description}</p>
+                </div>
+                <span class="feature-status {feature.status}">
+                  {feature.status === 'active' ? '✅' : '🚧'}
+                </span>
               </div>
-              <div class="feature-status">
-                {#if feature.status === 'active'}
-                  <span class="status-badge active">Active</span>
-                {:else}
-                  <span class="status-badge coming-soon">Coming Soon</span>
-                {/if}
+              <div class="feature-features">
+                <h4>Key Features:</h4>
+                <ul>
+                  {#each feature.features as feat}
+                    <li>{feat}</li>
+                  {/each}
+                </ul>
               </div>
+              <div class="feature-arrow">→</div>
             </div>
           {/each}
         </div>
       </div>
 
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <h2>Quick Actions</h2>
-        <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/modules/deploy/pci-resolution')}>
-            <span class="action-icon">📊</span>
-            <span class="action-text">PCI Resolution</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/deploy/acs-cpe')}>
-            <span class="action-icon">📡</span>
-            <span class="action-text">CPE Management</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/deploy/work-orders')}>
-            <span class="action-icon">📋</span>
-            <span class="action-text">Work Orders</span>
-          </button>
+      <!-- Deployment Workflow -->
+      <div class="workflow-section">
+        <h2>Deployment Workflow</h2>
+        <div class="workflow-steps">
+          <div class="workflow-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3>PCI Planning</h3>
+              <p>Resolve PCI conflicts and optimize cell configurations</p>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3>Work Order Creation</h3>
+              <p>Create deployment tasks and assign technicians</p>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3>Equipment Configuration</h3>
+              <p>Configure CPE devices and network equipment</p>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3>Installation</h3>
+              <p>Deploy equipment and perform installations</p>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+              <h3>Quality Assurance</h3>
+              <p>Test and validate deployment success</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -159,264 +201,263 @@
 </TenantGuard>
 
 <style>
+  /* General Module Styling */
   .deploy-module {
+    background: var(--background-color);
     min-height: 100vh;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    padding: 2rem;
+    color: var(--text-color);
   }
 
   .module-header {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 1rem 0;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-md);
+    color: white;
+    position: relative;
+    overflow: hidden;
   }
 
   .header-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
   }
 
   .back-btn {
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-md);
     padding: 0.5rem 1rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease;
   }
 
   .back-btn:hover {
-    background: #e5e7eb;
-    border-color: #9ca3af;
+    background: rgba(255, 255, 255, 0.2);
   }
 
   .back-icon {
-    font-size: 1.25rem;
-  }
-
-  .module-title {
-    text-align: center;
-    flex: 1;
+    font-size: 1.2rem;
   }
 
   .module-title h1 {
     font-size: 2rem;
+    margin: 0;
     font-weight: 700;
-    color: #1f2937;
-    margin: 0;
-  }
-
-  .module-title p {
-    color: #6b7280;
-    margin: 0.25rem 0 0 0;
-  }
-
-  .tenant-info {
-    display: flex;
-    align-items: center;
-  }
-
-  .tenant-name {
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-weight: 500;
-    color: #1f2937;
-  }
-
-  .module-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
-  }
-
-  .overview-section {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 1rem;
-    padding: 2rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-
-  .overview-section h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin: 0 0 1rem 0;
-  }
-
-  .overview-section p {
-    color: #6b7280;
-    line-height: 1.6;
-    margin: 0;
-  }
-
-  .features-section {
-    margin-bottom: 2rem;
-  }
-
-  .features-section h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    margin: 0 0 1.5rem 0;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
+  .module-title p {
+    font-size: 0.9rem;
+    margin: 0;
+    opacity: 0.8;
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 0.85rem;
+    opacity: 0.9;
+  }
+
+  .user-name {
+    font-weight: 600;
+  }
+
+  .user-role {
+    font-style: italic;
+  }
+
+  .module-content {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .overview-section, .features-section, .workflow-section {
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.8rem;
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+  }
+
+  /* Features Grid */
   .features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 1.5rem;
   }
 
   .feature-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 1rem;
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius-md);
     padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     border: 2px solid transparent;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
   }
 
   .feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    border-color: #10b981;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-color);
   }
 
-  .feature-card.active {
-    border-color: #10b981;
-  }
-
-  .feature-card.coming-soon {
-    opacity: 0.7;
-    cursor: not-allowed;
+  .feature-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
   }
 
   .feature-icon {
     font-size: 2rem;
-    text-align: center;
+    flex-shrink: 0;
   }
 
   .feature-info {
-    text-align: center;
+    flex-grow: 1;
   }
 
   .feature-name {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--primary-color);
     margin: 0 0 0.5rem 0;
   }
 
   .feature-description {
-    color: #6b7280;
+    font-size: 0.9rem;
+    color: var(--text-color-light);
     margin: 0;
-    line-height: 1.5;
   }
 
   .feature-status {
-    display: flex;
-    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
   }
 
-  .status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 500;
+  .feature-features {
+    margin-bottom: 1rem;
   }
 
-  .status-badge.active {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .status-badge.coming-soon {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  .quick-actions {
-    margin-bottom: 2rem;
-  }
-
-  .quick-actions h2 {
-    font-size: 1.5rem;
+  .feature-features h4 {
+    font-size: 0.9rem;
     font-weight: 600;
-    color: white;
-    margin: 0 0 1.5rem 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    color: var(--text-color);
+    margin: 0 0 0.5rem 0;
   }
 
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  .feature-features ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .feature-features li {
+    font-size: 0.8rem;
+    color: var(--text-color-light);
+    margin-bottom: 0.25rem;
+    padding-left: 1rem;
+    position: relative;
+  }
+
+  .feature-features li::before {
+    content: '•';
+    color: var(--primary-color);
+    position: absolute;
+    left: 0;
+  }
+
+  .feature-arrow {
+    text-align: right;
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    opacity: 0.7;
+  }
+
+  /* Workflow Section */
+  .workflow-steps {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
   }
 
-  .action-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border: 2px solid transparent;
-    border-radius: 0.75rem;
-    padding: 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
+  .workflow-step {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-sm);
   }
 
-  .action-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-color: #10b981;
+  .step-number {
+    background: var(--primary-color);
+    color: white;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    flex-shrink: 0;
   }
 
-  .action-icon {
-    font-size: 1.5rem;
+  .step-content h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0 0 0.25rem 0;
   }
 
-  .action-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #1f2937;
+  .step-content p {
+    font-size: 0.9rem;
+    color: var(--text-color-light);
+    margin: 0;
   }
 
+  /* Responsive adjustments */
   @media (max-width: 768px) {
     .header-content {
       flex-direction: column;
-      gap: 1rem;
-      text-align: center;
+      align-items: flex-start;
     }
 
-    .module-title h1 {
-      font-size: 1.5rem;
-    }
-
-    .module-content {
-      padding: 1rem;
+    .user-info {
+      align-items: flex-start;
     }
 
     .features-grid {
       grid-template-columns: 1fr;
     }
 
-    .actions-grid {
-      grid-template-columns: repeat(2, 1fr);
+    .module-content {
+      padding: 1rem;
+    }
+
+    .workflow-step {
+      flex-direction: column;
+      text-align: center;
     }
   }
 </style>

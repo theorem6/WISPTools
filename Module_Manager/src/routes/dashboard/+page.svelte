@@ -21,44 +21,44 @@
 
   const modules: Module[] = [
     {
-      id: 'coverage-map',
-      name: '🗺️ Coverage Map',
-      description: 'Network coverage visualization and site management',
-      icon: '🗺️',
+      id: 'plan',
+      name: '📋 Plan',
+      description: 'Strategic planning and design tools for network expansion',
+      icon: '📋',
       color: '#3b82f6', // Blue
       status: 'active',
-      path: '/modules/coverage-map',
-      features: ['Site Management', 'Coverage Visualization', 'Inventory Tracking', 'Network Planning']
+      path: '/modules/plan',
+      features: ['Coverage Mapping', 'Inventory Management', 'CBRS Management', 'Site Planning', 'Capacity Planning', 'Cost Analysis']
     },
     {
-      id: 'acs-cpe-management',
-      name: '📡 ACS CPE Management',
-      description: 'Customer Premises Equipment management and monitoring',
-      icon: '📡',
+      id: 'deploy',
+      name: '🚀 Deploy',
+      description: 'Implementation and deployment tools for network rollouts',
+      icon: '🚀',
       color: '#10b981', // Green
       status: 'active',
-      path: '/modules/acs-cpe-management',
-      features: ['Device Management', 'Performance Monitoring', 'TR069 Configuration', 'Fault Management']
+      path: '/modules/deploy',
+      features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Equipment Configuration', 'Quality Assurance']
     },
     {
-      id: 'monitoring',
-      name: '📊 Network Monitoring',
+      id: 'monitor',
+      name: '📊 Monitor',
       description: 'Real-time network monitoring and performance management',
       icon: '📊',
       color: '#f59e0b', // Amber
       status: 'active',
-      path: '/modules/monitoring',
-      features: ['Network Monitoring', 'Device Health', 'Performance Analytics', 'Alert Management']
+      path: '/modules/monitor',
+      features: ['Network Monitoring', 'Device Health', 'Traffic Analysis', 'Performance Analytics', 'Alert Management', 'SLA Monitoring']
     },
     {
-      id: 'work-orders',
-      name: '📋 Work Orders',
-      description: 'Comprehensive work order and maintenance management',
-      icon: '📋',
+      id: 'maintain',
+      name: '🔧 Maintain',
+      description: 'Comprehensive ticketing and maintenance management',
+      icon: '🔧',
       color: '#ef4444', // Red
       status: 'active',
-      path: '/modules/work-orders',
-      features: ['Work Order Management', 'Maintenance Scheduling', 'Field Operations', 'Task Tracking']
+      path: '/modules/maintain',
+      features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Vendor Management', 'Knowledge Base']
     }
   ];
 
@@ -225,21 +225,21 @@
       <div class="quick-actions">
         <h2 class="section-title">Quick Actions</h2>
         <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/modules/coverage-map')}>
-            <span class="action-icon">🗺️</span>
-            <span class="action-text">Coverage Map</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/acs-cpe-management')}>
-            <span class="action-icon">📡</span>
-            <span class="action-text">CPE Management</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/monitoring')}>
-            <span class="action-icon">📊</span>
-            <span class="action-text">Network Monitoring</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/work-orders')}>
+          <button class="action-btn" on:click={() => goto('/modules/plan')}>
             <span class="action-icon">📋</span>
-            <span class="action-text">Work Orders</span>
+            <span class="action-text">Plan</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/deploy')}>
+            <span class="action-icon">🚀</span>
+            <span class="action-text">Deploy</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/monitor')}>
+            <span class="action-icon">📊</span>
+            <span class="action-text">Monitor</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/maintain')}>
+            <span class="action-icon">🔧</span>
+            <span class="action-text">Maintain</span>
           </button>
         </div>
       </div>
