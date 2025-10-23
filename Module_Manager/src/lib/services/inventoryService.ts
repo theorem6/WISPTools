@@ -122,7 +122,7 @@ export interface InventoryStats {
 class InventoryService {
   private async getAuthToken(): Promise<string> {
     const { auth } = await import('$lib/firebase');
-    const currentUser = auth.currentUser;
+    const currentUser = auth().currentUser;
     if (!currentUser) {
       throw new Error('Not authenticated');
     }

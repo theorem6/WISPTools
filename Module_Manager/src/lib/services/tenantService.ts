@@ -29,7 +29,7 @@ export class TenantService {
    * Get authentication headers for API calls
    */
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const user = auth.currentUser;
+    const user = auth().currentUser;
     if (!user) {
       throw new Error('User not authenticated');
     }
