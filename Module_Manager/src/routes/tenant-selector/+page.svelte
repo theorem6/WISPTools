@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import { authService } from '$lib/services/authService';
   import { tenantStore } from '$lib/stores/tenantStore';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import type { Tenant } from '$lib/models/tenant';
 
   let isLoading = true;
@@ -65,6 +66,7 @@
   }
 </script>
 
+<TenantGuard requireTenant={false}>
 <div class="tenant-selector-page">
   <div class="selector-container">
     <div class="selector-header">
@@ -109,15 +111,16 @@
     {/if}
   </div>
 </div>
+</TenantGuard>
 
 <style>
   .tenant-selector-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--gradient-primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2rem;
+    padding: var(--spacing-xl);
   }
 
   .selector-container {
@@ -127,35 +130,38 @@
 
   .selector-header {
     text-align: center;
-    color: white;
-    margin-bottom: 2rem;
+    color: var(--text-inverse);
+    margin-bottom: var(--spacing-xl);
   }
 
   .selector-header h1 {
     font-size: 2rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 600;
   }
 
   .selector-header p {
     opacity: 0.9;
+    font-size: 1.1rem;
   }
 
   .loading-card, .error-card {
     background: var(--card-bg);
-    border-radius: 1rem;
-    padding: 3rem;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-2xl);
+    box-shadow: var(--shadow-xl);
     text-align: center;
+    border: 1px solid var(--border-color);
   }
 
   .spinner-large {
     width: 48px;
     height: 48px;
-    border: 4px solid rgba(124, 58, 237, 0.2);
+    border: 4px solid var(--border-light);
     border-top-color: var(--brand-primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
-    margin: 0 auto 1rem;
+    margin: 0 auto var(--spacing-md);
   }
 
   @keyframes spin {
@@ -165,22 +171,22 @@
   .error-icon {
     font-size: 3rem;
     display: block;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-md);
   }
 
   .tenants-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.5rem;
+    gap: var(--spacing-lg);
   }
 
   .tenant-card {
     background: var(--card-bg);
-    border-radius: 1rem;
-    padding: 2rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-lg);
     cursor: pointer;
-    transition: all 0.3s;
+    transition: var(--transition);
     border: 2px solid transparent;
     text-align: center;
     display: flex;
@@ -190,69 +196,70 @@
 
   .tenant-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-xl);
     border-color: var(--brand-primary);
   }
 
   .tenant-icon {
     font-size: 3rem;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-md);
   }
 
   .tenant-card h3 {
     font-size: 1.25rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--spacing-sm);
     color: var(--text-primary);
+    font-weight: 600;
   }
 
   .tenant-subdomain {
     color: var(--text-secondary);
     font-size: 0.875rem;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-md);
     font-family: 'Courier New', monospace;
   }
 
   .tenant-meta {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
     flex-wrap: wrap;
     justify-content: center;
   }
 
   .status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 1rem;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--border-radius);
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
   }
 
   .status-active {
-    background-color: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
+    background-color: var(--success-light);
+    color: var(--success);
   }
 
   .status-trial {
-    background-color: rgba(251, 191, 36, 0.2);
-    color: #fbbf24;
+    background-color: var(--warning-light);
+    color: var(--warning);
   }
 
   .status-suspended {
-    background-color: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    background-color: var(--danger-light);
+    color: var(--danger);
   }
 
   .role-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 1rem;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--border-radius);
     font-size: 0.75rem;
-    background-color: rgba(124, 58, 237, 0.2);
+    background-color: var(--primary-light);
     color: var(--brand-secondary);
   }
 
   .create-new {
     border: 2px dashed var(--border-color);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-secondary);
   }
 
   .create-new:hover {
@@ -262,31 +269,32 @@
 
   .create-icon {
     font-size: 3rem;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-md);
     opacity: 0.7;
   }
 
   .btn-primary {
-    padding: 0.75rem 1.5rem;
-    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-    color: white;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--gradient-primary);
+    color: var(--text-inverse);
     border: none;
-    border-radius: 0.5rem;
+    border-radius: var(--border-radius);
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 1rem;
+    transition: var(--transition);
+    margin-top: var(--spacing-md);
+    box-shadow: var(--shadow-md);
   }
 
   .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+    box-shadow: var(--shadow-lg);
   }
 
   @media (max-width: 768px) {
     .tenant-selector-page {
-      padding: 1rem;
+      padding: var(--spacing-md);
     }
 
     .tenants-grid {

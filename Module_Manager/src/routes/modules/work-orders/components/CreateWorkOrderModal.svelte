@@ -17,7 +17,7 @@
     priority: 'medium' as WorkOrder['priority'],
     title: '',
     description: '',
-    issueCategory: '' as WorkOrder['issueCategory'],
+    issueCategory: undefined as WorkOrder['issueCategory'],
     location: {
       type: 'tower' as any,
       siteId: '',
@@ -150,7 +150,7 @@
       priority: 'medium',
       title: '',
       description: '',
-      issueCategory: '',
+      issueCategory: undefined,
       location: { type: 'tower', siteId: '', siteName: '' },
       customerReported: false,
       customerName: '',
@@ -341,26 +341,28 @@
   
   .modal-content {
     background: var(--card-bg);
-    border-radius: 12px;
+    border-radius: var(--border-radius-lg);
     width: 90%;
     max-width: 800px;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
   }
   
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem;
+    padding: var(--spacing-lg);
     border-bottom: 1px solid var(--border-color);
   }
   
   .modal-header h2 {
     margin: 0;
     color: var(--text-primary);
+    font-weight: 600;
   }
   
   .close-btn {
@@ -369,6 +371,7 @@
     font-size: 1.5rem;
     cursor: pointer;
     color: var(--text-secondary);
+    transition: var(--transition);
   }
   
   .close-btn:hover {
@@ -376,40 +379,41 @@
   }
   
   .error-banner {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
-    padding: 1rem;
-    margin: 1rem 1.5rem;
-    border-radius: 6px;
+    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius);
   }
   
   .modal-body {
-    padding: 1.5rem;
+    padding: var(--spacing-lg);
     overflow-y: auto;
     flex: 1;
   }
   
   .section {
-    margin-bottom: 2rem;
+    margin-bottom: var(--spacing-xl);
   }
   
   .section h3 {
-    margin: 0 0 1rem 0;
+    margin: 0 0 var(--spacing-md) 0;
     font-size: 1.1rem;
     color: var(--brand-primary);
+    font-weight: 600;
   }
   
   .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    gap: var(--spacing-md);
   }
   
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
   }
   
   .form-group label {
@@ -421,12 +425,21 @@
   .form-group input,
   .form-group select,
   .form-group textarea {
-    padding: 0.75rem;
+    padding: var(--spacing-md);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--bg-primary);
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
     color: var(--text-primary);
     font-size: 0.9rem;
+    transition: var(--transition);
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    background: var(--card-bg);
   }
   
   .form-group textarea {
@@ -441,32 +454,36 @@
   .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 1rem;
-    padding: 1.5rem;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
     border-top: 1px solid var(--border-color);
   }
   
   .btn-primary,
   .btn-secondary {
-    padding: 0.75rem 1.5rem;
+    padding: var(--spacing-md) var(--spacing-lg);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-weight: 600;
     cursor: pointer;
+    transition: var(--transition);
   }
   
   .btn-primary {
-    background: var(--brand-primary);
-    color: white;
+    background: var(--gradient-primary);
+    color: var(--text-inverse);
+    box-shadow: var(--shadow-md);
   }
   
   .btn-primary:hover:not(:disabled) {
-    background: var(--brand-primary-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
   }
   
   .btn-primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
   }
   
   .btn-secondary {
@@ -477,6 +494,7 @@
   
   .btn-secondary:hover {
     background: var(--bg-tertiary);
+    transform: translateY(-1px);
   }
 </style>
 
