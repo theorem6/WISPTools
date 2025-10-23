@@ -188,29 +188,6 @@
         </div>
       </div>
 
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <h2>Quick Actions</h2>
-        <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/admin/tenant-management')}>
-            <span class="action-icon">🏢</span>
-            <span class="action-text">Manage Tenants</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/user-management')}>
-            <span class="action-icon">👥</span>
-            <span class="action-text">Manage Users</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/backend-management')}>
-            <span class="action-icon">⚙️</span>
-            <span class="action-text">System Settings</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/tenant-management')}>
-            <span class="action-icon">💳</span>
-            <span class="action-text">Billing</span>
-          </button>
-        </div>
-      </div>
-
       <!-- System Status -->
       <div class="system-status">
         <h2>System Status</h2>
@@ -451,53 +428,6 @@
     flex-shrink: 0;
   }
 
-  .quick-actions {
-    margin-bottom: 2rem;
-  }
-
-  .quick-actions h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    margin: 0 0 1.5rem 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  .actions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-  }
-
-  .action-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border: 2px solid transparent;
-    border-radius: 0.75rem;
-    padding: 1rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .action-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-color: #6b7280;
-  }
-
-  .action-icon {
-    font-size: 1.5rem;
-  }
-
-  .action-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #1f2937;
-  }
-
   .system-status {
     margin-bottom: 2rem;
   }
@@ -616,10 +546,6 @@
 
     .features-grid {
       grid-template-columns: 1fr;
-    }
-
-    .actions-grid {
-      grid-template-columns: repeat(2, 1fr);
     }
 
     .status-grid {
