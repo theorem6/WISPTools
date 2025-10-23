@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
+  import { getAllUsers } from '$lib/services/userManagementService';
+  import { tenantService } from '$lib/services/tenantService';
 
   interface AdminFeature {
     id: string;
@@ -49,13 +51,80 @@
 
   let isAdmin = false;
   let currentUser: any = null;
+  
+  // Live status data
+  let systemStatus = {
+    health: 'checking',
+    healthMessage: 'Checking system status...',
+    activeTenants: 0,
+    totalUsers: 0,
+    databaseStatus: 'checking',
+    databaseMessage: 'Checking database connection...'
+  };
+  
+  let statusLoading = true;
+  let statusError = '';
+  let statusUpdateInterval: NodeJS.Timeout | null = null;
 
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
       isAdmin = isPlatformAdmin(currentUser?.email || null);
+      
+      if (isAdmin) {
+        await loadSystemStatus();
+        // Update status every 30 seconds
+        statusUpdateInterval = setInterval(loadSystemStatus, 30000);
+      }
     }
   });
+
+  onDestroy(() => {
+    if (statusUpdateInterval) {
+      clearInterval(statusUpdateInterval);
+    }
+  });
+
+  async function loadSystemStatus() {
+    if (!isAdmin) return;
+    
+    try {
+      statusLoading = true;
+      statusError = '';
+      
+      // Load tenants and users in parallel
+      const [tenants, users] = await Promise.all([
+        tenantService.getAllTenants().catch(() => []),
+        getAllUsers().catch(() => [])
+      ]);
+      
+      // Update system status
+      systemStatus = {
+        health: 'operational',
+        healthMessage: 'All systems operational',
+        activeTenants: tenants.length,
+        totalUsers: users.length,
+        databaseStatus: 'connected',
+        databaseMessage: 'MongoDB Atlas connected'
+      };
+      
+    } catch (error: any) {
+      console.error('Error loading system status:', error);
+      statusError = error.message || 'Failed to load system status';
+      
+      // Set error status
+      systemStatus = {
+        health: 'error',
+        healthMessage: 'System status unavailable',
+        activeTenants: 0,
+        totalUsers: 0,
+        databaseStatus: 'error',
+        databaseMessage: 'Database connection failed'
+      };
+    } finally {
+      statusLoading = false;
+    }
+  }
 
   function handleFeatureClick(feature: AdminFeature) {
     goto(feature.path);
@@ -145,33 +214,67 @@
       <!-- System Status -->
       <div class="system-status">
         <h2>System Status</h2>
+        {#if statusError}
+          <div class="status-error">
+            <p>⚠️ {statusError}</p>
+            <button class="retry-btn" on:click={loadSystemStatus}>Retry</button>
+          </div>
+        {/if}
         <div class="status-grid">
           <div class="status-card">
-            <div class="status-icon">🟢</div>
+            <div class="status-icon {systemStatus.health}">
+              {#if systemStatus.health === 'operational'}
+                🟢
+              {:else if systemStatus.health === 'error'}
+                🔴
+              {:else}
+                🟡
+              {/if}
+            </div>
             <div class="status-info">
               <h4>System Health</h4>
-              <p>All systems operational</p>
+              <p>{systemStatus.healthMessage}</p>
             </div>
           </div>
           <div class="status-card">
             <div class="status-icon">📊</div>
             <div class="status-info">
               <h4>Active Tenants</h4>
-              <p>Multiple tenants active</p>
+              <p>
+                {#if statusLoading}
+                  Loading...
+                {:else}
+                  {systemStatus.activeTenants} tenant{systemStatus.activeTenants !== 1 ? 's' : ''} active
+                {/if}
+              </p>
             </div>
           </div>
           <div class="status-card">
             <div class="status-icon">👥</div>
             <div class="status-info">
               <h4>Total Users</h4>
-              <p>Users across all tenants</p>
+              <p>
+                {#if statusLoading}
+                  Loading...
+                {:else}
+                  {systemStatus.totalUsers} users across all tenants
+                {/if}
+              </p>
             </div>
           </div>
           <div class="status-card">
-            <div class="status-icon">💾</div>
+            <div class="status-icon {systemStatus.databaseStatus}">
+              {#if systemStatus.databaseStatus === 'connected'}
+                💾
+              {:else if systemStatus.databaseStatus === 'error'}
+                ⚠️
+              {:else}
+                🔄
+              {/if}
+            </div>
             <div class="status-info">
               <h4>Database</h4>
-              <p>MongoDB Atlas connected</p>
+              <p>{systemStatus.databaseMessage}</p>
             </div>
           </div>
         </div>
@@ -420,11 +523,33 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  .status-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
   .status-icon {
     font-size: 1.5rem;
     flex-shrink: 0;
+  }
+
+  .status-icon.operational {
+    color: #10b981;
+  }
+
+  .status-icon.error {
+    color: #ef4444;
+  }
+
+  .status-icon.checking {
+    color: #f59e0b;
+  }
+
+  .status-icon.connected {
+    color: #10b981;
   }
 
   .status-info h4 {
@@ -438,6 +563,40 @@
     font-size: 0.875rem;
     color: #6b7280;
     margin: 0;
+  }
+
+  .status-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-error p {
+    margin: 0;
+    color: #dc2626;
+    font-weight: 500;
+  }
+
+  .retry-btn {
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .retry-btn:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
   }
 
   @media (max-width: 768px) {
