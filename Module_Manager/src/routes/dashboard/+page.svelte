@@ -97,11 +97,17 @@
   async function handleLogout() {
     try {
       await authService.signOut();
+      
+      // Clear all localStorage data
       localStorage.removeItem('isAuthenticated');
       localStorage.removeItem('userEmail');
       localStorage.removeItem('selectedTenantId');
       localStorage.removeItem('selectedTenantName');
       localStorage.removeItem('tenantSetupCompleted');
+      
+      // Clear tenant store
+      tenantStore.clearTenantData();
+      
       await goto('/login', { replaceState: true });
     } catch (error) {
       console.error('Logout error:', error);

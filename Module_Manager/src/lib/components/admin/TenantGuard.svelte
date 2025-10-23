@@ -35,22 +35,19 @@
     console.log('[TenantGuard] Checking authentication and tenant...');
     
     try {
-      // Step 1: Check authentication
+      // Step 1: Check Firebase authentication
       const currentUser = authService.getCurrentUser();
       if (!currentUser) {
-        const isAuthenticatedFlag = localStorage.getItem('isAuthenticated');
-        if (isAuthenticatedFlag !== 'true') {
-          console.log('[TenantGuard] Not authenticated, redirecting to login');
-          await goto('/login', { replaceState: true });
-          return;
-        }
+        console.log('[TenantGuard] Not authenticated, redirecting to login');
+        await goto('/login', { replaceState: true });
+        return;
       }
       
       isAuthenticated = true;
-      console.log('[TenantGuard] User authenticated');
+      console.log('[TenantGuard] User authenticated:', currentUser.email);
       
       // Step 2: Check if user is admin
-      const userEmail = currentUser?.email || localStorage.getItem('userEmail') || '';
+      const userEmail = currentUser?.email || '';
       isAdmin = isPlatformAdmin(userEmail);
       console.log('[TenantGuard] Is admin:', isAdmin);
       

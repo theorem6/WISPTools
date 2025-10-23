@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { authService } from '$lib/services/authService';
 
   let email = '';
   let password = '';
@@ -9,23 +10,28 @@
   let error = '';
   let mode: 'signin' | 'signup' = 'signin';
 
-  // For now, we'll use localStorage to simulate authentication
-  // This will be replaced with Firebase auth from Login_Logic fork
-  
   onMount(async () => {
     if (!browser) return;
     
-    console.log('Login page: Checking if already authenticated...');
+    console.log('[Login Page] Checking authentication...');
     
-    // Check if already logged in
-    const isAuthenticated = localStorage.getItem('isAuthenticated');
-    console.log('Login page: isAuthenticated =', isAuthenticated);
+    // Wait for auth service to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    if (isAuthenticated === 'true') {
-      console.log('Login page: Already authenticated, redirecting to dashboard');
+    // Check if already authenticated with Firebase
+    const user = authService.getCurrentUser();
+    const isAuthenticated = !!user;
+    
+    console.log('[Login Page] Auth check:', {
+      isAuthenticated,
+      userEmail: user?.email || 'none'
+    });
+    
+    if (isAuthenticated) {
+      console.log('[Login Page] Already authenticated, redirecting to dashboard');
       await goto('/dashboard', { replaceState: true });
     } else {
-      console.log('Login page: Not authenticated, showing login form');
+      console.log('[Login Page] Not authenticated, showing login form');
     }
   });
 
@@ -47,71 +53,64 @@
     }
 
     try {
-      // Use real Firebase authentication
-      const { authService } = await import('$lib/services/authService');
-      
       let result;
-      if (mode === 'signup') {
-        console.log('Login page: Creating new account with Firebase...');
-        result = await authService.signUp(email, password);
-      } else {
-        console.log('Login page: Signing in with Firebase...');
-        result = await authService.signIn(email, password);
-      }
       
+      if (mode === 'signin') {
+        console.log('[Login Page] Attempting sign in...');
+        result = await authService.signIn(email, password);
+      } else {
+        console.log('[Login Page] Attempting sign up...');
+        result = await authService.signUp(email, password);
+      }
+
       if (result.success) {
-        console.log('Login page: Firebase auth successful!');
-        console.log('Login page: User:', result.data?.email);
+        console.log('[Login Page] Authentication successful, redirecting to dashboard');
         
-        // Set localStorage for authentication
+        // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', result.data?.email || email);
+        localStorage.setItem('userEmail', email);
         
-        // Automatically load and set tenant for the user
-        try {
-          const { tenantService } = await import('$lib/services/tenantService');
-          const { isPlatformAdmin } = await import('$lib/services/adminService');
-          
-          const userEmail = result.data?.email || email;
-          const isAdmin = isPlatformAdmin(userEmail);
-          
-          // Platform admins don't need a tenant
-          if (!isAdmin) {
-            console.log('Login page: Loading user tenants...');
-            const tenants = await tenantService.getUserTenants(result.data?.uid || '');
-            
-            if (tenants.length === 1) {
-              // Auto-select single tenant immediately on login
-              console.log('Login page: Auto-selecting single tenant:', tenants[0].displayName);
-              localStorage.setItem('selectedTenantId', tenants[0].id);
-              localStorage.setItem('selectedTenantName', tenants[0].displayName);
-              localStorage.setItem('tenantSetupCompleted', 'true');
-            } else if (tenants.length > 1) {
-              // Multiple tenants - will redirect to selector from dashboard
-              console.log('Login page: Multiple tenants found, dashboard will handle selection');
-            } else {
-              // No tenants - will redirect to setup from dashboard
-              console.log('Login page: No tenants found, dashboard will handle setup');
-            }
-          } else {
-            console.log('Login page: Platform admin login, no tenant needed');
-          }
-        } catch (err) {
-          console.warn('Login page: Could not load tenant info, dashboard will handle it:', err);
-        }
-        
-        // Go to dashboard (which now has tenant pre-selected if single tenant)
+        // Redirect to dashboard
         await goto('/dashboard', { replaceState: true });
       } else {
         error = result.error || 'Authentication failed';
-        console.error('Login page: Auth failed:', error);
+        console.error('[Login Page] Authentication failed:', error);
       }
     } catch (err: any) {
-      error = err.message || 'An error occurred during authentication';
-      console.error('Login page: Auth error:', err);
+      error = err.message || 'An unexpected error occurred';
+      console.error('[Login Page] Authentication error:', err);
+    } finally {
+      isLoading = false;
     }
-    
-    isLoading = false;
+  }
+
+  async function handleGoogleSignIn() {
+    isLoading = true;
+    error = '';
+
+    try {
+      console.log('[Login Page] Attempting Google sign in...');
+      const result = await authService.signInWithGoogle();
+
+      if (result.success) {
+        console.log('[Login Page] Google authentication successful, redirecting to dashboard');
+        
+        // Store user info in localStorage for compatibility
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('userEmail', result.data?.email || '');
+        
+        // Redirect to dashboard
+        await goto('/dashboard', { replaceState: true });
+      } else {
+        error = result.error || 'Google authentication failed';
+        console.error('[Login Page] Google authentication failed:', error);
+      }
+    } catch (err: any) {
+      error = err.message || 'Google authentication error';
+      console.error('[Login Page] Google authentication error:', err);
+    } finally {
+      isLoading = false;
+    }
   }
 
   function toggleMode() {
