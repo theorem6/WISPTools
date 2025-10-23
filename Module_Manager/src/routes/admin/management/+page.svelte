@@ -53,7 +53,7 @@
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
-      isAdmin = await isPlatformAdmin();
+      isAdmin = isPlatformAdmin(currentUser?.email || null);
     }
   });
 
