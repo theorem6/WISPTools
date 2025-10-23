@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
   import { goto } from '$app/navigation';
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   
   let loading = true;
   let error = '';
@@ -243,6 +244,7 @@
   }
 </script>
 
+<TenantGuard adminOnly={true} requireTenant={false}>
 <div class="admin-page">
   <header>
     <div class="header-content">
@@ -901,3 +903,4 @@
     }
   }
 </style>
+</TenantGuard>

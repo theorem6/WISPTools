@@ -38,7 +38,8 @@
     isInitializing = false;
   });
   
-  // Listen for auth state changes
+  // Simple auth state listener for basic protection
+  // TenantGuard will handle the complex logic
   authService.onAuthStateChange((user) => {
     if (!browser) return;
     
@@ -50,24 +51,9 @@
       userEmail: user?.email || 'none'
     });
     
-    // Handle authentication state changes
+    // Only handle sign-out (let TenantGuard handle sign-in)
     if (!isAuthenticated) {
-      // User signed out - clear tenant data and redirect to login
-      // Only redirect if not already on login page to prevent loops
-      if (window.location.pathname !== '/login') {
-        tenantStore.clearTenantData();
-        goto('/login', { replaceState: true });
-      }
-    } else {
-      // User signed in - initialize tenant store if not already done
-      if (!tenantStore.isInitialized) {
-        tenantStore.initialize();
-      }
-      
-      // If on login page and authenticated, redirect to dashboard
-      if (window.location.pathname === '/login') {
-        goto('/dashboard', { replaceState: true });
-      }
+      tenantStore.clearTenantData();
     }
   });
 </script>
@@ -77,11 +63,8 @@
     <div class="spinner"></div>
     <p>Initializing authentication...</p>
   </div>
-{:else if !isAuthenticated}
-  <!-- Not authenticated - show login page -->
-  <slot />
 {:else}
-  <!-- Authenticated - show protected content -->
+  <!-- Let TenantGuard handle authentication and tenant logic -->
   <slot />
 {/if}
 
