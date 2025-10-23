@@ -21,44 +21,44 @@
 
   const modules: Module[] = [
     {
-      id: 'plan',
-      name: '📋 Plan',
-      description: 'Strategic planning and design tools for network expansion and optimization',
-      icon: '📋',
+      id: 'coverage-map',
+      name: '🗺️ Coverage Map',
+      description: 'Network coverage visualization and site management',
+      icon: '🗺️',
       color: '#3b82f6', // Blue
       status: 'active',
       path: '/modules/coverage-map',
-      features: ['Coverage Mapping', 'Inventory Management', 'CBRS Management', 'Site Planning', 'Capacity Planning']
+      features: ['Site Management', 'Coverage Visualization', 'Inventory Tracking', 'Network Planning']
     },
     {
-      id: 'deploy',
-      name: '🚀 Deploy',
-      description: 'Implementation and deployment tools for network rollouts',
-      icon: '🚀',
+      id: 'acs-cpe-management',
+      name: '📡 ACS CPE Management',
+      description: 'Customer Premises Equipment management and monitoring',
+      icon: '📡',
       color: '#10b981', // Green
       status: 'active',
-      path: '/modules/pci-resolution',
-      features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Quality Assurance']
+      path: '/modules/acs-cpe-management',
+      features: ['Device Management', 'Performance Monitoring', 'TR069 Configuration', 'Fault Management']
     },
     {
-      id: 'monitor',
-      name: '📊 Monitor',
+      id: 'monitoring',
+      name: '📊 Network Monitoring',
       description: 'Real-time network monitoring and performance management',
       icon: '📊',
       color: '#f59e0b', // Amber
       status: 'active',
       path: '/modules/monitoring',
-      features: ['Network Monitoring', 'Device Health', 'Performance Analytics', 'Alert Management', 'SLA Monitoring']
+      features: ['Network Monitoring', 'Device Health', 'Performance Analytics', 'Alert Management']
     },
     {
-      id: 'maintain',
-      name: '🔧 Maintain',
-      description: 'Comprehensive ticketing and maintenance management',
-      icon: '🔧',
+      id: 'work-orders',
+      name: '📋 Work Orders',
+      description: 'Comprehensive work order and maintenance management',
+      icon: '📋',
       color: '#ef4444', // Red
       status: 'active',
-      path: '/modules/help-desk',
-      features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Knowledge Base']
+      path: '/modules/work-orders',
+      features: ['Work Order Management', 'Maintenance Scheduling', 'Field Operations', 'Task Tracking']
     }
   ];
 
@@ -227,15 +227,15 @@
         <div class="actions-grid">
           <button class="action-btn" on:click={() => goto('/modules/coverage-map')}>
             <span class="action-icon">🗺️</span>
-            <span class="action-text">View Coverage Map</span>
+            <span class="action-text">Coverage Map</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/acs-cpe-management')}>
+            <span class="action-icon">📡</span>
+            <span class="action-text">CPE Management</span>
           </button>
           <button class="action-btn" on:click={() => goto('/modules/monitoring')}>
             <span class="action-icon">📊</span>
-            <span class="action-text">Check Network Status</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/help-desk')}>
-            <span class="action-icon">🎫</span>
-            <span class="action-text">View Tickets</span>
+            <span class="action-text">Network Monitoring</span>
           </button>
           <button class="action-btn" on:click={() => goto('/modules/work-orders')}>
             <span class="action-icon">📋</span>
