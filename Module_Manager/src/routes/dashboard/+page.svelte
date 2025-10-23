@@ -140,9 +140,16 @@
             <div class="user-badge">
               <span class="user-email">{currentUser.email}</span>
               {#if isAdmin}
-                <span class="admin-badge">Admin</span>
+                <span class="admin-badge">Platform Admin</span>
+              {:else}
+                <span class="user-badge-text">Regular User</span>
               {/if}
             </div>
+            {#if !isAdmin && currentUser.email === 'david@tenant.com'}
+              <div class="admin-notice">
+                <small>⚠️ To access admin features, login as david@david.com</small>
+              </div>
+            {/if}
             <button class="logout-btn" on:click={handleLogout}>
               <span class="logout-icon">🚪</span>
               Logout
@@ -336,6 +343,25 @@
     border-radius: 9999px;
     font-size: 0.75rem;
     font-weight: 500;
+  }
+
+  .user-badge-text {
+    background: #f3f4f6;
+    color: #6b7280;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .admin-notice {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    border: 1px solid #fbbf24;
   }
 
   .logout-btn, .login-btn {
