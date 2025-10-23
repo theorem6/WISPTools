@@ -124,34 +124,19 @@
           <h1 class="app-title">WispTools.io</h1>
           <p class="app-subtitle">Comprehensive WISP Management Platform</p>
         </div>
-        <div class="tenant-info" class:has-tenant={$currentTenant}>
-          {#if $currentTenant}
-            <div class="tenant-badge">
-              <span class="tenant-name">{$currentTenant.displayName}</span>
-              <span class="tenant-subdomain">{$currentTenant.subdomain}</span>
-            </div>
-          {:else if isAdmin}
-            <div class="admin-tenant-info">
-              <span class="admin-badge">Platform Admin</span>
-              <span class="admin-text">No tenant required</span>
-            </div>
-          {/if}
-        </div>
-        
-        <!-- User Info and Logout -->
-        <div class="user-info">
+        <!-- Minimal User Info and Power Button -->
+        <div class="user-controls">
           {#if isLoggedIn && currentUser}
-            <div class="user-badge">
-              <span class="user-email">{currentUser.email}</span>
+            <div class="user-status">
               {#if isAdmin}
-                <span class="admin-badge">Platform Admin</span>
-              {:else}
-                <span class="user-badge-text">Regular User</span>
+                <span class="admin-indicator">Admin</span>
               {/if}
             </div>
-            <button class="logout-btn" on:click={handleLogout}>
-              <span class="logout-icon">🚪</span>
-              Logout
+            <button class="power-btn" on:click={handleLogout} title="Logout">
+              <svg class="power-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
             </button>
           {:else}
             <button class="login-btn" on:click={() => goto('/login')}>
@@ -306,56 +291,57 @@
     margin: 0.25rem 0 0 0;
   }
 
-  .tenant-info {
+  .user-controls {
     display: flex;
     align-items: center;
     gap: 1rem;
   }
 
-  .user-info {
+  .user-status {
     display: flex;
     align-items: center;
-    gap: 1rem;
   }
 
-  .user-badge {
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    padding: 0.5rem 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .user-email {
-    font-weight: 500;
-    color: #1f2937;
-    font-size: 0.875rem;
-  }
-
-  .admin-badge {
+  .admin-indicator {
     background: #dcfce7;
     color: #166534;
-    padding: 0.125rem 0.5rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
-  .user-badge-text {
-    background: #f3f4f6;
-    color: #6b7280;
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 500;
+  .power-btn {
+    background: #6b7280;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
-
-  .logout-btn, .login-btn {
+  .power-btn:hover {
     background: #ef4444;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .power-icon {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.5;
+  }
+
+  .login-btn {
+    background: #3b82f6;
     color: white;
     border: none;
     border-radius: 0.5rem;
@@ -369,52 +355,13 @@
     transition: all 0.2s ease;
   }
 
-  .login-btn {
-    background: #3b82f6;
-  }
-
-  .logout-btn:hover {
-    background: #dc2626;
-  }
-
   .login-btn:hover {
     background: #2563eb;
+    transform: translateY(-1px);
   }
 
-  .logout-icon, .login-icon {
+  .login-icon {
     font-size: 1rem;
-  }
-
-  .tenant-badge {
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    padding: 0.5rem 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .tenant-name {
-    font-weight: 600;
-    color: #1f2937;
-  }
-
-  .tenant-subdomain {
-    font-size: 0.875rem;
-    color: #6b7280;
-  }
-
-  .admin-tenant-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .admin-text {
-    font-size: 0.75rem;
-    color: #6b7280;
   }
 
   .main-content {
