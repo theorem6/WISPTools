@@ -1,7 +1,7 @@
 {
-  "name": "wisp-multitool",
-  "version": "1.0.0",
-  "description": "WISP Multitool - Complete wireless ISP management platform",
+  "name": "wisptools-io",
+  "version": "2.0.0",
+  "description": "WispTools.io - Comprehensive WISP management platform for planning, deployment, monitoring, and maintenance",
   "type": "module",
   "scripts": {
     "dev": "vite dev",

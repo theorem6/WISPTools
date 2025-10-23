@@ -6,7 +6,6 @@
   import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
-  import { availableModules, modulePermissions } from '$lib/stores/modulePermissions';
 
   interface Module {
     id: string;
@@ -17,654 +16,534 @@
     status: 'active' | 'coming-soon';
     path: string;
     adminOnly?: boolean;
+    features: string[];
   }
 
   const modules: Module[] = [
     {
-      id: 'tenant-management',
-      name: 'Tenant Management',
-      description: 'Create and manage organization tenants (Platform Admin Only)',
-      icon: '🏢',
-      color: 'var(--danger)',
-      status: 'active',
-      path: '/admin/tenant-management',
-      adminOnly: true
-    },
-    {
-      id: 'pci-resolution',
-      name: 'PCI Resolution & Network Optimization',
-      description: 'Physical Cell ID conflict detection, SON optimization, and network self-organization',
-      icon: '📊',
-      color: 'var(--primary)',
-      status: 'active',
-      path: '/modules/pci-resolution'
-    },
-    {
-      id: 'acs-cpe-management',
-      name: 'ACS CPE Management',
-      description: 'TR-069 device management and CPE monitoring with GPS mapping',
-      icon: '📡',
-      color: 'var(--success)',
-      status: 'active',
-      path: '/modules/acs-cpe-management'
-    },
-    {
-      id: 'cbrs-management',
-      name: 'CBRS Management',
-      description: 'Citizens Broadband Radio Service management with Google SAS and Federated Wireless API integration',
-      icon: '📡',
-      color: '#8b5cf6',
-      status: 'active',
-      path: '/modules/cbrs-management'
-    },
-    {
-      id: 'coverage-map',
-      name: 'Coverage Map',
-      description: 'Comprehensive network asset mapping with towers, sectors, CPE, and equipment inventory management',
-      icon: '🗺️',
-      color: '#7c3aed',
-      status: 'active',
-      path: '/modules/coverage-map'
-    },
-    {
-      id: 'inventory',
-      name: 'Inventory Management',
-      description: 'Centralized asset tracking with location management, maintenance history, and warranty tracking',
-      icon: '📦',
-      color: '#10b981',
-      status: 'active',
-      path: '/modules/inventory'
-    },
-    {
-      id: 'work-orders',
-      name: 'Work Orders & Tickets',
-      description: 'Field operations management, trouble tickets, installations, and SLA tracking',
+      id: 'plan',
+      name: '📋 Plan',
+      description: 'Strategic planning and design tools for network expansion and optimization',
       icon: '📋',
-      color: '#f59e0b',
+      color: '#3b82f6', // Blue
       status: 'active',
-      path: '/modules/work-orders'
+      path: '/modules/plan',
+      features: ['Coverage Mapping', 'Inventory Management', 'CBRS Management', 'Site Planning', 'Capacity Planning']
     },
     {
-      id: 'help-desk',
-      name: 'Help Desk',
-      description: 'Customer support ticketing with equipment lookup and quick actions',
-      icon: '🎧',
-      color: '#06b6d4',
+      id: 'deploy',
+      name: '🚀 Deploy',
+      description: 'Implementation and deployment tools for network rollouts',
+      icon: '🚀',
+      color: '#10b981', // Green
       status: 'active',
-      path: '/modules/help-desk'
+      path: '/modules/deploy',
+      features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Quality Assurance']
     },
     {
-      id: 'user-management',
-      name: 'User Management',
-      description: 'Manage users, roles, and permissions for your organization',
-      icon: '👥',
-      color: '#8b5cf6',
+      id: 'monitor',
+      name: '📊 Monitor',
+      description: 'Real-time network monitoring and performance management',
+      icon: '📊',
+      color: '#f59e0b', // Amber
       status: 'active',
-      path: '/modules/user-management'
+      path: '/modules/monitor',
+      features: ['Network Monitoring', 'Device Health', 'Performance Analytics', 'Alert Management', 'SLA Monitoring']
     },
     {
-      id: 'hss-management',
-      name: 'HSS & Subscriber Management',
-      description: 'Home Subscriber Server management with IMSI/Ki/OPc, groups, and bandwidth plans',
-      icon: '🔐',
-      color: 'var(--warning)',
+      id: 'maintain',
+      name: '🔧 Maintain',
+      description: 'Comprehensive ticketing and maintenance management',
+      icon: '🔧',
+      color: '#ef4444', // Red
       status: 'active',
-      path: '/modules/hss-management'
-    },
-    {
-      id: 'monitoring',
-      name: 'Monitoring & Alerts',
-      description: 'Real-time system monitoring, alerting, and audit logging across all modules',
-      icon: '🔍',
-      color: '#06b6d4',
-      status: 'active',
-      path: '/modules/monitoring'
-    },
-    {
-      id: 'backend-management',
-      name: 'Backend Management',
-      description: 'Platform admin only - Monitor and control backend services, system resources, and VM operations',
-      icon: '🖥️',
-      color: 'var(--danger)',
-      status: 'active',
-      path: '/modules/backend-management',
-      adminOnly: true
+      path: '/modules/maintain',
+      features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Knowledge Base']
     }
   ];
 
-  let isDarkMode = false;
-  let userEmail = '';
-  let tenantName = '';
-  let isAdmin = false;
+  const adminModules: Module[] = [
+    {
+      id: 'admin-management',
+      name: '⚙️ Admin Management',
+      description: 'User and tenant management for owners and administrators',
+      icon: '⚙️',
+      color: '#6b7280', // Gray
+      status: 'active',
+      path: '/admin/management',
+      adminOnly: true,
+      features: ['User Management', 'Tenant Management', 'System Settings', 'Billing & Subscriptions']
+    }
+  ];
 
-  // Subscribe to tenant store
-  $: if ($currentTenant) {
-    tenantName = $currentTenant.displayName;
-  }
-  
-  // Filter modules based on permissions and admin status
-  $: displayedModules = modules.filter(module => {
-    // Admin-only modules
-    if (module.adminOnly) {
-      return isAdmin;
-    }
-    
-    // Check module permissions
-    const permissionKey = getPermissionKey(module.id);
-    if (permissionKey && $modulePermissions) {
-      return $modulePermissions[permissionKey];
-    }
-    
-    // Default: show module
-    return true;
-  });
-  
-  function getPermissionKey(moduleId: string): keyof typeof $modulePermissions | null {
-    const map: Record<string, string> = {
-      'pci-resolution': 'pciResolution',
-      'acs-cpe-management': 'acsManagement',
-      'cbrs-management': 'cbrsManagement',
-      'coverage-map': 'coverageMap',
-      'inventory': 'inventory',
-      'work-orders': 'workOrders',
-      'hss-management': 'hssManagement',
-      'monitoring': 'monitoring',
-      'backend-management': 'backendManagement'
-    };
-    return map[moduleId] as any || null;
-  }
+  let isAdmin = false;
+  let currentUser: any = null;
 
   onMount(async () => {
-    if (!browser) return;
-    
-    console.log('[Dashboard] Mounted');
-    
-    // Get user email
-    const currentUser = authService.getCurrentUser();
-    userEmail = currentUser?.email || localStorage.getItem('userEmail') || 'user@example.com';
-
-    // Check if user is platform admin
-    isAdmin = isPlatformAdmin(userEmail);
-    
-    // Admins don't need a tenant
-      if (isAdmin) {
-        tenantName = 'Platform Admin';
+    if (browser) {
+      currentUser = await authService.getCurrentUser();
+      isAdmin = await isPlatformAdmin();
     }
-
-    // Check for saved theme preference
-    const savedTheme = localStorage.getItem('theme');
-    isDarkMode = savedTheme === 'dark';
-    updateTheme();
-    
-    console.log('[Dashboard] Initialization complete');
   });
-
-  function toggleTheme() {
-    isDarkMode = !isDarkMode;
-    updateTheme();
-  }
-
-  function updateTheme() {
-    if (isDarkMode) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('theme', 'light');
-    }
-  }
 
   function handleModuleClick(module: Module) {
     if (module.status === 'active') {
       goto(module.path);
     }
   }
-
-  async function handleLogout() {
-    await authService.signOut();
-    tenantStore.clear(); // Clear all tenant state
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('userEmail');
-    goto('/login');
-  }
-
-  function handleTenantSettings() {
-    goto('/tenant-admin');
-  }
-
-  function handleSwitchTenant() {
-    goto('/tenant-selector');
-  }
 </script>
 
-<TenantGuard requireTenant={!isAdmin}>
-<div class="dashboard-page">
-  <!-- Header -->
-  <header class="header">
-    <div class="container">
+<TenantGuard requireTenant={false}>
+  <div class="dashboard-container">
+    <!-- Header -->
+    <div class="header">
       <div class="header-content">
         <div class="logo-section">
-          <div class="logo-icon">📶</div>
-          <div class="logo-text">
-            <h1>LTE WISP Management Platform</h1>
-            <p class="tagline">Professional Network Planning & Optimization</p>
-          </div>
+          <h1 class="app-title">WispTools.io</h1>
+          <p class="app-subtitle">Comprehensive WISP Management Platform</p>
         </div>
-        
-        <div class="header-actions">
-          {#if isAdmin}
-            <button class="btn-create-tenant" on:click={() => goto('/admin/tenant-management')} title="Manage Tenants (Platform Admin)">
-              🏢 Manage Tenants
-            </button>
-          {/if}
-          
-          {#if tenantName}
-            <div class="tenant-info">
-              <span class="tenant-icon">🏢</span>
-              <div class="tenant-details">
-                <span class="tenant-label">Organization</span>
-                <span class="tenant-name">{tenantName}</span>
-              </div>
-              <button class="tenant-menu-btn" on:click={handleSwitchTenant} title="Switch Organization">
-                ⚙️
+        <div class="tenant-info" class:has-tenant={$currentTenant}>
+          {#if $currentTenant}
+            <div class="tenant-badge">
+              <span class="tenant-name">{$currentTenant.displayName}</span>
+              <span class="tenant-subdomain">{$currentTenant.subdomain}</span>
+            </div>
+          {:else}
+            <div class="no-tenant">
+              <span>No tenant selected</span>
+              <button class="btn btn-primary btn-sm" on:click={() => goto('/tenant-selector')}>
+                Select Tenant
               </button>
             </div>
           {/if}
-
-          <button class="theme-toggle" on:click={toggleTheme} aria-label="Toggle theme">
-            {#if isDarkMode}
-              ☀️
-            {:else}
-              🌙
-            {/if}
-          </button>
-          
-          <div class="user-menu">
-            <div class="user-info">
-              <span class="user-icon">👤</span>
-              <span class="user-email">{userEmail}</span>
-            </div>
-            <button class="btn-logout" on:click={handleLogout}>
-              Logout
-            </button>
-          </div>
         </div>
       </div>
     </div>
-  </header>
 
-  <!-- Modules Grid -->
-  <section class="modules-section">
-    <div class="container">
-      
-      <div class="modules-grid">
-        {#each displayedModules as module}
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Core Modules -->
+      <div class="modules-section">
+        <h2 class="section-title">Core Modules</h2>
+        <div class="modules-grid">
+          {#each modules as module}
             <div 
-              class="module-card {module.status}"
-              class:clickable={module.status === 'active'}
-              class:admin-module={module.adminOnly}
+              class="module-card" 
+              class:active={module.status === 'active'}
+              class:coming-soon={module.status === 'coming-soon'}
               on:click={() => handleModuleClick(module)}
               on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
               role="button"
               tabindex="0"
-              style="--module-color: {module.color}"
             >
               <div class="module-header">
-                <div class="module-icon">{module.icon}</div>
-                {#if module.adminOnly}
-                  <span class="status-badge admin">Admin Only</span>
-                {:else if module.status === 'coming-soon'}
-                  <span class="status-badge">Coming Soon</span>
-                {:else}
-                  <span class="status-badge active">Active</span>
-                {/if}
+                <div class="module-icon" style="background-color: {module.color}20; color: {module.color}">
+                  {module.icon}
+                </div>
+                <div class="module-info">
+                  <h3 class="module-name">{module.name}</h3>
+                  <p class="module-description">{module.description}</p>
+                </div>
               </div>
               
-              <h4 class="module-name">{module.name}</h4>
-              <p class="module-description">{module.description}</p>
-              
-              {#if module.status === 'active'}
-                <div class="module-footer">
-                  <span class="launch-text">Launch Module →</span>
-                </div>
-              {:else}
-                <div class="module-footer disabled">
-                  <span class="launch-text">In Development</span>
-                </div>
-              {/if}
+              <div class="module-features">
+                <h4>Key Features:</h4>
+                <ul>
+                  {#each module.features as feature}
+                    <li>{feature}</li>
+                  {/each}
+                </ul>
+              </div>
+
+              <div class="module-status">
+                {#if module.status === 'active'}
+                  <span class="status-badge active">Active</span>
+                {:else}
+                  <span class="status-badge coming-soon">Coming Soon</span>
+                {/if}
+              </div>
             </div>
-        {/each}
-        
-        {#if displayedModules.length === 0 && !isAdmin}
-          <div class="empty-modules">
-            <div class="empty-icon">📦</div>
-            <h3>No Modules Available</h3>
-            <p>Your subscription doesn't include any modules yet.</p>
-            <p class="help-text">Contact support to activate modules for your account.</p>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Admin Modules -->
+      {#if isAdmin}
+        <div class="admin-section">
+          <h2 class="section-title">Administration</h2>
+          <div class="admin-modules">
+            {#each adminModules as module}
+              <div 
+                class="admin-card" 
+                on:click={() => handleModuleClick(module)}
+                on:keydown={(e) => e.key === 'Enter' && handleModuleClick(module)}
+                role="button"
+                tabindex="0"
+              >
+                <div class="admin-icon" style="background-color: {module.color}20; color: {module.color}">
+                  {module.icon}
+                </div>
+                <div class="admin-info">
+                  <h3 class="admin-name">{module.name}</h3>
+                  <p class="admin-description">{module.description}</p>
+                </div>
+              </div>
+            {/each}
           </div>
-        {/if}
+        </div>
+      {/if}
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h2 class="section-title">Quick Actions</h2>
+        <div class="actions-grid">
+          <button class="action-btn" on:click={() => goto('/modules/plan/coverage-map')}>
+            <span class="action-icon">🗺️</span>
+            <span class="action-text">View Coverage Map</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/monitor')}>
+            <span class="action-icon">📊</span>
+            <span class="action-text">Check Network Status</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/maintain/tickets')}>
+            <span class="action-icon">🎫</span>
+            <span class="action-text">View Tickets</span>
+          </button>
+          <button class="action-btn" on:click={() => goto('/modules/deploy/work-orders')}>
+            <span class="action-icon">📋</span>
+            <span class="action-text">Work Orders</span>
+          </button>
+        </div>
       </div>
     </div>
-  </section>
-</div>
+  </div>
 </TenantGuard>
 
 <style>
-  .dashboard-page {
+  .dashboard-container {
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 0;
   }
 
-  /* Header */
   .header {
-    background-color: var(--card-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 1.5rem 0;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 0;
   }
 
   .header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
 
   .logo-section {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+    text-align: left;
   }
 
-  .logo-icon {
+  .app-title {
     font-size: 2.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  .logo-text h1 {
-    font-size: 1.5rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .tagline {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-  }
-
-  .btn-create-tenant {
-    padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-    color: white;
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-  }
-
-  .btn-create-tenant:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
-  }
-
-  .theme-toggle {
-    font-size: 1.5rem;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    transition: background-color 0.2s;
-  }
-
-  .theme-toggle:hover {
-    background-color: var(--bg-hover);
+  .app-subtitle {
+    font-size: 1rem;
+    color: #6b7280;
+    margin: 0.25rem 0 0 0;
   }
 
   .tenant-info {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 1rem;
-    background-color: rgba(124, 58, 237, 0.1);
-    border-radius: 0.5rem;
-    border: 1px solid rgba(124, 58, 237, 0.2);
-  }
-
-  .tenant-icon {
-    font-size: 1.25rem;
-  }
-
-  .tenant-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-
-  .tenant-label {
-    font-size: 0.625rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .tenant-name {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--brand-primary);
-  }
-
-  .tenant-menu-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    padding: 0.25rem;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-  }
-
-  .tenant-menu-btn:hover {
-    opacity: 1;
-  }
-
-  .user-menu {
-    display: flex;
-    align-items: center;
     gap: 1rem;
   }
 
-  .user-info {
+  .tenant-badge {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
     display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .tenant-name {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .tenant-subdomain {
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .no-tenant {
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background-color: var(--bg-tertiary);
-    border-radius: 0.5rem;
+    color: #6b7280;
   }
 
-  .user-icon {
-    font-size: 1.25rem;
+  .main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
   }
 
-  .user-email {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-
-  .btn-logout {
-    padding: 0.5rem 1rem;
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-logout:hover {
-    background-color: var(--bg-hover);
-  }
-
-  /* Modules Section */
-  .modules-section {
-    padding: 2rem 0;
-    flex: 1;
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    margin: 0 0 1.5rem 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .modules-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
   }
 
   .module-card {
-    background-color: var(--card-bg);
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 1rem;
-    padding: 2rem;
-    border: 2px solid var(--border-color);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .module-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background-color: var(--module-color);
-    transform: scaleX(0);
-    transition: transform 0.3s ease;
-  }
-
-  .module-card.clickable {
+    padding: 1.5rem;
     cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 
-  .module-card.clickable:hover {
+  .module-card:hover {
     transform: translateY(-4px);
-    box-shadow: var(--card-shadow-hover);
-    border-color: var(--module-color);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
   }
 
-  .module-card.clickable:hover::before {
-    transform: scaleX(1);
+  .module-card.active {
+    border-color: #3b82f6;
   }
 
   .module-card.coming-soon {
     opacity: 0.7;
+    cursor: not-allowed;
   }
 
   .module-header {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
+    gap: 1rem;
     margin-bottom: 1rem;
   }
 
   .module-icon {
-    font-size: 3rem;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .module-info {
+    flex: 1;
+  }
+
+  .module-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .module-description {
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .module-features {
+    margin-bottom: 1rem;
+  }
+
+  .module-features h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .module-features ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .module-features li {
+    font-size: 0.875rem;
+    color: #6b7280;
+    padding: 0.25rem 0;
+    position: relative;
+    padding-left: 1rem;
+  }
+
+  .module-features li::before {
+    content: '•';
+    color: #3b82f6;
+    position: absolute;
+    left: 0;
+  }
+
+  .module-status {
+    display: flex;
+    justify-content: flex-end;
   }
 
   .status-badge {
     padding: 0.25rem 0.75rem;
-    border-radius: 1rem;
+    border-radius: 9999px;
     font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background-color: var(--bg-tertiary);
-    color: var(--text-secondary);
+    font-weight: 500;
   }
 
   .status-badge.active {
-    background-color: rgba(16, 185, 129, 0.1);
-    color: var(--status-success);
+    background: #dcfce7;
+    color: #166534;
   }
 
-  .status-badge.admin {
-    background-color: rgba(239, 68, 68, 0.1);
-    color: var(--danger);
+  .status-badge.coming-soon {
+    background: #fef3c7;
+    color: #92400e;
   }
 
-  .module-card.admin-module {
-    border: 2px solid rgba(239, 68, 68, 0.3);
+  .admin-section {
+    margin-bottom: 3rem;
   }
 
-  .module-card.admin-module:hover {
-    border-color: var(--danger);
-    box-shadow: 0 10px 30px rgba(239, 68, 68, 0.2);
+  .admin-modules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
   }
 
-  .module-name {
-    font-size: 1.5rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .module-description {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    margin-bottom: 1.5rem;
-    min-height: 3rem;
-  }
-
-  .module-footer {
+  .admin-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    color: var(--module-color);
+    gap: 1rem;
+  }
+
+  .admin-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #6b7280;
+  }
+
+  .admin-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .admin-name {
+    font-size: 1rem;
     font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
   }
 
-  .module-footer.disabled {
-    color: var(--text-tertiary);
-  }
-
-  .launch-text {
+  .admin-description {
     font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
   }
 
-  /* Responsive */
+  .quick-actions {
+    margin-bottom: 2rem;
+  }
+
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .action-btn {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid transparent;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+  }
+
+  .action-icon {
+    font-size: 1.5rem;
+  }
+
+  .action-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1f2937;
+  }
+
   @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .app-title {
+      font-size: 2rem;
+    }
+
+    .main-content {
+      padding: 1rem;
+    }
+
     .modules-grid {
       grid-template-columns: 1fr;
     }
 
-    .logo-text h1 {
-      font-size: 1.25rem;
-    }
-
-    .header-actions {
-      gap: 0.75rem;
-    }
-
-    .user-email {
-      display: none;
-    }
-
-    .tenant-details {
-      display: none;
-    }
-
-    .tenant-info {
-      padding: 0.5rem;
+    .actions-grid {
+      grid-template-columns: repeat(2, 1fr);
     }
   }
 </style>
-
