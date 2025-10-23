@@ -27,7 +27,7 @@
       icon: '📋',
       color: '#3b82f6', // Blue
       status: 'active',
-      path: '/modules/plan',
+      path: '/modules/coverage-map',
       features: ['Coverage Mapping', 'Inventory Management', 'CBRS Management', 'Site Planning', 'Capacity Planning']
     },
     {
@@ -37,7 +37,7 @@
       icon: '🚀',
       color: '#10b981', // Green
       status: 'active',
-      path: '/modules/deploy',
+      path: '/modules/pci-resolution',
       features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Quality Assurance']
     },
     {
@@ -47,7 +47,7 @@
       icon: '📊',
       color: '#f59e0b', // Amber
       status: 'active',
-      path: '/modules/monitor',
+      path: '/modules/monitoring',
       features: ['Network Monitoring', 'Device Health', 'Performance Analytics', 'Alert Management', 'SLA Monitoring']
     },
     {
@@ -57,7 +57,7 @@
       icon: '🔧',
       color: '#ef4444', // Red
       status: 'active',
-      path: '/modules/maintain',
+      path: '/modules/help-desk',
       features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Knowledge Base']
     }
   ];
@@ -82,7 +82,7 @@
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
-      isAdmin = await isPlatformAdmin();
+      isAdmin = isPlatformAdmin(currentUser?.email || null);
     }
   });
 
@@ -197,19 +197,19 @@
       <div class="quick-actions">
         <h2 class="section-title">Quick Actions</h2>
         <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/modules/plan/coverage-map')}>
+          <button class="action-btn" on:click={() => goto('/modules/coverage-map')}>
             <span class="action-icon">🗺️</span>
             <span class="action-text">View Coverage Map</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/modules/monitor')}>
+          <button class="action-btn" on:click={() => goto('/modules/monitoring')}>
             <span class="action-icon">📊</span>
             <span class="action-text">Check Network Status</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/modules/maintain/tickets')}>
+          <button class="action-btn" on:click={() => goto('/modules/help-desk')}>
             <span class="action-icon">🎫</span>
             <span class="action-text">View Tickets</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/modules/deploy/work-orders')}>
+          <button class="action-btn" on:click={() => goto('/modules/work-orders')}>
             <span class="action-icon">📋</span>
             <span class="action-text">Work Orders</span>
           </button>
