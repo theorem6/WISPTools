@@ -22,28 +22,28 @@
       name: 'User Management',
       description: 'Manage users, roles, and permissions across tenants',
       icon: '👥',
-      path: '/admin/users'
+      path: '/modules/user-management'
     },
     {
       id: 'tenant-management',
       name: 'Tenant Management',
       description: 'Create, configure, and manage organization tenants',
       icon: '🏢',
-      path: '/admin/tenants'
+      path: '/admin/tenant-management'
     },
     {
       id: 'system-settings',
       name: 'System Settings',
       description: 'Configure system-wide settings and preferences',
       icon: '⚙️',
-      path: '/admin/settings'
+      path: '/modules/backend-management'
     },
     {
       id: 'billing-subscriptions',
       name: 'Billing & Subscriptions',
       description: 'Manage billing, subscriptions, and payment processing',
       icon: '💳',
-      path: '/admin/billing'
+      path: '/modules/tenant-management'
     }
   ];
 

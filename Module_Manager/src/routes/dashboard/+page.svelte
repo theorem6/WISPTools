@@ -78,17 +78,33 @@
 
   let isAdmin = false;
   let currentUser: any = null;
+  let isLoggedIn = false;
 
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
       isAdmin = isPlatformAdmin(currentUser?.email || null);
+      isLoggedIn = !!currentUser;
     }
   });
 
   function handleModuleClick(module: Module) {
     if (module.status === 'active') {
       goto(module.path);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await authService.signOut();
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('selectedTenantId');
+      localStorage.removeItem('selectedTenantName');
+      localStorage.removeItem('tenantSetupCompleted');
+      await goto('/login', { replaceState: true });
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   }
 </script>
@@ -115,6 +131,27 @@
                 Select Tenant
               </button>
             </div>
+          {/if}
+        </div>
+        
+        <!-- User Info and Logout -->
+        <div class="user-info">
+          {#if isLoggedIn && currentUser}
+            <div class="user-badge">
+              <span class="user-email">{currentUser.email}</span>
+              {#if isAdmin}
+                <span class="admin-badge">Admin</span>
+              {/if}
+            </div>
+            <button class="logout-btn" on:click={handleLogout}>
+              <span class="logout-icon">🚪</span>
+              Logout
+            </button>
+          {:else}
+            <button class="login-btn" on:click={() => goto('/login')}>
+              <span class="login-icon">🔑</span>
+              Login
+            </button>
           {/if}
         </div>
       </div>
@@ -267,6 +304,69 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .user-badge {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .user-email {
+    font-weight: 500;
+    color: #1f2937;
+    font-size: 0.875rem;
+  }
+
+  .admin-badge {
+    background: #dcfce7;
+    color: #166534;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .logout-btn, .login-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .login-btn {
+    background: #3b82f6;
+  }
+
+  .logout-btn:hover {
+    background: #dc2626;
+  }
+
+  .login-btn:hover {
+    background: #2563eb;
+  }
+
+  .logout-icon, .login-icon {
+    font-size: 1rem;
   }
 
   .tenant-badge {
