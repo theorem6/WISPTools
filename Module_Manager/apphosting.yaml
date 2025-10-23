@@ -96,3 +96,21 @@ env:
     value: https://sas.federatedwireless.com/api/v1
     availability:
       - RUNTIME
+  
+  # Billing API Configuration
+  - variable: VITE_API_URL
+    value: https://wisptools.io/api
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  # PayPal Configuration (for backend)
+  - variable: PAYPAL_CLIENT_ID
+    value: ARcw63HPgW_YB1FdF3kH2...
+    availability:
+      - RUNTIME
+  
+  - variable: PAYPAL_CLIENT_SECRET
+    secret: paypal-client-secret
+    availability:
+      - RUNTIME
