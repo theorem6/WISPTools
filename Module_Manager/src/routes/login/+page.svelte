@@ -28,8 +28,7 @@
     });
     
     if (isAuthenticated) {
-      console.log('[Login Page] Already authenticated, redirecting to dashboard');
-      await goto('/dashboard', { replaceState: true });
+      console.log('[Login Page] Already authenticated, layout will handle redirect');
     } else {
       console.log('[Login Page] Not authenticated, showing login form');
     }
@@ -64,14 +63,13 @@
       }
 
       if (result.success) {
-        console.log('[Login Page] Authentication successful, redirecting to dashboard');
+        console.log('[Login Page] Authentication successful, layout will handle redirect');
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', email);
         
-        // Redirect to dashboard
-        await goto('/dashboard', { replaceState: true });
+        // Layout will handle redirect to dashboard
       } else {
         error = result.error || 'Authentication failed';
         console.error('[Login Page] Authentication failed:', error);
@@ -93,14 +91,13 @@
       const result = await authService.signInWithGoogle();
 
       if (result.success) {
-        console.log('[Login Page] Google authentication successful, redirecting to dashboard');
+        console.log('[Login Page] Google authentication successful, layout will handle redirect');
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', result.data?.email || '');
         
-        // Redirect to dashboard
-        await goto('/dashboard', { replaceState: true });
+        // Layout will handle redirect to dashboard
       } else {
         error = result.error || 'Google authentication failed';
         console.error('[Login Page] Google authentication failed:', error);

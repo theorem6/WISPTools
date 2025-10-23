@@ -53,8 +53,21 @@
     // Handle authentication state changes
     if (!isAuthenticated) {
       // User signed out - clear tenant data and redirect to login
-      tenantStore.clearTenantData();
-      goto('/login', { replaceState: true });
+      // Only redirect if not already on login page to prevent loops
+      if (window.location.pathname !== '/login') {
+        tenantStore.clearTenantData();
+        goto('/login', { replaceState: true });
+      }
+    } else {
+      // User signed in - initialize tenant store if not already done
+      if (!tenantStore.isInitialized) {
+        tenantStore.initialize();
+      }
+      
+      // If on login page and authenticated, redirect to dashboard
+      if (window.location.pathname === '/login') {
+        goto('/dashboard', { replaceState: true });
+      }
     }
   });
 </script>

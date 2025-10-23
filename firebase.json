@@ -25,6 +25,7 @@
       "firebase-debug.*.log",
       ".svelte-kit",
       "build"
-    ]
+    ],
+    "alwaysDeployFromSource": true
   }
 }
