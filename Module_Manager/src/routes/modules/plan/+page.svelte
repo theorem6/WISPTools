@@ -75,8 +75,6 @@
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
-  let selectedTool: MapTool | null = null;
-  let showToolDetails = false;
 
   onMount(async () => {
     if (browser) {
@@ -88,43 +86,30 @@
   });
 
   function handleToolClick(tool: MapTool) {
-    selectedTool = tool;
-    showToolDetails = true;
     tool.action();
   }
 
-  function closeToolDetails() {
-    showToolDetails = false;
-    selectedTool = null;
-  }
-
   function analyzeCoverage() {
-    console.log('Starting coverage analysis...');
     goto('/modules/coverage-map');
   }
 
   function planNewSite() {
-    console.log('Opening site planning tool...');
-    goto('/modules/coverage-map?mode=planning');
+    goto('/modules/coverage-map');
   }
 
   function checkInventory() {
-    console.log('Checking inventory...');
     goto('/modules/inventory');
   }
 
   function manageCBRS() {
-    console.log('Managing CBRS spectrum...');
     goto('/modules/cbrs-management');
   }
 
   function planCapacity() {
-    console.log('Planning capacity...');
-    goto('/modules/monitoring?view=capacity');
+    goto('/modules/monitoring');
   }
 
   function analyzeCosts() {
-    console.log('Analyzing costs...');
     goto('/modules/inventory/reports');
   }
 
@@ -216,29 +201,6 @@
       </div>
     </div>
 
-    <!-- Tool Details Modal -->
-    {#if showToolDetails && selectedTool}
-      <div class="tool-modal-overlay" on:click={closeToolDetails}>
-        <div class="tool-modal" on:click|stopPropagation>
-          <div class="modal-header">
-            <h3>{selectedTool.name}</h3>
-            <button class="close-btn" on:click={closeToolDetails}>×</button>
-          </div>
-          <div class="modal-content">
-            <div class="tool-icon-large">{selectedTool.icon}</div>
-            <p class="tool-description">{selectedTool.description}</p>
-            <div class="modal-actions">
-              <button class="action-btn primary" on:click={() => { selectedTool.action(); closeToolDetails(); }}>
-                Open Tool
-              </button>
-              <button class="action-btn secondary" on:click={closeToolDetails}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
   </div>
 </TenantGuard>
 
@@ -513,123 +475,6 @@
     border-radius: 50%;
   }
 
-  /* Tool Modal */
-  .tool-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(5px);
-  }
-
-  .tool-modal {
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    max-width: 400px;
-    width: 90%;
-    box-shadow: var(--shadow-xl);
-    animation: modalSlideIn 0.3s ease-out;
-  }
-
-  @keyframes modalSlideIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9) translateY(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-  }
-
-  .modal-header h3 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0;
-  }
-
-  .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-color-light);
-    padding: 0.25rem;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-  }
-
-  .close-btn:hover {
-    background: var(--secondary-bg);
-    color: var(--text-color);
-  }
-
-  .modal-content {
-    text-align: center;
-  }
-
-  .tool-icon-large {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-  }
-
-  .tool-description {
-    font-size: 1rem;
-    color: var(--text-color-light);
-    margin-bottom: 2rem;
-    line-height: 1.5;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-  }
-
-  .action-btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: var(--border-radius-md);
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .action-btn.primary {
-    background: var(--primary-color);
-    color: white;
-  }
-
-  .action-btn.primary:hover {
-    background: var(--primary-color-dark);
-    transform: translateY(-1px);
-  }
-
-  .action-btn.secondary {
-    background: var(--secondary-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-  }
-
-  .action-btn.secondary:hover {
-    background: var(--border-color);
-  }
 
   /* Responsive Design */
   @media (max-width: 768px) {

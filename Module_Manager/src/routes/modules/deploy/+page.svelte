@@ -75,8 +75,6 @@
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
-  let selectedTool: MapTool | null = null;
-  let showToolDetails = false;
 
   onMount(async () => {
     if (browser) {
@@ -88,44 +86,31 @@
   });
 
   function handleToolClick(tool: MapTool) {
-    selectedTool = tool;
-    showToolDetails = true;
     tool.action();
   }
 
-  function closeToolDetails() {
-    showToolDetails = false;
-    selectedTool = null;
-  }
-
   function resolvePCI() {
-    console.log('Starting PCI resolution...');
     goto('/modules/pci-resolution');
   }
 
   function manageCPE() {
-    console.log('Managing CPE devices...');
     goto('/modules/acs-cpe-management');
   }
 
   function manageWorkOrders() {
-    console.log('Managing work orders...');
     goto('/modules/work-orders');
   }
 
   function manageInstallations() {
-    console.log('Managing installations...');
-    goto('/modules/work-orders?view=installations');
+    goto('/modules/work-orders');
   }
 
   function configureEquipment() {
-    console.log('Configuring equipment...');
-    goto('/modules/acs-cpe-management?mode=configuration');
+    goto('/modules/acs-cpe-management');
   }
 
   function performQA() {
-    console.log('Performing quality assurance...');
-    goto('/modules/monitoring?view=qa');
+    goto('/modules/monitoring');
   }
 
   function goBack() {
@@ -225,29 +210,6 @@
       </div>
     </div>
 
-    <!-- Tool Details Modal -->
-    {#if showToolDetails && selectedTool}
-      <div class="tool-modal-overlay" on:click={closeToolDetails}>
-        <div class="tool-modal" on:click|stopPropagation>
-          <div class="modal-header">
-            <h3>{selectedTool.name}</h3>
-            <button class="close-btn" on:click={closeToolDetails}>×</button>
-          </div>
-          <div class="modal-content">
-            <div class="tool-icon-large">{selectedTool.icon}</div>
-            <p class="tool-description">{selectedTool.description}</p>
-            <div class="modal-actions">
-              <button class="action-btn primary" on:click={() => { selectedTool.action(); closeToolDetails(); }}>
-                Open Tool
-              </button>
-              <button class="action-btn secondary" on:click={closeToolDetails}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
   </div>
 </TenantGuard>
 
@@ -547,123 +509,6 @@
     border-radius: 50%;
   }
 
-  /* Tool Modal */
-  .tool-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(5px);
-  }
-
-  .tool-modal {
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    max-width: 400px;
-    width: 90%;
-    box-shadow: var(--shadow-xl);
-    animation: modalSlideIn 0.3s ease-out;
-  }
-
-  @keyframes modalSlideIn {
-    from {
-      opacity: 0;
-      transform: scale(0.9) translateY(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-  }
-
-  .modal-header h3 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0;
-  }
-
-  .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-color-light);
-    padding: 0.25rem;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-  }
-
-  .close-btn:hover {
-    background: var(--secondary-bg);
-    color: var(--text-color);
-  }
-
-  .modal-content {
-    text-align: center;
-  }
-
-  .tool-icon-large {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-  }
-
-  .tool-description {
-    font-size: 1rem;
-    color: var(--text-color-light);
-    margin-bottom: 2rem;
-    line-height: 1.5;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-  }
-
-  .action-btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: var(--border-radius-md);
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .action-btn.primary {
-    background: var(--primary-color);
-    color: white;
-  }
-
-  .action-btn.primary:hover {
-    background: var(--primary-color-dark);
-    transform: translateY(-1px);
-  }
-
-  .action-btn.secondary {
-    background: var(--secondary-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-  }
-
-  .action-btn.secondary:hover {
-    background: var(--border-color);
-  }
 
   /* Responsive Design */
   @media (max-width: 768px) {
