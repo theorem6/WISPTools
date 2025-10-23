@@ -5,98 +5,127 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { isPlatformAdmin } from '$lib/services/adminService';
 
-  interface MonitorFeature {
+  interface MapTool {
     id: string;
     name: string;
     description: string;
     icon: string;
-    path: string;
-    status: 'active' | 'coming-soon';
-    features: string[];
+    action: () => void;
+    position: { x: number; y: number };
+    color: string;
   }
 
-  const monitorFeatures: MonitorFeature[] = [
+  const mapTools: MapTool[] = [
     {
       id: 'network-monitoring',
       name: 'Network Monitoring',
-      description: 'Real-time performance metrics and alerts',
-      icon: '📊',
-      path: '/modules/monitoring',
-      status: 'active',
-      features: ['Real-time Metrics', 'Performance Monitoring', 'Network Health', 'Status Dashboard']
+      description: 'Real-time performance metrics and network health status',
+      icon: '📈',
+      action: () => monitorNetwork(),
+      position: { x: 30, y: 25 },
+      color: '#3b82f6'
     },
     {
       id: 'device-health',
       name: 'Device Health',
-      description: 'Equipment status and diagnostics',
-      icon: '🏥',
-      path: '/modules/acs-cpe-management', // Link to ACS for device health
-      status: 'active',
-      features: ['Device Diagnostics', 'Health Monitoring', 'Fault Detection', 'Performance Metrics']
+      description: 'Monitor the operational status and diagnostics of all network devices',
+      icon: '❤️',
+      action: () => checkDeviceHealth(),
+      position: { x: 70, y: 30 },
+      color: '#ef4444'
     },
     {
       id: 'traffic-analysis',
       name: 'Traffic Analysis',
-      description: 'Bandwidth utilization and user behavior',
-      icon: '📈',
-      path: '/modules/monitoring', // Link to monitoring for traffic analysis
-      status: 'active',
-      features: ['Bandwidth Analysis', 'User Behavior', 'Traffic Patterns', 'Utilization Reports']
+      description: 'Analyze bandwidth utilization and user traffic patterns',
+      icon: '📊',
+      action: () => analyzeTraffic(),
+      position: { x: 25, y: 65 },
+      color: '#10b981'
     },
     {
       id: 'performance-analytics',
       name: 'Performance Analytics',
-      description: 'KPIs and trend analysis',
+      description: 'View key performance indicators and historical trends',
       icon: '📉',
-      path: '/modules/monitoring', // Link to monitoring for analytics
-      status: 'active',
-      features: ['KPI Tracking', 'Trend Analysis', 'Performance Reports', 'Historical Data']
+      action: () => viewAnalytics(),
+      position: { x: 75, y: 70 },
+      color: '#f59e0b'
     },
     {
       id: 'alert-management',
       name: 'Alert Management',
-      description: 'Automated notifications and escalation',
-      icon: '🚨',
-      path: '/modules/monitoring', // Link to monitoring for alerts
-      status: 'active',
-      features: ['Automated Alerts', 'Escalation Rules', 'Notification Management', 'Alert History']
-    },
-    {
-      id: 'sla-monitoring',
-      name: 'SLA Monitoring',
-      description: 'Service level agreement compliance',
-      icon: '📋',
-      path: '/modules/monitoring', // Link to monitoring for SLA
-      status: 'active',
-      features: ['SLA Compliance', 'Service Metrics', 'Uptime Tracking', 'Performance Targets']
+      description: 'Configure and manage automated alerts and notifications',
+      icon: '🔔',
+      action: () => manageAlerts(),
+      position: { x: 50, y: 20 },
+      color: '#8b5cf6'
     },
     {
       id: 'hss-management',
       name: 'HSS Management',
-      description: 'LTE core subscriber database management',
-      icon: '🗄️',
-      path: '/modules/hss-management',
-      status: 'active',
-      features: ['Subscriber Management', 'SIM Card Tracking', 'User Provisioning', 'Database Monitoring']
+      description: 'Manage subscriber profiles and SIM card provisioning',
+      icon: '👤',
+      action: () => manageHSS(),
+      position: { x: 50, y: 80 },
+      color: '#06b6d4'
     }
   ];
 
-  let isAdmin = false;
   let currentUser: any = null;
+  let mapContainer: HTMLDivElement;
+  let selectedTool: MapTool | null = null;
+  let showToolDetails = false;
 
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
-      isAdmin = isPlatformAdmin(currentUser?.email || null);
+      if (!currentUser) {
+        goto('/login');
+      }
     }
   });
 
-  function handleFeatureClick(feature: MonitorFeature) {
-    if (feature.status === 'active') {
-      goto(feature.path);
-    }
+  function handleToolClick(tool: MapTool) {
+    selectedTool = tool;
+    showToolDetails = true;
+    tool.action();
+  }
+
+  function closeToolDetails() {
+    showToolDetails = false;
+    selectedTool = null;
+  }
+
+  function monitorNetwork() {
+    console.log('Starting network monitoring...');
+    goto('/modules/monitoring');
+  }
+
+  function checkDeviceHealth() {
+    console.log('Checking device health...');
+    goto('/modules/acs-cpe-management/monitoring');
+  }
+
+  function analyzeTraffic() {
+    console.log('Analyzing traffic...');
+    goto('/modules/monitoring?view=traffic');
+  }
+
+  function viewAnalytics() {
+    console.log('Viewing performance analytics...');
+    goto('/modules/monitoring?view=analytics');
+  }
+
+  function manageAlerts() {
+    console.log('Managing alerts...');
+    goto('/modules/monitoring?view=alerts');
+  }
+
+  function manageHSS() {
+    console.log('Managing HSS...');
+    goto('/modules/hss-management');
   }
 
   function goBack() {
@@ -104,7 +133,7 @@
   }
 </script>
 
-<TenantGuard requireTenant={false}>
+<TenantGuard requireTenant={true}>
   <div class="monitor-module">
     <!-- Header -->
     <div class="module-header">
@@ -115,7 +144,7 @@
         </button>
         <div class="module-title">
           <h1>📊 Monitor Module</h1>
-          <p>Real-time network monitoring and performance management</p>
+          <p>Interactive map-based monitoring tools for network oversight</p>
         </div>
         <div class="user-info">
           {#if currentUser}
@@ -126,123 +155,125 @@
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="module-content">
-      <!-- Overview -->
-      <div class="overview-section">
-        <h2>Monitoring Overview</h2>
-        <p>The Monitor module provides comprehensive real-time monitoring capabilities for your network infrastructure, including network performance metrics, device health monitoring, traffic analysis, performance analytics, alert management, SLA monitoring, and HSS subscriber database management. This module ensures optimal network performance and reliability.</p>
+    <!-- Map Container -->
+    <div class="map-container">
+      <div class="map-header">
+        <h2>Network Monitoring Map</h2>
+        <p>Click on monitoring tools to access different monitoring features</p>
       </div>
-
-      <!-- Features Grid -->
-      <div class="features-section">
-        <h2>Monitoring Features</h2>
-        <div class="features-grid">
-          {#each monitorFeatures as feature (feature.id)}
-            <div class="feature-card" on:click={() => handleFeatureClick(feature)}>
-              <div class="feature-header">
-                <span class="feature-icon">{feature.icon}</span>
-                <div class="feature-info">
-                  <h3 class="feature-name">{feature.name}</h3>
-                  <p class="feature-description">{feature.description}</p>
-                </div>
-                <span class="feature-status {feature.status}">
-                  {feature.status === 'active' ? '✅' : '🚧'}
-                </span>
+      
+      <div class="map-area" bind:this={mapContainer}>
+        <!-- Map Background -->
+        <div class="map-background">
+          <div class="map-grid"></div>
+          <div class="map-overlay">
+            <div class="monitoring-indicators">
+              <div class="monitoring-node" style="left: 30%; top: 40%;">
+                <div class="node-icon">📡</div>
+                <div class="node-status online"></div>
+                <div class="node-signal"></div>
               </div>
-              <div class="feature-features">
-                <h4>Key Features:</h4>
-                <ul>
-                  {#each feature.features as feat}
-                    <li>{feat}</li>
-                  {/each}
-                </ul>
+              <div class="monitoring-node" style="left: 70%; top: 45%;">
+                <div class="node-icon">📡</div>
+                <div class="node-status warning"></div>
+                <div class="node-signal"></div>
               </div>
-              <div class="feature-arrow">→</div>
-            </div>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Monitoring Dashboard Preview -->
-      <div class="dashboard-preview">
-        <h2>Live Monitoring Dashboard</h2>
-        <div class="dashboard-grid">
-          <div class="dashboard-card">
-            <h3>Network Status</h3>
-            <div class="status-indicators">
-              <div class="status-item">
-                <span class="status-dot operational"></span>
-                <span>Operational</span>
-              </div>
-              <div class="status-item">
-                <span class="status-dot warning"></span>
-                <span>Warning</span>
-              </div>
-              <div class="status-item">
-                <span class="status-dot critical"></span>
-                <span>Critical</span>
+              <div class="monitoring-node" style="left: 50%; top: 70%;">
+                <div class="node-icon">📡</div>
+                <div class="node-status online"></div>
+                <div class="node-signal"></div>
               </div>
             </div>
-          </div>
-          <div class="dashboard-card">
-            <h3>Active Alerts</h3>
-            <div class="alert-count">3</div>
-            <p>Active alerts requiring attention</p>
-          </div>
-          <div class="dashboard-card">
-            <h3>Uptime</h3>
-            <div class="uptime-value">99.9%</div>
-            <p>Network availability</p>
-          </div>
-          <div class="dashboard-card">
-            <h3>Active Users</h3>
-            <div class="user-count">1,247</div>
-            <p>Currently connected</p>
           </div>
         </div>
-      </div>
 
-      <!-- Monitoring Workflow -->
-      <div class="workflow-section">
-        <h2>Monitoring Workflow</h2>
-        <div class="workflow-steps">
-          <div class="workflow-step">
-            <div class="step-number">1</div>
-            <div class="step-content">
-              <h3>Data Collection</h3>
-              <p>Collect metrics from network devices and systems</p>
+        <!-- Monitoring Tools -->
+        {#each mapTools as tool (tool.id)}
+          <div 
+            class="map-tool"
+            style="left: {tool.position.x}%; top: {tool.position.y}%; --tool-color: {tool.color};"
+            on:click={() => handleToolClick(tool)}
+            on:keydown={(e) => e.key === 'Enter' && handleToolClick(tool)}
+            role="button"
+            tabindex="0"
+          >
+            <div class="tool-icon">{tool.icon}</div>
+            <div class="tool-name">{tool.name}</div>
+            <div class="tool-pulse"></div>
+          </div>
+        {/each}
+
+        <!-- Map Legend -->
+        <div class="map-legend">
+          <h3>Legend</h3>
+          <div class="legend-items">
+            <div class="legend-item">
+              <div class="legend-color" style="background: #3b82f6;"></div>
+              <span>Monitoring Tools</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #ef4444;"></div>
+              <span>Health Tools</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #10b981;"></div>
+              <span>Analysis Tools</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-color" style="background: #f59e0b;"></div>
+              <span>Analytics Tools</span>
             </div>
           </div>
-          <div class="workflow-step">
-            <div class="step-number">2</div>
-            <div class="step-content">
-              <h3>Analysis</h3>
-              <p>Analyze performance data and identify trends</p>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="status-panel">
+          <h3>Network Status</h3>
+          <div class="status-items">
+            <div class="status-item">
+              <div class="status-indicator online"></div>
+              <span>Online: 2</span>
             </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">3</div>
-            <div class="step-content">
-              <h3>Alerting</h3>
-              <p>Generate alerts for anomalies and issues</p>
+            <div class="status-item">
+              <div class="status-indicator warning"></div>
+              <span>Warning: 1</span>
             </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">4</div>
-            <div class="step-content">
-              <h3>Reporting</h3>
-              <p>Create reports and dashboards for stakeholders</p>
+            <div class="status-item">
+              <div class="status-indicator offline"></div>
+              <span>Offline: 0</span>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Tool Details Modal -->
+    {#if showToolDetails && selectedTool}
+      <div class="tool-modal-overlay" on:click={closeToolDetails}>
+        <div class="tool-modal" on:click|stopPropagation>
+          <div class="modal-header">
+            <h3>{selectedTool.name}</h3>
+            <button class="close-btn" on:click={closeToolDetails}>×</button>
+          </div>
+          <div class="modal-content">
+            <div class="tool-icon-large">{selectedTool.icon}</div>
+            <p class="tool-description">{selectedTool.description}</p>
+            <div class="modal-actions">
+              <button class="action-btn primary" on:click={() => { selectedTool.action(); closeToolDetails(); }}>
+                Open Tool
+              </button>
+              <button class="action-btn secondary" on:click={closeToolDetails}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
 </TenantGuard>
 
 <style>
-  /* General Module Styling */
   .monitor-module {
     background: var(--background-color);
     min-height: 100vh;
@@ -319,232 +350,409 @@
     font-style: italic;
   }
 
-  .module-content {
+  /* Map Container */
+  .map-container {
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     padding: 2rem;
     box-shadow: var(--shadow-lg);
   }
 
-  .overview-section, .features-section, .dashboard-preview, .workflow-section {
+  .map-header {
+    text-align: center;
     margin-bottom: 2rem;
   }
 
-  h2 {
+  .map-header h2 {
     font-size: 1.8rem;
     color: var(--primary-color);
-    margin-bottom: 1.5rem;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 0.5rem;
+    margin: 0 0 0.5rem 0;
   }
 
-  /* Features Grid */
-  .features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 1.5rem;
+  .map-header p {
+    color: var(--text-color-light);
+    margin: 0;
   }
 
-  .feature-card {
-    background: var(--secondary-bg);
+  .map-area {
+    position: relative;
+    height: 600px;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
     border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
+    overflow: hidden;
+    border: 2px solid var(--border-color);
   }
 
-  .feature-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-color);
+  .map-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
-  .feature-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 1rem;
+  .map-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    opacity: 0.3;
   }
 
-  .feature-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
+  .map-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
-  .feature-info {
-    flex-grow: 1;
+  .monitoring-indicators {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
-  .feature-name {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0 0 0.5rem 0;
+  .monitoring-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
   }
 
-  .feature-description {
-    font-size: 0.9rem;
-    color: var(--text-color-light);
-    margin: 0;
-  }
-
-  .feature-status {
-    font-size: 1.2rem;
-    flex-shrink: 0;
-  }
-
-  .feature-features {
-    margin-bottom: 1rem;
-  }
-
-  .feature-features h4 {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-color);
-    margin: 0 0 0.5rem 0;
-  }
-
-  .feature-features ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .feature-features li {
-    font-size: 0.8rem;
-    color: var(--text-color-light);
+  .node-icon {
+    font-size: 1.5rem;
+    text-align: center;
     margin-bottom: 0.25rem;
-    padding-left: 1rem;
+  }
+
+  .node-status {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin: 0 auto;
     position: relative;
   }
 
-  .feature-features li::before {
-    content: '•';
-    color: var(--primary-color);
+  .node-status.online {
+    background: #10b981;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  }
+
+  .node-status.warning {
+    background: #f59e0b;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  }
+
+  .node-status.offline {
+    background: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  }
+
+  .node-signal {
     position: absolute;
-    left: 0;
+    top: -15px;
+    left: -15px;
+    width: 30px;
+    height: 30px;
+    border: 2px solid #f59e0b;
+    border-radius: 50%;
+    animation: signalPulse 2s ease-in-out infinite;
   }
 
-  .feature-arrow {
-    text-align: right;
-    font-size: 1.2rem;
-    color: var(--primary-color);
-    opacity: 0.7;
+  @keyframes signalPulse {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.3); opacity: 0.3; }
   }
 
-  /* Dashboard Preview */
-  .dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+  /* Map Tools */
+  .map-tool {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.3s ease;
   }
 
-  .dashboard-card {
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    text-align: center;
+  .map-tool:hover {
+    transform: translate(-50%, -50%) scale(1.1);
   }
 
-  .dashboard-card h3 {
-    font-size: 1rem;
+  .tool-icon {
+    width: 60px;
+    height: 60px;
+    background: var(--tool-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    box-shadow: var(--shadow-md);
+    border: 3px solid white;
+    transition: all 0.3s ease;
+  }
+
+  .map-tool:hover .tool-icon {
+    box-shadow: var(--shadow-lg);
+    transform: scale(1.1);
+  }
+
+  .tool-name {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
     font-weight: 600;
-    color: var(--primary-color);
-    margin: 0 0 1rem 0;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
 
-  .status-indicators {
+  .map-tool:hover .tool-name {
+    opacity: 1;
+  }
+
+  .tool-pulse {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    background: var(--tool-color);
+    opacity: 0.3;
+    animation: toolPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes toolPulse {
+    0% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.3); opacity: 0.1; }
+    100% { transform: scale(1); opacity: 0.3; }
+  }
+
+  /* Map Legend */
+  .map-legend {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+  }
+
+  .map-legend h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color);
+  }
+
+  .legend-items {
     display: flex;
     flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  /* Status Panel */
+  .status-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+  }
+
+  .status-panel h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color);
+  }
+
+  .status-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .status-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
   }
 
-  .status-dot {
-    width: 12px;
-    height: 12px;
+  .status-indicator {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
   }
 
-  .status-dot.operational {
+  .status-indicator.online {
     background: #10b981;
   }
 
-  .status-dot.warning {
+  .status-indicator.warning {
     background: #f59e0b;
   }
 
-  .status-dot.critical {
+  .status-indicator.offline {
     background: #ef4444;
   }
 
-  .alert-count, .uptime-value, .user-count {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-  }
-
-  .dashboard-card p {
-    font-size: 0.8rem;
-    color: var(--text-color-light);
-    margin: 0;
-  }
-
-  /* Workflow Section */
-  .workflow-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .workflow-step {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .step-number {
-    background: var(--primary-color);
-    color: white;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
+  /* Tool Modal */
+  .tool-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
-    flex-shrink: 0;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
   }
 
-  .step-content h3 {
-    font-size: 1.1rem;
+  .tool-modal {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: var(--shadow-xl);
+    animation: modalSlideIn 0.3s ease-out;
+  }
+
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-header h3 {
+    font-size: 1.5rem;
     font-weight: 600;
     color: var(--primary-color);
-    margin: 0 0 0.25rem 0;
-  }
-
-  .step-content p {
-    font-size: 0.9rem;
-    color: var(--text-color-light);
     margin: 0;
   }
 
-  /* Responsive adjustments */
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-color-light);
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .close-btn:hover {
+    background: var(--secondary-bg);
+    color: var(--text-color);
+  }
+
+  .modal-content {
+    text-align: center;
+  }
+
+  .tool-icon-large {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .tool-description {
+    font-size: 1rem;
+    color: var(--text-color-light);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+  }
+
+  .action-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius-md);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .action-btn.primary {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .action-btn.primary:hover {
+    background: var(--primary-color-dark);
+    transform: translateY(-1px);
+  }
+
+  .action-btn.secondary {
+    background: var(--secondary-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+  }
+
+  .action-btn.secondary:hover {
+    background: var(--border-color);
+  }
+
+  /* Responsive Design */
   @media (max-width: 768px) {
+    .monitor-module {
+      padding: 1rem;
+    }
+
     .header-content {
       flex-direction: column;
       align-items: flex-start;
@@ -554,21 +762,37 @@
       align-items: flex-start;
     }
 
-    .features-grid {
-      grid-template-columns: 1fr;
+    .map-area {
+      height: 500px;
     }
 
-    .dashboard-grid {
-      grid-template-columns: repeat(2, 1fr);
+    .map-tool {
+      transform: translate(-50%, -50%) scale(0.8);
     }
 
-    .module-content {
-      padding: 1rem;
+    .map-legend {
+      position: relative;
+      top: auto;
+      right: auto;
+      margin-top: 1rem;
+      width: 100%;
     }
 
-    .workflow-step {
+    .status-panel {
+      position: relative;
+      bottom: auto;
+      left: auto;
+      margin-top: 1rem;
+      width: 100%;
+    }
+
+    .legend-items {
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .modal-actions {
       flex-direction: column;
-      text-align: center;
     }
   }
 </style>

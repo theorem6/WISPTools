@@ -115,7 +115,7 @@
         </button>
         <div class="module-title">
           <h1>🔧 Maintain Module</h1>
-          <p>Comprehensive ticketing and maintenance management</p>
+          <p>Traditional interface for ticketing and maintenance management</p>
         </div>
         <div class="user-info">
           {#if currentUser}

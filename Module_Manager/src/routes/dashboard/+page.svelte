@@ -20,46 +20,46 @@
   }
 
   const modules: Module[] = [
-    {
-      id: 'plan',
-      name: '📋 Plan',
-      description: 'Strategic planning and design tools for network expansion',
-      icon: '📋',
-      color: '#3b82f6', // Blue
-      status: 'active',
-      path: '/modules/plan',
-      features: ['Coverage Mapping', 'Inventory Management', 'CBRS Management', 'Site Planning', 'Capacity Planning', 'Cost Analysis']
-    },
-    {
-      id: 'deploy',
-      name: '🚀 Deploy',
-      description: 'Implementation and deployment tools for network rollouts',
-      icon: '🚀',
-      color: '#10b981', // Green
-      status: 'active',
-      path: '/modules/deploy',
-      features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Equipment Configuration', 'Quality Assurance']
-    },
-    {
-      id: 'monitor',
-      name: '📊 Monitor',
-      description: 'Real-time network monitoring and performance management',
-      icon: '📊',
-      color: '#f59e0b', // Amber
-      status: 'active',
-      path: '/modules/monitor',
-      features: ['Network Monitoring', 'Device Health', 'Traffic Analysis', 'Performance Analytics', 'Alert Management', 'SLA Monitoring']
-    },
-    {
-      id: 'maintain',
-      name: '🔧 Maintain',
-      description: 'Comprehensive ticketing and maintenance management',
-      icon: '🔧',
-      color: '#ef4444', // Red
-      status: 'active',
-      path: '/modules/maintain',
-      features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Vendor Management', 'Knowledge Base']
-    }
+            {
+              id: 'plan',
+              name: '📋 Plan',
+              description: 'Interactive map-based planning tools for network expansion',
+              icon: '📋',
+              color: '#3b82f6', // Blue
+              status: 'active',
+              path: '/modules/plan',
+              features: ['Coverage Analysis', 'Site Planning', 'Inventory Check', 'CBRS Spectrum', 'Capacity Planning', 'Cost Analysis']
+            },
+            {
+              id: 'deploy',
+              name: '🚀 Deploy',
+              description: 'Interactive map-based deployment tools for network rollouts',
+              icon: '🚀',
+              color: '#10b981', // Green
+              status: 'active',
+              path: '/modules/deploy',
+              features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Equipment Configuration', 'Quality Assurance']
+            },
+            {
+              id: 'monitor',
+              name: '📊 Monitor',
+              description: 'Interactive map-based monitoring tools for network oversight',
+              icon: '📊',
+              color: '#f59e0b', // Amber
+              status: 'active',
+              path: '/modules/monitor',
+              features: ['Network Monitoring', 'Device Health', 'Traffic Analysis', 'Performance Analytics', 'Alert Management', 'HSS Management']
+            },
+            {
+              id: 'maintain',
+              name: '🔧 Maintain',
+              description: 'Traditional interface for ticketing and maintenance management',
+              icon: '🔧',
+              color: '#ef4444', // Red
+              status: 'active',
+              path: '/modules/maintain',
+              features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Vendor Management', 'Knowledge Base']
+            }
   ];
 
   const adminModules: Module[] = [
