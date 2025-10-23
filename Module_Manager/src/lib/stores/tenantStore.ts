@@ -229,6 +229,13 @@ function createTenantStore() {
     },
     
     /**
+     * Alias for clear() method for compatibility
+     */
+    clearTenantData(): void {
+      this.clear();
+    },
+    
+    /**
      * Set error state
      */
     setError(error: string): void {
