@@ -183,8 +183,8 @@ env:
   # Create OAuth Client ID in Google Cloud Console:
   # https://console.cloud.google.com/apis/credentials?project=lte-pci-mapper-65450042-bbf71
   # Type: Web application
-  # Authorized origins: https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app
-  # Redirect URIs: https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app/oauth/google/callback
+  # Authorized origins: https://wisptools.io, https://www.wisptools.io
+  # Redirect URIs: https://wisptools.io/oauth/google/callback, https://www.wisptools.io/oauth/google/callback
   - variable: PUBLIC_GOOGLE_OAUTH_CLIENT_ID
     value: "1044782186913-kehquaq56fcubedupb34611c0hm1ctob.apps.googleusercontent.com"
     availability:
@@ -268,7 +268,7 @@ env:
       - RUNTIME
 
   - variable: PUBLIC_APP_URL
-    value: "https://lte-pci-mapper-65450042-bbf71.web.app"
+    value: "https://wisptools.io"
     availability:
       - BUILD
       - RUNTIME
@@ -283,7 +283,7 @@ env:
   # CORS CONFIGURATION
   # ==========================================
   - variable: ALLOWED_ORIGINS
-    value: "https://lte-pci-mapper-65450042-bbf71.web.app,https://lte-pci-mapper-65450042-bbf71.firebaseapp.com"
+    value: "https://wisptools.io,https://www.wisptools.io,https://lte-pci-mapper-65450042-bbf71.web.app,https://lte-pci-mapper-65450042-bbf71.firebaseapp.com"
     availability:
       - RUNTIME
 
