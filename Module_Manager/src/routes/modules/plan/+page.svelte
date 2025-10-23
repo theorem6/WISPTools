@@ -20,7 +20,7 @@
       name: 'Coverage Mapping',
       description: 'Interactive coverage visualization and planning tools',
       icon: '🗺️',
-      path: '/modules/plan/coverage-map',
+      path: '/modules/coverage-map',
       status: 'active'
     },
     {
@@ -28,7 +28,7 @@
       name: 'Inventory Management',
       description: 'Equipment tracking and asset management',
       icon: '📦',
-      path: '/modules/plan/inventory',
+      path: '/modules/inventory',
       status: 'active'
     },
     {
@@ -36,7 +36,7 @@
       name: 'CBRS Management',
       description: 'Spectrum planning and device registration',
       icon: '📡',
-      path: '/modules/plan/cbrs',
+      path: '/modules/cbrs-management',
       status: 'active'
     },
     {
@@ -44,24 +44,24 @@
       name: 'Site Planning',
       description: 'Tower placement and sector optimization',
       icon: '🏗️',
-      path: '/modules/plan/sites',
-      status: 'coming-soon'
+      path: '/modules/coverage-map',
+      status: 'active'
     },
     {
       id: 'capacity-planning',
       name: 'Capacity Planning',
       description: 'Bandwidth and user capacity analysis',
       icon: '📊',
-      path: '/modules/plan/capacity',
-      status: 'coming-soon'
+      path: '/modules/monitoring',
+      status: 'active'
     },
     {
       id: 'cost-analysis',
       name: 'Cost Analysis',
       description: 'ROI calculations and budget planning',
       icon: '💰',
-      path: '/modules/plan/costs',
-      status: 'coming-soon'
+      path: '/modules/inventory/reports',
+      status: 'active'
     }
   ];
 
@@ -140,15 +140,15 @@
       <div class="quick-actions">
         <h2>Quick Actions</h2>
         <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/modules/plan/coverage-map')}>
+          <button class="action-btn" on:click={() => goto('/modules/coverage-map')}>
             <span class="action-icon">🗺️</span>
             <span class="action-text">View Coverage Map</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/modules/plan/inventory')}>
+          <button class="action-btn" on:click={() => goto('/modules/inventory')}>
             <span class="action-icon">📦</span>
             <span class="action-text">Manage Inventory</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/modules/plan/cbrs')}>
+          <button class="action-btn" on:click={() => goto('/modules/cbrs-management')}>
             <span class="action-icon">📡</span>
             <span class="action-text">CBRS Management</span>
           </button>
