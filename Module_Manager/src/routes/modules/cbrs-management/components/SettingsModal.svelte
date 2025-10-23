@@ -3,7 +3,6 @@
   
   export let show = false;
   export let config: any = {};
-  export let tenantId: string = '';
   
   const dispatch = createEventDispatcher();
   

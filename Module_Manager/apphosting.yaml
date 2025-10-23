@@ -103,14 +103,3 @@ env:
     availability:
       - BUILD
       - RUNTIME
-  
-  # PayPal Configuration (for backend)
-  - variable: PAYPAL_CLIENT_ID
-    value: ARcw63HPgW_YB1FdF3kH2...
-    availability:
-      - RUNTIME
-  
-  - variable: PAYPAL_CLIENT_SECRET
-    secret: paypal-client-secret
-    availability:
-      - RUNTIME
