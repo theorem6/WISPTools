@@ -38,7 +38,7 @@ export interface TenantUser {
  * Get auth headers with Firebase token
  */
 async function getAuthHeaders(tenantId: string): Promise<HeadersInit> {
-  const user = auth().currentUser;
+  const user = auth.currentUser;
   if (!user) {
     throw new Error('Not authenticated');
   }
