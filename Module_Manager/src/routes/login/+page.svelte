@@ -125,8 +125,8 @@
     <!-- Branding Section -->
     <div class="login-brand">
       <div class="brand-icon">📶</div>
-      <h1>LTE WISP Management Platform</h1>
-      <p class="brand-tagline">Professional Network Planning & Optimization</p>
+      <h1>WispTools.io</h1>
+      <p class="brand-tagline">Comprehensive WISP Management Platform</p>
     </div>
 
     <!-- Login Form -->
