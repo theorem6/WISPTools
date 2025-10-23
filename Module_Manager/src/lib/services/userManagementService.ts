@@ -77,6 +77,41 @@ export async function getTenantUsers(tenantId: string): Promise<TenantUser[]> {
 }
 
 /**
+ * Get all users across all tenants (admin only)
+ */
+export async function getAllUsers(): Promise<TenantUser[]> {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const token = await user.getIdToken();
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+      // Note: No X-Tenant-ID header for admin requests
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/api/users/all`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch all users');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    throw error;
+  }
+}
+
+/**
  * Invite a new user to the tenant
  */
 export async function inviteUser(

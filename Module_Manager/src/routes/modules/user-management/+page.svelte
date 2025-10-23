@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { getTenantUsers, type TenantUser } from '$lib/services/userManagementService';
+  import { getTenantUsers, getAllUsers, type TenantUser } from '$lib/services/userManagementService';
   import { ROLE_NAMES } from '$lib/models/userRole';
+  import { isPlatformAdmin } from '$lib/services/adminService';
+  import { authService } from '$lib/services/authService';
   import InviteUserModal from './components/InviteUserModal.svelte';
   import EditUserModal from './components/EditUserModal.svelte';
   import type { UserRole } from '$lib/models/userRole';
@@ -15,6 +17,7 @@
   let searchQuery = '';
   let roleFilter: UserRole | 'all' = 'all';
   let statusFilter: 'all' | 'active' | 'suspended' | 'pending_invitation' = 'all';
+  let isAdmin = false;
   
   let showInviteModal = false;
   let showEditModal = false;
@@ -22,23 +25,31 @@
 
   // Load users on mount
   onMount(async () => {
+    const currentUser = await authService.getCurrentUser();
+    isAdmin = isPlatformAdmin(currentUser?.email || null);
     await loadUsers();
   });
 
   async function loadUsers() {
-    if (!$currentTenant) {
-      loading = false;
-      error = 'No tenant selected. Please select a tenant from the dashboard.';
-      console.error('No tenant selected');
-      return;
-    }
-    
     loading = true;
     error = '';
     
     try {
-      console.log('Loading users for tenant:', $currentTenant.id);
-      users = await getTenantUsers($currentTenant.id);
+      if (isAdmin) {
+        // Admin users see all users across all tenants
+        console.log('Loading all users (admin view)');
+        users = await getAllUsers();
+      } else {
+        // Regular users see only their tenant's users
+        if (!$currentTenant) {
+          loading = false;
+          error = 'No tenant selected. Please select a tenant from the dashboard.';
+          console.error('No tenant selected');
+          return;
+        }
+        console.log('Loading users for tenant:', $currentTenant.id);
+        users = await getTenantUsers($currentTenant.id);
+      }
       console.log('Loaded users:', users);
       applyFilters();
     } catch (err: any) {
@@ -170,7 +181,13 @@
     
     <div class="title-section">
       <h1>👥 User Management</h1>
-      <p class="subtitle">Manage users, roles, and permissions for {$currentTenant?.name || 'your organization'}</p>
+      <p class="subtitle">
+        {#if isAdmin}
+          Manage all users across all organizations
+        {:else}
+          Manage users, roles, and permissions for {$currentTenant?.name || 'your organization'}
+        {/if}
+      </p>
     </div>
     
     <button class="btn btn-primary" on:click={openInviteModal}>
