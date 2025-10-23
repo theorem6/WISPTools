@@ -45,7 +45,7 @@
       name: 'Billing & Subscriptions',
       description: 'Manage billing, subscriptions, and payment processing',
       icon: '💳',
-      path: '/modules/tenant-management'
+      path: '/admin/billing'
     }
   ];
 
