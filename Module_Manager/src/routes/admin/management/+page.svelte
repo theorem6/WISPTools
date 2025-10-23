@@ -123,19 +123,19 @@
       <div class="quick-actions">
         <h2>Quick Actions</h2>
         <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/admin/tenants')}>
+          <button class="action-btn" on:click={() => goto('/admin/tenant-management')}>
             <span class="action-icon">🏢</span>
             <span class="action-text">Manage Tenants</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/admin/users')}>
+          <button class="action-btn" on:click={() => goto('/modules/user-management')}>
             <span class="action-icon">👥</span>
             <span class="action-text">Manage Users</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/admin/settings')}>
+          <button class="action-btn" on:click={() => goto('/modules/backend-management')}>
             <span class="action-icon">⚙️</span>
             <span class="action-text">System Settings</span>
           </button>
-          <button class="action-btn" on:click={() => goto('/admin/billing')}>
+          <button class="action-btn" on:click={() => goto('/modules/tenant-management')}>
             <span class="action-icon">💳</span>
             <span class="action-text">Billing</span>
           </button>
