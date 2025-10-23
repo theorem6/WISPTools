@@ -130,12 +130,10 @@
               <span class="tenant-name">{$currentTenant.displayName}</span>
               <span class="tenant-subdomain">{$currentTenant.subdomain}</span>
             </div>
-          {:else}
-            <div class="no-tenant">
-              <span>No tenant selected</span>
-              <button class="btn btn-primary btn-sm" on:click={() => goto('/tenant-selector')}>
-                Select Tenant
-              </button>
+          {:else if isAdmin}
+            <div class="admin-tenant-info">
+              <span class="admin-badge">Platform Admin</span>
+              <span class="admin-text">No tenant required</span>
             </div>
           {/if}
         </div>
@@ -151,11 +149,6 @@
                 <span class="user-badge-text">Regular User</span>
               {/if}
             </div>
-            {#if !isAdmin && currentUser.email === 'david@tenant.com'}
-              <div class="admin-notice">
-                <small>⚠️ To access admin features, login as david@david.com</small>
-              </div>
-            {/if}
             <button class="logout-btn" on:click={handleLogout}>
               <span class="logout-icon">🚪</span>
               Logout
@@ -360,15 +353,6 @@
     font-weight: 500;
   }
 
-  .admin-notice {
-    background: #fef3c7;
-    color: #92400e;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-    border: 1px solid #fbbf24;
-  }
 
   .logout-btn, .login-btn {
     background: #ef4444;
@@ -421,11 +405,15 @@
     color: #6b7280;
   }
 
-  .no-tenant {
+  .admin-tenant-info {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
+  }
+
+  .admin-text {
+    font-size: 0.75rem;
     color: #6b7280;
   }
 
