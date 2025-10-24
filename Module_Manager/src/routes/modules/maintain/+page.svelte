@@ -80,6 +80,15 @@
       path: '/modules/monitoring', // Link to monitoring for SLA management
       status: 'active',
       features: ['SLA Tracking', 'Service Level Reporting', 'Compliance Monitoring', 'Performance Metrics']
+    },
+    {
+      id: 'asset-management',
+      name: 'Asset Management',
+      description: 'Hardware inventory and equipment tracking',
+      icon: '📦',
+      path: '/modules/inventory',
+      status: 'active',
+      features: ['Hardware Upload', 'Equipment Tracking', 'Asset Tagging', 'Inventory Management']
     }
   ];
 
