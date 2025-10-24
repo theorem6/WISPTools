@@ -35,12 +35,18 @@
     console.log('[TenantGuard] Checking authentication and tenant...');
     
     try {
-      // Step 1: Check Firebase authentication
-      const currentUser = authService.getCurrentUser();
+      // Step 1: Check Firebase authentication with retry logic
+      let currentUser = authService.getCurrentUser();
       if (!currentUser) {
-        console.log('[TenantGuard] Not authenticated, redirecting to login');
-        await goto('/login', { replaceState: true });
-        return;
+        // Wait a bit for auth state to initialize
+        await new Promise(resolve => setTimeout(resolve, 100));
+        currentUser = authService.getCurrentUser();
+        
+        if (!currentUser) {
+          console.log('[TenantGuard] Not authenticated, redirecting to login');
+          await goto('/login', { replaceState: true });
+          return;
+        }
       }
       
       isAuthenticated = true;
@@ -135,6 +141,7 @@
       
     } catch (err) {
       console.error('[TenantGuard] Error during checks:', err);
+      // Don't immediately redirect to login on errors - show error instead
       error = 'Failed to validate access. Please refresh the page.';
       isChecking = false;
     }

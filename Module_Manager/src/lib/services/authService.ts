@@ -77,11 +77,17 @@ export class AuthService {
     this.tokenRefreshInterval = setInterval(async () => {
       if (this.currentUser) {
         try {
-          await this.currentUser.getIdToken(true); // Force refresh
-          console.log('Auth token refreshed successfully');
+          // Check if token is still valid before refreshing
+          const token = await this.currentUser.getIdToken(false);
+          if (token) {
+            // Token is still valid, force refresh
+            await this.currentUser.getIdToken(true);
+            console.log('Auth token refreshed successfully');
+          }
         } catch (error) {
           console.error('Token refresh failed:', error);
-          // User might need to re-authenticate
+          // Don't immediately log out - let Firebase handle auth state changes
+          // The onAuthStateChanged listener will handle the logout
         }
       }
     }, 50 * 60 * 1000); // 50 minutes in milliseconds
@@ -225,6 +231,23 @@ export class AuthService {
    */
   isAuthenticated(): boolean {
     return this.currentUser !== null;
+  }
+
+  /**
+   * Check if user is authenticated with retry logic
+   * Useful for components that might load before auth state is fully initialized
+   */
+  async isAuthenticatedWithRetry(maxRetries: number = 3): Promise<boolean> {
+    for (let i = 0; i < maxRetries; i++) {
+      if (this.currentUser) {
+        return true;
+      }
+      
+      // Wait a bit for auth state to initialize
+      await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+    }
+    
+    return false;
   }
 
   /**
