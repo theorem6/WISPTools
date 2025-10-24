@@ -121,6 +121,15 @@
 
     <!-- Map Container -->
     <div class="map-container">
+      <!-- Map Area -->
+      <div class="map-area" bind:this={mapContainer}>
+        <iframe 
+          src="/modules/coverage-map" 
+          title="Network Coverage Map"
+          class="coverage-map-iframe"
+        ></iframe>
+      </div>
+      
       <!-- Floating Tools Modal -->
       <div class="tools-modal" class:open={showToolsModal}>
         <div class="tools-content">
@@ -144,15 +153,6 @@
             {/each}
           </div>
         </div>
-      </div>
-      
-      <!-- Map Area -->
-      <div class="map-area" bind:this={mapContainer}>
-        <iframe 
-          src="/modules/coverage-map" 
-          title="Network Coverage Map"
-          class="coverage-map-iframe"
-        ></iframe>
       </div>
       
       <!-- Tools Toggle Button -->
@@ -218,26 +218,31 @@
 
   .tools-modal {
     position: absolute;
-    top: 0;
-    left: -300px;
-    width: 300px;
-    height: 100%;
+    top: 20px;
+    left: 20px;
+    width: 320px;
+    max-height: calc(100vh - 120px);
     background: var(--card-bg);
-    border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
-    box-shadow: var(--shadow-lg);
-    transition: left 0.3s ease;
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
     z-index: 1000;
     overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
   }
 
   .tools-modal.open {
-    left: 0;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
   }
 
   .tools-content {
-    height: 100%;
     display: flex;
     flex-direction: column;
+    max-height: calc(100vh - 120px);
   }
 
   .tools-header {
@@ -324,7 +329,7 @@
   .tools-toggle {
     position: absolute;
     top: 20px;
-    left: 20px;
+    right: 20px;
     background: var(--primary-color);
     color: white;
     border: none;
@@ -366,12 +371,14 @@
 
     .tools-modal {
       width: 280px;
-      left: -280px;
+      top: 10px;
+      left: 10px;
+      max-height: calc(100vh - 80px);
     }
 
     .tools-toggle {
       top: 10px;
-      left: 10px;
+      right: 10px;
       padding: 0.5rem 0.75rem;
     }
 
