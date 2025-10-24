@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
+  import { page } from '$app/stores';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import CoverageMapView from './components/CoverageMapView.svelte';
@@ -83,6 +84,9 @@
   // Tenant info
   $: tenantId = $currentTenant?.id || '';
   $: tenantName = $currentTenant?.displayName || 'Organization';
+  
+  // Check if stats should be hidden (for plan module)
+  $: hideStats = $page.url.searchParams.get('hideStats') === 'true';
   
   onMount(async () => {
     if (tenantId) {
@@ -448,6 +452,7 @@
   {/if}
   
   <!-- Statistics Bar -->
+  {#if !hideStats}
   <div class="stats-bar">
     <div class="stat-card">
       <div class="stat-icon">📡</div>
@@ -481,6 +486,7 @@
       </div>
     </div>
   </div>
+  {/if}
   
   <!-- Main Content -->
   {#if isLoading}
