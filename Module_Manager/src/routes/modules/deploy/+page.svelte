@@ -25,6 +25,11 @@
 
 <TenantGuard requireTenant={true}>
   <div class="deploy-module">
+    <!-- Simplified Header -->
+    <div class="module-header-simple">
+      <h1>🚀 Deploy</h1>
+    </div>
+
     <!-- Map Container -->
     <div class="map-container">
       <!-- Map Area -->
@@ -35,35 +40,46 @@
           class="coverage-map-iframe"
         ></iframe>
       </div>
-      
-      <!-- Exit Button -->
-      <button class="exit-btn" on:click={goBack}>
-        <span class="exit-icon">✕</span>
-        <span class="exit-text">Exit</span>
-      </button>
     </div>
   </div>
 </TenantGuard>
 
 <style>
   .deploy-module {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    background: var(--background-color);
+    min-height: 100vh;
+    padding: 0.5rem;
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .module-header-simple {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: var(--border-radius-md);
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+    box-shadow: var(--shadow-sm);
+    color: white;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .module-header-simple h1 {
+    font-size: 1.2rem;
     margin: 0;
-    padding: 0;
-    background: #000;
-    z-index: 9999;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   .map-container {
-    width: 100%;
-    height: 100%;
+    flex-grow: 1;
     position: relative;
-    background: #000;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-md);
     overflow: hidden;
+    box-shadow: var(--shadow-md);
+    min-height: calc(100vh - 100px);
   }
 
   .map-area {
@@ -77,51 +93,5 @@
     height: 100%;
     border: none;
     display: block;
-  }
-
-  .exit-btn {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    background: rgba(239, 68, 68, 0.9);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius-md);
-    padding: 0.75rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    box-shadow: var(--shadow-md);
-    transition: all 0.2s ease;
-    z-index: 999;
-  }
-
-  .exit-btn:hover {
-    background: rgba(239, 68, 68, 1);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .exit-icon {
-    font-size: 1.2rem;
-  }
-
-  .exit-text {
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .exit-btn {
-      bottom: 10px;
-      right: 10px;
-      padding: 0.5rem 0.75rem;
-    }
-
-    .exit-text {
-      display: none;
-    }
   }
 </style>

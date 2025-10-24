@@ -1,0 +1,30 @@
+{
+  "name": "wisp-billing-service",
+  "version": "1.0.0",
+  "description": "PayPal billing service for WispTools.io",
+  "main": "billing-api.js",
+  "scripts": {
+    "start": "node billing-api.js",
+    "init-plans": "node initialize-billing-plans.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
+    "express": "^4.18.2",
+    "mongoose": "^7.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "paypal",
+    "billing",
+    "subscription",
+    "wisp",
+    "telecommunications"
+  ],
+  "author": "WispTools.io",
+  "license": "MIT"
+}
