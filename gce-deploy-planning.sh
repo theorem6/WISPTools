@@ -6,9 +6,39 @@
 echo "🚀 GCE Planning System Backend Deployment"
 echo "=========================================="
 echo ""
+echo "🔍 Searching for PCI Mapper project directory..."
+echo "Checking common locations: /home/*/pci-mapper, /opt/pci-mapper, /var/www/pci-mapper, etc."
+echo ""
 
-# Auto-detect variables
-PROJECT_DIR=$(pwd)
+# Auto-detect project directory
+# Try common locations for the PCI mapper project
+POSSIBLE_DIRS=(
+    "/home/*/pci-mapper"
+    "/home/*/lte-pci-mapper" 
+    "/opt/pci-mapper"
+    "/opt/lte-pci-mapper"
+    "/var/www/pci-mapper"
+    "/var/www/lte-pci-mapper"
+    "/root/pci-mapper"
+    "/root/lte-pci-mapper"
+    "$(pwd)"
+)
+
+PROJECT_DIR=""
+for pattern in "${POSSIBLE_DIRS[@]}"; do
+    for dir in $pattern; do
+        if [ -d "$dir" ] && [ -f "$dir/backend-services/server.js" ]; then
+            PROJECT_DIR="$dir"
+            break 2
+        fi
+    done
+done
+
+# If not found, use current directory as fallback
+if [ -z "$PROJECT_DIR" ]; then
+    PROJECT_DIR=$(pwd)
+fi
+
 BACKUP_DIR="/tmp/pci-mapper-backup-$(date +%Y%m%d_%H%M%S)"
 
 # Auto-detect service name
@@ -50,6 +80,12 @@ echo "Project Directory: $PROJECT_DIR"
 echo "Service Name: $SERVICE_NAME"
 echo "Backend Port: $BACKEND_PORT"
 echo "Backup Location: $BACKUP_DIR"
+echo ""
+
+# Change to project directory
+echo "📁 Changing to project directory..."
+cd "$PROJECT_DIR"
+echo "✅ Working in: $(pwd)"
 echo ""
 
 # Check if running as root or with sudo
