@@ -78,7 +78,11 @@
           // No tenant selected - load user's tenants
           if (currentUser) {
             console.log('[TenantGuard] No tenant selected, loading user tenants...');
+            console.log('[TenantGuard] User UID:', currentUser.uid);
+            console.log('[TenantGuard] User Email:', currentUser.email);
+            
             const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
+            console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
             
             if (tenants.length === 0) {
               // No tenants at all - create a default tenant for the user

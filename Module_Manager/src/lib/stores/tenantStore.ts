@@ -124,15 +124,25 @@ function createTenantStore() {
     async loadUserTenants(userId: string, userEmail?: string): Promise<Tenant[]> {
       if (!browser) return [];
       
+      console.log('[TenantStore] loadUserTenants called with:', { userId, userEmail });
       update(state => ({ ...state, isLoading: true }));
       
       try {
         const { tenantService } = await import('../services/tenantService');
+        console.log('[TenantStore] Calling tenantService.getUserTenants...');
         const tenants = await tenantService.getUserTenants(userId);
+        console.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
         
         // Auto-select tenant for non-admin users with exactly one tenant
         const isPlatformAdmin = userEmail === 'david@david.com';
         const currentState = get({ subscribe });
+        
+        console.log('[TenantStore] Auto-selection check:', { 
+          tenantCount: tenants.length, 
+          isPlatformAdmin, 
+          hasCurrentTenant: !!currentState.currentTenant,
+          userEmail 
+        });
         
         if (tenants.length === 1 && !isPlatformAdmin && !currentState.currentTenant) {
           // Regular user with one tenant - auto-select it
