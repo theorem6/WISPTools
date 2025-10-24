@@ -37,7 +37,12 @@
 
     <!-- Minimal Header Overlay -->
     <div class="header-overlay">
-      <h1>📊 Monitor</h1>
+      <div class="header-left">
+        <button class="back-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+          ←
+        </button>
+        <h1>📊 Monitor</h1>
+      </div>
       <div class="header-controls">
         <ThemeSwitcher />
       </div>
@@ -82,6 +87,38 @@
     color: white;
     text-align: center;
     z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 400px;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .back-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: white;
+    transition: all 0.2s;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .back-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateX(-2px);
   }
 
   .header-overlay h1 {
