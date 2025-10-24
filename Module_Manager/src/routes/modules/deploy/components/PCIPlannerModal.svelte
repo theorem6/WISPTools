@@ -159,6 +159,7 @@
     analysisResult = null;
     optimizationResult = null;
     activeTab = 'analysis';
+    dispatch('close');
   }
   
   function exportResults() {

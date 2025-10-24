@@ -182,7 +182,10 @@
     <!-- Deploy Header Overlay -->
     <div class="header-overlay">
       <div class="header-left">
-        <button class="back-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+        <button class="back-btn" on:click={() => {
+          console.log('[Deploy] Back to Dashboard clicked');
+          goto('/dashboard');
+        }} title="Back to Dashboard">
           ←
         </button>
         <h1>🚀 Deploy</h1>
@@ -192,7 +195,10 @@
         <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
           📋 Plans ({readyPlans.length})
         </button>
-        <button class="control-btn" on:click={openPCIPlanner} title="PCI Planner">
+        <button class="control-btn" on:click={() => {
+          console.log('[Deploy] PCI button clicked');
+          openPCIPlanner();
+        }} title="PCI Planner">
           📊 PCI
         </button>
         <button class="control-btn" on:click={() => alert('Frequency Planner - Coming Soon')} title="Frequency Planner">
