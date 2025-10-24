@@ -6,6 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
+  import { planService, type PlanProject } from '$lib/services/planService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -13,6 +14,12 @@
   let availableHardware: InventoryItem[] = [];
   let selectedHardware: InventoryItem[] = [];
   let isLoadingHardware = false;
+  
+  // Plan approval workflow
+  let showPlanApprovalModal = false;
+  let readyPlans: PlanProject[] = [];
+  let selectedPlan: PlanProject | null = null;
+  let isLoadingPlans = false;
 
   onMount(async () => {
     if (browser) {
@@ -36,6 +43,21 @@
       console.error('Failed to load hardware:', err);
     } finally {
       isLoadingHardware = false;
+    }
+  }
+
+  async function loadReadyPlans() {
+    isLoadingPlans = true;
+    try {
+      const tenantId = $currentTenant?.id;
+      if (tenantId) {
+        const plans = await planService.getPlans(tenantId);
+        readyPlans = plans.filter(plan => plan.status === 'ready');
+      }
+    } catch (err) {
+      console.error('Failed to load ready plans:', err);
+    } finally {
+      isLoadingPlans = false;
     }
   }
 
@@ -69,6 +91,62 @@
     // TODO: Implement deployment logic
     alert(`Deploying ${selectedHardware.length} items to selected location`);
   }
+
+  // Plan approval functions
+  function openPlanApproval() {
+    showPlanApprovalModal = true;
+  }
+
+  function closePlanApprovalModal() {
+    showPlanApprovalModal = false;
+    selectedPlan = null;
+  }
+
+  function selectPlanForApproval(plan: PlanProject) {
+    selectedPlan = plan;
+  }
+
+  async function approvePlan() {
+    if (!selectedPlan) return;
+    
+    try {
+      await planService.updatePlan(selectedPlan.id, { status: 'approved' });
+      await loadReadyPlans();
+      alert(`Plan "${selectedPlan.name}" has been approved for deployment.`);
+      closePlanApprovalModal();
+    } catch (error) {
+      console.error('Error approving plan:', error);
+      alert('Failed to approve plan');
+    }
+  }
+
+  async function rejectPlan() {
+    if (!selectedPlan) return;
+    
+    try {
+      await planService.updatePlan(selectedPlan.id, { status: 'rejected' });
+      await loadReadyPlans();
+      alert(`Plan "${selectedPlan.name}" has been rejected.`);
+      closePlanApprovalModal();
+    } catch (error) {
+      console.error('Error rejecting plan:', error);
+      alert('Failed to reject plan');
+    }
+  }
+
+  async function refactorPlan() {
+    if (!selectedPlan) return;
+    
+    try {
+      await planService.updatePlan(selectedPlan.id, { status: 'draft' });
+      await loadReadyPlans();
+      alert(`Plan "${selectedPlan.name}" has been sent back for refactoring.`);
+      closePlanApprovalModal();
+    } catch (error) {
+      console.error('Error refactoring plan:', error);
+      alert('Failed to refactor plan');
+    }
+  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -83,11 +161,23 @@
     </div>
 
     <!-- Minimal Header Overlay -->
+    <!-- Deploy Header Overlay -->
     <div class="header-overlay">
       <h1>🚀 Deploy</h1>
-      <button class="hardware-btn" on:click={toggleHardwareSelector} title="Select Hardware">
-        📦 {selectedHardware.length > 0 ? selectedHardware.length : ''}
-      </button>
+      <div class="header-controls">
+        <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
+          📋 Plans ({readyPlans.length})
+        </button>
+        <button class="control-btn" on:click={() => alert('PCI Planner - Coming Soon')} title="PCI Planner">
+          📊 PCI
+        </button>
+        <button class="control-btn" on:click={() => alert('Frequency Planner - Coming Soon')} title="Frequency Planner">
+          📡 Freq
+        </button>
+        <button class="control-btn" on:click={toggleHardwareSelector} title="Select Hardware">
+          📦 {selectedHardware.length > 0 ? selectedHardware.length : ''}
+        </button>
+      </div>
     </div>
 
     <!-- Hardware Selection Panel -->
