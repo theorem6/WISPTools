@@ -37,17 +37,27 @@
     }
   });
   
-  $: if (show && tenantId) {
+  $: if (show && tenantId && tenantId.trim() !== '') {
     loadNetworkData();
   }
   
   async function loadNetworkData() {
+    if (!tenantId || tenantId.trim() === '') {
+      console.warn('[PCIPlanner] No tenant ID provided');
+      error = 'No tenant selected';
+      isLoading = false;
+      return;
+    }
+    
     isLoading = true;
     error = '';
     
     try {
+      console.log(`[PCIPlanner] Loading network data for tenant: ${tenantId}`);
       // Load tower sites and convert to cells
       const sites = await coverageMapService.getTowerSites(tenantId);
+      console.log(`[PCIPlanner] Loaded ${sites.length} sites from coverage map service`);
+      
       cells = sites.map(site => ({
         id: site.id,
         name: site.name,
@@ -61,10 +71,10 @@
         type: 'tower'
       }));
       
-      console.log(`Loaded ${cells.length} cells for PCI analysis`);
+      console.log(`[PCIPlanner] Converted to ${cells.length} cells for PCI analysis`);
     } catch (err) {
-      console.error('Failed to load network data:', err);
-      error = 'Failed to load network data';
+      console.error('[PCIPlanner] Failed to load network data:', err);
+      error = `Failed to load network data: ${err.message || 'Unknown error'}`;
     } finally {
       isLoading = false;
     }
@@ -187,30 +197,36 @@
     {/if}
     
     <div class="modal-body">
-      <!-- Tabs -->
-      <div class="tabs">
-        <button 
-          class="tab-btn" 
-          class:active={activeTab === 'analysis'} 
-          on:click={() => activeTab = 'analysis'}
-        >
-          📊 Analysis
-        </button>
-        <button 
-          class="tab-btn" 
-          class:active={activeTab === 'conflicts'} 
-          on:click={() => activeTab = 'conflicts'}
-        >
-          ⚠️ Conflicts ({conflicts.length})
-        </button>
-        <button 
-          class="tab-btn" 
-          class:active={activeTab === 'optimization'} 
-          on:click={() => activeTab = 'optimization'}
-        >
-          🔧 Optimization
-        </button>
-      </div>
+      {#if isLoading}
+        <div class="loading-state">
+          <div class="loading-spinner"></div>
+          <p>Loading network data...</p>
+        </div>
+      {:else}
+        <!-- Tabs -->
+        <div class="tabs">
+          <button 
+            class="tab-btn" 
+            class:active={activeTab === 'analysis'} 
+            on:click={() => activeTab = 'analysis'}
+          >
+            📊 Analysis
+          </button>
+          <button 
+            class="tab-btn" 
+            class:active={activeTab === 'conflicts'} 
+            on:click={() => activeTab = 'conflicts'}
+          >
+            ⚠️ Conflicts ({conflicts.length})
+          </button>
+          <button 
+            class="tab-btn" 
+            class:active={activeTab === 'optimization'} 
+            on:click={() => activeTab = 'optimization'}
+          >
+            🔧 Optimization
+          </button>
+        </div>
       
       <!-- Analysis Tab -->
       {#if activeTab === 'analysis'}
@@ -412,6 +428,7 @@
             </div>
           {/if}
         </div>
+      {/if}
       {/if}
     </div>
   </div>
@@ -716,5 +733,30 @@
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     margin-bottom: var(--spacing-md);
+  }
+  
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl);
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 </style>

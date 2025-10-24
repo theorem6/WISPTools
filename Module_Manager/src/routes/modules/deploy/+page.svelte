@@ -155,10 +155,14 @@
 
   // PCI Planner functions
   function openPCIPlanner() {
+    console.log('[Deploy] Opening PCI Planner modal');
+    console.log('[Deploy] Current tenant:', $currentTenant);
+    console.log('[Deploy] Tenant ID:', $currentTenant?.id);
     showPCIPlannerModal = true;
   }
 
   function closePCIPlannerModal() {
+    console.log('[Deploy] Closing PCI Planner modal');
     showPCIPlannerModal = false;
   }
 </script>
