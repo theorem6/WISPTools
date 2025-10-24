@@ -7,16 +7,49 @@ echo "🚀 GCE Planning System Backend Deployment"
 echo "=========================================="
 echo ""
 
-# Set variables
-PROJECT_DIR="/path/to/your/pci-mapper"  # Update this path
+# Auto-detect variables
+PROJECT_DIR=$(pwd)
 BACKUP_DIR="/tmp/pci-mapper-backup-$(date +%Y%m%d_%H%M%S)"
-SERVICE_NAME="pci-mapper-backend"  # Update this to your actual service name
 
-echo "📋 DEPLOYMENT CHECKLIST:"
-echo "========================"
-echo "1. Update PROJECT_DIR variable in this script to your actual project path"
-echo "2. Update SERVICE_NAME variable to your actual service name"
-echo "3. Ensure you have proper permissions to restart services"
+# Auto-detect service name
+if command -v systemctl &> /dev/null; then
+    # Try common service names
+    for service in "pci-mapper" "pci-mapper-backend" "lte-pci-mapper" "backend" "api"; do
+        if systemctl list-units --type=service | grep -q "$service"; then
+            SERVICE_NAME="$service"
+            break
+        fi
+    done
+elif command -v pm2 &> /dev/null; then
+    # Try common PM2 app names
+    for app in "pci-mapper" "pci-mapper-backend" "lte-pci-mapper" "backend" "api"; do
+        if pm2 list | grep -q "$app"; then
+            SERVICE_NAME="$app"
+            break
+        fi
+    done
+fi
+
+# Fallback if not detected
+if [ -z "$SERVICE_NAME" ]; then
+    SERVICE_NAME="pci-mapper-backend"
+fi
+
+# Auto-detect backend port
+BACKEND_PORT="3000"
+if [ -f "backend-services/server.js" ]; then
+    PORT_LINE=$(grep -E "listen.*[0-9]+" backend-services/server.js | head -1)
+    if [[ $PORT_LINE =~ ([0-9]+) ]]; then
+        BACKEND_PORT="${BASH_REMATCH[1]}"
+    fi
+fi
+
+echo "🔍 Auto-detected configuration:"
+echo "================================"
+echo "Project Directory: $PROJECT_DIR"
+echo "Service Name: $SERVICE_NAME"
+echo "Backend Port: $BACKEND_PORT"
+echo "Backup Location: $BACKUP_DIR"
 echo ""
 
 # Check if running as root or with sudo
@@ -122,34 +155,74 @@ echo ""
 echo "🔄 Restarting backend service..."
 echo "==============================="
 
-# Restart the service (update command based on your setup)
+RESTART_SUCCESS=false
+
+# Try systemctl first
 if command -v systemctl &> /dev/null; then
-    # Systemd service
-    sudo systemctl restart "$SERVICE_NAME"
-    if [ $? -eq 0 ]; then
-        echo "✅ Service restarted successfully"
+    echo "Trying systemctl restart..."
+    if sudo systemctl restart "$SERVICE_NAME" 2>/dev/null; then
+        echo "✅ Service restarted successfully via systemctl"
+        RESTART_SUCCESS=true
+        
+        # Check service status
+        echo "Checking service status..."
+        sudo systemctl status "$SERVICE_NAME" --no-pager -l
     else
-        echo "❌ Failed to restart service"
-        exit 1
+        echo "⚠️  systemctl restart failed, trying other methods..."
     fi
-    
-    # Check service status
-    echo "Checking service status..."
-    sudo systemctl status "$SERVICE_NAME" --no-pager -l
-elif command -v pm2 &> /dev/null; then
-    # PM2 service
-    pm2 restart "$SERVICE_NAME"
-    if [ $? -eq 0 ]; then
+fi
+
+# Try PM2 if systemctl failed
+if [ "$RESTART_SUCCESS" = false ] && command -v pm2 &> /dev/null; then
+    echo "Trying PM2 restart..."
+    if pm2 restart "$SERVICE_NAME" 2>/dev/null; then
         echo "✅ PM2 service restarted"
+        RESTART_SUCCESS=true
+        
+        # Check PM2 status
+        pm2 status
     else
-        echo "❌ Failed to restart PM2 service"
-        exit 1
+        echo "⚠️  PM2 restart failed, trying other methods..."
+    fi
+fi
+
+# Try direct node restart if other methods failed
+if [ "$RESTART_SUCCESS" = false ]; then
+    echo "Trying direct node process restart..."
+    
+    # Kill existing node processes on the backend port
+    if command -v lsof &> /dev/null; then
+        PIDS=$(lsof -ti:$BACKEND_PORT 2>/dev/null)
+        if [ ! -z "$PIDS" ]; then
+            echo "Killing existing processes on port $BACKEND_PORT: $PIDS"
+            kill $PIDS 2>/dev/null
+            sleep 2
+        fi
     fi
     
-    # Check PM2 status
-    pm2 status
-else
-    echo "⚠️  No systemctl or PM2 found. Please restart your service manually."
+    # Start the backend service
+    if [ -f "backend-services/server.js" ]; then
+        echo "Starting backend service directly..."
+        cd backend-services
+        nohup node server.js > ../backend.log 2>&1 &
+        BACKEND_PID=$!
+        cd ..
+        
+        if [ ! -z "$BACKEND_PID" ]; then
+            echo "✅ Backend started with PID: $BACKEND_PID"
+            RESTART_SUCCESS=true
+        fi
+    fi
+fi
+
+# Final check
+if [ "$RESTART_SUCCESS" = false ]; then
+    echo "❌ All restart methods failed"
+    echo "Please restart your service manually:"
+    echo "  - systemctl restart $SERVICE_NAME"
+    echo "  - pm2 restart $SERVICE_NAME"
+    echo "  - cd backend-services && node server.js"
+    exit 1
 fi
 
 echo ""
@@ -160,7 +233,7 @@ echo "=========================="
 sleep 5
 
 # Test health endpoint
-HEALTH_URL="http://localhost:3000/health"
+HEALTH_URL="http://localhost:$BACKEND_PORT/health"
 if command -v curl &> /dev/null; then
     echo "Testing health endpoint: $HEALTH_URL"
     curl -s "$HEALTH_URL" | head -5
@@ -174,7 +247,7 @@ else
 fi
 
 # Test new plans endpoint
-PLANS_URL="http://localhost:3000/api/plans"
+PLANS_URL="http://localhost:$BACKEND_PORT/api/plans"
 if command -v curl &> /dev/null; then
     echo "Testing plans endpoint: $PLANS_URL"
     curl -s -H "X-Tenant-ID: test" "$PLANS_URL" | head -5
