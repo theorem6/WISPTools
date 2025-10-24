@@ -213,17 +213,17 @@ export class BarcodeService {
   }
 
   /**
-   * Scan barcode/QR code using device camera
+   * Manual barcode/QR code entry (mobile app handles camera scanning)
+   * Main app only supports manual entry
    */
   async scanCode(): Promise<string> {
     return new Promise((resolve, reject) => {
-      // This would integrate with a barcode scanning library
-      // For now, prompt for manual entry
-      const scanned = prompt('Enter scanned barcode/QR code value:');
+      // Main app only supports manual entry - camera scanning is mobile-only
+      const scanned = prompt('Enter barcode/QR code value manually (use mobile app for camera scanning):');
       if (scanned) {
         resolve(scanned);
       } else {
-        reject(new Error('Scan cancelled'));
+        reject(new Error('Entry cancelled'));
       }
     });
   }

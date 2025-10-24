@@ -15,6 +15,10 @@
   let error = '';
   let success = '';
   
+  // Manual barcode entry (mobile app handles camera scanning)
+  let showManualEntry = false;
+  let manualBarcode = '';
+  
   // Asset Tag
   let showAssetTag = false;
   let selectedItemForTag: InventoryItem | null = null;
@@ -198,30 +202,24 @@
     showAssetTag = true;
   }
   
-  async function handleScanBarcode() {
+  async function handleManualBarcodeEntry() {
+    if (!manualBarcode.trim()) return;
+    
     try {
-      const scannedValue = await barcodeService.scanCode();
-      const parsedData = barcodeService.parseQRCode(scannedValue);
-      
-      if (parsedData.assetTag) {
-        searchQuery = parsedData.assetTag;
-        applyFilters();
-      } else if (parsedData.serialNumber) {
-        searchQuery = parsedData.serialNumber;
-        applyFilters();
+      // Look up item by barcode/QR code
+      const result = await inventoryService.getInventory({ search: manualBarcode });
+      if (result.items.length > 0) {
+        const item = result.items[0];
+        goto(`/modules/inventory/${item._id}`);
       } else {
-        searchQuery = scannedValue;
-        applyFilters();
+        error = 'No equipment found with that barcode/QR code';
       }
-      
-      success = 'Barcode scanned successfully';
-      setTimeout(() => success = '', 3000);
     } catch (err: any) {
-      if (err.message !== 'Scan cancelled') {
-        error = err.message || 'Scan failed';
-        setTimeout(() => error = '', 3000);
-      }
+      error = err.message || 'Failed to lookup equipment';
     }
+    
+    showManualEntry = false;
+    manualBarcode = '';
   }
   
   function getStatusColor(status: string): string {
@@ -276,8 +274,8 @@
     </div>
     
     <div class="header-actions">
-      <button class="btn-secondary" on:click={handleScanBarcode}>
-        📷 Scan Barcode
+      <button class="btn-secondary" on:click={() => showManualEntry = true}>
+        🔍 Manual Lookup
       </button>
       <button class="btn-secondary" on:click={() => goto('/modules/inventory/reports')}>
         📊 View Reports
@@ -455,13 +453,6 @@
                   <div class="action-buttons">
                     <button 
                       class="btn-icon" 
-                      title="Print Asset Tag"
-                      on:click={() => handlePrintTag(item)}
-                    >
-                      🏷️
-                    </button>
-                    <button 
-                      class="btn-icon" 
                       title="View Details"
                       on:click={() => goto(`/modules/inventory/${item._id}`)}
                     >
@@ -469,10 +460,17 @@
                     </button>
                     <button 
                       class="btn-icon" 
-                      title="Edit"
+                      title="Edit Equipment"
                       on:click={() => goto(`/modules/inventory/${item._id}/edit`)}
                     >
                       ✏️
+                    </button>
+                    <button 
+                      class="btn-icon" 
+                      title="Print Asset Tag"
+                      on:click={() => handlePrintTag(item)}
+                    >
+                      🏷️
                     </button>
                   </div>
                 </td>
@@ -510,6 +508,42 @@
     {/if}
   {/if}
   
+  <!-- Manual Barcode Entry Modal -->
+  {#if showManualEntry}
+  <div class="modal-overlay" on:click={() => showManualEntry = false}>
+    <div class="modal-content" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>🔍 Manual Equipment Lookup</h3>
+        <button class="close-btn" on:click={() => showManualEntry = false}>✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-description">
+          Enter a barcode, QR code, asset tag, or serial number to find equipment.
+          <br><small>For camera scanning, use the mobile app.</small>
+        </p>
+        <div class="form-group">
+          <label for="manualBarcode">Search Value</label>
+          <input 
+            id="manualBarcode"
+            type="text" 
+            bind:value={manualBarcode} 
+            placeholder="Enter barcode, asset tag, or serial number..."
+            on:keydown={(e) => e.key === 'Enter' && handleManualBarcodeEntry()}
+          />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" on:click={() => showManualEntry = false}>
+          Cancel
+        </button>
+        <button class="btn btn-primary" on:click={handleManualBarcodeEntry} disabled={!manualBarcode.trim()}>
+          Lookup Equipment
+        </button>
+      </div>
+    </div>
+  </div>
+  {/if}
+
   <!-- Asset Tag Viewer -->
   {#if selectedItemForTag}
     <AssetTagViewer bind:show={showAssetTag} item={selectedItemForTag} />
@@ -820,9 +854,99 @@
     font-size: 0.875rem;
   }
   
-  .action-buttons {
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-description {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.6;
+  }
+
+  .modal-description small {
+    color: var(--text-tertiary);
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
   }
   
   .btn-icon {
