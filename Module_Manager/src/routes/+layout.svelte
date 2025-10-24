@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import { authService } from '$lib/services/authService';
   import { tenantStore } from '$lib/stores/tenantStore';
+  import { themeManager } from '$lib/stores/themeStore';
   import '../app.css';
   
   let isInitializing = true;
@@ -12,6 +13,9 @@
   
   onMount(async () => {
     if (!browser) return;
+    
+    console.log('[Root Layout] Initializing theme system...');
+    // Theme manager is automatically initialized when imported
     
     console.log('[Root Layout] Initializing authentication...');
     

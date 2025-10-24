@@ -67,6 +67,7 @@
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   --gradient-surface: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
@@ -121,6 +122,7 @@
   
   --gradient-primary: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
   --gradient-success: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  --gradient-warning: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   --gradient-surface: linear-gradient(135deg, #1e293b 0%, #334155 100%);
 }
 

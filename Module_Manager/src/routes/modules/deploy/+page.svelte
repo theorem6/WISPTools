@@ -7,6 +7,7 @@
   import { authService } from '$lib/services/authService';
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
   import { planService, type PlanProject } from '$lib/services/planService';
+  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -165,6 +166,7 @@
     <div class="header-overlay">
       <h1>🚀 Deploy</h1>
       <div class="header-controls">
+        <ThemeSwitcher />
         <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
           📋 Plans ({readyPlans.length})
         </button>
@@ -281,7 +283,7 @@
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: var(--gradient-success);
     border-radius: var(--border-radius-md);
     padding: 0.5rem 1rem;
     box-shadow: var(--shadow-sm);
@@ -520,7 +522,7 @@
 
   .status-badge.available {
     background: rgba(16, 185, 129, 0.2);
-    color: #10b981;
+    color: var(--success);
   }
 
   .loading {

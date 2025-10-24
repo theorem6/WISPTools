@@ -6,6 +6,7 @@
   import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
+  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 
   interface Module {
     id: string;
@@ -126,6 +127,7 @@
                 </div>
         <!-- Minimal User Info and Power Button -->
         <div class="user-controls">
+          <ThemeSwitcher />
           {#if isLoggedIn && currentUser}
             <div class="user-status">
               {#if isAdmin}

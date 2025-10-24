@@ -6,6 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject, type HardwareView } from '$lib/services/planService';
+  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -438,6 +439,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     <div class="header-overlay">
       <h1>📋 Plan</h1>
       <div class="header-controls">
+        <ThemeSwitcher />
         <button class="control-btn" on:click={openHardwareView} title="View All Hardware">
           🔧
         </button>
@@ -992,7 +994,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    background: var(--gradient-primary);
     border-radius: var(--border-radius-md);
     padding: 0.5rem 1rem;
     box-shadow: var(--shadow-sm);
@@ -1196,7 +1198,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     width: 40px;
     height: 40px;
     border: 4px solid rgba(59, 130, 246, 0.1);
-    border-top-color: #3b82f6;
+    border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }

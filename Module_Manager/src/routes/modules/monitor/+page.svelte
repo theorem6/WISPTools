@@ -5,6 +5,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
+  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -37,6 +38,9 @@
     <!-- Minimal Header Overlay -->
     <div class="header-overlay">
       <h1>📊 Monitor</h1>
+      <div class="header-controls">
+        <ThemeSwitcher />
+      </div>
     </div>
   </div>
 </TenantGuard>
@@ -71,7 +75,7 @@
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    background: var(--gradient-warning);
     border-radius: var(--border-radius-md);
     padding: 0.5rem 1rem;
     box-shadow: var(--shadow-sm);
