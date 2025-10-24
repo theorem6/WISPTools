@@ -140,64 +140,34 @@
       </div>
     </div>
 
-    <!-- Map Container -->
-    <div class="map-container">
-      <div class="map-header">
-        <h2>Network Planning Map</h2>
-        <p>Click on planning tools to access different planning features</p>
+    <!-- Map Container with Sidebar -->
+    <div class="map-container-with-sidebar">
+      <!-- Tools Sidebar -->
+      <div class="tools-sidebar">
+        <h3>Planning Tools</h3>
+        <p class="sidebar-subtitle">Select a tool to access features</p>
+        {#each mapTools as tool (tool.id)}
+          <button 
+            class="sidebar-tool"
+            style="--tool-color: {tool.color};"
+            on:click={() => handleToolClick(tool)}
+          >
+            <span class="sidebar-icon">{tool.icon}</span>
+            <div class="sidebar-tool-info">
+              <h4>{tool.name}</h4>
+              <p>{tool.description}</p>
+            </div>
+          </button>
+        {/each}
       </div>
       
-      <div class="map-area" bind:this={mapContainer}>
-        <!-- Map Background -->
-        <div class="map-background">
-          <div class="map-grid"></div>
-          <div class="map-overlay">
-            <div class="coverage-indicators">
-              <div class="coverage-circle" style="left: 25%; top: 35%;"></div>
-              <div class="coverage-circle" style="left: 70%; top: 40%;"></div>
-              <div class="coverage-circle" style="left: 45%; top: 60%;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Planning Tools -->
-        {#each mapTools as tool (tool.id)}
-          <div 
-            class="map-tool"
-            style="left: {tool.position.x}%; top: {tool.position.y}%; --tool-color: {tool.color};"
-            on:click={() => handleToolClick(tool)}
-            on:keydown={(e) => e.key === 'Enter' && handleToolClick(tool)}
-            role="button"
-            tabindex="0"
-          >
-            <div class="tool-icon">{tool.icon}</div>
-            <div class="tool-name">{tool.name}</div>
-            <div class="tool-pulse"></div>
-          </div>
-        {/each}
-
-        <!-- Map Legend -->
-        <div class="map-legend">
-          <h3>Legend</h3>
-          <div class="legend-items">
-            <div class="legend-item">
-              <div class="legend-color" style="background: #3b82f6;"></div>
-              <span>Analysis Tools</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background: #10b981;"></div>
-              <span>Planning Tools</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background: #f59e0b;"></div>
-              <span>Resource Tools</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-color" style="background: #ef4444;"></div>
-              <span>Spectrum Tools</span>
-            </div>
-          </div>
-        </div>
+      <!-- Map Area (Embedded Coverage Map) -->
+      <div class="map-area-full" bind:this={mapContainer}>
+        <iframe 
+          src="/modules/coverage-map" 
+          title="Network Coverage Map"
+          class="coverage-map-iframe"
+        ></iframe>
       </div>
     </div>
 
@@ -287,6 +257,93 @@
     border-radius: var(--border-radius-lg);
     padding: 2rem;
     box-shadow: var(--shadow-lg);
+  }
+
+  /* New Sidebar Layout */
+  .map-container-with-sidebar {
+    flex-grow: 1;
+    display: flex;
+    gap: 1.5rem;
+    overflow: hidden;
+  }
+
+  .tools-sidebar {
+    width: 300px;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .tools-sidebar h3 {
+    font-size: 1.3rem;
+    color: var(--primary-color);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .sidebar-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-color-light);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .sidebar-tool {
+    width: 100%;
+    background: var(--secondary-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+  }
+
+  .sidebar-tool:hover {
+    background: var(--primary-color-light);
+    border-color: var(--primary-color);
+    transform: translateX(3px);
+  }
+
+  .sidebar-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .sidebar-tool-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0 0 0.25rem 0;
+  }
+
+  .sidebar-tool-info p {
+    font-size: 0.75rem;
+    color: var(--text-color-light);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .map-area-full {
+    flex-grow: 1;
+    position: relative;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    min-height: 600px;
+  }
+
+  .coverage-map-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
   }
 
   .map-header {
