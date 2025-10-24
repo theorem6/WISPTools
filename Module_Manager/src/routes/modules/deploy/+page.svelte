@@ -158,6 +158,13 @@
     console.log('[Deploy] Opening PCI Planner modal');
     console.log('[Deploy] Current tenant:', $currentTenant);
     console.log('[Deploy] Tenant ID:', $currentTenant?.id);
+    
+    if (!$currentTenant) {
+      console.error('[Deploy] No tenant available - cannot open PCI Planner');
+      alert('No tenant selected. Please ensure you are properly logged in.');
+      return;
+    }
+    
     showPCIPlannerModal = true;
   }
 
@@ -195,10 +202,15 @@
         <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
           📋 Plans ({readyPlans.length})
         </button>
-        <button class="control-btn" on:click={() => {
-          console.log('[Deploy] PCI button clicked');
-          openPCIPlanner();
-        }} title="PCI Planner">
+        <button 
+          class="control-btn" 
+          class:disabled={!$currentTenant}
+          on:click={() => {
+            console.log('[Deploy] PCI button clicked');
+            openPCIPlanner();
+          }} 
+          title={$currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)"}
+        >
           📊 PCI
         </button>
         <button class="control-btn" on:click={() => alert('Frequency Planner - Coming Soon')} title="Frequency Planner">
@@ -633,5 +645,36 @@
 
   .btn-secondary:hover {
     background: var(--bg-tertiary);
+  }
+
+  /* Control Button Styles */
+  .control-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+  }
+
+  .control-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .control-btn.disabled {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .control-btn.disabled:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 </style>
