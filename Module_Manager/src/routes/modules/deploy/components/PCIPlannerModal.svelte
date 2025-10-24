@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { pciService, type ServiceResult } from '$lib/services/pciService';
   import { pciMapper, type Cell, type PCIConflict } from '$lib/pciMapper';
-  import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
+  import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
   import { currentTenant } from '$lib/stores/tenantStore';
   
   export let show = false;
@@ -290,29 +290,29 @@
               <h3>No Conflicts Found</h3>
               <p>Your network has no PCI conflicts!</p>
             </div>
-          {:else}
-            <div class="conflicts-section">
-              {@const stats = getConflictStats()}
-              {#if stats}
-                <div class="conflict-stats">
-                  <div class="stat-item critical">
-                    <span class="stat-number">{stats.critical}</span>
-                    <span class="stat-label">Critical</span>
+            {:else}
+              <div class="conflicts-section">
+                {#if getConflictStats()}
+                  {@const stats = getConflictStats()}
+                  <div class="conflict-stats">
+                    <div class="stat-item critical">
+                      <span class="stat-number">{stats.critical}</span>
+                      <span class="stat-label">Critical</span>
+                    </div>
+                    <div class="stat-item high">
+                      <span class="stat-number">{stats.high}</span>
+                      <span class="stat-label">High</span>
+                    </div>
+                    <div class="stat-item medium">
+                      <span class="stat-number">{stats.medium}</span>
+                      <span class="stat-label">Medium</span>
+                    </div>
+                    <div class="stat-item low">
+                      <span class="stat-number">{stats.low}</span>
+                      <span class="stat-label">Low</span>
+                    </div>
                   </div>
-                  <div class="stat-item high">
-                    <span class="stat-number">{stats.high}</span>
-                    <span class="stat-label">High</span>
-                  </div>
-                  <div class="stat-item medium">
-                    <span class="stat-number">{stats.medium}</span>
-                    <span class="stat-label">Medium</span>
-                  </div>
-                  <div class="stat-item low">
-                    <span class="stat-number">{stats.low}</span>
-                    <span class="stat-label">Low</span>
-                  </div>
-                </div>
-              {/if}
+                {/if}
               
               <div class="conflicts-list">
                 {#each conflicts as conflict}
