@@ -85,6 +85,9 @@
         map: map,
         center: [-98.5795, 39.8283], // Center of USA
         zoom: 5,
+        ui: {
+          components: [] // Remove all default UI components
+        },
         popup: {
           dockEnabled: true,
           dockOptions: {
