@@ -31,7 +31,37 @@
     try {
       item = await inventoryService.getItem(itemId);
       if (item) {
-        formData = { ...item };
+        formData = { 
+          ...item,
+          currentLocation: {
+            type: 'warehouse',
+            siteId: '',
+            siteName: '',
+            warehouse: { name: '', section: '', aisle: '', shelf: '', bin: '' },
+            tower: { rack: '', rackUnit: '', cabinet: '', position: '' },
+            ...item.currentLocation
+          },
+          purchaseInfo: {
+            vendor: '',
+            purchaseDate: '',
+            purchasePrice: 0,
+            purchaseOrderNumber: '',
+            ...item.purchaseInfo
+          },
+          warranty: {
+            provider: '',
+            startDate: '',
+            endDate: '',
+            type: '',
+            ...item.warranty
+          },
+          technicalSpecs: {
+            powerRequirements: '',
+            ipAddress: '',
+            managementUrl: '',
+            ...item.technicalSpecs
+          }
+        };
       }
     } catch (err: any) {
       error = err.message || 'Failed to load item';
@@ -226,7 +256,7 @@
           <div class="form-grid">
             <div class="form-group">
               <label for="locationType">Location Type *</label>
-              <select id="locationType" bind:value={formData.currentLocation?.type} required>
+              <select id="locationType" bind:value={formData.currentLocation.type} required>
                 <option value="warehouse">Warehouse</option>
                 <option value="tower">Tower Site</option>
                 <option value="noc">NOC</option>
@@ -243,7 +273,7 @@
               <input 
                 id="siteName"
                 type="text" 
-                bind:value={formData.currentLocation?.siteName} 
+                bind:value={formData.currentLocation.siteName} 
                 placeholder="Enter site name"
               />
             </div>
@@ -259,7 +289,7 @@
               <input 
                 id="vendor"
                 type="text" 
-                bind:value={formData.purchaseInfo?.vendor} 
+                bind:value={formData.purchaseInfo.vendor} 
                 placeholder="Enter vendor name"
               />
             </div>
@@ -269,7 +299,7 @@
               <input 
                 id="purchaseDate"
                 type="date" 
-                bind:value={formData.purchaseInfo?.purchaseDate} 
+                bind:value={formData.purchaseInfo.purchaseDate} 
               />
             </div>
             
@@ -279,7 +309,7 @@
                 id="purchasePrice"
                 type="number" 
                 step="0.01"
-                bind:value={formData.purchaseInfo?.purchasePrice} 
+                bind:value={formData.purchaseInfo.purchasePrice} 
                 placeholder="0.00"
               />
             </div>
@@ -289,7 +319,7 @@
               <input 
                 id="purchaseOrderNumber"
                 type="text" 
-                bind:value={formData.purchaseInfo?.purchaseOrderNumber} 
+                bind:value={formData.purchaseInfo.purchaseOrderNumber} 
                 placeholder="Enter PO number"
               />
             </div>
@@ -305,7 +335,7 @@
               <input 
                 id="warrantyProvider"
                 type="text" 
-                bind:value={formData.warranty?.provider} 
+                bind:value={formData.warranty.provider} 
                 placeholder="Enter warranty provider"
               />
             </div>
@@ -315,7 +345,7 @@
               <input 
                 id="warrantyStartDate"
                 type="date" 
-                bind:value={formData.warranty?.startDate} 
+                bind:value={formData.warranty.startDate} 
               />
             </div>
             
@@ -324,7 +354,7 @@
               <input 
                 id="warrantyEndDate"
                 type="date" 
-                bind:value={formData.warranty?.endDate} 
+                bind:value={formData.warranty.endDate} 
               />
             </div>
             
@@ -333,7 +363,7 @@
               <input 
                 id="warrantyType"
                 type="text" 
-                bind:value={formData.warranty?.type} 
+                bind:value={formData.warranty.type} 
                 placeholder="e.g., Manufacturer, Extended"
               />
             </div>
@@ -349,7 +379,7 @@
               <input 
                 id="powerRequirements"
                 type="text" 
-                bind:value={formData.technicalSpecs?.powerRequirements} 
+                bind:value={formData.technicalSpecs.powerRequirements} 
                 placeholder="e.g., 24V DC, 2A"
               />
             </div>
@@ -359,7 +389,7 @@
               <input 
                 id="ipAddress"
                 type="text" 
-                bind:value={formData.technicalSpecs?.ipAddress} 
+                bind:value={formData.technicalSpecs.ipAddress} 
                 placeholder="192.168.1.100"
               />
             </div>
@@ -369,7 +399,7 @@
               <input 
                 id="managementUrl"
                 type="url" 
-                bind:value={formData.technicalSpecs?.managementUrl} 
+                bind:value={formData.technicalSpecs.managementUrl} 
                 placeholder="http://192.168.1.100"
               />
             </div>
