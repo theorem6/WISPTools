@@ -30,7 +30,7 @@
   
   // New hardware requirement form
   let newRequirement = {
-    category: 'equipment',
+    category: 'Radio Equipment',
     equipmentType: '',
     manufacturer: '',
     model: '',
@@ -42,6 +42,129 @@
   // Project workflow states
   let activeProject: PlanProject | null = null;
   let showProjectActions = false;
+
+  // Equipment categories (matching inventory module)
+  const equipmentCategories = {
+    'Radio Equipment': [
+      'Base Station (eNodeB/gNodeB)',
+      'Remote Radio Head (RRH)',
+      'Radio Unit (RU)',
+      'Baseband Unit (BBU)',
+      'Distributed Unit (DU)',
+      'Centralized Unit (CU)',
+      'Small Cell',
+      'Repeater',
+      'Microwave Radio',
+      'Point-to-Point Radio'
+    ],
+    'Antennas': [
+      'Sector Antenna',
+      'Panel Antenna',
+      'Omni Antenna',
+      'Parabolic Dish',
+      'MIMO Antenna',
+      'Massive MIMO Array',
+      'GPS Antenna',
+      'Combiner'
+    ],
+    'Power Systems': [
+      'Rectifier',
+      'Battery Bank',
+      'UPS',
+      'Generator',
+      'Solar Panel System',
+      'Power Distribution Unit',
+      'DC Power Plant',
+      'Surge Protector'
+    ],
+    'Networking Equipment': [
+      'Core Router',
+      'Edge Router',
+      'Layer 2/3 Switch',
+      'Firewall',
+      'Load Balancer',
+      'Optical Network Terminal',
+      'Media Converter',
+      'Ethernet Switch'
+    ],
+    'Transmission Equipment': [
+      'Fiber Optic Terminal',
+      'Multiplexer (DWDM/CWDM)',
+      'Fiber Distribution Panel',
+      'Coaxial Cable',
+      'Fiber Optic Cable',
+      'Hybrid Cable',
+      'RF Cables/Jumpers',
+      'Waveguide'
+    ],
+    'Environmental Control': [
+      'HVAC Unit',
+      'Air Conditioner',
+      'Heat Exchanger',
+      'Ventilation Fan',
+      'Temperature Sensor',
+      'Humidity Sensor',
+      'Fire Suppression System'
+    ],
+    'Monitoring & Control': [
+      'Remote Monitoring Unit',
+      'SNMP Agent',
+      'GPS Clock/Timing Source',
+      'Network Management System',
+      'CCTV Camera',
+      'Access Control System',
+      'Alarm Panel'
+    ],
+    'Structural & Housing': [
+      'Equipment Shelter',
+      'Equipment Cabinet/Rack',
+      'Weatherproof Enclosure',
+      'Cable Tray',
+      'Tower Lighting System',
+      'Grounding System',
+      'Lightning Arrestor',
+      'Surge Arrestor'
+    ],
+    'Test Equipment': [
+      'Spectrum Analyzer',
+      'Cable Tester',
+      'OTDR',
+      'Power Meter',
+      'Multimeter',
+      'Signal Generator'
+    ],
+    'CPE Devices': [
+      'LTE CPE',
+      'CBRS CPE',
+      'Fixed Wireless CPE',
+      'Cable Modem',
+      'ONT',
+      'WiFi Router'
+    ],
+    'SIM Cards': [
+      'SIM Card',
+      'eSIM Profile'
+    ],
+    'Cables & Accessories': [
+      'Ethernet Cable',
+      'Fiber Patch Cable',
+      'RF Jumper',
+      'Connector',
+      'Adapter'
+    ],
+    'Tools': [
+      'Drill',
+      'Crimper',
+      'Cable Stripper',
+      'Torque Wrench',
+      'Ladder'
+    ]
+  };
+
+  const categories = Object.keys(equipmentCategories);
+  
+  // Reactive variable for available equipment types based on selected category
+  $: availableTypes = equipmentCategories[newRequirement.category as keyof typeof equipmentCategories] || [];
 
   onMount(async () => {
     if (browser) {
@@ -703,24 +826,21 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <div class="form-group">
               <label for="category">Category *</label>
               <select id="category" bind:value={newRequirement.category} required>
-                <option value="equipment">Equipment</option>
-                <option value="cpe">CPE Device</option>
-                <option value="antenna">Antenna</option>
-                <option value="cable">Cable</option>
-                <option value="power">Power Supply</option>
-                <option value="mounting">Mounting Hardware</option>
+                <option value="">Select category...</option>
+                {#each categories as category}
+                  <option value={category}>{category}</option>
+                {/each}
               </select>
             </div>
             
             <div class="form-group">
               <label for="equipmentType">Equipment Type *</label>
-              <input
-                id="equipmentType"
-                type="text"
-                bind:value={newRequirement.equipmentType}
-                placeholder="e.g., cpe-device, sector-antenna, router"
-                required
-              />
+              <select id="equipmentType" bind:value={newRequirement.equipmentType} required>
+                <option value="">Select equipment type...</option>
+                {#each availableTypes as type}
+                  <option value={type}>{type}</option>
+                {/each}
+              </select>
             </div>
             
             <div class="form-row">
