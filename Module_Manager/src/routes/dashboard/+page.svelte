@@ -26,7 +26,7 @@
               name: '📋 Plan',
               description: 'Interactive map-based planning tools for network expansion',
               icon: '📋',
-              color: '#3b82f6', // Blue
+              color: 'var(--primary)', // Blue
               status: 'active',
               path: '/modules/plan',
               features: ['Coverage Analysis', 'Site Planning', 'Inventory Check', 'CBRS Spectrum', 'Capacity Planning', 'Cost Analysis']
@@ -36,7 +36,7 @@
               name: '🚀 Deploy',
               description: 'Interactive map-based deployment tools for network rollouts',
               icon: '🚀',
-              color: '#10b981', // Green
+              color: 'var(--success)', // Green
               status: 'active',
               path: '/modules/deploy',
               features: ['PCI Resolution', 'ACS CPE Management', 'Work Orders', 'Installation Management', 'Equipment Configuration', 'Quality Assurance']
@@ -46,7 +46,7 @@
               name: '📊 Monitor',
               description: 'Interactive map-based monitoring tools for network oversight',
               icon: '📊',
-              color: '#f59e0b', // Amber
+              color: 'var(--warning)', // Amber
               status: 'active',
               path: '/modules/monitor',
               features: ['Network Monitoring', 'Device Health', 'Traffic Analysis', 'Performance Analytics', 'Alert Management', 'HSS Management']
@@ -56,7 +56,7 @@
               name: '🔧 Maintain',
               description: 'Traditional interface for ticketing and maintenance management',
               icon: '🔧',
-              color: '#ef4444', // Red
+              color: 'var(--danger)', // Red
               status: 'active',
               path: '/modules/maintain',
               features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Vendor Management', 'Knowledge Base']
@@ -69,7 +69,7 @@
       name: '⚙️ Admin Management',
       description: 'User and tenant management for owners and administrators',
       icon: '⚙️',
-      color: '#6b7280', // Gray
+      color: 'var(--text-secondary)', // Gray
       status: 'active',
       path: '/admin/management',
       adminOnly: true,
@@ -252,7 +252,7 @@
 <style>
   .dashboard-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--gradient-primary);
     padding: 0;
   }
 
@@ -279,9 +279,9 @@
   .app-title {
     font-size: 2.5rem;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--text-primary);
     margin: 0;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -289,7 +289,7 @@
 
   .app-subtitle {
     font-size: 1rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin: 0.25rem 0 0 0;
   }
 
@@ -305,8 +305,8 @@
   }
 
   .admin-indicator {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--success-light);
+    color: var(--success);
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.75rem;
@@ -316,7 +316,7 @@
   }
 
   .power-btn {
-    background: #6b7280;
+    background: var(--secondary);
     color: white;
     border: none;
     border-radius: 50%;
@@ -331,7 +331,7 @@
   }
 
   .power-btn:hover {
-    background: #ef4444;
+    background: var(--danger);
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   }
@@ -343,7 +343,7 @@
   }
 
   .login-btn {
-    background: #3b82f6;
+    background: var(--primary);
     color: white;
     border: none;
     border-radius: 0.5rem;
@@ -358,7 +358,7 @@
   }
 
   .login-btn:hover {
-    background: #2563eb;
+    background: var(--primary-hover);
     transform: translateY(-1px);
   }
 
