@@ -13,6 +13,8 @@
   let showHardwareModal = false;
   let showProjectModal = false;
   let showCreateProjectModal = false;
+  let showMissingHardwareModal = false;
+  let showAddRequirementModal = false;
   
   // Data
   let existingHardware: HardwareView[] = [];
@@ -24,6 +26,17 @@
   let newProject = {
     name: '',
     description: ''
+  };
+  
+  // New hardware requirement form
+  let newRequirement = {
+    category: 'equipment',
+    equipmentType: '',
+    manufacturer: '',
+    model: '',
+    quantity: 1,
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
+    specifications: {}
   };
 
   onMount(async () => {
@@ -124,6 +137,97 @@
   function getHardwareByType(type: string) {
     return existingHardware.filter(h => h.type === type);
   }
+
+  function openMissingHardwareModal() {
+    if (!selectedProject) return;
+    showMissingHardwareModal = true;
+  }
+
+  function closeMissingHardwareModal() {
+    showMissingHardwareModal = false;
+  }
+
+  function openAddRequirementModal() {
+    if (!selectedProject) return;
+    showAddRequirementModal = true;
+    newRequirement = {
+      category: 'equipment',
+      equipmentType: '',
+      manufacturer: '',
+      model: '',
+      quantity: 1,
+      priority: 'medium',
+      specifications: {}
+    };
+  }
+
+  function closeAddRequirementModal() {
+    showAddRequirementModal = false;
+  }
+
+  async function addHardwareRequirement() {
+    if (!selectedProject || !newRequirement.equipmentType.trim()) return;
+    
+    try {
+      await planService.addHardwareRequirement(selectedProject.id, newRequirement);
+      await loadData(); // Reload to get updated project
+      closeAddRequirementModal();
+    } catch (error) {
+      console.error('Error adding hardware requirement:', error);
+    }
+  }
+
+  async function analyzeMissingHardware() {
+    if (!selectedProject) return;
+    
+    try {
+      const updatedProject = await planService.analyzeMissingHardware(selectedProject.id);
+      if (updatedProject) {
+        selectedProject = updatedProject;
+        // Update projects array
+        const index = projects.findIndex(p => p.id === selectedProject?.id);
+        if (index !== -1) {
+          projects[index] = updatedProject;
+        }
+      }
+    } catch (error) {
+      console.error('Error analyzing missing hardware:', error);
+    }
+  }
+
+  async function generatePurchaseOrder() {
+    if (!selectedProject) return;
+    
+    try {
+      const purchaseOrder = await planService.generatePurchaseOrder(selectedProject.id);
+      if (purchaseOrder) {
+        // Create a downloadable purchase order
+        const content = `
+PURCHASE ORDER
+Order ID: ${purchaseOrder.purchaseOrderId}
+Project: ${selectedProject.name}
+Generated: ${purchaseOrder.generatedAt.toLocaleDateString()}
+
+ITEMS:
+${purchaseOrder.items.map(item => 
+  `- ${item.equipmentType}: ${item.quantity} units @ $${item.estimatedCost} (${item.priority} priority)`
+).join('\n')}
+
+TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
+        `;
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PurchaseOrder_${purchaseOrder.purchaseOrderId}.txt`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error generating purchase order:', error);
+    }
+  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -150,6 +254,14 @@
         <button class="control-btn" on:click={openCreateProject} title="Create New Project">
           ➕
         </button>
+        {#if selectedProject}
+          <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
+            🛒
+          </button>
+          <button class="control-btn" on:click={openAddRequirementModal} title="Add Hardware Requirement">
+            📋
+          </button>
+        {/if}
         <button class="control-btn" on:click={openPlanningReport} title="Planning Reports">
           📊
         </button>
@@ -353,6 +465,203 @@
           <button class="btn-secondary" on:click={closeCreateProjectModal}>Cancel</button>
           <button class="btn-primary" on:click={createProject} disabled={!newProject.name.trim()}>
             Create Project
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Missing Hardware Modal -->
+  {#if showMissingHardwareModal && selectedProject}
+    <div class="modal-overlay" on:click={closeMissingHardwareModal}>
+      <div class="modal-content missing-hardware-modal" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>🛒 Missing Hardware Analysis - {selectedProject.name}</h2>
+          <button class="close-btn" on:click={closeMissingHardwareModal}>✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="analysis-summary">
+            <div class="summary-card">
+              <div class="card-icon">💰</div>
+              <div class="card-content">
+                <div class="card-value">${selectedProject.purchasePlan.totalEstimatedCost.toLocaleString()}</div>
+                <div class="card-label">Total Estimated Cost</div>
+              </div>
+            </div>
+            <div class="summary-card">
+              <div class="card-icon">📦</div>
+              <div class="card-content">
+                <div class="card-value">{selectedProject.purchasePlan.missingHardware.length}</div>
+                <div class="card-label">Missing Items</div>
+              </div>
+            </div>
+            <div class="summary-card">
+              <div class="card-icon">⚠️</div>
+              <div class="card-content">
+                <div class="card-value">{selectedProject.purchasePlan.missingHardware.filter(item => item.priority === 'critical').length}</div>
+                <div class="card-label">Critical Items</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="missing-hardware-list">
+            {#if selectedProject.purchasePlan.missingHardware.length === 0}
+              <div class="empty-state">
+                <div class="empty-icon">✅</div>
+                <h3>No Missing Hardware</h3>
+                <p>All required hardware is available in inventory.</p>
+                <button class="btn-primary" on:click={analyzeMissingHardware}>Re-analyze</button>
+              </div>
+            {:else}
+              <div class="hardware-requirements">
+                <h4>Hardware Requirements</h4>
+                <div class="requirements-list">
+                  {#each selectedProject.hardwareRequirements.needed as requirement, index}
+                    <div class="requirement-item">
+                      <div class="requirement-info">
+                        <div class="requirement-name">{requirement.equipmentType}</div>
+                        <div class="requirement-details">
+                          {requirement.manufacturer} {requirement.model} • Qty: {requirement.quantity} • {requirement.priority} priority
+                        </div>
+                      </div>
+                      <div class="requirement-cost">${requirement.estimatedCost?.toLocaleString() || 'TBD'}</div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+              
+              <div class="missing-items">
+                <h4>Missing Hardware</h4>
+                <div class="missing-list">
+                  {#each selectedProject.purchasePlan.missingHardware as item}
+                    <div class="missing-item">
+                      <div class="item-header">
+                        <div class="item-info">
+                          <div class="item-name">{item.manufacturer} {item.model || item.equipmentType}</div>
+                          <div class="item-details">Qty: {item.quantity} • ${item.estimatedCost.toLocaleString()} • {item.priority} priority</div>
+                        </div>
+                        <div class="priority-badge {item.priority}">{item.priority}</div>
+                      </div>
+                      <div class="item-reason">{item.reason}</div>
+                      {#if item.alternatives && item.alternatives.length > 0}
+                        <div class="alternatives">
+                          <h5>Alternatives:</h5>
+                          <div class="alternatives-list">
+                            {#each item.alternatives as alt}
+                              <div class="alternative-item">
+                                <span class="alt-name">{alt.manufacturer} {alt.model}</span>
+                                <span class="alt-cost">${alt.estimatedCost}</span>
+                                <span class="alt-availability {alt.availability}">{alt.availability}</span>
+                              </div>
+                            {/each}
+                          </div>
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" on:click={closeMissingHardwareModal}>Close</button>
+          <button class="btn-secondary" on:click={analyzeMissingHardware}>Re-analyze</button>
+          <button class="btn-primary" on:click={generatePurchaseOrder} disabled={selectedProject.purchasePlan.missingHardware.length === 0}>
+            Generate Purchase Order
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Add Hardware Requirement Modal -->
+  {#if showAddRequirementModal && selectedProject}
+    <div class="modal-overlay" on:click={closeAddRequirementModal}>
+      <div class="modal-content add-requirement-modal" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>📋 Add Hardware Requirement - {selectedProject.name}</h2>
+          <button class="close-btn" on:click={closeAddRequirementModal}>✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <form on:submit|preventDefault={addHardwareRequirement}>
+            <div class="form-group">
+              <label for="category">Category *</label>
+              <select id="category" bind:value={newRequirement.category} required>
+                <option value="equipment">Equipment</option>
+                <option value="cpe">CPE Device</option>
+                <option value="antenna">Antenna</option>
+                <option value="cable">Cable</option>
+                <option value="power">Power Supply</option>
+                <option value="mounting">Mounting Hardware</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="equipmentType">Equipment Type *</label>
+              <input
+                id="equipmentType"
+                type="text"
+                bind:value={newRequirement.equipmentType}
+                placeholder="e.g., cpe-device, sector-antenna, router"
+                required
+              />
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="manufacturer">Manufacturer</label>
+                <input
+                  id="manufacturer"
+                  type="text"
+                  bind:value={newRequirement.manufacturer}
+                  placeholder="e.g., Ubiquiti, Cisco"
+                />
+              </div>
+              
+              <div class="form-group">
+                <label for="model">Model</label>
+                <input
+                  id="model"
+                  type="text"
+                  bind:value={newRequirement.model}
+                  placeholder="e.g., NanoStation M5"
+                />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="quantity">Quantity *</label>
+                <input
+                  id="quantity"
+                  type="number"
+                  bind:value={newRequirement.quantity}
+                  min="1"
+                  required
+                />
+              </div>
+              
+              <div class="form-group">
+                <label for="priority">Priority *</label>
+                <select id="priority" bind:value={newRequirement.priority} required>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" on:click={closeAddRequirementModal}>Cancel</button>
+          <button class="btn-primary" on:click={addHardwareRequirement} disabled={!newRequirement.equipmentType.trim()}>
+            Add Requirement
           </button>
         </div>
       </div>
@@ -898,5 +1207,218 @@
   .form-group textarea {
     resize: vertical;
     min-height: 80px;
+  }
+
+  /* Missing Hardware Modal Styles */
+  .missing-hardware-modal {
+    max-width: 1200px;
+  }
+
+  .analysis-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .hardware-requirements {
+    margin-bottom: 2rem;
+  }
+
+  .hardware-requirements h4 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .requirements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .requirement-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+  }
+
+  .requirement-name {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .requirement-details {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .requirement-cost {
+    font-weight: 600;
+    color: var(--brand-primary);
+  }
+
+  .missing-items h4 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .missing-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .missing-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+  }
+
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .item-details {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .priority-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .priority-badge.critical {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+  }
+
+  .priority-badge.high {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+  }
+
+  .priority-badge.medium {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+  }
+
+  .priority-badge.low {
+    background: rgba(156, 163, 175, 0.1);
+    color: #6b7280;
+  }
+
+  .item-reason {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.05);
+    border-left: 3px solid #ef4444;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .alternatives {
+    margin-top: 1rem;
+  }
+
+  .alternatives h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .alternatives-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .alternative-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+  }
+
+  .alt-name {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .alt-cost {
+    font-weight: 600;
+    color: var(--brand-primary);
+  }
+
+  .alt-availability {
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .alt-availability.in-stock {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  }
+
+  .alt-availability.backorder {
+    background: rgba(245, 158, 11, 0.1);
+    color: #d97706;
+  }
+
+  .alt-availability.discontinued {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+  }
+
+  /* Add Requirement Modal Styles */
+  .add-requirement-modal {
+    max-width: 600px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--brand-primary);
   }
 </style>

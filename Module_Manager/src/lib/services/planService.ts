@@ -44,6 +44,49 @@ export interface PlanProject {
       quantity: number;
       estimatedCost?: number;
       priority: 'low' | 'medium' | 'high' | 'critical';
+      specifications?: {
+        power?: string;
+        frequency?: string;
+        range?: string;
+        capacity?: string;
+        [key: string]: any;
+      };
+    }>;
+  };
+  
+  // Purchase Planning
+  purchasePlan: {
+    totalEstimatedCost: number;
+    missingHardware: Array<{
+      id: string;
+      category: string;
+      equipmentType: string;
+      manufacturer?: string;
+      model?: string;
+      quantity: number;
+      estimatedCost: number;
+      priority: 'low' | 'medium' | 'high' | 'critical';
+      specifications?: any;
+      reason: string; // Why this hardware is needed
+      alternatives?: Array<{
+        manufacturer: string;
+        model: string;
+        estimatedCost: number;
+        availability: 'in-stock' | 'backorder' | 'discontinued';
+      }>;
+    }>;
+    procurementStatus: 'pending' | 'quoted' | 'ordered' | 'received' | 'complete';
+    vendorQuotes?: Array<{
+      vendor: string;
+      quoteDate: Date;
+      totalCost: number;
+      validUntil: Date;
+      items: Array<{
+        equipmentType: string;
+        quantity: number;
+        unitCost: number;
+        totalCost: number;
+      }>;
     }>;
   };
   
@@ -218,6 +261,11 @@ class PlanService {
         existing: [],
         needed: []
       },
+      purchasePlan: {
+        totalEstimatedCost: 0,
+        missingHardware: [],
+        procurementStatus: 'pending'
+      },
       deployment: {},
       ...planData
     };
@@ -320,6 +368,226 @@ class PlanService {
    */
   async deletePlan(planId: string): Promise<boolean> {
     return this.plans.delete(planId);
+  }
+  
+  /**
+   * Analyze project requirements and identify missing hardware
+   */
+  async analyzeMissingHardware(planId: string): Promise<PlanProject | null> {
+    const plan = this.plans.get(planId);
+    if (!plan) return null;
+    
+    try {
+      const tenantId = plan.tenantId;
+      const existingInventory = await inventoryService.getInventory(tenantId);
+      
+      // Clear existing missing hardware analysis
+      plan.purchasePlan.missingHardware = [];
+      plan.purchasePlan.totalEstimatedCost = 0;
+      
+      // Analyze each hardware requirement
+      for (const requirement of plan.hardwareRequirements.needed) {
+        const available = existingInventory.filter(item => 
+          item.category === requirement.category &&
+          item.equipmentType === requirement.equipmentType &&
+          (item.status === 'available' || item.status === 'reserved')
+        );
+        
+        const availableQuantity = available.reduce((sum, item) => sum + 1, 0);
+        const neededQuantity = requirement.quantity;
+        
+        if (availableQuantity < neededQuantity) {
+          const missingQuantity = neededQuantity - availableQuantity;
+          const estimatedCost = this.estimateHardwareCost(requirement);
+          
+          plan.purchasePlan.missingHardware.push({
+            id: `missing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            category: requirement.category,
+            equipmentType: requirement.equipmentType,
+            manufacturer: requirement.manufacturer,
+            model: requirement.model,
+            quantity: missingQuantity,
+            estimatedCost: estimatedCost * missingQuantity,
+            priority: requirement.priority,
+            specifications: requirement.specifications,
+            reason: this.generateMissingHardwareReason(requirement, missingQuantity, availableQuantity),
+            alternatives: this.generateAlternatives(requirement)
+          });
+          
+          plan.purchasePlan.totalEstimatedCost += estimatedCost * missingQuantity;
+        }
+      }
+      
+      // Update plan
+      plan.updatedAt = new Date();
+      this.plans.set(planId, plan);
+      
+      return plan;
+    } catch (error) {
+      console.error('Error analyzing missing hardware:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Add hardware requirement to a plan
+   */
+  async addHardwareRequirement(
+    planId: string, 
+    requirement: {
+      category: string;
+      equipmentType: string;
+      manufacturer?: string;
+      model?: string;
+      quantity: number;
+      priority: 'low' | 'medium' | 'high' | 'critical';
+      specifications?: any;
+    }
+  ): Promise<boolean> {
+    const plan = this.plans.get(planId);
+    if (!plan) return false;
+    
+    plan.hardwareRequirements.needed.push({
+      ...requirement,
+      estimatedCost: this.estimateHardwareCost(requirement)
+    });
+    
+    plan.updatedAt = new Date();
+    this.plans.set(planId, plan);
+    
+    // Re-analyze missing hardware
+    await this.analyzeMissingHardware(planId);
+    
+    return true;
+  }
+  
+  /**
+   * Remove hardware requirement from a plan
+   */
+  async removeHardwareRequirement(planId: string, requirementIndex: number): Promise<boolean> {
+    const plan = this.plans.get(planId);
+    if (!plan || requirementIndex < 0 || requirementIndex >= plan.hardwareRequirements.needed.length) {
+      return false;
+    }
+    
+    plan.hardwareRequirements.needed.splice(requirementIndex, 1);
+    plan.updatedAt = new Date();
+    this.plans.set(planId, plan);
+    
+    // Re-analyze missing hardware
+    await this.analyzeMissingHardware(planId);
+    
+    return true;
+  }
+  
+  /**
+   * Generate purchase order from missing hardware
+   */
+  async generatePurchaseOrder(planId: string): Promise<{
+    purchaseOrderId: string;
+    items: Array<{
+      equipmentType: string;
+      quantity: number;
+      estimatedCost: number;
+      priority: string;
+    }>;
+    totalCost: number;
+    generatedAt: Date;
+  } | null> {
+    const plan = this.plans.get(planId);
+    if (!plan || plan.purchasePlan.missingHardware.length === 0) return null;
+    
+    const purchaseOrderId = `PO_${planId}_${Date.now()}`;
+    
+    const items = plan.purchasePlan.missingHardware.map(item => ({
+      equipmentType: `${item.manufacturer || 'Generic'} ${item.model || item.equipmentType}`,
+      quantity: item.quantity,
+      estimatedCost: item.estimatedCost,
+      priority: item.priority
+    }));
+    
+    return {
+      purchaseOrderId,
+      items,
+      totalCost: plan.purchasePlan.totalEstimatedCost,
+      generatedAt: new Date()
+    };
+  }
+  
+  /**
+   * Estimate hardware cost based on equipment type
+   */
+  private estimateHardwareCost(requirement: any): number {
+    const costEstimates: { [key: string]: number } = {
+      'tower': 50000,
+      'sector-antenna': 2000,
+      'cpe-device': 500,
+      'router': 300,
+      'switch': 200,
+      'power-supply': 150,
+      'cable': 5,
+      'connector': 10,
+      'mounting-hardware': 100,
+      'backhaul-radio': 3000,
+      'fiber-optic': 2,
+      'ups': 800,
+      'generator': 5000
+    };
+    
+    return costEstimates[requirement.equipmentType] || 1000;
+  }
+  
+  /**
+   * Generate reason for missing hardware
+   */
+  private generateMissingHardwareReason(requirement: any, missingQuantity: number, availableQuantity: number): string {
+    if (availableQuantity === 0) {
+      return `No ${requirement.equipmentType} equipment available in inventory`;
+    } else {
+      return `Only ${availableQuantity} ${requirement.equipmentType} available, need ${missingQuantity} more`;
+    }
+  }
+  
+  /**
+   * Generate alternative equipment options
+   */
+  private generateAlternatives(requirement: any): Array<{
+    manufacturer: string;
+    model: string;
+    estimatedCost: number;
+    availability: 'in-stock' | 'backorder' | 'discontinued';
+  }> {
+    const alternatives: Array<{
+      manufacturer: string;
+      model: string;
+      estimatedCost: number;
+      availability: 'in-stock' | 'backorder' | 'discontinued';
+    }> = [];
+    
+    // Add some generic alternatives based on equipment type
+    switch (requirement.equipmentType) {
+      case 'cpe-device':
+        alternatives.push(
+          { manufacturer: 'Ubiquiti', model: 'NanoStation M5', estimatedCost: 450, availability: 'in-stock' },
+          { manufacturer: 'MikroTik', model: 'SXT Lite5', estimatedCost: 380, availability: 'in-stock' },
+          { manufacturer: 'Cambium', model: 'ePMP 1000', estimatedCost: 520, availability: 'backorder' }
+        );
+        break;
+      case 'sector-antenna':
+        alternatives.push(
+          { manufacturer: 'RFS', model: 'Sector Antenna 120°', estimatedCost: 1800, availability: 'in-stock' },
+          { manufacturer: 'CommScope', model: 'Sector Antenna 90°', estimatedCost: 2200, availability: 'in-stock' }
+        );
+        break;
+      case 'router':
+        alternatives.push(
+          { manufacturer: 'Cisco', model: 'ISR 4331', estimatedCost: 2500, availability: 'in-stock' },
+          { manufacturer: 'Juniper', model: 'MX104', estimatedCost: 3000, availability: 'backorder' }
+        );
+        break;
+    }
+    
+    return alternatives;
   }
 }
 
