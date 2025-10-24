@@ -120,32 +120,15 @@
 
 <TenantGuard requireTenant={true}>
   <div class="deploy-module">
-    <!-- Header -->
-    <div class="module-header">
-      <div class="header-content">
-        <button class="back-btn" on:click={goBack}>
-          <span class="back-icon">←</span>
-          Back to Dashboard
-        </button>
-        <div class="module-title">
-          <h1>🚀 Deploy Module</h1>
-          <p>Interactive map-based deployment tools for network rollouts</p>
-        </div>
-        <div class="user-info">
-          {#if currentUser}
-            <span class="user-name">{currentUser.email}</span>
-            <span class="user-role">{$currentTenant?.name || 'No Tenant'}</span>
-          {/if}
-        </div>
-      </div>
+    <!-- Simplified Header -->
+    <div class="module-header-simple">
+      <h1>🚀 Deploy</h1>
     </div>
 
     <!-- Map Container with Sidebar -->
     <div class="map-container-with-sidebar">
       <!-- Tools Sidebar -->
       <div class="tools-sidebar">
-        <h3>Deployment Tools</h3>
-        <p class="sidebar-subtitle">Select a tool to access deployment features</p>
         {#each mapTools as tool (tool.id)}
           <button 
             class="sidebar-tool"
@@ -178,8 +161,28 @@
   .deploy-module {
     background: var(--background-color);
     min-height: 100vh;
-    padding: 2rem;
+    padding: 0.5rem;
     color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .module-header-simple {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: var(--border-radius-md);
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+    box-shadow: var(--shadow-sm);
+    color: white;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .module-header-simple h1 {
+    font-size: 1.2rem;
+    margin: 0;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
   .module-header {
@@ -268,37 +271,37 @@
   }
 
   .tools-sidebar {
-    width: 300px;
+    width: 200px;
     background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-md);
+    border-radius: var(--border-radius-md);
+    padding: 0.75rem;
+    box-shadow: var(--shadow-sm);
     overflow-y: auto;
     flex-shrink: 0;
   }
 
   .tools-sidebar h3 {
-    font-size: 1.3rem;
+    font-size: 1rem;
     color: var(--primary-color);
     margin: 0 0 0.5rem 0;
   }
 
   .sidebar-subtitle {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: var(--text-color-light);
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 1rem 0;
   }
 
   .sidebar-tool {
     width: 100%;
     background: var(--secondary-bg);
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    padding: 1rem;
-    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 0.5rem;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: left;
@@ -307,36 +310,36 @@
   .sidebar-tool:hover {
     background: var(--primary-color-light);
     border-color: var(--primary-color);
-    transform: translateX(3px);
+    transform: translateX(2px);
   }
 
   .sidebar-icon {
-    font-size: 2rem;
+    font-size: 1.2rem;
     flex-shrink: 0;
   }
 
   .sidebar-tool-info h4 {
-    font-size: 1rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-color);
-    margin: 0 0 0.25rem 0;
+    margin: 0 0 0.1rem 0;
   }
 
   .sidebar-tool-info p {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     color: var(--text-color-light);
     margin: 0;
-    line-height: 1.3;
+    line-height: 1.2;
   }
 
   .map-area-full {
     flex-grow: 1;
     position: relative;
     background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
+    border-radius: var(--border-radius-md);
     overflow: hidden;
-    box-shadow: var(--shadow-lg);
-    min-height: 600px;
+    box-shadow: var(--shadow-md);
+    min-height: calc(100vh - 100px);
   }
 
   .coverage-map-iframe {

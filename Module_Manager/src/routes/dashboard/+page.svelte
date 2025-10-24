@@ -120,10 +120,10 @@
     <!-- Header -->
     <div class="header">
       <div class="header-content">
-        <div class="logo-section">
-          <h1 class="app-title">WispTools.io</h1>
-          <p class="app-subtitle">Comprehensive WISP Management Platform</p>
-        </div>
+                <div class="logo-section">
+                  <h1 class="app-title">WISPTools</h1>
+                  <p class="app-subtitle">Comprehensive WISP Management Platform</p>
+                </div>
         <!-- Minimal User Info and Power Button -->
         <div class="user-controls">
           {#if isLoggedIn && currentUser}
