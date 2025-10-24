@@ -8,6 +8,7 @@
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
   import { planService, type PlanProject } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import PCIPlannerModal from './components/PCIPlannerModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -21,6 +22,9 @@
   let readyPlans: PlanProject[] = [];
   let selectedPlan: PlanProject | null = null;
   let isLoadingPlans = false;
+  
+  // PCI Planner
+  let showPCIPlannerModal = false;
 
   onMount(async () => {
     if (browser) {
@@ -148,6 +152,15 @@
       alert('Failed to refactor plan');
     }
   }
+
+  // PCI Planner functions
+  function openPCIPlanner() {
+    showPCIPlannerModal = true;
+  }
+
+  function closePCIPlannerModal() {
+    showPCIPlannerModal = false;
+  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -175,7 +188,7 @@
         <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
           📋 Plans ({readyPlans.length})
         </button>
-        <button class="control-btn" on:click={() => alert('PCI Planner - Coming Soon')} title="PCI Planner">
+        <button class="control-btn" on:click={openPCIPlanner} title="PCI Planner">
           📊 PCI
         </button>
         <button class="control-btn" on:click={() => alert('Frequency Planner - Coming Soon')} title="Frequency Planner">
@@ -256,6 +269,13 @@
       </div>
     {/if}
   </div>
+
+  <!-- PCI Planner Modal -->
+  <PCIPlannerModal 
+    show={showPCIPlannerModal} 
+    tenantId={$currentTenant?.id || ''} 
+    on:close={closePCIPlannerModal}
+  />
 </TenantGuard>
 
 <style>
