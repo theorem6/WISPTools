@@ -29,14 +29,14 @@
     <div class="map-fullscreen" bind:this={mapContainer}>
       <iframe 
         src="/modules/coverage-map" 
-        title="Network Coverage Map"
+        title="Plan"
         class="coverage-map-iframe"
       ></iframe>
     </div>
 
     <!-- Minimal Header Overlay -->
     <div class="header-overlay">
-      <h1>📋 Plan</h1>
+      <h1>📋</h1>
     </div>
   </div>
 </TenantGuard>
