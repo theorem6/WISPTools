@@ -1,0 +1,502 @@
+// Planning System API
+// Manages deployment plans and project workflows
+
+const express = require('express');
+const router = express.Router();
+const { PlanProject } = require('../models/plan');
+const { InventoryItem } = require('../models/inventory');
+const { UnifiedTower, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
+
+// ============================================================================
+// MIDDLEWARE
+// ============================================================================
+
+// Require tenant ID
+const requireTenant = (req, res, next) => {
+  const tenantId = req.headers['x-tenant-id'];
+  if (!tenantId) {
+    return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+  }
+  req.tenantId = tenantId;
+  next();
+};
+
+router.use(requireTenant);
+
+// ============================================================================
+// PLAN MANAGEMENT
+// ============================================================================
+
+// GET /plans - Get all plans for tenant
+router.get('/', async (req, res) => {
+  try {
+    const { status, createdBy } = req.query;
+    const query = { tenantId: req.tenantId };
+    
+    if (status) query.status = status;
+    if (createdBy) query.createdBy = createdBy;
+    
+    const plans = await PlanProject.find(query)
+      .sort({ updatedAt: -1 })
+      .lean();
+    
+    res.json(plans);
+  } catch (error) {
+    console.error('Error fetching plans:', error);
+    res.status(500).json({ error: 'Failed to fetch plans', message: error.message });
+  }
+});
+
+// GET /plans/:id - Get single plan
+router.get('/:id', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).lean();
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    res.json(plan);
+  } catch (error) {
+    console.error('Error fetching plan:', error);
+    res.status(500).json({ error: 'Failed to fetch plan', message: error.message });
+  }
+});
+
+// POST /plans - Create new plan
+router.post('/', async (req, res) => {
+  try {
+    const planData = {
+      ...req.body,
+      tenantId: req.tenantId,
+      createdBy: req.user?.email || req.user?.name,
+      createdById: req.user?.uid
+    };
+    
+    const plan = new PlanProject(planData);
+    await plan.save();
+    
+    res.status(201).json(plan);
+  } catch (error) {
+    console.error('Error creating plan:', error);
+    res.status(500).json({ error: 'Failed to create plan', message: error.message });
+  }
+});
+
+// PUT /plans/:id - Update plan
+router.put('/:id', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
+      { 
+        ...req.body, 
+        updatedAt: new Date(),
+        updatedBy: req.user?.email || req.user?.name,
+        updatedById: req.user?.uid
+      },
+      { new: true, runValidators: true }
+    );
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    res.json(plan);
+  } catch (error) {
+    console.error('Error updating plan:', error);
+    res.status(500).json({ error: 'Failed to update plan', message: error.message });
+  }
+});
+
+// DELETE /plans/:id - Delete plan
+router.delete('/:id', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOneAndDelete({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    res.json({ message: 'Plan deleted successfully', plan });
+  } catch (error) {
+    console.error('Error deleting plan:', error);
+    res.status(500).json({ error: 'Failed to delete plan', message: error.message });
+  }
+});
+
+// ============================================================================
+// HARDWARE REQUIREMENTS
+// ============================================================================
+
+// POST /plans/:id/requirements - Add hardware requirement
+router.post('/:id/requirements', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    const requirement = {
+      ...req.body,
+      estimatedCost: estimateHardwareCost(req.body)
+    };
+    
+    plan.hardwareRequirements.needed.push(requirement);
+    await plan.save();
+    
+    // Re-analyze missing hardware
+    await analyzeMissingHardware(plan);
+    
+    res.json(plan);
+  } catch (error) {
+    console.error('Error adding requirement:', error);
+    res.status(500).json({ error: 'Failed to add requirement', message: error.message });
+  }
+});
+
+// DELETE /plans/:id/requirements/:requirementIndex - Remove hardware requirement
+router.delete('/:id/requirements/:requirementIndex', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    const requirementIndex = parseInt(req.params.requirementIndex);
+    if (requirementIndex < 0 || requirementIndex >= plan.hardwareRequirements.needed.length) {
+      return res.status(400).json({ error: 'Invalid requirement index' });
+    }
+    
+    plan.hardwareRequirements.needed.splice(requirementIndex, 1);
+    await plan.save();
+    
+    // Re-analyze missing hardware
+    await analyzeMissingHardware(plan);
+    
+    res.json(plan);
+  } catch (error) {
+    console.error('Error removing requirement:', error);
+    res.status(500).json({ error: 'Failed to remove requirement', message: error.message });
+  }
+});
+
+// ============================================================================
+// MISSING HARDWARE ANALYSIS
+// ============================================================================
+
+// POST /plans/:id/analyze - Analyze missing hardware
+router.post('/:id/analyze', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    await analyzeMissingHardware(plan);
+    
+    res.json(plan);
+  } catch (error) {
+    console.error('Error analyzing missing hardware:', error);
+    res.status(500).json({ error: 'Failed to analyze missing hardware', message: error.message });
+  }
+});
+
+// GET /plans/:id/missing-hardware - Get missing hardware analysis
+router.get('/:id/missing-hardware', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).lean();
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    res.json({
+      missingHardware: plan.purchasePlan.missingHardware,
+      totalEstimatedCost: plan.purchasePlan.totalEstimatedCost,
+      procurementStatus: plan.purchasePlan.procurementStatus
+    });
+  } catch (error) {
+    console.error('Error fetching missing hardware:', error);
+    res.status(500).json({ error: 'Failed to fetch missing hardware', message: error.message });
+  }
+});
+
+// ============================================================================
+// PURCHASE ORDERS
+// ============================================================================
+
+// POST /plans/:id/purchase-order - Generate purchase order
+router.post('/:id/purchase-order', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).lean();
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    if (plan.purchasePlan.missingHardware.length === 0) {
+      return res.status(400).json({ error: 'No missing hardware to generate purchase order' });
+    }
+    
+    const purchaseOrderId = `PO_${plan._id}_${Date.now()}`;
+    
+    const items = plan.purchasePlan.missingHardware.map(item => ({
+      equipmentType: `${item.manufacturer || 'Generic'} ${item.model || item.equipmentType}`,
+      quantity: item.quantity,
+      estimatedCost: item.estimatedCost,
+      priority: item.priority,
+      specifications: item.specifications,
+      alternatives: item.alternatives
+    }));
+    
+    const purchaseOrder = {
+      purchaseOrderId,
+      planId: plan._id,
+      planName: plan.name,
+      items,
+      totalCost: plan.purchasePlan.totalEstimatedCost,
+      generatedAt: new Date(),
+      generatedBy: req.user?.email || req.user?.name
+    };
+    
+    res.json(purchaseOrder);
+  } catch (error) {
+    console.error('Error generating purchase order:', error);
+    res.status(500).json({ error: 'Failed to generate purchase order', message: error.message });
+  }
+});
+
+// ============================================================================
+// EXISTING HARDWARE QUERY
+// ============================================================================
+
+// GET /plans/hardware/existing - Get all existing hardware from all modules
+router.get('/hardware/existing', async (req, res) => {
+  try {
+    const hardware = [];
+    
+    // Get towers
+    const towers = await UnifiedTower.find({ tenantId: req.tenantId }).lean();
+    towers.forEach(tower => {
+      hardware.push({
+        id: tower._id.toString(),
+        type: 'tower',
+        name: tower.name,
+        location: {
+          latitude: tower.location.latitude,
+          longitude: tower.location.longitude,
+          address: tower.location.address
+        },
+        status: tower.status,
+        module: 'manual',
+        lastUpdated: tower.updatedAt,
+        isReadOnly: true,
+        inventoryId: tower.inventoryId
+      });
+    });
+    
+    // Get sectors
+    const sectors = await UnifiedSector.find({ tenantId: req.tenantId }).lean();
+    sectors.forEach(sector => {
+      hardware.push({
+        id: sector._id.toString(),
+        type: 'sector',
+        name: `${sector.name} - Sector ${sector.azimuth}°`,
+        location: {
+          latitude: sector.location.latitude,
+          longitude: sector.location.longitude
+        },
+        status: sector.status,
+        module: sector.modules?.pci ? 'pci' : 'manual',
+        lastUpdated: sector.updatedAt,
+        isReadOnly: true,
+        inventoryId: sector.inventoryId
+      });
+    });
+    
+    // Get CPE devices
+    const cpeDevices = await UnifiedCPE.find({ tenantId: req.tenantId }).lean();
+    cpeDevices.forEach(cpe => {
+      hardware.push({
+        id: cpe._id.toString(),
+        type: 'cpe',
+        name: `${cpe.manufacturer} ${cpe.model} - ${cpe.serialNumber}`,
+        location: {
+          latitude: cpe.location.latitude,
+          longitude: cpe.location.longitude,
+          address: cpe.location.address
+        },
+        status: cpe.status,
+        module: cpe.modules?.acs ? 'acs' : cpe.modules?.hss ? 'hss' : 'manual',
+        lastUpdated: cpe.updatedAt,
+        isReadOnly: true,
+        inventoryId: cpe.inventoryId
+      });
+    });
+    
+    // Get inventory items
+    const inventoryItems = await InventoryItem.find({ tenantId: req.tenantId }).lean();
+    inventoryItems.forEach(item => {
+      // Only include items that aren't already mapped to coverage map
+      const alreadyMapped = hardware.some(h => h.inventoryId === item._id.toString());
+      if (!alreadyMapped) {
+        hardware.push({
+          id: item._id.toString(),
+          type: 'equipment',
+          name: `${item.manufacturer || 'Unknown'} ${item.model || 'Unknown'} - ${item.serialNumber}`,
+          location: {
+            latitude: item.currentLocation?.latitude || 0,
+            longitude: item.currentLocation?.longitude || 0,
+            address: item.currentLocation?.address
+          },
+          status: item.status,
+          module: item.modules?.acs ? 'acs' : item.modules?.hss ? 'hss' : 'inventory',
+          lastUpdated: item.updatedAt,
+          isReadOnly: true,
+          inventoryId: item._id.toString()
+        });
+      }
+    });
+    
+    res.json(hardware);
+  } catch (error) {
+    console.error('Error fetching existing hardware:', error);
+    res.status(500).json({ error: 'Failed to fetch existing hardware', message: error.message });
+  }
+});
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+async function analyzeMissingHardware(plan) {
+  try {
+    const existingInventory = await InventoryItem.find({ tenantId: plan.tenantId }).lean();
+    
+    // Clear existing missing hardware analysis
+    plan.purchasePlan.missingHardware = [];
+    plan.purchasePlan.totalEstimatedCost = 0;
+    
+    // Analyze each hardware requirement
+    for (const requirement of plan.hardwareRequirements.needed) {
+      const available = existingInventory.filter(item => 
+        item.category === requirement.category &&
+        item.equipmentType === requirement.equipmentType &&
+        (item.status === 'available' || item.status === 'reserved')
+      );
+      
+      const availableQuantity = available.length;
+      const neededQuantity = requirement.quantity;
+      
+      if (availableQuantity < neededQuantity) {
+        const missingQuantity = neededQuantity - availableQuantity;
+        const estimatedCost = estimateHardwareCost(requirement);
+        
+        plan.purchasePlan.missingHardware.push({
+          id: `missing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          category: requirement.category,
+          equipmentType: requirement.equipmentType,
+          manufacturer: requirement.manufacturer,
+          model: requirement.model,
+          quantity: missingQuantity,
+          estimatedCost: estimatedCost * missingQuantity,
+          priority: requirement.priority,
+          specifications: requirement.specifications,
+          reason: generateMissingHardwareReason(requirement, missingQuantity, availableQuantity),
+          alternatives: generateAlternatives(requirement)
+        });
+        
+        plan.purchasePlan.totalEstimatedCost += estimatedCost * missingQuantity;
+      }
+    }
+    
+    plan.updatedAt = new Date();
+    await plan.save();
+  } catch (error) {
+    console.error('Error analyzing missing hardware:', error);
+    throw error;
+  }
+}
+
+function estimateHardwareCost(requirement) {
+  const costEstimates = {
+    'tower': 50000,
+    'sector-antenna': 2000,
+    'cpe-device': 500,
+    'router': 300,
+    'switch': 200,
+    'power-supply': 150,
+    'cable': 5,
+    'connector': 10,
+    'mounting-hardware': 100,
+    'backhaul-radio': 3000,
+    'fiber-optic': 2,
+    'ups': 800,
+    'generator': 5000
+  };
+  
+  return costEstimates[requirement.equipmentType] || 1000;
+}
+
+function generateMissingHardwareReason(requirement, missingQuantity, availableQuantity) {
+  if (availableQuantity === 0) {
+    return `No ${requirement.equipmentType} equipment available in inventory`;
+  } else {
+    return `Only ${availableQuantity} ${requirement.equipmentType} available, need ${missingQuantity} more`;
+  }
+}
+
+function generateAlternatives(requirement) {
+  const alternatives = [];
+  
+  // Add some generic alternatives based on equipment type
+  switch (requirement.equipmentType) {
+    case 'cpe-device':
+      alternatives.push(
+        { manufacturer: 'Ubiquiti', model: 'NanoStation M5', estimatedCost: 450, availability: 'in-stock' },
+        { manufacturer: 'MikroTik', model: 'SXT Lite5', estimatedCost: 380, availability: 'in-stock' },
+        { manufacturer: 'Cambium', model: 'ePMP 1000', estimatedCost: 520, availability: 'backorder' }
+      );
+      break;
+    case 'sector-antenna':
+      alternatives.push(
+        { manufacturer: 'RFS', model: 'Sector Antenna 120°', estimatedCost: 1800, availability: 'in-stock' },
+        { manufacturer: 'CommScope', model: 'Sector Antenna 90°', estimatedCost: 2200, availability: 'in-stock' }
+      );
+      break;
+    case 'router':
+      alternatives.push(
+        { manufacturer: 'Cisco', model: 'ISR 4331', estimatedCost: 2500, availability: 'in-stock' },
+        { manufacturer: 'Juniper', model: 'MX104', estimatedCost: 3000, availability: 'backorder' }
+      );
+      break;
+  }
+  
+  return alternatives;
+}
+
+module.exports = router;
