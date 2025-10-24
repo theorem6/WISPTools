@@ -39,6 +39,10 @@
     specifications: {}
   };
 
+  // Project workflow states
+  let activeProject: PlanProject | null = null;
+  let showProjectActions = false;
+
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
@@ -228,6 +232,72 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       console.error('Error generating purchase order:', error);
     }
   }
+
+  // Project workflow functions
+  async function startProject(project: PlanProject) {
+    try {
+      activeProject = project;
+      showProjectActions = true;
+      await planService.updatePlan(project.id, { status: 'active' });
+      await loadData();
+      alert(`Project "${project.name}" is now active. All map changes will be saved to this project.`);
+    } catch (error) {
+      console.error('Error starting project:', error);
+      alert('Failed to start project');
+    }
+  }
+
+  async function finishProject() {
+    if (!activeProject) return;
+    
+    try {
+      await planService.updatePlan(activeProject.id, { status: 'ready' });
+      await loadData();
+      alert(`Project "${activeProject.name}" has been marked as ready for deployment.`);
+      activeProject = null;
+      showProjectActions = false;
+    } catch (error) {
+      console.error('Error finishing project:', error);
+      alert('Failed to finish project');
+    }
+  }
+
+  async function cancelProject() {
+    if (!activeProject) return;
+    
+    try {
+      await planService.updatePlan(activeProject.id, { status: 'cancelled' });
+      await loadData();
+      alert(`Project "${activeProject.name}" has been cancelled.`);
+      activeProject = null;
+      showProjectActions = false;
+    } catch (error) {
+      console.error('Error cancelling project:', error);
+      alert('Failed to cancel project');
+    }
+  }
+
+  async function approveProject(project: PlanProject) {
+    try {
+      await planService.updatePlan(project.id, { status: 'approved' });
+      await loadData();
+      alert(`Project "${project.name}" has been approved for deployment.`);
+    } catch (error) {
+      console.error('Error approving project:', error);
+      alert('Failed to approve project');
+    }
+  }
+
+  async function rejectProject(project: PlanProject) {
+    try {
+      await planService.updatePlan(project.id, { status: 'rejected' });
+      await loadData();
+      alert(`Project "${project.name}" has been rejected.`);
+    } catch (error) {
+      console.error('Error rejecting project:', error);
+      alert('Failed to reject project');
+    }
+  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -260,6 +330,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           </button>
           <button class="control-btn" on:click={openAddRequirementModal} title="Add Hardware Requirement">
             📋
+          </button>
+        {/if}
+        
+        <!-- Project Workflow Actions -->
+        {#if activeProject}
+          <button class="control-btn finish-btn" on:click={finishProject} title="Finish Project">
+            ✅
+          </button>
+          <button class="control-btn cancel-btn" on:click={cancelProject} title="Cancel Project">
+            ❌
           </button>
         {/if}
         <button class="control-btn" on:click={openPlanningReport} title="Planning Reports">
@@ -395,15 +475,50 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         <div class="modal-body">
           <div class="project-list">
             {#each projects as project}
-              <div class="project-item" on:click={() => selectProject(project)}>
-                <div class="project-header">
-                  <h3>{project.name}</h3>
-                  <span class="status-badge {project.status}">{project.status}</span>
+              <div class="project-item">
+                <div class="project-content" on:click={() => selectProject(project)}>
+                  <div class="project-header">
+                    <h3>{project.name}</h3>
+                    <span class="status-badge {project.status}">{project.status}</span>
+                  </div>
+                  <p class="project-description">{project.description}</p>
+                  <div class="project-meta">
+                    <span>Created: {new Date(project.createdAt).toLocaleDateString()}</span>
+                    <span>Hardware: {project.scope.towers.length + project.scope.sectors.length + project.scope.cpeDevices.length + project.scope.equipment.length} items</span>
+                  </div>
                 </div>
-                <p class="project-description">{project.description}</p>
-                <div class="project-meta">
-                  <span>Created: {new Date(project.createdAt).toLocaleDateString()}</span>
-                  <span>Hardware: {project.scope.towers.length + project.scope.sectors.length + project.scope.cpeDevices.length + project.scope.equipment.length} items</span>
+                
+                <div class="project-actions" on:click|stopPropagation>
+                  {#if project.status === 'draft'}
+                    <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project">
+                      ▶️ Start
+                    </button>
+                  {/if}
+                  
+                  {#if project.status === 'ready'}
+                    <button class="action-btn approve-btn" on:click={() => approveProject(project)} title="Approve Project">
+                      ✅ Approve
+                    </button>
+                    <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project">
+                      ❌ Reject
+                    </button>
+                  {/if}
+                  
+                  {#if project.status === 'active'}
+                    <span class="active-indicator">🔄 Active</span>
+                  {/if}
+                  
+                  {#if project.status === 'approved'}
+                    <span class="approved-indicator">✅ Approved</span>
+                  {/if}
+                  
+                  {#if project.status === 'rejected'}
+                    <span class="rejected-indicator">❌ Rejected</span>
+                  {/if}
+                  
+                  {#if project.status === 'cancelled'}
+                    <span class="cancelled-indicator">🚫 Cancelled</span>
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -1086,14 +1201,113 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md);
     padding: 1.5rem;
-    cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
   }
 
-  .project-item:hover {
+  .project-content {
+    flex: 1;
+    cursor: pointer;
+  }
+
+  .project-content:hover {
     border-color: var(--brand-primary);
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
+  }
+
+  .project-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .action-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .start-btn {
+    background: #10b981;
+    color: white;
+  }
+
+  .start-btn:hover {
+    background: #059669;
+  }
+
+  .approve-btn {
+    background: #10b981;
+    color: white;
+  }
+
+  .approve-btn:hover {
+    background: #059669;
+  }
+
+  .reject-btn {
+    background: #ef4444;
+    color: white;
+  }
+
+  .reject-btn:hover {
+    background: #dc2626;
+  }
+
+  .finish-btn {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .finish-btn:hover {
+    background: #2563eb;
+  }
+
+  .cancel-btn {
+    background: #ef4444;
+    color: white;
+  }
+
+  .cancel-btn:hover {
+    background: #dc2626;
+  }
+
+  .active-indicator,
+  .approved-indicator,
+  .rejected-indicator,
+  .cancelled-indicator {
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .active-indicator {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .approved-indicator {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .rejected-indicator {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .cancelled-indicator {
+    background: #f3f4f6;
+    color: #374151;
   }
 
   .project-header {
