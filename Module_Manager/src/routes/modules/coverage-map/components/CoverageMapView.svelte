@@ -700,17 +700,20 @@
   }
 </script>
 
-<div class="map-container" bind:this={mapContainer}>
-  {#if mapView}
-    <BasemapSwitcher {currentBasemap} on:change={handleBasemapChange} />
-  {/if}
+<div class="coverage-map-container">
+  <div bind:this={mapContainer} class="map-container"></div>
 </div>
 
 <style>
+  .coverage-map-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
   .map-container {
     width: 100%;
     height: 100%;
-    min-height: 600px;
     position: relative;
   }
 </style>

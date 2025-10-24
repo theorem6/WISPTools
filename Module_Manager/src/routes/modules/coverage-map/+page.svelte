@@ -18,7 +18,7 @@
   import AddInventoryModal from './components/AddInventoryModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
-  import { coverageMapService } from './lib/coverageMapService.mongodb';  // Backend API via hssProxy
+  import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import type { 
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
@@ -35,8 +35,10 @@
   let isLoading = true;
   let error = '';
   let success = '';
-  let showFilters = true;
-  let currentBasemap = 'topo-vector'; // Valid ArcGIS basemap ID
+  let showFilters = false;
+  let showMainMenu = false;
+  let showStats = false;
+  let currentBasemap = 'topo-vector';
   
   // Modals
   let showAddSiteModal = false;
@@ -268,8 +270,6 @@
         showTowerActionsMenu = true;
       }
     }
-    
-    // TODO: Handle sector and CPE clicks
   }
   
   function handleTowerAction(event: CustomEvent) {
@@ -277,7 +277,6 @@
     
     switch (action) {
       case 'edit-site':
-        // TODO: Open edit modal
         success = 'Edit functionality coming soon';
         setTimeout(() => success = '', 3000);
         break;
@@ -294,11 +293,9 @@
         showAddInventoryModal = true;
         break;
       case 'view-inventory':
-        // Navigate to inventory module filtered by this site
         goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
         break;
       case 'view-details':
-        // TODO: Open details view
         success = `Viewing ${tower.name}`;
         setTimeout(() => success = '', 3000);
         break;
@@ -347,96 +344,198 @@
 </script>
 
 <TenantGuard>
-<div class="coverage-map-page">
-  <!-- Header -->
-  <div class="page-header">
-    <div class="header-left">
-      <button class="back-button" on:click={() => goto('/dashboard')}>
-        ← Back to Dashboard
-      </button>
-      <div>
-        <h1>🗺️ Coverage Map</h1>
-        <p class="subtitle">{tenantName} - Comprehensive Network Asset View</p>
-      </div>
+<div class="fullscreen-map">
+  <!-- Full Screen Map -->
+  {#if isLoading}
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading network assets...</p>
     </div>
-    
-    <div class="header-actions">
-      <!-- Basemap Switcher -->
-      <div class="basemap-switcher">
-        <button 
-          class="basemap-btn" 
-          class:active={currentBasemap === 'streets-vector'}
-          on:click={() => changeBasemap('streets-vector')}
-          title="Streets View"
-        >
-          🛣️
-        </button>
-        <button 
-          class="basemap-btn" 
-          class:active={currentBasemap === 'hybrid'}
-          on:click={() => changeBasemap('hybrid')}
-          title="Satellite View"
-        >
-          🛰️
-        </button>
-        <button 
-          class="basemap-btn" 
-          class:active={currentBasemap === 'topo-vector'}
-          on:click={() => changeBasemap('topo-vector')}
-          title="Topographic View"
-        >
-          🗺️
-        </button>
-      </div>
-      
-      <!-- Add Equipment Actions -->
-      <div class="dropdown">
-        <button class="btn-primary">
-          ➕ Add Equipment
-        </button>
-        <div class="dropdown-content">
-          <button on:click={handleAddSite}>
-            📡 Add Tower Site
-          </button>
-          <button on:click={() => handleAddSector(null)}>
-            📶 Add Sector
-          </button>
-          <button on:click={handleAddCPE}>
-            📱 Add CPE Device
-          </button>
-        </div>
-      </div>
-      
-      <!-- Actions -->
-      <button class="btn-secondary" on:click={() => showFilters = !showFilters}>
-        {showFilters ? '✕' : '🔍'} Filters
+  {:else}
+    <CoverageMapView 
+      bind:this={mapComponent}
+      {towers}
+      {sectors}
+      {cpeDevices}
+      {equipment}
+      {filters}
+      on:map-right-click={handleMapRightClick}
+      on:asset-click={handleAssetClick}
+    />
+  {/if}
+
+  <!-- Floating Control Panel -->
+  <div class="floating-controls">
+    <!-- Main Menu Button -->
+    <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu}>
+      ☰
+    </button>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
+        🔍
       </button>
-      
-      <div class="dropdown">
-        <button class="btn-secondary">
-          📥 Import
-        </button>
-        <div class="dropdown-content">
-          <button on:click={handleImportFromCBRS}>Import from CBRS</button>
-          <button on:click={handleImportFromACS}>Import from ACS</button>
-        </div>
+      <button class="control-btn" on:click={() => showStats = !showStats} title="Toggle Statistics">
+        📊
+      </button>
+      <button class="control-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+        ←
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Menu Modal -->
+  {#if showMainMenu}
+  <div class="modal-overlay" on:click={() => showMainMenu = false}>
+    <div class="modal-content main-menu-modal" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>🗺️ Coverage Map Controls</h3>
+        <button class="close-btn" on:click={() => showMainMenu = false}>✕</button>
       </div>
       
-      <div class="dropdown">
-        <button class="btn-secondary">
-          📊 Export Report
-        </button>
-        <div class="dropdown-content">
-          <button on:click={handleExportCSV}>Download CSV</button>
-          <button on:click={handleExportPDF}>Print PDF</button>
+      <div class="modal-body">
+        <!-- Basemap Switcher -->
+        <div class="menu-section">
+          <h4>🗺️ Map View</h4>
+          <div class="basemap-switcher">
+            <button 
+              class="basemap-btn" 
+              class:active={currentBasemap === 'streets-vector'}
+              on:click={() => changeBasemap('streets-vector')}
+            >
+              🛣️ Streets
+            </button>
+            <button 
+              class="basemap-btn" 
+              class:active={currentBasemap === 'hybrid'}
+              on:click={() => changeBasemap('hybrid')}
+            >
+              🛰️ Satellite
+            </button>
+            <button 
+              class="basemap-btn" 
+              class:active={currentBasemap === 'topo-vector'}
+              on:click={() => changeBasemap('topo-vector')}
+            >
+              🗺️ Topographic
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Equipment -->
+        <div class="menu-section">
+          <h4>➕ Add Equipment</h4>
+          <div class="action-grid">
+            <button class="action-btn" on:click={handleAddSite}>
+              📡 Tower Site
+            </button>
+            <button class="action-btn" on:click={() => handleAddSector(null)}>
+              📶 Sector
+            </button>
+            <button class="action-btn" on:click={handleAddCPE}>
+              📱 CPE Device
+            </button>
+            <button class="action-btn" on:click={() => showAddNOCModal = true}>
+              🏢 NOC
+            </button>
+            <button class="action-btn" on:click={() => showAddWarehouseModal = true}>
+              🏭 Warehouse
+            </button>
+            <button class="action-btn" on:click={() => showAddVehicleModal = true}>
+              🚛 Vehicle
+            </button>
+          </div>
+        </div>
+
+        <!-- Import/Export -->
+        <div class="menu-section">
+          <h4>📥 Import & Export</h4>
+          <div class="action-grid">
+            <button class="action-btn" on:click={handleImportFromCBRS}>
+              📡 Import from CBRS
+            </button>
+            <button class="action-btn" on:click={handleImportFromACS}>
+              📱 Import from ACS
+            </button>
+            <button class="action-btn" on:click={handleExportCSV}>
+              📊 Export CSV
+            </button>
+            <button class="action-btn" on:click={handleExportPDF}>
+              🖨️ Print PDF
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
-  
+  {/if}
+
+  <!-- Filters Modal -->
+  {#if showFilters}
+  <div class="modal-overlay" on:click={() => showFilters = false}>
+    <div class="modal-content filters-modal" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>🔍 Map Filters</h3>
+        <button class="close-btn" on:click={() => showFilters = false}>✕</button>
+      </div>
+      <div class="modal-body">
+        <FilterPanel {filters} on:change={handleFiltersChange} />
+      </div>
+    </div>
+  </div>
+  {/if}
+
+  <!-- Statistics Modal -->
+  {#if showStats && !hideStats}
+  <div class="modal-overlay" on:click={() => showStats = false}>
+    <div class="modal-content stats-modal" on:click|stopPropagation>
+      <div class="modal-header">
+        <h3>📊 Network Statistics</h3>
+        <button class="close-btn" on:click={() => showStats = false}>✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📡</div>
+            <div class="stat-content">
+              <div class="stat-value">{towers.length}</div>
+              <div class="stat-label">Tower Sites</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">📶</div>
+            <div class="stat-content">
+              <div class="stat-value">{sectors.length}</div>
+              <div class="stat-label">Sectors</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">📱</div>
+            <div class="stat-content">
+              <div class="stat-value">{cpeDevices.length}</div>
+              <div class="stat-label">CPE Devices</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">🔧</div>
+            <div class="stat-content">
+              <div class="stat-value">{equipment.length}</div>
+              <div class="stat-label">Equipment</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {/if}
+
   <!-- Messages -->
   {#if error}
-    <div class="alert alert-error">
+    <div class="message-banner error">
       <span>⚠️</span>
       <span>{error}</span>
       <button class="dismiss-btn" on:click={() => error = ''}>✕</button>
@@ -444,348 +543,379 @@
   {/if}
   
   {#if success}
-    <div class="alert alert-success">
+    <div class="message-banner success">
       <span>✅</span>
       <span>{success}</span>
       <button class="dismiss-btn" on:click={() => success = ''}>✕</button>
     </div>
   {/if}
-  
-  <!-- Statistics Bar -->
-  {#if !hideStats}
-  <div class="stats-bar">
-    <div class="stat-card">
-      <div class="stat-icon">📡</div>
-      <div class="stat-content">
-        <div class="stat-value">{towers.length}</div>
-        <div class="stat-label">Tower Sites</div>
-      </div>
-    </div>
-    
-    <div class="stat-card">
-      <div class="stat-icon">📶</div>
-      <div class="stat-content">
-        <div class="stat-value">{sectors.length}</div>
-        <div class="stat-label">Sectors</div>
-      </div>
-    </div>
-    
-    <div class="stat-card">
-      <div class="stat-icon">📱</div>
-      <div class="stat-content">
-        <div class="stat-value">{cpeDevices.length}</div>
-        <div class="stat-label">CPE Devices</div>
-      </div>
-    </div>
-    
-    <div class="stat-card">
-      <div class="stat-icon">🔧</div>
-      <div class="stat-content">
-        <div class="stat-value">{equipment.length}</div>
-        <div class="stat-label">Equipment</div>
-      </div>
-    </div>
-  </div>
-  {/if}
-  
-  <!-- Main Content -->
-  {#if isLoading}
-    <div class="loading-state">
-      <div class="spinner"></div>
-      <p>Loading network assets...</p>
-    </div>
-  {:else}
-    <div class="map-layout">
-      <!-- Filter Panel -->
-      {#if showFilters}
-        <aside class="filters-sidebar">
-          <FilterPanel {filters} on:change={handleFiltersChange} />
-        </aside>
-      {/if}
-      
-      <!-- Map -->
-      <main class="map-main" class:full-width={!showFilters}>
-        <CoverageMapView 
-          bind:this={mapComponent}
-          {towers}
-          {sectors}
-          {cpeDevices}
-          {equipment}
-          {filters}
-          on:map-right-click={handleMapRightClick}
-          on:asset-click={handleAssetClick}
-        />
-      </main>
-    </div>
-  {/if}
-  
-  <!-- Modals -->
-  <AddSiteModal 
-    bind:show={showAddSiteModal}
-    initialLatitude={contextMenuLat}
-    initialLongitude={contextMenuLon}
-    initialType={initialSiteType}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddNOCModal 
-    bind:show={showAddNOCModal}
-    initialLatitude={contextMenuLat}
-    initialLongitude={contextMenuLon}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddWarehouseModal 
-    bind:show={showAddWarehouseModal}
-    initialLatitude={contextMenuLat}
-    initialLongitude={contextMenuLon}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddVehicleModal 
-    bind:show={showAddVehicleModal}
-    initialLatitude={contextMenuLat}
-    initialLongitude={contextMenuLon}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddRMAModal 
-    bind:show={showAddRMAModal}
-    initialLatitude={contextMenuLat}
-    initialLongitude={contextMenuLon}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddSectorModal 
-    bind:show={showAddSectorModal}
-    sites={towers}
-    selectedSite={selectedSiteForSector}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddCPEModal 
-    bind:show={showAddCPEModal}
-    sites={towers}
-    initialLatitude={contextMenuLat}
-    initialLongitude={contextMenuLon}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddBackhaulLinkModal 
-    bind:show={showAddBackhaulModal}
-    fromSite={selectedSiteForBackhaul}
-    sites={towers}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <AddInventoryModal 
-    bind:show={showAddInventoryModal}
-    site={selectedSiteForInventory}
-    {tenantId}
-    on:saved={handleModalSaved}
-  />
-  
-  <!-- Context Menus -->
-  <MapContextMenu 
-    bind:show={showContextMenu}
-    x={contextMenuX}
-    y={contextMenuY}
-    latitude={contextMenuLat}
-    longitude={contextMenuLon}
-    on:action={handleContextMenuAction}
-  />
-  
-  <TowerActionsMenu 
-    bind:show={showTowerActionsMenu}
-    tower={selectedTowerForMenu}
-    x={towerMenuX}
-    y={towerMenuY}
-    on:action={handleTowerAction}
-  />
 </div>
+
+<!-- Modals -->
+<AddSiteModal 
+  bind:show={showAddSiteModal}
+  initialLatitude={contextMenuLat}
+  initialLongitude={contextMenuLon}
+  initialType={initialSiteType}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddNOCModal 
+  bind:show={showAddNOCModal}
+  initialLatitude={contextMenuLat}
+  initialLongitude={contextMenuLon}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddWarehouseModal 
+  bind:show={showAddWarehouseModal}
+  initialLatitude={contextMenuLat}
+  initialLongitude={contextMenuLon}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddVehicleModal 
+  bind:show={showAddVehicleModal}
+  initialLatitude={contextMenuLat}
+  initialLongitude={contextMenuLon}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddRMAModal 
+  bind:show={showAddRMAModal}
+  initialLatitude={contextMenuLat}
+  initialLongitude={contextMenuLon}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddSectorModal 
+  bind:show={showAddSectorModal}
+  sites={towers}
+  selectedSite={selectedSiteForSector}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddCPEModal 
+  bind:show={showAddCPEModal}
+  sites={towers}
+  initialLatitude={contextMenuLat}
+  initialLongitude={contextMenuLon}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddBackhaulLinkModal 
+  bind:show={showAddBackhaulModal}
+  fromSite={selectedSiteForBackhaul}
+  sites={towers}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<AddInventoryModal 
+  bind:show={showAddInventoryModal}
+  site={selectedSiteForInventory}
+  {tenantId}
+  on:saved={handleModalSaved}
+/>
+
+<!-- Context Menus -->
+<MapContextMenu 
+  bind:show={showContextMenu}
+  x={contextMenuX}
+  y={contextMenuY}
+  latitude={contextMenuLat}
+  longitude={contextMenuLon}
+  on:action={handleContextMenuAction}
+/>
+
+<TowerActionsMenu 
+  bind:show={showTowerActionsMenu}
+  tower={selectedTowerForMenu}
+  x={towerMenuX}
+  y={towerMenuY}
+  on:action={handleTowerAction}
+/>
 </TenantGuard>
 
 <style>
-  .coverage-map-page {
-    min-height: 100vh;
-    background: var(--bg-primary);
-    padding: 2rem;
+  .fullscreen-map {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: 1;
   }
-  
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1.5rem;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-  
-  .header-left {
+
+  .loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-  }
-  
-  .back-button {
-    background: none;
-    border: 1px solid var(--border-color);
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    width: fit-content;
-    transition: all 0.2s;
-  }
-  
-  .back-button:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--brand-primary);
-  }
-  
-  h1 {
-    font-size: 2rem;
-    margin: 0;
-    color: var(--text-primary);
-  }
-  
-  .subtitle {
-    color: var(--text-secondary);
-    margin: 0;
-  }
-  
-  .header-actions {
-    display: flex;
-    gap: 0.75rem;
     align-items: center;
-    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    color: white;
+    z-index: 1000;
   }
-  
-  .basemap-switcher {
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .floating-controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
     display: flex;
-    gap: 0.25rem;
-    background: var(--card-bg);
-    padding: 0.25rem;
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
+    flex-direction: column;
+    gap: 10px;
+    z-index: 100;
   }
-  
-  .basemap-btn {
+
+  .control-btn {
+    width: 50px;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+  }
+
+  .control-btn:hover {
+    background: rgba(124, 58, 237, 0.8);
+    border-color: rgba(124, 58, 237, 0.5);
+    transform: scale(1.1);
+  }
+
+  .main-menu-btn {
+    background: rgba(124, 58, 237, 0.8);
+    border-color: rgba(124, 58, 237, 0.5);
+  }
+
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    border-radius: 12px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  .main-menu-modal {
+    width: 600px;
+  }
+
+  .filters-modal {
+    width: 400px;
+  }
+
+  .stats-modal {
+    width: 500px;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .close-btn {
     background: none;
     border: none;
-    padding: 0.5rem 0.75rem;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
     border-radius: 4px;
     transition: all 0.2s;
   }
-  
+
+  .close-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .menu-section {
+    margin-bottom: 2rem;
+  }
+
+  .menu-section h4 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+  }
+
+  .basemap-switcher {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .basemap-btn {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+  }
+
   .basemap-btn:hover {
     background: var(--bg-hover);
   }
-  
+
   .basemap-btn.active {
     background: var(--brand-primary);
+    color: white;
+    border-color: var(--brand-primary);
   }
-  
-  .btn-primary, .btn-secondary {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
+
+  .action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .action-btn {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
+    text-align: left;
+    font-size: 0.875rem;
   }
-  
-  .btn-primary {
-    background: var(--brand-primary);
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    background: var(--brand-primary-hover);
+
+  .action-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--brand-primary);
     transform: translateY(-2px);
   }
-  
-  .btn-secondary {
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .stat-card {
     background: var(--bg-secondary);
-    color: var(--text-primary);
     border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
-  
-  .btn-secondary:hover {
-    background: var(--bg-tertiary);
+
+  .stat-icon {
+    font-size: 2rem;
   }
-  
-  .dropdown {
-    position: relative;
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand-primary);
   }
-  
-  .dropdown-content {
-    display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
-    margin-top: 0.5rem;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    min-width: 200px;
-    z-index: 100;
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
   }
-  
-  .dropdown:hover .dropdown-content {
-    display: block;
-  }
-  
-  .dropdown-content button {
-    display: block;
-    width: 100%;
-    padding: 0.75rem 1rem;
-    background: none;
-    border: none;
-    text-align: left;
-    cursor: pointer;
-    color: var(--text-primary);
-    transition: background 0.2s;
-  }
-  
-  .dropdown-content button:hover {
-    background: var(--bg-hover);
-  }
-  
-  .alert {
+
+  .message-banner {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     padding: 1rem 1.5rem;
-    border-radius: 6px;
-    margin-bottom: 1.5rem;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    z-index: 1001;
+    max-width: 500px;
+    backdrop-filter: blur(10px);
   }
-  
-  .alert-error {
-    background: rgba(239, 68, 68, 0.1);
+
+  .message-banner.error {
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
     border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
   }
-  
-  .alert-success {
-    background: rgba(34, 197, 94, 0.1);
+
+  .message-banner.success {
+    background: rgba(34, 197, 94, 0.9);
+    color: white;
     border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #22c55e;
   }
-  
+
   .dismiss-btn {
     margin-left: auto;
     background: none;
@@ -794,117 +924,44 @@
     cursor: pointer;
     color: inherit;
     opacity: 0.7;
+    padding: 0.25rem;
+    border-radius: 4px;
   }
-  
+
   .dismiss-btn:hover {
     opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
   }
-  
-  .stats-bar {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .stat-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.25rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-  
-  .stat-icon {
-    font-size: 2.5rem;
-  }
-  
-  .stat-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--brand-primary);
-  }
-  
-  .stat-label {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-  }
-  
-  .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem;
-    gap: 1rem;
-  }
-  
-  .spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid rgba(124, 58, 237, 0.2);
-    border-top-color: var(--brand-primary);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  
-  .map-layout {
-    display: flex;
-    gap: 1rem;
-    height: calc(100vh - 400px);
-    min-height: 600px;
-  }
-  
-  .filters-sidebar {
-    width: 300px;
-    flex-shrink: 0;
-  }
-  
-  .map-main {
-    flex: 1;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  
-  .map-main.full-width {
-    width: 100%;
-  }
-  
-  @media (max-width: 1024px) {
-    .coverage-map-page {
-      padding: 1rem;
+
+  @media (max-width: 768px) {
+    .floating-controls {
+      top: 10px;
+      right: 10px;
     }
-    
-    .page-header {
-      flex-direction: column;
-      align-items: stretch;
+
+    .control-btn {
+      width: 45px;
+      height: 45px;
+      font-size: 1.25rem;
     }
-    
-    .header-actions {
-      justify-content: flex-start;
+
+    .main-menu-modal,
+    .filters-modal,
+    .stats-modal {
+      width: 95vw;
+      margin: 10px;
     }
-    
-    .map-layout {
-      flex-direction: column;
-      height: auto;
+
+    .action-grid {
+      grid-template-columns: 1fr;
     }
-    
-    .filters-sidebar {
-      width: 100%;
-      max-height: 400px;
+
+    .stats-grid {
+      grid-template-columns: 1fr;
     }
-    
-    .map-main {
-      min-height: 500px;
+
+    .basemap-switcher {
+      grid-template-columns: 1fr;
     }
   }
 </style>
-
