@@ -370,6 +370,19 @@
     <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu}>
       ☰
     </button>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
+        🔍
+      </button>
+      <button class="control-btn" on:click={() => showStats = !showStats} title="Toggle Statistics">
+        📊
+      </button>
+      <button class="control-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+        ←
+      </button>
+    </div>
   </div>
 
   <!-- Main Menu Modal -->
@@ -382,22 +395,6 @@
       </div>
       
       <div class="modal-body">
-        <!-- Map Controls -->
-        <div class="menu-section">
-          <h4>🎛️ Map Controls</h4>
-          <div class="action-grid">
-            <button class="action-btn" on:click={() => { showFilters = true; showMainMenu = false; }}>
-              🔍 Filters
-            </button>
-            <button class="action-btn" on:click={() => { showStats = true; showMainMenu = false; }}>
-              📊 Statistics
-            </button>
-            <button class="action-btn" on:click={() => goto('/dashboard')}>
-              ← Back to Dashboard
-            </button>
-          </div>
-        </div>
-
         <!-- Basemap Switcher -->
         <div class="menu-section">
           <h4>🗺️ Map View</h4>
@@ -724,6 +721,12 @@
   .main-menu-btn {
     background: rgba(124, 58, 237, 0.8);
     border-color: rgba(124, 58, 237, 0.5);
+  }
+
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
 
