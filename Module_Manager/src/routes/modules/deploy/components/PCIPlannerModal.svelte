@@ -437,10 +437,90 @@
 {/if}
 
 <style>
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: var(--transition);
+  }
+
+  .close-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    padding: var(--spacing-lg);
+    flex: 1;
+    overflow-y: auto;
+  }
+
   .pci-planner-modal {
     width: 95%;
     max-width: 1000px;
     max-height: 90vh;
+  }
+
+  .error-banner {
+    background: var(--danger);
+    color: white;
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+    border-radius: var(--border-radius-md);
+    text-align: center;
+  }
+
+  .success-banner {
+    background: var(--success);
+    color: white;
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+    border-radius: var(--border-radius-md);
+    text-align: center;
   }
   
   .tabs {
