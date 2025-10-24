@@ -26,6 +26,9 @@
   // PCI Planner
   let showPCIPlannerModal = false;
 
+  // Reactive tenant tracking
+  $: console.log('[Deploy] Tenant state changed:', $currentTenant);
+
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
@@ -158,14 +161,21 @@
     console.log('[Deploy] Opening PCI Planner modal');
     console.log('[Deploy] Current tenant:', $currentTenant);
     console.log('[Deploy] Tenant ID:', $currentTenant?.id);
+    console.log('[Deploy] Tenant store state:', $currentTenant);
     
-    if (!$currentTenant) {
-      console.error('[Deploy] No tenant available - cannot open PCI Planner');
-      alert('No tenant selected. Please ensure you are properly logged in.');
-      return;
-    }
-    
-    showPCIPlannerModal = true;
+    // Wait a bit for tenant state to update
+    setTimeout(() => {
+      console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
+      console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
+      
+      if (!$currentTenant) {
+        console.error('[Deploy] No tenant available - cannot open PCI Planner');
+        alert('No tenant selected. Please ensure you are properly logged in.');
+        return;
+      }
+      
+      showPCIPlannerModal = true;
+    }, 100);
   }
 
   function closePCIPlannerModal() {
