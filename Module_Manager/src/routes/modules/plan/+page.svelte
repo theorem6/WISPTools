@@ -5,19 +5,55 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
+  import { planService, type PlanProject, type HardwareView } from '$lib/services/planService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
   let showReportModal = false;
+  let showHardwareModal = false;
+  let showProjectModal = false;
+  let showCreateProjectModal = false;
+  
+  // Data
+  let existingHardware: HardwareView[] = [];
+  let projects: PlanProject[] = [];
+  let selectedProject: PlanProject | null = null;
+  let isLoading = false;
+  
+  // New project form
+  let newProject = {
+    name: '',
+    description: ''
+  };
 
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
       if (!currentUser) {
         goto('/login');
+        return;
       }
+      
+      await loadData();
     }
   });
+
+  async function loadData() {
+    if (!currentUser) return;
+    
+    isLoading = true;
+    try {
+      const tenantId = localStorage.getItem('selectedTenantId');
+      if (tenantId) {
+        existingHardware = await planService.getAllExistingHardware(tenantId);
+        projects = await planService.getPlans(tenantId);
+      }
+    } catch (error) {
+      console.error('Error loading plan data:', error);
+    } finally {
+      isLoading = false;
+    }
+  }
 
   function goBack() {
     goto('/dashboard');
@@ -29,6 +65,64 @@
 
   function closeReportModal() {
     showReportModal = false;
+  }
+
+  function openHardwareView() {
+    showHardwareModal = true;
+  }
+
+  function closeHardwareModal() {
+    showHardwareModal = false;
+  }
+
+  function openProjectList() {
+    showProjectModal = true;
+  }
+
+  function closeProjectModal() {
+    showProjectModal = false;
+  }
+
+  function openCreateProject() {
+    showCreateProjectModal = true;
+    newProject = { name: '', description: '' };
+  }
+
+  function closeCreateProjectModal() {
+    showCreateProjectModal = false;
+  }
+
+  async function createProject() {
+    if (!newProject.name.trim()) return;
+    
+    try {
+      const tenantId = localStorage.getItem('selectedTenantId');
+      if (tenantId) {
+        const project = await planService.createPlan(tenantId, {
+          name: newProject.name,
+          description: newProject.description,
+          createdBy: currentUser.email
+        });
+        
+        projects.push(project);
+        closeCreateProjectModal();
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+    }
+  }
+
+  function selectProject(project: PlanProject) {
+    selectedProject = project;
+    closeProjectModal();
+  }
+
+  function getHardwareByModule(module: string) {
+    return existingHardware.filter(h => h.module === module);
+  }
+
+  function getHardwareByType(type: string) {
+    return existingHardware.filter(h => h.type === type);
   }
 </script>
 
@@ -43,21 +137,234 @@
       ></iframe>
     </div>
 
-    <!-- Minimal Header Overlay -->
+    <!-- Enhanced Header Overlay -->
     <div class="header-overlay">
-      <h1>📋</h1>
-      <button class="report-btn" on:click={openPlanningReport} title="Planning Inventory Report">
-        📊
-      </button>
+      <h1>📋 Plan</h1>
+      <div class="header-controls">
+        <button class="control-btn" on:click={openHardwareView} title="View All Hardware">
+          🔧
+        </button>
+        <button class="control-btn" on:click={openProjectList} title="Project List">
+          📁
+        </button>
+        <button class="control-btn" on:click={openCreateProject} title="Create New Project">
+          ➕
+        </button>
+        <button class="control-btn" on:click={openPlanningReport} title="Planning Reports">
+          📊
+        </button>
+      </div>
     </div>
   </div>
+
+  <!-- Hardware View Modal -->
+  {#if showHardwareModal}
+    <div class="modal-overlay" on:click={closeHardwareModal}>
+      <div class="modal-content hardware-modal" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>🔧 All Existing Hardware</h2>
+          <button class="close-btn" on:click={closeHardwareModal}>✕</button>
+        </div>
+        
+        <div class="modal-body">
+          {#if isLoading}
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Loading hardware data...</p>
+            </div>
+          {:else}
+            <div class="hardware-summary">
+              <div class="summary-cards">
+                <div class="summary-card">
+                  <div class="card-icon">📡</div>
+                  <div class="card-content">
+                    <div class="card-value">{getHardwareByType('tower').length}</div>
+                    <div class="card-label">Tower Sites</div>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <div class="card-icon">📶</div>
+                  <div class="card-content">
+                    <div class="card-value">{getHardwareByType('sector').length}</div>
+                    <div class="card-label">Sectors</div>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <div class="card-icon">📱</div>
+                  <div class="card-content">
+                    <div class="card-value">{getHardwareByType('cpe').length}</div>
+                    <div class="card-label">CPE Devices</div>
+                  </div>
+                </div>
+                <div class="summary-card">
+                  <div class="card-icon">🔧</div>
+                  <div class="card-content">
+                    <div class="card-value">{getHardwareByType('equipment').length}</div>
+                    <div class="card-label">Equipment</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="hardware-tabs">
+              <div class="tab-buttons">
+                <button class="tab-btn active">By Module</button>
+                <button class="tab-btn">By Type</button>
+              </div>
+              
+              <div class="tab-content">
+                <div class="module-breakdown">
+                  <h4>📱 ACS Managed ({getHardwareByModule('acs').length})</h4>
+                  <div class="hardware-list">
+                    {#each getHardwareByModule('acs') as hardware}
+                      <div class="hardware-item readonly">
+                        <div class="item-icon">📱</div>
+                        <div class="item-info">
+                          <div class="item-name">{hardware.name}</div>
+                          <div class="item-details">{hardware.status} • {hardware.type}</div>
+                        </div>
+                        <div class="item-badge readonly">Read Only</div>
+                      </div>
+                    {/each}
+                  </div>
+                  
+                  <h4>🏢 HSS Managed ({getHardwareByModule('hss').length})</h4>
+                  <div class="hardware-list">
+                    {#each getHardwareByModule('hss') as hardware}
+                      <div class="hardware-item readonly">
+                        <div class="item-icon">🏢</div>
+                        <div class="item-info">
+                          <div class="item-name">{hardware.name}</div>
+                          <div class="item-details">{hardware.status} • {hardware.type}</div>
+                        </div>
+                        <div class="item-badge readonly">Read Only</div>
+                      </div>
+                    {/each}
+                  </div>
+                  
+                  <h4>📦 Inventory ({getHardwareByModule('inventory').length})</h4>
+                  <div class="hardware-list">
+                    {#each getHardwareByModule('inventory') as hardware}
+                      <div class="hardware-item readonly">
+                        <div class="item-icon">📦</div>
+                        <div class="item-info">
+                          <div class="item-name">{hardware.name}</div>
+                          <div class="item-details">{hardware.status} • {hardware.type}</div>
+                        </div>
+                        <div class="item-badge readonly">Read Only</div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {/if}
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" on:click={closeHardwareModal}>Close</button>
+          <button class="btn-primary" on:click={() => { goto('/modules/inventory'); closeHardwareModal(); }}>
+            View Full Inventory
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Project List Modal -->
+  {#if showProjectModal}
+    <div class="modal-overlay" on:click={closeProjectModal}>
+      <div class="modal-content project-modal" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>📁 Deployment Projects</h2>
+          <button class="close-btn" on:click={closeProjectModal}>✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="project-list">
+            {#each projects as project}
+              <div class="project-item" on:click={() => selectProject(project)}>
+                <div class="project-header">
+                  <h3>{project.name}</h3>
+                  <span class="status-badge {project.status}">{project.status}</span>
+                </div>
+                <p class="project-description">{project.description}</p>
+                <div class="project-meta">
+                  <span>Created: {new Date(project.createdAt).toLocaleDateString()}</span>
+                  <span>Hardware: {project.scope.towers.length + project.scope.sectors.length + project.scope.cpeDevices.length + project.scope.equipment.length} items</span>
+                </div>
+              </div>
+            {/each}
+            
+            {#if projects.length === 0}
+              <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <h3>No Projects Yet</h3>
+                <p>Create your first deployment project to get started.</p>
+                <button class="btn-primary" on:click={openCreateProject}>Create Project</button>
+              </div>
+            {/if}
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" on:click={closeProjectModal}>Close</button>
+          <button class="btn-primary" on:click={openCreateProject}>Create New Project</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Create Project Modal -->
+  {#if showCreateProjectModal}
+    <div class="modal-overlay" on:click={closeCreateProjectModal}>
+      <div class="modal-content create-modal" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>➕ Create New Project</h2>
+          <button class="close-btn" on:click={closeCreateProjectModal}>✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <form on:submit|preventDefault={createProject}>
+            <div class="form-group">
+              <label for="projectName">Project Name *</label>
+              <input
+                id="projectName"
+                type="text"
+                bind:value={newProject.name}
+                placeholder="Enter project name"
+                required
+              />
+            </div>
+            
+            <div class="form-group">
+              <label for="projectDescription">Description</label>
+              <textarea
+                id="projectDescription"
+                bind:value={newProject.description}
+                placeholder="Describe the project scope and objectives"
+                rows="3"
+              ></textarea>
+            </div>
+          </form>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" on:click={closeCreateProjectModal}>Cancel</button>
+          <button class="btn-primary" on:click={createProject} disabled={!newProject.name.trim()}>
+            Create Project
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Planning Report Modal -->
   {#if showReportModal}
     <div class="modal-overlay" on:click={closeReportModal}>
       <div class="modal-content" on:click|stopPropagation>
         <div class="modal-header">
-          <h2>📊 Planning Inventory Report</h2>
+          <h2>📊 Planning Reports</h2>
           <button class="close-btn" on:click={closeReportModal}>✕</button>
         </div>
         
@@ -163,7 +470,12 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   }
 
-  .report-btn {
+  .header-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .control-btn {
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 6px;
@@ -175,7 +487,7 @@
     backdrop-filter: blur(10px);
   }
 
-  .report-btn:hover {
+  .control-btn:hover {
     background: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
     transform: translateY(-1px);
@@ -296,5 +608,295 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-md);
+  }
+
+  /* Hardware Modal Styles */
+  .hardware-modal {
+    max-width: 1000px;
+  }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 1rem;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(59, 130, 246, 0.1);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .hardware-summary {
+    margin-bottom: 2rem;
+  }
+
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .summary-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .card-icon {
+    font-size: 2rem;
+  }
+
+  .card-content {
+    flex: 1;
+  }
+
+  .card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand-primary);
+  }
+
+  .card-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .hardware-tabs {
+    margin-top: 1rem;
+  }
+
+  .tab-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tab-btn {
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .tab-btn.active {
+    background: var(--brand-primary);
+    color: white;
+    border-color: var(--brand-primary);
+  }
+
+  .module-breakdown h4 {
+    margin: 1.5rem 0 0.75rem 0;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .hardware-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .hardware-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    transition: all 0.2s;
+  }
+
+  .hardware-item.readonly {
+    opacity: 0.7;
+    background: var(--bg-tertiary);
+  }
+
+  .item-icon {
+    font-size: 1.25rem;
+  }
+
+  .item-info {
+    flex: 1;
+  }
+
+  .item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .item-details {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .item-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .item-badge.readonly {
+    background: rgba(156, 163, 175, 0.1);
+    color: #6b7280;
+  }
+
+  /* Project Modal Styles */
+  .project-modal {
+    max-width: 800px;
+  }
+
+  .project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .project-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .project-item:hover {
+    border-color: var(--brand-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .project-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-badge.draft {
+    background: rgba(156, 163, 175, 0.1);
+    color: #6b7280;
+  }
+
+  .status-badge.ready {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  }
+
+  .status-badge.deployed {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+  }
+
+  .status-badge.cancelled {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+  }
+
+  .project-description {
+    margin: 0 0 1rem 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .project-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+  }
+
+  .empty-state p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-secondary);
+  }
+
+  /* Create Project Modal Styles */
+  .create-modal {
+    max-width: 500px;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 80px;
   }
 </style>
