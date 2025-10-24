@@ -342,9 +342,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             ❌
           </button>
         {/if}
-        <button class="control-btn" on:click={openPlanningReport} title="Planning Reports">
-          📊
-        </button>
       </div>
     </div>
   </div>
@@ -490,34 +487,34 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 
                 <div class="project-actions" on:click|stopPropagation>
                   {#if project.status === 'draft'}
-                    <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project">
+                    <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
                     </button>
                   {/if}
                   
                   {#if project.status === 'ready'}
-                    <button class="action-btn approve-btn" on:click={() => approveProject(project)} title="Approve Project">
+                    <button class="action-btn approve-btn" on:click={() => approveProject(project)} title="Approve Project - Mark as ready for deployment">
                       ✅ Approve
                     </button>
-                    <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project">
+                    <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project - Send back for revision">
                       ❌ Reject
                     </button>
                   {/if}
                   
                   {#if project.status === 'active'}
-                    <span class="active-indicator">🔄 Active</span>
+                    <span class="active-indicator" title="This project is currently active - all map changes will be saved to this project">🔄 Active</span>
                   {/if}
                   
                   {#if project.status === 'approved'}
-                    <span class="approved-indicator">✅ Approved</span>
+                    <span class="approved-indicator" title="This project has been approved and is ready for deployment">✅ Approved</span>
                   {/if}
                   
                   {#if project.status === 'rejected'}
-                    <span class="rejected-indicator">❌ Rejected</span>
+                    <span class="rejected-indicator" title="This project was rejected and needs revision">❌ Rejected</span>
                   {/if}
                   
                   {#if project.status === 'cancelled'}
-                    <span class="cancelled-indicator">🚫 Cancelled</span>
+                    <span class="cancelled-indicator" title="This project was cancelled">🚫 Cancelled</span>
                   {/if}
                 </div>
               </div>
@@ -917,6 +914,33 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     transform: translateY(-1px);
   }
 
+  /* Enhanced Tooltips */
+  .control-btn {
+    position: relative;
+  }
+
+  .control-btn::after {
+    content: attr(title);
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+  }
+
+  .control-btn:hover::after {
+    opacity: 1;
+  }
+
   /* Modal Styles */
   .modal-overlay {
     position: fixed;
@@ -1233,6 +1257,29 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .action-btn::after {
+    content: attr(title);
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+  }
+
+  .action-btn:hover::after {
+    opacity: 1;
   }
 
   .start-btn {
@@ -1288,6 +1335,36 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     border-radius: var(--border-radius-sm);
     font-size: 0.875rem;
     font-weight: 500;
+    position: relative;
+    cursor: help;
+  }
+
+  .active-indicator::after,
+  .approved-indicator::after,
+  .rejected-indicator::after,
+  .cancelled-indicator::after {
+    content: attr(title);
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+  }
+
+  .active-indicator:hover::after,
+  .approved-indicator:hover::after,
+  .rejected-indicator:hover::after,
+  .cancelled-indicator:hover::after {
+    opacity: 1;
   }
 
   .active-indicator {
