@@ -4,9 +4,9 @@
  */
 
 import { inventoryService } from './inventoryService';
-import { coverageMapService } from '../routes/modules/coverage-map/lib/coverageMapService.mongodb';
+import { coverageMapService } from '../../routes/modules/coverage-map/lib/coverageMapService.mongodb';
 import type { InventoryItem } from './inventoryService';
-import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../routes/modules/coverage-map/lib/models';
+import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../routes/modules/coverage-map/lib/models';
 
 export interface PlanProject {
   id: string;
