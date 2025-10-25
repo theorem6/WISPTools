@@ -46,14 +46,14 @@
   };
 
   onMount(async () => {
-    if (show && tenantId) {
+    if (show && $currentTenant?.id) {
       // Initialize with tenant data if available
-      console.log(`[EPCDeployment] Initializing for tenant: ${tenantId}`);
+      console.log(`[EPCDeployment] Initializing for tenant: ${$currentTenant.id}`);
     }
   });
 
-  $: if (show && tenantId && tenantId.trim() !== '') {
-    console.log(`[EPCDeployment] Tenant loaded: ${tenantId}`);
+  $: if (show && $currentTenant?.id && $currentTenant.id.trim() !== '') {
+    console.log(`[EPCDeployment] Tenant loaded: ${$currentTenant.id}`);
   }
 
   function handleClose() {

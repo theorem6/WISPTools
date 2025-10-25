@@ -28,19 +28,19 @@
   const HSS_API = import.meta.env.VITE_BACKEND_API_URL || 'https://136.112.111.167:3001/api/hss';
 
   onMount(async () => {
-    if (show && tenantId) {
+    if (show && $currentTenant?.id) {
       await loadInitialData();
     }
   });
 
-  $: if (show && tenantId && tenantId.trim() !== '') {
+  $: if (show && $currentTenant?.id && $currentTenant.id.trim() !== '') {
     console.log('[HSSManagement] Tenant ID available, loading data...');
     loadInitialData();
   }
 
   async function loadInitialData() {
-    if (!tenantId || tenantId.trim() === '') {
-      console.warn('[HSSManagement] No tenant ID provided');
+    if (!$currentTenant?.id || $currentTenant.id.trim() === '') {
+      console.warn('[HSSManagement] No tenant ID available');
       error = 'No tenant selected';
       loading = false;
       return;
@@ -50,7 +50,7 @@
     error = '';
 
     try {
-      console.log(`[HSSManagement] Loading HSS data for tenant: ${tenantId}`);
+      console.log(`[HSSManagement] Loading HSS data for tenant: ${$currentTenant.id}`);
       await Promise.all([
         loadStats(),
         loadGroups(),
@@ -73,7 +73,7 @@
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
         }
       });
 
@@ -97,7 +97,7 @@
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
         }
       });
 
@@ -121,7 +121,7 @@
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
         }
       });
 

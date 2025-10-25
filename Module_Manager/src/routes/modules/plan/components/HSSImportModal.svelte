@@ -18,19 +18,19 @@
   const HSS_API = import.meta.env.VITE_BACKEND_API_URL || 'https://136.112.111.167:3001/api/hss';
 
   onMount(async () => {
-    if (show && tenantId) {
+    if (show && $currentTenant?.id) {
       await loadHSSData();
     }
   });
 
-  $: if (show && tenantId && tenantId.trim() !== '') {
+  $: if (show && $currentTenant?.id && $currentTenant.id.trim() !== '') {
     console.log('[HSSImport] Tenant ID available, loading data...');
     loadHSSData();
   }
 
   async function loadHSSData() {
-    if (!tenantId || tenantId.trim() === '') {
-      console.warn('[HSSImport] No tenant ID provided');
+    if (!$currentTenant?.id || $currentTenant.id.trim() === '') {
+      console.warn('[HSSImport] No tenant ID available');
       error = 'No tenant selected';
       return;
     }
@@ -39,7 +39,7 @@
     error = '';
 
     try {
-      console.log(`[HSSImport] Loading HSS data for tenant: ${tenantId}`);
+      console.log(`[HSSImport] Loading HSS data for tenant: ${$currentTenant.id}`);
       
       // Load all HSS data
       const [subscribers, groups, plans, epcs] = await Promise.all([
@@ -72,7 +72,7 @@
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-        'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
       }
     });
 
@@ -89,7 +89,7 @@
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-        'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
       }
     });
 
@@ -106,7 +106,7 @@
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-        'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
       }
     });
 
@@ -123,7 +123,7 @@
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-        'X-Tenant-ID': tenantId
+          'X-Tenant-ID': $currentTenant.id
       }
     });
 
