@@ -25,7 +25,7 @@
   let showEPCDeploymentModal = false;
 
   // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_BACKEND_API_URL || 'http://136.112.111.167:3000/api/hss';
+  const HSS_API = import.meta.env.VITE_BACKEND_API_URL || 'https://136.112.111.167:3001/api/hss';
 
   onMount(async () => {
     if (show && tenantId) {

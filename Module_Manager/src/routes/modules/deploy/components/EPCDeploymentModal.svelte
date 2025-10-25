@@ -40,7 +40,7 @@
     },
     hssConfig: {
       hssHost: '136.112.111.167',
-      hssPort: '3868',
+      hssPort: '3001',
       diameterRealm: 'example.com'
     }
   };
