@@ -126,7 +126,7 @@
           <img src="/wisptools-logo.svg" alt="WISPTools.io" class="dashboard-logo" />
           <div class="branding">
             <h1 class="app-title">WISPTools.io</h1>
-            <p class="app-subtitle">LTE WISP Management Platform</p>
+            <p class="app-subtitle">WISP Management Platform</p>
           </div>
         </div>
         <!-- Minimal User Info and Power Button -->

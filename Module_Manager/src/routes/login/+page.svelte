@@ -123,9 +123,9 @@
   <div class="login-container">
     <!-- Branding Section -->
     <div class="login-brand">
-      <div class="brand-icon">📶</div>
-      <h1>WispTools.io</h1>
-      <p class="brand-tagline">Comprehensive WISP Management Platform</p>
+      <img src="/wisptools-logo.svg" alt="WISPTools.io" class="brand-logo" />
+      <h1>WISPTools.io</h1>
+      <p class="brand-tagline">WISP Management Platform</p>
     </div>
 
     <!-- Login Form -->
@@ -217,7 +217,7 @@
 <style>
   .login-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #0f1419 0%, #1a2332 50%, #1e3a4f 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -233,38 +233,65 @@
     text-align: center;
     color: white;
     margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
   }
 
-  .brand-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+  .brand-logo {
+    width: 120px;
+    height: 120px;
+    filter: drop-shadow(0 0 30px rgba(0, 217, 255, 0.6));
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      filter: drop-shadow(0 0 30px rgba(0, 217, 255, 0.6));
+    }
+    50% {
+      filter: drop-shadow(0 0 50px rgba(0, 242, 254, 0.8));
+    }
   }
 
   .login-brand h1 {
-    font-size: 1.75rem;
-    margin-bottom: 0.5rem;
-    color: white;
+    font-size: 2rem;
+    margin: 0;
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+    font-weight: 700;
   }
 
   .brand-tagline {
-    opacity: 0.9;
-    font-size: 0.95rem;
+    color: #00d9ff;
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
   }
 
   .login-card {
-    background: var(--card-bg);
+    background: linear-gradient(135deg, #1e3a4f 0%, #1a2332 100%);
+    border: 2px solid rgba(0, 217, 255, 0.3);
     border-radius: 1rem;
     padding: 2.5rem;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 217, 255, 0.2);
   }
 
   .login-card h2 {
     font-size: 1.75rem;
     margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .subtitle {
-    color: var(--text-secondary);
+    color: #a0d9e8;
     margin-bottom: 2rem;
     font-size: 0.95rem;
   }
@@ -295,23 +322,24 @@
     margin-bottom: 0.5rem;
     font-weight: 500;
     font-size: 0.875rem;
+    color: #00d9ff;
   }
 
   .form-group input {
     width: 100%;
     padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid rgba(0, 217, 255, 0.3);
     border-radius: 0.5rem;
     font-size: 0.95rem;
     transition: all 0.2s;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
+    background-color: rgba(15, 20, 25, 0.5);
+    color: #ffffff;
   }
 
   .form-group input:focus {
     outline: none;
-    border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: #00f2fe;
+    box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.2);
   }
 
   .form-group input:disabled {
@@ -322,9 +350,9 @@
   .btn-primary {
     width: 100%;
     padding: 0.875rem;
-    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
-    color: white;
-    border: none;
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    color: #0f1419;
+    border: 2px solid #00d9ff;
     border-radius: 0.5rem;
     font-size: 1rem;
     font-weight: 600;
@@ -338,7 +366,7 @@
 
   .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 217, 255, 0.5);
   }
 
   .btn-primary:disabled {
@@ -368,7 +396,7 @@
   .link-btn {
     background: none;
     border: none;
-    color: var(--brand-primary);
+    color: #00d9ff;
     cursor: pointer;
     font-size: 0.875rem;
     text-decoration: underline;
@@ -376,16 +404,17 @@
   }
 
   .link-btn:hover {
-    color: var(--brand-primary-hover);
+    color: #00f2fe;
   }
 
   .demo-notice {
     margin-top: 2rem;
     padding: 1rem;
-    background-color: rgba(124, 58, 237, 0.1);
+    background-color: rgba(0, 217, 255, 0.1);
+    border: 1px solid rgba(0, 217, 255, 0.2);
     border-radius: 0.5rem;
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    color: #a0d9e8;
   }
 
   .demo-notice p {
@@ -393,7 +422,7 @@
   }
 
   .demo-notice strong {
-    color: var(--brand-secondary);
+    color: #00f2fe;
   }
 
   .features {
@@ -404,12 +433,20 @@
   }
 
   .feature {
-    background: rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.1) 0%, rgba(0, 242, 254, 0.05) 100%);
     backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 217, 255, 0.2);
     border-radius: 0.75rem;
     padding: 1.5rem 1rem;
     text-align: center;
     color: white;
+    transition: all 0.3s ease;
+  }
+
+  .feature:hover {
+    border-color: #00d9ff;
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+    transform: translateY(-2px);
   }
 
   .feature-icon {
@@ -421,12 +458,13 @@
   .feature h3 {
     font-size: 0.875rem;
     margin-bottom: 0.25rem;
-    color: white;
+    color: #00f2fe;
+    font-weight: 600;
   }
 
   .feature p {
     font-size: 0.75rem;
-    opacity: 0.9;
+    color: #a0d9e8;
   }
 
   @media (max-width: 768px) {
@@ -442,8 +480,9 @@
       grid-template-columns: 1fr;
     }
 
-    .brand-icon {
-      font-size: 3rem;
+    .brand-logo {
+      width: 100px;
+      height: 100px;
     }
 
     .login-brand h1 {
