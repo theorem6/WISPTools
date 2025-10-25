@@ -10,6 +10,7 @@
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
+  import HSSManagementModal from './components/HSSManagementModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -29,6 +30,9 @@
 
   // Frequency Planner
   let showFrequencyPlannerModal = false;
+
+  // HSS Management
+  let showHSSManagementModal = false;
 
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
@@ -213,6 +217,33 @@
     console.log('[Deploy] Closing Frequency Planner modal');
     showFrequencyPlannerModal = false;
   }
+
+  // HSS Management functions
+  function openHSSManagement() {
+    console.log('[Deploy] Opening HSS Management modal');
+    console.log('[Deploy] Current tenant:', $currentTenant);
+    console.log('[Deploy] Tenant ID:', $currentTenant?.id);
+    console.log('[Deploy] Tenant store state:', $currentTenant);
+    
+    // Wait a bit for tenant state to update
+    setTimeout(() => {
+      console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
+      console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
+      
+      if (!$currentTenant) {
+        console.error('[Deploy] No tenant available - cannot open HSS Management');
+        alert('No tenant selected. Please ensure you are properly logged in.');
+        return;
+      }
+      
+      showHSSManagementModal = true;
+    }, 100);
+  }
+
+  function closeHSSManagementModal() {
+    console.log('[Deploy] Closing HSS Management modal');
+    showHSSManagementModal = false;
+  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -265,6 +296,18 @@
           title={$currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"}
         >
           📡 Frequency
+        </button>
+
+        <button 
+          class="control-btn" 
+          class:disabled={!$currentTenant}
+          on:click={() => {
+            console.log('[Deploy] HSS button clicked');
+            openHSSManagement();
+          }} 
+          title={$currentTenant ? "HSS Management" : "HSS Management (No tenant selected)"}
+        >
+          🏠 HSS
         </button>
         <button class="control-btn" on:click={toggleHardwareSelector} title="Select Hardware">
           📦 {selectedHardware.length > 0 ? selectedHardware.length : ''}
@@ -354,6 +397,13 @@
     show={showFrequencyPlannerModal}
     tenantId={$currentTenant?.id || ''}
     on:close={closeFrequencyPlannerModal}
+  />
+
+  <!-- HSS Management Modal -->
+  <HSSManagementModal
+    show={showHSSManagementModal}
+    tenantId={$currentTenant?.id || ''}
+    on:close={closeHSSManagementModal}
   />
 </TenantGuard>
 

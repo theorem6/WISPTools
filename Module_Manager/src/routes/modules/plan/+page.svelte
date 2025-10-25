@@ -7,6 +7,7 @@
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject, type HardwareView } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import HSSImportModal from './components/HSSImportModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -16,6 +17,7 @@
   let showCreateProjectModal = false;
   let showMissingHardwareModal = false;
   let showAddRequirementModal = false;
+  let showHSSImportModal = false;
   
   // Data
   let existingHardware: HardwareView[] = [];
@@ -293,6 +295,15 @@
     showAddRequirementModal = false;
   }
 
+  // HSS Import functions
+  function openHSSImportModal() {
+    showHSSImportModal = true;
+  }
+
+  function closeHSSImportModal() {
+    showHSSImportModal = false;
+  }
+
   async function addHardwareRequirement() {
     if (!selectedProject || !newRequirement.equipmentType.trim()) return;
     
@@ -472,6 +483,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             ❌
           </button>
         {/if}
+        
+        <button class="control-btn" on:click={openHSSImportModal} title="Import HSS Data">
+          🏠 HSS
+        </button>
       </div>
     </div>
   </div>
@@ -967,6 +982,13 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       </div>
     </div>
   {/if}
+
+  <!-- HSS Import Modal -->
+  <HSSImportModal
+    show={showHSSImportModal}
+    tenantId={$currentTenant?.id || ''}
+    on:close={closeHSSImportModal}
+  />
 </TenantGuard>
 
 <style>
