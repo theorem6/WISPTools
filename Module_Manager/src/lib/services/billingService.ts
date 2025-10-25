@@ -102,7 +102,7 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   try {
     const headers = await getAuthHeaders();
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/plans`, {
+    const response = await fetch(`${API_BASE_URL}/billing/plans`, {
       method: 'GET',
       headers
     });
@@ -126,7 +126,7 @@ export async function getTenantSubscription(tenantId: string): Promise<Subscript
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/subscription/${tenantId}`, {
+    const response = await fetch(`${API_BASE_URL}/billing/subscription/${tenantId}`, {
       method: 'GET',
       headers
     });
@@ -158,7 +158,7 @@ export async function createPayPalSubscription(
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/subscription/create`, {
+    const response = await fetch(`${API_BASE_URL}/billing/subscription/create`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -188,7 +188,7 @@ export async function cancelSubscription(tenantId: string, subscriptionId: strin
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/subscription/${subscriptionId}/cancel`, {
+    const response = await fetch(`${API_BASE_URL}/billing/subscription/${subscriptionId}/cancel`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ tenantId })
@@ -211,7 +211,7 @@ export async function getTenantInvoices(tenantId: string): Promise<Invoice[]> {
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/invoices/${tenantId}`, {
+    const response = await fetch(`${API_BASE_URL}/billing/invoices/${tenantId}`, {
       method: 'GET',
       headers
     });

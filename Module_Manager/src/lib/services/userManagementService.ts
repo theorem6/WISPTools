@@ -59,7 +59,7 @@ export async function getTenantUsers(tenantId: string): Promise<TenantUser[]> {
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/tenant/${tenantId}`, {
+    const response = await fetch(`${API_BASE_URL}/users/tenant/${tenantId}`, {
       method: 'GET',
       headers
     });
@@ -94,7 +94,7 @@ export async function getAllUsers(): Promise<TenantUser[]> {
       // Note: No X-Tenant-ID header for admin requests
     };
     
-    const response = await fetch(`${API_BASE_URL}/api/users/all`, {
+    const response = await fetch(`${API_BASE_URL}/users/all`, {
       method: 'GET',
       headers
     });
@@ -123,7 +123,7 @@ export async function inviteUser(
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/invite`, {
+    const response = await fetch(`${API_BASE_URL}/users/invite`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -157,7 +157,7 @@ export async function updateUserRole(
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/role`, {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/role`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -187,7 +187,7 @@ export async function updateUserModuleAccess(
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/modules`, {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/modules`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -213,7 +213,7 @@ export async function suspendUser(tenantId: string, userId: string): Promise<voi
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/suspend`, {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/suspend`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ tenantId })
@@ -236,7 +236,7 @@ export async function activateUser(tenantId: string, userId: string): Promise<vo
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/activate`, {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/activate`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ tenantId })
@@ -259,7 +259,7 @@ export async function removeUserFromTenant(tenantId: string, userId: string): Pr
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/tenant/${tenantId}`, {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/tenant/${tenantId}`, {
       method: 'DELETE',
       headers
     });
@@ -281,7 +281,7 @@ export async function getUserActivity(tenantId: string, userId: string): Promise
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/activity?tenantId=${tenantId}`, {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/activity?tenantId=${tenantId}`, {
       method: 'GET',
       headers
     });
