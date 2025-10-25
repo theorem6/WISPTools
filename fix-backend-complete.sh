@@ -28,7 +28,27 @@ print_info() {
     echo -e "${BLUE}ℹ️  $1${NC}"
 }
 
-# Check if we're in the right directory
+# 1. Navigate to home directory and pull latest changes
+print_info "Navigating to home directory..."
+cd ~
+
+print_info "Pulling latest changes from Git..."
+if [ -d "lte-pci-mapper" ]; then
+    cd lte-pci-mapper
+    git pull origin main
+    if [ $? -eq 0 ]; then
+        print_status "Git pull successful"
+    else
+        print_error "Git pull failed"
+        exit 1
+    fi
+else
+    print_error "lte-pci-mapper directory not found!"
+    print_info "Please clone the repository first"
+    exit 1
+fi
+
+# 2. Check if backend-services directory exists
 if [ ! -d "backend-services" ]; then
     print_error "backend-services directory not found!"
     print_info "Make sure you're in the lte-pci-mapper root directory"
@@ -40,7 +60,7 @@ print_info "Starting complete backend fix..."
 # Navigate to backend-services
 cd backend-services
 
-# 1. Install dependencies
+# 3. Install dependencies
 print_info "Installing dependencies..."
 npm install
 if [ $? -eq 0 ]; then
@@ -50,20 +70,20 @@ else
     exit 1
 fi
 
-# 2. Set environment variables
+# 4. Set environment variables
 print_info "Setting environment variables..."
 export MONGODB_URI="mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0"
 export PORT=3000
 export HSS_PORT=3001
 print_status "Environment variables set"
 
-# 3. Stop existing PM2 processes
+# 5. Stop existing PM2 processes
 print_info "Stopping existing PM2 processes..."
 pm2 stop all 2>/dev/null || true
 pm2 delete all 2>/dev/null || true
 print_status "PM2 processes stopped"
 
-# 4. Check if hss-server.js exists, create if not
+# 6. Check if hss-server.js exists, create if not
 if [ ! -f "hss-server.js" ]; then
     print_warning "hss-server.js not found, creating it..."
     cat > hss-server.js << 'EOF'
@@ -140,7 +160,7 @@ else
     print_status "hss-server.js already exists"
 fi
 
-# 5. Start main API server
+# 7. Start main API server
 print_info "Starting main API server (port 3000)..."
 pm2 start server.js --name "main-api" -- --port 3000
 if [ $? -eq 0 ]; then
@@ -150,7 +170,7 @@ else
     exit 1
 fi
 
-# 6. Start HSS API server
+# 8. Start HSS API server
 print_info "Starting HSS API server (port 3001)..."
 pm2 start hss-server.js --name "hss-api" -- --port 3001
 if [ $? -eq 0 ]; then
@@ -160,12 +180,12 @@ else
     exit 1
 fi
 
-# 7. Save PM2 configuration
+# 9. Save PM2 configuration
 print_info "Saving PM2 configuration..."
 pm2 save
 print_status "PM2 configuration saved"
 
-# 8. Check GenieACS services
+# 10. Check GenieACS services
 print_info "Checking GenieACS services..."
 GENIEACS_SERVICES=("genieacs-cwmp" "genieacs-nbi" "genieacs-fs" "genieacs-ui")
 
@@ -178,7 +198,7 @@ for service in "${GENIEACS_SERVICES[@]}"; do
     fi
 done
 
-# 9. Show final status
+# 11. Show final status
 echo ""
 echo "================================"
 echo "🎉 BACKEND FIX COMPLETE!"
