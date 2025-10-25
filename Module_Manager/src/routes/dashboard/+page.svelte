@@ -308,6 +308,7 @@
     border-radius: 8px;
     font-size: 0.9rem;
     font-weight: 500;
+    order: 3;
   }
 
   .tenant-icon {
@@ -322,6 +323,7 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+    margin-left: auto;
   }
 
   .user-status {
