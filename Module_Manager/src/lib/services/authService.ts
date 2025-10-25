@@ -265,6 +265,22 @@ export class AuthService {
   }
 
   /**
+   * Get the current user's authentication token
+   */
+  async getAuthToken(): Promise<string | null> {
+    if (!this.currentUser) {
+      return null;
+    }
+    
+    try {
+      return await this.currentUser.getIdToken();
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get user-friendly error messages
    */
   private getAuthErrorMessage(error: any): string {
