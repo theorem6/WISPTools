@@ -567,7 +567,7 @@
     position: absolute;
     top: 80px;
     right: 20px;
-    width: 400px;
+    width: 500px;
     max-height: calc(100vh - 120px);
     background: var(--card-bg);
     border: 1px solid var(--border-color);

@@ -143,7 +143,6 @@
   }
 
   function handleClose() {
-    show = false;
     error = '';
     success = '';
     importData = null;
