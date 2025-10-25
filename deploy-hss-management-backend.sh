@@ -12,6 +12,9 @@ BACKEND_DIR="/opt/hss-api"
 BACKUP_DIR="/opt/backups/hss-management-$(date +%Y%m%d-%H%M%S)"
 SERVICE_NAME="hss-api"
 
+# MongoDB Atlas Connection
+export MONGODB_URI="mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

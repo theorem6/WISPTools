@@ -1,32 +1,21 @@
 /**
  * HSS Management Routes
  * Home Subscriber Server management endpoints
+ * Uses MongoDB Atlas connection via mongoose
  */
 
 const express = require('express');
 const router = express.Router();
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
 
-// MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
-let db;
-
-// Connect to MongoDB
-MongoClient.connect(MONGODB_URI)
-  .then(client => {
-    db = client.db('hss_management');
-    console.log('✅ HSS Management: Connected to MongoDB');
-  })
-  .catch(err => {
-    console.error('❌ HSS Management: MongoDB connection failed:', err);
-  });
+console.log('🔗 HSS Management: Using MongoDB Atlas connection via mongoose');
 
 // Middleware to ensure database connection
 const ensureDB = (req, res, next) => {
-  if (!db) {
+  if (mongoose.connection.readyState !== 1) {
     return res.status(500).json({ error: 'Database not connected' });
   }
-  req.db = db;
+  req.db = mongoose.connection.db;
   next();
 };
 
