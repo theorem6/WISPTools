@@ -271,17 +271,9 @@ export class TenantService {
         throw new Error(`Failed to get user tenants: ${response.statusText}`);
       }
 
-      const userTenants = await response.json();
+      const tenants = await response.json();
       
-      // Get tenant details for each user-tenant association
-      const tenants: Tenant[] = [];
-      for (const userTenant of userTenants) {
-        const tenant = await this.getTenant(userTenant.tenantId);
-        if (tenant) {
-          tenants.push(tenant);
-        }
-      }
-      
+      // Backend already returns full tenant details with user role
       return tenants;
     } catch (error) {
       console.error('Error getting user tenants:', error);
