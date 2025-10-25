@@ -2,7 +2,7 @@
 // Uses SendGrid for email delivery
 
 const sgMail = require('@sendgrid/mail');
-const TenantEmailConfig = require('./tenant-email-schema');
+const TenantEmailConfig = require('./models/tenant-email');
 
 class EmailService {
   constructor() {

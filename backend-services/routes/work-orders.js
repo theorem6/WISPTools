@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { WorkOrder } = require('./work-order-schema');
+const { WorkOrder } = require('../models/work-order');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {

@@ -491,8 +491,8 @@ router.post('/test-email', async (req, res) => {
 router.get('/email-config', async (req, res) => {
   try {
     const tenantId = req.headers['x-tenant-id'];
-    const emailService = require('./email-service');
-    const TenantEmailConfig = require('./tenant-email-schema');
+    const emailService = require('../email-service');
+    const TenantEmailConfig = require('../models/tenant-email');
     
     // Get tenant config
     const tenantConfig = await TenantEmailConfig.findOne({ tenant_id: tenantId });
@@ -516,7 +516,7 @@ router.get('/email-config', async (req, res) => {
 router.put('/email-config', async (req, res) => {
   try {
     const tenantId = req.headers['x-tenant-id'];
-    const TenantEmailConfig = require('./tenant-email-schema');
+    const TenantEmailConfig = require('../models/tenant-email');
     const { v4: uuidv4 } = require('uuid');
     
     let config = await TenantEmailConfig.findOne({ tenant_id: tenantId });

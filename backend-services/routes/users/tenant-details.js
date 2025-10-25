@@ -5,7 +5,7 @@
 
 const express = require('express');
 const { verifyAuth } = require('./role-auth-middleware');
-const { Tenant } = require('./tenant-schema');
+const { Tenant } = require('../../models/tenant');
 const { UserTenant } = require('./user-schema');
 
 const router = express.Router();

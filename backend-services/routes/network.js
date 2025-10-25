@@ -4,7 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('./unified-network-schema');
+const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
