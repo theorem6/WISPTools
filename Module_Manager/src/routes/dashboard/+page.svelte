@@ -153,6 +153,22 @@
 
     <!-- Main Content -->
     <div class="main-content">
+      <!-- Module Launch Buttons -->
+      <div class="module-launch-bar">
+        <button class="launch-btn plan" on:click={() => goto('/modules/plan')}>
+          Plan
+        </button>
+        <button class="launch-btn deploy" on:click={() => goto('/modules/deploy')}>
+          Deploy
+        </button>
+        <button class="launch-btn monitor" on:click={() => goto('/modules/monitor')}>
+          Monitor
+        </button>
+        <button class="launch-btn maintain" on:click={() => goto('/modules/maintain')}>
+          Maintain
+        </button>
+      </div>
+
       <!-- Core Modules -->
       <div class="modules-section">
         <h2 class="section-title">Core Modules</h2>
@@ -168,17 +184,10 @@
               tabindex="0"
             >
               <div class="module-header">
-                <div class="module-icon" style="background-color: {module.color}20; color: {module.color}">
-                  {module.icon}
-                </div>
-                <div class="module-info">
-                  <h3 class="module-name">{module.name}</h3>
-                  <p class="module-description">{module.description}</p>
-                </div>
+                <h3 class="module-name">{module.name}</h3>
               </div>
               
               <div class="module-features">
-                <h4>Key Features:</h4>
                 <ul>
                   {#each module.features as feature}
                     <li>{feature}</li>
@@ -224,28 +233,6 @@
         </div>
       {/if}
 
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <h2 class="section-title">Quick Actions</h2>
-        <div class="actions-grid">
-          <button class="action-btn" on:click={() => goto('/modules/plan')}>
-            <span class="action-icon">📋</span>
-            <span class="action-text">Plan</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/deploy')}>
-            <span class="action-icon">🚀</span>
-            <span class="action-text">Deploy</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/monitor')}>
-            <span class="action-icon">📊</span>
-            <span class="action-text">Monitor</span>
-          </button>
-          <button class="action-btn" on:click={() => goto('/modules/maintain')}>
-            <span class="action-icon">🔧</span>
-            <span class="action-text">Maintain</span>
-          </button>
-        </div>
-      </div>
     </div>
   </div>
   
@@ -384,6 +371,53 @@
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
+  /* Module Launch Bar */
+  .module-launch-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .launch-btn {
+    padding: 1rem 3rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 140px;
+  }
+
+  .launch-btn.plan {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .launch-btn.deploy {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+
+  .launch-btn.monitor {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  }
+
+  .launch-btn.maintain {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  }
+
+  .launch-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .launch-btn:active {
+    transform: translateY(0);
+  }
+
   .modules-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -418,49 +452,20 @@
   }
 
   .module-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
     margin-bottom: 1rem;
-  }
-
-  .module-icon {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 0.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    flex-shrink: 0;
-  }
-
-  .module-info {
-    flex: 1;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e2e8f0;
   }
 
   .module-name {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #1f2937;
-    margin: 0 0 0.5rem 0;
-  }
-
-  .module-description {
-    color: #6b7280;
     margin: 0;
-    line-height: 1.5;
+    font-size: 1.5rem;
+    color: #1a202c;
+    font-weight: 700;
   }
 
   .module-features {
-    margin-bottom: 1rem;
-  }
-
-  .module-features h4 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #374151;
-    margin: 0 0 0.5rem 0;
+    margin: 1rem 0;
   }
 
   .module-features ul {
@@ -470,18 +475,19 @@
   }
 
   .module-features li {
-    font-size: 0.875rem;
-    color: #6b7280;
-    padding: 0.25rem 0;
-    position: relative;
-    padding-left: 1rem;
+    padding: 0.6rem 0;
+    color: #4a5568;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
   }
 
-  .module-features li::before {
-    content: '•';
+  .module-features li:before {
+    content: "•";
     color: #3b82f6;
-    position: absolute;
-    left: 0;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-right: 0.75rem;
   }
 
   .module-status {
