@@ -15,7 +15,7 @@ admin.initializeApp();
 exports.billingApi = functions.https.onRequest(billingApi);
 
 // Export webhook handler for custom domain routing
-exports.billingWebhook = functions.https.onRequest((req, res) => {
+exports.billingWebhook = functions.https.onRequest((req: any, res: any) => {
   // Handle PayPal webhooks at custom domain
   if (req.method === 'POST' && req.path === '/api/billing/webhook/paypal') {
     return billingApi(req, res);
@@ -25,7 +25,7 @@ exports.billingWebhook = functions.https.onRequest((req, res) => {
 });
 
 // Scheduled function to update billing analytics daily
-exports.updateBillingAnalytics = functions.pubsub.schedule('0 2 * * *').onRun(async (context) => {
+exports.updateBillingAnalytics = functions.pubsub.schedule('0 2 * * *').onRun(async (context: any) => {
   try {
     console.log('Updating billing analytics...');
     
@@ -69,7 +69,7 @@ exports.updateBillingAnalytics = functions.pubsub.schedule('0 2 * * *').onRun(as
 });
 
 // Function to handle subscription renewals
-exports.processSubscriptionRenewals = functions.pubsub.schedule('0 0 * * *').onRun(async (context) => {
+exports.processSubscriptionRenewals = functions.pubsub.schedule('0 0 * * *').onRun(async (context: any) => {
   try {
     console.log('Processing subscription renewals...');
     
