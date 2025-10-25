@@ -44,9 +44,6 @@
         </button>
         <h1>📊 Monitor</h1>
       </div>
-      <div class="header-controls">
-        <ThemeSwitcher />
-      </div>
     </div>
   </div>
   

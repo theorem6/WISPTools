@@ -482,7 +482,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         <h1>📋 Plan</h1>
       </div>
       <div class="header-controls">
-        <ThemeSwitcher />
         <button class="control-btn" on:click={openHardwareView} title="View All Hardware">
           🔧
         </button>

@@ -329,7 +329,6 @@
         <h1>🚀 Deploy</h1>
       </div>
       <div class="header-controls">
-        <ThemeSwitcher />
         <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
           📋 Plans ({readyPlans.length})
         </button>

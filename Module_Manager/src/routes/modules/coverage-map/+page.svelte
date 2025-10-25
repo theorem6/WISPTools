@@ -367,8 +367,16 @@
 
   <!-- Floating Control Panel -->
   <div class="floating-controls">
-    <!-- Main Menu Button -->
-    <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu}>
+    <button class="control-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+      ←
+    </button>
+    <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
+      🔍
+    </button>
+    <button class="control-btn" on:click={() => showStats = !showStats} title="Toggle Statistics">
+      📊
+    </button>
+    <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu} title="Main Menu">
       ☰
     </button>
   </div>
