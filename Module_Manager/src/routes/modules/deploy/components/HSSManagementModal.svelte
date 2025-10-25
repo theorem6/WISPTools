@@ -99,7 +99,7 @@
   async function loadStats() {
     try {
       console.log('[HSSManagement] Loading stats...');
-      const response = await fetch(`${HSS_API}/stats`, {
+      const response = await fetch(`${HSS_API}/dashboard/stats`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
