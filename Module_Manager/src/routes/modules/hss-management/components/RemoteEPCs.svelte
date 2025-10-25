@@ -64,8 +64,8 @@
       
       const token = await user.getIdToken();
       const url = statusFilter === 'all' 
-        ? `${HSS_API}/api/epc/list`
-        : `${HSS_API}/api/epc/list?status=${statusFilter}`;
+        ? `${HSS_API}/epc/list`
+        : `${HSS_API}/epc/list?status=${statusFilter}`;
       
       const response = await fetch(url, {
         headers: {
@@ -127,7 +127,7 @@
       const token = await user.getIdToken();
       console.log('[RemoteEPCs] Sending registration request...');
       
-      const response = await fetch(`${HSS_API}/api/epc/register`, {
+      const response = await fetch(`${HSS_API}/epc/register`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -175,7 +175,7 @@
       
       const token = await user.getIdToken();
       
-      const response = await fetch(`${HSS_API}/api/epc/${epc.epc_id}/deployment-script`, {
+      const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/deployment-script`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': tenantId
@@ -233,7 +233,7 @@
       
       const token = await user.getIdToken();
       
-      const response = await fetch(`${HSS_API}/api/epc/${epc.epc_id}`, {
+      const response = await fetch(`${HSS_API}/epc/${epc.epc_id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
