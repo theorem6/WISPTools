@@ -9,6 +9,7 @@
   import { planService, type PlanProject } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
+  import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -25,6 +26,9 @@
   
   // PCI Planner
   let showPCIPlannerModal = false;
+
+  // Frequency Planner
+  let showFrequencyPlannerModal = false;
 
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
@@ -182,6 +186,33 @@
     console.log('[Deploy] Closing PCI Planner modal');
     showPCIPlannerModal = false;
   }
+
+  // Frequency Planner functions
+  function openFrequencyPlanner() {
+    console.log('[Deploy] Opening Frequency Planner modal');
+    console.log('[Deploy] Current tenant:', $currentTenant);
+    console.log('[Deploy] Tenant ID:', $currentTenant?.id);
+    console.log('[Deploy] Tenant store state:', $currentTenant);
+    
+    // Wait a bit for tenant state to update
+    setTimeout(() => {
+      console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
+      console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
+      
+      if (!$currentTenant) {
+        console.error('[Deploy] No tenant available - cannot open Frequency Planner');
+        alert('No tenant selected. Please ensure you are properly logged in.');
+        return;
+      }
+      
+      showFrequencyPlannerModal = true;
+    }, 100);
+  }
+
+  function closeFrequencyPlannerModal() {
+    console.log('[Deploy] Closing Frequency Planner modal');
+    showFrequencyPlannerModal = false;
+  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -223,8 +254,17 @@
         >
           📊 PCI
         </button>
-        <button class="control-btn" on:click={() => alert('Frequency Planner - Coming Soon')} title="Frequency Planner">
-          📡 Freq
+
+        <button 
+          class="control-btn" 
+          class:disabled={!$currentTenant}
+          on:click={() => {
+            console.log('[Deploy] Frequency button clicked');
+            openFrequencyPlanner();
+          }} 
+          title={$currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"}
+        >
+          📡 Frequency
         </button>
         <button class="control-btn" on:click={toggleHardwareSelector} title="Select Hardware">
           📦 {selectedHardware.length > 0 ? selectedHardware.length : ''}
@@ -303,10 +343,17 @@
   </div>
 
   <!-- PCI Planner Modal -->
-  <PCIPlannerModal 
-    show={showPCIPlannerModal} 
-    tenantId={$currentTenant?.id || ''} 
+  <PCIPlannerModal
+    show={showPCIPlannerModal}
+    tenantId={$currentTenant?.id || ''}
     on:close={closePCIPlannerModal}
+  />
+
+  <!-- Frequency Planner Modal -->
+  <FrequencyPlannerModal
+    show={showFrequencyPlannerModal}
+    tenantId={$currentTenant?.id || ''}
+    on:close={closeFrequencyPlannerModal}
   />
 </TenantGuard>
 
