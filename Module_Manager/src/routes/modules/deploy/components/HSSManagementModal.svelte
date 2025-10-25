@@ -1,6 +1,5 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
-  import { tenantGuardService, type TenantGuardResult } from '$lib/services/tenantGuardService';
   import { authService } from '$lib/services/authService';
   import SubscriberList from '../../hss-management/components/SubscriberList.svelte';
   import GroupManagement from '../../hss-management/components/GroupManagement.svelte';
@@ -24,54 +23,26 @@
   let error = '';
   let showEPCDeploymentModal = false;
 
-  // Tenant state
-  let tenantResult: TenantGuardResult | null = null;
-  let unsubscribeTenantGuard: (() => void) | null = null;
-
   // HSS API endpoint
   const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/hss';
 
-  onMount(async () => {
-    if (show) {
-      // Subscribe to tenant state changes
-      unsubscribeTenantGuard = tenantGuardService.onTenantStateChange((result) => {
-        tenantResult = result;
-        if (result.success && result.tenant) {
-          loadInitialData();
-        }
-      });
-
-      // Ensure tenant is available
-      const result = await tenantGuardService.ensureTenant({
-        requireTenant: true,
-        autoSelectSingleTenant: true,
-        createDefaultTenant: true
-      });
-      
-      tenantResult = result;
-      if (result.success && result.tenant) {
-        loadInitialData();
-      } else if (result.error) {
-        error = result.error;
-        loading = false;
-      }
-    }
-  });
-
-  onDestroy(() => {
-    if (unsubscribeTenantGuard) {
-      unsubscribeTenantGuard();
-    }
-  });
-
-  $: if (show && tenantResult?.success && tenantResult.tenant) {
-    console.log('[HSSManagement] Tenant available, loading data...');
+  // Reactive statement to load data when modal opens
+  $: if (show && tenantId) {
+    console.log('[HSSManagement] Modal opened with tenant:', tenantId);
     loadInitialData();
   }
 
+  onMount(() => {
+    console.log('[HSSManagement] Component mounted');
+  });
+
+  onDestroy(() => {
+    console.log('[HSSManagement] Component destroyed');
+  });
+
   async function loadInitialData() {
-    if (!tenantResult?.success || !tenantResult.tenant) {
-      console.warn('[HSSManagement] No tenant available');
+    if (!tenantId || tenantId.trim() === '') {
+      console.warn('[HSSManagement] No tenant ID provided');
       error = 'No tenant selected';
       loading = false;
       return;
@@ -81,7 +52,7 @@
     error = '';
 
     try {
-      console.log(`[HSSManagement] Loading HSS data for tenant: ${tenantResult.tenant.id}`);
+      console.log(`[HSSManagement] Loading HSS data for tenant: ${tenantId}`);
       await Promise.all([
         loadStats(),
         loadGroups(),
@@ -104,7 +75,7 @@
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantResult.tenant.id
+          'X-Tenant-ID': tenantId
         }
       });
 
@@ -128,7 +99,7 @@
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantResult.tenant.id
+          'X-Tenant-ID': tenantId
         }
       });
 
@@ -152,7 +123,7 @@
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantResult.tenant.id
+          'X-Tenant-ID': tenantId
         }
       });
 
