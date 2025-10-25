@@ -34,6 +34,7 @@
   });
 
   $: if (show && tenantId && tenantId.trim() !== '') {
+    console.log('[HSSManagement] Tenant ID available, loading data...');
     loadInitialData();
   }
 
@@ -55,6 +56,7 @@
         loadGroups(),
         loadBandwidthPlans()
       ]);
+      console.log('[HSSManagement] HSS data loaded successfully');
     } catch (err: any) {
       console.error('[HSSManagement] Failed to load initial data:', err);
       error = `Failed to load HSS data: ${err.message || 'Unknown error'}`;
@@ -65,6 +67,7 @@
 
   async function loadStats() {
     try {
+      console.log('[HSSManagement] Loading stats...');
       const response = await fetch(`${HSS_API}/stats`, {
         method: 'GET',
         headers: {
@@ -88,6 +91,7 @@
 
   async function loadGroups() {
     try {
+      console.log('[HSSManagement] Loading groups...');
       const response = await fetch(`${HSS_API}/groups`, {
         method: 'GET',
         headers: {
@@ -111,6 +115,7 @@
 
   async function loadBandwidthPlans() {
     try {
+      console.log('[HSSManagement] Loading bandwidth plans...');
       const response = await fetch(`${HSS_API}/bandwidth-plans`, {
         method: 'GET',
         headers: {

@@ -24,6 +24,7 @@
   });
 
   $: if (show && tenantId && tenantId.trim() !== '') {
+    console.log('[HSSImport] Tenant ID available, loading data...');
     loadHSSData();
   }
 
