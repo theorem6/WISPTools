@@ -7,9 +7,9 @@
 
 const express = require('express');
 const admin = require('firebase-admin');
-const { Tenant } = require('./tenant-schema');
-const { UserTenant } = require('./user-schema');
-const { verifyAuth, isPlatformAdmin } = require('./role-auth-middleware');
+const { Tenant } = require('../users/user-schema');
+const { UserTenant } = require('../users/user-schema');
+const { verifyAuth, isPlatformAdmin } = require('../users/role-auth-middleware');
 
 const router = express.Router();
 
