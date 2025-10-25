@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { InventoryItem } = require('./inventory-schema');
+const { InventoryItem } = require('../models/inventory');
 
 // ============================================================================
 // MIDDLEWARE
