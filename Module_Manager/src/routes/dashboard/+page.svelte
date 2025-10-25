@@ -162,25 +162,8 @@
 
     <!-- Main Content -->
     <div class="main-content">
-      <!-- Module Launch Buttons -->
-      <div class="module-launch-bar">
-        <button class="launch-btn plan" on:click={() => goto('/modules/plan')}>
-          Plan
-        </button>
-        <button class="launch-btn deploy" on:click={() => goto('/modules/deploy')}>
-          Deploy
-        </button>
-        <button class="launch-btn monitor" on:click={() => goto('/modules/monitor')}>
-          Monitor
-        </button>
-        <button class="launch-btn maintain" on:click={() => goto('/modules/maintain')}>
-          Maintain
-        </button>
-      </div>
-
       <!-- Core Modules -->
       <div class="modules-section">
-        <h2 class="section-title">Core Modules</h2>
         <div class="modules-grid">
           {#each modules as module}
             <div 
