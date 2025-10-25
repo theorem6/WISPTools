@@ -80,6 +80,11 @@
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn('[HSSManagement] Stats endpoint not available (404), using empty stats');
+          stats = null;
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -87,7 +92,8 @@
       console.log('[HSSManagement] Stats loaded:', stats);
     } catch (err: any) {
       console.error('[HSSManagement] Failed to load stats:', err);
-      throw err;
+      // Don't throw - allow modal to continue loading other data
+      stats = null;
     }
   }
 
