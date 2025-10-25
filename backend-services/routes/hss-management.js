@@ -504,9 +504,23 @@ router.get('/bandwidth-plans', async (req, res) => {
 
     const plans = await req.db.collection('bandwidth_plans')
       .find({ tenant_id: tenantId })
+      .sort({ created_at: -1 })
       .toArray();
 
-    res.json(plans);
+    res.json({
+      count: plans.length,
+      plans: plans.map(p => ({
+        id: p.plan_id || p._id.toString(),
+        plan_id: p.plan_id || p._id.toString(),
+        name: p.name,
+        description: p.description || '',
+        max_bandwidth_mbps: p.max_bandwidth_mbps || 0,
+        max_bandwidth_dl: p.max_bandwidth_dl || 0,
+        max_bandwidth_ul: p.max_bandwidth_ul || 0,
+        created_at: p.created_at,
+        updated_at: p.updated_at
+      }))
+    });
   } catch (error) {
     console.error('Error fetching bandwidth plans:', error);
     res.status(500).json({ error: 'Failed to fetch bandwidth plans' });
@@ -548,8 +562,22 @@ router.put('/bandwidth-plans/:id', async (req, res) => {
       updated_at: new Date()
     };
 
+    // Find by plan_id or _id (ObjectId)
+    let query = { tenant_id: tenantId };
+    if (ObjectId.isValid(id)) {
+      query = {
+        $or: [
+          { plan_id: id },
+          { _id: new ObjectId(id) }
+        ],
+        tenant_id: tenantId
+      };
+    } else {
+      query.plan_id = id;
+    }
+
     const result = await req.db.collection('bandwidth_plans').updateOne(
-      { _id: id, tenant_id: tenantId },
+      query,
       { $set: updateData }
     );
 
@@ -572,16 +600,48 @@ router.delete('/bandwidth-plans/:id', async (req, res) => {
     }
 
     const { id } = req.params;
-    const result = await req.db.collection('bandwidth_plans').deleteOne({
-      _id: id,
-      tenant_id: tenantId
-    });
 
-    if (result.deletedCount === 0) {
+    // Find by plan_id or _id (ObjectId)
+    let query = { tenant_id: tenantId };
+    if (ObjectId.isValid(id)) {
+      query = {
+        $or: [
+          { plan_id: id },
+          { _id: new ObjectId(id) }
+        ],
+        tenant_id: tenantId
+      };
+    } else {
+      query.plan_id = id;
+    }
+
+    const plan = await req.db.collection('bandwidth_plans').findOne(query);
+
+    if (!plan) {
       return res.status(404).json({ error: 'Bandwidth plan not found' });
     }
 
-    res.json({ success: true, deleted: result.deletedCount });
+    // Check if any groups are using this plan
+    const groupsUsingPlan = await req.db.collection('subscriber_groups').countDocuments({
+      bandwidth_plan_id: plan.plan_id || plan._id.toString()
+    });
+
+    if (groupsUsingPlan > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete bandwidth plan that is in use by groups',
+        groups_using: groupsUsingPlan
+      });
+    }
+
+    // Delete by plan_id
+    await req.db.collection('bandwidth_plans').deleteOne({ 
+      plan_id: plan.plan_id || plan._id.toString() 
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Bandwidth plan deleted successfully' 
+    });
   } catch (error) {
     console.error('Error deleting bandwidth plan:', error);
     res.status(500).json({ error: 'Failed to delete bandwidth plan' });

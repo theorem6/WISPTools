@@ -40,7 +40,9 @@
         headers: { 'x-tenant-id': tenantId }
       });
       if (response.ok) {
-        plans = await response.json();
+        const data = await response.json();
+        // Backend returns { count, plans } format
+        plans = data.plans || data || [];
       }
     } catch (error) {
       console.error('Error loading bandwidth plans:', error);

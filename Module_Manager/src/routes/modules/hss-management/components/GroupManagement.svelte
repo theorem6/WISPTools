@@ -42,7 +42,9 @@
         headers: { 'x-tenant-id': tenantId }
       });
       if (response.ok) {
-        groups = await response.json();
+        const data = await response.json();
+        // Backend returns { count, groups } format
+        groups = data.groups || data || [];
       }
     } catch (error) {
       console.error('Error loading groups:', error);
@@ -56,7 +58,9 @@
         headers: { 'x-tenant-id': tenantId }
       });
       if (response.ok) {
-        bandwidthPlans = await response.json();
+        const data = await response.json();
+        // Backend might return array or { count, plans } format
+        bandwidthPlans = data.plans || data || [];
       }
     } catch (error) {
       console.error('Error loading bandwidth plans:', error);
