@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // CORS configuration
 app.use(cors({
@@ -34,32 +34,18 @@ mongoose.connect(MONGODB_URI)
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'user-management-system',
+    service: 'hss-management-api',
     port: PORT,
     timestamp: new Date().toISOString()
   });
 });
 
-// Use existing route files - ALL MODULES
-app.use('/api/users', require('./routes/users'));
-app.use('/api/tenants', require('./routes/users/tenants'));
-app.use('/api/user-tenants', require('./routes/users/tenant-details'));
-app.use('/api/customers', require('./routes/customers'));
-app.use('/api/inventory', require('./routes/inventory'));
-app.use('/api/work-orders', require('./routes/work-orders'));
-app.use('/api/network', require('./routes/network'));
-app.use('/api/plans', require('./routes/plans'));
+// HSS Management routes
 app.use('/api/hss', require('./routes/hss-management'));
-app.use('/api/monitoring', require('./routes/monitoring'));
-app.use('/api/epc', require('./routes/epc'));
-app.use('/api/system', require('./routes/system'));
-app.use('/admin', require('./routes/admin/general'));
-app.use('/admin/tenants', require('./routes/admin/tenants'));
-app.use('/setup-admin', require('./routes/setup'));
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 User Management System API running on port ${PORT}`);
+  console.log(`🚀 HSS Management API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
 });
 
