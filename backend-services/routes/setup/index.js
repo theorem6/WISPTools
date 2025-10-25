@@ -7,7 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
-const { UserTenant } = require('./user-schema');
+const { UserTenant } = require('../users/user-schema');
 
 /**
  * POST /setup-admin
