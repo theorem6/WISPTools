@@ -1,7 +1,7 @@
 // Monitoring and Alerting Service
 // Collects metrics, evaluates alert rules, sends notifications
 
-const { Metric, AlertRule, Alert, ServiceHealth, AuditLog } = require('./monitoring-schema');
+const { Metric, AlertRule, Alert, ServiceHealth, AuditLog } = require('./routes/monitoring-schema');
 const { v4: uuidv4 } = require('uuid');
 
 class MonitoringService {
