@@ -23,8 +23,8 @@ const LocationSchema = new mongoose.Schema({
   }
 });
 
-// Unified Tower/Site Schema
-const UnifiedTowerSchema = new mongoose.Schema({
+// Unified Site Schema
+const UnifiedSiteSchema = new mongoose.Schema({
   // Basic Information
   name: {
     type: String,
@@ -346,13 +346,13 @@ NetworkEquipmentSchema.pre('save', function(next) {
 });
 
 // Create models
-const UnifiedTower = mongoose.model('UnifiedTower', UnifiedTowerSchema);
+const UnifiedSite = mongoose.model('UnifiedSite', UnifiedSiteSchema);
 const UnifiedSector = mongoose.model('UnifiedSector', UnifiedSectorSchema);
 const UnifiedCPE = mongoose.model('UnifiedCPE', UnifiedCPESchema);
 const NetworkEquipment = mongoose.model('NetworkEquipment', NetworkEquipmentSchema);
 
 module.exports = {
-  UnifiedTower,
+  UnifiedSite,
   UnifiedSector,
   UnifiedCPE,
   NetworkEquipment
