@@ -4,7 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { Metric, AlertRule, Alert, ServiceHealth, AuditLog } = require('./monitoring-schema');
-const monitoringService = require('./monitoring-service');
+const monitoringService = require('../monitoring-service');
 const { v4: uuidv4 } = require('uuid');
 
 // ============================================
