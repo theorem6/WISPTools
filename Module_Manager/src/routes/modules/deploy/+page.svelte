@@ -43,6 +43,8 @@
 
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
+  $: isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+  $: buttonsDisabled = !isAdmin && !$currentTenant;
 
   onMount(async () => {
     if (browser) {
@@ -88,6 +90,15 @@
   async function loadAvailableHardware() {
     isLoadingHardware = true;
     try {
+      // Check if user is admin - if so, skip tenant requirement
+      const currentUser = await authService.getCurrentUser();
+      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+      
+      if (!isAdmin && !$currentTenant?.id) {
+        console.log('[Deploy] No tenant available and user is not admin - skipping hardware load');
+        return;
+      }
+      
       const result = await inventoryService.getInventory({
         status: 'available',
         limit: 100
@@ -214,8 +225,11 @@
       console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
       console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
       
-      if (!$currentTenant) {
-        console.error('[Deploy] No tenant available - cannot open PCI Planner');
+      // Check if user is admin - if so, allow opening without tenant
+      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+      
+      if (!isAdmin && !$currentTenant) {
+        console.error('[Deploy] No tenant available and user is not admin - cannot open PCI Planner');
         alert('No tenant selected. Please ensure you are properly logged in.');
         return;
       }
@@ -241,8 +255,11 @@
       console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
       console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
       
-      if (!$currentTenant) {
-        console.error('[Deploy] No tenant available - cannot open Frequency Planner');
+      // Check if user is admin - if so, allow opening without tenant
+      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+      
+      if (!isAdmin && !$currentTenant) {
+        console.error('[Deploy] No tenant available and user is not admin - cannot open Frequency Planner');
         alert('No tenant selected. Please ensure you are properly logged in.');
         return;
       }
@@ -268,8 +285,11 @@
       console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
       console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
       
-      if (!$currentTenant) {
-        console.error('[Deploy] No tenant available - cannot open HSS Management');
+      // Check if user is admin - if so, allow opening without tenant
+      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+      
+      if (!isAdmin && !$currentTenant) {
+        console.error('[Deploy] No tenant available and user is not admin - cannot open HSS Management');
         alert('No tenant selected. Please ensure you are properly logged in.');
         return;
       }
@@ -314,36 +334,36 @@
         </button>
         <button 
           class="control-btn" 
-          class:disabled={!$currentTenant}
+          class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] PCI button clicked');
             openPCIPlanner();
           }} 
-          title={$currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)"}
+          title={isAdmin ? "PCI Planner (Admin)" : ($currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)")}
         >
           📊 PCI
         </button>
 
         <button 
           class="control-btn" 
-          class:disabled={!$currentTenant}
+          class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] Frequency button clicked');
             openFrequencyPlanner();
           }} 
-          title={$currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"}
+          title={isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)")}
         >
           📡 Frequency
         </button>
 
         <button 
           class="control-btn" 
-          class:disabled={!$currentTenant}
+          class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] HSS button clicked');
             openHSSManagement();
           }} 
-          title={$currentTenant ? "HSS Management" : "HSS Management (No tenant selected)"}
+          title={isAdmin ? "HSS Management (Admin)" : ($currentTenant ? "HSS Management" : "HSS Management (No tenant selected)")}
         >
           🏠 HSS
         </button>

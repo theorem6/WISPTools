@@ -1,6 +1,8 @@
 // Inventory Service - Frontend API interaction
 // Communicates with backend inventory API
 
+import { authService } from './authService';
+
 const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
 export interface InventoryItem {
@@ -120,6 +122,10 @@ export interface InventoryStats {
 }
 
 class InventoryService {
+  private async getCurrentUser() {
+    return await authService.getCurrentUser();
+  }
+  
   private async getAuthToken(): Promise<string> {
     const { auth } = await import('$lib/firebase');
     const currentUser = auth().currentUser;
@@ -133,18 +139,30 @@ class InventoryService {
     const token = await this.getAuthToken();
     const tenantId = localStorage.getItem('selectedTenantId');
     
-    if (!tenantId) {
+    // Check if user is admin - if so, tenant is optional
+    const currentUser = await this.getCurrentUser();
+    const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+    
+    if (!tenantId && !isAdmin) {
+      throw new Error('No tenant selected');
+    }
+    
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...options.headers as Record<string, string>
+    };
+    
+    // Only add X-Tenant-ID header if we have a tenant or if user is not admin
+    if (tenantId) {
+      headers['X-Tenant-ID'] = tenantId;
+    } else if (!isAdmin) {
       throw new Error('No tenant selected');
     }
     
     const response = await fetch(`${API_URL}/api/inventory${endpoint}`, {
       ...options,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'X-Tenant-ID': tenantId,
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
+      headers
     });
     
     if (!response.ok) {
