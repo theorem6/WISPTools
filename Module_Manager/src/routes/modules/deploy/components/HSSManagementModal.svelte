@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { authService } from '$lib/services/authService';
   import SubscriberList from '../../hss-management/components/SubscriberList.svelte';
   import GroupManagement from '../../hss-management/components/GroupManagement.svelte';
   import BandwidthPlans from '../../hss-management/components/BandwidthPlans.svelte';
@@ -132,7 +133,6 @@
   }
 
   async function getAuthToken(): Promise<string> {
-    const { authService } = await import('$lib/services/authService');
     const token = await authService.getAuthToken();
     if (!token) {
       throw new Error('Not authenticated');

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { authService } from '$lib/services/authService';
 
   export let show = false;
   export let tenantId: string;
