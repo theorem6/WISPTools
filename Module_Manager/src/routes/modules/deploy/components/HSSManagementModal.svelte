@@ -113,7 +113,9 @@
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      groups = await response.json();
+      const data = await response.json();
+      // Backend returns { count, groups } format
+      groups = data.groups || data || [];
       console.log('[HSSManagement] Groups loaded:', groups.length);
     } catch (err: any) {
       console.error('[HSSManagement] Failed to load groups:', err);
@@ -137,7 +139,9 @@
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      bandwidthPlans = await response.json();
+      const data = await response.json();
+      // Backend returns { count, plans } format
+      bandwidthPlans = data.plans || data || [];
       console.log('[HSSManagement] Bandwidth plans loaded:', bandwidthPlans.length);
     } catch (err: any) {
       console.error('[HSSManagement] Failed to load bandwidth plans:', err);
