@@ -25,7 +25,8 @@ router.get('/sites', async (req, res) => {
     const sites = await UnifiedSite.find({ tenantId: req.tenantId }).sort({ name: 1 }).lean();
     res.json(sites);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch sites' });
+    console.error('Error fetching sites:', error);
+    res.status(500).json({ error: 'Failed to fetch sites', message: error.message });
   }
 });
 
