@@ -1,8 +1,8 @@
 // Coverage Map Service - MongoDB Backend Version
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
 
-// Backend API URL - Direct connection to GCE backend (HTTP)
-const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://136.112.111.167:3000';
+// Backend API URL - wisptools.io with SSL certificate
+const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'https://wisptools.io';
 
 export class CoverageMapService {
   

@@ -11,7 +11,7 @@
 import { auth } from '$lib/firebase';
 import type { UserRole, ModuleAccess } from '$lib/models/userRole';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://136.112.111.167:3000';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'https://wisptools.io';
 
 /**
  * User in tenant

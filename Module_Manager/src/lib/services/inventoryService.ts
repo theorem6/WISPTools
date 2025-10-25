@@ -3,7 +3,7 @@
 
 import { authService } from './authService';
 
-const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://136.112.111.167:3000';
+const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'https://wisptools.io';
 
 export interface InventoryItem {
   _id?: string;
