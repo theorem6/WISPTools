@@ -21,8 +21,8 @@ export class TenantService {
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
     
-    // Backend API URL - wisptools.io with SSL certificate
-    this.apiBaseUrl = 'https://wisptools.io';
+    // Backend API URL via hssProxy Cloud Function
+    this.apiBaseUrl = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
   }
 
   /**

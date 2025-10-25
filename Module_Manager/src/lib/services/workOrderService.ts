@@ -3,7 +3,7 @@
  * Manages trouble tickets, installations, and field operations
  */
 
-const API_URL = import.meta.env.VITE_BACKEND_API_URL || 'https://wisptools.io';
+const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
 export interface WorkOrder {
   _id?: string;
