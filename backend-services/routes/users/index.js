@@ -44,6 +44,68 @@ const requireAdmin = requireRole(['owner', 'admin']);
 // ============================================================================
 
 /**
+ * GET /api/users
+ * Get all users across all tenants (platform admin only)
+ */
+router.get('/', async (req, res) => {
+  try {
+    // Check if user is platform admin
+    const userEmail = req.user?.email;
+    if (userEmail !== 'david@david.com') {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Platform admin access required'
+      });
+    }
+    
+    // Get all user-tenant records from MongoDB
+    const userTenants = await UserTenant.find().lean();
+    
+    // Get unique user IDs
+    const uniqueUserIds = [...new Set(userTenants.map(ut => ut.userId))];
+    
+    // Get full user profiles from Firebase Auth
+    const users = [];
+    for (const userId of uniqueUserIds) {
+      try {
+        const userRecord = await admin.auth().getUser(userId);
+        
+        // Get all tenants for this user
+        const userTenantsForUser = userTenants.filter(ut => ut.userId === userId);
+        
+        users.push({
+          uid: userId,
+          email: userRecord.email || '',
+          displayName: userRecord.displayName || '',
+          photoURL: userRecord.photoURL || '',
+          phoneNumber: userRecord.phoneNumber || '',
+          disabled: userRecord.disabled || false,
+          emailVerified: userRecord.emailVerified || false,
+          createdAt: userRecord.metadata?.creationTime || null,
+          lastLoginAt: userRecord.metadata?.lastSignInTime || null,
+          tenants: userTenantsForUser.map(ut => ({
+            tenantId: ut.tenantId,
+            role: ut.role,
+            status: ut.status
+          }))
+        });
+      } catch (authError) {
+        console.error(`User ${userId} not found in Firebase Auth:`, authError.message);
+        // Skip users that don't exist in Firebase Auth
+      }
+    }
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Error listing all users:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to list users'
+    });
+  }
+});
+
+/**
  * GET /api/users/tenant/:tenantId
  * List all users in a tenant
  */
