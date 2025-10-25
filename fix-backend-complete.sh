@@ -28,23 +28,16 @@ print_info() {
     echo -e "${BLUE}ℹ️  $1${NC}"
 }
 
-# 1. Navigate to home directory and pull latest changes
-print_info "Navigating to home directory..."
-cd ~
+# 1. Navigate to project directory and pull latest changes
+print_info "Navigating to project directory..."
+cd ~/lte-pci-mapper
 
 print_info "Pulling latest changes from Git..."
-if [ -d "lte-pci-mapper" ]; then
-    cd lte-pci-mapper
-    git pull origin main
-    if [ $? -eq 0 ]; then
-        print_status "Git pull successful"
-    else
-        print_error "Git pull failed"
-        exit 1
-    fi
+git pull origin main
+if [ $? -eq 0 ]; then
+    print_status "Git pull successful"
 else
-    print_error "lte-pci-mapper directory not found!"
-    print_info "Please clone the repository first"
+    print_error "Git pull failed"
     exit 1
 fi
 
