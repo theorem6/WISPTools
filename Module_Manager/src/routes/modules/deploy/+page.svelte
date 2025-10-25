@@ -5,6 +5,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
+  import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
   import { planService, type PlanProject } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
@@ -34,6 +35,12 @@
   // HSS Management
   let showHSSManagementModal = false;
 
+  // Module context for object state management
+  let moduleContext: ModuleContext = {
+    module: 'deploy',
+    userRole: 'admin' // This should be determined from user permissions
+  };
+
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
 
@@ -42,10 +49,41 @@
       currentUser = await authService.getCurrentUser();
       if (!currentUser) {
         goto('/login');
+        return;
       }
+      
+      // Initialize iframe communication
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
+      if (iframe) {
+        iframeCommunicationService.initialize(iframe, moduleContext);
+        
+        // Listen for iframe object actions
+        window.addEventListener('iframe-object-action', handleIframeObjectAction);
+      }
+      
       await loadAvailableHardware();
     }
+    
+    return () => {
+      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
+      iframeCommunicationService.destroy();
+    };
   });
+
+  // Handle iframe object actions
+  function handleIframeObjectAction(event: CustomEvent) {
+    const { objectId, action, allowed, message, state } = event.detail;
+    
+    if (!allowed) {
+      // Show user-friendly error message
+      error = message || `Action '${action}' is not allowed for this object.`;
+      setTimeout(() => error = '', 5000);
+    } else {
+      // Handle allowed actions
+      console.log(`Action '${action}' allowed for object ${objectId}`);
+      // Add specific handling for different actions here
+    }
+  }
 
   async function loadAvailableHardware() {
     isLoadingHardware = true;

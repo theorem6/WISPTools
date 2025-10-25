@@ -8,6 +8,7 @@
   import { planService, type PlanProject, type HardwareView } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import HSSImportModal from './components/HSSImportModal.svelte';
+  import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -45,6 +46,12 @@
   // Project workflow states
   let activeProject: PlanProject | null = null;
   let showProjectActions = false;
+
+  // Module context for object state management
+  let moduleContext: ModuleContext = {
+    module: 'plan',
+    userRole: 'admin' // This should be determined from user permissions
+  };
 
   // Equipment categories (matching inventory module)
   const equipmentCategories = {
@@ -177,9 +184,38 @@
         return;
       }
       
+      // Initialize iframe communication
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
+      if (iframe) {
+        iframeCommunicationService.initialize(iframe, moduleContext);
+        
+        // Listen for iframe object actions
+        window.addEventListener('iframe-object-action', handleIframeObjectAction);
+      }
+      
       await loadData();
     }
+    
+    return () => {
+      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
+      iframeCommunicationService.destroy();
+    };
   });
+
+  // Handle iframe object actions
+  function handleIframeObjectAction(event: CustomEvent) {
+    const { objectId, action, allowed, message, state } = event.detail;
+    
+    if (!allowed) {
+      // Show user-friendly error message
+      error = message || `Action '${action}' is not allowed for this object.`;
+      setTimeout(() => error = '', 5000);
+    } else {
+      // Handle allowed actions
+      console.log(`Action '${action}' allowed for object ${objectId}`);
+      // Add specific handling for different actions here
+    }
+  }
 
   async function loadData() {
     if (!currentUser) return;

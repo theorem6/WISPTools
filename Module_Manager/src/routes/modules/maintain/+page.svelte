@@ -6,6 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
+  import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   interface MaintainFeature {
     id: string;
@@ -94,13 +95,49 @@
 
   let isAdmin = false;
   let currentUser: any = null;
+  let mapContainer: HTMLDivElement;
+
+  // Module context for object state management
+  let moduleContext: ModuleContext = {
+    module: 'maintain',
+    userRole: 'admin' // This should be determined from user permissions
+  };
 
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
       isAdmin = isPlatformAdmin(currentUser?.email || null);
+      
+      // Initialize iframe communication
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
+      if (iframe) {
+        iframeCommunicationService.initialize(iframe, moduleContext);
+        
+        // Listen for iframe object actions
+        window.addEventListener('iframe-object-action', handleIframeObjectAction);
+      }
     }
+    
+    return () => {
+      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
+      iframeCommunicationService.destroy();
+    };
   });
+
+  // Handle iframe object actions
+  function handleIframeObjectAction(event: CustomEvent) {
+    const { objectId, action, allowed, message, state } = event.detail;
+    
+    if (!allowed) {
+      // Show user-friendly error message
+      console.warn(`Action '${action}' denied for object ${objectId}: ${message}`);
+      // In maintain module, we might want to show this differently
+    } else {
+      // Handle allowed actions
+      console.log(`Action '${action}' allowed for object ${objectId}`);
+      // Add specific handling for different actions here
+    }
+  }
 
   function handleFeatureClick(feature: MaintainFeature) {
     if (feature.status === 'active') {

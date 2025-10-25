@@ -1,22 +1,40 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { TowerSite } from '../lib/models';
+  import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
   
   export let show = false;
   export let tower: TowerSite | null = null;
   export let x = 0;
   export let y = 0;
+  export let moduleContext: ModuleContext = { module: 'coverage-map', userRole: 'admin' };
   
   const dispatch = createEventDispatcher();
   
+  // Get object permissions
+  $: objectPermissions = tower ? objectStateManager.getObjectPermissions(tower, moduleContext) : null;
+  
   function handleAction(action: string) {
     if (!tower) return;
+    
+    // Check if action is allowed
+    if (!objectStateManager.isActionAllowed(tower, action, moduleContext)) {
+      console.warn(`Action '${action}' not allowed for tower ${tower.id}`);
+      return;
+    }
+    
     dispatch('action', { action, tower });
     show = false;
   }
   
   function handleClickOutside() {
     show = false;
+  }
+  
+  // Check if action should be disabled
+  function isActionDisabled(action: string): boolean {
+    if (!tower || !objectPermissions) return false;
+    return objectPermissions.restrictedActions.includes(action);
   }
 </script>
 
@@ -31,24 +49,43 @@
   <div class="menu-header">
     <span class="tower-name">📡 {tower.name}</span>
     <span class="tower-type">{tower.type}</span>
+    {#if objectPermissions?.isReadOnly}
+      <span class="readonly-indicator">🔒</span>
+    {/if}
   </div>
   
-  <button class="menu-item" on:click={() => handleAction('edit-site')}>
+  <button 
+    class="menu-item" 
+    class:disabled={isActionDisabled('edit-site')}
+    on:click={() => handleAction('edit-site')}
+  >
     <span class="menu-icon">✏️</span>
     <span>Edit Tower Site</span>
   </button>
   
-  <button class="menu-item" on:click={() => handleAction('add-sector')}>
+  <button 
+    class="menu-item" 
+    class:disabled={isActionDisabled('add-sector')}
+    on:click={() => handleAction('add-sector')}
+  >
     <span class="menu-icon">📶</span>
     <span>Add Sector</span>
   </button>
   
-  <button class="menu-item" on:click={() => handleAction('add-backhaul')}>
+  <button 
+    class="menu-item" 
+    class:disabled={isActionDisabled('add-backhaul')}
+    on:click={() => handleAction('add-backhaul')}
+  >
     <span class="menu-icon">🔗</span>
     <span>Add Backhaul Link</span>
   </button>
   
-  <button class="menu-item" on:click={() => handleAction('add-inventory')}>
+  <button 
+    class="menu-item" 
+    class:disabled={isActionDisabled('add-inventory')}
+    on:click={() => handleAction('add-inventory')}
+  >
     <span class="menu-icon">📦</span>
     <span>Add Equipment Inventory</span>
   </button>
@@ -65,10 +102,35 @@
     <span>View Details</span>
   </button>
   
-  <button class="menu-item danger" on:click={() => handleAction('delete-site')}>
+  <button 
+    class="menu-item danger" 
+    class:disabled={isActionDisabled('delete-site')}
+    on:click={() => handleAction('delete-site')}
+  >
     <span class="menu-icon">🗑️</span>
     <span>Delete Site</span>
   </button>
+  
+  <!-- Show object state info -->
+  {#if objectPermissions}
+    <div class="menu-divider"></div>
+    <div class="object-state-info">
+      <div class="state-item">
+        <span class="state-label">Status:</span>
+        <span class="state-value">{objectPermissions.status}</span>
+      </div>
+      <div class="state-item">
+        <span class="state-label">Source:</span>
+        <span class="state-value">{objectPermissions.source}</span>
+      </div>
+      {#if objectPermissions.projectId}
+        <div class="state-item">
+          <span class="state-label">Project:</span>
+          <span class="state-value">{objectPermissions.projectId}</span>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
 {/if}
 
@@ -129,6 +191,47 @@
   
   .menu-item.danger:hover {
     background: rgba(239, 68, 68, 0.1);
+  }
+  
+  .menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    color: var(--text-muted);
+  }
+  
+  .menu-item.disabled:hover {
+    background: none;
+  }
+  
+  .readonly-indicator {
+    font-size: 0.8rem;
+    opacity: 0.8;
+  }
+  
+  .object-state-info {
+    padding: 0.75rem 1rem;
+    background: var(--bg-subtle);
+    font-size: 0.85rem;
+  }
+  
+  .state-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+  }
+  
+  .state-item:last-child {
+    margin-bottom: 0;
+  }
+  
+  .state-label {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  
+  .state-value {
+    color: var(--text-primary);
+    text-transform: capitalize;
   }
   
   .menu-icon {
