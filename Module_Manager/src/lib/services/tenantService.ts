@@ -21,8 +21,8 @@ export class TenantService {
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
     
-    // Backend API URL - Direct connection to GCE backend
-    this.apiBaseUrl = 'https://136.112.111.167:3000';
+    // Backend API URL - Direct connection to GCE backend (HTTP)
+    this.apiBaseUrl = 'http://136.112.111.167:3000';
   }
 
   /**
