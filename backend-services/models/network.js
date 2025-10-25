@@ -315,8 +315,8 @@ const NetworkEquipmentSchema = new mongoose.Schema({
 });
 
 // Indexes
-UnifiedTowerSchema.index({ tenantId: 1, status: 1 });
-UnifiedTowerSchema.index({ tenantId: 1, name: 1 });
+UnifiedSiteSchema.index({ tenantId: 1, status: 1 });
+UnifiedSiteSchema.index({ tenantId: 1, name: 1 });
 UnifiedSectorSchema.index({ tenantId: 1, siteId: 1 });
 UnifiedSectorSchema.index({ tenantId: 1, status: 1 });
 UnifiedCPESchema.index({ tenantId: 1, status: 1 });
@@ -325,7 +325,7 @@ NetworkEquipmentSchema.index({ tenantId: 1, type: 1 });
 NetworkEquipmentSchema.index({ tenantId: 1, status: 1 });
 
 // Pre-save middleware
-UnifiedTowerSchema.pre('save', function(next) {
+UnifiedSiteSchema.pre('save', function(next) {
   this.updatedAt = new Date();
   next();
 });
