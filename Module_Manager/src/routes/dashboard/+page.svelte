@@ -122,12 +122,21 @@
     <!-- Header -->
     <div class="header">
       <div class="header-content">
-                <div class="logo-section">
-                  <h1 class="app-title">WISPTools</h1>
-                  <p class="app-subtitle">Comprehensive WISP Management Platform</p>
-                </div>
+        <div class="logo-section">
+          <img src="/wisptools-logo.svg" alt="WISPTools.io" class="dashboard-logo" />
+          <div class="branding">
+            <h1 class="app-title">WISPTools.io</h1>
+            <p class="app-subtitle">LTE WISP Management Platform</p>
+          </div>
+        </div>
         <!-- Minimal User Info and Power Button -->
         <div class="user-controls">
+          {#if $currentTenant}
+            <div class="tenant-info">
+              <span class="tenant-icon">🏢</span>
+              <span class="tenant-name">{$currentTenant.displayName || $currentTenant.name}</span>
+            </div>
+          {/if}
           <ThemeSwitcher />
           {#if isLoggedIn && currentUser}
             <div class="user-status">
@@ -243,14 +252,15 @@
 <style>
   .dashboard-container {
     min-height: 100vh;
-    background: var(--gradient-primary);
+    background: linear-gradient(135deg, #0f1419 0%, #1a2332 50%, #1e3a4f 100%);
     padding: 0;
   }
 
   .header {
-    background: rgba(255, 255, 255, 0.95);
+    background: linear-gradient(90deg, #1a2332 0%, #1e3a4f 100%);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 2px solid #00d9ff;
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.2);
     padding: 1rem 0;
   }
 
@@ -264,24 +274,65 @@
   }
 
   .logo-section {
-    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .dashboard-logo {
+    width: 60px;
+    height: 60px;
+    filter: drop-shadow(0 0 10px rgba(0, 217, 255, 0.5));
+    transition: transform 0.3s ease;
+  }
+
+  .dashboard-logo:hover {
+    transform: scale(1.05) rotate(5deg);
+  }
+
+  .branding {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .app-title {
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     font-weight: 700;
-    color: var(--text-primary);
     margin: 0;
-    background: var(--gradient-primary);
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    letter-spacing: 1px;
   }
 
   .app-subtitle {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin: 0.25rem 0 0 0;
+    font-size: 0.85rem;
+    color: #00d9ff;
+    margin: 0;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .tenant-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 217, 255, 0.1);
+    border: 1px solid #00d9ff;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .tenant-icon {
+    font-size: 1.1rem;
+  }
+
+  .tenant-name {
+    color: #00f2fe;
   }
 
   .user-controls {
@@ -364,11 +415,14 @@
   }
 
   .section-title {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     font-weight: 600;
-    color: white;
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     margin: 0 0 1.5rem 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
   }
 
   /* Module Launch Bar */
@@ -395,18 +449,23 @@
 
   .launch-btn.plan {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid rgba(102, 126, 234, 0.3);
   }
 
   .launch-btn.deploy {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border: 2px solid rgba(240, 147, 251, 0.3);
   }
 
   .launch-btn.monitor {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    border: 2px solid #00d9ff;
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.4);
   }
 
   .launch-btn.maintain {
     background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    border: 2px solid rgba(67, 233, 123, 0.3);
   }
 
   .launch-btn:hover {
@@ -427,23 +486,24 @@
   }
 
   .module-card {
-    background: rgba(255, 255, 255, 0.95);
+    background: linear-gradient(135deg, #1e3a4f 0%, #1a2332 100%);
     border-radius: 1rem;
     padding: 1.5rem;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: 2px solid transparent;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 2px solid rgba(0, 217, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   }
 
   .module-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 217, 255, 0.4);
+    border-color: #00d9ff;
   }
 
   .module-card.active {
-    border-color: #3b82f6;
+    border-color: #00f2fe;
+    box-shadow: 0 4px 20px rgba(0, 242, 254, 0.5);
   }
 
   .module-card.coming-soon {
@@ -454,14 +514,15 @@
   .module-header {
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid rgba(0, 217, 255, 0.3);
   }
 
   .module-name {
     margin: 0;
     font-size: 1.5rem;
-    color: #1a202c;
+    color: #00f2fe;
     font-weight: 700;
+    text-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
   }
 
   .module-features {
@@ -476,15 +537,15 @@
 
   .module-features li {
     padding: 0.6rem 0;
-    color: #4a5568;
+    color: #a0d9e8;
     font-size: 0.95rem;
     display: flex;
     align-items: center;
   }
 
   .module-features li:before {
-    content: "•";
-    color: #3b82f6;
+    content: "▸";
+    color: #00d9ff;
     font-weight: bold;
     font-size: 1.2rem;
     margin-right: 0.75rem;
