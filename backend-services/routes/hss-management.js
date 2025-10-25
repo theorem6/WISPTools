@@ -514,9 +514,12 @@ router.get('/bandwidth-plans', async (req, res) => {
         plan_id: p.plan_id || p._id.toString(),
         name: p.name,
         description: p.description || '',
+        // Support both old and new field names
+        download_mbps: p.download_mbps || p.max_bandwidth_dl || 0,
+        upload_mbps: p.upload_mbps || p.max_bandwidth_ul || 0,
         max_bandwidth_mbps: p.max_bandwidth_mbps || 0,
-        max_bandwidth_dl: p.max_bandwidth_dl || 0,
-        max_bandwidth_ul: p.max_bandwidth_ul || 0,
+        max_bandwidth_dl: p.max_bandwidth_dl || p.download_mbps || 0,
+        max_bandwidth_ul: p.max_bandwidth_ul || p.upload_mbps || 0,
         created_at: p.created_at,
         updated_at: p.updated_at
       }))

@@ -101,22 +101,29 @@
   }
 
   async function deletePlan(planId: string) {
-    if (!confirm('Delete this bandwidth plan? Subscribers using this plan will be affected.')) return;
+    if (!confirm('Delete this bandwidth plan? This will affect any groups using it.')) return;
     
     try {
       const response = await fetch(`${HSS_API}/bandwidth-plans/${planId}`, {
         method: 'DELETE',
-        headers: { 'x-tenant-id': tenantId }
+        headers: { 
+          'x-tenant-id': tenantId,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.ok) {
+        alert('Bandwidth plan deleted successfully');
         loadPlans();
       } else {
-        alert('Error deleting bandwidth plan');
+        const errorData = await response.json();
+        const errorMsg = errorData.error || 'Error deleting bandwidth plan';
+        alert(errorMsg);
+        console.error('Delete error:', errorData);
       }
     } catch (error) {
       console.error('Error deleting plan:', error);
-      alert('Error deleting bandwidth plan');
+      alert('Error deleting bandwidth plan: ' + error.message);
     }
   }
 </script>
@@ -146,12 +153,12 @@
           </div>
           <div class="plan-speeds">
             <div class="speed">
-              <span class="label">Download</span>
-              <span class="value">{plan.download_mbps} Mbps</span>
+              <span class="label">DOWNLOAD</span>
+              <span class="value">{plan.download_mbps || 0} Mbps</span>
             </div>
             <div class="speed">
-              <span class="label">Upload</span>
-              <span class="value">{plan.upload_mbps} Mbps</span>
+              <span class="label">UPLOAD</span>
+              <span class="value">{plan.upload_mbps || 0} Mbps</span>
             </div>
           </div>
           <div class="plan-actions">
