@@ -17,6 +17,7 @@
 import { browser } from '$app/environment';
 import { goto } from '$app/navigation';
 import { tenantStore } from '../stores/tenantStore';
+import { get } from 'svelte/store';
 import { authService } from './authService';
 import { isPlatformAdmin } from './adminService';
 import type { Tenant } from '../models/tenant';
@@ -104,7 +105,7 @@ class TenantGuardService {
       const isAdmin = isPlatformAdmin(userEmail);
 
       // Get current tenant state
-      const tenantState = tenantStore.getState();
+      const tenantState = get(tenantStore);
       
       // If admin, they don't need a tenant
       if (isAdmin) {
@@ -190,7 +191,7 @@ class TenantGuardService {
       }
 
       // Initialize tenant store if needed
-      const tenantState = tenantStore.getState();
+      const tenantState = get(tenantStore);
       if (!tenantState.isInitialized) {
         console.log('[TenantGuardService] Initializing tenant store...');
         await tenantStore.initialize();
@@ -284,7 +285,7 @@ class TenantGuardService {
    * Get the current tenant without triggering any loading
    */
   getCurrentTenant(): Tenant | null {
-    const state = tenantStore.getState();
+    const state = get(tenantStore);
     return state.currentTenant || null;
   }
 
