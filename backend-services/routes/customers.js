@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { Customer } = require('./customer-schema');
+const { Customer } = require('../models/customer');
 
 // ============================================================================
 // CUSTOMER CRUD ENDPOINTS
