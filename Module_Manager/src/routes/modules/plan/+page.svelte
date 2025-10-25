@@ -7,6 +7,7 @@
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject, type HardwareView } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import SettingsButton from '$lib/components/SettingsButton.svelte';
   import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
@@ -1004,7 +1005,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       </div>
     </div>
   {/if}
-
+  
+  <!-- Global Settings Button -->
+  <SettingsButton />
 </TenantGuard>
 
 <style>

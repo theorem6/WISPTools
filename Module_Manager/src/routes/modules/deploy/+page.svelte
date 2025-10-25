@@ -9,6 +9,7 @@
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
   import { planService, type PlanProject } from '$lib/services/planService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import SettingsButton from '$lib/components/SettingsButton.svelte';
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
   import HSSManagementModal from './components/HSSManagementModal.svelte';
@@ -463,6 +464,9 @@
     tenantId={$currentTenant?.id || ''}
     on:close={closeHSSManagementModal}
   />
+  
+  <!-- Global Settings Button -->
+  <SettingsButton />
 </TenantGuard>
 
 <style>

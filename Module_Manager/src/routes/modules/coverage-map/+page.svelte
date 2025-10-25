@@ -13,6 +13,7 @@
   import AddVehicleModal from './components/AddVehicleModal.svelte';
   import AddRMAModal from './components/AddRMAModal.svelte';
   import AddSectorModal from './components/AddSectorModal.svelte';
+  import SettingsButton from '$lib/components/SettingsButton.svelte';
   import AddCPEModal from './components/AddCPEModal.svelte';
   import AddBackhaulLinkModal from './components/AddBackhaulLinkModal.svelte';
   import AddInventoryModal from './components/AddInventoryModal.svelte';
@@ -370,19 +371,6 @@
     <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu}>
       ☰
     </button>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
-        🔍
-      </button>
-      <button class="control-btn" on:click={() => showStats = !showStats} title="Toggle Statistics">
-        📊
-      </button>
-      <button class="control-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
-        ←
-      </button>
-    </div>
   </div>
 
   <!-- Main Menu Modal -->
@@ -642,6 +630,9 @@
   y={towerMenuY}
   on:action={handleTowerAction}
 />
+
+<!-- Global Settings Button -->
+<SettingsButton />
 </TenantGuard>
 
 <style>

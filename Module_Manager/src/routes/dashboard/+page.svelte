@@ -7,6 +7,7 @@
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import SettingsButton from '$lib/components/SettingsButton.svelte';
 
   interface Module {
     id: string;
@@ -247,6 +248,9 @@
       </div>
     </div>
   </div>
+  
+  <!-- Global Settings Button -->
+  <SettingsButton />
 </TenantGuard>
 
 <style>
@@ -382,9 +386,10 @@
 
   .modules-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
     margin-bottom: 3rem;
+    max-width: 1200px;
   }
 
   .module-card {

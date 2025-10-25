@@ -6,6 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import SettingsButton from '$lib/components/SettingsButton.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -48,6 +49,9 @@
       </div>
     </div>
   </div>
+  
+  <!-- Global Settings Button -->
+  <SettingsButton />
 </TenantGuard>
 
 <style>
