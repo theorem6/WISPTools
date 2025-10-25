@@ -55,9 +55,15 @@ const requireRole = (requiredRole) => {
 
 const VALID_ROLES = ['admin', 'user', 'tenant_admin'];
 
+// Check if user is platform admin
+const isPlatformAdmin = (email) => {
+  return email === 'david@david.com' || email === 'david@4gengineer.com';
+};
+
 module.exports = {
   verifyAuth,
   extractTenantId,
   requireRole,
+  isPlatformAdmin,
   VALID_ROLES
 };
