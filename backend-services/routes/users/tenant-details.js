@@ -11,10 +11,61 @@ const { UserTenant } = require('./user-schema');
 const router = express.Router();
 
 /**
+ * GET /api/user-tenants/:userId
+ * Get all tenants assigned to a user
+ */
+router.get('/:userId', verifyAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.uid;
+    
+    // Users can only query their own tenants (unless they're platform admin)
+    if (userId !== requestingUserId && req.user.email !== 'david@david.com') {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You can only view your own tenants'
+      });
+    }
+    
+    // Get all tenant associations for this user
+    const userTenants = await UserTenant.find({ 
+      userId,
+      status: 'active'
+    }).lean();
+    
+    if (!userTenants || userTenants.length === 0) {
+      return res.json([]);
+    }
+    
+    // Get full tenant details for each association
+    const tenants = [];
+    for (const ut of userTenants) {
+      const tenant = await Tenant.findById(ut.tenantId).lean();
+      if (tenant) {
+        tenants.push({
+          ...tenant,
+          id: tenant._id.toString(),
+          userRole: ut.role
+        });
+      }
+    }
+    
+    res.json(tenants);
+    
+  } catch (error) {
+    console.error('Error getting user tenants:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/tenants/:tenantId
  * Get tenant details (only if user is assigned to this tenant)
  */
-router.get('/:tenantId', verifyAuth, async (req, res) => {
+router.get('/tenant/:tenantId', verifyAuth, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const userId = req.user.uid;
