@@ -67,6 +67,7 @@ const customerAPI = require('./customer-api');
 const inventoryAPI = require('./inventory-api');
 const unifiedNetworkAPI = require('./unified-network-api');
 const plansAPI = require('./routes/plans');
+const hssManagementAPI = require('./routes/hss-management');
 
 // System APIs
 const monitoringAPI = require('./monitoring-api');
@@ -85,6 +86,7 @@ app.use('/api/customers', customerAPI);
 app.use('/api/inventory', inventoryAPI);
 app.use('/api/network', unifiedNetworkAPI);
 app.use('/api/plans', plansAPI);
+app.use('/api/hss', hssManagementAPI);
 app.use('/api/monitoring', monitoringAPI);
 app.use('/api/epc', distributedEpcAPI);
 

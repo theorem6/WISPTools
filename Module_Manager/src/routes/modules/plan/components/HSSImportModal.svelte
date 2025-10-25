@@ -15,7 +15,7 @@
   let importData: any = null;
 
   // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+  const HSS_API = import.meta.env.VITE_BACKEND_API_URL || 'http://136.112.111.167:3000/api/hss';
 
   onMount(async () => {
     if (show && tenantId) {
