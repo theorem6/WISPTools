@@ -99,7 +99,7 @@ env:
   
   # Billing API Configuration
   - variable: VITE_API_URL
-    value: https://wisptools.io/api
+    value: https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy
     availability:
       - BUILD
       - RUNTIME

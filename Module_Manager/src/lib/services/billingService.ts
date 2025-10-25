@@ -10,7 +10,7 @@
 
 import { auth } from '$lib/firebase';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://wisptools.io/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
 /**
  * Subscription Plan
