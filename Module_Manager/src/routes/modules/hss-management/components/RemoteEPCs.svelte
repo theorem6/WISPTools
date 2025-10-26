@@ -11,16 +11,21 @@
   let showAddModal = false;
   let showDetailsModal = false;
   let showMonitorModal = false;
+  let showCreateSiteModal = false;
   let selectedEPC: any = null;
   let monitoringEPCId: string = '';
   let statusFilter = 'all';
   let viewMode = 'list'; // 'list' or 'monitor'
   let downloadingISO = false;
+  let sites: any[] = [];
+  let selectedSiteId = '';
+  let loadingSites = true;
   
   // ISO API configuration
   const HSS_IP = '136.112.111.167';
   const ISO_API_PORT = '3002';
   const ISO_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
+  const NETWORK_API = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/coverageMapProxy';
   
   // Form data for new EPC
   let formData = {
@@ -51,11 +56,51 @@
   let refreshInterval: any = null;
   
   onMount(async () => {
-    await loadEPCs();
+    await Promise.all([loadEPCs(), loadSites()]);
     
     // Auto-refresh every 30 seconds
     refreshInterval = setInterval(loadEPCs, 30000);
   });
+  
+  async function loadSites() {
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${NETWORK_API}/api/network/sites`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        sites = data || [];
+      }
+    } catch (err: any) {
+      console.error('[RemoteEPCs] Error loading sites:', err);
+    } finally {
+      loadingSites = false;
+    }
+  }
+  
+  function handleSiteSelect() {
+    if (selectedSiteId === 'create-new') {
+      showCreateSiteModal = true;
+      return;
+    }
+    
+    const site = sites.find(s => (s._id || s.id) === selectedSiteId);
+    if (site) {
+      formData.site_name = site.name || site.siteName || '';
+      formData.location.city = site.location?.city || '';
+      formData.location.state = site.location?.state || '';
+      formData.location.coordinates.latitude = site.location?.coordinates?.latitude || 0;
+      formData.location.coordinates.longitude = site.location?.coordinates?.longitude || 0;
+    }
+  }
   
   onDestroy(() => {
     if (refreshInterval) {
@@ -527,8 +572,31 @@ To use:
         <div class="form-section">
           <h3>Site Information</h3>
           <div class="form-group">
-            <label>Site Name *</label>
-            <input type="text" bind:value={formData.site_name} placeholder="e.g., Main Tower Site" required />
+            <label>Select Site *</label>
+            {#if loadingSites}
+              <p class="loading-text">Loading sites...</p>
+            {:else if sites.length === 0}
+              <select bind:value={selectedSiteId} on:change={handleSiteSelect}>
+                <option value="create-new">➕ Create New Site...</option>
+              </select>
+              <small class="form-hint">No sites available. Select "Create New Site" to add one.</small>
+            {:else}
+              <select bind:value={selectedSiteId} on:change={handleSiteSelect}>
+                <option value="">-- Select a site --</option>
+                <option value="create-new">➕ Create New Site...</option>
+                {#each sites as site}
+                  <option value={site._id || site.id}>
+                    {site.name || site.siteName || 'Unnamed Site'} 
+                    {#if site.location?.city}
+                      - {site.location.city}, {site.location.state || ''}
+                    {/if}
+                  </option>
+                {/each}
+              </select>
+              {#if formData.site_name}
+                <small class="form-hint">Selected site: {formData.site_name}</small>
+              {/if}
+            {/if}
           </div>
           
           <div class="form-row">
