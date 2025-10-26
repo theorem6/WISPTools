@@ -5,7 +5,7 @@
  * Verifies that all critical issues have been resolved
  */
 
-const axios = require('axios');
+import axios from 'axios';
 
 const BASE_URL = 'http://localhost:3000';
 

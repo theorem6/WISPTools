@@ -24,7 +24,6 @@ async function connectDatabase() {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       bufferCommands: false,
-      bufferMaxEntries: 0,
       retryWrites: true,
       w: 'majority'
     };
