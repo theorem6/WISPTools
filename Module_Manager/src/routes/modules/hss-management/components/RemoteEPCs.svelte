@@ -86,6 +86,20 @@
     }
   }
   
+  // Site creation data
+  let newSiteData = {
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    country: 'USA',
+    coordinates: {
+      latitude: 0,
+      longitude: 0
+    }
+  };
+  let creatingSite = false;
+  
   function handleSiteSelect() {
     if (selectedSiteId === 'create-new') {
       showCreateSiteModal = true;
@@ -99,6 +113,67 @@
       formData.location.state = site.location?.state || '';
       formData.location.coordinates.latitude = site.location?.coordinates?.latitude || 0;
       formData.location.coordinates.longitude = site.location?.coordinates?.longitude || 0;
+    }
+  }
+  
+  async function createNewSite() {
+    if (!newSiteData.name || !newSiteData.coordinates.latitude || !newSiteData.coordinates.longitude) {
+      alert('Site name and GPS coordinates are required');
+      return;
+    }
+    
+    creatingSite = true;
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`${NETWORK_API}/api/network/sites`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newSiteData.name,
+          location: {
+            address: newSiteData.address,
+            city: newSiteData.city,
+            state: newSiteData.state,
+            country: newSiteData.country,
+            coordinates: {
+              latitude: newSiteData.coordinates.latitude,
+              longitude: newSiteData.coordinates.longitude
+            }
+          }
+        })
+      });
+      
+      if (response.ok) {
+        const newSite = await response.json();
+        // Add to sites list
+        sites = [...sites, newSite];
+        
+        // Auto-select the new site
+        selectedSiteId = newSite._id || newSite.id;
+        handleSiteSelect();
+        
+        // Close modal
+        showCreateSiteModal = false;
+        
+        alert(`✅ Site "${newSiteData.name}" created successfully!`);
+      } else {
+        const error = await response.json();
+        alert(`Failed to create site: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error('Error creating site:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      creatingSite = false;
     }
   }
   
@@ -681,6 +756,72 @@ To use:
           }}
         >
           Register EPC
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Create New Site Modal -->
+{#if showCreateSiteModal}
+  <div class="modal-overlay" on:click|self={() => showCreateSiteModal = false}>
+    <div class="modal">
+      <div class="modal-header">
+        <h2>➕ Create New Site</h2>
+        <button class="close-btn" on:click={() => showCreateSiteModal = false}>✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="form-section">
+          <h3>Site Information</h3>
+          <div class="form-group">
+            <label>Site Name *</label>
+            <input type="text" bind:value={newSiteData.name} placeholder="e.g., Main Tower Site" required />
+          </div>
+          
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" bind:value={newSiteData.address} placeholder="Street address" />
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>City *</label>
+              <input type="text" bind:value={newSiteData.city} placeholder="City" required />
+            </div>
+            <div class="form-group">
+              <label>State *</label>
+              <input type="text" bind:value={newSiteData.state} placeholder="State" required />
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Latitude *</label>
+              <input type="number" step="0.0001" bind:value={newSiteData.coordinates.latitude} placeholder="40.7128" required />
+            </div>
+            <div class="form-group">
+              <label>Longitude *</label>
+              <input type="number" step="0.0001" bind:value={newSiteData.coordinates.longitude} placeholder="-74.0060" required />
+            </div>
+          </div>
+          
+          <div class="info-box">
+            <strong>💡 Tip:</strong> Enter GPS coordinates or use the Coverage Map module to drop a pin and get exact coordinates.
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={() => showCreateSiteModal = false}>
+          Cancel
+        </button>
+        <button class="btn-primary" on:click={createNewSite} disabled={creatingSite}>
+          {#if creatingSite}
+            ⏳ Creating...
+          {:else}
+            ✅ Create Site
+          {/if}
         </button>
       </div>
     </div>
