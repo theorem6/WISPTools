@@ -1,0 +1,76 @@
+name: Auto Deploy to Google Cloud
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        cd backend-services
+        npm ci --production
+        
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
+      
+    - name: Deploy Firebase Functions
+      run: |
+        cd functions
+        npm ci
+        npm run build
+        cd ..
+        firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Deploy Firestore Rules
+      run: |
+        firebase deploy --only firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Deploy App Hosting
+      run: |
+        firebase deploy --only apphosting --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Setup Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        
+    - name: Deploy to GCE
+      run: |
+        # Create deployment package
+        cd backend-services
+        tar -czf ../backend-deployment.tar.gz \
+          --exclude=node_modules \
+          --exclude=.git \
+          --exclude=*.log \
+          .
+        cd ..
+        
+        # Upload to GCS
+        gsutil cp backend-deployment.tar.gz gs://${{ secrets.GCP_PROJECT_ID }}-deployments/backend-$(date +%Y%m%d-%H%M%S).tar.gz
+        
+        # Update GCE instance
+        gcloud compute ssh backend-server \
+          --zone=us-central1-a \
+          --project=${{ secrets.GCP_PROJECT_ID }} \
+          --command="gsutil cp gs://${{ secrets.GCP_PROJECT_ID }}-deployments/backend-*.tar.gz /tmp/backend-latest.tar.gz && cd /opt/wisptools && tar -xzf /tmp/backend-latest.tar.gz && cd backend-services && npm install --production && sudo systemctl restart wisptools-backend wisptools-hss"
+        
+    - name: Health Check
+      run: |
+        sleep 30
+        curl -f https://us-central1-${{ secrets.FIREBASE_PROJECT_ID }}.cloudfunctions.net/analyzePCI || echo "Health check failed"

@@ -18,25 +18,42 @@ console.log('📍 MongoDB URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@')); 
  */
 async function connectDatabase() {
   try {
-    await mongoose.connect(MONGODB_URI);
+    // Set connection options for better error handling
+    const options = {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      bufferCommands: false,
+      retryWrites: true,
+      w: 'majority'
+    };
+
+    await mongoose.connect(MONGODB_URI, options);
     console.log('✅ MongoDB connected successfully');
     
     // Handle connection events
     mongoose.connection.on('error', (error) => {
       console.error('❌ MongoDB connection error:', error);
+      // Don't exit process, let the app handle it gracefully
     });
     
     mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected');
+      console.warn('⚠️ MongoDB disconnected - attempting to reconnect...');
     });
     
     mongoose.connection.on('reconnected', () => {
-      console.log('✅ MongoDB reconnected');
+      console.log('✅ MongoDB reconnected successfully');
+    });
+
+    mongoose.connection.on('close', () => {
+      console.log('🔌 MongoDB connection closed');
     });
     
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error);
-    process.exit(1);
+    console.error('💡 Check your MongoDB URI and network connectivity');
+    // Don't exit immediately, let the app start and show health check errors
+    throw error;
   }
 }
 

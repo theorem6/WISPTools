@@ -1,0 +1,163 @@
+# Google Cloud Build - Automated Deployment from Git
+# This configuration automatically deploys the backend services when code is pushed to the repository
+
+steps:
+  # Step 1: Install Node.js and dependencies
+  - name: 'node:20'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔧 Installing dependencies..."
+        cd backend-services
+        npm install --production
+        echo "✅ Dependencies installed"
+
+  # Step 2: Install Firebase CLI
+  - name: 'node:20'
+    entrypoint: 'npm'
+    args: ['install', '-g', 'firebase-tools']
+
+  # Step 3: Deploy Firebase Functions
+  - name: 'node:20'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🚀 Deploying Firebase Functions..."
+        cd functions
+        npm install
+        npm run build
+        cd ..
+        npx firebase deploy --only functions --project $PROJECT_ID --token ${_FIREBASE_TOKEN}
+        echo "✅ Firebase Functions deployed"
+
+  # Step 4: Deploy Firestore Rules and Indexes
+  - name: 'node:20'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📊 Deploying Firestore configuration..."
+        npx firebase deploy --only firestore:rules,firestore:indexes --project $PROJECT_ID --token ${_FIREBASE_TOKEN}
+        echo "✅ Firestore configuration deployed"
+
+  # Step 5: Deploy App Hosting (Frontend)
+  - name: 'node:20'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🌐 Deploying App Hosting..."
+        npx firebase deploy --only apphosting --project $PROJECT_ID --token ${_FIREBASE_TOKEN}
+        echo "✅ App Hosting deployed"
+
+  # Step 6: Deploy Backend to GCE (if needed)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🖥️ Preparing backend deployment..."
+        cd backend-services
+        
+        # Create deployment package
+        tar -czf backend-deployment.tar.gz \
+          --exclude=node_modules \
+          --exclude=.git \
+          --exclude=*.log \
+          .
+        
+        # Upload to GCS bucket
+        gsutil cp backend-deployment.tar.gz gs://$PROJECT_ID-deployments/backend-$(date +%Y%m%d-%H%M%S).tar.gz
+        
+        echo "✅ Backend package uploaded to GCS"
+
+  # Step 7: Update GCE instance (if configured)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🔄 Updating GCE instance..."
+        
+        # Check if GCE instance exists
+        if gcloud compute instances describe backend-server --zone=us-central1-a --project=$PROJECT_ID 2>/dev/null; then
+          echo "📡 Updating existing GCE instance..."
+          
+          # Create startup script for deployment
+          cat > deploy-backend.sh << 'EOF'
+        #!/bin/bash
+        echo "🚀 Starting backend deployment..."
+        
+        # Download latest deployment
+        cd /opt/wisptools
+        gsutil cp gs://$PROJECT_ID-deployments/backend-*.tar.gz backend-latest.tar.gz
+        
+        # Extract and install
+        tar -xzf backend-latest.tar.gz
+        cd backend-services
+        
+        # Install dependencies
+        npm install --production
+        
+        # Restart services
+        sudo systemctl restart wisptools-backend
+        sudo systemctl restart wisptools-hss
+        
+        echo "✅ Backend deployment complete"
+        EOF
+          
+          # Make script executable and run it
+          gcloud compute ssh backend-server --zone=us-central1-a --project=$PROJECT_ID --command="chmod +x /opt/wisptools/deploy-backend.sh && /opt/wisptools/deploy-backend.sh"
+          
+          echo "✅ GCE instance updated"
+        else
+          echo "⚠️ GCE instance not found, skipping backend deployment"
+        fi
+
+  # Step 8: Run health checks
+  - name: 'node:20'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "🏥 Running health checks..."
+        
+        # Wait for services to start
+        sleep 30
+        
+        # Check Firebase Functions
+        FUNCTIONS_URL="https://us-central1-$PROJECT_ID.cloudfunctions.net"
+        if curl -f "$FUNCTIONS_URL/analyzePCI" > /dev/null 2>&1; then
+          echo "✅ Firebase Functions healthy"
+        else
+          echo "⚠️ Firebase Functions health check failed"
+        fi
+        
+        # Check App Hosting
+        APP_URL="https://$PROJECT_ID.web.app"
+        if curl -f "$APP_URL" > /dev/null 2>&1; then
+          echo "✅ App Hosting healthy"
+        else
+          echo "⚠️ App Hosting health check failed"
+        fi
+        
+        echo "🏥 Health checks completed"
+
+# Build configuration
+timeout: '3600s'  # 1 hour timeout
+
+# Substitutions
+substitutions:
+  _FIREBASE_TOKEN: ''  # Will be set by Cloud Build triggers
+  _GCE_ZONE: 'us-central1-a'
+  _GCE_INSTANCE: 'backend-server'
+
+# Options
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'
+  diskSizeGb: 100
+
+# Build triggers will be configured in Google Cloud Console

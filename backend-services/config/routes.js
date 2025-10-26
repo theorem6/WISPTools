@@ -33,8 +33,8 @@ function registerRoutes(app) {
   
   // User management routes
   apiRouter.use('/users', require('../routes/users'));
-  apiRouter.use('/user-tenants', require('../routes/user-tenants'));
-  apiRouter.use('/tenants', require('../routes/tenants'));
+  apiRouter.use('/user-tenants', require('../routes/users/tenant-details'));
+  apiRouter.use('/tenants', require('../routes/users/tenants'));
   
   // Business logic routes
   apiRouter.use('/work-orders', require('../routes/work-orders'));

@@ -79,11 +79,56 @@ function errorHandler(err, req, res, next) {
       message: 'Origin not allowed'
     });
   }
+
+  // MongoDB connection errors
+  if (err.name === 'MongoNetworkError' || err.name === 'MongoServerError') {
+    return res.status(503).json({
+      error: 'Database Unavailable',
+      message: 'Database connection failed. Please try again later.',
+      code: 'DATABASE_ERROR'
+    });
+  }
+
+  // Firebase Auth errors
+  if (err.code && err.code.startsWith('auth/')) {
+    return res.status(401).json({
+      error: 'Authentication Error',
+      message: err.message || 'Authentication failed',
+      code: err.code
+    });
+  }
+
+  // Validation errors
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      error: 'Validation Error',
+      message: err.message || 'Invalid data provided',
+      code: 'VALIDATION_ERROR'
+    });
+  }
+
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      error: 'Invalid Token',
+      message: 'Authentication token is invalid',
+      code: 'INVALID_TOKEN'
+    });
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      error: 'Token Expired',
+      message: 'Authentication token has expired',
+      code: 'TOKEN_EXPIRED'
+    });
+  }
   
   // Default error response
   res.status(err.status || 500).json({
     error: err.name || 'Internal Server Error',
     message: err.message || 'An unexpected error occurred',
+    code: err.code || 'INTERNAL_ERROR',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 }
