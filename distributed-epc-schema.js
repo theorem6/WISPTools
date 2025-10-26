@@ -70,6 +70,42 @@ const RemoteEPCSchema = new mongoose.Schema({
     phone: String
   },
   
+  // Hardware Information (for auto-provisioned systems)
+  hardware_info: {
+    hardware_id: String,      // System UUID or MAC-based ID
+    mac_address: String,       // Primary interface MAC
+    serial_number: String,     // System serial number
+    manufacturer: String,      // System manufacturer
+    product: String,          // System product name
+    hostname: String          // System hostname
+  },
+  
+  // Network Information (detected during auto-provision)
+  network_info: {
+    primary_ip: String,       // Primary IP address
+    gateway: String,          // Default gateway
+    interface: String,        // Primary network interface
+    netmask: String,          // Network mask (CIDR)
+    dns_servers: String       // DNS servers (comma-separated)
+  },
+  
+  // OS Information
+  os_info: {
+    os_version: String,       // Full OS version string
+    kernel_version: String    // Kernel version
+  },
+  
+  // Deployment Information
+  deployment_info: {
+    method: {                 // How this EPC was deployed
+      type: String,
+      enum: ['manual', 'auto_provision', 'cloud_init', 'pxe_boot'],
+      default: 'manual'
+    },
+    boot_time: Date,          // When system first booted
+    registered_at: Date       // When registered with wisptools.io
+  },
+  
   // Metadata
   notes: String,
   tags: [String],
@@ -84,6 +120,8 @@ const RemoteEPCSchema = new mongoose.Schema({
 RemoteEPCSchema.index({ tenant_id: 1, status: 1 });
 RemoteEPCSchema.index({ auth_code: 1 });
 RemoteEPCSchema.index({ last_heartbeat: -1 });
+RemoteEPCSchema.index({ 'hardware_info.hardware_id': 1 });
+RemoteEPCSchema.index({ 'hardware_info.mac_address': 1 });
 
 /**
  * EPC Metrics Schema

@@ -5,6 +5,7 @@ const express = require('express');
 
 // Import route modules
 const registrationRoutes = require('./routes/registration');
+const autoRegisterRoutes = require('./routes/auto-register');
 const managementRoutes = require('./routes/management');
 const metricsRoutes = require('./routes/metrics');
 const monitoringRoutes = require('./routes/monitoring');
@@ -15,7 +16,9 @@ const router = express.Router();
  * Mount all EPC-related routes
  * 
  * Routes:
- * - /epc/register - Register new EPC sites
+ * - /epc/register - Register new EPC sites (manual)
+ * - /epc/auto-register - Auto-register from boot disc (minimal Ubuntu)
+ * - /epc/auto-registered - List auto-registered EPCs
  * - /epc/list - List all EPCs for a tenant
  * - /epc/:epc_id - Get/Update/Delete specific EPC
  * - /epc/:epc_id/deployment-script - Download deployment script
@@ -31,6 +34,7 @@ const router = express.Router();
 
 // Mount route modules
 router.use('/epc', registrationRoutes);
+router.use('/epc', autoRegisterRoutes);
 router.use('/epc', managementRoutes);
 router.use('/metrics', metricsRoutes);
 router.use('/', monitoringRoutes);

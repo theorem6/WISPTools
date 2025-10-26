@@ -1,0 +1,166 @@
+#cloud-config
+# Cloud-init autoinstall configuration for WISPTools.io minimal boot disc
+# Ubuntu 24.04 LTS Server - Unattended installation
+
+autoinstall:
+  version: 1
+  
+  # Interactive mode disabled
+  interactive-sections: []
+  
+  # Locale and keyboard
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  
+  # Identity - Default user (should change password after first login)
+  identity:
+    hostname: wisp-epc-node
+    # Password: wisp123 (change immediately!)
+    password: "$6$rounds=4096$saltsaltsal$hBHuZm7adhEYRKKp7oSfFkFq8C5L5CfLXqJ3qvQZQBfVZb9kCL3HH8wJOhZ8L5nKkTRqy8FqKLMnLmKMnLM8."
+    username: wisp
+  
+  # SSH - Enable for remote management
+  ssh:
+    install-server: yes
+    allow-pw: yes  # Allow password auth initially
+    authorized-keys: []  # Add your public keys here
+  
+  # Network - DHCP on all interfaces
+  network:
+    version: 2
+    ethernets:
+      # Match any ethernet interface starting with 'en' or 'eth'
+      any:
+        match:
+          name: "en*"
+        dhcp4: true
+        dhcp6: false
+        dhcp4-overrides:
+          use-dns: true
+          use-routes: true
+  
+  # Storage - Use entire first disk
+  storage:
+    layout:
+      name: direct
+      match:
+        size: largest
+  
+  # Packages to install
+  packages:
+    # Essential networking
+    - curl
+    - wget
+    - net-tools
+    - iputils-ping
+    - dnsutils
+    - bridge-utils
+    
+    # System utilities
+    - jq
+    - nano
+    - vim
+    - htop
+    - tmux
+    
+    # Security
+    - ufw
+    - fail2ban
+    
+    # Build tools (needed for some installations)
+    - build-essential
+    - git
+    
+    # Monitoring
+    - sysstat
+    
+    # Required for dmidecode (hardware detection)
+    - dmidecode
+  
+  # Package updates
+  package_update: true
+  package_upgrade: true
+  
+  # Timezone
+  timezone: UTC
+  
+  # Early commands (run before installation)
+  early-commands:
+    - echo "Starting WISPTools.io minimal installation..."
+  
+  # Late commands (run after installation, in target system)
+  late-commands:
+    # Download and install Node.js 20.x
+    - curtin in-target --target=/target -- bash -c "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"
+    - curtin in-target --target=/target -- apt-get install -y nodejs
+    
+    # Create wisptools directories
+    - curtin in-target --target=/target -- mkdir -p /opt/wisptools
+    - curtin in-target --target=/target -- mkdir -p /etc/wisptools
+    - curtin in-target --target=/target -- mkdir -p /var/lib/wisptools
+    - curtin in-target --target=/target -- mkdir -p /var/log/wisptools
+    
+    # Download registration script
+    - curtin in-target --target=/target -- wget -O /opt/wisptools-register.sh https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/scripts/deployment/wisptools-register.sh
+    - curtin in-target --target=/target -- chmod +x /opt/wisptools-register.sh
+    
+    # Download systemd service
+    - curtin in-target --target=/target -- wget -O /etc/systemd/system/wisptools-register.service https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/scripts/deployment/wisptools-register.service
+    
+    # Enable the registration service
+    - curtin in-target --target=/target -- systemctl enable wisptools-register.service
+    
+    # Create banner
+    - curtin in-target --target=/target -- bash -c "cat > /etc/motd << 'EOF'
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║        WISPTools.io - Distributed EPC Node                     ║
+║        Ubuntu 24.04 LTS Minimal Installation                   ║
+║                                                                ║
+║  This system will auto-register with wisptools.io on boot     ║
+║  and download the appropriate configuration.                   ║
+║                                                                ║
+║  Default credentials: wisp / wisp123                           ║
+║  ⚠️  CHANGE PASSWORD IMMEDIATELY!                              ║
+║                                                                ║
+║  Registration log: /var/log/wisptools-register.log            ║
+║  Configuration: /etc/wisptools/                                ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+"
+    
+    # Configure firewall (but don't enable yet - will be configured during deployment)
+    - curtin in-target --target=/target -- ufw default deny incoming
+    - curtin in-target --target=/target -- ufw default allow outgoing
+    - curtin in-target --target=/target -- ufw allow ssh
+    
+    # Set up automatic security updates
+    - curtin in-target --target=/target -- apt-get install -y unattended-upgrades
+    - curtin in-target --target=/target -- dpkg-reconfigure -plow unattended-upgrades
+    
+    # Clean up
+    - curtin in-target --target=/target -- apt-get clean
+    - curtin in-target --target=/target -- apt-get autoremove -y
+    
+    # Final message
+    - curtin in-target --target=/target -- bash -c "echo 'WISPTools.io minimal system ready' > /var/log/wisptools-install.log"
+  
+  # Shutdown behavior - reboot after installation
+  shutdown: reboot
+  
+  # User data (runs on first boot)
+  user-data:
+    # Disable swap (not needed for EPC nodes)
+    swap:
+      size: 0
+    
+    # Run commands on first boot
+    runcmd:
+      - echo "First boot completed at $(date)" >> /var/log/wisptools-firstboot.log
+      - systemctl status wisptools-register.service >> /var/log/wisptools-firstboot.log
+    
+    # Final message
+    final_message: "WISPTools.io EPC node ready. System will auto-register with wisptools.io."
+

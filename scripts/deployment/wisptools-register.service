@@ -1,0 +1,27 @@
+[Unit]
+Description=WISPTools.io Auto-Registration Service
+Documentation=https://github.com/theorem6/lte-pci-mapper
+After=network-online.target systemd-resolved.service
+Wants=network-online.target
+ConditionPathExists=!/var/lib/wisptools/.registered
+
+[Service]
+Type=oneshot
+ExecStart=/opt/wisptools-register.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wisptools-register
+
+# Restart on failure (network might not be ready)
+Restart=on-failure
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=10
+
+# Timeout after 10 minutes
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
+
