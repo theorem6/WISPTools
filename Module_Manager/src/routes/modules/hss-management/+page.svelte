@@ -11,6 +11,7 @@
   import MMEConnections from './components/MMEConnections.svelte';
   import BulkImport from './components/BulkImport.svelte';
   import RemoteEPCs from './components/RemoteEPCs.svelte';
+  import DeployEPC from './components/DeployEPC.svelte';
   
   let activeTab = 'dashboard';
   let stats: any = null;
@@ -190,6 +191,12 @@
         📥 Bulk Import
       </button>
       <button 
+        class:active={activeTab === 'deploy'} 
+        on:click={() => switchTab('deploy')}
+      >
+        🚀 Deploy EPC
+      </button>
+      <button 
         class:active={activeTab === 'remote-epcs'} 
         on:click={() => switchTab('remote-epcs')}
       >
@@ -211,6 +218,8 @@
         <MMEConnections {tenantId} {HSS_API} />
       {:else if activeTab === 'import'}
         <BulkImport {tenantId} {HSS_API} on:imported={loadStats} />
+      {:else if activeTab === 'deploy'}
+        <DeployEPC {tenantId} {HSS_API} />
       {:else if activeTab === 'remote-epcs'}
         <RemoteEPCs {tenantId} {HSS_API} />
       {/if}
