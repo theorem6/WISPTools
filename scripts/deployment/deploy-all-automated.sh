@@ -94,6 +94,10 @@ print_header "System Update"
 print_status "Updating package lists..."
 apt-get update -qq
 
+print_status "Fixing any broken packages..."
+DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+DEBIAN_FRONTEND=noninteractive apt-get install -f -y -qq
+
 print_status "Upgrading system packages..."
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 print_success "System updated"
@@ -125,13 +129,28 @@ print_success "Base packages installed"
 
 # Install Node.js
 print_header "Installing Node.js"
-if command -v node >/dev/null 2>&1; then
+if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     print_success "Node.js already installed: $(node --version)"
+    print_success "npm already installed: v$(npm --version)"
 else
-    print_status "Installing Node.js 20.x..."
+    print_status "Installing Node.js 20.x (includes npm)..."
+    
+    # Remove any conflicting packages
+    apt-get remove -y nodejs npm 2>/dev/null || true
+    apt-get autoremove -y 2>/dev/null || true
+    
+    # Install from NodeSource
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
-    print_success "Node.js installed: $(node --version)"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+    
+    # Verify installation
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        print_success "Node.js installed: $(node --version)"
+        print_success "npm installed: v$(npm --version)"
+    else
+        print_error "Node.js or npm installation failed"
+        exit 1
+    fi
 fi
 
 # Install MongoDB
