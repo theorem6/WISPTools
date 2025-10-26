@@ -171,33 +171,80 @@
     }
   }
   
-  async function downloadBootISO() {
+  async function downloadBootISO(epc: any = null) {
+    if (!epc) {
+      alert('Please register an EPC first, then download its ISO');
+      return;
+    }
+    
     downloadingISO = true;
     
     try {
-      // This would ideally call a backend endpoint that generates the ISO
-      // For now, provide instructions
-      alert(`To create a boot ISO with tenant ${tenantId}:
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      // Call GCE server to generate ISO
+      const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/generate-iso`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          auth_code: epc.auth_code,
+          api_key: epc.api_key,
+          secret_key: epc.secret_key,
+          site_name: epc.site_name
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Show download information
+        const message = `✅ ISO Generated Successfully!
 
-1. On a Linux system, run:
-   sudo bash scripts/deployment/build-minimal-iso.sh ${tenantId}
+EPC: ${epc.site_name} (${epc.epc_id})
+File: ${data.iso_filename}
+Size: ~${data.size_mb}MB
 
-2. The ISO will be created in iso-output/ directory
+Download URL:
+${data.download_url}
 
-3. Burn to USB:
-   sudo dd if=wisptools-epc-ubuntu-24.04-tenant-${tenantId}.iso of=/dev/sdX bs=4M
+Checksum:
+${data.checksum_url}
 
-The ISO will automatically:
-- Boot and install Ubuntu 24.04
-- Register with wisptools.io
-- Connect to HSS at ${HSS_IP}:${HSS_PORT}
-- Deploy Open5GS EPC
-- Start reporting metrics
+This ISO contains:
+• Unique EPC credentials embedded
+• Auto-connects to HSS at ${HSS_IP}:${HSS_PORT}
+• Downloads full deployment from GCE server on first boot
+• Fully automated installation
 
-GitHub: https://github.com/theorem6/lte-pci-mapper
-Scripts: scripts/deployment/build-minimal-iso.sh`);
+To use:
+1. Download the ISO
+2. Burn to USB: dd if=${data.iso_filename} of=/dev/sdX bs=4M
+3. Boot target hardware from USB
+4. System automatically deploys and connects!
+
+The ISO will download the full deployment script from the GCE server during installation.`;
+        
+        alert(message);
+        
+        // Optionally open download URL
+        if (confirm('Open download URL in new tab?')) {
+          window.open(data.download_url, '_blank');
+        }
+      } else {
+        const error = await response.json();
+        alert(`Failed to generate ISO: ${error.error || 'Unknown error'}`);
+      }
     } catch (err: any) {
       console.error('Error:', err);
+      alert(`Error generating ISO: ${err.message}`);
     } finally {
       downloadingISO = false;
     }
@@ -318,78 +365,84 @@ Scripts: scripts/deployment/build-minimal-iso.sh`);
   {:else}
     <div class="instructions-panel">
       <h3>💿 Boot Disc ISO Method</h3>
-      <p>Create a tenant-specific bootable ISO for zero-touch deployment:</p>
+      <p>Generate small bootable ISO with unique EPC credentials - downloads full deployment on first boot</p>
       
       <div class="steps">
         <div class="step">
           <div class="step-number">1</div>
           <div class="step-content">
-            <h4>Build ISO</h4>
-            <p>On a Linux workstation with this repository:</p>
-            <code>
-              git clone https://github.com/theorem6/lte-pci-mapper.git<br/>
-              cd lte-pci-mapper<br/>
-              sudo bash scripts/deployment/build-minimal-iso.sh {tenantId}
-            </code>
-            <p class="note">Takes ~10-20 minutes (downloads Ubuntu 24.04 ISO)</p>
+            <h4>Register EPC</h4>
+            <p>Click "Register New EPC" above to create EPC configuration with unique credentials</p>
           </div>
         </div>
         
         <div class="step">
           <div class="step-number">2</div>
           <div class="step-content">
-            <h4>Burn to USB</h4>
-            <code>
-              sudo dd if=iso-output/wisptools-epc-ubuntu-24.04-tenant-{tenantId}.iso \<br/>
-              of=/dev/sdX bs=4M status=progress && sync
-            </code>
-            <p class="note">Replace /dev/sdX with your USB device (check with lsblk)</p>
+            <h4>Generate ISO</h4>
+            <p>Find your EPC below and click the "💿 ISO" button</p>
+            <p>The GCE server ({HSS_IP}) will generate a small ISO (~150MB) with:</p>
+            <ul>
+              <li>✅ Unique EPC credentials embedded</li>
+              <li>✅ Tenant ID included</li>
+              <li>✅ Bootstrap script that downloads full deployment</li>
+            </ul>
           </div>
         </div>
         
         <div class="step">
           <div class="step-number">3</div>
           <div class="step-content">
-            <h4>Boot Hardware</h4>
-            <p>Boot target hardware from USB. System will:</p>
-            <ul>
-              <li>Auto-install Ubuntu 24.04 (5-10 min)</li>
-              <li>Reboot and get IP via DHCP</li>
-              <li>Auto-register with wisptools.io</li>
-              <li>Download and execute deployment</li>
-              <li>Connect to Cloud HSS at {HSS_IP}:{HSS_PORT}</li>
-            </ul>
+            <h4>Download & Burn to USB</h4>
+            <p>Download the generated ISO and burn to USB:</p>
+            <code>
+              curl -O http://{HSS_IP}/downloads/isos/wisptools-epc-*.iso<br/>
+              sudo dd if=wisptools-epc-*.iso of=/dev/sdX bs=4M status=progress && sync
+            </code>
+            <p class="note">Replace /dev/sdX with your USB device (check with lsblk)</p>
           </div>
         </div>
         
         <div class="step">
           <div class="step-number">4</div>
           <div class="step-content">
-            <h4>Monitor Dashboard</h4>
-            <p>Watch "Remote EPCs" tab - new EPC appears automatically!</p>
+            <h4>Boot & Auto-Deploy</h4>
+            <p>Boot target hardware from USB. System will automatically:</p>
+            <ul>
+              <li>🔧 Install Ubuntu 24.04 (5-10 min)</li>
+              <li>🌐 Get IP via DHCP</li>
+              <li>📥 Download full deployment from GCE ({HSS_IP})</li>
+              <li>⚙️ Install Open5GS components</li>
+              <li>🔌 Connect to Cloud HSS at {HSS_IP}:{HSS_PORT}</li>
+              <li>📊 Start reporting metrics</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <h4>Monitor Status</h4>
+            <p>Check dashboard - EPC automatically appears online!</p>
           </div>
         </div>
       </div>
       
-      <div class="info-box warning">
-        <strong>⚠️ Requirements:</strong><br/>
-        • Linux system to build ISO<br/>
-        • 10GB free space<br/>
-        • Internet connection<br/>
-        • Target: x86_64 hardware, 4GB+ RAM, 20GB+ storage
+      <div class="info-box">
+        <strong>💡 How It Works:</strong><br/>
+        • Small ISO (~150MB) contains only Ubuntu base + credentials<br/>
+        • On first boot, downloads full deployment script from GCE server<br/>
+        • Unique code per EPC ensures proper authentication<br/>
+        • All files hosted on GCE server ({HSS_IP})<br/>
+        • No manual configuration needed!
       </div>
       
-      <button 
-        class="btn-secondary btn-large"
-        on:click={downloadBootISO}
-        disabled={downloadingISO}
-      >
-        {#if downloadingISO}
-          ⏳ Generating instructions...
-        {:else}
-          📥 Get ISO Build Instructions
-        {/if}
-      </button>
+      <div class="info-box warning">
+        <strong>⚠️ Requirements:</strong><br/>
+        • Target: x86_64 hardware, 4GB+ RAM, 20GB+ storage<br/>
+        • Network: DHCP-enabled with internet access<br/>
+        • Connectivity: Must reach GCE server at {HSS_IP}
+      </div>
     </div>
   {/if}
   
@@ -441,14 +494,27 @@ Scripts: scripts/deployment/build-minimal-iso.sh`);
             
             <div class="epc-actions">
               <button 
-                class="btn-action"
+                class="btn-action btn-script"
                 on:click={() => downloadDeploymentScript(epc)}
                 disabled={downloadingScript}
+                title="Download deployment script for existing Ubuntu server"
               >
                 {#if downloadingScript}
                   ⏳
                 {:else}
-                  📥 Download Script
+                  📜 Script
+                {/if}
+              </button>
+              <button 
+                class="btn-action btn-iso"
+                on:click={() => downloadBootISO(epc)}
+                disabled={downloadingISO}
+                title="Generate bootable ISO with embedded credentials"
+              >
+                {#if downloadingISO}
+                  ⏳
+                {:else}
+                  💿 ISO
                 {/if}
               </button>
             </div>
