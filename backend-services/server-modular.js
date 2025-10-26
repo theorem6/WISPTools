@@ -29,8 +29,11 @@ const PORT = process.env.PORT || 3000; // User Management System
 // Setup middleware
 setupMiddleware(app);
 
-// Connect to database
-connectDatabase();
+// Connect to database with error handling
+connectDatabase().catch((error) => {
+  console.error('❌ Failed to connect to database:', error);
+  console.log('⚠️ Server will start but database operations may fail');
+});
 
 // Register all routes
 registerRoutes(app);

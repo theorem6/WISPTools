@@ -395,6 +395,7 @@ function requireRole(roles) {
         console.log(`⚠️ User ${req.user.email} not in MongoDB for tenant ${req.tenantId}. Checking Firestore...`);
         
         try {
+          // Check Firestore for tenant creation data (legacy)
           const tenantDoc = await firestore.collection('tenants').doc(req.tenantId).get();
           
           if (tenantDoc.exists()) {

@@ -116,7 +116,7 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
       console.log(`⚠️ Tenant ${tenantId} has no users in MongoDB. Checking Firestore...`);
       
       try {
-        const firestore = admin.firestore();
+        // Use centralized firestore
         const tenantDoc = await firestore.collection('tenants').doc(tenantId).get();
         
         if (tenantDoc.exists()) {
@@ -289,14 +289,14 @@ router.post('/invite', requireAdmin, async (req, res) => {
         role,
         customModuleAccess: customModuleAccess || null,
         invitedBy: req.user.uid,
-        invitedAt: admin.firestore.FieldValue.serverTimestamp(),
+        invitedAt: firestore.FieldValue.serverTimestamp(),
         status: 'pending',
-        expiresAt: admin.firestore.Timestamp.fromDate(
+        expiresAt: firestore.Timestamp.fromDate(
           new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         )
       };
       
-      await admin.firestore().collection('tenant_invitations').doc(invitationId).set(invitation);
+      await firestore.collection('tenant_invitations').doc(invitationId).set(invitation);
       console.log(`📧 Created invitation for ${email} (user doesn't exist yet)`);
     }
     
