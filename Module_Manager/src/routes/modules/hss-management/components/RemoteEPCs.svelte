@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { auth } from '$lib/firebase';
+  import { auth, db } from '$lib/firebase';
+  import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
   import EPCMonitor from './EPCMonitor.svelte';
   
   export let tenantId: string;
@@ -25,7 +26,8 @@
   const HSS_IP = '136.112.111.167';
   const ISO_API_PORT = '3002';
   const ISO_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
-  const NETWORK_API = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/coverageMapProxy';
+  // Use Firebase data directly via Firestore instead of API proxy
+  const NETWORK_API = 'https://lte-pci-mapper-65450042-bbf71.firebaseapp.com';
   
   // Form data for new EPC
   let formData = {
@@ -64,44 +66,26 @@
   
   async function loadSites() {
     try {
-      const user = auth().currentUser;
-      if (!user) {
-        console.log('[RemoteEPCs] No user, skipping site load');
+      console.log('[RemoteEPCs] Loading sites from Firestore, Tenant ID:', tenantId);
+      
+      if (!tenantId) {
+        console.log('[RemoteEPCs] No tenant ID, skipping site load');
         loadingSites = false;
         return;
       }
       
-      const token = await user.getIdToken();
-      console.log('[RemoteEPCs] Loading sites from:', `${NETWORK_API}/api/network/sites`);
-      console.log('[RemoteEPCs] Tenant ID:', tenantId);
+      // Query sites from Firestore
+      const sitesRef = collection(db, 'networkSites');
+      const q = query(sitesRef, where('tenant_id', '==', tenantId));
+      const querySnapshot = await getDocs(q);
       
-      const response = await fetch(`${NETWORK_API}/api/network/sites`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
-        }
-      });
+      sites = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        _id: doc.id,
+        ...doc.data()
+      }));
       
-      console.log('[RemoteEPCs] Response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[RemoteEPCs] Sites data:', data);
-        
-        // Handle both array and object with sites property
-        if (Array.isArray(data)) {
-          sites = data;
-        } else if (data && data.sites && Array.isArray(data.sites)) {
-          sites = data.sites;
-        } else {
-          sites = [];
-        }
-        
-        console.log('[RemoteEPCs] Loaded sites:', sites.length);
-      } else {
-        const errorData = await response.json();
-        console.error('[RemoteEPCs] Failed to load sites:', errorData);
-      }
+      console.log('[RemoteEPCs] Loaded sites from Firestore:', sites.length);
     } catch (err: any) {
       console.error('[RemoteEPCs] Error loading sites:', err);
     } finally {
@@ -148,50 +132,43 @@
     creatingSite = true;
     
     try {
-      const user = auth().currentUser;
-      if (!user) return;
-      
-      const token = await user.getIdToken();
-      
-      const response = await fetch(`${NETWORK_API}/api/network/sites`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: newSiteData.name,
-          location: {
-            address: newSiteData.address,
-            city: newSiteData.city,
-            state: newSiteData.state,
-            country: newSiteData.country,
-            coordinates: {
-              latitude: newSiteData.coordinates.latitude,
-              longitude: newSiteData.coordinates.longitude
-            }
+      // Add site to Firestore
+      const sitesRef = collection(db, 'networkSites');
+      const newSite = {
+        name: newSiteData.name,
+        tenant_id: tenantId,
+        location: {
+          address: newSiteData.address,
+          city: newSiteData.city,
+          state: newSiteData.state,
+          country: newSiteData.country,
+          coordinates: {
+            latitude: newSiteData.coordinates.latitude,
+            longitude: newSiteData.coordinates.longitude
           }
-        })
-      });
+        },
+        created_at: new Date(),
+        updated_at: new Date()
+      };
       
-      if (response.ok) {
-        const newSite = await response.json();
-        // Add to sites list
-        sites = [...sites, newSite];
-        
-        // Auto-select the new site
-        selectedSiteId = newSite._id || newSite.id;
-        handleSiteSelect();
-        
-        // Close modal
-        showCreateSiteModal = false;
-        
-        alert(`✅ Site "${newSiteData.name}" created successfully!`);
-      } else {
-        const error = await response.json();
-        alert(`Failed to create site: ${error.error || 'Unknown error'}`);
-      }
+      const docRef = await addDoc(sitesRef, newSite);
+      
+      // Add to sites list with ID
+      const siteWithId = {
+        id: docRef.id,
+        _id: docRef.id,
+        ...newSite
+      };
+      sites = [...sites, siteWithId];
+      
+      // Auto-select the new site
+      selectedSiteId = docRef.id;
+      handleSiteSelect();
+      
+      // Close modal
+      showCreateSiteModal = false;
+      
+      alert(`✅ Site "${newSiteData.name}" created successfully!`);
     } catch (err: any) {
       console.error('Error creating site:', err);
       alert(`Error: ${err.message}`);
