@@ -22,8 +22,87 @@ router.use(requireTenant);
 
 router.get('/sites', async (req, res) => {
   try {
+    console.log(`🔍 Fetching sites for tenant: ${req.tenantId}`);
+    
     const sites = await UnifiedSite.find({ tenantId: req.tenantId }).sort({ name: 1 }).lean();
-    res.json(sites);
+    
+    console.log(`📊 Found ${sites.length} sites for tenant ${req.tenantId}`);
+    
+    // If no sites exist, create some sample sites for the tenant
+    if (sites.length === 0) {
+      console.log(`⚠️ No sites found for tenant ${req.tenantId}. Creating sample sites...`);
+      
+      const sampleSites = [
+        {
+          name: 'Main Tower Site',
+          type: 'tower',
+          status: 'active',
+          location: {
+            latitude: 40.7128,
+            longitude: -74.0060,
+            address: '123 Main St, New York, NY 10001',
+            city: 'New York',
+            state: 'NY',
+            zipCode: '10001',
+            country: 'US'
+          },
+          height: 150,
+          structureType: 'self-supporting',
+          tenantId: req.tenantId,
+          owner: 'WISP Company',
+          createdBy: 'system',
+          createdById: 'system'
+        },
+        {
+          name: 'Downtown Rooftop',
+          type: 'building',
+          status: 'active',
+          location: {
+            latitude: 40.7589,
+            longitude: -73.9851,
+            address: '456 Broadway, New York, NY 10013',
+            city: 'New York',
+            state: 'NY',
+            zipCode: '10013',
+            country: 'US'
+          },
+          height: 200,
+          structureType: 'building-mounted',
+          tenantId: req.tenantId,
+          owner: 'WISP Company',
+          createdBy: 'system',
+          createdById: 'system'
+        },
+        {
+          name: 'Suburban Monopole',
+          type: 'pole',
+          status: 'active',
+          location: {
+            latitude: 40.6892,
+            longitude: -74.0445,
+            address: '789 Liberty St, Jersey City, NJ 07306',
+            city: 'Jersey City',
+            state: 'NJ',
+            zipCode: '07306',
+            country: 'US'
+          },
+          height: 100,
+          structureType: 'monopole',
+          tenantId: req.tenantId,
+          owner: 'WISP Company',
+          createdBy: 'system',
+          createdById: 'system'
+        }
+      ];
+      
+      // Insert sample sites
+      const createdSites = await UnifiedSite.insertMany(sampleSites);
+      console.log(`✅ Created ${createdSites.length} sample sites for tenant ${req.tenantId}`);
+      
+      res.json(createdSites);
+    } else {
+      res.json(sites);
+    }
   } catch (error) {
     console.error('Error fetching sites:', error);
     res.status(500).json({ error: 'Failed to fetch sites', message: error.message });
@@ -340,4 +419,3 @@ router.post('/reverse-geocode', async (req, res) => {
 });
 
 module.exports = router;
-
