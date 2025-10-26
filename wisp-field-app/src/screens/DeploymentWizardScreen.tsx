@@ -35,12 +35,27 @@ export default function DeploymentWizardScreen() {
 
   const loadSites = async () => {
     try {
+      console.log('🔍 Loading sites for deployment...');
       const allSites = await apiService.getSites();
-      setSites(allSites.filter((s: any) => 
-        s.type === 'tower' || s.type === 'rooftop' || s.type === 'monopole'
-      ));
+      console.log(`📊 Loaded ${allSites.length} total sites from API`);
+      
+      const filteredSites = allSites.filter((s: any) => 
+        s.type === 'tower' || s.type === 'building' || s.type === 'pole'
+      );
+      
+      console.log(`📡 Filtered to ${filteredSites.length} deployment sites (tower/building/pole)`);
+      setSites(filteredSites);
+      
+      if (filteredSites.length === 0) {
+        console.warn('⚠️ No deployment sites found. Check tenant configuration.');
+      }
     } catch (error) {
-      console.error('Failed to load sites:', error);
+      console.error('❌ Failed to load sites:', error);
+      Alert.alert(
+        'Error Loading Sites',
+        'Could not load available sites. Please check your connection and try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -198,23 +213,39 @@ export default function DeploymentWizardScreen() {
         </View>
 
         <ScrollView style={styles.siteList}>
-          {sites.map((site) => (
-            <TouchableOpacity
-              key={site._id}
-              style={styles.siteCard}
-              onPress={() => handleSelectSite(site)}
-            >
-              <Text style={styles.siteIcon}>📡</Text>
-              <View style={styles.siteInfo}>
-                <Text style={styles.siteName}>{site.name}</Text>
-                <Text style={styles.siteType}>{site.type}</Text>
-                {site.location?.address && (
-                  <Text style={styles.siteAddress}>{site.location.address}</Text>
-                )}
-              </View>
-              <Text style={styles.arrow}>→</Text>
-            </TouchableOpacity>
-          ))}
+          {sites.length === 0 ? (
+            <View style={styles.noSitesContainer}>
+              <Text style={styles.noSitesIcon}>📡</Text>
+              <Text style={styles.noSitesTitle}>No Sites Available</Text>
+              <Text style={styles.noSitesMessage}>
+                No deployment sites found for your tenant. Please contact your administrator to add sites.
+              </Text>
+              <TouchableOpacity
+                style={styles.refreshButton}
+                onPress={loadSites}
+              >
+                <Text style={styles.refreshButtonText}>🔄 Refresh</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            sites.map((site) => (
+              <TouchableOpacity
+                key={site._id}
+                style={styles.siteCard}
+                onPress={() => handleSelectSite(site)}
+              >
+                <Text style={styles.siteIcon}>📡</Text>
+                <View style={styles.siteInfo}>
+                  <Text style={styles.siteName}>{site.name}</Text>
+                  <Text style={styles.siteType}>{site.type}</Text>
+                  {site.location?.address && (
+                    <Text style={styles.siteAddress}>{site.location.address}</Text>
+                  )}
+                </View>
+                <Text style={styles.arrow}>→</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
       </View>
     );
@@ -526,6 +557,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold'
+  },
+  noSitesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#1f2937',
+    borderRadius: 12,
+    margin: 15,
+    borderWidth: 1,
+    borderColor: '#374151'
+  },
+  noSitesIcon: {
+    fontSize: 64,
+    marginBottom: 20,
+    opacity: 0.5
+  },
+  noSitesTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 12,
+    textAlign: 'center'
+  },
+  noSitesMessage: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24
+  },
+  refreshButton: {
+    backgroundColor: '#7c3aed',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   }
 });
 

@@ -106,8 +106,19 @@ class APIService {
   // ============================================================================
 
   async getSites() {
-    const response = await this.client.get('/api/network/sites');
-    return response.data;
+    try {
+      console.log('🔍 Fetching sites from API...');
+      const response = await this.client.get('/api/network/sites');
+      console.log(`📊 Received ${response.data.length} sites from API`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error fetching sites:', error);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
+      throw error;
+    }
   }
 
   async getSite(id: string) {
