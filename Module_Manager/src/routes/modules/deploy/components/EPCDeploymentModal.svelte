@@ -294,8 +294,8 @@ echo "📝 Generating configuration files..."
 sudo tee /etc/open5gs/mme.yaml > /dev/null <<EOF
 mme:
   freeDiameter:
-    identity: mme.${DIAMETER_REALM}
-    realm: ${DIAMETER_REALM}
+    identity: mme.\${DIAMETER_REALM}
+    realm: \${DIAMETER_REALM}
     port: 3868
     listen_on: 0.0.0.0
     no_fwd: false
@@ -313,8 +313,8 @@ mme:
       - /usr/local/lib/x86_64-linux-gnu/freeDiameter/dict_3gpp_ts29_329.fdx
       - /usr/local/lib/x86_64-linux-gnu/freeDiameter/dict_3gpp_ts29_329_avps.fdx
     connect_peer:
-      - identity: hss.${DIAMETER_REALM}
-        realm: ${DIAMETER_REALM}
+      - identity: hss.\${DIAMETER_REALM}
+        realm: \${DIAMETER_REALM}
         port: ${HSS_PORT}
         host: ${HSS_HOST}
   s1ap:
@@ -437,8 +437,8 @@ EOF
 sudo tee /etc/open5gs/pcrfd.yaml > /dev/null <<EOF
 pcrf:
   freeDiameter:
-    identity: pcrf.${DIAMETER_REALM}
-    realm: ${DIAMETER_REALM}
+    identity: pcrf.\${DIAMETER_REALM}
+    realm: \${DIAMETER_REALM}
     port: 3868
     listen_on: 0.0.0.0
     no_fwd: false
@@ -456,8 +456,8 @@ pcrf:
       - /usr/local/lib/x86_64-linux-gnu/freeDiameter/dict_3gpp_ts29_329.fdx
       - /usr/local/lib/x86_64-linux-gnu/freeDiameter/dict_3gpp_ts29_329_avps.fdx
     connect_peer:
-      - identity: hss.${DIAMETER_REALM}
-        realm: ${DIAMETER_REALM}
+      - identity: hss.\${DIAMETER_REALM}
+        realm: \${DIAMETER_REALM}
         port: ${HSS_PORT}
         host: ${HSS_HOST}
   gx:
