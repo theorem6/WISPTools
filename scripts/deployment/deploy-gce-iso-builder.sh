@@ -355,7 +355,8 @@ if [ ! -f "package.json" ]; then
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1"
   }
 }
 PKG_EOF
@@ -363,6 +364,31 @@ fi
 
 npm install --production --quiet
 print_success "Node.js dependencies installed"
+
+# Create .env file
+if [ ! -f "$BACKEND_DIR/.env" ]; then
+    print_status "Creating .env file..."
+    cat > "$BACKEND_DIR/.env" << ENV_EOF
+# GCE Backend Configuration
+NODE_ENV=production
+PORT=${HSS_PORT}
+GCE_PUBLIC_IP=${GCE_PUBLIC_IP}
+HSS_PORT=${HSS_PORT}
+
+# MongoDB Atlas (configure after deployment)
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/wisptools
+
+# API URLs
+HSS_API_URL=https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy
+
+# Directories
+ISO_BUILD_DIR=${ISO_BUILD_DIR}
+ISO_OUTPUT_DIR=${ISO_OUTPUT_DIR}
+BASE_ISO_PATH=${BASE_ISO_DIR}/ubuntu-${UBUNTU_VERSION}-live-server-amd64.iso
+ENV_EOF
+    chmod 600 "$BACKEND_DIR/.env"
+    print_success ".env file created"
+fi
 
 # Create systemd service
 print_header "Creating Systemd Service"
@@ -373,7 +399,8 @@ cat > /etc/systemd/system/gce-backend.service << SERVICE_EOF
 [Unit]
 Description=GCE Backend - ISO Generation and EPC Management
 Documentation=https://github.com/theorem6/lte-pci-mapper
-After=network.target mongodb.service
+After=network.target nginx.service
+Wants=nginx.service
 
 [Service]
 Type=simple
