@@ -315,8 +315,8 @@ mme:
     connect_peer:
       - identity: hss.\${DIAMETER_REALM}
         realm: \${DIAMETER_REALM}
-        port: ${HSS_PORT}
-        host: ${HSS_HOST}
+        port: \${HSS_PORT}
+        host: \${HSS_HOST}
   s1ap:
     addr: 0.0.0.0
   s11:
@@ -331,20 +331,20 @@ mme:
     addr: 0.0.0.0
   guami:
     - plmn_id:
-        mcc: ${MCC}
-        mnc: ${MNC}
+        mcc: \${MCC}
+        mnc: \${MNC}
       amf_id:
         region: 2
         set: 1
   tai:
     - plmn_id:
-        mcc: ${MCC}
-        mnc: ${MNC}
-      tac: ${TAC}
+        mcc: \${MCC}
+        mnc: \${MNC}
+      tac: \${TAC}
   plmn_support:
     - plmn_id:
-        mcc: ${MCC}
-        mnc: ${MNC}
+        mcc: \${MCC}
+        mnc: \${MNC}
       s_nssai:
         - sst: 1
   security:
@@ -357,8 +357,8 @@ mme:
       - NEA1
       - NEA0
   network_name:
-    full: ${SITE_NAME} EPC
-    short: ${SITE_NAME}
+    full: \${SITE_NAME} EPC
+    short: \${SITE_NAME}
   amf:
     addr: 0.0.0.0
   sbi:
@@ -458,8 +458,8 @@ pcrf:
     connect_peer:
       - identity: hss.\${DIAMETER_REALM}
         realm: \${DIAMETER_REALM}
-        port: ${HSS_PORT}
-        host: ${HSS_HOST}
+        port: \${HSS_PORT}
+        host: \${HSS_HOST}
   gx:
     addr: 0.0.0.0
   rx:
