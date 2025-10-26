@@ -65,9 +65,16 @@
   async function loadSites() {
     try {
       const user = auth().currentUser;
-      if (!user) return;
+      if (!user) {
+        console.log('[RemoteEPCs] No user, skipping site load');
+        loadingSites = false;
+        return;
+      }
       
       const token = await user.getIdToken();
+      console.log('[RemoteEPCs] Loading sites from:', `${NETWORK_API}/api/network/sites`);
+      console.log('[RemoteEPCs] Tenant ID:', tenantId);
+      
       const response = await fetch(`${NETWORK_API}/api/network/sites`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -75,9 +82,25 @@
         }
       });
       
+      console.log('[RemoteEPCs] Response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
-        sites = data || [];
+        console.log('[RemoteEPCs] Sites data:', data);
+        
+        // Handle both array and object with sites property
+        if (Array.isArray(data)) {
+          sites = data;
+        } else if (data && data.sites && Array.isArray(data.sites)) {
+          sites = data.sites;
+        } else {
+          sites = [];
+        }
+        
+        console.log('[RemoteEPCs] Loaded sites:', sites.length);
+      } else {
+        const errorData = await response.json();
+        console.error('[RemoteEPCs] Failed to load sites:', errorData);
       }
     } catch (err: any) {
       console.error('[RemoteEPCs] Error loading sites:', err);
@@ -656,20 +679,28 @@ To use:
               </select>
               <small class="form-hint">No sites available. Select "Create New Site" to add one.</small>
             {:else}
-              <select bind:value={selectedSiteId} on:change={handleSiteSelect}>
-                <option value="">-- Select a site --</option>
-                <option value="create-new">➕ Create New Site...</option>
-                {#each sites as site}
-                  <option value={site._id || site.id}>
-                    {site.name || site.siteName || 'Unnamed Site'} 
-                    {#if site.location?.city}
-                      - {site.location.city}, {site.location.state || ''}
-                    {/if}
-                  </option>
-                {/each}
-              </select>
+              <div style="display: flex; gap: 0.5rem;">
+                <select bind:value={selectedSiteId} on:change={handleSiteSelect} style="flex: 1;">
+                  <option value="">-- Select a site --</option>
+                  <option value="create-new">➕ Create New Site...</option>
+                  {#each sites as site}
+                    <option value={site._id || site.id}>
+                      {site.name || site.siteName || 'Unnamed Site'} 
+                      {#if site.location?.city}
+                        - {site.location.city}, {site.location.state || ''}
+                      {/if}
+                    </option>
+                  {/each}
+                </select>
+                <button type="button" class="btn-secondary" on:click={loadSites} title="Refresh sites">
+                  🔄
+                </button>
+              </div>
               {#if formData.site_name}
                 <small class="form-hint">Selected site: {formData.site_name}</small>
+              {/if}
+              {#if sites.length > 0}
+                <small class="form-hint">Found {sites.length} site(s)</small>
               {/if}
             {/if}
           </div>
