@@ -363,6 +363,7 @@ Environment="NODE_ENV=production"
 Environment="PORT=3001"
 Environment="GCE_PUBLIC_IP=136.112.111.167"
 Environment="HSS_PORT=3001"
+Environment="ISO_API_PORT=3002"
 
 # MongoDB Atlas connection (update with: systemctl edit wisptools-backend)
 Environment="MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/wisptools"

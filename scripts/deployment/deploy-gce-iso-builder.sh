@@ -52,7 +52,8 @@ echo ""
 # Configuration
 GCE_PUBLIC_IP="136.112.111.167"
 GCE_INTERNAL_IP=$(hostname -I | awk '{print $1}')
-HSS_PORT=3001
+HSS_PORT=3001  # Main HSS API (existing service)
+ISO_API_PORT=3002  # ISO Generation API (this service)
 BACKEND_DIR="/opt/gce-backend"
 ISO_BUILD_DIR="/opt/epc-iso-builder"
 ISO_OUTPUT_DIR="/var/www/html/downloads/isos"
@@ -62,7 +63,8 @@ UBUNTU_ISO_URL="https://releases.ubuntu.com/${UBUNTU_VERSION}/ubuntu-${UBUNTU_VE
 
 print_status "GCE Public IP: $GCE_PUBLIC_IP"
 print_status "GCE Internal IP: $GCE_INTERNAL_IP"
-print_status "HSS Port: $HSS_PORT"
+print_status "HSS API Port: $HSS_PORT (existing service)"
+print_status "ISO API Port: $ISO_API_PORT (this service)"
 echo ""
 
 read -p "Continue with installation? [Y/n]: " CONFIRM
@@ -293,7 +295,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;  // ISO Generation API port
 
 // Middleware
 app.use(cors());
@@ -383,7 +385,7 @@ WorkingDirectory=$BACKEND_DIR
 
 # Environment Variables (no .env file needed in GCE)
 Environment="NODE_ENV=production"
-Environment="PORT=$HSS_PORT"
+Environment="PORT=$ISO_API_PORT"
 Environment="GCE_PUBLIC_IP=$GCE_PUBLIC_IP"
 Environment="HSS_PORT=$HSS_PORT"
 
@@ -590,7 +592,8 @@ echo ""
 echo -e "${CYAN}System Information:${NC}"
 echo "  Public IP: $GCE_PUBLIC_IP"
 echo "  Internal IP: $GCE_INTERNAL_IP"
-echo "  HSS Port: $HSS_PORT"
+echo "  HSS API Port: $HSS_PORT (main backend)"
+echo "  ISO API Port: $ISO_API_PORT (ISO generation)"
 echo "  ISO Downloads: http://$GCE_PUBLIC_IP/downloads/isos/"
 echo "  Test Page: http://$GCE_PUBLIC_IP/"
 echo ""
