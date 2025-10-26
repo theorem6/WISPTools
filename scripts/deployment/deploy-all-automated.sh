@@ -91,8 +91,14 @@ print_success "Repository updated"
 
 # System update
 print_header "System Update"
+
+print_status "Cleaning up old repository files..."
+# Remove any old MongoDB repository files (we use Atlas now)
+rm -f /etc/apt/sources.list.d/mongodb*.list 2>/dev/null || true
+print_success "Old repositories cleaned"
+
 print_status "Updating package lists..."
-apt-get update -qq
+apt-get update -qq 2>&1 | grep -v "does not have a Release file" || true
 
 print_status "Fixing any broken packages..."
 DEBIAN_FRONTEND=noninteractive dpkg --configure -a
