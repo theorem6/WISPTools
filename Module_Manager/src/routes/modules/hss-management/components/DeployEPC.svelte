@@ -16,8 +16,11 @@
   const HSS_IP = '136.112.111.167';
   const HSS_HOSTNAME = 'hss.wisptools.io';
   const HSS_PORT = '3001';
-  const ISO_API_PORT = '3002';  // ISO Generation API uses different port
-  const ISO_API_URL = `http://${HSS_IP}:${ISO_API_PORT}/api`;
+  const ISO_API_PORT = '3002';
+  
+  // Use Cloud Function proxies for HTTPS (backend has no domain yet)
+  const HSS_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+  const ISO_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
   
   // Form data for new EPC registration
   let formData = {
@@ -187,8 +190,8 @@
       
       const token = await user.getIdToken();
       
-      // Call ISO Generation API (port 3002) to generate ISO
-      const response = await fetch(`${ISO_API_URL}/epc/${epc.epc_id}/generate-iso`, {
+      // Call ISO Generation API via Cloud Function proxy
+      const response = await fetch(`${ISO_PROXY}/api/epc/${epc.epc_id}/generate-iso`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

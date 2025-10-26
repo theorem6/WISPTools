@@ -214,7 +214,7 @@ function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
-// HSS API Proxy - Provides HTTPS endpoint for HTTP backend
+// HSS API Proxy - Provides HTTPS endpoint for HTTP backend (Port 3001)
 export const hssProxy = onRequest({
   region: 'us-central1',
   memory: '256MiB',
@@ -287,6 +287,76 @@ export const hssProxy = onRequest({
     console.error('HSS Proxy Error:', error);
     res.status(500).json({ 
       error: 'Proxy error', 
+      message: error.message,
+      details: error.toString()
+    });
+  }
+});
+
+// ISO Generation API Proxy - Provides HTTPS endpoint for ISO API (Port 3002)
+export const isoProxy = onRequest({
+  region: 'us-central1',
+  memory: '512MiB',
+  timeoutSeconds: 300,  // 5 minutes for ISO generation
+  cors: true
+}, async (req, res) => {
+  // Set CORS headers explicitly
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
+  res.set('Access-Control-Max-Age', '3600');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+  
+  const backendUrl = 'http://136.112.111.167:3002';  // ISO API port
+  const path = req.path || '';
+  const url = `${backendUrl}${path}`;
+  
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Forward x-tenant-id if present
+    if (req.headers['x-tenant-id']) {
+      headers['x-tenant-id'] = req.headers['x-tenant-id'] as string;
+    }
+    
+    // Forward Authorization header if present
+    if (req.headers['authorization']) {
+      headers['Authorization'] = req.headers['authorization'] as string;
+    }
+    
+    const options: RequestInit = {
+      method: req.method,
+      headers
+    };
+    
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      options.body = JSON.stringify(req.body);
+    }
+    
+    const response = await fetch(url, options);
+    
+    // Check content type to determine how to handle response
+    const contentType = response.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } else {
+      // Fallback for other content types
+      const text = await response.text();
+      res.status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
+    }
+  } catch (error: any) {
+    console.error('ISO Proxy Error:', error);
+    res.status(500).json({ 
+      error: 'ISO proxy error', 
       message: error.message,
       details: error.toString()
     });
