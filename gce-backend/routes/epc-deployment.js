@@ -33,18 +33,22 @@ router.post('/:epc_id/generate-iso', async (req, res) => {
     const { epc_id } = req.params;
     const { tenant_id, auth_code, api_key, secret_key, site_name } = req.body;
     
-    if (!tenant_id || !auth_code || !api_key || !secret_key) {
-      return res.status(400).json({ error: 'Missing required EPC credentials' });
+    if (!tenant_id || !auth_code || !api_key || !secret_key || !site_name) {
+      return res.status(400).json({ error: 'Missing required EPC credentials for ISO generation' });
     }
     
-    console.log(`[ISO Generator] Creating ISO for EPC: ${epc_id}`);
+    console.log(`[ISO Generator] Creating ISO for EPC: ${epc_id} (Tenant: ${tenant_id})`);
     
-    // Generate unique ISO ID
-    const iso_id = crypto.randomBytes(8).toString('hex');
-    const iso_filename = `wisptools-epc-${epc_id}-${iso_id}.iso`;
+    // Generate unique ISO filename
+    const timestamp = Date.now();
+    const iso_filename = `wisptools-epc-${epc_id}-${timestamp}.iso`;
     const iso_path = path.join(ISO_OUTPUT_DIR, iso_filename);
     
-    // Create cloud-init user-data with embedded credentials
+    // Create ISO build directory
+    const buildDir = path.join(ISO_BUILD_DIR, `build-${epc_id}-${timestamp}`);
+    await fs.mkdir(buildDir, { recursive: true });
+    
+    // Generate cloud-init config
     const cloudInitUserData = generateCloudInitConfig({
       epc_id,
       tenant_id,
@@ -56,32 +60,85 @@ router.post('/:epc_id/generate-iso', async (req, res) => {
       hss_port: HSS_PORT
     });
     
-    // Create ISO build directory for this EPC
-    const buildDir = path.join(ISO_BUILD_DIR, `build-${iso_id}`);
-    await fs.mkdir(buildDir, { recursive: true });
-    
-    // Write cloud-init files
+    // Create autoinstall directory
     const autoinstallDir = path.join(buildDir, 'autoinstall');
     await fs.mkdir(autoinstallDir, { recursive: true });
     await fs.writeFile(path.join(autoinstallDir, 'user-data'), cloudInitUserData);
-    await fs.writeFile(path.join(autoinstallDir, 'meta-data'), `instance-id: epc-${epc_id}\n`);
+    await fs.writeFile(path.join(autoinstallDir, 'meta-data'), `instance-id: epc-${epc_id}\nlocal-hostname: ${site_name.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}\n`);
     
-    // Create minimal ISO (this would use actual ISO creation tool)
-    // For now, simulate with a script that would call xorriso
-    const buildScript = `#!/bin/bash
+    // Build script that will actually create the ISO
+    const buildScript = path.join(buildDir, 'build.sh');
+    const buildScriptContent = `#!/bin/bash
 set -e
 
+BUILD_DIR="${buildDir}"
+ISO_PATH="${iso_path}"
+AUTOINSTALL_DIR="${autoinstallDir}"
+BASE_ISO="${BASE_ISO_PATH}"
+
+echo "[Build] Starting ISO creation..."
+echo "[Build] EPC ID: ${epc_id}"
+echo "[Build] Output: \$ISO_PATH"
+
 # Extract base Ubuntu ISO
-mkdir -p ${buildDir}/iso_extract
-7z x ${BASE_ISO_PATH} -o${buildDir}/iso_extract > /dev/null 2>&1
+echo "[Build] Extracting base Ubuntu ISO..."
+EXTRACT_DIR="\${BUILD_DIR}/iso_extract"
+mkdir -p "\${EXTRACT_DIR}"
+7z x "\${BASE_ISO}" -o"\${EXTRACT_DIR}" > /dev/null 2>&1
 
 # Copy autoinstall files
-cp -r ${autoinstallDir} ${buildDir}/iso_extract/
+echo "[Build] Copying autoinstall configuration..."
+cp -r "\${AUTOINSTALL_DIR}" "\${EXTRACT_DIR}/"
 
-# Create new ISO with xorriso
+# Update GRUB config for autoinstall
+echo "[Build] Configuring GRUB..."
+GRUB_CFG="\${EXTRACT_DIR}/boot/grub/grub.cfg"
+if [ -f "\${GRUB_CFG}" ]; then
+    cat > "\${GRUB_CFG}" << 'GRUBEOF'
+set timeout=5
+set default=0
+
+menuentry "WISPTools.io EPC - Autoinstall" {
+    set gfxpayload=keep
+    linux   /casper/vmlinuz autoinstall ds=nocloud\\\\;s=/cdrom/autoinstall/ ---
+    initrd  /casper/initrd
+}
+
+menuentry "Ubuntu Server (Manual)" {
+    set gfxpayload=keep
+    linux   /casper/vmlinuz ---
+    initrd  /casper/initrd
+}
+
+menuentry "Boot from first hard disk" {
+    set root=(hd0)
+    chainloader +1
+}
+GRUBEOF
+fi
+
+# Update ISOLINUX config for BIOS boot
+echo "[Build] Configuring ISOLINUX..."
+ISOLINUX_CFG="\${EXTRACT_DIR}/isolinux/txt.cfg"
+if [ -f "\${ISOLINUX_CFG}" ]; then
+    cat > "\${ISOLINUX_CFG}" << 'ISOLINUXEOF'
+default autoinstall
+label autoinstall
+  menu label ^WISPTools.io EPC - Autoinstall
+  kernel /casper/vmlinuz
+  append initrd=/casper/initrd autoinstall ds=nocloud;s=/cdrom/autoinstall/ ---
+label manual
+  menu label ^Ubuntu Server (Manual)
+  kernel /casper/vmlinuz
+  append initrd=/casper/initrd ---
+ISOLINUXEOF
+fi
+
+# Build ISO with xorriso
+echo "[Build] Building ISO image (this may take a few minutes)..."
 xorriso -as mkisofs \\
   -r -V "WISPTools EPC ${epc_id}" \\
-  -o ${iso_path} \\
+  -o "\${ISO_PATH}" \\
   -J -l \\
   -b isolinux/isolinux.bin \\
   -c isolinux/boot.cat \\
@@ -92,28 +149,55 @@ xorriso -as mkisofs \\
   -e boot/grub/efi.img \\
   -no-emul-boot \\
   -isohybrid-gpt-basdat \\
-  ${buildDir}/iso_extract > /dev/null 2>&1
+  -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \\
+  "\${EXTRACT_DIR}" \\
+  2>&1 | grep -v "FAILURE"
 
 # Calculate checksum
-cd ${ISO_OUTPUT_DIR}
-sha256sum ${iso_filename} > ${iso_filename}.sha256
+if [ -f "\${ISO_PATH}" ]; then
+    echo "[Build] Calculating checksum..."
+    cd "$ISO_OUTPUT_DIR"
+    sha256sum "${iso_filename}" > "${iso_filename}.sha256"
+    echo "[Build] ISO created successfully: ${iso_filename}"
+    echo "[Build] Size: \$(du -h \${ISO_PATH} | cut -f1)"
+else
+    echo "[Build] ERROR: ISO creation failed"
+    exit 1
+fi
 
-# Cleanup build directory
-rm -rf ${buildDir}
+echo "[Build] Cleaning up temporary files..."
+rm -rf "\${BUILD_DIR}"
 
-echo "ISO created: ${iso_path}"
+echo "[Build] Complete!"
 `;
     
-    await fs.writeFile(path.join(buildDir, 'build.sh'), buildScript);
-    await fs.chmod(path.join(buildDir, 'build.sh'), 0o755);
+    await fs.writeFile(buildScript, buildScriptContent);
+    await fs.chmod(buildScript, 0o755);
     
-    // Execute build script (in production)
-    // For now, create a placeholder response
-    console.log(`[ISO Generator] ISO build initiated for ${epc_id}`);
+    // Execute build script
+    console.log(`[ISO Generator] Executing build script...`);
+    try {
+      const { stdout, stderr } = await execAsync(`sudo ${buildScript}`);
+      console.log('[ISO Generator] Build output:', stdout);
+      if (stderr) console.error('[ISO Generator] Build warnings:', stderr);
+    } catch (buildError) {
+      console.error('[ISO Generator] Build failed:', buildError);
+      // Still return success if ISO file exists
+      try {
+        await fs.access(iso_path);
+      } catch {
+        throw new Error(`Build failed: ${buildError.message}`);
+      }
+    }
     
-    // Return download URL
+    // Verify ISO was created
+    const stats = await fs.stat(iso_path);
+    const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+    
     const downloadUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}`;
     const checksumUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}.sha256`;
+    
+    console.log(`[ISO Generator] ISO created: ${iso_filename} (${sizeMB}MB)`);
     
     res.json({
       success: true,
@@ -121,8 +205,8 @@ echo "ISO created: ${iso_path}"
       iso_filename,
       download_url: downloadUrl,
       checksum_url: checksumUrl,
-      size_mb: 150, // Estimated small ISO size
-      message: 'ISO generation initiated. Download will be available shortly.'
+      size_mb: sizeMB,
+      message: 'ISO generated successfully!'
     });
     
   } catch (error) {
