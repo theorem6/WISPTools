@@ -7,10 +7,13 @@
   
   let deploymentMethod: 'script' | 'iso' = 'script';
   let epcs: any[] = [];
+  let sites: any[] = [];
   let loading = true;
+  let loadingSites = true;
   let showRegisterModal = false;
   let downloadingScript = false;
   let downloadingISO = false;
+  let selectedSiteId = '';
   
   // HSS and ISO API configuration
   const HSS_IP = '136.112.111.167';
@@ -21,6 +24,7 @@
   // Use Cloud Function proxies for HTTPS (backend has no domain yet)
   const HSS_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
   const ISO_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
+  const NETWORK_API = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/coverageMapProxy';
   
   // Form data for new EPC registration
   let formData = {
@@ -49,7 +53,7 @@
   };
   
   onMount(async () => {
-    await loadEPCs();
+    await Promise.all([loadEPCs(), loadSites()]);
   });
   
   async function loadEPCs() {
@@ -73,6 +77,64 @@
       console.error('Error loading EPCs:', err);
     } finally {
       loading = false;
+    }
+  }
+  
+  async function loadSites() {
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${NETWORK_API}/api/network/sites`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        sites = data || [];
+        console.log('[DeployEPC] Loaded sites:', sites.length);
+      }
+    } catch (err: any) {
+      console.error('[DeployEPC] Error loading sites:', err);
+    } finally {
+      loadingSites = false;
+    }
+  }
+  
+  function handleSiteSelect(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const siteId = select.value;
+    selectedSiteId = siteId;
+    
+    if (!siteId) {
+      formData.site_name = '';
+      return;
+    }
+    
+    const site = sites.find(s => s._id === siteId || s.id === siteId);
+    if (site) {
+      console.log('[DeployEPC] Selected site:', site);
+      formData.site_name = site.name || site.siteName || '';
+      
+      // Auto-populate location if available
+      if (site.location) {
+        formData.location.address = site.location.address || site.address || '';
+        formData.location.city = site.location.city || site.city || '';
+        formData.location.state = site.location.state || site.state || '';
+        formData.location.coordinates.latitude = site.location.latitude || site.latitude || 0;
+        formData.location.coordinates.longitude = site.location.longitude || site.longitude || 0;
+      }
+      
+      // Auto-populate contact if available
+      if (site.contact) {
+        formData.contact.name = site.contact.name || '';
+        formData.contact.email = site.contact.email || '';
+        formData.contact.phone = site.contact.phone || '';
+      }
     }
   }
   
@@ -103,6 +165,7 @@
         await loadEPCs();
         
         // Reset form
+        selectedSiteId = '';
         formData = {
           site_name: '',
           location: {
@@ -541,8 +604,26 @@ The ISO will download the full deployment script from the GCE server during inst
       
       <div class="modal-body">
         <div class="form-group">
-          <label>Site Name *</label>
-          <input type="text" bind:value={formData.site_name} placeholder="Tower Site Alpha" />
+          <label>Select Site *</label>
+          {#if loadingSites}
+            <p class="loading-text">Loading sites...</p>
+          {:else if sites.length === 0}
+            <p class="info-text">⚠️ No sites found. Please create a tower site first in the Coverage Map module.</p>
+            <input type="text" bind:value={formData.site_name} placeholder="Or enter site name manually" />
+          {:else}
+            <select bind:value={selectedSiteId} on:change={handleSiteSelect}>
+              <option value="">-- Select a site --</option>
+              {#each sites as site}
+                <option value={site._id || site.id}>
+                  {site.name || site.siteName || 'Unnamed Site'} 
+                  {#if site.location?.city}
+                    - {site.location.city}, {site.location.state || ''}
+                  {/if}
+                </option>
+              {/each}
+            </select>
+            <small class="form-hint">Selected site: {formData.site_name || 'None'}</small>
+          {/if}
         </div>
         
         <div class="form-row">
@@ -990,6 +1071,30 @@ The ISO will download the full deployment script from the GCE server during inst
     font-size: 1rem;
     background: var(--bg-primary);
     color: var(--text-primary);
+  }
+  
+  .form-hint {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  
+  .loading-text {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 0.75rem;
+    margin: 0;
+  }
+  
+  .info-text {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
   }
   
   .form-row {
