@@ -41,7 +41,7 @@
     hssConfig: {
       hssHost: '136.112.111.167',
       hssPort: '3001',
-      diameterRealm: 'example.com'
+      diameterRealm: 'wisptools.io'
     }
   };
 

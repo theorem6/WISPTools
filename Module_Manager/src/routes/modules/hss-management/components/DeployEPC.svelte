@@ -12,10 +12,12 @@
   let downloadingScript = false;
   let downloadingISO = false;
   
-  // HSS IP address configuration
+  // HSS and ISO API configuration
   const HSS_IP = '136.112.111.167';
   const HSS_HOSTNAME = 'hss.wisptools.io';
   const HSS_PORT = '3001';
+  const ISO_API_PORT = '3002';  // ISO Generation API uses different port
+  const ISO_API_URL = `http://${HSS_IP}:${ISO_API_PORT}/api`;
   
   // Form data for new EPC registration
   let formData = {
@@ -185,8 +187,8 @@
       
       const token = await user.getIdToken();
       
-      // Call GCE server to generate ISO
-      const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/generate-iso`, {
+      // Call ISO Generation API (port 3002) to generate ISO
+      const response = await fetch(`${ISO_API_URL}/epc/${epc.epc_id}/generate-iso`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
