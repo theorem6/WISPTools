@@ -15,6 +15,12 @@
   let monitoringEPCId: string = '';
   let statusFilter = 'all';
   let viewMode = 'list'; // 'list' or 'monitor'
+  let downloadingISO = false;
+  
+  // ISO API configuration
+  const HSS_IP = '136.112.111.167';
+  const ISO_API_PORT = '3002';
+  const ISO_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
   
   // Form data for new EPC
   let formData = {
@@ -199,6 +205,71 @@
     } catch (err: any) {
       console.error('Error downloading script:', err);
       alert('Failed to download script: ' + err.message);
+    }
+  }
+  
+  async function downloadBootISO(epc: any) {
+    if (!epc) {
+      alert('Please register an EPC first');
+      return;
+    }
+    
+    downloadingISO = true;
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      // Call ISO Generation API via Cloud Function proxy
+      const response = await fetch(`${ISO_PROXY}/api/epc/${epc.epc_id}/generate-iso`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          auth_code: epc.auth_code,
+          api_key: epc.api_key,
+          secret_key: epc.secret_key,
+          site_name: epc.site_name,
+          hss_id: tenantId // Ensure tenant-specific HSS
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        alert(`✅ ISO Generated Successfully!
+        
+EPC: ${epc.site_name} (${epc.epc_id})
+File: ${data.iso_filename}
+Size: ~${data.size_mb}MB
+
+Download: ${data.download_url}
+
+To use:
+1. Download the ISO
+2. Burn to USB: dd if=${data.iso_filename} of=/dev/sdX bs=4M
+3. Boot from USB
+4. System will automatically deploy!`);
+        
+        // Open download URL
+        if (confirm('Open download URL in new tab?')) {
+          window.open(data.download_url, '_blank');
+        }
+      } else {
+        const error = await response.json();
+        alert(`Failed to generate ISO: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error('Error:', err);
+      alert(`Error generating ISO: ${err.message}`);
+    } finally {
+      downloadingISO = false;
     }
   }
   
@@ -425,6 +496,9 @@
             </button>
             <button class="btn-secondary" on:click={() => downloadDeploymentScript(epc)}>
               📥 Script
+            </button>
+            <button class="btn-secondary" on:click={() => downloadBootISO(epc)} disabled={downloadingISO}>
+              {#if downloadingISO}⏳{:else}💿 ISO{/if}
             </button>
             <button class="btn-secondary" on:click={() => viewEPCDetails(epc)}>
               ℹ️ Details
