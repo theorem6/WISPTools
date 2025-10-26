@@ -14,6 +14,7 @@
   let downloadingScript = false;
   let downloadingISO = false;
   let selectedSiteId = '';
+  let registrationError = '';
   
   // HSS and ISO API configuration
   const HSS_IP = '136.112.111.167';
@@ -110,6 +111,9 @@
     const siteId = select.value;
     selectedSiteId = siteId;
     
+    // Clear any previous errors
+    registrationError = '';
+    
     if (!siteId) {
       formData.site_name = '';
       return;
@@ -139,14 +143,21 @@
   }
   
   async function registerNewEPC() {
-    if (!formData.site_name) {
-      alert('Site name is required');
+    // Clear previous errors
+    registrationError = '';
+    
+    // Validate
+    if (!formData.site_name || formData.site_name.trim() === '') {
+      registrationError = 'Site name is required';
       return;
     }
     
     try {
       const user = auth().currentUser;
-      if (!user) return;
+      if (!user) {
+        registrationError = 'You must be logged in to register an EPC';
+        return;
+      }
       
       const token = await user.getIdToken();
       const response = await fetch(`${HSS_API}/epc/register`, {
@@ -160,8 +171,9 @@
       });
       
       if (response.ok) {
-        alert('EPC registered successfully!');
+        alert('✅ EPC registered successfully!');
         showRegisterModal = false;
+        registrationError = '';
         await loadEPCs();
         
         // Reset form
@@ -192,12 +204,22 @@
         };
       } else {
         const error = await response.json();
-        alert(`Failed to register EPC: ${error.error || 'Unknown error'}`);
+        registrationError = `Failed to register EPC: ${error.error || 'Unknown error'}`;
       }
     } catch (err: any) {
       console.error('Error registering EPC:', err);
-      alert(`Error: ${err.message}`);
+      registrationError = `Error: ${err.message}`;
     }
+  }
+  
+  function openRegisterModal() {
+    registrationError = '';
+    showRegisterModal = true;
+  }
+  
+  function closeRegisterModal() {
+    registrationError = '';
+    showRegisterModal = false;
   }
   
   async function downloadDeploymentScript(epc: any) {
@@ -340,7 +362,7 @@ The ISO will download the full deployment script from the GCE server during inst
         <h2>🚀 Deploy Remote EPC</h2>
         <p class="subtitle">Deploy distributed EPC nodes connected to Cloud HSS ({HSS_IP}:{HSS_PORT})</p>
       </div>
-      <button class="btn-primary" on:click={() => showRegisterModal = true}>
+      <button class="btn-primary" on:click={openRegisterModal}>
         ➕ Register New EPC
       </button>
     </div>
@@ -523,7 +545,7 @@ The ISO will download the full deployment script from the GCE server during inst
     {:else if epcs.length === 0}
       <div class="empty-state">
         <p>No EPCs registered yet.</p>
-        <button class="btn-primary" on:click={() => showRegisterModal = true}>
+        <button class="btn-primary" on:click={openRegisterModal}>
           Register Your First EPC
         </button>
       </div>
@@ -595,12 +617,18 @@ The ISO will download the full deployment script from the GCE server during inst
 
 <!-- Register EPC Modal -->
 {#if showRegisterModal}
-  <div class="modal-overlay" on:click={() => showRegisterModal = false}>
+  <div class="modal-overlay" on:click={closeRegisterModal}>
     <div class="modal-content" on:click|stopPropagation>
       <div class="modal-header">
         <h3>Register New Remote EPC</h3>
-        <button class="close-btn" on:click={() => showRegisterModal = false}>✕</button>
+        <button class="close-btn" on:click={closeRegisterModal}>✕</button>
       </div>
+      
+      {#if registrationError}
+        <div class="error-banner">
+          ⚠️ {registrationError}
+        </div>
+      {/if}
       
       <div class="modal-body">
         <div class="form-group">
@@ -609,7 +637,12 @@ The ISO will download the full deployment script from the GCE server during inst
             <p class="loading-text">Loading sites...</p>
           {:else if sites.length === 0}
             <p class="info-text">⚠️ No sites found. Please create a tower site first in the Coverage Map module.</p>
-            <input type="text" bind:value={formData.site_name} placeholder="Or enter site name manually" />
+            <input 
+              type="text" 
+              bind:value={formData.site_name} 
+              on:input={() => registrationError = ''}
+              placeholder="Or enter site name manually" 
+            />
           {:else}
             <select bind:value={selectedSiteId} on:change={handleSiteSelect}>
               <option value="">-- Select a site --</option>
@@ -673,7 +706,7 @@ The ISO will download the full deployment script from the GCE server during inst
       </div>
       
       <div class="modal-footer">
-        <button class="btn-secondary" on:click={() => showRegisterModal = false}>Cancel</button>
+        <button class="btn-secondary" on:click={closeRegisterModal}>Cancel</button>
         <button class="btn-primary" on:click={registerNewEPC}>Register EPC</button>
       </div>
     </div>
@@ -1095,6 +1128,16 @@ The ISO will download the full deployment script from the GCE server during inst
     border-radius: 6px;
     margin-bottom: 0.75rem;
     font-size: 0.9rem;
+  }
+  
+  .error-banner {
+    background: #ef4444;
+    color: white;
+    padding: 1rem;
+    margin: 0;
+    font-weight: 500;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
   }
   
   .form-row {
