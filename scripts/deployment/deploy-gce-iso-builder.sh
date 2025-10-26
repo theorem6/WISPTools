@@ -50,7 +50,8 @@ echo "Location: GCE Server (136.112.111.167)"
 echo ""
 
 # Configuration
-GCE_IP=$(hostname -I | awk '{print $1}')
+GCE_PUBLIC_IP="136.112.111.167"
+GCE_INTERNAL_IP=$(hostname -I | awk '{print $1}')
 HSS_PORT=3001
 BACKEND_DIR="/opt/gce-backend"
 ISO_BUILD_DIR="/opt/epc-iso-builder"
@@ -59,7 +60,8 @@ BASE_ISO_DIR="/opt/base-images"
 UBUNTU_VERSION="24.04"
 UBUNTU_ISO_URL="https://releases.ubuntu.com/${UBUNTU_VERSION}/ubuntu-${UBUNTU_VERSION}-live-server-amd64.iso"
 
-print_status "GCE IP: $GCE_IP"
+print_status "GCE Public IP: $GCE_PUBLIC_IP"
+print_status "GCE Internal IP: $GCE_INTERNAL_IP"
 print_status "HSS Port: $HSS_PORT"
 echo ""
 
@@ -71,24 +73,50 @@ fi
 
 # Update system
 print_header "Updating System"
+
+print_status "Cleaning up old repository files..."
+rm -f /etc/apt/sources.list.d/mongodb*.list 2>/dev/null || true
+
 print_status "Running apt update..."
-apt-get update -qq
+apt-get update -qq 2>&1 | grep -v "does not have a Release file" || true
+
+print_status "Fixing broken packages..."
+dpkg --configure -a 2>/dev/null || true
+apt-get install -f -y -qq 2>/dev/null || true
 
 print_status "Installing system updates..."
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 
 print_success "System updated"
 
-# Install required packages
-print_header "Installing Required Packages"
+# Install Node.js (includes npm)
+print_header "Installing Node.js & npm"
+if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    print_success "Node.js already installed: $(node --version)"
+    print_success "npm already installed: v$(npm --version)"
+else
+    print_status "Installing Node.js 20.x (includes npm)..."
+    apt-get remove -y nodejs npm 2>/dev/null || true
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+    
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        print_success "Node.js installed: $(node --version)"
+        print_success "npm installed: v$(npm --version)"
+    else
+        print_error "Node.js/npm installation failed"
+        exit 1
+    fi
+fi
+
+# Install other required packages
+print_header "Installing ISO Builder Packages"
 
 PACKAGES="
     xorriso
     isolinux
     p7zip-full
     nginx
-    nodejs
-    npm
     curl
     wget
     git
@@ -353,7 +381,7 @@ User=root
 WorkingDirectory=$BACKEND_DIR
 Environment="NODE_ENV=production"
 Environment="PORT=$HSS_PORT"
-Environment="GCE_PUBLIC_IP=$GCE_IP"
+Environment="GCE_PUBLIC_IP=$GCE_PUBLIC_IP"
 Environment="HSS_PORT=$HSS_PORT"
 ExecStart=/usr/bin/node $BACKEND_DIR/server.js
 Restart=always
@@ -545,10 +573,11 @@ echo ""
 print_success "GCE ISO Builder is now running!"
 echo ""
 echo -e "${CYAN}System Information:${NC}"
-echo "  Server IP: $GCE_IP"
+echo "  Public IP: $GCE_PUBLIC_IP"
+echo "  Internal IP: $GCE_INTERNAL_IP"
 echo "  HSS Port: $HSS_PORT"
-echo "  ISO Downloads: http://$GCE_IP/downloads/isos/"
-echo "  Test Page: http://$GCE_IP/"
+echo "  ISO Downloads: http://$GCE_PUBLIC_IP/downloads/isos/"
+echo "  Test Page: http://$GCE_PUBLIC_IP/"
 echo ""
 echo -e "${CYAN}Services:${NC}"
 echo "  Backend: systemctl status gce-backend.service"
@@ -565,7 +594,7 @@ echo "  Base Images: $BASE_ISO_DIR"
 echo "  Backend: $BACKEND_DIR"
 echo ""
 echo -e "${CYAN}Next Steps:${NC}"
-echo "  1. Visit http://$GCE_IP/ to verify installation"
+echo "  1. Visit http://$GCE_PUBLIC_IP/ to verify installation"
 echo "  2. Check /downloads/isos/ for generated ISOs"
 echo "  3. Deploy EPCs from wisptools.io UI"
 echo "  4. Monitor logs for ISO generation"
