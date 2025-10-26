@@ -18,7 +18,7 @@ This single command sets up:
 - ✅ ISO Builder
 - ✅ Deployment APIs
 - ✅ Web Server (Nginx)
-- ✅ MongoDB
+- ✅ MongoDB Atlas connection
 - ✅ All system services
 
 ---
@@ -96,7 +96,33 @@ bash scripts/deployment/deploy-frontend-updates.sh development
 
 ---
 
-### 4. **Windows PowerShell Deployment**
+### 4. **Update MongoDB Atlas Connection**
+**Script:** `update-mongodb-atlas.sh`
+
+**What it does:**
+- Updates MongoDB Atlas connection string
+- Backs up existing configuration
+- Restarts backend service
+- Verifies connection
+
+**Usage:**
+```bash
+# On GCE server
+sudo bash scripts/deployment/update-mongodb-atlas.sh "mongodb+srv://user:pass@cluster.mongodb.net/wisptools"
+```
+
+**Get your Atlas connection string:**
+1. Login to MongoDB Atlas (https://cloud.mongodb.com)
+2. Click "Connect" on your cluster
+3. Choose "Connect your application"
+4. Copy the connection string
+5. Replace `<password>` with your actual password
+
+**Time:** <1 minute
+
+---
+
+### 5. **Windows PowerShell Deployment**
 **Script:** `Deploy-All.ps1`
 
 **What it does:**

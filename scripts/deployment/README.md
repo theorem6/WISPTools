@@ -30,10 +30,13 @@ bash scripts/deployment/deploy-frontend-updates.sh production
 | `deploy-frontend-updates.sh` | Frontend to Firebase | Linux/Mac | 5-10 min |
 | `Deploy-All.ps1` | Complete deployment | Windows | Varies |
 | `update-gce-ip.sh` | Update IP address | Linux/Mac | <1 min |
+| `update-mongodb-atlas.sh` | Update Atlas connection | Linux | <1 min |
 | `deploy-gce-iso-builder.sh` | ISO builder only | Linux | 5 min |
 | `build-minimal-iso.sh` | Build single ISO | Linux | 2 min |
 | `wisptools-register.sh` | EPC auto-registration | Linux | <1 min |
 | `cloud-init-autoinstall.yaml` | Unattended Ubuntu install | Linux | N/A |
+| `fix-broken-packages.sh` | Fix apt package issues | Linux | <1 min |
+| `reinstall-nodejs.sh` | Clean Node.js reinstall | Linux | 2 min |
 
 ---
 

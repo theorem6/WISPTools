@@ -153,20 +153,10 @@ else
     fi
 fi
 
-# Install MongoDB
-print_header "Installing MongoDB"
-if command -v mongod >/dev/null 2>&1; then
-    print_success "MongoDB already installed"
-else
-    print_status "Installing MongoDB..."
-    wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | apt-key add -
-    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mongodb-org
-    systemctl enable mongod
-    systemctl start mongod
-    print_success "MongoDB installed and running"
-fi
+# MongoDB (using Atlas cloud - no local installation needed)
+print_header "MongoDB Configuration"
+print_status "Using MongoDB Atlas (cloud database)"
+print_success "No local MongoDB installation required"
 
 # Install nginx
 print_header "Installing Nginx"
@@ -247,8 +237,9 @@ PORT=3001
 GCE_PUBLIC_IP=136.112.111.167
 HSS_PORT=3001
 
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/wisptools
+# MongoDB Atlas (cloud database)
+# TODO: Update with your Atlas connection string
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/wisptools?retryWrites=true&w=majority
 
 # API URLs
 HSS_API_URL=https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy
@@ -262,6 +253,8 @@ BASE_ISO_PATH=/opt/base-images/ubuntu-24.04-live-server-amd64.iso
 SESSION_SECRET=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 ENV_EOF
+
+print_warning "Remember to update MONGODB_URI in $BACKEND_DIR/.env with your Atlas connection string"
 
 chmod 600 "$BACKEND_DIR/.env"
 print_success "Environment configured"
@@ -295,7 +288,7 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       api: 'running',
-      mongodb: 'connected',
+      mongodb: 'atlas (cloud)',
       iso_builder: 'ready'
     }
   });
@@ -378,8 +371,8 @@ cat > /etc/systemd/system/wisptools-backend.service << SERVICE_EOF
 [Unit]
 Description=WISPTools.io Complete Backend System
 Documentation=https://github.com/theorem6/lte-pci-mapper
-After=network.target mongodb.service nginx.service
-Wants=mongodb.service nginx.service
+After=network.target nginx.service
+Wants=nginx.service
 
 [Service]
 Type=simple
@@ -490,13 +483,14 @@ echo ""
 
 # Service status
 echo "Services:"
-for service in wisptools-backend nginx mongodb; do
+for service in wisptools-backend nginx; do
     if systemctl is-active --quiet $service; then
         echo "  ✓ $service: running"
     else
         echo "  ✗ $service: stopped"
     fi
 done
+echo "  ✓ mongodb: Atlas (cloud)"
 
 echo ""
 echo "Network:"
@@ -676,7 +670,7 @@ sleep 2
 print_status "Checking services..."
 systemctl is-active --quiet wisptools-backend && print_success "Backend: Running" || print_error "Backend: Stopped"
 systemctl is-active --quiet nginx && print_success "Nginx: Running" || print_error "Nginx: Stopped"
-systemctl is-active --quiet mongodb && print_success "MongoDB: Running" || print_error "MongoDB: Stopped"
+print_success "MongoDB: Atlas (cloud)"
 
 print_status "Testing endpoints..."
 curl -s http://localhost:3001/health > /dev/null && print_success "Backend API: Responding" || print_error "Backend API: Not responding"
