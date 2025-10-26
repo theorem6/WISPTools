@@ -81,23 +81,49 @@ if [ -f "$CONFIG_DIR/tenant.conf" ]; then
     fi
 fi
 
-# If no tenant ID, prompt for it
+# Check kernel command line for tenant ID (can be passed at boot)
 if [ -z "$TENANT_ID" ]; then
-    print_warning "No tenant ID configured"
-    echo ""
-    echo "Please enter your WISPTools.io Tenant ID"
-    echo "(You can find this in your wisptools.io dashboard under Settings > Tenant Info)"
-    echo ""
-    read -p "Tenant ID: " TENANT_ID
+    CMDLINE_TENANT=$(grep -oP 'wisptools_tenant=\K[^\s]+' /proc/cmdline 2>/dev/null || echo "")
+    if [ -n "$CMDLINE_TENANT" ]; then
+        TENANT_ID="$CMDLINE_TENANT"
+        print_success "Found tenant ID from boot parameters: $TENANT_ID"
+        # Save for future boots
+        echo "WISPTOOLS_TENANT_ID=$TENANT_ID" > "$CONFIG_DIR/tenant.conf"
+        chmod 600 "$CONFIG_DIR/tenant.conf"
+    fi
+fi
+
+# If no tenant ID found, use default for testing (can be overridden)
+if [ -z "$TENANT_ID" ]; then
+    # For automated deployment, we need a tenant ID
+    # This should be set during ISO creation or boot parameters
+    print_error "No tenant ID configured"
+    print_error "This system cannot auto-register without a tenant ID"
+    print_status "Please create boot disc with embedded tenant ID:"
+    print_status "  sudo bash scripts/deployment/build-minimal-iso.sh YOUR_TENANT_ID"
     
-    if [ -z "$TENANT_ID" ]; then
-        print_error "Tenant ID is required"
+    # Allow manual entry as fallback
+    if [ -t 0 ]; then
+        # Interactive terminal available
+        echo ""
+        echo "Or enter your WISPTools.io Tenant ID now:"
+        echo "(Find this in wisptools.io dashboard under Settings > Tenant Info)"
+        echo ""
+        read -p "Tenant ID: " TENANT_ID
+        
+        if [ -z "$TENANT_ID" ]; then
+            print_error "Tenant ID is required for registration"
+            exit 1
+        fi
+        
+        # Save tenant ID for future use
+        echo "WISPTOOLS_TENANT_ID=$TENANT_ID" > "$CONFIG_DIR/tenant.conf"
+        chmod 600 "$CONFIG_DIR/tenant.conf"
+    else
+        # Non-interactive - cannot proceed
+        print_error "Cannot proceed without tenant ID in non-interactive mode"
         exit 1
     fi
-    
-    # Save tenant ID for future use
-    echo "WISPTOOLS_TENANT_ID=$TENANT_ID" > "$CONFIG_DIR/tenant.conf"
-    chmod 600 "$CONFIG_DIR/tenant.conf"
 fi
 
 # Collect hardware information

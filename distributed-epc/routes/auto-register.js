@@ -95,17 +95,24 @@ router.post('/auto-register', requireTenant, async (req, res) => {
     // This would require a geolocation service/API
     // For now, use placeholder values
     
-    // Auto-assign network configuration
-    // In production, this might query available MCC/MNC pools
-    // or use tenant-specific defaults
+    // Auto-assign tenant-specific network configuration
+    // Query tenant settings or use defaults
+    // TODO: Fetch tenant's MCC/MNC pool from database
+    
+    // Generate unique TAC based on timestamp to avoid conflicts
+    const tac = Math.floor(Date.now() / 1000) % 65535 + 1;
+    
+    // Use test MCC/MNC for now - in production this would come from tenant settings
     const network_config = {
-      mcc: '001', // Test network - should be configured per tenant
-      mnc: '01',
-      tac: Math.floor(Math.random() * 65535) + 1, // Random TAC
+      mcc: '001', // Test network MCC
+      mnc: '01',  // Test network MNC
+      tac: tac,   // Unique TAC per EPC
       apn: 'internet',
       dns_primary: '8.8.8.8',
       dns_secondary: '8.8.4.4'
     };
+    
+    console.log(`[Auto-Register] Assigned TAC ${tac} to ${epc_id}`);
     
     // Create EPC record
     const epc = new RemoteEPC({

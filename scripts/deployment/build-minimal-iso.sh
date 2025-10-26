@@ -159,16 +159,30 @@ if [ -n "$TENANT_ID" ]; then
     # Create tenant configuration that will be copied during installation
     cat > "$ISO_CUSTOM_DIR/autoinstall/tenant.conf" <<EOF
 # WISPTools.io Tenant Configuration
-# Embedded during ISO creation
+# Embedded during ISO creation: $(date)
 WISPTOOLS_TENANT_ID="$TENANT_ID"
 EOF
     
-    # Add late command to copy tenant config
-    # This would need to be integrated into the cloud-init file
-    print_success "Tenant ID embedded"
+    # Update cloud-init to copy tenant config
+    print_status "Updating cloud-init configuration with tenant ID..."
+    
+    # Add late command to copy tenant config to target system
+    cat >> "$ISO_CUSTOM_DIR/autoinstall/user-data" <<EOF
+
+    # Copy embedded tenant configuration
+    - curtin in-target --target=/target -- mkdir -p /etc/wisptools
+    - curtin in-target --target=/target -- bash -c "echo 'WISPTOOLS_TENANT_ID=$TENANT_ID' > /etc/wisptools/tenant.conf"
+    - curtin in-target --target=/target -- chmod 600 /etc/wisptools/tenant.conf
+    - curtin in-target --target=/target -- bash -c "echo 'Tenant ID embedded: $TENANT_ID' >> /var/log/wisptools-install.log"
+EOF
+    
+    print_success "Tenant ID embedded in ISO"
+    print_success "This ISO will automatically register to tenant: $TENANT_ID"
     ISO_NAME="${ISO_NAME}-tenant-${TENANT_ID}"
 else
     print_warning "No tenant ID provided - system will prompt on first boot"
+    print_warning "For fully automated deployment, rebuild with tenant ID:"
+    print_warning "  sudo bash $0 YOUR_TENANT_ID"
 fi
 
 # Modify grub configuration for autoinstall

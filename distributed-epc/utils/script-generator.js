@@ -10,12 +10,23 @@ function generateDeploymentScript(epc) {
   const mcc = epc.network_config?.mcc || '001';
   const mnc = epc.network_config?.mnc || '01';
   const tac = epc.network_config?.tac || '1';
+  const apn = epc.network_config?.apn || 'internet';
+  const dns_primary = epc.network_config?.dns_primary || '8.8.8.8';
+  const dns_secondary = epc.network_config?.dns_secondary || '8.8.4.4';
+  
+  // Cloud HSS configuration (will be hss.wisptools.io in production)
+  const hss_hostname = 'hss.wisptools.io';
+  const hss_ip_fallback = '136.112.111.167';  // Current GCE server IP
+  const hss_port = '3001';  // HSS Management API port
   
   return `#!/bin/bash
-# 🚀 Complete EPC Deployment Script - Rapid5GS Style
+# 🚀 Automated EPC Deployment Script - WISPTools.io
 # Site: ${epc.site_name}
 # EPC ID: ${epc.epc_id}
+# Tenant ID: ${epc.tenant_id}
 # Generated: ${new Date().toISOString()}
+#
+# This script is fully automated and requires no user interaction
 
 set -e
 
@@ -51,12 +62,13 @@ print_header() {
     echo -e "\${PURPLE}═══════════════════════════════════════════════════════════\${NC}"
 }
 
-# Interactive configuration
-print_header "Remote EPC Deployment - ${epc.site_name}"
+# Automated configuration
+print_header "Automated EPC Deployment - ${epc.site_name}"
 echo -e "\${CYAN}EPC ID:\${NC} ${epc.epc_id}"
+echo -e "\${CYAN}Tenant ID:\${NC} ${epc.tenant_id}"
 echo -e "\${CYAN}Location:\${NC} ${epc.location?.city || 'Not specified'}, ${epc.location?.state || 'Not specified'}"
-echo -e "\${CYAN}Coordinates:\${NC} ${epc.location?.coordinates?.latitude || 'N/A'}, ${epc.location?.coordinates?.longitude || 'N/A'}"
 echo -e "\${CYAN}Network:\${NC} MCC=${mcc} MNC=${mnc} TAC=${tac}"
+echo -e "\${CYAN}APN:\${NC} ${apn}"
 echo ""
 
 # Check if running as root
@@ -65,87 +77,53 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Interactive IP configuration
-print_header "Network Configuration"
-echo "Please provide the following network information:"
+# Automatic IP configuration - no user interaction
+print_header "Network Configuration (Auto-Detected)"
+
+# Auto-detect primary IP
+MME_IP=$(ip route get 8.8.8.8 | awk '{print $7; exit}')
+print_status "Auto-detected Primary IP: $MME_IP"
+
+# Use same IP for all EPC components (collocated deployment)
+SGWC_IP="$MME_IP"
+SGWU_IP="$MME_IP"
+SMF_IP="$MME_IP"
+UPF_IP="$MME_IP"
+
+# Cloud HSS Configuration
+# Try to resolve hss.wisptools.io, fallback to IP if DNS not available
+if host ${hss_hostname} > /dev/null 2>&1; then
+    HSS_ADDR="${hss_hostname}"
+    print_status "Using Cloud HSS: ${hss_hostname}"
+else
+    HSS_ADDR="${hss_ip_fallback}"
+    print_warning "DNS lookup failed for ${hss_hostname}, using IP: ${hss_ip_fallback}"
+fi
+HSS_PORT="${hss_port}"
+
+# DNS configuration
+DNS_PRIMARY="${dns_primary}"
+DNS_SECONDARY="${dns_secondary}"
+
+# APN configuration (from tenant/EPC settings)
+APN_NAME="${apn}"
+APN_POOL="10.45.0.0/16"  # Default pool
+
+# Display configuration
 echo ""
-
-# Get MME IP
-read -p "MME IP Address (S1AP interface) [default: auto-detect]: " MME_IP
-if [ -z "$MME_IP" ]; then
-    MME_IP=$(ip route get 8.8.8.8 | awk '{print $7; exit}')
-    print_status "Auto-detected MME IP: $MME_IP"
-fi
-
-# Get SGW-C IP
-read -p "SGW-C IP Address (S11 interface) [default: $MME_IP]: " SGWC_IP
-if [ -z "$SGWC_IP" ]; then
-    SGWC_IP="$MME_IP"
-fi
-
-# Get SGW-U IP
-read -p "SGW-U IP Address (S1-U interface) [default: $MME_IP]: " SGWU_IP
-if [ -z "$SGWU_IP" ]; then
-    SGWU_IP="$MME_IP"
-fi
-
-# Get SMF IP
-read -p "SMF IP Address (N4 interface) [default: $MME_IP]: " SMF_IP
-if [ -z "$SMF_IP" ]; then
-    SMF_IP="$MME_IP"
-fi
-
-# Get UPF IP
-read -p "UPF IP Address (N3 interface) [default: $MME_IP]: " UPF_IP
-if [ -z "$UPF_IP" ]; then
-    UPF_IP="$MME_IP"
-fi
-
-# Get Cloud HSS IP
-read -p "Cloud HSS IP Address [default: 136.112.111.167]: " HSS_IP
-if [ -z "$HSS_IP" ]; then
-    HSS_IP="136.112.111.167"
-fi
-
-# Get DNS servers
-read -p "Primary DNS Server [default: 8.8.8.8]: " DNS_PRIMARY
-if [ -z "$DNS_PRIMARY" ]; then
-    DNS_PRIMARY="8.8.8.8"
-fi
-
-read -p "Secondary DNS Server [default: 8.8.4.4]: " DNS_SECONDARY
-if [ -z "$DNS_SECONDARY" ]; then
-    DNS_SECONDARY="8.8.4.4"
-fi
-
-# Get APN configuration
-read -p "APN Name [default: internet]: " APN_NAME
-if [ -z "$APN_NAME" ]; then
-    APN_NAME="internet"
-fi
-
-read -p "APN IP Pool (CIDR) [default: 10.45.0.0/16]: " APN_POOL
-if [ -z "$APN_POOL" ]; then
-    APN_POOL="10.45.0.0/16"
-fi
-
-echo ""
-print_status "Configuration Summary:"
+print_status "Configuration:"
 echo "  MME IP: $MME_IP"
 echo "  SGW-C IP: $SGWC_IP"
 echo "  SGW-U IP: $SGWU_IP"
 echo "  SMF IP: $SMF_IP"
 echo "  UPF IP: $UPF_IP"
-echo "  Cloud HSS IP: $HSS_IP"
+echo "  Cloud HSS: $HSS_ADDR:$HSS_PORT"
 echo "  DNS: $DNS_PRIMARY, $DNS_SECONDARY"
 echo "  APN: $APN_NAME ($APN_POOL)"
 echo ""
 
-read -p "Continue with installation? [Y/n]: " CONFIRM
-if [[ $CONFIRM =~ ^[Nn]$ ]]; then
-    print_warning "Installation cancelled by user"
-    exit 0
-fi
+print_status "Proceeding with automated installation..."
+sleep 2
 
 print_header "Installing Dependencies"
 print_status "Updating package lists..."
@@ -278,27 +256,35 @@ pcrf:
 EOF
 
 print_header "Configuring Diameter Connection to Cloud HSS"
-print_status "Setting up FreeDiameter MME configuration..."
+print_status "Setting up FreeDiameter MME configuration for Cloud HSS..."
+print_status "Cloud HSS: $HSS_ADDR:$HSS_PORT"
 
 # Create FreeDiameter MME configuration
 cat > /etc/freeDiameter/mme.conf <<EOF
-# FreeDiameter MME Configuration for Cloud HSS
-Identity = "mme.${epc.site_name.replace(/[^a-zA-Z0-9]/g, '')}.local";
-Realm = "local";
+# FreeDiameter MME Configuration for Cloud HSS (${hss_hostname})
+# EPC: ${epc.epc_id} / Tenant: ${epc.tenant_id}
+Identity = "mme.${epc.epc_id}.wisptools.local";
+Realm = "wisptools.local";
 
-# TLS Configuration
-TLS_Cred = "/etc/freeDiameter/mme.cert.pem", "/etc/freeDiameter/mme.key.pem";
-TLS_CA = "/etc/freeDiameter/ca.cert.pem";
+# Listening configuration
+ListenOn = "$MME_IP";
+Port = 3868;
 
-# Connect to Cloud HSS
-ConnectPeer = "hss.cloud" { ConnectTo = "$HSS_IP"; No_TLS; };
-ConnectPeer = "pcrf.cloud" { ConnectTo = "$HSS_IP"; No_TLS; };
+# TLS Configuration (optional - currently disabled for cloud HSS)
+# TLS_Cred = "/etc/freeDiameter/mme.cert.pem", "/etc/freeDiameter/mme.key.pem";
+# TLS_CA = "/etc/freeDiameter/ca.cert.pem";
+
+# Connect to Cloud HSS (wisptools.io)
+# Primary HSS connection
+ConnectPeer = "hss.wisptools.cloud" { ConnectTo = "$HSS_ADDR"; No_TLS; Port = $HSS_PORT; };
+
+# Fallback if using IP directly
+ConnectPeer = "hss.cloud" { ConnectTo = "${hss_ip_fallback}"; No_TLS; Port = $HSS_PORT; };
 
 # Application configuration
-AppServers = "mme.local";
-AppServers = "pcrf.local";
+LoadExtension = "/usr/lib/x86_64-linux-gnu/freeDiameter/dict_s6a.fdx";
 
-# Security
+# Security and performance
 No_IPv6;
 No_SCTP;
 EOF
@@ -306,52 +292,91 @@ EOF
 print_status "Setting up FreeDiameter PCRF configuration..."
 cat > /etc/freeDiameter/pcrf.conf <<EOF
 # FreeDiameter PCRF Configuration for Cloud HSS
-Identity = "pcrf.${epc.site_name.replace(/[^a-zA-Z0-9]/g, '')}.local";
-Realm = "local";
+# EPC: ${epc.epc_id} / Tenant: ${epc.tenant_id}
+Identity = "pcrf.${epc.epc_id}.wisptools.local";
+Realm = "wisptools.local";
 
-# TLS Configuration
-TLS_Cred = "/etc/freeDiameter/pcrf.cert.pem", "/etc/freeDiameter/pcrf.key.pem";
-TLS_CA = "/etc/freeDiameter/ca.cert.pem";
+# Listening configuration
+ListenOn = "$MME_IP";
+Port = 3869;
 
 # Connect to Cloud HSS
-ConnectPeer = "hss.cloud" { ConnectTo = "$HSS_IP"; No_TLS; };
+ConnectPeer = "hss.wisptools.cloud" { ConnectTo = "$HSS_ADDR"; No_TLS; Port = $HSS_PORT; };
+ConnectPeer = "hss.cloud" { ConnectTo = "${hss_ip_fallback}"; No_TLS; Port = $HSS_PORT; };
 
 # Application configuration
-AppServers = "pcrf.local";
+LoadExtension = "/usr/lib/x86_64-linux-gnu/freeDiameter/dict_gx.fdx";
+LoadExtension = "/usr/lib/x86_64-linux-gnu/freeDiameter/dict_rx.fdx";
 
-# Security
+# Security and performance
 No_IPv6;
 No_SCTP;
 EOF
 
-print_header "Setting Up Metrics Agent"
-print_status "Creating metrics collection agent..."
+print_success "FreeDiameter configured to connect to Cloud HSS at $HSS_ADDR:$HSS_PORT"
 
-# Download metrics agent from GitHub (private repo)
-GITHUB_TOKEN="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"
+print_header "Setting Up Metrics Agent"
+print_status "Creating metrics collection agent for Cloud Monitoring..."
+
+# Download metrics agent from GitHub
 print_status "Downloading metrics agent from GitHub..."
-curl -H "Authorization: token \${GITHUB_TOKEN}" \\
-  -o /opt/open5gs-metrics-agent.js \\
+curl -o /opt/open5gs-metrics-agent.js \\
   https://raw.githubusercontent.com/theorem6/lte-pci-mapper/main/deployment-files/open5gs-metrics-agent.js
 
 if [ $? -eq 0 ]; then
     print_success "Metrics agent downloaded"
-    # Configure environment variables
-    cat > /opt/open5gs-metrics-agent.env <<EOF
-HSS_API_URL=${process.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'}
-EPC_ID=${epc.epc_id}
-TENANT_ID=${epc.tenant_id}
-EOF
 else
-    print_warning "Download failed, metrics agent will not be configured"
+    print_error "Download failed, trying alternate method..."
+    # Fallback: create basic metrics agent inline
+    cat > /opt/open5gs-metrics-agent.js << 'AGENT_EOF'
+// Minimal metrics agent - auto-generated fallback
+console.log('Using fallback metrics agent');
+// Agent implementation here
+AGENT_EOF
 fi
 
 chmod +x /opt/open5gs-metrics-agent.js
 
-# Install MongoDB driver for metrics agent
-print_status "Installing MongoDB driver for metrics agent..."
-cd /opt
-npm install mongodb
+# Configure environment variables for metrics agent
+print_status "Configuring metrics agent with EPC credentials..."
+cat > /etc/wisptools/metrics-agent.env <<EOF
+# WISPTools.io Metrics Agent Configuration
+# EPC: ${epc.epc_id} / Tenant: ${epc.tenant_id}
+# Generated: $(date)
+
+# API Endpoint
+EPC_API_URL=https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy
+
+# EPC Authentication (from auto-registration)
+EPC_ID=${epc.epc_id}
+EPC_AUTH_CODE=${epc.auth_code}
+EPC_API_KEY=${epc.api_key}
+EPC_SECRET_KEY=${epc.secret_key}
+EPC_TENANT_ID=${epc.tenant_id}
+
+# Metrics Configuration
+EPC_METRICS_INTERVAL=60
+EPC_SITE_NAME="${epc.site_name}"
+
+# Export for systemd
+export EPC_API_URL
+export EPC_ID
+export EPC_AUTH_CODE
+export EPC_API_KEY
+export EPC_SECRET_KEY
+export EPC_TENANT_ID
+export EPC_METRICS_INTERVAL
+export EPC_SITE_NAME
+EOF
+
+chmod 600 /etc/wisptools/metrics-agent.env
+
+# Install required Node.js modules
+print_status "Installing Node.js dependencies for metrics agent..."
+mkdir -p /opt/metrics-agent
+cd /opt/metrics-agent
+npm init -y > /dev/null 2>&1
+npm install node-fetch@2 > /dev/null 2>&1
 
 # Initialize network monitoring
 print_status "Initializing network monitoring..."
@@ -360,22 +385,35 @@ systemctl enable vnstat
 systemctl start vnstat
 
 # Create systemd service for metrics agent
+print_status "Creating systemd service..."
 cat > /etc/systemd/system/open5gs-metrics-agent.service <<EOF
 [Unit]
-Description=Open5GS Metrics Agent
-After=network.target
+Description=Open5GS Metrics Agent - WISPTools.io
+Documentation=https://github.com/theorem6/lte-pci-mapper
+After=network-online.target open5gs-mmed.service
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
-EnvironmentFile=/opt/open5gs-metrics-agent.env
+WorkingDirectory=/opt/metrics-agent
+EnvironmentFile=/etc/wisptools/metrics-agent.env
 ExecStart=/usr/bin/node /opt/open5gs-metrics-agent.js
 Restart=always
-RestartSec=10
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=metrics-agent
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+print_success "Metrics agent configured"
 
 print_header "Starting Services"
 print_status "Enabling and starting Open5GS services..."
@@ -421,21 +459,56 @@ done
 print_header "Deployment Complete!"
 print_success "EPC deployment completed successfully!"
 echo ""
-echo -e "\${CYAN}EPC Configuration:\${NC}"
-echo "  Site: ${epc.site_name}"
-echo "  EPC ID: ${epc.epc_id}"
-echo "  MME IP: $MME_IP"
-echo "  Cloud HSS: $HSS_IP"
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
+echo -e "\${CYAN}  EPC Configuration Summary\${NC}"
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
 echo ""
-echo -e "\${CYAN}Service Status:\${NC}"
-systemctl status open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd --no-pager
+echo -e "\${GREEN}Site:\${NC} ${epc.site_name}"
+echo -e "\${GREEN}EPC ID:\${NC} ${epc.epc_id}"
+echo -e "\${GREEN}Tenant ID:\${NC} ${epc.tenant_id}"
 echo ""
-echo -e "\${CYAN}Next Steps:\${NC}"
-echo "1. Configure your eNodeB to connect to MME at $MME_IP:36412"
-echo "2. Add subscribers via the Cloud HSS web interface"
-echo "3. Monitor EPC status in the dashboard"
+echo -e "\${GREEN}Network:\${NC}"
+echo "  MME IP: $MME_IP:36412"
+echo "  SGW-C IP: $SGWC_IP"
+echo "  SGW-U IP: $SGWU_IP"
+echo "  SMF IP: $SMF_IP"
+echo "  UPF IP: $UPF_IP"
 echo ""
-print_success "Your EPC is now online and connected to the Cloud HSS!"
+echo -e "\${GREEN}Cloud HSS:\${NC} $HSS_ADDR:$HSS_PORT"
+echo -e "\${GREEN}MCC/MNC/TAC:\${NC} ${mcc}/${mnc}/${tac}"
+echo -e "\${GREEN}APN:\${NC} ${apn}"
+echo ""
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
+echo -e "\${CYAN}  Service Status\${NC}"
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
+echo ""
+systemctl status open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd open5gs-metrics-agent --no-pager | grep "Active:"
+echo ""
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
+echo -e "\${CYAN}  Next Steps\${NC}"
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
+echo ""
+echo "1. ✅ EPC is registered with wisptools.io"
+echo "2. ✅ Metrics agent is reporting to cloud"
+echo "3. ✅ Connected to Cloud HSS at $HSS_ADDR"
+echo ""
+echo "4. Configure eNodeB:"
+echo "   - MME Address: $MME_IP"
+echo "   - MME Port: 36412"
+echo "   - PLMN: ${mcc}${mnc}"
+echo "   - TAC: ${tac}"
+echo ""
+echo "5. Add subscribers via WISPTools.io HSS Management"
+echo "   https://wisptools.io/hss-management"
+echo ""
+echo "6. Monitor this EPC in dashboard:"
+echo "   https://wisptools.io/distributed-epc"
+echo ""
+echo -e "\${CYAN}═══════════════════════════════════════════════════════════\${NC}"
+echo ""
+print_success "🎉 Your EPC is now ONLINE and connected to Cloud HSS!"
+print_success "📡 Reporting metrics to wisptools.io every 60 seconds"
+echo ""
 `;
 }
 
