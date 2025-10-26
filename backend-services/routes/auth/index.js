@@ -4,16 +4,11 @@
  */
 
 const express = require('express');
-const admin = require('firebase-admin');
+const { admin, auth, firestore } = require('../../config/firebase');
 const { UserTenant } = require('../users/user-schema');
 const { verifyAuth, extractTenantId, getUserTenantRole, isPlatformAdmin } = require('../users/role-auth-middleware');
 
 const router = express.Router();
-
-// Initialize Firebase Admin if not already done
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 
 /**
  * POST /api/auth/login
@@ -31,7 +26,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Verify Firebase ID token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await auth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
     const email = decodedToken.email;
 
@@ -68,7 +63,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Get user record from Firebase Auth
-    const userRecord = await admin.auth().getUser(uid);
+    const userRecord = await auth.getUser(uid);
 
     // Update last access time
     if (userTenant) {
@@ -150,7 +145,7 @@ router.get('/me', verifyAuth, extractTenantId, async (req, res) => {
     }
 
     // Get user record from Firebase Auth
-    const userRecord = await admin.auth().getUser(uid);
+    const userRecord = await auth.getUser(uid);
 
     // Get tenant information
     const userTenant = await UserTenant.findOne({ userId: uid, tenantId }).lean();

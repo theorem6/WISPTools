@@ -12,7 +12,7 @@
  */
 
 const express = require('express');
-const admin = require('firebase-admin');
+const { admin, auth, firestore } = require('../../config/firebase');
 const { UserTenant } = require('./user-schema');
 const { 
   verifyAuth, 
@@ -20,11 +20,6 @@ const {
   requireRole,
   VALID_ROLES 
 } = require('./role-auth-middleware');
-
-// Initialize Firebase Admin if not already done
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 
 const router = express.Router();
 
@@ -68,7 +63,7 @@ router.get('/', async (req, res) => {
     const users = [];
     for (const userId of uniqueUserIds) {
       try {
-        const userRecord = await admin.auth().getUser(userId);
+        const userRecord = await auth.getUser(userId);
         
         // Get all tenants for this user
         const userTenantsForUser = userTenants.filter(ut => ut.userId === userId);
@@ -164,7 +159,7 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
     for (const userTenant of userTenants) {
       try {
         // Get user from Firebase Auth
-        const userRecord = await admin.auth().getUser(userTenant.userId);
+        const userRecord = await auth.getUser(userTenant.userId);
         
         users.push({
           uid: userTenant.userId,
@@ -243,7 +238,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
     // Check if user already exists in Firebase Auth
     let userRecord;
     try {
-      userRecord = await admin.auth().getUserByEmail(email);
+      userRecord = await auth.getUserByEmail(email);
     } catch (error) {
       if (error.code === 'auth/user-not-found') {
         // User doesn't exist - they'll need to sign up

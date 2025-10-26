@@ -39,12 +39,25 @@ registerRoutes(app);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start server
+// Start server with error handling
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 User Management System API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth/*`);
   console.log(`📊 MongoDB status: ${getConnectionStatus().isConnected ? 'Connected' : 'Disconnected'}`);
   console.log(`⚠️  Note: Open5GS HSS uses port 3001, GenieACS UI uses port 3002`);
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Please check for other running processes.`);
+    console.error('💡 Try running: lsof -ti:' + PORT + ' | xargs kill -9');
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+    process.exit(1);
+  }
 });
 
 // Graceful shutdown
@@ -62,6 +75,17 @@ process.on('SIGINT', () => {
     console.log('Process terminated');
     process.exit(0);
   });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 module.exports = app;

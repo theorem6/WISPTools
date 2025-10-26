@@ -9,13 +9,8 @@
  * - MongoDB Atlas: User-tenant relationships, roles, permissions
  */
 
-const admin = require('firebase-admin');
+const { admin, auth, firestore } = require('../config/firebase');
 const { UserTenant } = require('./user-schema');
-
-// Initialize Firebase Admin if not already done
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 
 // ============================================================================
 // ROLE DEFINITIONS (must match frontend TypeScript)
@@ -315,7 +310,7 @@ async function verifyAuth(req, res, next) {
     const token = authHeader.substring(7);
     
     try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await auth.verifyIdToken(token);
       
       req.user = {
         uid: decodedToken.uid,
@@ -400,8 +395,6 @@ function requireRole(roles) {
         console.log(`⚠️ User ${req.user.email} not in MongoDB for tenant ${req.tenantId}. Checking Firestore...`);
         
         try {
-          const admin = require('firebase-admin');
-          const firestore = admin.firestore();
           const tenantDoc = await firestore.collection('tenants').doc(req.tenantId).get();
           
           if (tenantDoc.exists()) {

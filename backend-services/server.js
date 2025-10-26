@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001; // Open5GS HSS Service
 
 // CORS configuration
 app.use(cors({
@@ -57,10 +57,23 @@ app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
 app.use('/setup-admin', require('./routes/setup'));
 
-// Start server
+// Start server with error handling
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 User Management System API running on port ${PORT}`);
   console.log(`📡 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth/*`);
+});
+
+// Handle server errors
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Please check for other running processes.`);
+    console.error('💡 Try running: lsof -ti:' + PORT + ' | xargs kill -9');
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+    process.exit(1);
+  }
 });
 
 // Graceful shutdown
@@ -78,4 +91,15 @@ process.on('SIGINT', () => {
     console.log('Process terminated');
     mongoose.connection.close();
   });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
