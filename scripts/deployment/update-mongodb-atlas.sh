@@ -64,31 +64,37 @@ fi
 
 print_status "Connection string provided"
 
-# Backend .env file location
-BACKEND_ENV="/opt/gce-backend/.env"
+# Systemd service file location (GCE uses systemd, not .env files)
+SERVICE_FILE="/etc/systemd/system/wisptools-backend.service"
 
-if [ ! -f "$BACKEND_ENV" ]; then
-    print_error "Backend .env file not found: $BACKEND_ENV"
+if [ ! -f "$SERVICE_FILE" ]; then
+    SERVICE_FILE="/etc/systemd/system/gce-backend.service"
+fi
+
+if [ ! -f "$SERVICE_FILE" ]; then
+    print_error "Backend service file not found"
     print_status "Run deployment script first: deploy-all-automated.sh"
     exit 1
 fi
 
-# Backup existing .env
+print_status "Found service file: $SERVICE_FILE"
+
+# Backup existing service file
 print_status "Creating backup..."
-cp "$BACKEND_ENV" "$BACKEND_ENV.backup.$(date +%Y%m%d_%H%M%S)"
+cp "$SERVICE_FILE" "$SERVICE_FILE.backup.$(date +%Y%m%d_%H%M%S)"
 print_success "Backup created"
 
-# Update MongoDB URI
-print_status "Updating MongoDB connection string..."
-sed -i "s|MONGODB_URI=.*|MONGODB_URI=$CONNECTION_STRING|" "$BACKEND_ENV"
+# Update MongoDB URI in systemd service
+print_status "Updating MongoDB connection string in systemd service..."
+sed -i "s|Environment=\"MONGODB_URI=.*\"|Environment=\"MONGODB_URI=$CONNECTION_STRING\"|" "$SERVICE_FILE"
 print_success "Connection string updated"
 
 # Verify
-if grep -q "MONGODB_URI=$CONNECTION_STRING" "$BACKEND_ENV"; then
+if grep -q "MONGODB_URI=$CONNECTION_STRING" "$SERVICE_FILE"; then
     print_success "Verification passed"
 else
     print_error "Update failed - restoring backup"
-    cp "$BACKEND_ENV.backup" "$BACKEND_ENV"
+    cp "$SERVICE_FILE.backup" "$SERVICE_FILE"
     exit 1
 fi
 
@@ -96,6 +102,11 @@ fi
 print_status "Current configuration:"
 MASKED=$(echo "$CONNECTION_STRING" | sed 's/:[^:@]*@/:***@/')
 echo "  MONGODB_URI=$MASKED"
+
+# Reload systemd
+print_status "Reloading systemd daemon..."
+systemctl daemon-reload
+print_success "Systemd reloaded"
 
 # Restart backend service
 echo ""

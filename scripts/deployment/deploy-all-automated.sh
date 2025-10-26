@@ -233,37 +233,10 @@ if [ -d "$REPO_DIR/deployment-files" ]; then
     print_success "Deployment files copied"
 fi
 
-# Configure environment
-print_header "Configuring Environment"
-
-cat > "$BACKEND_DIR/.env" << ENV_EOF
-# WISPTools.io GCE Backend Configuration
-NODE_ENV=production
-PORT=3001
-GCE_PUBLIC_IP=136.112.111.167
-HSS_PORT=3001
-
-# MongoDB Atlas (cloud database)
-# TODO: Update with your Atlas connection string
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/wisptools?retryWrites=true&w=majority
-
-# API URLs
-HSS_API_URL=https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy
-
-# Directories
-ISO_BUILD_DIR=/opt/epc-iso-builder
-ISO_OUTPUT_DIR=/var/www/html/downloads/isos
-BASE_ISO_PATH=/opt/base-images/ubuntu-24.04-live-server-amd64.iso
-
-# Security
-SESSION_SECRET=$(openssl rand -hex 32)
-JWT_SECRET=$(openssl rand -hex 32)
-ENV_EOF
-
-print_warning "Remember to update MONGODB_URI in $BACKEND_DIR/.env with your Atlas connection string"
-
-chmod 600 "$BACKEND_DIR/.env"
-print_success "Environment configured"
+# Environment will be configured in systemd service
+print_header "Environment Configuration"
+print_status "Environment variables will be set in systemd service (GCE best practice)"
+print_success "No .env file needed"
 
 # Create master backend server
 print_header "Creating Master Backend Server"
@@ -271,7 +244,7 @@ print_header "Creating Master Backend Server"
 cat > "$BACKEND_DIR/server.js" << 'SERVER_EOF'
 // WISPTools.io GCE Backend Master Server
 // Handles ALL backend operations
-require('dotenv').config();
+// Environment variables set via systemd service
 
 const express = require('express');
 const cors = require('cors');
@@ -384,7 +357,24 @@ Wants=nginx.service
 Type=simple
 User=root
 WorkingDirectory=$BACKEND_DIR
-EnvironmentFile=$BACKEND_DIR/.env
+
+# Environment Variables (GCE best practice - no .env file)
+Environment="NODE_ENV=production"
+Environment="PORT=3001"
+Environment="GCE_PUBLIC_IP=136.112.111.167"
+Environment="HSS_PORT=3001"
+
+# MongoDB Atlas connection (update with: systemctl edit wisptools-backend)
+Environment="MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/wisptools"
+
+# API URLs
+Environment="HSS_API_URL=https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy"
+
+# Directories
+Environment="ISO_BUILD_DIR=/opt/epc-iso-builder"
+Environment="ISO_OUTPUT_DIR=/var/www/html/downloads/isos"
+Environment="BASE_ISO_PATH=/opt/base-images/ubuntu-24.04-live-server-amd64.iso"
+
 ExecStart=/usr/bin/node $BACKEND_DIR/server.js
 Restart=always
 RestartSec=10
