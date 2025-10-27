@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { page } from '$app/stores';
   import { auth, db } from '$lib/firebase';
   import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
   import EPCMonitor from './EPCMonitor.svelte';
@@ -62,6 +63,34 @@
     
     // Auto-refresh every 30 seconds
     refreshInterval = setInterval(loadEPCs, 30000);
+    
+    // Check for URL parameters from coverage map
+    $: if ($page.url.searchParams.has('siteId')) {
+      const siteId = $page.url.searchParams.get('siteId');
+      const siteName = $page.url.searchParams.get('siteName');
+      const lat = $page.url.searchParams.get('lat');
+      const lon = $page.url.searchParams.get('lon');
+      
+      console.log('[RemoteEPCs] URL params detected:', { siteId, siteName, lat, lon });
+      
+      if (siteName) {
+        formData.site_name = siteName;
+        
+        // Try to find the site in the list
+        if (sites.length > 0) {
+          const foundSite = sites.find(s => s.name === siteName || s.id === siteId);
+          if (foundSite) {
+            selectedSiteId = foundSite.id;
+            handleSiteSelect(foundSite.id);
+          }
+        }
+        
+        // Open the registration modal
+        setTimeout(() => {
+          showAddModal = true;
+        }, 500);
+      }
+    }
   });
   
   async function loadSites() {

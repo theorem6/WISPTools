@@ -305,6 +305,10 @@
         selectedTowerForEPC = tower;
         showEPCDeploymentModal = true;
         break;
+      case 'add-epc':
+        // Navigate to HSS Management to add EPC for this site
+        goto(`/modules/hss-management?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}&lat=${tower.location?.latitude}&lon=${tower.location?.longitude}`);
+        break;
       case 'register-hss':
         selectedTowerForEPC = tower;
         showHSSRegistrationModal = true;

@@ -100,11 +100,20 @@
   <!-- HSS/EPC Deployment Options -->
   <button 
     class="menu-item epc-option" 
+    class:disabled={isActionDisabled('add-epc')}
+    on:click={() => handleAction('add-epc')}
+  >
+    <span class="menu-icon">📡</span>
+    <span>Add EPC to Site</span>
+  </button>
+  
+  <button 
+    class="menu-item epc-option" 
     class:disabled={isActionDisabled('deploy-epc')}
     on:click={() => handleAction('deploy-epc')}
   >
     <span class="menu-icon">🚀</span>
-    <span>Deploy EPC</span>
+    <span>Deploy EPC Script</span>
   </button>
   
   <button 
