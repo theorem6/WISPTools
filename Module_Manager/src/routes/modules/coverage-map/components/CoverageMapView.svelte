@@ -428,10 +428,6 @@
               id: tower.id,
               name: tower.name,
               ...tower
-            },
-            popupTemplate: {
-              title: '{name}',
-              content: createTowerPopupContent
             }
           });
 
@@ -470,10 +466,6 @@
               type: 'sector',
               id: sector.id,
               ...sector
-            },
-            popupTemplate: {
-              title: '{name}',
-              content: createSectorPopupContent
             }
           });
 
@@ -512,10 +504,6 @@
               type: 'cpe',
               id: cpe.id,
               ...cpe
-            },
-            popupTemplate: {
-              title: '{name}',
-              content: createCPEPopupContent
             }
           });
 
@@ -558,10 +546,6 @@
               type: 'equipment',
               id: eq.id,
               ...eq
-            },
-            popupTemplate: {
-              title: '{name}',
-              content: createEquipmentPopupContent
             }
           });
 
@@ -710,10 +694,6 @@
               toSite: toSite.name,
               capacity: notes.capacity || 'N/A',
               status: link.status
-            },
-            popupTemplate: {
-              title: '🔗 {name}',
-              content: createBackhaulPopupContent
             }
           });
           
