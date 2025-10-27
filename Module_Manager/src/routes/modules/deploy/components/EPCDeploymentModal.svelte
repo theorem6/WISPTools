@@ -5,6 +5,7 @@
 
   export let show = false;
   export let tenantId: string;
+  export let siteData: any = null;
 
   const dispatch = createEventDispatcher();
 
@@ -46,11 +47,48 @@
   };
 
   onMount(async () => {
-    if (show && $currentTenant?.id) {
-      // Initialize with tenant data if available
-      console.log(`[EPCDeployment] Initializing for tenant: ${$currentTenant.id}`);
+    if (show) {
+      if (siteData) {
+        // Initialize with site data
+        console.log(`[EPCDeployment] Initializing for site: ${siteData.name}`);
+        epcConfig.siteName = siteData.name || '';
+        epcConfig.location.address = siteData.location?.address || '';
+        epcConfig.location.city = siteData.location?.city || '';
+        epcConfig.location.state = siteData.location?.state || '';
+        epcConfig.location.coordinates.latitude = siteData.location?.latitude || 0;
+        epcConfig.location.coordinates.longitude = siteData.location?.longitude || 0;
+        
+        if (siteData.siteContact) {
+          epcConfig.contact.name = siteData.siteContact.name || '';
+          epcConfig.contact.email = siteData.siteContact.email || '';
+          epcConfig.contact.phone = siteData.siteContact.phone || '';
+        }
+      } else if ($currentTenant?.id) {
+        // Initialize with tenant data if available
+        console.log(`[EPCDeployment] Initializing for tenant: ${$currentTenant.id}`);
+        epcConfig.siteName = $currentTenant.name || '';
+        epcConfig.contact.name = $currentTenant.contactName || '';
+        epcConfig.contact.email = $currentTenant.contactEmail || '';
+        epcConfig.contact.phone = $currentTenant.contactPhone || '';
+      }
     }
   });
+
+  $: if (show && siteData) {
+    console.log(`[EPCDeployment] Site data loaded: ${siteData.name}`);
+    epcConfig.siteName = siteData.name || '';
+    epcConfig.location.address = siteData.location?.address || '';
+    epcConfig.location.city = siteData.location?.city || '';
+    epcConfig.location.state = siteData.location?.state || '';
+    epcConfig.location.coordinates.latitude = siteData.location?.latitude || 0;
+    epcConfig.location.coordinates.longitude = siteData.location?.longitude || 0;
+    
+    if (siteData.siteContact) {
+      epcConfig.contact.name = siteData.siteContact.name || '';
+      epcConfig.contact.email = siteData.siteContact.email || '';
+      epcConfig.contact.phone = siteData.siteContact.phone || '';
+    }
+  }
 
   $: if (show && $currentTenant?.id && $currentTenant.id.trim() !== '') {
     console.log(`[EPCDeployment] Tenant loaded: ${$currentTenant.id}`);

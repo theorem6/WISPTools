@@ -19,6 +19,8 @@
   import AddInventoryModal from './components/AddInventoryModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
+  import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
+  import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import type { 
@@ -53,6 +55,8 @@
   let showAddInventoryModal = false;
   let showContextMenu = false;
   let showTowerActionsMenu = false;
+  let showEPCDeploymentModal = false;
+  let showHSSRegistrationModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat = 0;
@@ -61,6 +65,7 @@
   let selectedSiteForBackhaul: TowerSite | null = null;
   let selectedSiteForInventory: TowerSite | null = null;
   let selectedTowerForMenu: TowerSite | null = null;
+  let selectedTowerForEPC: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
   let initialSiteType: 'tower' | 'noc' | null = null;
@@ -295,6 +300,14 @@
         break;
       case 'view-inventory':
         goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+        break;
+      case 'deploy-epc':
+        selectedTowerForEPC = tower;
+        showEPCDeploymentModal = true;
+        break;
+      case 'register-hss':
+        selectedTowerForEPC = tower;
+        showHSSRegistrationModal = true;
         break;
       case 'view-details':
         success = `Viewing ${tower.name}`;
@@ -637,6 +650,28 @@
   x={towerMenuX}
   y={towerMenuY}
   on:action={handleTowerAction}
+/>
+
+<!-- EPC Deployment Modal -->
+<EPCDeploymentModal
+  bind:show={showEPCDeploymentModal}
+  tenantId={tenantId}
+  siteData={selectedTowerForEPC}
+  on:close={() => {
+    showEPCDeploymentModal = false;
+    selectedTowerForEPC = null;
+  }}
+/>
+
+<!-- HSS Registration Modal -->
+<HSSRegistrationModal
+  bind:show={showHSSRegistrationModal}
+  tenantId={tenantId}
+  siteData={selectedTowerForEPC}
+  on:close={() => {
+    showHSSRegistrationModal = false;
+    selectedTowerForEPC = null;
+  }}
 />
 
 <!-- Global Settings Button -->

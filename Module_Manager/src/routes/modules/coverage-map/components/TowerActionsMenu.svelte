@@ -97,6 +97,27 @@
   
   <div class="menu-divider"></div>
   
+  <!-- HSS/EPC Deployment Options -->
+  <button 
+    class="menu-item epc-option" 
+    class:disabled={isActionDisabled('deploy-epc')}
+    on:click={() => handleAction('deploy-epc')}
+  >
+    <span class="menu-icon">🚀</span>
+    <span>Deploy EPC</span>
+  </button>
+  
+  <button 
+    class="menu-item epc-option" 
+    class:disabled={isActionDisabled('register-hss')}
+    on:click={() => handleAction('register-hss')}
+  >
+    <span class="menu-icon">🏠</span>
+    <span>Register with HSS</span>
+  </button>
+  
+  <div class="menu-divider"></div>
+  
   <button class="menu-item" on:click={() => handleAction('view-details')}>
     <span class="menu-icon">ℹ️</span>
     <span>View Details</span>
@@ -191,6 +212,15 @@
   
   .menu-item.danger:hover {
     background: rgba(239, 68, 68, 0.1);
+  }
+  
+  .menu-item.epc-option {
+    color: var(--brand-primary);
+    font-weight: 500;
+  }
+  
+  .menu-item.epc-option:hover {
+    background: rgba(124, 58, 237, 0.1);
   }
   
   .menu-item.disabled {
