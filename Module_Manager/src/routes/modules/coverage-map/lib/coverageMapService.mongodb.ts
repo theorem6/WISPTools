@@ -237,6 +237,43 @@ export class CoverageMapService {
     
     return { imported, errors };
   }
+  
+  // ========== Hardware Deployments ==========
+  
+  async getSiteHardware(tenantId: string, siteId: string): Promise<any[]> {
+    return await this.apiCall(`sites/${siteId}/hardware`);
+  }
+  
+  async deployHardware(tenantId: string, siteId: string, hardware: {
+    hardware_type: string;
+    name: string;
+    config?: any;
+    epc_config?: any;
+    inventory_item_id?: string;
+  }): Promise<any> {
+    return await this.apiCall(`sites/${siteId}/hardware`, {
+      method: 'POST',
+      body: JSON.stringify(hardware)
+    });
+  }
+  
+  async getAllHardwareDeployments(tenantId: string, hardware_type?: string): Promise<any[]> {
+    const params = hardware_type ? `?hardware_type=${hardware_type}` : '';
+    return await this.apiCall(`hardware-deployments${params}`);
+  }
+  
+  async updateHardwareDeployment(tenantId: string, deploymentId: string, updates: any): Promise<any> {
+    return await this.apiCall(`hardware-deployments/${deploymentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  }
+  
+  async removeHardwareDeployment(tenantId: string, deploymentId: string): Promise<void> {
+    await this.apiCall(`hardware-deployments/${deploymentId}`, {
+      method: 'DELETE'
+    });
+  }
 }
 
 export const coverageMapService = new CoverageMapService();
