@@ -1175,17 +1175,4 @@
       font-size: 16px;
     }
   }
-
-    .action-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .stats-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .basemap-switcher {
-      grid-template-columns: 1fr;
-    }
-  }
 </style>
