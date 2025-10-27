@@ -5,7 +5,7 @@
   export let show = false;
   export let initialLatitude: number | null = null;
   export let initialLongitude: number | null = null;
-  export let initialType: 'tower' | 'noc' | null = null;
+  export let initialType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
   export let tenantId: string;
   
   const dispatch = createEventDispatcher();
@@ -18,7 +18,7 @@
   // Form data
   let formData = {
     name: '',
-    type: (initialType || 'tower') as 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'other',
+    type: (initialType || 'tower') as 'tower' | 'noc' | 'warehouse' | 'other',
     latitude: initialLatitude || 40.7128,
     longitude: initialLongitude || -74.0060,
     address: '',
@@ -41,7 +41,7 @@
   
   $: if (initialLatitude !== null) formData.latitude = initialLatitude;
   $: if (initialLongitude !== null) formData.longitude = initialLongitude;
-  $: if (initialType) formData.type = initialType as 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'other';
+  $: if (initialType) formData.type = initialType;
   
   async function handleSearchAddress() {
     if (!searchAddress.trim()) {
@@ -184,25 +184,14 @@
           <div class="form-group">
             <label>Type</label>
           <select bind:value={formData.type}>
-            <optgroup label="Network Infrastructure">
-              <option value="tower">Tower</option>
-              <option value="rooftop">Rooftop</option>
-              <option value="monopole">Monopole</option>
-              <option value="noc">NOC (Network Operations Center)</option>
-            </optgroup>
-            <optgroup label="Inventory Locations">
-              <option value="warehouse">Warehouse / Storage</option>
-              <option value="vehicle">Service Vehicle</option>
-              <option value="rma">RMA / Repair Center</option>
-              <option value="vendor">Vendor Location</option>
-            </optgroup>
-            <optgroup label="Other">
-              <option value="other">Other</option>
-            </optgroup>
+            <option value="tower">📡 Tower</option>
+            <option value="noc">🖥️ NOC (Network Operations Center)</option>
+            <option value="warehouse">🏭 Warehouse / Storage</option>
+            <option value="other">📍 Other Site</option>
           </select>
           </div>
           
-          {#if formData.type !== 'noc' && formData.type !== 'warehouse' && formData.type !== 'vehicle' && formData.type !== 'rma'}
+          {#if formData.type === 'tower'}
           <div class="form-group">
             <label>Height (feet)</label>
             <input type="number" bind:value={formData.height} placeholder="100" />
@@ -255,7 +244,7 @@
       </div>
       
       <!-- Tower-Specific Sections (only for actual towers) -->
-      {#if formData.type === 'tower' || formData.type === 'rooftop' || formData.type === 'monopole'}
+      {#if formData.type === 'tower'}
       <!-- Tower Contact -->
       <div class="section">
         <h3>🏢 Tower Owner Contact</h3>

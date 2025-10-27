@@ -34,44 +34,27 @@
   </div>
   
   <div class="menu-section">
-    <div class="section-label">Network Infrastructure</div>
-    <button class="menu-item" on:click={() => handleAction('add-site')}>
+    <div class="section-label">Create Site</div>
+    <button class="menu-item" on:click={() => handleAction('create-site-tower')}>
       <span class="menu-icon">📡</span>
-      <span>Add Tower Site</span>
+      <span>Create Tower Site</span>
     </button>
     
-    <button class="menu-item" on:click={() => handleAction('add-noc')}>
+    <button class="menu-item" on:click={() => handleAction('create-site-noc')}>
       <span class="menu-icon">🖥️</span>
-      <span>Add NOC</span>
+      <span>Create NOC</span>
     </button>
-  </div>
-  
-  <div class="menu-divider"></div>
-  
-  <div class="menu-section">
-    <div class="section-label">Inventory Locations</div>
-    <button class="menu-item" on:click={() => handleAction('add-warehouse')}>
+    
+    <button class="menu-item" on:click={() => handleAction('create-site-warehouse')}>
       <span class="menu-icon">🏭</span>
-      <span>Add Warehouse</span>
+      <span>Create Warehouse</span>
     </button>
     
-    <button class="menu-item" on:click={() => handleAction('add-vehicle')}>
-      <span class="menu-icon">🚚</span>
-      <span>Add Service Vehicle</span>
-    </button>
-    
-    <button class="menu-item" on:click={() => handleAction('add-rma')}>
-      <span class="menu-icon">🔧</span>
-      <span>Add RMA Center</span>
+    <button class="menu-item" on:click={() => handleAction('create-site-other')}>
+      <span class="menu-icon">📍</span>
+      <span>Create Other Site</span>
     </button>
   </div>
-  
-  <div class="menu-divider"></div>
-  
-  <button class="menu-item" on:click={() => handleAction('add-cpe')}>
-    <span class="menu-icon">📱</span>
-    <span>Add CPE Device</span>
-  </button>
   
   <div class="menu-divider"></div>
   

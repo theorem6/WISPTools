@@ -68,7 +68,7 @@
   let selectedTowerForEPC: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
-  let initialSiteType: 'tower' | 'noc' | null = null;
+  let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
   
   // Filters
   let filters: CoverageMapFilters = {
@@ -226,24 +226,21 @@
     contextMenuLon = longitude;
     
     switch (action) {
-      case 'add-site':
+      case 'create-site-tower':
         initialSiteType = 'tower';
         showAddSiteModal = true;
         break;
-      case 'add-noc':
-        showAddNOCModal = true;
+      case 'create-site-noc':
+        initialSiteType = 'noc';
+        showAddSiteModal = true;
         break;
-      case 'add-warehouse':
-        showAddWarehouseModal = true;
+      case 'create-site-warehouse':
+        initialSiteType = 'warehouse';
+        showAddSiteModal = true;
         break;
-      case 'add-vehicle':
-        showAddVehicleModal = true;
-        break;
-      case 'add-rma':
-        showAddRMAModal = true;
-        break;
-      case 'add-cpe':
-        showAddCPEModal = true;
+      case 'create-site-other':
+        initialSiteType = 'other';
+        showAddSiteModal = true;
         break;
       case 'copy-coords':
         navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
