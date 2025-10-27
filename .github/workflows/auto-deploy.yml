@@ -1,13 +1,17 @@
-name: Auto Deploy to Google Cloud
+name: Auto Deploy WISPTools.io Platform
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  FIREBASE_PROJECT_ID: lte-pci-mapper-65450042-bbf71
+  NODE_VERSION: '20'
 
 jobs:
-  deploy:
+  deploy-functions:
+    name: Deploy Cloud Functions
     runs-on: ubuntu-latest
     
     steps:
@@ -17,60 +21,83 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
-        
-    - name: Install dependencies
-      run: |
-        cd backend-services
-        npm ci --production
+        cache-dependency-path: functions/package-lock.json
         
     - name: Install Firebase CLI
-      run: npm install -g firebase-tools
+      run: npm install -g firebase-tools@latest
       
-    - name: Deploy Firebase Functions
+    - name: Authenticate to Firebase
+      run: |
+        echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
+        export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+        firebase login:ci --token $FIREBASE_TOKEN
+        
+    - name: Build Functions
       run: |
         cd functions
         npm ci
         npm run build
-        cd ..
-        firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+        
+    - name: Deploy Functions
+      run: |
+        export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+        firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: Module_Manager/package-lock.json
+        
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools@latest
+      
+    - name: Authenticate to Firebase
+      run: |
+        echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
+        export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+        firebase login:ci --token $FIREBASE_TOKEN
+        
+    - name: Build Frontend
+      run: |
+        cd Module_Manager
+        npm ci
+        npm run build
+        
+    - name: Deploy Frontend
+      run: |
+        export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+        firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
+
+  deploy-rules:
+    name: Deploy Firestore Rules
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools@latest
+      
+    - name: Authenticate to Firebase
+      run: |
+        echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
+        export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+        firebase login:ci --token $FIREBASE_TOKEN
         
     - name: Deploy Firestore Rules
       run: |
-        firebase deploy --only firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
-        
-    - name: Deploy App Hosting
-      run: |
-        firebase deploy --only apphosting --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
-        
-    - name: Setup Google Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        service_account_key: ${{ secrets.GCP_SA_KEY }}
-        project_id: ${{ secrets.GCP_PROJECT_ID }}
-        
-    - name: Deploy to GCE
-      run: |
-        # Create deployment package
-        cd backend-services
-        tar -czf ../backend-deployment.tar.gz \
-          --exclude=node_modules \
-          --exclude=.git \
-          --exclude=*.log \
-          .
-        cd ..
-        
-        # Upload to GCS
-        gsutil cp backend-deployment.tar.gz gs://${{ secrets.GCP_PROJECT_ID }}-deployments/backend-$(date +%Y%m%d-%H%M%S).tar.gz
-        
-        # Update GCE instance
-        gcloud compute ssh backend-server \
-          --zone=us-central1-a \
-          --project=${{ secrets.GCP_PROJECT_ID }} \
-          --command="gsutil cp gs://${{ secrets.GCP_PROJECT_ID }}-deployments/backend-*.tar.gz /tmp/backend-latest.tar.gz && cd /opt/wisptools && tar -xzf /tmp/backend-latest.tar.gz && cd backend-services && npm install --production && sudo systemctl restart wisptools-backend wisptools-hss"
-        
-    - name: Health Check
-      run: |
-        sleep 30
-        curl -f https://us-central1-${{ secrets.FIREBASE_PROJECT_ID }}.cloudfunctions.net/analyzePCI || echo "Health check failed"
+        export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+        firebase deploy --only firestore:rules,firestore:indexes --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
