@@ -398,25 +398,6 @@
     </button>
   </div>
 
-  <!-- Mobile Bottom Controls -->
-  <div class="mobile-bottom-controls">
-    <button class="mobile-control-btn" on:click={() => showMainMenu = !showMainMenu}>
-      <span class="mobile-icon">☰</span>
-      <span class="mobile-label">Menu</span>
-    </button>
-    <button class="mobile-control-btn" on:click={() => showFilters = !showFilters}>
-      <span class="mobile-icon">🔍</span>
-      <span class="mobile-label">Filters</span>
-    </button>
-    <button class="mobile-control-btn" on:click={() => showStats = !showStats}>
-      <span class="mobile-icon">📊</span>
-      <span class="mobile-label">Stats</span>
-    </button>
-    <button class="mobile-control-btn" on:click={() => goto('/dashboard')}>
-      <span class="mobile-icon">←</span>
-      <span class="mobile-label">Back</span>
-    </button>
-  </div>
 
   <!-- Main Menu Modal -->
   {#if showMainMenu}
@@ -781,59 +762,6 @@
     border-color: rgba(124, 58, 237, 0.5);
   }
 
-  /* Mobile Bottom Controls */
-  .mobile-bottom-controls {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.9);
-    backdrop-filter: blur(10px);
-    display: none;
-    padding: 0.5rem;
-    z-index: 100;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .mobile-bottom-controls {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-  }
-
-  .mobile-control-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    background: none;
-    border: none;
-    color: white;
-    padding: 0.75rem 0.5rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: 60px;
-  }
-
-  .mobile-control-btn:hover {
-    background: rgba(124, 58, 237, 0.3);
-  }
-
-  .mobile-control-btn:active {
-    background: rgba(124, 58, 237, 0.5);
-    transform: scale(0.95);
-  }
-
-  .mobile-icon {
-    font-size: 1.25rem;
-  }
-
-  .mobile-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
   .quick-actions {
     display: flex;
     flex-direction: column;
@@ -1053,10 +981,6 @@
   @media (max-width: 768px) {
     .floating-controls {
       display: none;
-    }
-    
-    .mobile-bottom-controls {
-      display: grid;
     }
     
     .control-btn {
