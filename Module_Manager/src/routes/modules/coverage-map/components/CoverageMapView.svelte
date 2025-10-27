@@ -218,12 +218,10 @@
       // Add zoom controls
       const [
         { default: Zoom },
-        { default: BasemapToggle },
         { default: Locate },
         { default: Compass }
       ] = await Promise.all([
         import('@arcgis/core/widgets/Zoom.js'),
-        import('@arcgis/core/widgets/BasemapToggle.js'),
         import('@arcgis/core/widgets/Locate.js'),
         import('@arcgis/core/widgets/Compass.js')
       ]);
@@ -239,16 +237,7 @@
         index: 0
       });
       
-      // Basemap toggle
-      const basemapToggle = new BasemapToggle({
-        view: mapView,
-        nextBasemap: "satellite"
-      });
-      
-      mapView.ui.add(basemapToggle, {
-        position: "top-right",
-        index: 0
-      });
+      // Basemap toggle is now handled by the <arcgis-basemap-toggle> web component
       
       // Add locate button for mobile users
       if (isMobile && navigator.geolocation) {
@@ -916,6 +905,7 @@
 
 <div class="coverage-map-container">
   <div bind:this={mapContainer} class="map-container"></div>
+  <arcgis-basemap-toggle view={mapView}></arcgis-basemap-toggle>
 </div>
 
 <style>
