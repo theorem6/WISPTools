@@ -153,6 +153,7 @@ const InventoryItemSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
+      'EPC Equipment',
       'Radio Equipment',
       'Antennas',
       'Power Systems',
