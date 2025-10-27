@@ -107,29 +107,35 @@
           momentumEnabled: true,
           frictionFactor: 0.9
         },
-        // Mobile-optimized popup
-        popup: {
-          dockEnabled: true,
-          dockOptions: {
-            buttonEnabled: true,
-            breakpoint: {
-              width: 544, // Mobile breakpoint
-              height: 544
-            },
-            position: isMobile ? "bottom-center" : "top-right"
+      // Mobile-optimized popup
+      popup: {
+        dockEnabled: true,
+        dockOptions: {
+          buttonEnabled: true,
+          breakpoint: {
+            width: 544, // Mobile breakpoint
+            height: 544
           },
-          // Mobile-specific popup styling
-          viewModel: {
-            includeDefaultActions: false,
-            actions: isMobile ? [
-              {
-                title: "View Details",
-                id: "view-details",
-                className: "esri-icon-description"
-              }
-            ] : []
-          }
-        }
+          position: isMobile ? "bottom-center" : "top-right"
+        },
+        // Mobile-specific popup styling
+        viewModel: {
+          includeDefaultActions: false,
+          actions: isMobile ? [
+            {
+              title: "View Details",
+              id: "view-details",
+              className: "esri-icon-description"
+            }
+          ] : []
+        },
+        // Mobile-specific popup sizing
+        ...(isMobile && {
+          width: "90vw",
+          height: "auto",
+          maxHeight: "60vh"
+        })
+      }
       });
 
       // Wait for view to be ready before adding handlers

@@ -6,6 +6,21 @@
   
   const dispatch = createEventDispatcher();
   
+  // Mobile state for collapsible sections
+  let expandedSections = {
+    assetTypes: true,
+    backhaulTypes: false,
+    bands: false,
+    status: false
+  };
+  
+  // Check if we're on mobile
+  let isMobile = false;
+  
+  if (typeof window !== 'undefined') {
+    isMobile = window.innerWidth <= 768;
+  }
+  
   const availableBands = [
     { id: 'LTE', name: 'LTE', color: '#ef4444' },
     { id: 'CBRS', name: 'CBRS (3.5 GHz)', color: '#3b82f6' },
@@ -71,6 +86,12 @@
     }));
     dispatch('change', filters);
   }
+  
+  function toggleSection(section: keyof typeof expandedSections) {
+    if (isMobile) {
+      expandedSections[section] = !expandedSections[section];
+    }
+  }
 </script>
 
 <div class="filter-panel">
@@ -78,8 +99,17 @@
   
   <!-- Asset Type Filters -->
   <div class="filter-section">
-    <h4>Asset Types</h4>
-    <div class="filter-options">
+    <button 
+      class="section-header" 
+      class:collapsible={isMobile}
+      on:click={() => toggleSection('assetTypes')}
+    >
+      <h4>Asset Types</h4>
+      {#if isMobile}
+        <span class="expand-icon" class:expanded={expandedSections.assetTypes}>▼</span>
+      {/if}
+    </button>
+    <div class="filter-options" class:collapsed={isMobile && !expandedSections.assetTypes}>
       <label class="filter-checkbox">
         <input 
           type="checkbox" 
@@ -135,8 +165,17 @@
   <!-- Backhaul Type Filters -->
   {#if filters.showBackhaul}
     <div class="filter-section">
-      <h4>Backhaul Types</h4>
-      <div class="filter-options">
+      <button 
+        class="section-header" 
+        class:collapsible={isMobile}
+        on:click={() => toggleSection('backhaulTypes')}
+      >
+        <h4>Backhaul Types</h4>
+        {#if isMobile}
+          <span class="expand-icon" class:expanded={expandedSections.backhaulTypes}>▼</span>
+        {/if}
+      </button>
+      <div class="filter-options" class:collapsed={isMobile && !expandedSections.backhaulTypes}>
         <label class="filter-checkbox">
           <input 
             type="checkbox" 
@@ -181,14 +220,31 @@
   
   <!-- Band/Technology Filters -->
   <div class="filter-section">
-    <div class="filter-header">
-      <h4>Bands / Technology</h4>
-      <div class="filter-actions">
-        <button class="btn-link" on:click={showAllBands}>All</button>
-        <button class="btn-link" on:click={clearAllBandFilters}>None</button>
+    <button 
+      class="section-header" 
+      class:collapsible={isMobile}
+      on:click={() => toggleSection('bands')}
+    >
+      <div class="filter-header">
+        <h4>Bands / Technology</h4>
+        {#if !isMobile}
+          <div class="filter-actions">
+            <button class="btn-link" on:click={showAllBands}>All</button>
+            <button class="btn-link" on:click={clearAllBandFilters}>None</button>
+          </div>
+        {/if}
       </div>
-    </div>
-    <div class="filter-options">
+      {#if isMobile}
+        <span class="expand-icon" class:expanded={expandedSections.bands}>▼</span>
+      {/if}
+    </button>
+    <div class="filter-options" class:collapsed={isMobile && !expandedSections.bands}>
+      {#if isMobile}
+        <div class="filter-actions mobile-actions">
+          <button class="btn-link" on:click={showAllBands}>All</button>
+          <button class="btn-link" on:click={clearAllBandFilters}>None</button>
+        </div>
+      {/if}
       {#each availableBands as band}
         <label class="filter-checkbox">
           <input 
@@ -212,8 +268,17 @@
   
   <!-- Status Filters -->
   <div class="filter-section">
-    <h4>Status</h4>
-    <div class="filter-options">
+    <button 
+      class="section-header" 
+      class:collapsible={isMobile}
+      on:click={() => toggleSection('status')}
+    >
+      <h4>Status</h4>
+      {#if isMobile}
+        <span class="expand-icon" class:expanded={expandedSections.status}>▼</span>
+      {/if}
+    </button>
+    <div class="filter-options" class:collapsed={isMobile && !expandedSections.status}>
       <label class="filter-checkbox">
         <input 
           type="checkbox" 
@@ -294,11 +359,54 @@
     margin-bottom: 0;
   }
   
+  .section-header {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  
+  .section-header.collapsible {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .section-header.collapsible:hover {
+    background: var(--bg-hover);
+    border-radius: 4px;
+  }
+  
+  .expand-icon {
+    transition: transform 0.2s ease;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+  
+  .expand-icon.expanded {
+    transform: rotate(180deg);
+  }
+  
   .filter-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.75rem;
+  }
+  
+  .filter-options.collapsed {
+    display: none;
+  }
+  
+  .mobile-actions {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
   }
   
   h4 {
@@ -379,6 +487,49 @@
     font-size: 0.875rem;
     color: var(--text-secondary);
     font-style: italic;
+  }
+  
+  /* Mobile-specific styles */
+  @media (max-width: 768px) {
+    .filter-panel {
+      padding: 1rem;
+      max-height: 80vh;
+    }
+    
+    .filter-checkbox {
+      min-height: 44px;
+      padding: 0.5rem 0;
+      font-size: 1rem;
+    }
+    
+    .filter-checkbox input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-right: 0.75rem;
+    }
+    
+    .btn-link {
+      min-height: 44px;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border-radius: 6px;
+      background: var(--bg-hover);
+    }
+    
+    .btn-link:hover {
+      background: var(--brand-primary);
+      color: white;
+    }
+    
+    .section-header.collapsible {
+      min-height: 48px;
+      padding: 0.75rem 0;
+    }
+    
+    .section-header h4 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
   }
 </style>
 
