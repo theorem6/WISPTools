@@ -5,6 +5,8 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import EmailSettings from './components/EmailSettings.svelte';
+  import EPCMonitor from './components/EPCMonitor.svelte';
+  import MMEConnections from './components/MMEConnections.svelte';
   
   // Monitoring API endpoint
   const MONITORING_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
@@ -248,6 +250,20 @@
       on:click={() => activeTab = 'email'}
     >
       📧 Email Settings
+    </button>
+    <button 
+      class="tab" 
+      class:active={activeTab === 'epc'}
+      on:click={() => activeTab = 'epc'}
+    >
+      🌐 EPC Monitoring
+    </button>
+    <button 
+      class="tab" 
+      class:active={activeTab === 'mme'}
+      on:click={() => activeTab = 'mme'}
+    >
+      🔗 MME Connections
     </button>
   </div>
 
@@ -545,6 +561,12 @@
   {:else if activeTab === 'email'}
     <!-- Email Settings Tab -->
     <EmailSettings {tenantId} API_URL={MONITORING_API} />
+  {:else if activeTab === 'epc'}
+    <!-- EPC Monitoring Tab -->
+    <EPCMonitor {tenantId} HSS_API={MONITORING_API} epcId="all" />
+  {:else if activeTab === 'mme'}
+    <!-- MME Connections Tab -->
+    <MMEConnections {tenantId} HSS_API={MONITORING_API} />
   {/if}
 </div>
 </TenantGuard>
