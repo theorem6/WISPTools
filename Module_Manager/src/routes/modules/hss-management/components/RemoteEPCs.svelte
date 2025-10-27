@@ -102,7 +102,7 @@
       }
       
       // Query sites from Firestore
-      const sitesRef = collection(db, 'networkSites');
+      const sitesRef = collection(db(), 'networkSites');
       const q = query(sitesRef, where('tenant_id', '==', tenantId));
       const querySnapshot = await getDocs(q);
       
@@ -160,7 +160,7 @@
     
     try {
       // Add site to Firestore
-      const sitesRef = collection(db, 'networkSites');
+      const sitesRef = collection(db(), 'networkSites');
       const newSite = {
         name: newSiteData.name,
         tenant_id: tenantId,
