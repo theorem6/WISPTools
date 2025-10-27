@@ -972,6 +972,50 @@
     .floating-controls {
       top: 10px;
       right: 10px;
+      gap: 8px;
+    }
+    
+    .floating-controls button {
+      min-height: 44px;
+      min-width: 44px;
+      font-size: 18px;
+    }
+    
+    .coverage-map-page {
+      height: 100vh;
+      height: 100dvh; /* Dynamic viewport height for mobile */
+    }
+    
+    .map-container {
+      touch-action: pan-x pan-y;
+    }
+    
+    .filter-panel {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    
+    .filter-panel button {
+      min-height: 44px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
+    
+    .modal {
+      margin: 10px;
+      max-width: calc(100vw - 20px);
+      max-height: calc(100vh - 20px);
+    }
+    
+    .modal-content {
+      padding: 16px;
+    }
+    
+    .modal button {
+      min-height: 44px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
     }
 
     .control-btn {
