@@ -196,7 +196,7 @@ export class ObjectStateManager {
     
     // Admin can do everything
     if (context.userRole === 'admin') {
-      state.allowedActions.push('edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment', 'add-epc', 'deploy-epc', 'register-hss');
+      state.allowedActions.push('edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment', 'deploy-hardware', 'change-site-type');
       state.isReadOnly = false;
     } else if (context.userRole === 'operator') {
       state.allowedActions.push('edit', 'add-sector', 'add-backhaul', 'add-equipment');

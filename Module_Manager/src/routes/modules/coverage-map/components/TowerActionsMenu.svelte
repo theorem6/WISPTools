@@ -97,32 +97,23 @@
   
   <div class="menu-divider"></div>
   
-  <!-- HSS/EPC Deployment Options -->
+  <!-- Hardware Deployment -->
   <button 
     class="menu-item epc-option" 
-    class:disabled={isActionDisabled('add-epc')}
-    on:click={() => handleAction('add-epc')}
+    class:disabled={isActionDisabled('deploy-hardware')}
+    on:click={() => handleAction('deploy-hardware')}
   >
-    <span class="menu-icon">📡</span>
-    <span>Add EPC to Site</span>
+    <span class="menu-icon">🔧</span>
+    <span>Deploy Hardware</span>
   </button>
   
   <button 
-    class="menu-item epc-option" 
-    class:disabled={isActionDisabled('deploy-epc')}
-    on:click={() => handleAction('deploy-epc')}
+    class="menu-item" 
+    class:disabled={isActionDisabled('change-site-type')}
+    on:click={() => handleAction('change-site-type')}
   >
-    <span class="menu-icon">🚀</span>
-    <span>Deploy EPC Script</span>
-  </button>
-  
-  <button 
-    class="menu-item epc-option" 
-    class:disabled={isActionDisabled('register-hss')}
-    on:click={() => handleAction('register-hss')}
-  >
-    <span class="menu-icon">🏠</span>
-    <span>Register with HSS</span>
+    <span class="menu-icon">🔄</span>
+    <span>Change Site Type</span>
   </button>
   
   <div class="menu-divider"></div>

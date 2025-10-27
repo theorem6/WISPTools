@@ -298,17 +298,14 @@
       case 'view-inventory':
         goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
         break;
-      case 'deploy-epc':
-        selectedTowerForEPC = tower;
-        showEPCDeploymentModal = true;
+      case 'deploy-hardware':
+        // Navigate to deploy module with this site pre-selected
+        goto(`/modules/deploy?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
         break;
-      case 'add-epc':
-        // Navigate to HSS Management to add EPC for this site
-        goto(`/modules/hss-management?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}&lat=${tower.location?.latitude}&lon=${tower.location?.longitude}`);
-        break;
-      case 'register-hss':
-        selectedTowerForEPC = tower;
-        showHSSRegistrationModal = true;
+      case 'change-site-type':
+        // Show site type change modal
+        success = 'Site type change feature coming soon';
+        setTimeout(() => success = '', 3000);
         break;
       case 'view-details':
         success = `Viewing ${tower.name}`;
