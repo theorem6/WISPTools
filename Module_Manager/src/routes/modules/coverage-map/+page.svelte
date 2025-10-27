@@ -21,6 +21,7 @@
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
+  import HardwareDeploymentModal from './components/HardwareDeploymentModal.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
@@ -58,6 +59,7 @@
   let showTowerActionsMenu = false;
   let showEPCDeploymentModal = false;
   let showHSSRegistrationModal = false;
+  let showHardwareDeploymentModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat = 0;
@@ -330,8 +332,8 @@
         goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
         break;
       case 'deploy-hardware':
-        // Navigate to deploy module with this site pre-selected
-        goto(`/modules/deploy?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+        selectedTowerForEPC = tower;
+        showHardwareDeploymentModal = true;
         break;
       case 'change-site-type':
         // Show site type change modal
@@ -701,6 +703,17 @@
   siteData={selectedTowerForEPC}
   on:close={() => {
     showHSSRegistrationModal = false;
+    selectedTowerForEPC = null;
+  }}
+/>
+
+<!-- Hardware Deployment Modal -->
+<HardwareDeploymentModal
+  bind:show={showHardwareDeploymentModal}
+  tower={selectedTowerForEPC}
+  {tenantId}
+  on:close={() => {
+    showHardwareDeploymentModal = false;
     selectedTowerForEPC = null;
   }}
 />
