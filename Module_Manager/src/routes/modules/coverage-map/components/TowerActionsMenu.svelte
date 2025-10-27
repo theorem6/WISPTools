@@ -163,6 +163,7 @@
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     min-width: 280px;
+    max-width: 90vw;
     z-index: 2000;
     overflow: hidden;
   }
@@ -200,6 +201,7 @@
     color: var(--text-primary);
     transition: background 0.2s;
     font-size: 0.95rem;
+    min-height: 44px;
   }
   
   .menu-item:hover {
@@ -274,6 +276,47 @@
     height: 1px;
     background: var(--border-color);
     margin: 0.25rem 0;
+  }
+  
+  /* Mobile-specific styles */
+  @media (max-width: 768px) {
+    .tower-menu {
+      min-width: 260px;
+      max-width: calc(100vw - 2rem);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .menu-header {
+      padding: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .menu-item {
+      min-height: 48px;
+      padding: 1rem;
+      font-size: 1rem;
+    }
+    
+    .menu-icon {
+      font-size: 1.5rem;
+      width: 28px;
+    }
+    
+    .tower-name {
+      font-size: 1.1rem;
+    }
+    
+    .tower-type {
+      font-size: 0.9rem;
+    }
+    
+    .object-state-info {
+      padding: 1rem;
+      font-size: 0.9rem;
+    }
   }
 </style>
 
