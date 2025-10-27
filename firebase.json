@@ -69,19 +69,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "apphosting": {
-    "backendId": "lte-pci-mapper",
-    "rootDir": "/Module_Manager",
-    "deployFunctions": true,
-    "ignore": [
-      "node_modules",
-      ".git",
-      "firebase-debug.log",
-      "firebase-debug.*.log",
-      ".svelte-kit",
-      "build"
-    ],
-    "alwaysDeployFromSource": true
   }
 }
