@@ -54,14 +54,45 @@ export class PCIArcGISMapper {
       basemap: isDarkMode ? "dark-gray-vector" : "topo-vector"
     });
     
-    // Create the map view
+    // Detect mobile device
+    const isMobile = window.innerWidth <= 768;
+    
+    // Create the map view with mobile-optimized settings
     this.mapView = new MapView({
       container: containerId,
       map: this.map,
       center: [-74.5, 40], // Default to New York area
-      zoom: 10,
+      zoom: isMobile ? 11 : 10, // Slightly more zoomed on mobile
       ui: {
         components: [] // Remove default UI components, we'll add custom ones
+      },
+      // Mobile-specific constraints
+      constraints: {
+        rotationEnabled: !isMobile, // Disable rotation on mobile
+        snapToZoom: true,
+        minZoom: 3,
+        maxZoom: 20
+      },
+      // Enable touch interactions
+      navigation: {
+        gamepad: {
+          enabled: false
+        },
+        browserTouchPanEnabled: true,
+        momentumEnabled: true,
+        frictionFactor: 0.9
+      },
+      // Mobile-optimized popup
+      popup: {
+        dockEnabled: true,
+        dockOptions: {
+          buttonEnabled: true,
+          breakpoint: {
+            width: 544, // Mobile breakpoint
+            height: 544
+          },
+          position: isMobile ? "bottom-center" : "top-right"
+        }
       }
     });
     
@@ -80,14 +111,8 @@ export class PCIArcGISMapper {
     // Wait for the view to be ready before allowing interactions
     await this.mapView.when();
     
-    // Add Zoom widget
-    const zoom = new Zoom({
-      view: this.mapView
-    });
-    this.mapView.ui.add(zoom, {
-      position: "top-center",
-      index: 0
-    });
+    // Add mobile-optimized UI controls
+    await this.addMobileUIControls();
     
     // Note: ArcGIS widgets are deprecated in favor of web components
     // Users can right-click on map to access basemap options via native ArcGIS context menu
@@ -95,6 +120,85 @@ export class PCIArcGISMapper {
     
     this.isInitialized = true;
     console.log('PCIArcGISMapper: Map initialized and ready');
+  }
+  
+  /**
+   * Add mobile-optimized UI controls
+   */
+  private async addMobileUIControls() {
+    if (!this.mapView) return;
+    
+    const isMobile = window.innerWidth <= 768;
+    
+    try {
+      // Add zoom controls
+      const [
+        { default: Zoom },
+        { default: BasemapToggle },
+        { default: Locate },
+        { default: Compass }
+      ] = await Promise.all([
+        import('@arcgis/core/widgets/Zoom.js'),
+        import('@arcgis/core/widgets/BasemapToggle.js'),
+        import('@arcgis/core/widgets/Locate.js'),
+        import('@arcgis/core/widgets/Compass.js')
+      ]);
+      
+      // Mobile-friendly zoom controls
+      const zoom = new Zoom({
+        view: this.mapView,
+        layout: isMobile ? "horizontal" : "vertical"
+      });
+      
+      this.mapView.ui.add(zoom, {
+        position: "bottom-right",
+        index: 0
+      });
+      
+      // Basemap toggle
+      const basemapToggle = new BasemapToggle({
+        view: this.mapView,
+        nextBasemap: "satellite"
+      });
+      
+      this.mapView.ui.add(basemapToggle, {
+        position: "top-right",
+        index: 0
+      });
+      
+      // Add locate button for mobile users
+      if (isMobile && navigator.geolocation) {
+        const locate = new Locate({
+          view: this.mapView,
+          useHeadingEnabled: false,
+          goToOverride: (view, options) => {
+            options.target.scale = 15000; // Zoom level for mobile
+            return view.goTo(options.target);
+          }
+        });
+        
+        this.mapView.ui.add(locate, {
+          position: "top-left",
+          index: 0
+        });
+      }
+      
+      // Add compass for mobile
+      if (isMobile) {
+        const compass = new Compass({
+          view: this.mapView,
+          label: "Reset rotation"
+        });
+        
+        this.mapView.ui.add(compass, {
+          position: "top-left",
+          index: 1
+        });
+      }
+      
+    } catch (err) {
+      console.error('PCIArcGISMapper: Failed to add mobile UI controls:', err);
+    }
   }
   
   /**
@@ -154,7 +258,10 @@ export class PCIArcGISMapper {
       // Create a sector cone instead of a simple marker
       const azimuth = (cell as any).azimuth || 0;
       const sectorWidth = (cell as any).beamwidth || 65; // Use sector-specific beamwidth (default 65°)
-      const sectorRadius = 0.005; // ~500m in degrees
+      
+      // Responsive sector radius based on screen size
+      const isMobile = window.innerWidth <= 768;
+      const sectorRadius = isMobile ? 0.003 : 0.005; // Smaller sectors on mobile
       
       // Calculate sector polygon points
       const startAngle = azimuth - sectorWidth / 2;
@@ -163,8 +270,9 @@ export class PCIArcGISMapper {
         [cell.longitude, cell.latitude], // Center point
       ]];
       
-      // Add arc points
-      for (let angle = startAngle; angle <= endAngle; angle += 5) {
+      // Add arc points (fewer points on mobile for better performance)
+      const angleStep = isMobile ? 10 : 5; // Larger steps on mobile
+      for (let angle = startAngle; angle <= endAngle; angle += angleStep) {
         const radians = (angle * Math.PI) / 180;
         const x = cell.longitude + sectorRadius * Math.sin(radians);
         const y = cell.latitude + sectorRadius * Math.cos(radians);
@@ -389,13 +497,18 @@ export class PCIArcGISMapper {
         spatialReference: { wkid: 4326 }
       });
       
+      // Responsive sizing for conflict highlights
+      const isMobile = window.innerWidth <= 768;
+      const markerSize = isMobile ? 20 : 16;
+      const outlineWidth = isMobile ? 4 : 3;
+      
       const graphic = new Graphic({
         geometry: point,
         symbol: {
           type: "simple-marker",
           color: this.getConflictColorArray(severity),
-          size: 16,
-          outline: { color: [255, 255, 255, 255], width: 3 }
+          size: markerSize,
+          outline: { color: [255, 255, 255, 255], width: outlineWidth }
         },
         attributes: { 
           ...cell, 
