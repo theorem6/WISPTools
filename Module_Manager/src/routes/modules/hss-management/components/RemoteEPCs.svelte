@@ -213,11 +213,21 @@
   
   async function registerEPC() {
     console.log('[RemoteEPCs] Registering EPC:', formData);
+    console.log('[RemoteEPCs] Selected site ID:', selectedSiteId);
+    console.log('[RemoteEPCs] Available sites:', sites);
     
     // Validate required fields
-    if (!formData.site_name) {
-      alert('Site name is required');
+    if (!formData.site_name && !selectedSiteId) {
+      alert('Please select a site or enter a site name');
       return;
+    }
+    
+    // Auto-populate site_name from selected site if not already set
+    if (!formData.site_name && selectedSiteId) {
+      const selectedSite = sites.find(s => (s._id || s.id) === selectedSiteId);
+      if (selectedSite) {
+        formData.site_name = selectedSite.name || selectedSite.siteName || 'Unknown Site';
+      }
     }
     
     if (!formData.location.coordinates.latitude || !formData.location.coordinates.longitude) {
