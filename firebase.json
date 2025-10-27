@@ -72,7 +72,7 @@
   },
   "apphosting": {
     "backendId": "lte-pci-mapper",
-    "rootDir": "/Module_Manager",
+    "rootDir": "Module_Manager",
     "deployFunctions": true,
     "ignore": [
       "node_modules",
