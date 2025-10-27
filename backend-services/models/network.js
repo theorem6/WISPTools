@@ -33,7 +33,7 @@ const UnifiedSiteSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['tower', 'building', 'pole', 'other'],
+    enum: ['tower', 'noc', 'warehouse', 'building', 'pole', 'other'],
     default: 'tower'
   },
   status: {
@@ -44,6 +44,13 @@ const UnifiedSiteSchema = new mongoose.Schema({
   
   // Location
   location: LocationSchema,
+  
+  // Contact Information
+  contact: {
+    name: String,
+    email: String,
+    phone: String
+  },
   
   // Physical Properties
   height: {
@@ -345,15 +352,106 @@ NetworkEquipmentSchema.pre('save', function(next) {
   next();
 });
 
+// Hardware Deployment Schema - tracks hardware deployed at sites
+const HardwareDeploymentSchema = new mongoose.Schema({
+  // Basic Information
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  hardware_type: {
+    type: String,
+    enum: ['sector', 'backhaul', 'router', 'epc', 'switch', 'power', 'other'],
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['deployed', 'planned', 'maintenance', 'removed'],
+    default: 'deployed'
+  },
+  
+  // Site Association
+  siteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UnifiedSite',
+    required: true,
+    index: true
+  },
+  
+  // Inventory Link (optional - for purchased hardware)
+  inventory_item_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'InventoryItem'
+  },
+  
+  // Hardware Configuration (type-specific)
+  config: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  
+  // EPC-specific fields (when hardware_type is 'epc')
+  epc_config: {
+    mcc: String,
+    mnc: String,
+    tac: String,
+    hss_config: {
+      host: String,
+      port: Number,
+      auth_code: String,
+      api_key: String,
+      secret_key: String
+    }
+  },
+  
+  // Ownership
+  tenantId: {
+    type: String,
+    required: true,
+    index: true
+  },
+  
+  // Metadata
+  deployedAt: {
+    type: Date,
+    default: Date.now
+  },
+  createdBy: String,
+  createdById: String,
+  updatedBy: String,
+  updatedById: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Indexes
+HardwareDeploymentSchema.index({ tenantId: 1, siteId: 1 });
+HardwareDeploymentSchema.index({ tenantId: 1, hardware_type: 1 });
+HardwareDeploymentSchema.index({ tenantId: 1, status: 1 });
+
+HardwareDeploymentSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
 // Create models
 const UnifiedSite = mongoose.model('UnifiedSite', UnifiedSiteSchema);
 const UnifiedSector = mongoose.model('UnifiedSector', UnifiedSectorSchema);
 const UnifiedCPE = mongoose.model('UnifiedCPE', UnifiedCPESchema);
 const NetworkEquipment = mongoose.model('NetworkEquipment', NetworkEquipmentSchema);
+const HardwareDeployment = mongoose.model('HardwareDeployment', HardwareDeploymentSchema);
 
 module.exports = {
   UnifiedSite,
   UnifiedSector,
   UnifiedCPE,
-  NetworkEquipment
+  NetworkEquipment,
+  HardwareDeployment
 };

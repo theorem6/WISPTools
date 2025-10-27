@@ -4,7 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -415,6 +415,104 @@ router.post('/reverse-geocode', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ error: 'Reverse geocoding failed' });
+  }
+});
+
+// ========== HARDWARE DEPLOYMENTS ==========
+
+// Get hardware deployments for a site
+router.get('/sites/:siteId/hardware', async (req, res) => {
+  try {
+    const hardware = await HardwareDeployment.find({ 
+      siteId: req.params.siteId,
+      tenantId: req.tenantId 
+    }).sort({ deployedAt: -1 }).lean();
+    res.json(hardware);
+  } catch (error) {
+    console.error('Error fetching hardware:', error);
+    res.status(500).json({ error: 'Failed to fetch hardware' });
+  }
+});
+
+// Create hardware deployment
+router.post('/sites/:siteId/hardware', async (req, res) => {
+  try {
+    const { siteId } = req.params;
+    const { hardware_type, name, config, epc_config, inventory_item_id } = req.body;
+    
+    // Verify site exists and belongs to tenant
+    const site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId });
+    if (!site) {
+      return res.status(404).json({ error: 'Site not found' });
+    }
+    
+    const hardware = new HardwareDeployment({
+      siteId,
+      tenantId: req.tenantId,
+      hardware_type,
+      name,
+      config,
+      epc_config,
+      inventory_item_id
+    });
+    
+    await hardware.save();
+    res.status(201).json(hardware);
+  } catch (error) {
+    console.error('Error creating hardware:', error);
+    res.status(500).json({ error: 'Failed to create hardware deployment', details: error.message });
+  }
+});
+
+// Get all hardware deployments for tenant
+router.get('/hardware-deployments', async (req, res) => {
+  try {
+    const { hardware_type, status } = req.query;
+    const query = { tenantId: req.tenantId };
+    
+    if (hardware_type) query.hardware_type = hardware_type;
+    if (status) query.status = status;
+    
+    const hardware = await HardwareDeployment.find(query)
+      .populate('siteId', 'name type location')
+      .sort({ deployedAt: -1 })
+      .lean();
+    
+    res.json(hardware);
+  } catch (error) {
+    console.error('Error fetching hardware deployments:', error);
+    res.status(500).json({ error: 'Failed to fetch hardware deployments' });
+  }
+});
+
+// Update hardware deployment
+router.put('/hardware-deployments/:id', async (req, res) => {
+  try {
+    const hardware = await HardwareDeployment.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.tenantId },
+      { ...req.body, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    );
+    if (!hardware) return res.status(404).json({ error: 'Hardware deployment not found' });
+    res.json(hardware);
+  } catch (error) {
+    console.error('Error updating hardware:', error);
+    res.status(500).json({ error: 'Failed to update hardware deployment' });
+  }
+});
+
+// Delete hardware deployment
+router.delete('/hardware-deployments/:id', async (req, res) => {
+  try {
+    const hardware = await HardwareDeployment.findOneAndDelete({ 
+      _id: req.params.id, 
+      tenantId: req.tenantId 
+    });
+    if (!hardware) return res.status(404).json({ error: 'Hardware deployment not found' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting hardware:', error);
+    res.status(500).json({ error: 'Failed to delete hardware deployment' });
   }
 });
 
