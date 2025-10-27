@@ -260,7 +260,7 @@
   }
   
   function handleAssetClick(event: CustomEvent) {
-    const { type, id, data, screenX, screenY } = event.detail;
+    const { type, id, data, screenX, screenY, isRightClick } = event.detail;
     console.log(`Clicked ${type}:`, id, data);
     
     // Check if this is a read-only item from ACS or CBRS
@@ -270,36 +270,39 @@
       return;
     }
     
-    // Handle all asset types - show actions menu
-    if (type === 'tower' || type === 'noc' || type === 'warehouse') {
-      const tower = towers.find(t => t.id === id);
-      if (tower) {
-        selectedTowerForMenu = tower;
-        towerMenuX = screenX;
-        towerMenuY = screenY;
-        showTowerActionsMenu = true;
-      }
-    } else if (type === 'sector') {
-      const sector = sectors.find(s => s.id === id);
-      if (sector) {
-        success = `Sector: ${data.name || 'Unknown'} - Right-click for options`;
+    // Only show menu for right-clicks
+    if (isRightClick) {
+      // Handle all asset types - show actions menu
+      if (type === 'tower' || type === 'noc' || type === 'warehouse') {
+        const tower = towers.find(t => t.id === id);
+        if (tower) {
+          selectedTowerForMenu = tower;
+          towerMenuX = screenX;
+          towerMenuY = screenY;
+          showTowerActionsMenu = true;
+        }
+      } else if (type === 'sector') {
+        const sector = sectors.find(s => s.id === id);
+        if (sector) {
+          success = `Sector: ${data.name || 'Unknown'} - Right-click for options`;
+          setTimeout(() => success = '', 3000);
+        }
+      } else if (type === 'cpe') {
+        const cpe = cpeDevices.find(c => c.id === id);
+        if (cpe) {
+          success = `CPE: ${data.name || 'Unknown'} - Right-click for options`;
+          setTimeout(() => success = '', 3000);
+        }
+      } else if (type === 'equipment') {
+        const eq = equipment.find(e => e.id === id);
+        if (eq) {
+          success = `Equipment: ${data.name || 'Unknown'} - Right-click for options`;
+          setTimeout(() => success = '', 3000);
+        }
+      } else if (type === 'backhaul') {
+        success = `Backhaul Link: ${data.name || 'Unknown'}`;
         setTimeout(() => success = '', 3000);
       }
-    } else if (type === 'cpe') {
-      const cpe = cpeDevices.find(c => c.id === id);
-      if (cpe) {
-        success = `CPE: ${data.name || 'Unknown'} - Right-click for options`;
-        setTimeout(() => success = '', 3000);
-      }
-    } else if (type === 'equipment') {
-      const eq = equipment.find(e => e.id === id);
-      if (eq) {
-        success = `Equipment: ${data.name || 'Unknown'} - Right-click for options`;
-        setTimeout(() => success = '', 3000);
-      }
-    } else if (type === 'backhaul') {
-      success = `Backhaul Link: ${data.name || 'Unknown'}`;
-      setTimeout(() => success = '', 3000);
     }
   }
   

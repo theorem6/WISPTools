@@ -167,8 +167,27 @@
       });
       
       // Listen for right-click
-      mapView.on('pointer-down', (event: any) => {
+      mapView.on('pointer-down', async (event: any) => {
         if (event.button === 2) { // Right mouse button
+          // Check if right-clicking on a graphic (asset)
+          const hitTest = await mapView.hitTest(event);
+          if (hitTest.results.length > 0) {
+            const graphic = hitTest.results[0].graphic;
+            if (graphic && graphic.attributes) {
+              // Right-click on an asset - dispatch asset-click with isRightClick flag
+              dispatch('asset-click', {
+                type: graphic.attributes.type,
+                id: graphic.attributes.id,
+                data: graphic.attributes,
+                screenX: event.x,
+                screenY: event.y,
+                isRightClick: true
+              });
+              return;
+            }
+          }
+          
+          // Not clicking on an asset - show create-site menu
           const point = mapView.toMap(event);
           dispatch('map-right-click', {
             latitude: point.latitude,
@@ -857,6 +876,11 @@
   }
 
   async function handleMapClick(event: any) {
+    // Only handle left-clicks, right-clicks are handled by pointer-down
+    if (event.native && event.native.button !== 0) {
+      return;
+    }
+    
     const response = await mapView.hitTest(event);
     if (response.results.length > 0) {
       const graphic = response.results[0].graphic;
