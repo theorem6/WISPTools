@@ -23,6 +23,7 @@
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
+  import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
   import type { 
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
     CoverageMapFilters, Location 
@@ -69,6 +70,12 @@
   let towerMenuX = 0;
   let towerMenuY = 0;
   let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
+  
+  // Module context for permissions
+  let moduleContext: ModuleContext = {
+    module: 'coverage-map',
+    userRole: 'admin' // TODO: Get from actual user permissions
+  };
   
   // Filters
   let filters: CoverageMapFilters = {
@@ -648,6 +655,7 @@
   tower={selectedTowerForMenu}
   x={towerMenuX}
   y={towerMenuY}
+  moduleContext={moduleContext}
   on:action={handleTowerAction}
 />
 

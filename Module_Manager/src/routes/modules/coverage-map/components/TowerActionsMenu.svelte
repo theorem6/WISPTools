@@ -7,7 +7,7 @@
   export let tower: TowerSite | null = null;
   export let x = 0;
   export let y = 0;
-  export let moduleContext: ModuleContext = { module: 'coverage-map', userRole: 'admin' };
+  export let moduleContext: ModuleContext;
   
   const dispatch = createEventDispatcher();
   

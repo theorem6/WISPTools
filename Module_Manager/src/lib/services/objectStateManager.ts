@@ -61,6 +61,9 @@ export class ObjectStateManager {
       case 'frequency':
         this.applyOptimizationModuleRules(state, context);
         break;
+      case 'coverage-map':
+        this.applyCoverageMapRules(state, context);
+        break;
       default:
         this.applyDefaultRules(state, context);
     }
@@ -260,6 +263,24 @@ export class ObjectStateManager {
       [`${optimizationType}Optimized`]: true,
       [`${optimizationType}OptimizedAt`]: new Date().toISOString()
     };
+  }
+
+  /**
+   * Apply Coverage Map module rules
+   */
+  private applyCoverageMapRules(state: ObjectState, context: ModuleContext): void {
+    state.allowedActions = ['view', 'select'];
+    
+    if (context.userRole === 'admin') {
+      state.allowedActions.push('edit', 'delete', 'view-details', 'edit-site', 'add-sector', 'add-backhaul', 'add-equipment', 'view-inventory', 'deploy-hardware', 'change-site-type');
+      state.isReadOnly = false;
+    } else if (context.userRole === 'operator') {
+      state.allowedActions.push('view-details', 'edit-site', 'add-sector', 'add-backhaul', 'add-equipment');
+      state.restrictedActions = ['delete', 'change-site-type'];
+      state.isReadOnly = false;
+    } else {
+      state.isReadOnly = true;
+    }
   }
 }
 
