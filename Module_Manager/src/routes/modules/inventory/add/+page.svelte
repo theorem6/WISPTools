@@ -34,16 +34,7 @@
   // Equipment categories (matching backend schema)
   const equipmentCategories = {
     'EPC Equipment': [
-      'MME (Mobility Management Entity)',
-      'SGW (Serving Gateway)',
-      'PGW (Packet Data Network Gateway)',
-      'PCRF (Policy and Charging Rules Function)',
-      'HSS (Home Subscriber Server)',
-      'USIM Authentication Server',
-      'Diameter Gateway',
-      'Firewall',
-      'Load Balancer',
-      'Session Controller'
+      'Distributed EPC Server'
     ],
     'Radio Equipment': [
       'Base Station (eNodeB/gNodeB)',
