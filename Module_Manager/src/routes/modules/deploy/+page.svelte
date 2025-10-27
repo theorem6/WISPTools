@@ -12,7 +12,6 @@
   import SettingsButton from '$lib/components/SettingsButton.svelte';
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
-  import HSSManagementModal from './components/HSSManagementModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -33,8 +32,6 @@
   // Frequency Planner
   let showFrequencyPlannerModal = false;
 
-  // HSS Management
-  let showHSSManagementModal = false;
 
   // Module context for object state management
   let moduleContext: ModuleContext = {
@@ -274,35 +271,6 @@
     showFrequencyPlannerModal = false;
   }
 
-  // HSS Management functions
-  function openHSSManagement() {
-    console.log('[Deploy] Opening HSS Management modal');
-    console.log('[Deploy] Current tenant:', $currentTenant);
-    console.log('[Deploy] Tenant ID:', $currentTenant?.id);
-    console.log('[Deploy] Tenant store state:', $currentTenant);
-    
-    // Wait a bit for tenant state to update
-    setTimeout(() => {
-      console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
-      console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
-      
-      // Check if user is admin - if so, allow opening without tenant
-      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
-      
-      if (!isAdmin && !$currentTenant) {
-        console.error('[Deploy] No tenant available and user is not admin - cannot open HSS Management');
-        alert('No tenant selected. Please ensure you are properly logged in.');
-        return;
-      }
-      
-      showHSSManagementModal = true;
-    }, 100);
-  }
-
-  function closeHSSManagementModal() {
-    console.log('[Deploy] Closing HSS Management modal');
-    showHSSManagementModal = false;
-  }
 </script>
 
 <TenantGuard requireTenant={true}>
@@ -356,17 +324,6 @@
           📡 Frequency
         </button>
 
-        <button 
-          class="control-btn" 
-          class:disabled={buttonsDisabled}
-          on:click={() => {
-            console.log('[Deploy] HSS button clicked');
-            openHSSManagement();
-          }} 
-          title={isAdmin ? "HSS Management (Admin)" : ($currentTenant ? "HSS Management" : "HSS Management (No tenant selected)")}
-        >
-          🏠 HSS
-        </button>
         <button class="control-btn" on:click={toggleHardwareSelector} title="Select Hardware">
           📦 {selectedHardware.length > 0 ? selectedHardware.length : ''}
         </button>
@@ -457,12 +414,6 @@
     on:close={closeFrequencyPlannerModal}
   />
 
-  <!-- HSS Management Modal -->
-  <HSSManagementModal
-    show={showHSSManagementModal}
-    tenantId={$currentTenant?.id || ''}
-    on:close={closeHSSManagementModal}
-  />
   
   <!-- Global Settings Button -->
   <SettingsButton />

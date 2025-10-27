@@ -12,7 +12,7 @@
  */
 
 const express = require('express');
-const admin = require('firebase-admin');
+const { admin, auth, firestore } = require('../../config/firebase');
 const { UserTenant } = require('./user-schema');
 const { 
   verifyAuth, 
@@ -20,11 +20,6 @@ const {
   requireRole,
   VALID_ROLES 
 } = require('./role-auth-middleware');
-
-// Initialize Firebase Admin if not already done
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
 
 const router = express.Router();
 
@@ -68,7 +63,7 @@ router.get('/', async (req, res) => {
     const users = [];
     for (const userId of uniqueUserIds) {
       try {
-        const userRecord = await admin.auth().getUser(userId);
+        const userRecord = await auth.getUser(userId);
         
         // Get all tenants for this user
         const userTenantsForUser = userTenants.filter(ut => ut.userId === userId);
@@ -121,7 +116,7 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
       console.log(`⚠️ Tenant ${tenantId} has no users in MongoDB. Checking Firestore...`);
       
       try {
-        const firestore = admin.firestore();
+        // Use centralized firestore
         const tenantDoc = await firestore.collection('tenants').doc(tenantId).get();
         
         if (tenantDoc.exists()) {
@@ -164,7 +159,7 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
     for (const userTenant of userTenants) {
       try {
         // Get user from Firebase Auth
-        const userRecord = await admin.auth().getUser(userTenant.userId);
+        const userRecord = await auth.getUser(userTenant.userId);
         
         users.push({
           uid: userTenant.userId,
@@ -243,7 +238,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
     // Check if user already exists in Firebase Auth
     let userRecord;
     try {
-      userRecord = await admin.auth().getUserByEmail(email);
+      userRecord = await auth.getUserByEmail(email);
     } catch (error) {
       if (error.code === 'auth/user-not-found') {
         // User doesn't exist - they'll need to sign up
@@ -294,14 +289,14 @@ router.post('/invite', requireAdmin, async (req, res) => {
         role,
         customModuleAccess: customModuleAccess || null,
         invitedBy: req.user.uid,
-        invitedAt: admin.firestore.FieldValue.serverTimestamp(),
+        invitedAt: firestore.FieldValue.serverTimestamp(),
         status: 'pending',
-        expiresAt: admin.firestore.Timestamp.fromDate(
+        expiresAt: firestore.Timestamp.fromDate(
           new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
         )
       };
       
-      await admin.firestore().collection('tenant_invitations').doc(invitationId).set(invitation);
+      await firestore.collection('tenant_invitations').doc(invitationId).set(invitation);
       console.log(`📧 Created invitation for ${email} (user doesn't exist yet)`);
     }
     

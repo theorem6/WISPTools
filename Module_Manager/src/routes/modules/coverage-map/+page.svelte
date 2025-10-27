@@ -19,6 +19,8 @@
   import AddInventoryModal from './components/AddInventoryModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
+  import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
+  import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import type { 
@@ -53,6 +55,8 @@
   let showAddInventoryModal = false;
   let showContextMenu = false;
   let showTowerActionsMenu = false;
+  let showEPCDeploymentModal = false;
+  let showHSSRegistrationModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat = 0;
@@ -61,6 +65,7 @@
   let selectedSiteForBackhaul: TowerSite | null = null;
   let selectedSiteForInventory: TowerSite | null = null;
   let selectedTowerForMenu: TowerSite | null = null;
+  let selectedTowerForEPC: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
   let initialSiteType: 'tower' | 'noc' | null = null;
@@ -296,6 +301,14 @@
       case 'view-inventory':
         goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
         break;
+      case 'deploy-epc':
+        selectedTowerForEPC = tower;
+        showEPCDeploymentModal = true;
+        break;
+      case 'register-hss':
+        selectedTowerForEPC = tower;
+        showHSSRegistrationModal = true;
+        break;
       case 'view-details':
         success = `Viewing ${tower.name}`;
         setTimeout(() => success = '', 3000);
@@ -378,6 +391,26 @@
     </button>
     <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu} title="Main Menu">
       ☰
+    </button>
+  </div>
+
+  <!-- Mobile Bottom Controls -->
+  <div class="mobile-bottom-controls">
+    <button class="mobile-control-btn" on:click={() => showMainMenu = !showMainMenu}>
+      <span class="mobile-icon">☰</span>
+      <span class="mobile-label">Menu</span>
+    </button>
+    <button class="mobile-control-btn" on:click={() => showFilters = !showFilters}>
+      <span class="mobile-icon">🔍</span>
+      <span class="mobile-label">Filters</span>
+    </button>
+    <button class="mobile-control-btn" on:click={() => showStats = !showStats}>
+      <span class="mobile-icon">📊</span>
+      <span class="mobile-label">Stats</span>
+    </button>
+    <button class="mobile-control-btn" on:click={() => goto('/dashboard')}>
+      <span class="mobile-icon">←</span>
+      <span class="mobile-label">Back</span>
     </button>
   </div>
 
@@ -639,6 +672,28 @@
   on:action={handleTowerAction}
 />
 
+<!-- EPC Deployment Modal -->
+<EPCDeploymentModal
+  bind:show={showEPCDeploymentModal}
+  tenantId={tenantId}
+  siteData={selectedTowerForEPC}
+  on:close={() => {
+    showEPCDeploymentModal = false;
+    selectedTowerForEPC = null;
+  }}
+/>
+
+<!-- HSS Registration Modal -->
+<HSSRegistrationModal
+  bind:show={showHSSRegistrationModal}
+  tenantId={tenantId}
+  siteData={selectedTowerForEPC}
+  on:close={() => {
+    showHSSRegistrationModal = false;
+    selectedTowerForEPC = null;
+  }}
+/>
+
 <!-- Global Settings Button -->
 <SettingsButton />
 </TenantGuard>
@@ -722,6 +777,59 @@
     border-color: rgba(124, 58, 237, 0.5);
   }
 
+  /* Mobile Bottom Controls */
+  .mobile-bottom-controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    display: none;
+    padding: 0.5rem;
+    z-index: 100;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .mobile-bottom-controls {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  .mobile-control-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    background: none;
+    border: none;
+    color: white;
+    padding: 0.75rem 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 60px;
+  }
+
+  .mobile-control-btn:hover {
+    background: rgba(124, 58, 237, 0.3);
+  }
+
+  .mobile-control-btn:active {
+    background: rgba(124, 58, 237, 0.5);
+    transform: scale(0.95);
+  }
+
+  .mobile-icon {
+    font-size: 1.25rem;
+  }
+
+  .mobile-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
   .quick-actions {
     display: flex;
     flex-direction: column;
@@ -741,6 +849,7 @@
     justify-content: center;
     z-index: 1000;
     backdrop-filter: blur(5px);
+    padding: 1rem;
   }
 
   .modal-content {
@@ -750,18 +859,22 @@
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    width: 100%;
   }
 
   .main-menu-modal {
     width: 600px;
+    max-width: calc(100vw - 2rem);
   }
 
   .filters-modal {
     width: 400px;
+    max-width: calc(100vw - 2rem);
   }
 
   .stats-modal {
     width: 500px;
+    max-width: calc(100vw - 2rem);
   }
 
   .modal-header {
@@ -935,22 +1048,133 @@
 
   @media (max-width: 768px) {
     .floating-controls {
-      top: 10px;
-      right: 10px;
+      display: none;
     }
-
+    
+    .mobile-bottom-controls {
+      display: grid;
+    }
+    
     .control-btn {
-      width: 45px;
-      height: 45px;
+      width: 48px;
+      height: 48px;
       font-size: 1.25rem;
+      min-height: 48px;
+      min-width: 48px;
     }
-
+    
+    .coverage-map-page {
+      height: 100vh;
+      height: 100dvh; /* Dynamic viewport height for mobile */
+    }
+    
+    .map-container {
+      touch-action: pan-x pan-y;
+    }
+    
+    .filter-panel {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    
+    .filter-panel button {
+      min-height: 44px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
+    
+    .modal-overlay {
+      padding: 0.5rem;
+      align-items: flex-start;
+      padding-top: 2rem;
+    }
+    
+    .modal-content {
+      max-height: calc(100vh - 4rem);
+      margin: 0;
+    }
+    
     .main-menu-modal,
     .filters-modal,
     .stats-modal {
-      width: 95vw;
-      margin: 10px;
+      width: 100%;
+      max-width: calc(100vw - 1rem);
     }
+    
+    .modal-header {
+      padding: 1rem;
+      position: sticky;
+      top: 0;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 10;
+    }
+    
+    .modal-body {
+      padding: 1rem;
+    }
+    
+    .action-grid {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .basemap-switcher {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .basemap-btn {
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
+    
+    .stats-grid {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    
+    .stat-card {
+      padding: 1rem;
+    }
+    
+    .message-banner {
+      left: 1rem;
+      right: 1rem;
+      transform: none;
+      max-width: none;
+      bottom: 80px; /* Above mobile controls */
+    }
+    
+    /* Improve touch targets */
+    .close-btn {
+      min-height: 44px;
+      min-width: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Better spacing for mobile */
+    .modal-body {
+      padding-bottom: 2rem; /* Extra space for mobile controls */
+    }
+    
+    /* Prevent zoom on input focus */
+    input, select, textarea {
+      font-size: 16px;
+    }
+  }
 
     .action-grid {
       grid-template-columns: 1fr;

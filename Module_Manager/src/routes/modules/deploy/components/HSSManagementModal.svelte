@@ -8,7 +8,6 @@
   import RemoteEPCs from '../../hss-management/components/RemoteEPCs.svelte';
   import HSSStats from '../../hss-management/components/HSSStats.svelte';
   import MMEConnections from '../../hss-management/components/MMEConnections.svelte';
-  import EPCDeploymentModal from './EPCDeploymentModal.svelte';
 
   export let show = false;
   export let tenantId: string;
@@ -21,7 +20,6 @@
   let bandwidthPlans: any[] = [];
   let loading = true;
   let error = '';
-  let showEPCDeploymentModal = false;
 
   // HSS API endpoint
   const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/hss';
@@ -168,13 +166,6 @@
     loadInitialData();
   }
 
-  function openEPCDeploymentModal() {
-    showEPCDeploymentModal = true;
-  }
-
-  function closeEPCDeploymentModal() {
-    showEPCDeploymentModal = false;
-  }
 
   function getTabIcon(tab: string): string {
     switch (tab) {
@@ -341,9 +332,6 @@
                     <h3>EPC Management</h3>
                     <p>Deploy and manage Evolved Packet Core (EPC) instances</p>
                   </div>
-                  <button class="deploy-btn" on:click={openEPCDeploymentModal} title="Deploy EPC">
-                    🚀 Deploy EPC
-                  </button>
                 </div>
                 
                 <RemoteEPCs 
@@ -380,12 +368,6 @@
         {/if}
       </div>
 
-      <!-- EPC Deployment Modal -->
-      <EPCDeploymentModal
-        show={showEPCDeploymentModal}
-        tenantId={tenantId}
-        on:close={closeEPCDeploymentModal}
-      />
     </div>
   </div>
 {/if}

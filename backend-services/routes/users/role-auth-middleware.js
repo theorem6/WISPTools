@@ -1,15 +1,4 @@
-const admin = require('firebase-admin');
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  } catch (error) {
-    console.log('Firebase Admin already initialized or no credentials available');
-  }
-}
+const { admin, auth, firestore } = require('../../config/firebase');
 
 const verifyAuth = async (req, res, next) => {
   try {
@@ -19,7 +8,7 @@ const verifyAuth = async (req, res, next) => {
     }
 
     const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await auth.verifyIdToken(token);
     
     req.user = decodedToken;
     next();
