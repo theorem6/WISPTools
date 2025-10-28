@@ -74,10 +74,14 @@
   let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
   
   // Module context for permissions
-  $: moduleContext = {
-    module: 'coverage-map',
-    userRole: $currentTenant?.userRole || 'admin' // Get from current tenant
-  };
+  $: moduleContext = (() => {
+    const userRole = $currentTenant?.userRole || 'admin';
+    console.log('[CoverageMap] ModuleContext updated:', { userRole, tenant: $currentTenant?.displayName, hasUserRole: !!$currentTenant?.userRole });
+    return {
+      module: 'coverage-map',
+      userRole
+    };
+  })();
   
   // Filters
   let filters: CoverageMapFilters = {
