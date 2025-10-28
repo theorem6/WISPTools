@@ -12,7 +12,15 @@
   const dispatch = createEventDispatcher();
   
   // Get object permissions
-  $: objectPermissions = tower && moduleContext ? objectStateManager.getObjectPermissions(tower, moduleContext) : null;
+  $: objectPermissions = (() => {
+    try {
+      if (!tower || !moduleContext) return null;
+      return objectStateManager.getObjectPermissions(tower, moduleContext);
+    } catch (error) {
+      console.error('Error getting object permissions:', error);
+      return null;
+    }
+  })();
   
   function handleAction(action: string) {
     // Guard: ensure tower exists
