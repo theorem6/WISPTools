@@ -362,7 +362,7 @@ const HardwareDeploymentSchema = new mongoose.Schema({
   },
   hardware_type: {
     type: String,
-    enum: ['sector', 'backhaul', 'router', 'epc', 'switch', 'power', 'other'],
+    enum: ['tower', 'sector', 'backhaul', 'router', 'epc', 'switch', 'power', 'other'],
     required: true
   },
   status: {
