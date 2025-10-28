@@ -30,11 +30,15 @@
       return;
     }
     
+    // Capture values before closing
+    const towerId = tower.id;
+    const towerName = tower.name;
+    
     // Close modal first
     handleClose();
     
     // Navigate to deploy module with this tower pre-selected
-    goto(`/modules/deploy?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+    goto(`/modules/deploy?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
   }
   
   function handleInventory() {
@@ -50,11 +54,15 @@
       return;
     }
     
+    // Capture values before closing
+    const towerId = tower.id;
+    const towerName = tower.name;
+    
     // Close modal first
     handleClose();
     
     // Navigate to inventory page with filters for this tower
-    goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+    goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
   }
 </script>
 
