@@ -35,6 +35,16 @@ export class ObjectStateManager {
    * Get object permissions based on module context and object state
    */
   getObjectPermissions(object: any, context: ModuleContext): ObjectState {
+    // Guard: ensure object exists
+    if (!object) {
+      throw new Error('Object is null or undefined');
+    }
+    
+    // Guard: ensure object has id
+    if (!object.id) {
+      throw new Error('Object must have an id property');
+    }
+    
     const state: ObjectState = {
       id: object.id,
       type: object.type || 'tower',
