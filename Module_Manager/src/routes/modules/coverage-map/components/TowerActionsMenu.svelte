@@ -11,18 +11,21 @@
   
   const dispatch = createEventDispatcher();
   
-  // Get object permissions
+  // Get object permissions - with comprehensive null safety
   $: objectPermissions = (() => {
-    // Early return if tower or moduleContext is null
-    if (!tower) {
+    // Early return if tower is null or undefined
+    if (tower === null || tower === undefined) {
       return null;
     }
+    
+    // Check if moduleContext exists
     if (!moduleContext) {
       return null;
     }
     
-    // Additional check for tower.id
-    if (!tower.id) {
+    // Additional check for tower.id - but safely
+    const towerId = tower?.id;
+    if (!towerId && towerId !== '') {
       console.error('Tower object missing id property');
       return null;
     }
