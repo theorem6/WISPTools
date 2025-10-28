@@ -340,10 +340,13 @@
         }
         break;
       case 'deploy-hardware':
-        if (tower) {
-          selectedTowerForEPC = tower;
-          showHardwareDeploymentModal = true;
+        if (!tower) {
+          console.error('deploy-hardware action called without tower');
+          return;
         }
+        
+        selectedTowerForEPC = tower;
+        showHardwareDeploymentModal = true;
         break;
       case 'change-site-type':
         // Show site type change modal
