@@ -62,13 +62,17 @@
 <div class="modal-overlay" on:click={handleClose}>
   <div class="modal" on:click|stopPropagation>
     <div class="modal-header">
-      <h2>🔧 Deploy Hardware to {tower.name}</h2>
+      <h2>🔧 Deploy Hardware to {tower?.name || 'Selected Site'}</h2>
       <button class="close-btn" on:click={handleClose}>✕</button>
     </div>
     
     <div class="modal-content">
       <p class="info-text">
-        Deploy hardware to <strong>{tower.name}</strong> located at <strong>{tower.location?.address || `${tower.location?.latitude}, ${tower.location?.longitude}`}</strong>
+        {#if tower}
+          Deploy hardware to <strong>{tower.name}</strong> located at <strong>{tower.location?.address || `${tower.location?.latitude}, ${tower.location?.longitude}`}</strong>
+        {:else}
+          Deploy hardware to selected location
+        {/if}
       </p>
       
       {#if error}
