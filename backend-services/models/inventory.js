@@ -169,7 +169,14 @@ const InventoryItemSchema = new mongoose.Schema({
       'Tools',
       'Spare Parts',
       'Other'
-    ]
+    ],
+    validate: {
+      validator: function(v) {
+        // Allow existing EPC Equipment values even if enum doesn't match exactly
+        return this.constructor.schema.path('category').enumValues.includes(v) || v === 'EPC Equipment';
+      },
+      message: 'Invalid category'
+    }
   },
   
   subcategory: String, // e.g., "Base Station", "Sector Antenna", etc.
