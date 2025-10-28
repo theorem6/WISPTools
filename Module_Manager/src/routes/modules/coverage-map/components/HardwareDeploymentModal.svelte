@@ -23,6 +23,13 @@
       return;
     }
     
+    // Guard: ensure tower has required properties
+    if (!tower.id || !tower.name) {
+      error = 'Tower data incomplete';
+      console.error('Tower missing required properties:', tower);
+      return;
+    }
+    
     // Close modal first
     handleClose();
     
@@ -33,6 +40,13 @@
   function handleInventory() {
     if (!tower) {
       error = 'No tower selected';
+      return;
+    }
+    
+    // Guard: ensure tower has required properties
+    if (!tower.id || !tower.name) {
+      error = 'Tower data incomplete';
+      console.error('Tower missing required properties:', tower);
       return;
     }
     
