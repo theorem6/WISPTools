@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { goto } from '$app/navigation';
   import type { TowerSite } from '../lib/models';
   
   export let show = false;
@@ -22,8 +23,11 @@
       return;
     }
     
+    // Close modal first
+    handleClose();
+    
     // Navigate to deploy module with this tower pre-selected
-    window.location.href = `/modules/deploy?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`;
+    goto(`/modules/deploy?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
   }
   
   function handleInventory() {
@@ -32,8 +36,11 @@
       return;
     }
     
+    // Close modal first
+    handleClose();
+    
     // Navigate to inventory page with filters for this tower
-    window.location.href = `/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`;
+    goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
   }
 </script>
 
