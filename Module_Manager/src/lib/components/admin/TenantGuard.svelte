@@ -71,9 +71,8 @@
         await tenantStore.initialize();
       }
       
-      // Step 5: Check tenant requirement
-      if (requireTenant && !isAdmin) {
-        // Regular users need a tenant
+      // Step 5: Check tenant requirement - ALL users need a tenant for data isolation
+      if (requireTenant) {
         if (!tenantState.currentTenant) {
           // No tenant selected - load user's tenants
           if (currentUser) {
@@ -123,10 +122,15 @@
               console.log('[TenantGuard] Auto-selecting single tenant');
               tenantStore.setCurrentTenant(tenants[0]);
             } else {
-              // Multiple tenants - redirect to selector
-              console.log('[TenantGuard] Multiple tenants, redirecting to selector');
-              await goto('/tenant-selector', { replaceState: true });
-              return;
+              // Multiple tenants - redirect to selector (or auto-select first for admins)
+              if (isAdmin) {
+                console.log('[TenantGuard] Admin user - auto-selecting first tenant for isolation');
+                tenantStore.setCurrentTenant(tenants[0]);
+              } else {
+                console.log('[TenantGuard] Multiple tenants, redirecting to selector');
+                await goto('/tenant-selector', { replaceState: true });
+                return;
+              }
             }
           }
         }
@@ -135,9 +139,6 @@
         if (tenantState.currentTenant) {
           console.log('[TenantGuard] Tenant validated:', tenantState.currentTenant.displayName);
         }
-      } else if (isAdmin) {
-        // Admins don't need a tenant
-        console.log('[TenantGuard] Admin user - tenant not required');
       }
       
       isChecking = false;

@@ -133,19 +133,17 @@ function createTenantStore() {
         const tenants = await tenantService.getUserTenants(userId);
         console.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
         
-        // Auto-select tenant for non-admin users with exactly one tenant
-        const isPlatformAdmin = userEmail === 'david@david.com';
+        // Auto-select tenant for ALL users to ensure data isolation
         const currentState = get({ subscribe });
         
         console.log('[TenantStore] Auto-selection check:', { 
           tenantCount: tenants.length, 
-          isPlatformAdmin, 
           hasCurrentTenant: !!currentState.currentTenant,
           userEmail 
         });
         
-        if (tenants.length === 1 && !isPlatformAdmin && !currentState.currentTenant) {
-          // Regular user with one tenant - auto-select it
+        if (tenants.length === 1 && !currentState.currentTenant) {
+          // User with one tenant - auto-select it (enforces data isolation)
           const tenant = tenants[0];
           console.log('[TenantStore] Auto-selecting single tenant:', tenant.displayName);
           
@@ -162,8 +160,26 @@ function createTenantStore() {
           localStorage.setItem('selectedTenantId', tenant.id);
           localStorage.setItem('selectedTenantName', tenant.displayName);
           localStorage.setItem('tenantSetupCompleted', 'true');
+        } else if (tenants.length > 1 && !currentState.currentTenant) {
+          // Multiple tenants - set first as default for isolation, user can switch
+          const tenant = tenants[0];
+          console.log('[TenantStore] Auto-selecting first tenant for isolation:', tenant.displayName);
+          
+          update(state => ({
+            ...state,
+            userTenants: tenants,
+            currentTenant: tenant,
+            setupCompleted: true,
+            isLoading: false,
+            error: null
+          }));
+          
+          // Save to localStorage
+          localStorage.setItem('selectedTenantId', tenant.id);
+          localStorage.setItem('selectedTenantName', tenant.displayName);
+          localStorage.setItem('tenantSetupCompleted', 'true');
         } else {
-          // Platform admin or multi-tenant user - manual selection required
+          // Tenant already selected or no tenants
           update(state => ({
             ...state,
             userTenants: tenants,

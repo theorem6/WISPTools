@@ -273,7 +273,7 @@
 
 </script>
 
-<TenantGuard requireTenant={false}>
+<TenantGuard>
   <div class="app">
     <!-- Full Screen Map -->
     <div class="map-fullscreen" bind:this={mapContainer}>
