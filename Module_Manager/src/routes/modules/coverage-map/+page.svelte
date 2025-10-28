@@ -311,6 +311,12 @@
   function handleTowerAction(event: CustomEvent) {
     const { action, tower } = event.detail;
     
+    // Guard: ensure tower exists
+    if (!tower && action !== 'add-site') {
+      console.error('Tower action called without tower');
+      return;
+    }
+    
     switch (action) {
       case 'edit-site':
         success = 'Edit functionality coming soon';
@@ -329,11 +335,15 @@
         showAddInventoryModal = true;
         break;
       case 'view-inventory':
-        goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+        if (tower) {
+          goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+        }
         break;
       case 'deploy-hardware':
-        selectedTowerForEPC = tower;
-        showHardwareDeploymentModal = true;
+        if (tower) {
+          selectedTowerForEPC = tower;
+          showHardwareDeploymentModal = true;
+        }
         break;
       case 'change-site-type':
         // Show site type change modal
@@ -341,11 +351,13 @@
         setTimeout(() => success = '', 3000);
         break;
       case 'view-details':
-        success = `Viewing ${tower.name}`;
-        setTimeout(() => success = '', 3000);
+        if (tower) {
+          success = `Viewing ${tower.name}`;
+          setTimeout(() => success = '', 3000);
+        }
         break;
       case 'delete-site':
-        if (confirm(`Delete ${tower.name}?`)) {
+        if (tower && confirm(`Delete ${tower.name}?`)) {
           deleteTowerSite(tower.id);
         }
         break;

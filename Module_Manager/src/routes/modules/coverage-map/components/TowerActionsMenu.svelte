@@ -19,7 +19,7 @@
     
     // Check if action is allowed
     if (!objectStateManager.isActionAllowed(tower, action, moduleContext)) {
-      console.warn(`Action '${action}' not allowed for tower ${tower.id}`);
+      console.warn(`Action '${action}' not allowed for tower ${tower?.id || 'unknown'}`);
       return;
     }
     
