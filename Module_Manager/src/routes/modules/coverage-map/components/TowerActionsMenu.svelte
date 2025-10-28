@@ -47,21 +47,29 @@
   })();
   
   function handleAction(action: string) {
+    console.log('[TowerActionsMenu] handleAction called', { action, tower, hasTower: !!tower });
+    
     // Guard: ensure tower exists and has required properties
-    if (!tower) {
-      console.error('handleAction called without tower');
+    if (tower === null || tower === undefined) {
+      console.error('[TowerActionsMenu] handleAction called without tower');
+      return;
+    }
+    
+    // Guard: ensure tower is an object
+    if (typeof tower !== 'object' || Array.isArray(tower)) {
+      console.error('[TowerActionsMenu] handleAction called with invalid tower type:', typeof tower);
       return;
     }
     
     // Guard: ensure tower has an id
-    if (!tower.id) {
-      console.error('handleAction called with tower missing id');
+    if (tower.id === null || tower.id === undefined) {
+      console.error('[TowerActionsMenu] handleAction called with tower missing id', tower);
       return;
     }
     
     // Guard: ensure moduleContext exists
     if (!moduleContext) {
-      console.error('handleAction called without moduleContext');
+      console.error('[TowerActionsMenu] handleAction called without moduleContext');
       return;
     }
     
@@ -69,15 +77,16 @@
     try {
       const isAllowed = objectStateManager.isActionAllowed(tower, action, moduleContext);
       if (!isAllowed) {
-        console.warn(`Action '${action}' not allowed for tower ${tower.id}`);
+        console.warn(`[TowerActionsMenu] Action '${action}' not allowed for tower ${tower.id}`);
         return;
       }
       
       // Safely dispatch the action with the tower
+      console.log('[TowerActionsMenu] Dispatching action', { action, towerId: tower.id });
       dispatch('action', { action, tower });
       show = false;
     } catch (error) {
-      console.error('Error in handleAction:', error);
+      console.error('[TowerActionsMenu] Error in handleAction:', error);
     }
   }
   
