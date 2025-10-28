@@ -3,6 +3,21 @@ name: Auto Deploy WISPTools.io Platform
 on:
   push:
     branches: [ main, master ]
+    paths:
+      # Cloud Functions changes
+      - 'functions/**'
+      # Frontend changes
+      - 'Module_Manager/src/**'
+      - 'Module_Manager/package.json'
+      - 'Module_Manager/package-lock.json'
+      - 'Module_Manager/vite.config.ts'
+      - 'Module_Manager/svelte.config.js'
+      # Firestore rules changes
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      # Firebase config changes
+      - 'firebase.json'
+      # Force deployment on manual trigger
   workflow_dispatch:  # Allow manual triggers
 
 env:
@@ -15,10 +30,24 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Check changed files
+      uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          functions:
+            - 'functions/**'
+    
+    - name: Skip if no functions changes
+      if: steps.changes.outputs.functions == 'false'
+      run: echo "No functions changes detected, skipping deployment"
+    
     - name: Checkout code
+      if: steps.changes.outputs.functions == 'true'
       uses: actions/checkout@v4
       
     - name: Setup Node.js
+      if: steps.changes.outputs.functions == 'true'
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
@@ -26,21 +55,25 @@ jobs:
         cache-dependency-path: functions/package-lock.json
         
     - name: Install Firebase CLI
+      if: steps.changes.outputs.functions == 'true'
       run: npm install -g firebase-tools@latest
       
     - name: Authenticate to Firebase
+      if: steps.changes.outputs.functions == 'true'
       run: |
         echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase login:ci --token $FIREBASE_TOKEN
         
     - name: Build Functions
+      if: steps.changes.outputs.functions == 'true'
       run: |
         cd functions
         npm ci
         npm run build
         
     - name: Deploy Functions
+      if: steps.changes.outputs.functions == 'true'
       run: |
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase deploy --only functions --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
@@ -50,10 +83,29 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Check changed files
+      uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          frontend:
+            - 'Module_Manager/src/**'
+            - 'Module_Manager/package.json'
+            - 'Module_Manager/package-lock.json'
+            - 'Module_Manager/vite.config.ts'
+            - 'Module_Manager/svelte.config.js'
+            - 'firebase.json'
+    
+    - name: Skip if no frontend changes
+      if: steps.changes.outputs.frontend == 'false'
+      run: echo "No frontend changes detected, skipping deployment"
+    
     - name: Checkout code
+      if: steps.changes.outputs.frontend == 'true'
       uses: actions/checkout@v4
       
     - name: Setup Node.js
+      if: steps.changes.outputs.frontend == 'true'
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
@@ -61,21 +113,25 @@ jobs:
         cache-dependency-path: Module_Manager/package-lock.json
         
     - name: Install Firebase CLI
+      if: steps.changes.outputs.frontend == 'true'
       run: npm install -g firebase-tools@latest
       
     - name: Authenticate to Firebase
+      if: steps.changes.outputs.frontend == 'true'
       run: |
         echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase login:ci --token $FIREBASE_TOKEN
         
     - name: Build Frontend
+      if: steps.changes.outputs.frontend == 'true'
       run: |
         cd Module_Manager
         npm ci
         npm run build
         
     - name: Deploy Frontend
+      if: steps.changes.outputs.frontend == 'true'
       run: |
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
@@ -85,19 +141,36 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Check changed files
+      uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          rules:
+            - 'firestore.rules'
+            - 'firestore.indexes.json'
+    
+    - name: Skip if no rules changes
+      if: steps.changes.outputs.rules == 'false'
+      run: echo "No rules changes detected, skipping deployment"
+    
     - name: Checkout code
+      if: steps.changes.outputs.rules == 'true'
       uses: actions/checkout@v4
       
     - name: Install Firebase CLI
+      if: steps.changes.outputs.rules == 'true'
       run: npm install -g firebase-tools@latest
       
     - name: Authenticate to Firebase
+      if: steps.changes.outputs.rules == 'true'
       run: |
         echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase login:ci --token $FIREBASE_TOKEN
         
     - name: Deploy Firestore Rules
+      if: steps.changes.outputs.rules == 'true'
       run: |
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase deploy --only firestore:rules,firestore:indexes --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
