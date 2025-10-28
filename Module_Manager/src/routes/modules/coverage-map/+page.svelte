@@ -277,11 +277,14 @@
       // Handle all asset types - show actions menu
       if (type === 'tower' || type === 'noc' || type === 'warehouse') {
         const tower = towers.find(t => t.id === id);
-        if (tower) {
+        if (tower && tower.id) {
+          console.log('[CoverageMap] Opening tower actions menu', { tower, id, towerId: tower.id });
           selectedTowerForMenu = tower;
           towerMenuX = screenX;
           towerMenuY = screenY;
           showTowerActionsMenu = true;
+        } else {
+          console.error('[CoverageMap] Tower not found or missing id', { id, tower, towers });
         }
       } else if (type === 'sector') {
         const sector = sectors.find(s => s.id === id);
