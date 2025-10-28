@@ -462,7 +462,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   }
 </script>
 
-<TenantGuard requireTenant={true}>
+<TenantGuard requireTenant={false}>
   <div class="app">
     <!-- Full Screen Map -->
     <div class="map-fullscreen" bind:this={mapContainer}>
