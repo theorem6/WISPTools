@@ -80,22 +80,13 @@
 
   let isAdmin = false;
   let currentUser: any = null;
-  
-  // Reactive to handle auth state changes
-  $: {
+  let isLoggedIn = false;
+
+  onMount(async () => {
     if (browser) {
-      currentUser = authService.getCurrentUser();
+      currentUser = await authService.getCurrentUser();
       isAdmin = isPlatformAdmin(currentUser?.email || null);
-    }
-  }
-  
-  // Use authService listener to update state in real-time
-  onMount(() => {
-    if (browser) {
-      authService.onAuthStateChange((user) => {
-        currentUser = user;
-        isAdmin = isPlatformAdmin(user?.email || null);
-      });
+      isLoggedIn = !!currentUser;
     }
   });
 
@@ -126,7 +117,7 @@
   }
 </script>
 
-<TenantGuard>
+<TenantGuard requireTenant={false}>
   <div class="dashboard-container">
     <!-- Header -->
     <div class="header">
@@ -147,7 +138,7 @@
             </div>
           {/if}
           <ThemeSwitcher />
-          {#if currentUser}
+          {#if isLoggedIn && currentUser}
             <div class="user-status">
               {#if isAdmin}
                 <span class="admin-indicator">Admin</span>
