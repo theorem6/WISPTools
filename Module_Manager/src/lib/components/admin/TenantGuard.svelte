@@ -71,73 +71,83 @@
         await tenantStore.initialize();
       }
       
-      // Step 5: Check tenant requirement - ALL users need a tenant for data isolation
+      // Step 5: Check tenant requirement
       if (requireTenant) {
-        if (!tenantState.currentTenant) {
-          // No tenant selected - load user's tenants
-          if (currentUser) {
-            console.log('[TenantGuard] No tenant selected, loading user tenants...');
-            console.log('[TenantGuard] User UID:', currentUser.uid);
-            console.log('[TenantGuard] User Email:', currentUser.email);
-            
-            const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
-            console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
-            
-            if (tenants.length === 0) {
-              // No tenants at all - create a default tenant for the user
-              console.log('[TenantGuard] No tenants found - creating default tenant');
-              try {
-                const { tenantService } = await import('../../services/tenantService');
-                const result = await tenantService.createTenant(
-                  'default-tenant',
-                  'My Organization',
-                  currentUser.email || 'user@example.com',
-                  currentUser.uid,
-                  undefined,
-                  true,
-                  currentUser.email
-                );
-                
-                if (result.success && result.tenantId) {
-                  // Get the created tenant and set it as current
-                  const tenant = await tenantService.getTenant(result.tenantId);
-                  if (tenant) {
-                    tenantStore.setCurrentTenant(tenant);
-                    console.log('[TenantGuard] Created and set default tenant');
+        if (!isAdmin) {
+          // Regular users need a tenant for data isolation
+          if (!tenantState.currentTenant) {
+            // No tenant selected - load user's tenants
+            if (currentUser) {
+              console.log('[TenantGuard] No tenant selected, loading user tenants...');
+              console.log('[TenantGuard] User UID:', currentUser.uid);
+              console.log('[TenantGuard] User Email:', currentUser.email);
+              
+              const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
+              console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
+              
+              if (tenants.length === 0) {
+                // No tenants at all - create a default tenant for the user
+                console.log('[TenantGuard] No tenants found - creating default tenant');
+                try {
+                  const { tenantService } = await import('../../services/tenantService');
+                  const result = await tenantService.createTenant(
+                    'default-tenant',
+                    'My Organization',
+                    currentUser.email || 'user@example.com',
+                    currentUser.uid,
+                    undefined,
+                    true,
+                    currentUser.email
+                  );
+                  
+                  if (result.success && result.tenantId) {
+                    // Get the created tenant and set it as current
+                    const tenant = await tenantService.getTenant(result.tenantId);
+                    if (tenant) {
+                      tenantStore.setCurrentTenant(tenant);
+                      console.log('[TenantGuard] Created and set default tenant');
+                    }
+                  } else {
+                    console.log('[TenantGuard] Failed to create default tenant:', result.error);
+                    error = 'Unable to set up your organization. Please contact support.';
+                    isChecking = false;
+                    return;
                   }
-                } else {
-                  console.log('[TenantGuard] Failed to create default tenant:', result.error);
+                } catch (createError) {
+                  console.error('[TenantGuard] Error creating default tenant:', createError);
                   error = 'Unable to set up your organization. Please contact support.';
                   isChecking = false;
                   return;
                 }
-              } catch (createError) {
-                console.error('[TenantGuard] Error creating default tenant:', createError);
-                error = 'Unable to set up your organization. Please contact support.';
-                isChecking = false;
-                return;
-              }
-            } else if (tenants.length === 1) {
-              // Auto-select single tenant
-              console.log('[TenantGuard] Auto-selecting single tenant');
-              tenantStore.setCurrentTenant(tenants[0]);
-            } else {
-              // Multiple tenants - redirect to selector (or auto-select first for admins)
-              if (isAdmin) {
-                console.log('[TenantGuard] Admin user - auto-selecting first tenant for isolation');
+              } else if (tenants.length === 1) {
+                // Auto-select single tenant
+                console.log('[TenantGuard] Auto-selecting single tenant');
                 tenantStore.setCurrentTenant(tenants[0]);
               } else {
+                // Multiple tenants - redirect to selector
                 console.log('[TenantGuard] Multiple tenants, redirecting to selector');
                 await goto('/tenant-selector', { replaceState: true });
                 return;
               }
             }
           }
-        }
-        
-        // Verify tenant is still valid
-        if (tenantState.currentTenant) {
-          console.log('[TenantGuard] Tenant validated:', tenantState.currentTenant.displayName);
+          
+          // Verify tenant is still valid
+          if (tenantState.currentTenant) {
+            console.log('[TenantGuard] Tenant validated:', tenantState.currentTenant.displayName);
+          }
+        } else {
+          // Platform admin - can access without tenant requirement
+          console.log('[TenantGuard] Admin user - tenant not required');
+          
+          // Still load tenant info for UI display if available
+          if (!tenantState.currentTenant && currentUser) {
+            const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
+            if (tenants.length > 0) {
+              // Just load tenants without auto-selecting for admin
+              console.log('[TenantGuard] Admin has', tenants.length, 'tenants available');
+            }
+          }
         }
       }
       
