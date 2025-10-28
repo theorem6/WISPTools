@@ -13,8 +13,21 @@
   
   // Get object permissions
   $: objectPermissions = (() => {
+    // Early return if tower or moduleContext is null
+    if (!tower) {
+      return null;
+    }
+    if (!moduleContext) {
+      return null;
+    }
+    
+    // Additional check for tower.id
+    if (!tower.id) {
+      console.error('Tower object missing id property');
+      return null;
+    }
+    
     try {
-      if (!tower || !moduleContext) return null;
       return objectStateManager.getObjectPermissions(tower, moduleContext);
     } catch (error) {
       console.error('Error getting object permissions:', error);
