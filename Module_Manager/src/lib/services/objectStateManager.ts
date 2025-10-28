@@ -207,8 +207,8 @@ export class ObjectStateManager {
   private applyDefaultRules(state: ObjectState, context: ModuleContext): void {
     state.allowedActions = ['view', 'select'];
     
-    // Admin can do everything
-    if (context.userRole === 'admin') {
+    // Admin can do everything - also allow if userRole is undefined or 'owner'
+    if (context.userRole === 'admin' || context.userRole === 'owner' || !context.userRole) {
       state.allowedActions.push('edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment', 'deploy-hardware', 'change-site-type');
       state.isReadOnly = false;
     } else if (context.userRole === 'operator') {
@@ -281,7 +281,8 @@ export class ObjectStateManager {
   private applyCoverageMapRules(state: ObjectState, context: ModuleContext): void {
     state.allowedActions = ['view', 'select'];
     
-    if (context.userRole === 'admin') {
+    // Allow admin, owner, and undefined userRole to have full permissions
+    if (context.userRole === 'admin' || context.userRole === 'owner' || !context.userRole) {
       state.allowedActions.push('edit', 'delete', 'view-details', 'edit-site', 'add-sector', 'add-backhaul', 'add-equipment', 'view-inventory', 'deploy-hardware', 'change-site-type');
       state.isReadOnly = false;
     } else if (context.userRole === 'operator') {

@@ -117,7 +117,7 @@
   }
 </script>
 
-<TenantGuard requireTenant={false}>
+<TenantGuard>
   <div class="dashboard-container">
     <!-- Header -->
     <div class="header">
