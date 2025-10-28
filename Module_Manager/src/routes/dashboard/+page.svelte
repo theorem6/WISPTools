@@ -80,13 +80,22 @@
 
   let isAdmin = false;
   let currentUser: any = null;
-  let isLoggedIn = false;
-
-  onMount(async () => {
+  
+  // Reactive to handle auth state changes
+  $: {
     if (browser) {
-      currentUser = await authService.getCurrentUser();
+      currentUser = authService.getCurrentUser();
       isAdmin = isPlatformAdmin(currentUser?.email || null);
-      isLoggedIn = !!currentUser;
+    }
+  }
+  
+  // Use authService listener to update state in real-time
+  onMount(() => {
+    if (browser) {
+      authService.onAuthStateChange((user) => {
+        currentUser = user;
+        isAdmin = isPlatformAdmin(user?.email || null);
+      });
     }
   });
 
@@ -138,7 +147,7 @@
             </div>
           {/if}
           <ThemeSwitcher />
-          {#if isLoggedIn && currentUser}
+          {#if currentUser}
             <div class="user-status">
               {#if isAdmin}
                 <span class="admin-indicator">Admin</span>
