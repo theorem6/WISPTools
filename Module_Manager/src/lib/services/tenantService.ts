@@ -291,6 +291,7 @@ export class TenantService {
       displayName: apiTenant.displayName,
       subdomain: apiTenant.subdomain,
       cwmpUrl: apiTenant.cwmpUrl,
+      userRole: apiTenant.userRole, // Include user's role in this tenant
       contactEmail: apiTenant.contactEmail,
       settings: apiTenant.settings || {
         allowSelfRegistration: false,

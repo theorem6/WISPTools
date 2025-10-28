@@ -74,9 +74,9 @@
   let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
   
   // Module context for permissions
-  let moduleContext: ModuleContext = {
+  $: moduleContext = {
     module: 'coverage-map',
-    userRole: 'admin' // TODO: Get from actual user permissions
+    userRole: $currentTenant?.userRole || 'admin' // Get from current tenant
   };
   
   // Filters

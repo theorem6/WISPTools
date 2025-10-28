@@ -8,6 +8,9 @@ export interface Tenant {
   subdomain: string; // Unique subdomain for CWMP URLs
   cwmpUrl: string; // Full CWMP URL for this tenant
   
+  // User's role in this tenant (returned by backend API)
+  userRole?: TenantRole;
+  
   // Contact Information
   contactEmail: string;
   contactPhone?: string;
