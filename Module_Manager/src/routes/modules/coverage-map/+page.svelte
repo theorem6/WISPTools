@@ -318,11 +318,17 @@
   function handleTowerAction(event: CustomEvent) {
     const { action, tower } = event.detail;
     
-    console.log('[CoverageMap] handleTowerAction called:', { action, hasTower: !!tower, towerType: typeof tower, towerId: tower?.id, towerName: tower?.name });
+    console.log('[CoverageMap] handleTowerAction called');
+    console.log('  - action:', action);
+    console.log('  - hasTower:', !!tower);
+    console.log('  - tower type:', typeof tower);
+    console.log('  - tower value:', tower);
+    console.log('  - tower?.id:', tower?.id);
+    console.log('  - tower?.name:', tower?.name);
     
     // Guard: ensure tower exists
     if (!tower && action !== 'add-site') {
-      console.error('Tower action called without tower');
+      console.error('❌ Tower action called without tower');
       return;
     }
     
