@@ -12,19 +12,27 @@
   const dispatch = createEventDispatcher();
   
   // Get object permissions
-  $: objectPermissions = tower ? objectStateManager.getObjectPermissions(tower, moduleContext) : null;
+  $: objectPermissions = tower && moduleContext ? objectStateManager.getObjectPermissions(tower, moduleContext) : null;
   
   function handleAction(action: string) {
-    if (!tower) return;
-    
-    // Check if action is allowed
-    if (!objectStateManager.isActionAllowed(tower, action, moduleContext)) {
-      console.warn(`Action '${action}' not allowed for tower ${tower?.id || 'unknown'}`);
+    // Guard: ensure tower exists
+    if (!tower) {
+      console.error('handleAction called without tower');
       return;
     }
     
-    dispatch('action', { action, tower });
-    show = false;
+    // Check if action is allowed
+    try {
+      if (!objectStateManager.isActionAllowed(tower, action, moduleContext)) {
+        console.warn(`Action '${action}' not allowed for tower ${tower.id}`);
+        return;
+      }
+      
+      dispatch('action', { action, tower });
+      show = false;
+    } catch (error) {
+      console.error('Error in handleAction:', error);
+    }
   }
   
   function handleClickOutside() {
@@ -33,8 +41,14 @@
   
   // Check if action should be disabled
   function isActionDisabled(action: string): boolean {
-    if (!tower || !objectPermissions) return false;
-    return objectPermissions.restrictedActions.includes(action);
+    try {
+      if (!tower) return false;
+      if (!objectPermissions) return false;
+      return objectPermissions.restrictedActions.includes(action);
+    } catch (error) {
+      console.error('Error in isActionDisabled:', error);
+      return false;
+    }
   }
 </script>
 
