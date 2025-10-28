@@ -137,10 +137,9 @@
             console.log('[TenantGuard] Tenant validated:', tenantState.currentTenant.displayName);
           }
         } else {
-          // Platform admin - can access without tenant requirement
-          console.log('[TenantGuard] Admin user - tenant not required');
-          
-          // Still load tenant info for UI display if available
+          // Platform admin (david@david.com) has master tenant rights
+          // Can add, change, or delete tenant admins
+          console.log('[TenantGuard] Platform admin - has master tenant rights');
           if (!tenantState.currentTenant && currentUser) {
             const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
             if (tenants.length > 0) {
