@@ -25,13 +25,21 @@
     
     // Additional check for tower.id - but safely
     const towerId = tower?.id;
-    if (!towerId && towerId !== '') {
-      console.error('Tower object missing id property');
+    // Check if id is missing or empty (but allow falsy values like 0 if they're legitimate)
+    if (!towerId && towerId !== '' && towerId !== 0) {
+      console.error('Tower object missing id property:', tower);
+      return null;
+    }
+    
+    // Final validation that tower is fully initialized
+    if (typeof tower !== 'object' || Array.isArray(tower)) {
+      console.error('Tower is not a valid object:', tower);
       return null;
     }
     
     try {
-      return objectStateManager.getObjectPermissions(tower, moduleContext);
+      const permissions = objectStateManager.getObjectPermissions(tower, moduleContext);
+      return permissions;
     } catch (error) {
       console.error('Error getting object permissions:', error);
       return null;
@@ -39,19 +47,33 @@
   })();
   
   function handleAction(action: string) {
-    // Guard: ensure tower exists
+    // Guard: ensure tower exists and has required properties
     if (!tower) {
       console.error('handleAction called without tower');
       return;
     }
     
+    // Guard: ensure tower has an id
+    if (!tower.id) {
+      console.error('handleAction called with tower missing id');
+      return;
+    }
+    
+    // Guard: ensure moduleContext exists
+    if (!moduleContext) {
+      console.error('handleAction called without moduleContext');
+      return;
+    }
+    
     // Check if action is allowed
     try {
-      if (!objectStateManager.isActionAllowed(tower, action, moduleContext)) {
+      const isAllowed = objectStateManager.isActionAllowed(tower, action, moduleContext);
+      if (!isAllowed) {
         console.warn(`Action '${action}' not allowed for tower ${tower.id}`);
         return;
       }
       
+      // Safely dispatch the action with the tower
       dispatch('action', { action, tower });
       show = false;
     } catch (error) {
@@ -65,13 +87,25 @@
   
   // Check if action should be disabled
   function isActionDisabled(action: string): boolean {
+    // Early returns for safety
+    if (!tower) {
+      return false; // Can't be disabled if no tower
+    }
+    
+    if (!objectPermissions) {
+      return false; // Can't be disabled if no permissions loaded
+    }
+    
+    // Check if action is restricted
+    if (!objectPermissions.restrictedActions) {
+      return false; // No restrictions defined
+    }
+    
     try {
-      if (!tower) return false;
-      if (!objectPermissions) return false;
       return objectPermissions.restrictedActions.includes(action);
     } catch (error) {
       console.error('Error in isActionDisabled:', error);
-      return false;
+      return false; // Default to enabled on error
     }
   }
 </script>
@@ -85,8 +119,8 @@
   on:click|stopPropagation
 >
   <div class="menu-header">
-    <span class="tower-name">📡 {tower.name}</span>
-    <span class="tower-type">{tower.type}</span>
+    <span class="tower-name">📡 {tower?.name || 'Unknown Site'}</span>
+    <span class="tower-type">{tower?.type || 'tower'}</span>
     {#if objectPermissions?.isReadOnly}
       <span class="readonly-indicator">🔒</span>
     {/if}
