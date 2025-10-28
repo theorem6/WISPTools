@@ -8,6 +8,10 @@ on:
       - 'functions/**'
       # Frontend changes
       - 'Module_Manager/src/**'
+      - 'Module_Manager/src/routes/**'
+      - 'Module_Manager/src/lib/**'
+      - 'Module_Manager/src/routes/modules/**'
+      - 'Module_Manager/src/routes/modules/coverage-map/**'
       - 'Module_Manager/package.json'
       - 'Module_Manager/package-lock.json'
       - 'Module_Manager/vite.config.ts'
