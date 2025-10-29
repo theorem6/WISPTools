@@ -14,6 +14,7 @@
   let error = '';
   let success = '';
   let deploymentScript = '';
+  let deploymentOption: 'script' | 'iso' = 'script';
 
   // EPC Configuration
   let epcConfig = {
@@ -616,6 +617,60 @@ echo "🎉 EPC deployment successful!";
     }
   }
 
+  async function generateISO() {
+    loading = true;
+    error = '';
+    
+    try {
+      console.log('[EPCDeployment] Generating ISO...');
+      
+      // Call backend API to generate ISO with the EPC configuration
+      const response = await fetch('/api/deploy/generate-epc-iso', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId || ''
+        },
+        body: JSON.stringify({
+          siteName: epcConfig.siteName,
+          location: epcConfig.location,
+          networkConfig: epcConfig.networkConfig,
+          contact: epcConfig.contact,
+          hssConfig: epcConfig.hssConfig
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate ISO');
+      }
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `epc-${epcConfig.siteName.replace(/[^a-zA-Z0-9]/g, '-')}.iso`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      success = 'ISO downloaded successfully';
+    } catch (err: any) {
+      console.error('[EPCDeployment] ISO generation failed:', err);
+      error = `Failed to generate ISO: ${err.message || 'Unknown error'}`;
+    } finally {
+      loading = false;
+    }
+  }
+
+  function downloadDeployment() {
+    if (deploymentOption === 'script') {
+      downloadScript();
+    } else {
+      generateISO();
+    }
+  }
+
   function getStepTitle(): string {
     switch (activeStep) {
       case 'configure': return 'Configure EPC';
@@ -880,24 +935,55 @@ echo "🎉 EPC deployment successful!";
 
           {:else if activeStep === 'download'}
             <div class="download-content">
-              <h4>📥 Download Deployment Script</h4>
-              <p>The deployment script is ready for download. This script will automatically install and configure Open5GS EPC on your server.</p>
+              <h4>📥 Download Deployment Package</h4>
+              <p>Choose your deployment method:</p>
               
-              <div class="script-preview">
-                <h5>Script Preview:</h5>
-                <pre><code>{deploymentScript.substring(0, 500)}...</code></pre>
+              <div class="download-options">
+                <div class="option-item">
+                  <input type="radio" id="script-option" value="script" bind:group={deploymentOption} />
+                  <label for="script-option">
+                    <h5>📜 Deployment Script</h5>
+                    <p>Download a bash script to install and configure Open5GS EPC on an existing Linux server.</p>
+                  </label>
+                </div>
+                
+                <div class="option-item">
+                  <input type="radio" id="iso-option" value="iso" bind:group={deploymentOption} />
+                  <label for="iso-option">
+                    <h5>💿 ISO Image</h5>
+                    <p>Download a pre-configured ISO image ready to burn to a USB drive or DVD.</p>
+                  </label>
+                </div>
               </div>
 
-              <div class="download-instructions">
-                <h5>📋 Instructions:</h5>
-                <ol>
-                  <li>Download the script to your server</li>
-                  <li>Make it executable: <code>chmod +x epc-deploy-*.sh</code></li>
-                  <li>Run the script: <code>sudo ./epc-deploy-*.sh</code></li>
-                  <li>Monitor the deployment progress</li>
-                  <li>Check service status after completion</li>
-                </ol>
-              </div>
+              {#if deploymentOption === 'script'}
+                <div class="script-preview">
+                  <h5>Script Preview:</h5>
+                  <pre><code>{deploymentScript.substring(0, 500)}...</code></pre>
+                </div>
+
+                <div class="download-instructions">
+                  <h5>📋 Instructions:</h5>
+                  <ol>
+                    <li>Download the script to your server</li>
+                    <li>Make it executable: <code>chmod +x epc-deploy-*.sh</code></li>
+                    <li>Run the script: <code>sudo ./epc-deploy-*.sh</code></li>
+                    <li>Monitor the deployment progress</li>
+                    <li>Check service status after completion</li>
+                  </ol>
+                </div>
+              {:else}
+                <div class="download-instructions">
+                  <h5>📋 ISO Instructions:</h5>
+                  <ol>
+                    <li>Download the ISO image</li>
+                    <li>Burn the ISO to a USB drive using tools like Rufus, Etcher, or dd</li>
+                    <li>Boot your server from the USB drive</li>
+                    <li>The system will automatically install with your configured settings</li>
+                    <li>After boot, verify EPC services are running</li>
+                  </ol>
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -928,8 +1014,15 @@ echo "🎉 EPC deployment successful!";
               {/if}
             </button>
           {:else if activeStep === 'download'}
-            <button class="btn-primary" on:click={downloadScript}>
-              📥 Download Script
+            <button class="btn-primary" on:click={downloadDeployment} disabled={loading}>
+              {#if loading}
+                <div class="loading-spinner small"></div>
+                Generating...
+              {:else if deploymentOption === 'script'}
+                📥 Download Script
+              {:else}
+                💿 Download ISO
+              {/if}
             </button>
           {/if}
         </div>
@@ -1260,6 +1353,50 @@ echo "🎉 EPC deployment successful!";
     padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--border-radius-sm);
     font-family: monospace;
+    font-size: 0.9rem;
+  }
+
+  .download-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .option-item {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .option-item:hover {
+    border-color: var(--primary);
+    background: var(--bg-tertiary);
+  }
+
+  .option-item input[type="radio"] {
+    margin-top: 2px;
+  }
+
+  .option-item label {
+    flex: 1;
+    cursor: pointer;
+  }
+
+  .option-item h5 {
+    margin: 0 0 var(--spacing-xs) 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+
+  .option-item p {
+    margin: 0;
+    color: var(--text-secondary);
     font-size: 0.9rem;
   }
 
