@@ -120,35 +120,46 @@
   }
 
   function validateConfig(): boolean {
-    console.log('[EPCDeployment] Validating config:', {
-      siteName: epcConfig.siteName,
-      address: epcConfig.location.address,
-      contactName: epcConfig.contact.name,
-      contactEmail: epcConfig.contact.email
-    });
-    
     if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
-      console.log('[EPCDeployment] Site name is empty');
       return false;
     }
     if (!epcConfig.location.address || !epcConfig.location.address.trim()) {
-      console.log('[EPCDeployment] Address is empty');
       return false;
     }
     if (!epcConfig.contact.name || !epcConfig.contact.name.trim()) {
-      console.log('[EPCDeployment] Contact name is empty');
       return false;
     }
     if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
-      console.log('[EPCDeployment] Contact email is empty');
       return false;
     }
-    console.log('[EPCDeployment] Validation passed');
     return true;
   }
 
-  $: isValid = validateConfig();
-  $: canProceed = isValid && !loading;
+  function getValidationErrors(): string[] {
+    const errors: string[] = [];
+    if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
+      errors.push('Site Name is required');
+    }
+    if (!epcConfig.location.address || !epcConfig.location.address.trim()) {
+      errors.push('Address is required');
+    }
+    if (!epcConfig.contact.name || !epcConfig.contact.name.trim()) {
+      errors.push('Contact Name is required');
+    }
+    if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
+      errors.push('Contact Email is required');
+    }
+    return errors;
+  }
+
+  function handleNextClick() {
+    if (!validateConfig()) {
+      const errors = getValidationErrors();
+      error = errors.join(', ');
+      return;
+    }
+    nextStep();
+  }
 
   async function generateDeploymentScript() {
     if (!validateConfig()) {
@@ -900,7 +911,7 @@ echo "🎉 EPC deployment successful!";
           {/if}
           
           {#if activeStep === 'configure'}
-            <button class="btn-primary" on:click={nextStep} disabled={!canProceed}>
+            <button class="btn-primary" on:click={handleNextClick} disabled={loading}>
               Next →
             </button>
           {:else if activeStep === 'deploy'}
