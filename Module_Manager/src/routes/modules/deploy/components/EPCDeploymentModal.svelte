@@ -624,9 +624,10 @@ echo "🎉 EPC deployment successful!";
     try {
       console.log('[EPCDeployment] Generating ISO...');
       
-      // Call backend API to generate ISO with the EPC configuration
-      // Use relative URL to go through Firebase Hosting rewrite to Cloud Function
-      const response = await fetch('/api/deploy/generate-epc-iso', {
+      // Use direct Cloud Function URL to bypass Firebase Hosting rewrite issues
+      const apiUrl = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/deploy/generate-epc-iso';
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -641,9 +642,35 @@ echo "🎉 EPC deployment successful!";
         })
       });
       
+      // Check content type to avoid displaying HTML error pages
+      const contentType = response.headers.get('content-type') || '';
+      const isHtml = contentType.includes('text/html') || contentType.includes('application/xhtml');
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate ISO: ${errorText}`);
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        
+        if (isHtml) {
+          // If response is HTML (404 page), show user-friendly message
+          errorMessage = `Backend endpoint not found (${response.status}). Please verify the backend is deployed and the route is registered.`;
+        } else {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch {
+            // If not JSON, try text but limit length
+            const errorText = await response.text();
+            if (errorText && errorText.length < 200 && !errorText.trim().startsWith('<')) {
+              errorMessage = errorText;
+            }
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      // Only try to parse as JSON if it's not HTML
+      if (isHtml) {
+        throw new Error('Backend returned HTML instead of JSON. Please verify the endpoint is correct.');
       }
       
       // Backend returns JSON with download URL
