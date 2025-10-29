@@ -625,7 +625,7 @@ echo "🎉 EPC deployment successful!";
       console.log('[EPCDeployment] Generating ISO...');
       
       // Call backend API to generate ISO with the EPC configuration
-      const response = await fetch('http://136.112.111.167:3001/api/deploy/generate-epc-iso', {
+      const response = await fetch('/api/deploy/generate-epc-iso', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
