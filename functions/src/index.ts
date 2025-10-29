@@ -234,9 +234,22 @@ export const hssProxy = onRequest({
   }
   
   const backendUrl = 'https://hss.wisptools.io';
+  
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
-  const incoming = (req as any).originalUrl || req.url || req.path || '';
-  const proxiedPath = incoming.replace(/^\/hssProxy/, '');
+  // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
+  // When called via Firebase Hosting rewrite, path is: /api/deploy/...
+  // When called via Cloud Run service directly, path is: /api/deploy/...
+  let incoming = (req as any).originalUrl || req.url || req.path || '';
+  
+  // Strip /hssProxy prefix if present (when called directly via Cloud Function URL)
+  if (incoming.startsWith('/hssProxy')) {
+    incoming = incoming.substring('/hssProxy'.length);
+  } else if (incoming.startsWith('hssProxy/')) {
+    incoming = incoming.substring('hssProxy/'.length);
+  }
+  
+  // Ensure path starts with / for backend URL construction
+  const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
   const url = `${backendUrl}${proxiedPath}`;
   
   // Log request details for debugging
@@ -245,9 +258,9 @@ export const hssProxy = onRequest({
     path: req.path,
     url: req.url,
     originalUrl: (req as any).originalUrl,
-    proxiedPath,
+    processedPath: proxiedPath,
     finalUrl: url,
-    headers: req.headers
+    headers: Object.keys(req.headers || {})
   });
   
   try {

@@ -625,8 +625,8 @@ echo "🎉 EPC deployment successful!";
       console.log('[EPCDeployment] Generating ISO...');
       
       // Call backend API to generate ISO with the EPC configuration
-      // Use Cloud Function URL directly since Firebase App Hosting rewrites aren't working
-      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/deploy/generate-epc-iso', {
+      // Use relative URL to go through Firebase Hosting rewrite to Cloud Function
+      const response = await fetch('/api/deploy/generate-epc-iso', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -642,20 +642,25 @@ echo "🎉 EPC deployment successful!";
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate ISO');
+        const errorText = await response.text();
+        throw new Error(`Failed to generate ISO: ${errorText}`);
       }
       
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `epc-${epcConfig.siteName.replace(/[^a-zA-Z0-9]/g, '-')}.iso`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Backend returns JSON with download URL
+      const result = await response.json();
       
-      success = 'ISO downloaded successfully';
+      if (result.success && result.download_url) {
+        // Download ISO from the provided URL
+        console.log('[EPCDeployment] ISO generated:', result.iso_filename);
+        console.log('[EPCDeployment] Download URL:', result.download_url);
+        
+        // Open download URL in new window to trigger download
+        window.open(result.download_url, '_blank');
+        
+        success = `ISO generated successfully! (${result.size_mb}MB) Download started.`;
+      } else {
+        throw new Error(result.error || 'Failed to generate ISO');
+      }
     } catch (err: any) {
       console.error('[EPCDeployment] ISO generation failed:', err);
       error = `Failed to generate ISO: ${err.message || 'Unknown error'}`;
