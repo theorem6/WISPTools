@@ -239,6 +239,17 @@ export const hssProxy = onRequest({
   const proxiedPath = incoming.replace(/^\/hssProxy/, '');
   const url = `${backendUrl}${proxiedPath}`;
   
+  // Log request details for debugging
+  console.log('[hssProxy] Request details:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: (req as any).originalUrl,
+    proxiedPath,
+    finalUrl: url,
+    headers: req.headers
+  });
+  
   try {
     const headers: HeadersInit = {
       'Content-Type': 'application/json'
