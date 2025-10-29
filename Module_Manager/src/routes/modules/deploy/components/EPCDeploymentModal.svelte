@@ -351,11 +351,18 @@ sudo chown open5gs:open5gs /etc/open5gs
 # Generate configuration files
 echo "📝 Generating configuration files..."
 
+# Load Origin-Host FQDN (from credentials.env for ISO deployments, or use default)
+ORIGIN_HOST_FQDN=\${ORIGIN_HOST_FQDN:-mme.\${DIAMETER_REALM}}
+if [ -f /etc/wisptools/credentials.env ]; then
+  source /etc/wisptools/credentials.env
+  ORIGIN_HOST_FQDN=\${ORIGIN_HOST_FQDN:-mme.\${DIAMETER_REALM}}
+fi
+
 # MME configuration
 sudo tee /etc/open5gs/mme.yaml > /dev/null <<EOF
 mme:
   freeDiameter:
-    identity: mme.\${DIAMETER_REALM}
+    identity: \${ORIGIN_HOST_FQDN}
     realm: \${DIAMETER_REALM}
     port: 3868
     listen_on: 0.0.0.0

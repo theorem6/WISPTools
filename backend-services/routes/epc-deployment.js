@@ -8,6 +8,7 @@ const { promisify } = require('util');
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const { Tenant } = require('../../models/tenant');
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -32,6 +33,25 @@ router.post('/generate-epc-iso', async (req, res) => {
     // Generate unique EPC ID
     const epc_id = `epc_${crypto.randomBytes(16).toString('hex')}`;
     const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    // Fetch tenant to get domain/subdomain for Origin-Host AVP
+    let tenantDomain = 'wisptools.io'; // Default domain
+    try {
+      const tenant = await Tenant.findById(tenant_id);
+      if (tenant && tenant.subdomain) {
+        // Use tenant subdomain as domain: {subdomain}.wisptools.io
+        tenantDomain = `${tenant.subdomain}.wisptools.io`;
+        console.log('[ISO Generator] Tenant domain:', tenantDomain);
+      }
+    } catch (tenantError) {
+      console.warn('[ISO Generator] Could not fetch tenant domain, using default:', tenantError.message);
+    }
+    
+    // Generate Origin-Host AVP FQDN: mme-{epc-id}.{tenant-domain}
+    // Format: mme-{unique-id}.{tenant-subdomain}.wisptools.io
+    const mmeUniqueId = `mme-${epc_id.substring(4, 12)}`; // Use first 8 chars of epc_id for shorter FQDN
+    const originHostFQDN = `${mmeUniqueId}.${tenantDomain}`;
+    console.log('[ISO Generator] Origin-Host FQDN:', originHostFQDN);
     
     // Generate credentials
     const auth_code = crypto.randomBytes(16).toString('hex');
@@ -60,7 +80,8 @@ router.post('/generate-epc-iso', async (req, res) => {
       secret_key,
       site_name: siteName,
       gce_ip: GCE_PUBLIC_IP,
-      hss_port: HSS_PORT
+      hss_port: HSS_PORT,
+      origin_host_fqdn: originHostFQDN
     });
     
     // Create autoinstall directory
@@ -219,6 +240,7 @@ fi
       zip_download_url: zipDownloadUrl,
       zip_checksum_url: zipChecksumUrl,
       zip_size_mb: zipSizeMB,
+      origin_host_fqdn: originHostFQDN,
       message: 'ISO generated successfully! Windows users: download the ZIP file.'
     });
     
@@ -539,7 +561,7 @@ router.get('/isos', async (req, res) => {
  * Generate cloud-init configuration with embedded credentials
  */
 function generateCloudInitConfig(config) {
-  const { epc_id, tenant_id, auth_code, api_key, secret_key, site_name, gce_ip, hss_port } = config;
+  const { epc_id, tenant_id, auth_code, api_key, secret_key, site_name, gce_ip, hss_port, origin_host_fqdn } = config;
   
   return `#cloud-config
 # WISPTools.io EPC Boot Disc
@@ -600,6 +622,7 @@ EPC_API_KEY=${api_key}
 EPC_SECRET_KEY=${secret_key}
 GCE_SERVER=${gce_ip}
 HSS_PORT=${hss_port}
+ORIGIN_HOST_FQDN=${origin_host_fqdn}
 CREDS_EOF
 "
     - curtin in-target --target=/target -- chmod 600 /etc/wisptools/credentials.env
