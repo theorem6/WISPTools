@@ -86,14 +86,10 @@
               console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
               
               if (tenants.length === 0) {
-                // No tenants at all - deny login
-                console.log('[TenantGuard] No tenants found - denying login');
-                error = 'You do not have access to any organizations. Please contact your administrator.';
+                // No tenants - guide user to tenant selector instead of logging out
+                console.log('[TenantGuard] No tenants found - redirecting to tenant selector');
                 isChecking = false;
-                // Logout the user since they don't have access
-                const { authService } = await import('../../services/authService');
-                await authService.signOut();
-                await goto('/login?error=no-tenant', { replaceState: true });
+                await goto('/tenant-selector?empty=1', { replaceState: true });
                 return;
               } else if (tenants.length === 1) {
                 // Auto-select single tenant
