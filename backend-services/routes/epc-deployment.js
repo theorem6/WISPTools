@@ -8,7 +8,7 @@ const { promisify } = require('util');
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
-const { Tenant } = require('../../models/tenant');
+const { Tenant } = require('../models/tenant');
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -36,15 +36,19 @@ router.post('/generate-epc-iso', async (req, res) => {
     
     // Fetch tenant to get domain/subdomain for Origin-Host AVP
     let tenantDomain = 'wisptools.io'; // Default domain
-    try {
-      const tenant = await Tenant.findById(tenant_id);
-      if (tenant && tenant.subdomain) {
-        // Use tenant subdomain as domain: {subdomain}.wisptools.io
-        tenantDomain = `${tenant.subdomain}.wisptools.io`;
-        console.log('[ISO Generator] Tenant domain:', tenantDomain);
+    if (Tenant) {
+      try {
+        const tenant = await Tenant.findById(tenant_id);
+        if (tenant && tenant.subdomain) {
+          // Use tenant subdomain as domain: {subdomain}.wisptools.io
+          tenantDomain = `${tenant.subdomain}.wisptools.io`;
+          console.log('[ISO Generator] Tenant domain:', tenantDomain);
+        }
+      } catch (tenantError) {
+        console.warn('[ISO Generator] Could not fetch tenant domain, using default:', tenantError.message);
       }
-    } catch (tenantError) {
-      console.warn('[ISO Generator] Could not fetch tenant domain, using default:', tenantError.message);
+    } else {
+      console.warn('[ISO Generator] Tenant model not available, using default domain');
     }
     
     // Generate Origin-Host AVP FQDN: mme-{epc-id}.{tenant-domain}
