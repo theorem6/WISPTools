@@ -215,6 +215,7 @@ function toRadians(degrees: number): number {
 }
 
 // HSS API Proxy - Provides HTTPS endpoint for HTTP backend (Port 3001)
+// Updated: Improved path handling for Firebase Hosting rewrites
 export const hssProxy = onRequest({
   region: 'us-central1',
   memory: '256MiB',
