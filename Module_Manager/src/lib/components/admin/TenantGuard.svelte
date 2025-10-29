@@ -92,7 +92,7 @@
                 isChecking = false;
                 // Logout the user since they don't have access
                 const { authService } = await import('../../services/authService');
-                await authService.logout();
+                await authService.signOut();
                 await goto('/login?error=no-tenant', { replaceState: true });
                 return;
               } else if (tenants.length === 1) {
