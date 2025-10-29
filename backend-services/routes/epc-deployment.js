@@ -78,26 +78,95 @@ router.post('/generate-epc-iso', async (req, res) => {
     
     console.log('[ISO Generator] Creating ISO with mkisofs...');
     
-    // Create ISO using mkisofs (genisoimage)
-    const mkisofsCmd = `sudo mkisofs -o "${iso_path}" -r -J -V "WISPTools EPC ${epc_id}" "${autoinstallDir}"`;
-    
+    // Build a bootable ISO using a base Ubuntu image; download tools/base ISO if missing
+    const buildScript = path.join(buildDir, 'build.sh');
+    const buildScriptContent = `#!/bin/bash
+set -e
+
+BUILD_DIR="${buildDir}"
+ISO_PATH="${iso_path}"
+AUTOINSTALL_DIR="${autoinstallDir}"
+BASE_ISO="${BASE_ISO_PATH}"
+
+echo "[Build] Starting bootable ISO creation..."
+echo "[Build] Output: $ISO_PATH"
+
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get update -y
+sudo apt-get install -y p7zip-full xorriso isolinux syslinux syslinux-utils wget
+
+# Ensure base ISO exists (download Ubuntu Server if missing)
+if [ ! -f "$BASE_ISO" ]; then
+  echo "[Build] Base ISO not found. Downloading Ubuntu Server ISO..."
+  sudo mkdir -p $(dirname "$BASE_ISO")
+  sudo wget -O "$BASE_ISO" https://releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso
+fi
+
+echo "[Build] Extracting base ISO..."
+EXTRACT_DIR="$BUILD_DIR/iso_extract"
+mkdir -p "$EXTRACT_DIR"
+7z x "$BASE_ISO" -o"$EXTRACT_DIR" > /dev/null 2>&1 || true
+
+echo "[Build] Injecting autoinstall user-data/meta-data..."
+cp -r "$AUTOINSTALL_DIR" "$EXTRACT_DIR/"
+
+# Configure GRUB/ISOLINUX to autoinstall
+GRUB_CFG="$EXTRACT_DIR/boot/grub/grub.cfg"
+if [ -f "$GRUB_CFG" ]; then
+  cat > "$GRUB_CFG" << 'GRUBEOF'
+set timeout=5
+set default=0
+menuentry "WISPTools.io EPC - Autoinstall" {
+    set gfxpayload=keep
+    linux   /casper/vmlinuz autoinstall ds=nocloud\\;s=/cdrom/autoinstall/ ---
+    initrd  /casper/initrd
+}
+GRUBEOF
+fi
+
+ISOLINUX_CFG="$EXTRACT_DIR/isolinux/txt.cfg"
+if [ -f "$ISOLINUX_CFG" ]; then
+  cat > "$ISOLINUX_CFG" << 'ISOLINUXEOF'
+default autoinstall
+label autoinstall
+  kernel /casper/vmlinuz
+  append initrd=/casper/initrd autoinstall ds=nocloud;s=/cdrom/autoinstall/ ---
+ISOLINUXEOF
+fi
+
+echo "[Build] Building ISO image..."
+xorriso -as mkisofs \
+  -r -V "WISPTools EPC ${epc_id}" \
+  -o "$ISO_PATH" \
+  -J -l \
+  -b isolinux/isolinux.bin \
+  -c isolinux/boot.cat \
+  -no-emul-boot \
+  -boot-load-size 4 \
+  -boot-info-table \
+  -eltorito-alt-boot \
+  -e boot/grub/efi.img \
+  -no-emul-boot \
+  -isohybrid-gpt-basdat \
+  -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
+  "$EXTRACT_DIR" || {
+    echo "[Build] xorriso failed; falling back to simple data ISO (not bootable).";
+    genisoimage -o "$ISO_PATH" -r -J "$AUTOINSTALL_DIR";
+  }
+
+if [ -f "$ISO_PATH" ]; then
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
+fi
+`;
+
+    await fs.writeFile(buildScript, buildScriptContent);
+    await fs.chmod(buildScript, 0o755);
     try {
-      await execAsync(mkisofsCmd);
-      console.log('[ISO Generator] ISO created successfully');
+      const { stdout, stderr } = await execAsync(`sudo ${buildScript}`);
+      console.log('[ISO Generator] Build output:', stdout);
+      if (stderr) console.error('[ISO Generator] Build warnings:', stderr);
     } catch (isoError) {
-      console.error('[ISO Generator] ISO creation failed, creating placeholder:', isoError);
-      
-      // Create a placeholder file to indicate the ISO should be available
-      await fs.writeFile(iso_path, 'WISPTools.io EPC Deployment ISO - Placeholder\nThis ISO would contain the autoinstall configuration for automated Ubuntu installation.\n');
-      
-      // Create checksum file
-      const crypto = require('crypto');
-      const fsSync = require('fs');
-      const hash = crypto.createHash('sha256');
-      const data = fsSync.readFileSync(iso_path);
-      hash.update(data);
-      const checksum = hash.digest('hex');
-      fsSync.writeFileSync(`${iso_path}.sha256`, `${checksum}  ${iso_filename}`);
+      console.error('[ISO Generator] ISO creation failed:', isoError);
     }
     
     // Verify ISO was created
