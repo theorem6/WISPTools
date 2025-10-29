@@ -234,7 +234,10 @@ export const hssProxy = onRequest({
     return;
   }
   
-  const backendUrl = 'https://hss.wisptools.io';
+  // Forward to GCE backend API directly over HTTP on port 3001
+  // This avoids Nginx/host-level 404s and mixed-content in the browser since
+  // the Cloud Function terminates HTTPS and talks HTTP upstream.
+  const backendUrl = 'http://136.112.111.167:3001';
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
