@@ -121,23 +121,22 @@
 
   function validateConfig(): boolean {
     if (!epcConfig.siteName.trim()) {
-      error = 'Site name is required';
       return false;
     }
     if (!epcConfig.location.address.trim()) {
-      error = 'Address is required';
       return false;
     }
     if (!epcConfig.contact.name.trim()) {
-      error = 'Contact name is required';
       return false;
     }
     if (!epcConfig.contact.email.trim()) {
-      error = 'Contact email is required';
       return false;
     }
     return true;
   }
+
+  $: isValid = validateConfig();
+  $: canProceed = isValid && !loading;
 
   async function generateDeploymentScript() {
     if (!validateConfig()) {
@@ -889,7 +888,7 @@ echo "🎉 EPC deployment successful!";
           {/if}
           
           {#if activeStep === 'configure'}
-            <button class="btn-primary" on:click={nextStep} disabled={!validateConfig()}>
+            <button class="btn-primary" on:click={nextStep} disabled={!canProceed}>
               Next →
             </button>
           {:else if activeStep === 'deploy'}
