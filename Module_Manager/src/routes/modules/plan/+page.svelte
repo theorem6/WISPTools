@@ -1033,30 +1033,26 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     display: block;
   }
 
-  /* Sidebar Menu */
+  /* Left Horizontal Menu */
   .header-overlay {
     position: absolute;
     top: 20px;
     left: 20px;
-    width: 60px;
     background: var(--gradient-primary);
     border-radius: var(--border-radius-md);
-    padding: 0.75rem 0.5rem;
+    padding: 0.75rem 1rem;
     box-shadow: var(--shadow-sm);
     color: white;
     z-index: 10;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
   .header-left {
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    width: 100%;
   }
 
   .back-btn {
@@ -1068,8 +1064,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     cursor: pointer;
     color: white;
     transition: all 0.2s;
-    width: 48px;
-    height: 48px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1077,17 +1073,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .back-btn:hover {
     background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
+    transform: translateX(-2px);
   }
 
   .header-overlay h1 {
-    font-size: 0.9rem;
+    font-size: 1.2rem;
     margin: 0;
     font-weight: 600;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
   }
 
   .header-controls {
@@ -1099,23 +1092,18 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 6px;
-    padding: 0.5rem;
-    font-size: 1.1rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
     cursor: pointer;
     color: white;
     transition: all 0.2s;
     backdrop-filter: blur(10px);
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   .control-btn:hover {
     background: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-2px);
+    transform: translateY(-1px);
   }
 
   /* Enhanced Tooltips */
