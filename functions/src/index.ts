@@ -234,7 +234,8 @@ export const hssProxy = onRequest({
   }
   
   const backendUrl = 'https://hss.wisptools.io';
-  const path = req.path || '';
+  // Remove the /hssProxy prefix from the path to get the actual backend path
+  const path = (req.path || '').replace(/^\/hssProxy/, '');
   const url = `${backendUrl}${path}`;
   
   try {
