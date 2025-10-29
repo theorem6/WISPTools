@@ -22,9 +22,10 @@ export class TenantService {
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
     
-    // Backend API URLs via Hosting rewrite to Cloud Function proxy
-    this.apiBaseUrl = '/api';      // for backend routes mounted under /api
-    this.adminBaseUrl = '/admin';  // for backend routes mounted under /admin
+    // Backend API URLs - route directly via Cloud Function proxy to avoid Hosting rewrite inconsistencies
+    const proxyBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+    this.apiBaseUrl = `${proxyBase}/api`;      // for backend routes mounted under /api
+    this.adminBaseUrl = `${proxyBase}/admin`;  // for backend routes mounted under /admin
   }
 
   /**
