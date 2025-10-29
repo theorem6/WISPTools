@@ -15,14 +15,16 @@ import type {
 export class TenantService {
   private baseUrl: string;
   private apiBaseUrl: string;
+  private adminBaseUrl: string;
 
   constructor() {
     // Get base URL from environment or construct it
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
     
-    // Backend API URL - use Hosting rewrite to Cloud Function proxy
-    this.apiBaseUrl = '/api';
+    // Backend API URLs via Hosting rewrite to Cloud Function proxy
+    this.apiBaseUrl = '/api';      // for backend routes mounted under /api
+    this.adminBaseUrl = '/admin';  // for backend routes mounted under /admin
   }
 
   /**
@@ -56,7 +58,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -88,7 +90,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/api/tenants/${tenantId}`, {
+      const response = await fetch(`${this.apiBaseUrl}/tenants/${tenantId}`, {
         method: 'GET',
         headers
       });
@@ -113,7 +115,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}`, {
         method: 'GET',
         headers
       });
@@ -165,7 +167,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(updates)
@@ -214,7 +216,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}/assign-owner`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}/assign-owner`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ email })
@@ -239,7 +241,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}/users`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}/users`, {
         method: 'GET',
         headers
       });
@@ -262,7 +264,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/api/user-tenants/${userId}`, {
+      const response = await fetch(`${this.apiBaseUrl}/user-tenants/${userId}`, {
         method: 'GET',
         headers
       });

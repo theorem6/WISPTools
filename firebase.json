@@ -78,6 +78,10 @@
         "function": "hssProxy"
       },
       {
+        "source": "/admin/**",
+        "function": "hssProxy"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
