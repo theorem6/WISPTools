@@ -234,9 +234,10 @@ export const hssProxy = onRequest({
   }
   
   const backendUrl = 'https://hss.wisptools.io';
-  // Use the full request path (already stripped of /hssProxy by Firebase Hosting)
-  const path = req.path || '';
-  const url = `${backendUrl}${path}`;
+  // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
+  const incoming = (req as any).originalUrl || req.url || req.path || '';
+  const proxiedPath = incoming.replace(/^\/hssProxy/, '');
+  const url = `${backendUrl}${proxiedPath}`;
   
   try {
     const headers: HeadersInit = {
