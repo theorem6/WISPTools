@@ -624,8 +624,8 @@ echo "🎉 EPC deployment successful!";
     try {
       console.log('[EPCDeployment] Generating ISO...');
       
-      // Use direct Cloud Function URL to bypass Firebase Hosting rewrite issues
-      const apiUrl = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/deploy/generate-epc-iso';
+      // Use relative URL so Hosting rewrites proxy to Cloud Function (avoids CORS)
+      const apiUrl = '/api/deploy/generate-epc-iso';
       
       const response = await fetch(apiUrl, {
         method: 'POST',
