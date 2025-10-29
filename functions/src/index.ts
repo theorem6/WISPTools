@@ -222,11 +222,14 @@ export const hssProxy = onRequest({
   timeoutSeconds: 60,
   cors: true
 }, async (req, res) => {
-  // Set CORS headers explicitly
-  res.set('Access-Control-Allow-Origin', '*');
+  // Set CORS headers explicitly and reflect origin
+  const origin = (req.headers.origin as string) || '*';
+  res.set('Access-Control-Allow-Origin', origin);
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
   res.set('Access-Control-Max-Age', '3600');
+  res.set('Access-Control-Allow-Credentials', 'true');
+  res.set('Vary', 'Origin');
   
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -301,24 +304,24 @@ export const hssProxy = onRequest({
     
     if (contentType.includes('application/json')) {
       const data = await response.json();
-      res.status(response.status).json(data);
+      res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
     } else if (contentType.includes('text/') || url.includes('deployment-script')) {
       // Handle text responses (like shell scripts)
       const text = await response.text();
-      res.status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
+      res.set('Access-Control-Allow-Origin', origin).status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
     } else {
       // Fallback: try JSON, then text
       try {
         const data = await response.json();
-        res.status(response.status).json(data);
+        res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
       } catch {
         const text = await response.text();
-        res.status(response.status).send(text);
+        res.set('Access-Control-Allow-Origin', origin).status(response.status).send(text);
       }
     }
   } catch (error: any) {
     console.error('HSS Proxy Error:', error);
-    res.status(500).json({ 
+    res.set('Access-Control-Allow-Origin', origin).status(500).json({ 
       error: 'Proxy error', 
       message: error.message,
       details: error.toString()
