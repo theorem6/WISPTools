@@ -234,10 +234,10 @@ export const hssProxy = onRequest({
     return;
   }
   
-  // Forward to GCE backend API directly over HTTP on port 3001
-  // This avoids Nginx/host-level 404s and mixed-content in the browser since
-  // the Cloud Function terminates HTTPS and talks HTTP upstream.
-  const backendUrl = 'http://136.112.111.167:3001';
+  // Compute backend upstream based on path. Multiple backend services:
+  // - Port 3001: Core HSS/management API (/api/**, /admin/**, tenants, users, etc.)
+  // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
+  const backendHost = 'http://136.112.111.167';
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
@@ -254,7 +254,10 @@ export const hssProxy = onRequest({
   
   // Ensure path starts with / for backend URL construction
   const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
-  const url = `${backendUrl}${proxiedPath}`;
+
+  // Select upstream port by route family
+  const upstreamPort = proxiedPath.startsWith('/api/deploy/') || proxiedPath === '/api/deploy' ? 3002 : 3001;
+  const url = `${backendHost}:${upstreamPort}${proxiedPath}`;
   
   // Log request details for debugging
   console.log('[hssProxy] Request details:', {
