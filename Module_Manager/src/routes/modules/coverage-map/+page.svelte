@@ -746,6 +746,11 @@
     showHardwareDeploymentModal = false;
     selectedTowerForEPC = null;
   }}
+  on:deploy-epc={(e) => {
+    selectedTowerForEPC = e.detail;
+    showHardwareDeploymentModal = false;
+    showEPCDeploymentModal = true;
+  }}
 />
 
 <!-- Global Settings Button -->

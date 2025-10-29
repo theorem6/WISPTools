@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import type { TowerSite } from '../lib/models';
+  import { coverageMapService } from '../lib/coverageMapService.mongodb';
   
   export let show = false;
   export let tower: TowerSite | null = null;
@@ -11,6 +12,9 @@
   
   let isDeploying = false;
   let error = '';
+  let availableSites: TowerSite[] = [];
+  let selectedSiteId: string = '';
+  let isLoadingSites = false;
   
   function handleClose() {
     show = false;
@@ -64,6 +68,56 @@
     // Navigate to inventory page with filters for this tower
     goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
   }
+
+  onMount(async () => {
+    if (show) {
+      await loadAvailableSites();
+      if (tower) {
+        selectedSiteId = tower.id;
+      }
+    }
+  });
+  
+  $: if (show && tenantId) {
+    loadAvailableSites();
+  }
+  
+  $: if (tower && availableSites.length > 0) {
+    selectedSiteId = tower.id;
+  }
+
+  async function loadAvailableSites() {
+    if (isLoadingSites || !tenantId) return;
+    
+    isLoadingSites = true;
+    try {
+      availableSites = await coverageMapService.getTowerSites(tenantId);
+      if (tower) {
+        selectedSiteId = tower.id;
+      }
+    } catch (err) {
+      console.error('Failed to load sites:', err);
+      error = 'Failed to load available sites';
+    } finally {
+      isLoadingSites = false;
+    }
+  }
+
+  function getSelectedSite(): TowerSite | null {
+    return availableSites.find(s => s.id === selectedSiteId) || null;
+  }
+
+  function handleEPCDeployment() {
+    const site = getSelectedSite();
+    if (!site) {
+      error = 'Please select a site';
+      return;
+    }
+    
+    // Close this modal and open EPC deployment modal
+    handleClose();
+    dispatch('deploy-epc', site);
+  }
 </script>
 
 {#if show && tower}
@@ -89,13 +143,29 @@
       </div>
       {/if}
       
+      <!-- Site Selector -->
+      {#if availableSites.length > 1}
+        <div class="form-group">
+          <label for="siteSelect">Select Site:</label>
+          <select id="siteSelect" bind:value={selectedSiteId} class="form-control">
+            {#each availableSites as site}
+              <option value={site.id}>{site.name}</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
+
       <div class="button-group">
+        <button class="btn btn-primary" on:click={handleEPCDeployment}>
+          🚀 Deploy EPC to Site
+        </button>
+        
         <button class="btn btn-primary" on:click={handleDeploy}>
-          📦 Select from Inventory
+          📦 Select Hardware from Inventory
         </button>
         
         <button class="btn btn-secondary" on:click={handleInventory}>
-          📋 View Available Inventory
+          📋 View Current Inventory
         </button>
       </div>
       
@@ -261,6 +331,32 @@
     border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--primary);
   }
 </style>
 
