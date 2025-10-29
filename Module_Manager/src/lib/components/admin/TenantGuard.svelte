@@ -86,39 +86,15 @@
               console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
               
               if (tenants.length === 0) {
-                // No tenants at all - create a default tenant for the user
-                console.log('[TenantGuard] No tenants found - creating default tenant');
-                try {
-                  const { tenantService } = await import('../../services/tenantService');
-                  const result = await tenantService.createTenant(
-                    'default-tenant',
-                    'My Organization',
-                    currentUser.email || 'user@example.com',
-                    currentUser.uid,
-                    undefined,
-                    true,
-                    currentUser.email
-                  );
-                  
-                  if (result.success && result.tenantId) {
-                    // Get the created tenant and set it as current
-                    const tenant = await tenantService.getTenant(result.tenantId);
-                    if (tenant) {
-                      tenantStore.setCurrentTenant(tenant);
-                      console.log('[TenantGuard] Created and set default tenant');
-                    }
-                  } else {
-                    console.log('[TenantGuard] Failed to create default tenant:', result.error);
-                    error = 'Unable to set up your organization. Please contact support.';
-                    isChecking = false;
-                    return;
-                  }
-                } catch (createError) {
-                  console.error('[TenantGuard] Error creating default tenant:', createError);
-                  error = 'Unable to set up your organization. Please contact support.';
-                  isChecking = false;
-                  return;
-                }
+                // No tenants at all - deny login
+                console.log('[TenantGuard] No tenants found - denying login');
+                error = 'You do not have access to any organizations. Please contact your administrator.';
+                isChecking = false;
+                // Logout the user since they don't have access
+                const { authService } = await import('../../services/authService');
+                await authService.logout();
+                await goto('/login?error=no-tenant', { replaceState: true });
+                return;
               } else if (tenants.length === 1) {
                 // Auto-select single tenant
                 console.log('[TenantGuard] Auto-selecting single tenant');

@@ -18,6 +18,15 @@
     // Wait for auth service to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
     
+    // Check for error in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    if (errorParam === 'no-tenant') {
+      error = 'You do not have access to any organizations. Please contact your administrator to be added to a tenant.';
+      // Clear the error parameter from URL
+      window.history.replaceState({}, '', '/login');
+    }
+    
     // Check if already authenticated with Firebase
     const user = authService.getCurrentUser();
     const isAuthenticated = !!user;
