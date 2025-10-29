@@ -120,18 +120,30 @@
   }
 
   function validateConfig(): boolean {
-    if (!epcConfig.siteName.trim()) {
+    console.log('[EPCDeployment] Validating config:', {
+      siteName: epcConfig.siteName,
+      address: epcConfig.location.address,
+      contactName: epcConfig.contact.name,
+      contactEmail: epcConfig.contact.email
+    });
+    
+    if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
+      console.log('[EPCDeployment] Site name is empty');
       return false;
     }
-    if (!epcConfig.location.address.trim()) {
+    if (!epcConfig.location.address || !epcConfig.location.address.trim()) {
+      console.log('[EPCDeployment] Address is empty');
       return false;
     }
-    if (!epcConfig.contact.name.trim()) {
+    if (!epcConfig.contact.name || !epcConfig.contact.name.trim()) {
+      console.log('[EPCDeployment] Contact name is empty');
       return false;
     }
-    if (!epcConfig.contact.email.trim()) {
+    if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
+      console.log('[EPCDeployment] Contact email is empty');
       return false;
     }
+    console.log('[EPCDeployment] Validation passed');
     return true;
   }
 
