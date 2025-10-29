@@ -52,6 +52,7 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
+app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
 app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
