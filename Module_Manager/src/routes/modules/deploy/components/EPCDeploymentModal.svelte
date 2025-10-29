@@ -677,14 +677,18 @@ echo "🎉 EPC deployment successful!";
       const result = await response.json();
       
       if (result.success && result.download_url) {
-        // Download ISO from the provided URL
+        // Download ZIP (or ISO) from the provided URL
         console.log('[EPCDeployment] ISO generated:', result.iso_filename);
         console.log('[EPCDeployment] Download URL:', result.download_url);
+        if (result.zip_download_url) {
+          console.log('[EPCDeployment] ZIP available:', result.zip_filename);
+        }
         
         // Open download URL in new window to trigger download
         window.open(result.download_url, '_blank');
         
-        success = `ISO generated successfully! (${result.size_mb}MB) Download started.`;
+        const downloadType = result.zip_download_url ? 'ZIP (ISO included)' : 'ISO';
+        success = `${downloadType} generated successfully! (${result.size_mb}MB) Download started. Windows users: extract the ZIP file to get the ISO.`;
       } else {
         throw new Error(result.error || 'Failed to generate ISO');
       }

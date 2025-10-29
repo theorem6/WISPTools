@@ -93,7 +93,7 @@ echo "[Build] Output: $ISO_PATH"
 
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -y
-sudo apt-get install -y p7zip-full xorriso isolinux syslinux syslinux-utils wget
+sudo apt-get install -y p7zip-full xorriso isolinux syslinux syslinux-utils wget zip
 
 # Ensure base ISO exists (download Ubuntu Server if missing)
 if [ ! -f "$BASE_ISO" ]; then
@@ -156,6 +156,15 @@ xorriso -as mkisofs \
 
 if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
+  
+  # Create ZIP file for Windows compatibility
+  echo "[Build] Creating ZIP archive for Windows compatibility..."
+  ZIP_FILENAME="${iso_filename}.zip"
+  ZIP_PATH="${ISO_OUTPUT_DIR}/${ZIP_FILENAME}"
+  cd "${ISO_OUTPUT_DIR}"
+  zip -q "$ZIP_FILENAME" "${iso_filename}"
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "${ZIP_FILENAME}" > "${ZIP_FILENAME}.sha256") || true
+  echo "[Build] ZIP created: $ZIP_FILENAME"
 fi
 `;
 
@@ -173,8 +182,25 @@ fi
     const stats = await fs.stat(iso_path);
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
     
-    const downloadUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}`;
-    const checksumUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}.sha256`;
+    // Check for ZIP file (created by build script)
+    const zip_filename = `${iso_filename}.zip`;
+    const zip_path = path.join(ISO_OUTPUT_DIR, zip_filename);
+    let zipSizeMB = null;
+    let zipDownloadUrl = null;
+    let zipChecksumUrl = null;
+    
+    try {
+      const zipStats = await fs.stat(zip_path);
+      zipSizeMB = (zipStats.size / (1024 * 1024)).toFixed(2);
+      zipDownloadUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${zip_filename}`;
+      zipChecksumUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${zip_filename}.sha256`;
+      console.log(`[ISO Generator] ZIP ready: ${zip_filename} (${zipSizeMB}MB)`);
+    } catch (zipError) {
+      console.warn('[ISO Generator] ZIP file not found, returning ISO URL only:', zipError.message);
+    }
+    
+    const isoDownloadUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}`;
+    const isoChecksumUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}.sha256`;
     
     console.log(`[ISO Generator] ISO ready: ${iso_filename} (${sizeMB}MB)`);
     
@@ -182,10 +208,18 @@ fi
       success: true,
       epc_id,
       iso_filename,
-      download_url: downloadUrl,
-      checksum_url: checksumUrl,
-      size_mb: sizeMB,
-      message: 'ISO generated successfully!'
+      iso_download_url: isoDownloadUrl,
+      iso_checksum_url: isoChecksumUrl,
+      iso_size_mb: sizeMB,
+      // Prefer ZIP for Windows compatibility
+      download_url: zipDownloadUrl || isoDownloadUrl,
+      checksum_url: zipChecksumUrl || isoChecksumUrl,
+      size_mb: zipSizeMB || sizeMB,
+      zip_filename: zip_filename,
+      zip_download_url: zipDownloadUrl,
+      zip_checksum_url: zipChecksumUrl,
+      zip_size_mb: zipSizeMB,
+      message: 'ISO generated successfully! Windows users: download the ZIP file.'
     });
     
   } catch (error) {
