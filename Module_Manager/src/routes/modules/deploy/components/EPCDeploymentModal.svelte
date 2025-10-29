@@ -624,8 +624,8 @@ echo "🎉 EPC deployment successful!";
     try {
       console.log('[EPCDeployment] Generating ISO...');
       
-      // Call backend API to generate ISO with the EPC configuration
-      const response = await fetch('/api/deploy/generate-epc-iso', {
+      // Call backend API to generate ISO with the EPC configuration  
+      const response = await fetch('https://hss.wisptools.io/api/deploy/generate-epc-iso', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
