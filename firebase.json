@@ -75,10 +75,7 @@
       },
       {
         "source": "/api/deploy/**",
-        "run": {
-          "serviceId": "hssproxy",
-          "region": "us-central1"
-        }
+        "function": "hssProxy"
       },
       {
         "source": "**",
