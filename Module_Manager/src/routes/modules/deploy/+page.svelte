@@ -443,30 +443,30 @@
     display: block;
   }
 
-  /* Header Overlay */
+  /* Sidebar Menu */
   .header-overlay {
     position: absolute;
     top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 20px;
+    width: 60px;
     background: var(--gradient-success);
     border-radius: var(--border-radius-md);
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 0.5rem;
     box-shadow: var(--shadow-sm);
     color: white;
-    text-align: center;
     z-index: 10;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    min-width: 400px;
+    gap: 0.5rem;
   }
 
   .header-left {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    width: 100%;
   }
 
   .back-btn {
@@ -478,8 +478,8 @@
     cursor: pointer;
     color: white;
     transition: all 0.2s;
-    width: 36px;
-    height: 36px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -487,14 +487,17 @@
 
   .back-btn:hover {
     background: rgba(255, 255, 255, 0.3);
-    transform: translateX(-2px);
+    transform: translateY(-2px);
   }
 
   .header-overlay h1 {
-    font-size: 1.2rem;
+    font-size: 0.9rem;
     margin: 0;
     font-weight: 600;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
   }
 
   .hardware-btn {
@@ -771,17 +774,23 @@
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     transition: all 0.2s ease;
     backdrop-filter: blur(10px);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .control-btn:hover {
     background: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
   }
 
   .control-btn.disabled {
@@ -795,5 +804,6 @@
   .control-btn.disabled:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
+    transform: none;
   }
 </style>
