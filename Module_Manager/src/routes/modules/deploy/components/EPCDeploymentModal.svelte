@@ -631,10 +631,10 @@ echo "🎉 EPC deployment successful!";
     try {
       console.log('[EPCDeployment] Generating ISO...');
       
-      // Use relative URL so Hosting rewrites proxy to Cloud Function (avoids CORS)
-      const apiUrl = '/api/deploy/generate-epc-iso';
-      
-      const response = await fetch(apiUrl, {
+      // Prefer Hosting rewrite; fallback to direct Cloud Function proxy if 404/HTML
+      const relativeUrl = '/api/deploy/generate-epc-iso';
+
+      const makeRequest = (url: string) => fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -648,15 +648,27 @@ echo "🎉 EPC deployment successful!";
           hssConfig: epcConfig.hssConfig
         })
       });
+
+      let response = await makeRequest(relativeUrl);
       
       // Check content type to avoid displaying HTML error pages
       const contentType = response.headers.get('content-type') || '';
       const isHtml = contentType.includes('text/html') || contentType.includes('application/xhtml');
       
+      // If Hosting returned HTML/404, retry via direct Cloud Function proxy base
+      if (!response.ok && (response.status === 404 || isHtml)) {
+        console.warn('[EPCDeployment] Relative URL failed, retrying via Cloud Function proxy...');
+        const cfBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+        response = await makeRequest(`${cfBase}/api/deploy/generate-epc-iso`);
+      }
+
+      const finalContentType = response.headers.get('content-type') || '';
+      const finalIsHtml = finalContentType.includes('text/html') || finalContentType.includes('application/xhtml');
+
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
-        if (isHtml) {
+        if (finalIsHtml) {
           // If response is HTML (404 page), show user-friendly message
           errorMessage = `Backend endpoint not found (${response.status}). Please verify the backend is deployed and the route is registered.`;
         } else {
@@ -676,7 +688,7 @@ echo "🎉 EPC deployment successful!";
       }
       
       // Only try to parse as JSON if it's not HTML
-      if (isHtml) {
+      if (finalIsHtml) {
         throw new Error('Backend returned HTML instead of JSON. Please verify the endpoint is correct.');
       }
       
