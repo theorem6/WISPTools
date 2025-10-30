@@ -16,7 +16,13 @@ const router = express.Router();
 // Configuration
 const ISO_BUILD_DIR = '/opt/epc-iso-builder';
 const ISO_OUTPUT_DIR = '/var/www/html/downloads/isos';
-const BASE_ISO_PATH = '/opt/base-images/ubuntu-24.04-minimal.iso';
+// Minimal boot assets (holding folder). Pre-stage these once on the VM.
+// Required files:
+//  - /opt/base-images/minimal/vmlinuz
+//  - /opt/base-images/minimal/initrd
+const MINIMAL_DIR = '/opt/base-images/minimal';
+const KERNEL_PATH = `${MINIMAL_DIR}/vmlinuz`;
+const INITRD_PATH = `${MINIMAL_DIR}/initrd`;
 const GCE_PUBLIC_IP = process.env.GCE_PUBLIC_IP || '136.112.111.167';
 const HSS_PORT = process.env.HSS_PORT || '3001';
 
@@ -110,85 +116,85 @@ set -e
 
 BUILD_DIR="${buildDir}"
 ISO_PATH="${iso_path}"
-AUTOINSTALL_DIR="${autoinstallDir}"
-BASE_ISO="${BASE_ISO_PATH}"
+KERNEL_PATH="${KERNEL_PATH}"
+INITRD_PATH="${INITRD_PATH}"
 
-echo "[Build] Starting bootable ISO creation..."
+echo "[Build] Starting bootable ISO creation (Debian netboot)..."
 echo "[Build] Output: $ISO_PATH"
 
-export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update -y
-sudo apt-get install -y p7zip-full xorriso isolinux syslinux syslinux-utils wget zip
+MIN_DIR_FOR_KERNEL="$(dirname "$KERNEL_PATH")"
+mkdir -p "$MIN_DIR_FOR_KERNEL"
 
-# Ensure base ISO exists (download Ubuntu Server if missing)
-if [ ! -f "$BASE_ISO" ]; then
-  echo "[Build] Base ISO not found. Downloading Ubuntu Server ISO..."
-  sudo mkdir -p $(dirname "$BASE_ISO")
-  sudo wget -O "$BASE_ISO" https://releases.ubuntu.com/22.04/ubuntu-22.04.4-live-server-amd64.iso
+# Download tiny Debian netboot kernel/initrd if missing
+DEBIAN_NETBOOT_BASE="https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64"
+if [ ! -s "$KERNEL_PATH" ]; then
+  wget -q -O "$KERNEL_PATH" "$DEBIAN_NETBOOT_BASE/linux"
+fi
+if [ ! -s "$INITRD_PATH" ]; then
+  wget -q -O "$INITRD_PATH" "$DEBIAN_NETBOOT_BASE/initrd.gz"
 fi
 
-echo "[Build] Extracting base ISO..."
-EXTRACT_DIR="$BUILD_DIR/iso_extract"
-mkdir -p "$EXTRACT_DIR"
-7z x "$BASE_ISO" -o"$EXTRACT_DIR" > /dev/null 2>&1 || true
+# Publish preseed to web root (fetched during install)
+NETBOOT_DIR="/var/www/html/downloads/netboot"
+mkdir -p "$NETBOOT_DIR"
+PRESEED_NAME="preseed-${epc_id}.cfg"
+cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
+d-i debian-installer/locale string en_US
+d-i keyboard-configuration/xkb-keymap select us
+d-i netcfg/choose_interface select auto
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i partman-auto/method string regular
+d-i partman-auto/choose_recipe select atomic
+d-i partman/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
+d-i finish-install/reboot_in_progress note
+d-i preseed/late_command string \
+    in-target mkdir -p /etc/wisptools /opt/wisptools; \
+    in-target /bin/sh -c 'cat > /etc/wisptools/credentials.env <<"CREDS"\nEPC_ID=${epc_id}\nTENANT_ID=${tenant_id}\nEPC_AUTH_CODE=${auth_code}\nEPC_API_KEY=${api_key}\nEPC_SECRET_KEY=${secret_key}\nGCE_SERVER=${GCE_PUBLIC_IP}\nHSS_PORT=${HSS_PORT}\nORIGIN_HOST_FQDN=${originHostFQDN}\nCREDS'; \
+    in-target wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \
+    in-target chmod +x /opt/wisptools/bootstrap.sh; \
+    in-target /bin/sh -c 'cat > /etc/systemd/system/wisptools-bootstrap.service <<"UNIT"\n[Unit]\nDescription=WISPTools EPC Bootstrap\nAfter=network-online.target\nWants=network-online.target\nConditionPathExists=!/var/lib/wisptools/.bootstrapped\n\n[Service]\nType=oneshot\nExecStart=/opt/wisptools/bootstrap.sh\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\nUNIT'; \
+    in-target systemctl enable wisptools-bootstrap.service
+PRESEED_EOF
 
-echo "[Build] Injecting autoinstall user-data/meta-data..."
-cp -r "$AUTOINSTALL_DIR" "$EXTRACT_DIR/"
+# Build tiny ISO containing only netboot kernel/initrd and GRUB
+ISO_ROOT="$BUILD_DIR/iso_root"
+mkdir -p "$ISO_ROOT/debian" "$ISO_ROOT/boot/grub"
+cp "$KERNEL_PATH" "$ISO_ROOT/debian/vmlinuz"
+cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz"
+chmod 0644 "$ISO_ROOT/debian/vmlinuz" "$ISO_ROOT/debian/initrd.gz" || true
 
-# Configure GRUB/ISOLINUX to autoinstall
-GRUB_CFG="$EXTRACT_DIR/boot/grub/grub.cfg"
-if [ -f "$GRUB_CFG" ]; then
-  cat > "$GRUB_CFG" << 'GRUBEOF'
-set timeout=5
-set default=0
-menuentry "WISPTools.io EPC - Autoinstall" {
-    set gfxpayload=keep
-    linux   /casper/vmlinuz autoinstall ds=nocloud\\;s=/cdrom/autoinstall/ ---
-    initrd  /casper/initrd
+cat > "$ISO_ROOT/boot/grub/grub.cfg" << 'GRUBCFG'
+set timeout=0
+set default=auto
+insmod gzio
+
+menuentry "Debian 12 Netboot (Automated)" --id auto {
+  linux /debian/vmlinuz auto priority=critical preseed/url=http://${GCE_PUBLIC_IP}/downloads/netboot/${PRESEED_NAME} net.ifnames=0 biosdevname=0 ---
+  initrd /debian/initrd.gz
 }
-GRUBEOF
-fi
 
-ISOLINUX_CFG="$EXTRACT_DIR/isolinux/txt.cfg"
-if [ -f "$ISOLINUX_CFG" ]; then
-  cat > "$ISOLINUX_CFG" << 'ISOLINUXEOF'
-default autoinstall
-label autoinstall
-  kernel /casper/vmlinuz
-  append initrd=/casper/initrd autoinstall ds=nocloud;s=/cdrom/autoinstall/ ---
-ISOLINUXEOF
-fi
+menuentry "Debian 12 Netboot (Manual)" {
+  linux /debian/vmlinuz ---
+  initrd /debian/initrd.gz
+}
+GRUBCFG
 
-echo "[Build] Building ISO image..."
-xorriso -as mkisofs \
-  -r -V "WISPTools EPC ${epc_id}" \
-  -o "$ISO_PATH" \
-  -J -l \
-  -b isolinux/isolinux.bin \
-  -c isolinux/boot.cat \
-  -no-emul-boot \
-  -boot-load-size 4 \
-  -boot-info-table \
-  -eltorito-alt-boot \
-  -e boot/grub/efi.img \
-  -no-emul-boot \
-  -isohybrid-gpt-basdat \
-  -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
-  "$EXTRACT_DIR" || {
-    echo "[Build] xorriso failed; falling back to simple data ISO (not bootable).";
-    genisoimage -o "$ISO_PATH" -r -J "$AUTOINSTALL_DIR";
-  }
+apt-get update -y >/dev/null 2>&1 || true
+apt-get install -y grub-pc-bin grub-efi-amd64-bin xorriso mtools >/dev/null 2>&1 || true
+grub-mkrescue -o "$ISO_PATH" "$ISO_ROOT" >/dev/null 2>&1 || { echo "[Build] ERROR: grub-mkrescue failed"; exit 1; }
 
 if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
-  
-  # Create ZIP file for Windows compatibility
-  echo "[Build] Creating ZIP archive for Windows compatibility..."
   ZIP_FILENAME="${iso_filename}.zip"
-  ZIP_PATH="${ISO_OUTPUT_DIR}/${ZIP_FILENAME}"
+  ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
   cd "${ISO_OUTPUT_DIR}"
   zip -q "$ZIP_FILENAME" "${iso_filename}"
-  (cd "${ISO_OUTPUT_DIR}" && sha256sum "${ZIP_FILENAME}" > "${ZIP_FILENAME}.sha256") || true
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "\${ZIP_FILENAME}" > "\${ZIP_FILENAME}.sha256") || true
   echo "[Build] ZIP created: $ZIP_FILENAME"
 fi
 `;
@@ -372,7 +378,7 @@ fi
 # Build ISO with xorriso
 echo "[Build] Building ISO image (this may take a few minutes)..."
 xorriso -as mkisofs \\
-  -r -V "WISPTools EPC ${epc_id}" \\
+  -r -V "WISP-EPC-${epc_id.substring(4, 12)}" \\
   -o "\${ISO_PATH}" \\
   -J -l \\
   -b isolinux/isolinux.bin \\
