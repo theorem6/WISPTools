@@ -74,6 +74,10 @@
         "function": "billingApi"
       },
       {
+        "source": "/api/deploy/**",
+        "function": "isoProxy"
+      },
+      {
         "source": "/api/**",
         "function": "hssProxy"
       },
