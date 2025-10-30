@@ -655,11 +655,11 @@ echo "🎉 EPC deployment successful!";
       const contentType = response.headers.get('content-type') || '';
       const isHtml = contentType.includes('text/html') || contentType.includes('application/xhtml');
       
-      // If Hosting returned HTML/404, retry via direct Cloud Function proxy base
+      // If Hosting returned HTML/404, retry via direct Cloud Function (isoProxy) base
       if (!response.ok && (response.status === 404 || isHtml)) {
-        console.warn('[EPCDeployment] Relative URL failed, retrying via Cloud Function proxy...');
-        const cfBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
-        response = await makeRequest(`${cfBase}/api/deploy/generate-epc-iso`);
+        console.warn('[EPCDeployment] Relative URL failed, retrying via Cloud Function isoProxy...');
+        const isoProxyBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
+        response = await makeRequest(`${isoProxyBase}/api/deploy/generate-epc-iso`);
       }
 
       const finalContentType = response.headers.get('content-type') || '';
