@@ -168,7 +168,7 @@ cp "$KERNEL_PATH" "$ISO_ROOT/debian/vmlinuz"
 cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz"
 chmod 0644 "$ISO_ROOT/debian/vmlinuz" "$ISO_ROOT/debian/initrd.gz" || true
 
-cat > "$ISO_ROOT/boot/grub/grub.cfg" << 'GRUBCFG'
+cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
 set timeout=0
 set default=auto
 insmod gzio
