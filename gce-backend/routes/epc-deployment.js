@@ -207,6 +207,7 @@ d-i preseed/late_command string \\
     echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \\
     echo 'TENANT_ID=${tenant_id}' >> /target/etc/wisptools/credentials.env; \\
     echo 'EPC_AUTH_CODE=${auth_code}' >> /target/etc/wisptools/credentials.env; \\
+    in-target bash -c 'if [ -f /etc/default/grub ]; then echo "GRUB_GFXMODE=1024x768" >> /etc/default/grub; echo "GRUB_GFXPAYLOAD_LINUX=keep" >> /etc/default/grub; fi'; \\
     echo 'EPC_API_KEY=${api_key}' >> /target/etc/wisptools/credentials.env; \\
     echo 'EPC_SECRET_KEY=${secret_key}' >> /target/etc/wisptools/credentials.env; \\
     echo 'GCE_SERVER=${GCE_PUBLIC_IP}' >> /target/etc/wisptools/credentials.env; \\

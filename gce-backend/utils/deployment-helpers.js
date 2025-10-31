@@ -95,15 +95,22 @@ if [ -f /etc/default/grub ]; then
   if ! grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
     echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"' >> /etc/default/grub
   fi
-  # Inject parameters idempotently: nomodeset nofb vga=normal text and serial consoles
-  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\\(.*\\)"/GRUB_CMDLINE_LINUX_DEFAULT="\\1 nomodeset nofb vga=normal text console=ttyS0,115200n8 console=tty1"/g' /etc/default/grub
+  # Inject parameters idempotently: nomodeset nofb text and serial consoles (removed vga=normal, deprecated)
+  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\\(.*\\)"/GRUB_CMDLINE_LINUX_DEFAULT="\\1 nomodeset nofb text console=ttyS0,115200n8 console=tty1"/g' /etc/default/grub
+  # Configure GRUB graphics mode for VirtualBox compatibility
+  if ! grep -q '^GRUB_GFXMODE=' /etc/default/grub; then
+    echo 'GRUB_GFXMODE=1024x768' >> /etc/default/grub
+  fi
+  if ! grep -q '^GRUB_GFXPAYLOAD_LINUX=' /etc/default/grub; then
+    echo 'GRUB_GFXPAYLOAD_LINUX=keep' >> /etc/default/grub
+  fi
   print_status "Running update-grub (or grub-mkconfig fallback)"
   if command -v update-grub >/dev/null 2>&1; then
     update-grub >/dev/null 2>&1 || true
   else
     grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 || true
   fi
-  print_success "GRUB updated for headless boot"
+  print_success "GRUB updated for headless boot with VirtualBox compatibility"
 else
   print_status "/etc/default/grub not found, skipping persistent framebuffer disable"
 fi
