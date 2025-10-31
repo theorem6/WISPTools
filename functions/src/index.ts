@@ -240,7 +240,9 @@ export const hssProxy = onRequest({
   // Compute backend upstream based on path. Multiple backend services:
   // - Port 3001: Core HSS/management API (/api/**, /admin/**, tenants, users, etc.)
   // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
-  const backendHost = 'http://136.112.111.167';
+  // Use domain with HTTPS for port 3001 (proxied through nginx), IP with HTTP for port 3002 (direct access)
+  const backendDomain = process.env.BACKEND_DOMAIN || 'hss.wisptools.io';
+  const backendHost = `https://${backendDomain}`;  // Port 3001 goes through nginx SSL termination
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
@@ -259,8 +261,14 @@ export const hssProxy = onRequest({
   const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
 
   // Select upstream port by route family
+  // Port 3002 (ISO API) is accessed directly via IP (not proxied through nginx)
+  // Port 3001 (HSS API) goes through nginx with SSL at hss.wisptools.io
   const upstreamPort = proxiedPath.startsWith('/api/deploy/') || proxiedPath === '/api/deploy' ? 3002 : 3001;
-  const url = `${backendHost}:${upstreamPort}${proxiedPath}`;
+  
+  // For port 3002, use direct IP access (not proxied through nginx SSL)
+  // For port 3001, use domain with HTTPS (proxied through nginx)
+  const upstreamHost = upstreamPort === 3002 ? 'http://136.112.111.167' : backendHost;
+  const url = `${upstreamHost}:${upstreamPort}${proxiedPath}`;
   
   // Log request details for debugging
   console.log('[hssProxy] Request details:', {
@@ -348,7 +356,9 @@ export const isoProxy = onRequest({
     return;
   }
   
-  const backendUrl = 'http://136.112.111.167:3002';  // ISO API port
+  // Port 3002 (ISO API) is not proxied through nginx, access directly via IP
+  // If port 3002 needs HTTPS, nginx would need to be configured for it
+  const backendUrl = 'http://136.112.111.167:3002';  // ISO API port (direct access, not proxied)
   
   // Extract path from request - handle both direct calls and Firebase Hosting rewrites
   // Firebase Functions strips the function name from req.path, so check originalUrl first
@@ -417,6 +427,14 @@ export const isoProxy = onRequest({
     
     const response = await fetch(url, options);
     
+    // Log response details for debugging
+    console.log('[isoProxy] Backend response:', {
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers.get('content-type'),
+      url: url
+    });
+    
     // Check content type to determine how to handle response
     const contentType = response.headers.get('content-type') || '';
     
@@ -426,14 +444,42 @@ export const isoProxy = onRequest({
     } else {
       // Fallback for other content types
       const text = await response.text();
-      res.status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
+      
+      // If we got an error response, try to parse it as JSON first
+      if (!response.ok) {
+        try {
+          const errorData = JSON.parse(text);
+          res.status(response.status).json(errorData);
+        } catch {
+          // If not JSON, send as text
+          res.status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
+        }
+      } else {
+        res.status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
+      }
     }
   } catch (error: any) {
-    console.error('ISO Proxy Error:', error);
+    console.error('[isoProxy] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      url: url,
+      path: path
+    });
+    
+    // Provide more detailed error information
+    let errorMessage = error.message || 'Unknown error';
+    if (error.code === 'ECONNREFUSED') {
+      errorMessage = `Backend server not reachable at ${url}. Please verify the backend is running on port 3002.`;
+    } else if (error.code === 'ETIMEDOUT') {
+      errorMessage = `Backend server timeout at ${url}. The request took too long.`;
+    }
+    
     res.status(500).json({ 
       error: 'ISO proxy error', 
-      message: error.message,
-      details: error.toString()
+      message: errorMessage,
+      details: error.toString(),
+      url: url,
+      path: path
     });
   }
 });
