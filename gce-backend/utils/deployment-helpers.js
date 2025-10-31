@@ -1,15 +1,8 @@
 // Full Deployment Script Helper Functions
-// ═══════════════════════════════════════════════════════════════════════════════
-// PROTECTED FILE - CRITICAL DEPLOYMENT LOGIC
-// ═══════════════════════════════════════════════════════════════════════════════
-// 
-// ⚠️  DO NOT MODIFY unless fixing deployment script bugs
-// ⚠️  This file generates deployment scripts for EPC installation
-// ⚠️  Changes can break automated EPC deployment
+// Isolated utilities for EPC deployment script generation - DO NOT MODIFY unless fixing deployment issues
 // 
 // NOTE: Octal escape sequences (\1, \2, etc.) must be double-escaped (\\1, \\2)
 //       in JavaScript template strings to avoid syntax errors
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * Generate full EPC deployment script with Open5GS installation

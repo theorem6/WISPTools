@@ -1,31 +1,16 @@
-# Protected Files - ISO Generation and EPC Deployment
+# Protected Files - ISO Creation and Download
 
-## ⚠️ Critical Files - DO NOT MODIFY
+## ⚠️ Critical File - DO NOT MODIFY
 
-These files contain critical logic for ISO generation and EPC deployment. Modifications can break automated deployments.
+This file contains critical logic for ISO creation and download. Modifications can break automated ISO generation.
 
-### Core Route File
+### Core ISO Generation Route
 - **`routes/epc-deployment.js`**
   - Generates Debian netinstall ISOs
   - Configures preseed files for automated installation
   - Creates GRUB boot configuration
+  - Handles ISO download endpoints
   - **Installation Type**: Debian text-only netinstall (no GUI/TUI)
-
-### Helper Functions (utils/)
-- **`utils/iso-helpers.js`**
-  - Generates cloud-init configuration
-  - Embeds EPC credentials in boot disc
-  - Creates systemd services for first boot
-
-- **`utils/bootstrap-helpers.js`**
-  - Generates bootstrap scripts
-  - Handles EPC auto-configuration on first boot
-  - Connects EPC to WISPTools.io management system
-
-- **`utils/deployment-helpers.js`**
-  - Generates full deployment scripts
-  - Installs Open5GS and EPC components
-  - **Important**: Octal escape sequences (`\1`, `\2`) must be double-escaped (`\\1`, `\\2`) in JavaScript template strings
 
 ## Installation Configuration
 
