@@ -499,6 +499,7 @@ d-i preseed/early_command string anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
+    in-target bash -c 'if [ -f /etc/default/grub ]; then echo "GRUB_GFXMODE=1024x768" >> /etc/default/grub; echo "GRUB_GFXPAYLOAD_LINUX=keep" >> /etc/default/grub; fi'; \\
     in-target mkdir -p /etc/wisptools /opt/wisptools; \\
     in-target /bin/sh -c 'cat > /etc/wisptools/credentials.env <<"CREDS"\\nEPC_ID=${epc_id}\\nTENANT_ID=${tenant_id}\\nEPC_AUTH_CODE=${auth_code}\\nEPC_API_KEY=${api_key}\\nEPC_SECRET_KEY=${secret_key}\\nGCE_SERVER=${GCE_PUBLIC_IP}\\nHSS_PORT=${HSS_PORT}\\nORIGIN_HOST_FQDN=${originHostFQDN}\\nCREDS'; \\
     in-target wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \\
