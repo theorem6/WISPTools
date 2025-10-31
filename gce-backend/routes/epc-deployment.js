@@ -237,7 +237,7 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 quiet ---
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
