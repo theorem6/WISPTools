@@ -125,21 +125,33 @@ echo "[Build] Output: $ISO_PATH"
 MIN_DIR_FOR_KERNEL="$(dirname "$KERNEL_PATH")"
 mkdir -p "$MIN_DIR_FOR_KERNEL"
 
-# Download tiny Debian netboot kernel/initrd if missing
+# ALWAYS download fresh Debian netboot kernel/initrd (no caching)
+echo "[Build] Downloading fresh Debian netboot kernel/initrd..."
 DEBIAN_NETBOOT_BASE="https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64"
-if [ ! -s "$KERNEL_PATH" ]; then
-  wget -q -O "$KERNEL_PATH" "$DEBIAN_NETBOOT_BASE/linux"
-fi
-if [ ! -s "$INITRD_PATH" ]; then
-  wget -q -O "$INITRD_PATH" "$DEBIAN_NETBOOT_BASE/initrd.gz"
-fi
+rm -f "$KERNEL_PATH" "$INITRD_PATH" 2>/dev/null || true
+wget -q --timeout=30 --tries=3 -O "$KERNEL_PATH" "$DEBIAN_NETBOOT_BASE/linux" || { echo "[Build] ERROR: Failed to download kernel"; exit 1; }
+wget -q --timeout=30 --tries=3 -O "$INITRD_PATH" "$DEBIAN_NETBOOT_BASE/initrd.gz" || { echo "[Build] ERROR: Failed to download initrd"; exit 1; }
 
-# Publish preseed to web root (fetched during install)
+# Verify downloads succeeded
+if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
+  echo "[Build] ERROR: Downloaded files are empty or missing"
+  exit 1
+fi
+echo "[Build] Debian netboot files downloaded successfully"
+
+# Clean up old build directories and old preseed files before starting
+echo "[Build] Cleaning up old build artifacts..."
+rm -rf "$BUILD_DIR" 2>/dev/null || true
 NETBOOT_DIR="/var/www/html/downloads/netboot"
 mkdir -p "$NETBOOT_DIR"
-PRESEED_NAME="preseed-${epc_id}.cfg"
+# Clean up preseed files older than 1 day
+find "$NETBOOT_DIR" -name "preseed-*.cfg" -mtime +1 -delete 2>/dev/null || true
+
+# Generate unique preseed for this EPC build
+PRESEED_NAME="preseed-${epc_id}-$(date +%s).cfg"
 GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
 HSS_PORT="${HSS_PORT}"
+echo "[Build] Creating unique preseed: $PRESEED_NAME"
 cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
 d-i debian-installer/locale string en_US
 d-i keyboard-configuration/xkb-keymap select us
@@ -164,11 +176,15 @@ d-i preseed/late_command string \
 PRESEED_EOF
 
 # Build tiny ISO containing only netboot kernel/initrd and GRUB
+# Clean ISO root directory to ensure fresh build
 ISO_ROOT="$BUILD_DIR/iso_root"
+rm -rf "$ISO_ROOT" 2>/dev/null || true
 mkdir -p "$ISO_ROOT/debian" "$ISO_ROOT/boot/grub"
-cp "$KERNEL_PATH" "$ISO_ROOT/debian/vmlinuz"
-cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz"
+echo "[Build] Copying Debian netboot files to ISO root..."
+cp "$KERNEL_PATH" "$ISO_ROOT/debian/vmlinuz" || { echo "[Build] ERROR: Failed to copy kernel"; exit 1; }
+cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz" || { echo "[Build] ERROR: Failed to copy initrd"; exit 1; }
 chmod 0644 "$ISO_ROOT/debian/vmlinuz" "$ISO_ROOT/debian/initrd.gz" || true
+echo "[Build] Verified ISO root contains: $(ls -lh "$ISO_ROOT/debian/")"
 
 cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
 set timeout=0
@@ -186,18 +202,31 @@ menuentry "Debian 12 Netboot (Manual)" {
 }
 GRUBCFG
 
+# Remove any existing ISO with same name to avoid conflicts
+rm -f "$ISO_PATH" 2>/dev/null || true
+
 apt-get update -y >/dev/null 2>&1 || true
 apt-get install -y grub-pc-bin grub-efi-amd64-bin xorriso mtools >/dev/null 2>&1 || true
+
+echo "[Build] Building ISO with grub-mkrescue..."
 grub-mkrescue -o "$ISO_PATH" "$ISO_ROOT" >/dev/null 2>&1 || { echo "[Build] ERROR: grub-mkrescue failed"; exit 1; }
+
+if [ ! -s "$ISO_PATH" ]; then
+  echo "[Build] ERROR: Generated ISO is empty or missing"
+  exit 1
+fi
+echo "[Build] ISO created successfully: $(du -h "$ISO_PATH" | cut -f1)"
 
 if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
   ZIP_FILENAME="${iso_filename}.zip"
-  ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
+  ZIP_PATH="${ISO_OUTPUT_DIR}/$ZIP_FILENAME"
+  # Remove old ZIP if it exists
+  rm -f "$ZIP_PATH" "${ZIP_PATH}.sha256" 2>/dev/null || true
   cd "${ISO_OUTPUT_DIR}"
-  zip -q "$ZIP_FILENAME" "${iso_filename}"
-  (cd "${ISO_OUTPUT_DIR}" && sha256sum "\${ZIP_FILENAME}" > "\${ZIP_FILENAME}.sha256") || true
-  echo "[Build] ZIP created: $ZIP_FILENAME"
+  zip -q "$ZIP_FILENAME" "${iso_filename}" || { echo "[Build] ERROR: Failed to create ZIP"; exit 1; }
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "$ZIP_FILENAME" > "${ZIP_FILENAME}.sha256") || true
+  echo "[Build] ZIP created successfully: $ZIP_FILENAME ($(du -h "$ZIP_PATH" | cut -f1))"
 fi
 `;
 
