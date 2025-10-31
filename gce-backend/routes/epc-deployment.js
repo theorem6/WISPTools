@@ -253,8 +253,9 @@ insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # ⚠️  TEXT-ONLY INSTALL: 'text' + 'DEBIAN_FRONTEND=text' force text mode, no GUI/TUI installer
-  # vga=normal enables VGA output for display, nomodeset nofb keeps framebuffer minimal
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
+  # set gfxpayload=text - Use text mode for GRUB (replaces deprecated vga=normal)
+  set gfxpayload=text
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
@@ -519,8 +520,9 @@ insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # ⚠️  TEXT-ONLY INSTALL: 'text' + 'DEBIAN_FRONTEND=text' force text mode, no GUI/TUI installer
-  # vga=normal enables VGA output for display, nomodeset nofb keeps framebuffer minimal
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
+  # set gfxpayload=text - Use text mode for GRUB (replaces deprecated vga=normal)
+  set gfxpayload=text
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
