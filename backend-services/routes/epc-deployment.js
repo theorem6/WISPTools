@@ -174,7 +174,7 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated)" --id auto {
-  linux /debian/vmlinuz auto priority=critical preseed/url=http://${GCE_PUBLIC_IP}/downloads/netboot/${PRESEED_NAME} net.ifnames=0 biosdevname=0 ---
+  linux /debian/vmlinuz auto priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} net.ifnames=0 biosdevname=0 ---
   initrd /debian/initrd.gz
 }
 
