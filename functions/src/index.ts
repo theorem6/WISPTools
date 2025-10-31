@@ -361,26 +361,31 @@ export const isoProxy = onRequest({
   const backendUrl = 'http://hss.wisptools.io:3002';  // ISO API port (direct access, not proxied through nginx SSL)
   
   // Extract path from request
-  // Firebase Functions 2nd gen: The full URL path is in req.url (includes function name)
-  // Example: Request to https://xxx.cloudfunctions.net/isoProxy/api/deploy/generate-epc-iso
-  //          req.url = /isoProxy/api/deploy/generate-epc-iso
-  //          We need to remove /isoProxy prefix to get /api/deploy/generate-epc-iso
+  // Two scenarios:
+  // 1. Direct Cloud Function URL: /isoProxy/api/deploy/generate-epc-iso → remove /isoProxy prefix
+  // 2. Firebase Hosting rewrite: /api/deploy/generate-epc-iso → use path as-is (no /isoProxy prefix)
   
   let path = '';
   const reqUrl = req.url || '';
   const reqPath = req.path || '';
+  const originalUrl = (req as any).originalUrl || '';
   
-  // Try to extract path from req.url (most reliable for 2nd gen functions)
-  if (reqUrl && reqUrl.includes('/isoProxy')) {
-    // Remove /isoProxy prefix and any query parameters
-    path = reqUrl.replace(/^\/isoProxy/, '').split('?')[0];
-  } else if (reqPath && reqPath !== '/') {
-    // Fallback to req.path if available and not root
-    path = reqPath;
+  // Try originalUrl first (most reliable)
+  if (originalUrl && originalUrl !== '/') {
+    path = originalUrl;
   } else if (reqUrl && reqUrl !== '/') {
-    // Use req.url as last resort
-    path = reqUrl.split('?')[0];
+    path = reqUrl;
+  } else if (reqPath && reqPath !== '/') {
+    path = reqPath;
   }
+  
+  // Remove /isoProxy prefix if present (when called directly via Cloud Function URL)
+  if (path.includes('/isoProxy')) {
+    path = path.replace(/^\/isoProxy/, '').replace(/\/isoProxy\//, '/');
+  }
+  
+  // Remove query string
+  path = path.split('?')[0];
   
   // Ensure path starts with /
   if (!path.startsWith('/')) {
@@ -393,6 +398,7 @@ export const isoProxy = onRequest({
       method: req.method,
       reqPath: reqPath,
       reqUrl: reqUrl,
+      originalUrl: originalUrl,
       headers: {
         host: req.headers.host,
         'user-agent': req.headers['user-agent']
