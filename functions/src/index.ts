@@ -351,13 +351,30 @@ export const isoProxy = onRequest({
   const backendUrl = 'http://136.112.111.167:3002';  // ISO API port
   
   // Extract path from request - handle both direct calls and Firebase Hosting rewrites
-  let path = req.path || '';
-  // If path is empty or just "/", check URL
-  if (!path || path === '/') {
-    const fullUrl = (req as any).originalUrl || req.url || '';
+  // Firebase Functions strips the function name from req.path, so check originalUrl first
+  let path = '';
+  const originalUrl = (req as any).originalUrl || req.url || '';
+  const reqPath = req.path || '';
+  
+  // If originalUrl exists and contains /isoProxy, extract path from it
+  if (originalUrl && originalUrl.includes('/isoProxy')) {
     // Remove /isoProxy prefix if present
-    path = fullUrl.replace(/^\/isoProxy/, '') || '/api/deploy/generate-epc-iso';
+    path = originalUrl.replace(/^\/isoProxy/, '').split('?')[0]; // Remove query params
+    // If after removing prefix we get empty or just /, check if reqPath has the actual path
+    if (!path || path === '/') {
+      path = reqPath;
+    }
+  } else {
+    // Use req.path directly (Firebase Functions already strips function name)
+    path = reqPath;
   }
+  
+  // Fallback: if path is still empty or just "/", this shouldn't happen for valid requests
+  if (!path || path === '/') {
+    console.warn('[isoProxy] Empty path, defaulting to /api/epc/generate-iso');
+    path = '/api/epc/generate-iso';
+  }
+  
   // Ensure path starts with /
   if (!path.startsWith('/')) {
     path = '/' + path;
