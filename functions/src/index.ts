@@ -367,10 +367,10 @@ export const isoProxy = onRequest({
     return;
   }
   
-  // Port 3001 (HSS API) - The /api/deploy routes actually exist here
-  // Note: Even though this is isoProxy, the EPC deployment routes are in backend-services (port 3001)
-  // Port 3002 (gce-backend) may not have the routes properly configured
-  const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3001`;  // HSS API port (where /api/deploy routes exist)
+  // Port 3002 (ISO API) - The /api/deploy/generate-epc-iso route exists here
+  // Two services may run on 3002: epc-api (PM2, min-epc-server.js) or gce-backend.service (systemd, gce-backend/server.js)
+  // Both have the /api/deploy route. Route to port 3002 where ISO generation service runs.
+  const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3002`;  // ISO Generation API port
   
   // Extract path from request - SIMPLIFIED APPROACH
   // Firebase Functions 2nd gen with Hosting rewrites:
