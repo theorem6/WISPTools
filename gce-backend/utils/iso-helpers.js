@@ -1,5 +1,12 @@
 // ISO Generation Helper Functions
-// Isolated utilities for ISO creation - DO NOT MODIFY unless fixing ISO-specific issues
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROTECTED FILE - CRITICAL ISO GENERATION LOGIC
+// ═══════════════════════════════════════════════════════════════════════════════
+// 
+// ⚠️  DO NOT MODIFY unless fixing ISO generation bugs
+// ⚠️  This file generates cloud-init configuration for Ubuntu autoinstall
+// ⚠️  Changes can break EPC boot disc functionality
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const crypto = require('crypto');
 

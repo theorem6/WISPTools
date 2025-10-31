@@ -1,6 +1,19 @@
 // EPC Deployment - ISO Generation and Download
-// ISOLATED ROUTE FILE - DO NOT MODIFY unless fixing route-specific issues
-// Helper functions are in gce-backend/utils/ directory
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROTECTED FILE - CRITICAL ISO GENERATION LOGIC
+// ═══════════════════════════════════════════════════════════════════════════════
+// 
+// ⚠️  DO NOT MODIFY unless fixing ISO generation bugs
+// ⚠️  This file generates Debian netinstall ISOs with text-only installer
+// ⚠️  Changes to installation routine can break EPC deployment
+// 
+// DEPENDENCIES:
+//   - gce-backend/utils/iso-helpers.js (cloud-init config)
+//   - gce-backend/utils/bootstrap-helpers.js (bootstrap script)
+//   - gce-backend/utils/deployment-helpers.js (full deployment script)
+// 
+// INSTALLATION TYPE: Debian text-only netinstall (no GUI/TUI)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const express = require('express');
 const { exec } = require('child_process');
@@ -172,8 +185,10 @@ d-i partman-lvm/device_remove_lvm boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 
-# Package selection
+# Package selection - TEXT-ONLY INSTALL (NO DESKTOP/GUI)
+# ⚠️  DO NOT MODIFY: EPC requires headless text-only installation
 tasksel tasksel/first multiselect standard, ssh-server
+tasksel tasksel/skip-tasks string ^.*desktop^, ^.*x11^, ^.*gnome^, ^.*kde^
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i pkgsel/upgrade select none
 d-i pkgsel/update-policy select none
@@ -237,7 +252,8 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
+  # ⚠️  TEXT-ONLY INSTALL: 'text' + 'DEBIAN_FRONTEND=text' force text mode, no GUI/TUI installer
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
@@ -462,8 +478,10 @@ d-i partman-lvm/device_remove_lvm boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 
-# Package selection
+# Package selection - TEXT-ONLY INSTALL (NO DESKTOP/GUI)
+# ⚠️  DO NOT MODIFY: EPC requires headless text-only installation
 tasksel tasksel/first multiselect standard, ssh-server
+tasksel tasksel/skip-tasks string ^.*desktop^, ^.*x11^, ^.*gnome^, ^.*kde^
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i pkgsel/upgrade select none
 d-i pkgsel/update-policy select none
@@ -499,7 +517,8 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
+  # ⚠️  TEXT-ONLY INSTALL: 'text' + 'DEBIAN_FRONTEND=text' force text mode, no GUI/TUI installer
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 vga=normal nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
