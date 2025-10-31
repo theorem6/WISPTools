@@ -631,23 +631,46 @@ echo "🎉 EPC deployment successful!";
     try {
       console.log('[EPCDeployment] Generating ISO...');
       
+      // Get authentication token
+      let authToken: string | null = null;
+      try {
+        authToken = await authService.getAuthToken();
+      } catch (authErr) {
+        console.warn('[EPCDeployment] Could not get auth token:', authErr);
+      }
+      
+      // Get tenant ID from store if not provided as prop
+      const effectiveTenantId = tenantId || $currentTenant?.id || '';
+      if (!effectiveTenantId) {
+        throw new Error('Tenant ID is required. Please ensure you are logged in and have a tenant selected.');
+      }
+      
       // Prefer Hosting rewrite; fallback to direct Cloud Function proxy if 404/HTML
       const relativeUrl = '/api/deploy/generate-epc-iso';
 
-      const makeRequest = (url: string) => fetch(url, {
-        method: 'POST',
-        headers: {
+      const makeRequest = async (url: string) => {
+        const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          'X-Tenant-ID': tenantId || ''
-        },
-        body: JSON.stringify({
-          siteName: epcConfig.siteName,
-          location: epcConfig.location,
-          networkConfig: epcConfig.networkConfig,
-          contact: epcConfig.contact,
-          hssConfig: epcConfig.hssConfig
-        })
-      });
+          'X-Tenant-ID': effectiveTenantId
+        };
+        
+        // Add Authorization header if we have a token
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        return fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            siteName: epcConfig.siteName,
+            location: epcConfig.location,
+            networkConfig: epcConfig.networkConfig,
+            contact: epcConfig.contact,
+            hssConfig: epcConfig.hssConfig
+          })
+        });
+      };
 
       let response = await makeRequest(relativeUrl);
       
@@ -658,6 +681,8 @@ echo "🎉 EPC deployment successful!";
       // If Hosting returned HTML/404, retry via direct Cloud Function (isoProxy) base
       if (!response.ok && (response.status === 404 || isHtml)) {
         console.warn('[EPCDeployment] Relative URL failed, retrying via Cloud Function isoProxy...');
+        // When calling Cloud Function directly, the path should NOT include /isoProxy prefix
+        // Firebase Functions 2nd gen auto-routes based on the function name in the URL
         const isoProxyBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
         response = await makeRequest(`${isoProxyBase}/api/deploy/generate-epc-iso`);
       }

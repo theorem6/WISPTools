@@ -241,8 +241,9 @@ export const hssProxy = onRequest({
   // - Port 3001: Core HSS/management API (/api/**, /admin/**, tenants, users, etc.)
   // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
   // Use domain with HTTPS for port 3001 (proxied through nginx), IP with HTTP for port 3002 (direct access)
-  const backendDomain = process.env.BACKEND_DOMAIN || 'hss.wisptools.io';
-  const backendHost = `https://${backendDomain}`;  // Port 3001 goes through nginx SSL termination
+  // Prefer direct IP over HTTP to avoid nginx/DNS issues
+  const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
+  const backendHost = `http://${backendIp}:3001`;
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
@@ -265,10 +266,9 @@ export const hssProxy = onRequest({
   // Port 3001 (HSS API) - goes through nginx SSL on port 443 (default HTTPS, no port needed)
   const upstreamPort = proxiedPath.startsWith('/api/deploy/') || proxiedPath === '/api/deploy' ? 3002 : 3001;
   
-  // For port 3002, use HTTP with port (direct access, not proxied through nginx SSL)
-  // For port 3001, use HTTPS without port (nginx handles SSL on 443 and proxies to localhost:3001)
-  const upstreamHost = upstreamPort === 3002 ? `http://${backendDomain}:3002` : backendHost;
-  const url = upstreamPort === 3002 ? `${upstreamHost}${proxiedPath}` : `${upstreamHost}${proxiedPath}`;
+  // Use direct IP/HTTP for both services
+  const upstreamHost = upstreamPort === 3002 ? `http://${backendIp}:3002` : backendHost;
+  const url = `${upstreamHost}${proxiedPath}`;
   
   // Log request details for debugging
   console.log('[hssProxy] Request details:', {
@@ -358,28 +358,33 @@ export const isoProxy = onRequest({
   
   // Port 3002 (ISO API) - Use domain URL for backend
   // Note: Port 3002 is not proxied through nginx SSL, so use HTTP with domain
-  const backendUrl = 'http://hss.wisptools.io:3002';  // ISO API port (direct access, not proxied through nginx SSL)
+  const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3002`;  // ISO API port (direct access)
   
   // Extract path from request
-  // Firebase Functions 2nd gen: The full URL path is in req.url (includes function name)
-  // Example: Request to https://xxx.cloudfunctions.net/isoProxy/api/deploy/generate-epc-iso
-  //          req.url = /isoProxy/api/deploy/generate-epc-iso
-  //          We need to remove /isoProxy prefix to get /api/deploy/generate-epc-iso
+  // Firebase Functions 2nd gen behavior:
+  // - When called via Hosting rewrite: req.url = /api/deploy/generate-epc-iso (no function name)
+  // - When called directly: req.url may = /api/deploy/generate-epc-iso OR /isoProxy/api/deploy/... (varies)
   
   let path = '';
-  const reqUrl = req.url || '';
+  const reqUrl = (req as any).originalUrl || req.url || '';
   const reqPath = req.path || '';
   
-  // Try to extract path from req.url (most reliable for 2nd gen functions)
-  if (reqUrl && reqUrl.includes('/isoProxy')) {
-    // Remove /isoProxy prefix and any query parameters
+  // Try originalUrl first (most reliable)
+  if (reqUrl) {
+    // Remove /isoProxy prefix if present (when called directly via Cloud Function URL)
     path = reqUrl.replace(/^\/isoProxy/, '').split('?')[0];
   } else if (reqPath && reqPath !== '/') {
-    // Fallback to req.path if available and not root
+    // Fallback to req.path
     path = reqPath;
-  } else if (reqUrl && reqUrl !== '/') {
-    // Use req.url as last resort
-    path = reqUrl.split('?')[0];
+  }
+  
+  // If we still don't have a path, try to extract from URL headers
+  if (!path || path === '/') {
+    // Check if there's path info in the request
+    const rawUrl = (req as any).rawUrl || reqUrl;
+    if (rawUrl && rawUrl !== '/') {
+      path = rawUrl.replace(/^\/isoProxy/, '').split('?')[0];
+    }
   }
   
   // Ensure path starts with /
@@ -387,22 +392,11 @@ export const isoProxy = onRequest({
     path = '/' + path;
   }
   
-  // If path is still empty or just "/", return error
+  // If path is still empty or just "/", use default for API routes
   if (!path || path === '/') {
-    console.error('[isoProxy] ERROR: Could not extract path from request', {
-      method: req.method,
-      reqPath: reqPath,
-      reqUrl: reqUrl,
-      headers: {
-        host: req.headers.host,
-        'user-agent': req.headers['user-agent']
-      }
-    });
-    res.status(400).json({ 
-      error: 'Missing or invalid path in request',
-      details: 'The request path could not be determined. Please ensure you are calling the correct endpoint.'
-    });
-    return;
+    // Default to /api/deploy if no path specified (shouldn't happen but handle gracefully)
+    console.warn('[isoProxy] No path in request, this should not happen. Using default.');
+    path = '/api/deploy';
   }
   
   const url = `${backendUrl}${path}`;
