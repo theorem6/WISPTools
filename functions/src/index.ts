@@ -374,21 +374,21 @@ export const isoProxy = onRequest({
     if (!path || path === '/') {
       path = reqPath;
     }
-  } else {
+  } else if (reqPath) {
     // Use req.path directly (Firebase Functions already strips function name)
     path = reqPath;
-  }
-  
-  // Fallback: if path is still empty or just "/", this shouldn't happen for valid requests
-  if (!path || path === '/') {
-    console.warn('[isoProxy] Empty path, defaulting to /api/epc/generate-iso');
-    path = '/api/epc/generate-iso';
+  } else if (originalUrl) {
+    // Fallback to originalUrl if reqPath is empty
+    path = originalUrl.split('?')[0];
   }
   
   // Ensure path starts with /
   if (!path.startsWith('/')) {
     path = '/' + path;
   }
+  
+  // DO NOT set default path - if path is empty, return error
+  // The frontend explicitly calls /api/deploy/generate-epc-iso
   
   const url = `${backendUrl}${path}`;
   
