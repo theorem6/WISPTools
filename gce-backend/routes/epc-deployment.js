@@ -252,9 +252,10 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely for headless operation
-  # Parameters: text=text mode, DEBIAN_FRONTEND=text, nomodeset=nofb=disable framebuffer, video=off=disable all video
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb video=off vga=0 console=ttyS0,115200n8 console=tty1 text ---
+  # ⚠️  TEXT-ONLY INSTALL: No VGA/framebuffer - pure text console only
+  # Removed all vga/video parameters - framebuffer completely disabled
+  # nomodeset nofb = disable framebuffer, console only to serial/tty
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
@@ -518,9 +519,10 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely for headless operation
-  # Parameters: text=text mode, DEBIAN_FRONTEND=text, nomodeset=nofb=disable framebuffer, video=off=disable all video
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb video=off vga=0 console=ttyS0,115200n8 console=tty1 text ---
+  # ⚠️  TEXT-ONLY INSTALL: No VGA/framebuffer - pure text console only
+  # Removed all vga/video parameters - framebuffer completely disabled
+  # nomodeset nofb = disable framebuffer, console only to serial/tty
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb console=ttyS0,115200n8 console=tty1 text ---
   initrd /debian/initrd.gz
 }
 
