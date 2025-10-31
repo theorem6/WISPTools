@@ -87,6 +87,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for diff comparison
+    
     - name: Check changed files
       uses: dorny/paths-filter@v2
       id: changes
@@ -98,16 +103,34 @@ jobs:
             - 'Module_Manager/package-lock.json'
             - 'Module_Manager/vite.config.ts'
             - 'Module_Manager/svelte.config.js'
+            - 'Module_Manager/svelte.config.*'
+            - 'Module_Manager/tsconfig.json'
             - 'firebase.json'
+          backend:
+            - 'backend-services/**'
+            - 'gce-backend/**'
+            - 'distributed-epc/**'
+            - 'hss-module/**'
+            - 'genieacs-cloudrun/**'
+            - 'genieacs-fork/**'
+            - 'scripts/**'
+            - 'deploy*.sh'
+            - '*.sh'
     
     - name: Skip if no frontend changes
       if: steps.changes.outputs.frontend == 'false'
-      run: echo "No frontend changes detected, skipping deployment"
+      run: |
+        echo "⏭️ No frontend changes detected, skipping frontend deployment"
+        echo "Backend-only changes will not trigger frontend deployment"
+        exit 0
     
-    - name: Checkout code
-      if: steps.changes.outputs.frontend == 'true'
-      uses: actions/checkout@v4
-      
+    - name: Skip if only backend changes (no frontend)
+      if: steps.changes.outputs.frontend == 'false' && steps.changes.outputs.backend == 'true'
+      run: |
+        echo "⏭️ Only backend changes detected - skipping frontend deployment"
+        echo "Frontend will only deploy when frontend files are changed"
+        exit 0
+    
     - name: Setup Node.js
       if: steps.changes.outputs.frontend == 'true'
       uses: actions/setup-node@v4

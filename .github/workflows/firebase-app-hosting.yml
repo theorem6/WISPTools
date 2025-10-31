@@ -4,9 +4,31 @@ on:
   push:
     branches:
       - main
+    paths:
+      # Only trigger on frontend changes
+      - 'Module_Manager/src/**'
+      - 'Module_Manager/package.json'
+      - 'Module_Manager/package-lock.json'
+      - 'Module_Manager/vite.config.ts'
+      - 'Module_Manager/svelte.config.js'
+      - 'Module_Manager/tsconfig.json'
+      - 'firebase.json'
+      # Exclude backend paths to prevent unnecessary deployments
+      - '!backend-services/**'
+      - '!gce-backend/**'
+      - '!distributed-epc/**'
+      - '!hss-module/**'
+      - '!genieacs-cloudrun/**'
+      - '!genieacs-fork/**'
+      - '!scripts/**'
+      - '!*.sh'
+      - '!*.md'
   pull_request:
     branches:
       - main
+    paths:
+      - 'Module_Manager/**'
+      - 'firebase.json'
 
 env:
   PROJECT_ID: lte-pci-mapper-65450042-bbf71
@@ -21,8 +43,45 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for diff comparison
+      
+      - name: Check changed files
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters:
+            frontend:
+              - 'Module_Manager/src/**'
+              - 'Module_Manager/package.json'
+              - 'Module_Manager/package-lock.json'
+              - 'Module_Manager/vite.config.ts'
+              - 'Module_Manager/svelte.config.js'
+              - 'Module_Manager/tsconfig.json'
+              - 'firebase.json'
+            backend:
+              - 'backend-services/**'
+              - 'gce-backend/**'
+              - 'distributed-epc/**'
+              - 'hss-module/**'
+              - 'scripts/**'
+      
+      - name: Skip if no frontend changes
+        if: steps.changes.outputs.frontend == 'false'
+        run: |
+          echo "⏭️ No frontend changes detected - skipping deployment"
+          echo "Backend-only changes will not trigger frontend deployment"
+          exit 0
+      
+      - name: Skip if only backend changes
+        if: steps.changes.outputs.frontend == 'false' && steps.changes.outputs.backend == 'true'
+        run: |
+          echo "⏭️ Only backend changes detected - skipping frontend deployment"
+          echo "Frontend deployment will only occur when frontend files are modified"
+          exit 0
 
       - name: Setup Node.js
+        if: steps.changes.outputs.frontend == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -30,26 +89,31 @@ jobs:
           cache-dependency-path: Module_Manager/package-lock.json
 
       - name: Install dependencies
+        if: steps.changes.outputs.frontend == 'true'
         working-directory: ./Module_Manager
         run: npm ci
 
       - name: Build application
+        if: steps.changes.outputs.frontend == 'true'
         working-directory: ./Module_Manager
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Authenticate to Google Cloud
+        if: steps.changes.outputs.frontend == 'true'
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
+        if: steps.changes.outputs.frontend == 'true'
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
       - name: Deploy to Cloud Run (Firebase App Hosting)
+        if: steps.changes.outputs.frontend == 'true'
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --source ./Module_Manager \
@@ -66,6 +130,7 @@ jobs:
             --project ${{ env.PROJECT_ID }}
 
       - name: Route traffic to latest revision
+        if: steps.changes.outputs.frontend == 'true'
         run: |
           gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
             --region ${{ env.REGION }} \
@@ -73,6 +138,7 @@ jobs:
             --project ${{ env.PROJECT_ID }}
 
       - name: Get service URL
+        if: steps.changes.outputs.frontend == 'true'
         id: url
         run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
@@ -83,6 +149,7 @@ jobs:
           echo "🚀 Deployed to: $URL"
 
       - name: Deployment summary
+        if: steps.changes.outputs.frontend == 'true'
         run: |
           echo "✅ Deployment successful!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
