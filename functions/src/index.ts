@@ -361,20 +361,25 @@ export const isoProxy = onRequest({
   const backendUrl = 'http://136.112.111.167:3002';  // ISO API port (direct access, not proxied)
   
   // Extract path from request
-  // Firebase Functions (2nd gen) strips the function name, so req.path should already have the path
-  // Example: Request to /isoProxy/api/deploy/generate-epc-iso → req.path = /api/deploy/generate-epc-iso
-  let path = req.path || '';
-  const originalUrl = (req as any).originalUrl || req.url || '';
+  // Firebase Functions 2nd gen: The full URL path is in req.url (includes function name)
+  // Example: Request to https://xxx.cloudfunctions.net/isoProxy/api/deploy/generate-epc-iso
+  //          req.url = /isoProxy/api/deploy/generate-epc-iso
+  //          We need to remove /isoProxy prefix to get /api/deploy/generate-epc-iso
   
-  // If req.path is empty or just "/", try to extract from originalUrl
-  if (!path || path === '/') {
-    if (originalUrl && originalUrl.includes('/isoProxy')) {
-      // Remove /isoProxy prefix if present in originalUrl
-      path = originalUrl.replace(/^\/isoProxy/, '').split('?')[0];
-    } else if (originalUrl && originalUrl !== '/') {
-      // Use originalUrl directly if it's not empty
-      path = originalUrl.split('?')[0];
-    }
+  let path = '';
+  const reqUrl = req.url || '';
+  const reqPath = req.path || '';
+  
+  // Try to extract path from req.url (most reliable for 2nd gen functions)
+  if (reqUrl && reqUrl.includes('/isoProxy')) {
+    // Remove /isoProxy prefix and any query parameters
+    path = reqUrl.replace(/^\/isoProxy/, '').split('?')[0];
+  } else if (reqPath && reqPath !== '/') {
+    // Fallback to req.path if available and not root
+    path = reqPath;
+  } else if (reqUrl && reqUrl !== '/') {
+    // Use req.url as last resort
+    path = reqUrl.split('?')[0];
   }
   
   // Ensure path starts with /
@@ -386,10 +391,12 @@ export const isoProxy = onRequest({
   if (!path || path === '/') {
     console.error('[isoProxy] ERROR: Could not extract path from request', {
       method: req.method,
-      path: req.path,
-      url: req.url,
-      originalUrl: originalUrl,
-      headers: req.headers
+      reqPath: reqPath,
+      reqUrl: reqUrl,
+      headers: {
+        host: req.headers.host,
+        'user-agent': req.headers['user-agent']
+      }
     });
     res.status(400).json({ 
       error: 'Missing or invalid path in request',
@@ -401,22 +408,13 @@ export const isoProxy = onRequest({
   const url = `${backendUrl}${path}`;
   
   // Debug logging - log ALL request details to understand path extraction
-  const allRequestDetails = {
+  console.log('[isoProxy] Request details:', {
     method: req.method,
-    reqPath: req.path,
-    reqUrl: req.url,
-    originalUrl: originalUrl,
-    baseUrl: (req as any).baseUrl,
-    route: (req as any).route,
+    reqPath: reqPath,
+    reqUrl: reqUrl,
     extractedPath: path,
-    finalBackendUrl: url,
-    headers: {
-      host: req.headers.host,
-      'user-agent': req.headers['user-agent']
-    }
-  };
-  
-  console.log('[isoProxy] FULL Request details:', JSON.stringify(allRequestDetails, null, 2));
+    finalBackendUrl: url
+  });
   
   try {
     const headers: HeadersInit = {
