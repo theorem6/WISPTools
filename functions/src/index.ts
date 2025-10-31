@@ -400,14 +400,23 @@ export const isoProxy = onRequest({
   
   const url = `${backendUrl}${path}`;
   
-  console.log('[isoProxy] Request details:', {
+  // Debug logging - log ALL request details to understand path extraction
+  const allRequestDetails = {
     method: req.method,
     reqPath: req.path,
     reqUrl: req.url,
     originalUrl: originalUrl,
+    baseUrl: (req as any).baseUrl,
+    route: (req as any).route,
     extractedPath: path,
-    finalBackendUrl: url
-  });
+    finalBackendUrl: url,
+    headers: {
+      host: req.headers.host,
+      'user-agent': req.headers['user-agent']
+    }
+  };
+  
+  console.log('[isoProxy] FULL Request details:', JSON.stringify(allRequestDetails, null, 2));
   
   try {
     const headers: HeadersInit = {
