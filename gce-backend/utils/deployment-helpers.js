@@ -53,11 +53,11 @@ source /etc/wisptools/credentials.env
 
 # Use ORIGIN_HOST_FQDN as S6a Identity (unique per EPC)
 # This was generated during ISO creation: mme-{epc-id}.wisptools.io
-S6A_IDENTITY="${ORIGIN_HOST_FQDN:-mme.$EPC_ID.wisptools.local}"
-if [ -z "$ORIGIN_HOST_FQDN" ]; then
-    print_status "ORIGIN_HOST_FQDN not found, using fallback: $S6A_IDENTITY"
+S6A_IDENTITY="\${ORIGIN_HOST_FQDN:-mme.\$EPC_ID.wisptools.local}"
+if [ -z "\$ORIGIN_HOST_FQDN" ]; then
+    print_status "ORIGIN_HOST_FQDN not found, using fallback: \$S6A_IDENTITY"
 else
-    print_success "Using unique S6a Identity: $S6A_IDENTITY"
+    print_success "Using unique S6a Identity: \$S6A_IDENTITY"
 fi
 
 print_header "WISPTools.io EPC Deployment"
@@ -254,7 +254,7 @@ EOF
 # Create FreeDiameter PCRF configuration
 print_status "Setting up FreeDiameter PCRF configuration..."
 # Use same unique ID pattern for PCRF (derived from MME identity)
-PCRF_IDENTITY=$(echo $S6A_IDENTITY | sed 's/^mme-/pcrf-/')
+PCRF_IDENTITY=$(echo \$S6A_IDENTITY | sed 's/^mme-/pcrf-/')
 cat > /etc/freeDiameter/pcrf.conf <<EOF
 # FreeDiameter PCRF Configuration for Cloud HSS
 # EPC: $EPC_ID / Tenant: $TENANT_ID
