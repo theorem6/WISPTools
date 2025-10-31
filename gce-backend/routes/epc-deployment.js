@@ -131,26 +131,60 @@ GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
 HSS_PORT="${HSS_PORT}"
 echo "[Build] Creating unique preseed: $PRESEED_NAME"
 cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
-d-i debian-installer/locale string en_US
+# Force non-interactive installation (no GUI, no prompts)
+d-i debian-installer/locale string en_US.UTF-8
 d-i debian-installer/country string US
+d-i debian-installer/language string en
+d-i console-keymaps-at/keymap select us
 d-i keyboard-configuration/xkb-keymap select us
+d-i keyboard-configuration/layoutcode string us
+
+# Skip all interactive prompts
+d-i debconf/priority select critical
 d-i netcfg/choose_interface select auto
 d-i netcfg/get_hostname string epc-host
+d-i netcfg/get_domain string local
+d-i netcfg/wireless_wep string
 d-i mirror/http/hostname string deb.debian.org
 d-i mirror/http/directory string /debian
 d-i mirror/http/proxy string
+d-i mirror/country string US
+
+# Partitioning - fully automatic
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
+d-i partman-auto/expert_recipe string atomic :: \
+    1000 1000 1000 ext4 \
+    \$primary{ } \$bootable{ } \
+    method{ format } \
+    format{ } \
+    use_filesystem{ } \
+    filesystem{ ext4 } \
+    mountpoint{ / } .
 d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 d-i partman/confirm_write_new_label boolean true
 d-i partman-auto/disk string /dev/sda
 d-i partman-auto/init_automatically_partition select biggest_free
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+
+# Package selection
 tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i pkgsel/upgrade select none
+d-i pkgsel/update-policy select none
+
+# Grub installation
 d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+d-i finish-install/keep-consoles boolean true
 d-i debian-installer/exit/poweroff boolean false
+d-i debian-installer/exit/halt boolean false
+d-i preseed/early_command string anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
@@ -203,7 +237,7 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} net.ifnames=0 biosdevname=0 quiet ---
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 quiet ---
   initrd /debian/initrd.gz
 }
 
@@ -387,26 +421,60 @@ mkdir -p "$NETBOOT_DIR"
 # Generate preseed
 PRESEED_NAME="preseed-${epc_id}-$(date +%s).cfg"
 cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
-d-i debian-installer/locale string en_US
+# Force non-interactive installation (no GUI, no prompts)
+d-i debian-installer/locale string en_US.UTF-8
 d-i debian-installer/country string US
+d-i debian-installer/language string en
+d-i console-keymaps-at/keymap select us
 d-i keyboard-configuration/xkb-keymap select us
+d-i keyboard-configuration/layoutcode string us
+
+# Skip all interactive prompts
+d-i debconf/priority select critical
 d-i netcfg/choose_interface select auto
 d-i netcfg/get_hostname string epc-host
+d-i netcfg/get_domain string local
+d-i netcfg/wireless_wep string
 d-i mirror/http/hostname string deb.debian.org
 d-i mirror/http/directory string /debian
 d-i mirror/http/proxy string
+d-i mirror/country string US
+
+# Partitioning - fully automatic
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
+d-i partman-auto/expert_recipe string atomic :: \
+    1000 1000 1000 ext4 \
+    \$primary{ } \$bootable{ } \
+    method{ format } \
+    format{ } \
+    use_filesystem{ } \
+    filesystem{ ext4 } \
+    mountpoint{ / } .
 d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 d-i partman/confirm_write_new_label boolean true
 d-i partman-auto/disk string /dev/sda
 d-i partman-auto/init_automatically_partition select biggest_free
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+
+# Package selection
 tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i pkgsel/upgrade select none
+d-i pkgsel/update-policy select none
+
+# Grub installation
 d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+d-i finish-install/keep-consoles boolean true
 d-i debian-installer/exit/poweroff boolean false
+d-i debian-installer/exit/halt boolean false
+d-i preseed/early_command string anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
