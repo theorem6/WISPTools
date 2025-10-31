@@ -132,25 +132,60 @@ HSS_PORT="${HSS_PORT}"
 echo "[Build] Creating unique preseed: $PRESEED_NAME"
 cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
 d-i debian-installer/locale string en_US
+d-i debian-installer/country string US
 d-i keyboard-configuration/xkb-keymap select us
 d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string epc-host
 d-i mirror/http/hostname string deb.debian.org
 d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
-d-i partman/confirm_write_new_label boolean true
+d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
+d-i partman/confirm_write_new_label boolean true
+d-i partman-auto/disk string /dev/sda
+d-i partman-auto/init_automatically_partition select biggest_free
 tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/upgrade select none
+d-i grub-installer/only_debian boolean true
+d-i debian-installer/exit/poweroff boolean false
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
-    in-target mkdir -p /etc/wisptools /opt/wisptools; \\
-    in-target /bin/sh -c 'cat > /etc/wisptools/credentials.env <<"CREDS"\\nEPC_ID=${epc_id}\\nTENANT_ID=${tenant_id}\\nEPC_AUTH_CODE=${auth_code}\\nEPC_API_KEY=${api_key}\\nEPC_SECRET_KEY=${secret_key}\\nGCE_SERVER=${GCE_PUBLIC_IP}\\nHSS_PORT=${HSS_PORT}\\nORIGIN_HOST_FQDN=${originHostFQDN}\\nCREDS'; \\
-    in-target wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \\
-    in-target chmod +x /opt/wisptools/bootstrap.sh; \\
-    in-target /bin/sh -c 'cat > /etc/systemd/system/wisptools-bootstrap.service <<"UNIT"\\n[Unit]\\nDescription=WISPTools EPC Bootstrap\\nAfter=network-online.target\\nWants=network-online.target\\nConditionPathExists=!/var/lib/wisptools/.bootstrapped\\n\\n[Service]\\nType=oneshot\\nExecStart=/opt/wisptools/bootstrap.sh\\nRemainAfterExit=yes\\n\\n[Install]\\nWantedBy=multi-user.target\\nUNIT'; \\
-    in-target systemctl enable wisptools-bootstrap.service
+    mkdir -p /target/etc/wisptools /target/opt/wisptools /target/var/lib/wisptools; \\
+    echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \\
+    echo 'TENANT_ID=${tenant_id}' >> /target/etc/wisptools/credentials.env; \\
+    echo 'EPC_AUTH_CODE=${auth_code}' >> /target/etc/wisptools/credentials.env; \\
+    echo 'EPC_API_KEY=${api_key}' >> /target/etc/wisptools/credentials.env; \\
+    echo 'EPC_SECRET_KEY=${secret_key}' >> /target/etc/wisptools/credentials.env; \\
+    echo 'GCE_SERVER=${GCE_PUBLIC_IP}' >> /target/etc/wisptools/credentials.env; \\
+    echo 'HSS_PORT=${HSS_PORT}' >> /target/etc/wisptools/credentials.env; \\
+    echo 'ORIGIN_HOST_FQDN=${originHostFQDN}' >> /target/etc/wisptools/credentials.env; \\
+    chmod 600 /target/etc/wisptools/credentials.env; \\
+    wget -O /target/opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \\
+    chmod +x /target/opt/wisptools/bootstrap.sh; \\
+    cat > /target/etc/systemd/system/wisptools-bootstrap.service << 'EOF_SERVICE' \\
+[Unit]\\
+Description=WISPTools EPC Bootstrap and Deployment\\
+After=network-online.target\\
+Wants=network-online.target\\
+ConditionPathExists=!/var/lib/wisptools/.bootstrapped\\
+
+[Service]\\
+Type=oneshot\\
+ExecStart=/opt/wisptools/bootstrap.sh\\
+RemainAfterExit=yes\\
+StandardOutput=journal+console\\
+StandardError=journal+console\\
+TimeoutStartSec=3600\\
+
+[Install]\\
+WantedBy=multi-user.target\\
+EOF_SERVICE\\
+    chroot /target systemctl enable wisptools-bootstrap.service; \\
+    echo "WISPTools EPC bootstrap service configured for EPC ${epc_id}"
 PRESEED_EOF
 
 # Build tiny ISO containing only netboot kernel/initrd and GRUB
@@ -163,12 +198,12 @@ cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz" || { echo "[Build] ERROR: Failed 
 chmod 0644 "$ISO_ROOT/debian/vmlinuz" "$ISO_ROOT/debian/initrd.gz" || true
 
 cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
-set timeout=0
+set timeout=3
 set default=auto
 insmod gzio
 
-menuentry "Debian 12 Netboot (Automated)" --id auto {
-  linux /debian/vmlinuz auto priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} net.ifnames=0 biosdevname=0 ---
+menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} net.ifnames=0 biosdevname=0 quiet ---
   initrd /debian/initrd.gz
 }
 
@@ -353,16 +388,25 @@ mkdir -p "$NETBOOT_DIR"
 PRESEED_NAME="preseed-${epc_id}-$(date +%s).cfg"
 cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
 d-i debian-installer/locale string en_US
+d-i debian-installer/country string US
 d-i keyboard-configuration/xkb-keymap select us
 d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string epc-host
 d-i mirror/http/hostname string deb.debian.org
 d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
-d-i partman/confirm_write_new_label boolean true
+d-i partman-partitioning/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
+d-i partman/confirm_write_new_label boolean true
+d-i partman-auto/disk string /dev/sda
+d-i partman-auto/init_automatically_partition select biggest_free
 tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/upgrade select none
+d-i grub-installer/only_debian boolean true
+d-i debian-installer/exit/poweroff boolean false
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
