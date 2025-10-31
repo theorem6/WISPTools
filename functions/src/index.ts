@@ -349,8 +349,30 @@ export const isoProxy = onRequest({
   }
   
   const backendUrl = 'http://136.112.111.167:3002';  // ISO API port
-  const path = req.path || '';
+  
+  // Extract path from request - handle both direct calls and Firebase Hosting rewrites
+  let path = req.path || '';
+  // If path is empty or just "/", check URL
+  if (!path || path === '/') {
+    const fullUrl = (req as any).originalUrl || req.url || '';
+    // Remove /isoProxy prefix if present
+    path = fullUrl.replace(/^\/isoProxy/, '') || '/api/deploy/generate-epc-iso';
+  }
+  // Ensure path starts with /
+  if (!path.startsWith('/')) {
+    path = '/' + path;
+  }
+  
   const url = `${backendUrl}${path}`;
+  
+  console.log('[isoProxy] Request details:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: (req as any).originalUrl,
+    processedPath: path,
+    finalUrl: url
+  });
   
   try {
     const headers: HeadersInit = {
