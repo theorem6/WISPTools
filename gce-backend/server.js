@@ -31,8 +31,10 @@ app.get('/health', (req, res) => {
 // Load routes
 try {
   const epcDeployment = require('./routes/epc-deployment');
+  // Mount at both /api/epc (for registered EPCs) and /api/deploy (for deployment modal)
   app.use('/api/epc', epcDeployment);
-  console.log('[Server] EPC deployment routes loaded');
+  app.use('/api/deploy', epcDeployment);
+  console.log('[Server] EPC deployment routes loaded at /api/epc and /api/deploy');
 } catch (err) {
   console.error('[Server] Failed to load EPC deployment routes:', err);
 }
