@@ -61,27 +61,27 @@ else
 fi
 
 print_header "WISPTools.io EPC Deployment"
-echo "EPC ID: $EPC_ID"
-echo "Tenant ID: $TENANT_ID"
-echo "S6a Identity: $S6A_IDENTITY"
+echo "EPC ID: \$EPC_ID"
+echo "Tenant ID: \$TENANT_ID"
+echo "S6a Identity: \$S6A_IDENTITY"
 echo "Cloud HSS: ${gce_ip}:${hss_port}"
 echo ""
 
 # Auto-detect network configuration
 print_header "Network Configuration (Auto-Detected)"
-MME_IP=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7; exit}' || hostname -I | awk '{print $1}')
-if [ -z "$MME_IP" ]; then
+MME_IP=$(ip route get 8.8.8.8 2>/dev/null | awk '{print \$7; exit}' || hostname -I | awk '{print \$1}')
+if [ -z "\$MME_IP" ]; then
     print_error "Could not detect IP address"
     exit 1
 fi
 
-SGWC_IP="$MME_IP"
-SGWU_IP="$MME_IP"
-SMF_IP="$MME_IP"
-UPF_IP="$MME_IP"
+SGWC_IP="\$MME_IP"
+SGWU_IP="\$MME_IP"
+SMF_IP="\$MME_IP"
+UPF_IP="\$MME_IP"
 
-print_success "Auto-detected Primary IP: $MME_IP"
-print_status "All EPC components will use: $MME_IP"
+print_success "Auto-detected Primary IP: \$MME_IP"
+print_status "All EPC components will use: \$MME_IP"
 echo ""
 
 # Network configuration
@@ -132,20 +132,20 @@ cat > /etc/open5gs/mme.yaml <<EOF
 mme:
   freeDiameter: /etc/freeDiameter/mme.conf
   s1ap:
-    - addr: $MME_IP
+    - addr: \$MME_IP
   gtpc:
-    - addr: $SGWC_IP
+    - addr: \$SGWC_IP
   gummei:
     plmn_id:
-      mcc: ${MCC}
-      mnc: ${MNC}
+      mcc: \${MCC}
+      mnc: \${MNC}
     mme_gid: 2
     mme_code: 1
   tai:
     plmn_id:
-      mcc: ${MCC}
-      mnc: ${MNC}
-    tac: ${TAC}
+      mcc: \${MCC}
+      mnc: \${MNC}
+    tac: \${TAC}
   security:
     integrity_order: [EIA2, EIA1, EIA0]
     ciphering_order: [EEA0, EEA1, EEA2]
@@ -154,8 +154,8 @@ mme:
     short: "WISPTools"
   guami:
     plmn_id:
-      mcc: ${MCC}
-      mnc: ${MNC}
+      mcc: \${MCC}
+      mnc: \${MNC}
     amf_id:
       region: 2
       set: 1
@@ -166,11 +166,11 @@ print_status "Configuring SGW-C..."
 cat > /etc/open5gs/sgwc.yaml <<EOF
 sgwc:
   gtpc:
-    - addr: $SGWC_IP
+    - addr: \$SGWC_IP
   pfcp:
-    - addr: $SGWC_IP
+    - addr: \$SGWC_IP
   sgwu:
-    - addr: $SGWU_IP
+    - addr: \$SGWU_IP
 EOF
 
 # Configure SGW-U
@@ -178,11 +178,11 @@ print_status "Configuring SGW-U..."
 cat > /etc/open5gs/sgwu.yaml <<EOF
 sgwu:
   gtpu:
-    - addr: $SGWU_IP
+    - addr: \$SGWU_IP
   pfcp:
-    - addr: $SGWU_IP
+    - addr: \$SGWU_IP
   sgwc:
-    - addr: $SGWC_IP
+    - addr: \$SGWC_IP
 EOF
 
 # Configure SMF
@@ -190,18 +190,18 @@ print_status "Configuring SMF..."
 cat > /etc/open5gs/smf.yaml <<EOF
 smf:
   gtpc:
-    - addr: $SMF_IP
+    - addr: \$SMF_IP
   pfcp:
-    - addr: $SMF_IP
+    - addr: \$SMF_IP
   upf:
-    - addr: $UPF_IP
+    - addr: \$UPF_IP
   dns:
-    - $DNS_PRIMARY
-    - $DNS_SECONDARY
+    - \$DNS_PRIMARY
+    - \$DNS_SECONDARY
   subnet:
-    - addr: $APN_POOL
+    - addr: \$APN_POOL
   ue_pool:
-    - addr: $APN_POOL
+    - addr: \$APN_POOL
 EOF
 
 # Configure UPF
@@ -209,11 +209,11 @@ print_status "Configuring UPF..."
 cat > /etc/open5gs/upf.yaml <<EOF
 upf:
   gtpu:
-    - addr: $UPF_IP
+    - addr: \$UPF_IP
   pfcp:
-    - addr: $UPF_IP
+    - addr: \$UPF_IP
   smf:
-    - addr: $SMF_IP
+    - addr: \$SMF_IP
 EOF
 
 # Configure PCRF
@@ -231,17 +231,17 @@ print_status "Setting up FreeDiameter MME configuration..."
 # Create FreeDiameter MME configuration
 cat > /etc/freeDiameter/mme.conf <<EOF
 # FreeDiameter MME Configuration for Cloud HSS
-# EPC: $EPC_ID / Tenant: $TENANT_ID
-# S6a Identity (unique per EPC): $S6A_IDENTITY
-Identity = "$S6A_IDENTITY";
+# EPC: \$EPC_ID / Tenant: \$TENANT_ID
+# S6a Identity (unique per EPC): \$S6A_IDENTITY
+Identity = "\$S6A_IDENTITY";
 Realm = "wisptools.local";
 
 # Listening configuration
-ListenOn = "$MME_IP";
+ListenOn = "\$MME_IP";
 Port = 3868;
 
 # Connect to Cloud HSS
-ConnectPeer = "hss.wisptools.cloud" { ConnectTo = "$HSS_ADDR"; No_TLS; Port = $HSS_PORT; };
+ConnectPeer = "hss.wisptools.cloud" { ConnectTo = "\$HSS_ADDR"; No_TLS; Port = \$HSS_PORT; };
 
 # Application configuration
 LoadExtension = "/usr/lib/x86_64-linux-gnu/freeDiameter/dict_s6a.fdx";
@@ -257,17 +257,17 @@ print_status "Setting up FreeDiameter PCRF configuration..."
 PCRF_IDENTITY=$(echo \$S6A_IDENTITY | sed 's/^mme-/pcrf-/')
 cat > /etc/freeDiameter/pcrf.conf <<EOF
 # FreeDiameter PCRF Configuration for Cloud HSS
-# EPC: $EPC_ID / Tenant: $TENANT_ID
-# PCRF Identity (matches MME): $PCRF_IDENTITY
-Identity = "$PCRF_IDENTITY";
+# EPC: \$EPC_ID / Tenant: \$TENANT_ID
+# PCRF Identity (matches MME): \$PCRF_IDENTITY
+Identity = "\$PCRF_IDENTITY";
 Realm = "wisptools.local";
 
 # Listening configuration
-ListenOn = "$MME_IP";
+ListenOn = "\$MME_IP";
 Port = 3869;
 
 # Connect to Cloud HSS
-ConnectPeer = "hss.wisptools.cloud" { ConnectTo = "$HSS_ADDR"; No_TLS; Port = $HSS_PORT; };
+ConnectPeer = "hss.wisptools.cloud" { ConnectTo = "\$HSS_ADDR"; No_TLS; Port = \$HSS_PORT; };
 
 # Application configuration
 LoadExtension = "/usr/lib/x86_64-linux-gnu/freeDiameter/dict_gx.fdx";
@@ -278,7 +278,7 @@ No_IPv6;
 No_SCTP;
 EOF
 
-print_success "FreeDiameter configured to connect to Cloud HSS at $HSS_ADDR:$HSS_PORT"
+print_success "FreeDiameter configured to connect to Cloud HSS at \$HSS_ADDR:\$HSS_PORT"
 
 print_header "Starting Open5GS Services"
 print_status "Enabling and starting all EPC components..."
@@ -313,14 +313,14 @@ else
 fi
 
 print_header "Deployment Complete"
-print_success "EPC $EPC_ID has been deployed successfully!"
+print_success "EPC \$EPC_ID has been deployed successfully!"
 echo ""
 echo "Configuration Summary:"
-echo "  MME IP: $MME_IP"
-echo "  Cloud HSS: $HSS_ADDR:$HSS_PORT"
-echo "  MCC/MNC: ${MCC}/${MNC}"
-echo "  TAC: ${TAC}"
-echo "  APN: $APN_NAME"
+echo "  MME IP: \$MME_IP"
+echo "  Cloud HSS: \$HSS_ADDR:\$HSS_PORT"
+echo "  MCC/MNC: \${MCC}/\${MNC}"
+echo "  TAC: \${TAC}"
+echo "  APN: \$APN_NAME"
 echo ""
 echo "Services running:"
 systemctl list-units --type=service --state=running | grep open5gs || true
