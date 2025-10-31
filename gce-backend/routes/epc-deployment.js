@@ -253,10 +253,11 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely
-  # Remove set gfxpayload=text - it can enable framebuffer
-  # Use kernel parameters only: nomodeset nofb text
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb video=vesafb:off video=efifb:off text console=ttyS0,115200n8 console=tty1 ---
+  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely - prevent initrd from loading it
+  # fb=false - Explicitly disable framebuffer at kernel level
+  # nomodeset nofb - Disable kernel mode setting and framebuffer
+  # video=*-off - Disable all video/framebuffer drivers
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=vesafb:off video=efifb:off video=VGA-16:off video=off text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
@@ -521,10 +522,11 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely
-  # Remove set gfxpayload=text - it can enable framebuffer
-  # Use kernel parameters only: nomodeset nofb text
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 nomodeset nofb video=vesafb:off video=efifb:off text console=ttyS0,115200n8 console=tty1 ---
+  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely - prevent initrd from loading it
+  # fb=false - Explicitly disable framebuffer at kernel level
+  # nomodeset nofb - Disable kernel mode setting and framebuffer
+  # video=*-off - Disable all video/framebuffer drivers
+  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=vesafb:off video=efifb:off video=VGA-16:off video=off text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
