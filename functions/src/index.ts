@@ -361,42 +361,59 @@ export const isoProxy = onRequest({
   const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3002`;  // ISO API port (direct access)
   
   // Extract path from request
-  // Firebase Functions 2nd gen behavior:
-  // - When called via Hosting rewrite: req.url = /api/deploy/generate-epc-iso (no function name)
-  // - When called directly: req.url may = /api/deploy/generate-epc-iso OR /isoProxy/api/deploy/... (varies)
+  // Firebase Functions 2nd gen behavior varies:
+  // - When called via Hosting rewrite (/api/deploy/...): path comes without function name
+  // - When called directly (https://...cloudfunctions.net/isoProxy/api/deploy/...): 
+  //   req.url may include /isoProxy or just /api/deploy depending on version
   
   let path = '';
-  const reqUrl = (req as any).originalUrl || req.url || '';
+  
+  // Get all possible path sources
+  const originalUrl = (req as any).originalUrl || '';
+  const reqUrl = req.url || '';
   const reqPath = req.path || '';
   
-  // Try originalUrl first (most reliable)
-  if (reqUrl) {
-    // Remove /isoProxy prefix if present (when called directly via Cloud Function URL)
+  // Strategy 1: Use originalUrl if available (most reliable for Hosting rewrites)
+  if (originalUrl && originalUrl !== '/') {
+    path = originalUrl.split('?')[0];
+  }
+  // Strategy 2: Use req.url (direct Cloud Function calls)
+  else if (reqUrl && reqUrl !== '/') {
+    // Remove /isoProxy prefix if present
     path = reqUrl.replace(/^\/isoProxy/, '').split('?')[0];
-  } else if (reqPath && reqPath !== '/') {
-    // Fallback to req.path
+  }
+  // Strategy 3: Fallback to req.path
+  else if (reqPath && reqPath !== '/') {
     path = reqPath;
   }
   
-  // If we still don't have a path, try to extract from URL headers
-  if (!path || path === '/') {
-    // Check if there's path info in the request
-    const rawUrl = (req as any).rawUrl || reqUrl;
-    if (rawUrl && rawUrl !== '/') {
-      path = rawUrl.replace(/^\/isoProxy/, '').split('?')[0];
-    }
-  }
-  
   // Ensure path starts with /
-  if (!path.startsWith('/')) {
+  if (path && !path.startsWith('/')) {
     path = '/' + path;
   }
   
-  // If path is still empty or just "/", use default for API routes
+  // If path is still empty, this is an error
   if (!path || path === '/') {
-    // Default to /api/deploy if no path specified (shouldn't happen but handle gracefully)
-    console.warn('[isoProxy] No path in request, this should not happen. Using default.');
-    path = '/api/deploy';
+    console.error('[isoProxy] ERROR: Could not extract path from request', {
+      method: req.method,
+      originalUrl,
+      reqUrl,
+      reqPath,
+      headers: {
+        host: req.headers.host,
+        'user-agent': req.headers['user-agent']
+      }
+    });
+    res.status(400).json({ 
+      error: 'Missing or invalid path in request',
+      details: 'The request path could not be determined. Expected: /api/deploy/...',
+      debug: {
+        originalUrl,
+        reqUrl,
+        reqPath
+      }
+    });
+    return;
   }
   
   const url = `${backendUrl}${path}`;
