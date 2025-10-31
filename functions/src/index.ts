@@ -261,14 +261,14 @@ export const hssProxy = onRequest({
   const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
 
   // Select upstream port by route family
-  // Port 3002 (ISO API) is accessed directly via IP (not proxied through nginx)
-  // Port 3001 (HSS API) goes through nginx with SSL at hss.wisptools.io
+  // Port 3002 (ISO API) - direct HTTP access on port 3002
+  // Port 3001 (HSS API) - goes through nginx SSL on port 443 (default HTTPS, no port needed)
   const upstreamPort = proxiedPath.startsWith('/api/deploy/') || proxiedPath === '/api/deploy' ? 3002 : 3001;
   
-  // For port 3002, use domain URL (may need nginx proxy configuration)
-  // For port 3001, use domain with HTTPS (proxied through nginx)
-  const upstreamHost = upstreamPort === 3002 ? `http://${backendDomain}` : backendHost;
-  const url = `${upstreamHost}:${upstreamPort}${proxiedPath}`;
+  // For port 3002, use HTTP with port (direct access, not proxied through nginx SSL)
+  // For port 3001, use HTTPS without port (nginx handles SSL on 443 and proxies to localhost:3001)
+  const upstreamHost = upstreamPort === 3002 ? `http://${backendDomain}:3002` : backendHost;
+  const url = upstreamPort === 3002 ? `${upstreamHost}${proxiedPath}` : `${upstreamHost}${proxiedPath}`;
   
   // Log request details for debugging
   console.log('[hssProxy] Request details:', {
