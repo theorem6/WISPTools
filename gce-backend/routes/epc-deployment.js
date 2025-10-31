@@ -199,7 +199,12 @@ d-i grub-installer/with_other_os boolean true
 d-i finish-install/keep-consoles boolean true
 d-i debian-installer/exit/poweroff boolean false
 d-i debian-installer/exit/halt boolean false
-d-i preseed/early_command string anna-install selinux-utils || true
+d-i preseed/early_command string \
+    echo 'blacklist vga16fb' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist vesafb' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist fbcon' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo FRAMEBUFFER=n > /etc/initramfs-tools/conf.d/no-framebuffer.conf 2>/dev/null || true; \
+    anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
@@ -253,11 +258,13 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely - prevent initrd from loading it
-  # fb=false - Explicitly disable framebuffer at kernel level
+  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer - prevent initrd from initializing it
+  # FRAMEBUFFER=n environment variable tells Debian installer to skip framebuffer
   # nomodeset nofb - Disable kernel mode setting and framebuffer
-  # video=*-off - Disable all video/framebuffer drivers
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=vesafb:off video=efifb:off video=VGA-16:off video=off text console=ttyS0,115200n8 console=tty1 ---
+  # video=off - Disable all video drivers
+  # fb=false - Explicit disable at kernel level
+  # Preseed early_command will blacklist framebuffer drivers
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
@@ -496,7 +503,12 @@ d-i grub-installer/with_other_os boolean true
 d-i finish-install/keep-consoles boolean true
 d-i debian-installer/exit/poweroff boolean false
 d-i debian-installer/exit/halt boolean false
-d-i preseed/early_command string anna-install selinux-utils || true
+d-i preseed/early_command string \
+    echo 'blacklist vga16fb' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist vesafb' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist fbcon' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo FRAMEBUFFER=n > /etc/initramfs-tools/conf.d/no-framebuffer.conf 2>/dev/null || true; \
+    anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
@@ -522,11 +534,13 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer completely - prevent initrd from loading it
-  # fb=false - Explicitly disable framebuffer at kernel level
+  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer - prevent initrd from initializing it
+  # FRAMEBUFFER=n environment variable tells Debian installer to skip framebuffer
   # nomodeset nofb - Disable kernel mode setting and framebuffer
-  # video=*-off - Disable all video/framebuffer drivers
-  linux /debian/vmlinuz auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=vesafb:off video=efifb:off video=VGA-16:off video=off text console=ttyS0,115200n8 console=tty1 ---
+  # video=off - Disable all video drivers
+  # fb=false - Explicit disable at kernel level
+  # Preseed early_command will blacklist framebuffer drivers
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
