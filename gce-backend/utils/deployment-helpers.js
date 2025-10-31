@@ -84,6 +84,27 @@ print_success "Auto-detected Primary IP: \$MME_IP"
 print_status "All EPC components will use: \$MME_IP"
 echo ""
 
+# Persist framebuffer/console settings in GRUB to avoid graphics initialization
+print_header "Configuring GRUB for headless/text-only operation"
+if [ -f /etc/default/grub ]; then
+  print_status "Updating /etc/default/grub kernel parameters"
+  # Ensure GRUB_CMDLINE_LINUX_DEFAULT exists
+  if ! grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
+    echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"' >> /etc/default/grub
+  fi
+  # Inject parameters idempotently: nomodeset nofb vga=normal text and serial consoles
+  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 nomodeset nofb vga=normal text console=ttyS0,115200n8 console=tty1\"/g' /etc/default/grub
+  print_status "Running update-grub (or grub-mkconfig fallback)"
+  if command -v update-grub >/dev/null 2>&1; then
+    update-grub >/dev/null 2>&1 || true
+  else
+    grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 || true
+  fi
+  print_success "GRUB updated for headless boot"
+else
+  print_status "/etc/default/grub not found, skipping persistent framebuffer disable"
+fi
+
 # Network configuration
 MCC="${defaultMcc}"
 MNC="${defaultMnc}"
