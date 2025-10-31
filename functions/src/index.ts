@@ -360,35 +360,49 @@ export const isoProxy = onRequest({
   // Note: Port 3002 is not proxied through nginx SSL, so use HTTP with domain
   const backendUrl = 'http://hss.wisptools.io:3002';  // ISO API port (direct access, not proxied through nginx SSL)
   
-  // Extract path from request - handle both direct calls and Firebase Hosting rewrites
-  // Firebase Functions strips the function name from req.path, so check originalUrl first
+  // Extract path from request
+  // Firebase Functions 2nd gen: The full URL path is in req.url (includes function name)
+  // Example: Request to https://xxx.cloudfunctions.net/isoProxy/api/deploy/generate-epc-iso
+  //          req.url = /isoProxy/api/deploy/generate-epc-iso
+  //          We need to remove /isoProxy prefix to get /api/deploy/generate-epc-iso
+  
   let path = '';
-  const originalUrl = (req as any).originalUrl || req.url || '';
+  const reqUrl = req.url || '';
   const reqPath = req.path || '';
-
-  // If originalUrl exists and contains /isoProxy, extract path from it
-  if (originalUrl && originalUrl.includes('/isoProxy')) {
-    // Remove /isoProxy prefix if present
-    path = originalUrl.replace(/^\/isoProxy/, '').split('?')[0]; // Remove query params
-    // If after removing prefix we get empty or just /, check if reqPath has the actual path
-    if (!path || path === '/') {
-      path = reqPath;
-    }
-  } else {
-    // Use req.path directly (Firebase Functions already strips function name)
-    // For Firebase Hosting rewrites, reqPath will contain /api/deploy/generate-epc-iso
+  
+  // Try to extract path from req.url (most reliable for 2nd gen functions)
+  if (reqUrl && reqUrl.includes('/isoProxy')) {
+    // Remove /isoProxy prefix and any query parameters
+    path = reqUrl.replace(/^\/isoProxy/, '').split('?')[0];
+  } else if (reqPath && reqPath !== '/') {
+    // Fallback to req.path if available and not root
     path = reqPath;
+  } else if (reqUrl && reqUrl !== '/') {
+    // Use req.url as last resort
+    path = reqUrl.split('?')[0];
   }
-
-  // Fallback: if path is still empty or just "/", default to expected endpoint
-  if (!path || path === '/') {
-    console.warn('[isoProxy] Empty path, defaulting to /api/deploy/generate-epc-iso');
-    path = '/api/deploy/generate-epc-iso';
-  }
-
+  
   // Ensure path starts with /
   if (!path.startsWith('/')) {
     path = '/' + path;
+  }
+  
+  // If path is still empty or just "/", return error
+  if (!path || path === '/') {
+    console.error('[isoProxy] ERROR: Could not extract path from request', {
+      method: req.method,
+      reqPath: reqPath,
+      reqUrl: reqUrl,
+      headers: {
+        host: req.headers.host,
+        'user-agent': req.headers['user-agent']
+      }
+    });
+    res.status(400).json({ 
+      error: 'Missing or invalid path in request',
+      details: 'The request path could not be determined. Please ensure you are calling the correct endpoint.'
+    });
+    return;
   }
   
   const url = `${backendUrl}${path}`;
