@@ -93,7 +93,7 @@ if [ -f /etc/default/grub ]; then
     echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"' >> /etc/default/grub
   fi
   # Inject parameters idempotently: nomodeset nofb vga=normal text and serial consoles
-  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 nomodeset nofb vga=normal text console=ttyS0,115200n8 console=tty1\"/g' /etc/default/grub
+  sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\\(.*\\)"/GRUB_CMDLINE_LINUX_DEFAULT="\\1 nomodeset nofb vga=normal text console=ttyS0,115200n8 console=tty1"/g' /etc/default/grub
   print_status "Running update-grub (or grub-mkconfig fallback)"
   if command -v update-grub >/dev/null 2>&1; then
     update-grub >/dev/null 2>&1 || true
