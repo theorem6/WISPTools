@@ -261,13 +261,10 @@ export const hssProxy = onRequest({
   // Ensure path starts with / for backend URL construction
   const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
 
-  // Select upstream port by route family
-  // Port 3002 (ISO API) - direct HTTP access on port 3002
-  // Port 3001 (HSS API) - goes through nginx SSL on port 443 (default HTTPS, no port needed)
-  const upstreamPort = proxiedPath.startsWith('/api/deploy/') || proxiedPath === '/api/deploy' ? 3002 : 3001;
-  
-  // Use direct IP/HTTP for both services
-  const upstreamHost = upstreamPort === 3002 ? `http://${backendIp}:3002` : backendHost;
+  // isoProxy always routes to port 3001 (HSS API) where /api/deploy routes exist
+  // The /api/deploy routes are in backend-services/routes/epc-deployment.js (port 3001)
+  // Port 3002 (gce-backend) does not have these routes properly configured
+  const upstreamHost = backendHost;  // Always use port 3001 for isoProxy
   const url = `${upstreamHost}${proxiedPath}`;
   
   // Log request details for debugging
@@ -370,9 +367,10 @@ export const isoProxy = onRequest({
     return;
   }
   
-  // Port 3002 (ISO API) - Use domain URL for backend
-  // Note: Port 3002 is not proxied through nginx SSL, so use HTTP with domain
-  const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3002`;  // ISO API port (direct access)
+  // Port 3001 (HSS API) - The /api/deploy routes actually exist here
+  // Note: Even though this is isoProxy, the EPC deployment routes are in backend-services (port 3001)
+  // Port 3002 (gce-backend) may not have the routes properly configured
+  const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3001`;  // HSS API port (where /api/deploy routes exist)
   
   // Extract path from request - SIMPLIFIED APPROACH
   // Firebase Functions 2nd gen with Hosting rewrites:
@@ -423,8 +421,9 @@ export const isoProxy = onRequest({
   // Debug logging - log ALL request details to understand path extraction
   console.log('[isoProxy] Request details:', {
     method: req.method,
-    reqPath: reqPath,
-    reqUrl: reqUrl,
+    reqUrl: req.url,
+    reqPath: (req as any).path,
+    originalUrl: (req as any).originalUrl,
     extractedPath: path,
     finalBackendUrl: url
   });
