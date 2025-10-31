@@ -361,47 +361,60 @@ export const isoProxy = onRequest({
   const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3002`;  // ISO API port (direct access)
   
   // Extract path from request
-  // Firebase Functions 2nd gen behavior varies:
-  // - When called via Hosting rewrite (/api/deploy/...): path comes without function name
-  // - When called directly (https://...cloudfunctions.net/isoProxy/api/deploy/...): 
-  //   req.url may include /isoProxy or just /api/deploy depending on version
+  // Firebase Functions 2nd gen with Hosting rewrites behavior:
+  // - When called via Hosting rewrite (/api/deploy/generate-epc-iso):
+  //   The rewrite preserves the path, so req.url = /api/deploy/generate-epc-iso
+  // - When called directly (https://...cloudfunctions.net/isoProxy/api/deploy/...):
+  //   req.url = /isoProxy/api/deploy/generate-epc-iso or /api/deploy/...
   
   let path = '';
   
-  // Get all possible path sources
+  // Check all possible path sources (in order of reliability)
   const originalUrl = (req as any).originalUrl || '';
   const reqUrl = req.url || '';
-  const reqPath = req.path || '';
+  const reqPath = (req as any).path || '';
   
-  // Strategy 1: Use originalUrl if available (most reliable for Hosting rewrites)
-  if (originalUrl && originalUrl !== '/') {
-    path = originalUrl.split('?')[0];
-  }
-  // Strategy 2: Use req.url (direct Cloud Function calls)
-  else if (reqUrl && reqUrl !== '/') {
-    // Remove /isoProxy prefix if present
+  // Log all path sources for debugging
+  console.log('[isoProxy] Path extraction - raw values:', {
+    originalUrl,
+    reqUrl,
+    reqPath,
+    method: req.method,
+    host: req.headers.host
+  });
+  
+  // Strategy 1: Use req.url first (most reliable for Firebase Functions 2nd gen)
+  if (reqUrl && reqUrl !== '/') {
+    // Remove /isoProxy prefix if present (direct Cloud Function calls)
     path = reqUrl.replace(/^\/isoProxy/, '').split('?')[0];
   }
-  // Strategy 3: Fallback to req.path
+  // Strategy 2: originalUrl (Express standard fallback)
+  else if (originalUrl && originalUrl !== '/') {
+    path = originalUrl.replace(/^\/isoProxy/, '').split('?')[0];
+  }
+  // Strategy 3: req.path (last resort)
   else if (reqPath && reqPath !== '/') {
-    path = reqPath;
+    path = reqPath.replace(/^\/isoProxy/, '').split('?')[0];
   }
   
-  // Ensure path starts with /
+  // Ensure path starts with / (if we have one)
   if (path && !path.startsWith('/')) {
     path = '/' + path;
   }
   
-  // If path is still empty, this is an error
+  // If path is empty or just "/", the request is invalid
   if (!path || path === '/') {
     console.error('[isoProxy] ERROR: Could not extract path from request', {
       method: req.method,
       originalUrl,
       reqUrl,
       reqPath,
-      headers: {
-        host: req.headers.host,
-        'user-agent': req.headers['user-agent']
+      allHeaders: Object.keys(req.headers || {}),
+      host: req.headers.host,
+      rawRequest: {
+        url: req.url,
+        baseUrl: (req as any).baseUrl,
+        originalUrl: (req as any).originalUrl
       }
     });
     res.status(400).json({ 
@@ -410,10 +423,24 @@ export const isoProxy = onRequest({
       debug: {
         originalUrl,
         reqUrl,
-        reqPath
+        reqPath,
+        tip: 'Check Cloud Functions logs for full request details'
       }
     });
     return;
+  }
+  
+  // IMPORTANT: Ensure path starts with /api/deploy for backend routing
+  // If Firebase Hosting stripped the prefix, restore it
+  if (!path.startsWith('/api/deploy')) {
+    // If path is just /generate-epc-iso or /api/epc/..., we need to fix it
+    if (path.startsWith('/generate-epc-iso') || path.startsWith('/api/epc/')) {
+      // This shouldn't happen with proper rewrite, but handle it
+      path = '/api/deploy' + path;
+    } else if (!path.startsWith('/api/')) {
+      // Completely missing prefix, add it
+      path = '/api/deploy' + path;
+    }
   }
   
   const url = `${backendUrl}${path}`;
