@@ -31,9 +31,8 @@ on:
       - 'firebase.json'
 
 env:
-  PROJECT_ID: lte-pci-mapper-65450042-bbf71
-  REGION: us-central1
-  SERVICE_NAME: lte-pci-mapper
+  FIREBASE_PROJECT_ID: lte-pci-mapper-65450042-bbf71
+  NODE_VERSION: '20'
 
 jobs:
   deploy:
@@ -100,60 +99,29 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Authenticate to Google Cloud
+      - name: Install Firebase CLI
         if: steps.changes.outputs.frontend == 'true'
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up Cloud SDK
-        if: steps.changes.outputs.frontend == 'true'
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-
-      - name: Deploy to Cloud Run (Firebase App Hosting)
+        run: npm install -g firebase-tools@latest
+        
+      - name: Authenticate to Firebase
         if: steps.changes.outputs.frontend == 'true'
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --source ./Module_Manager \
-            --region ${{ env.REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --cpu 1 \
-            --memory 2Gi \
-            --min-instances 0 \
-            --max-instances 5 \
-            --concurrency 80 \
-            --port 8080 \
-            --set-env-vars="NODE_ENV=production" \
-            --project ${{ env.PROJECT_ID }}
+          echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
+          export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+          firebase login:ci --token $FIREBASE_TOKEN
 
-      - name: Route traffic to latest revision
+      - name: Deploy to Firebase App Hosting
         if: steps.changes.outputs.frontend == 'true'
         run: |
-          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
-            --region ${{ env.REGION }} \
-            --to-latest \
-            --project ${{ env.PROJECT_ID }}
-
-      - name: Get service URL
-        if: steps.changes.outputs.frontend == 'true'
-        id: url
-        run: |
-          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
-            --region ${{ env.REGION }} \
-            --project ${{ env.PROJECT_ID }} \
-            --format 'value(status.url)')
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "🚀 Deployed to: $URL"
+          export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
+          firebase deploy --only apphosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
 
       - name: Deployment summary
         if: steps.changes.outputs.frontend == 'true'
         run: |
           echo "✅ Deployment successful!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Service**: ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Region**: ${{ env.REGION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**URL**: ${{ steps.url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Service**: Firebase App Hosting" >> $GITHUB_STEP_SUMMARY
+          echo "**Project**: ${{ env.FIREBASE_PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: Frontend deployed successfully via Firebase CLI" >> $GITHUB_STEP_SUMMARY
 
