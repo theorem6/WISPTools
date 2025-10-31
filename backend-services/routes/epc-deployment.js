@@ -138,6 +138,8 @@ fi
 NETBOOT_DIR="/var/www/html/downloads/netboot"
 mkdir -p "$NETBOOT_DIR"
 PRESEED_NAME="preseed-${epc_id}.cfg"
+GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
+HSS_PORT="${HSS_PORT}"
 cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
 d-i debian-installer/locale string en_US
 d-i keyboard-configuration/xkb-keymap select us
