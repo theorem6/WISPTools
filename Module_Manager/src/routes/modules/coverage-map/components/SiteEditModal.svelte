@@ -16,7 +16,7 @@
   // Form data - comprehensive for all site types
   let formData = {
     name: '',
-    type: 'tower' as 'tower' | 'building' | 'noc' | 'warehouse' | 'pole' | 'other',
+    type: 'tower' as 'tower' | 'building' | 'noc' | 'warehouse' | 'pole' | 'internet-access' | 'internet' | 'other',
     status: 'active' as 'active' | 'inactive' | 'maintenance' | 'planned',
     
     // Location
@@ -340,7 +340,8 @@
               <option value="tower">📡 Tower</option>
               <option value="building">🏢 Building / Rooftop</option>
               <option value="noc">🖥️ NOC (Network Operations Center)</option>
-              <option value="warehouse">🏭 Warehouse / Storage</option>
+              <option value="internet-access">🌐 Internet Access Point</option>
+              <option value="warehouse">🏭 Warehouse</option>
               <option value="pole">📡 Pole / Monopole</option>
               <option value="other">📍 Other</option>
             </select>

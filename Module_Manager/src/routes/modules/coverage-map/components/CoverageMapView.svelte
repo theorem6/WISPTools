@@ -30,6 +30,11 @@
       return false;
     }
   });
+  
+  // Find internet access points (sites marked as internet access)
+  $: internetAccessPoints = towers.filter(tower => 
+    tower.type === 'internet-access' || tower.type === 'internet'
+  );
 
   onMount(async () => {
     await initializeMap();
@@ -386,7 +391,7 @@
       if (backhaulLayer) backhaulLayer.removeAll();
       
       // Render backhaul links first (so they appear under other assets)
-      if (filters.showBackhaul && backhaulLinks.length > 0 && backhaulLayer) {
+      if (filters.showBackhaul && backhaulLayer) {
         await renderBackhaulLinks();
       }
       
@@ -408,7 +413,7 @@
           const customIcon = createLocationIcon(tower.type, iconSize);
           
           if (customIcon) {
-            // NOC, Warehouse, Vehicle, RMA, Vendor - use custom SVG
+            // NOC, Warehouse, Vehicle, RMA, Vendor, Internet Access - use custom SVG
             symbol = new PictureMarkerSymbol(customIcon);
           } else {
             // Towers, rooftops, monopoles - use colored circles
@@ -633,11 +638,13 @@
       const [
         { default: Polyline },
         { default: Graphic },
-        { default: SimpleLineSymbol }
+        { default: SimpleLineSymbol },
+        { default: Point }
       ] = await Promise.all([
         import('@arcgis/core/geometry/Polyline.js'),
         import('@arcgis/core/Graphic.js'),
-        import('@arcgis/core/symbols/SimpleLineSymbol.js')
+        import('@arcgis/core/symbols/SimpleLineSymbol.js'),
+        import('@arcgis/core/geometry/Point.js')
       ]);
       
       backhaulLinks.forEach(link => {
@@ -650,10 +657,30 @@
           if (backhaulType === 'fixed-wireless-licensed' && !filters.showWirelessLicensed) return;
           if (backhaulType === 'fixed-wireless-unlicensed' && !filters.showWirelessUnlicensed) return;
           
-          const fromSite = towers.find(s => s.id === notes.fromSiteId);
-          const toSite = towers.find(s => s.id === notes.toSiteId);
+          // Try to find sites by ID (check both towers and equipment locations)
+          let fromSite = towers.find(s => s.id === notes.fromSiteId);
+          let toSite = towers.find(s => s.id === notes.toSiteId);
           
-          if (!fromSite || !toSite) return;
+          // If not found in towers, try to find by location in equipment
+          if (!fromSite && link.location) {
+            fromSite = {
+              id: notes.fromSiteId,
+              location: link.location,
+              name: link.name || 'Unknown Site'
+            } as any;
+          }
+          if (!toSite && equipment.find(eq => eq.id === notes.toSiteId)) {
+            const toEquipment = equipment.find(eq => eq.id === notes.toSiteId);
+            if (toEquipment && toEquipment.location) {
+              toSite = {
+                id: notes.toSiteId,
+                location: toEquipment.location,
+                name: toEquipment.name || 'Unknown Site'
+              } as any;
+            }
+          }
+          
+          if (!fromSite || !toSite || !fromSite.location || !toSite.location) return;
           
           // Determine line style based on backhaul type
           let lineColor: [number, number, number, number];
@@ -746,6 +773,8 @@
       monopole: '#06b6d4',     // Cyan
       warehouse: '#f59e0b',    // Orange
       noc: '#ef4444',          // Red
+      'internet-access': '#06b6d4', // Cyan (same as internet icon)
+      'internet': '#06b6d4',   // Cyan
       vehicle: '#10b981',      // Green
       rma: '#f97316',          // Dark Orange
       vendor: '#6366f1',       // Indigo

@@ -99,6 +99,27 @@ export const vendorIcon = `data:image/svg+xml;base64,${btoa(`
 </svg>
 `)}`;
 
+// Internet Access Point - Globe/WiFi icon - Cyan
+export const internetAccessIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Globe circle -->
+  <circle cx="32" cy="32" r="22" fill="#06b6d4" stroke="white" stroke-width="3"/>
+  <!-- Latitude lines -->
+  <ellipse cx="32" cy="32" rx="22" ry="8" fill="none" stroke="white" stroke-width="2"/>
+  <ellipse cx="32" cy="32" rx="22" ry="15" fill="none" stroke="white" stroke-width="1.5"/>
+  <!-- Longitude lines -->
+  <path d="M 10 32 Q 32 20 54 32" fill="none" stroke="white" stroke-width="1.5"/>
+  <path d="M 10 32 Q 32 44 54 32" fill="none" stroke="white" stroke-width="1.5"/>
+  <!-- WiFi signal waves at top -->
+  <path d="M 18 16 Q 32 8 46 16" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 20 12 Q 32 4 44 12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <!-- Connection dots -->
+  <circle cx="16" cy="28" r="2" fill="white"/>
+  <circle cx="48" cy="28" r="2" fill="white"/>
+  <circle cx="32" cy="20" r="2" fill="white"/>
+</svg>
+`)}`;
+
 // Helper function to create picture marker symbol
 export function createLocationIcon(type: string, size: number = 40): any {
   const iconMap: Record<string, string> = {
@@ -106,7 +127,9 @@ export function createLocationIcon(type: string, size: number = 40): any {
     'warehouse': warehouseIcon,
     'vehicle': vehicleIcon,
     'rma': rmaIcon,
-    'vendor': vendorIcon
+    'vendor': vendorIcon,
+    'internet-access': internetAccessIcon,
+    'internet': internetAccessIcon
   };
   
   const iconUrl = iconMap[type];

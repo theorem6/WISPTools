@@ -33,7 +33,7 @@ const UnifiedSiteSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['tower', 'noc', 'warehouse', 'building', 'pole', 'other'],
+    enum: ['tower', 'noc', 'warehouse', 'building', 'pole', 'internet-access', 'internet', 'other'],
     default: 'tower'
   },
   status: {

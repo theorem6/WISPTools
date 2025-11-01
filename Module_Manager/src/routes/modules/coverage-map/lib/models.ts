@@ -20,7 +20,7 @@ export interface TowerSite {
   id: string;
   name: string;
   location: Location;
-  type: 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'other';
+  type: 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'internet-access' | 'internet' | 'other';
   height?: number; // feet
   
   // Professional Info
