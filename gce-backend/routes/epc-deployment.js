@@ -197,13 +197,19 @@ d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean false
 
 ### --- POST-INSTALL FIXES ---
-# Disable framebuffer modules permanently and enforce serial console
+# Disable framebuffer modules permanently and configure serial-only console
+# Enable SSH server and configure system for serial console access
 d-i preseed/late_command string \
     echo "blacklist vesafb" > /target/etc/modprobe.d/blacklist-framebuffer.conf; \
     echo "blacklist efifb" >> /target/etc/modprobe.d/blacklist-framebuffer.conf; \
     echo "blacklist simplefb" >> /target/etc/modprobe.d/blacklist-framebuffer.conf; \
     in-target sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="fb=false nomodeset vga=normal video=vesafb:off video=efifb:off video=simplefb:off console=ttyS0,115200n8"/' /etc/default/grub; \
+    in-target sed -i 's/^#GRUB_TERMINAL=.*/GRUB_TERMINAL=serial/' /etc/default/grub; \
+    in-target sed -i 's/^GRUB_TERMINAL_OUTPUT=.*/GRUB_TERMINAL_OUTPUT=serial/' /etc/default/grub; \
+    echo 'GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"' >> /target/etc/default/grub; \
     in-target update-grub; \
+    in-target systemctl enable ssh; \
+    in-target systemctl enable sshd; \
     mkdir -p /target/etc/wisptools /target/opt/wisptools /target/var/lib/wisptools; \
     echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \
     echo 'TENANT_ID=${tenant_id}' >> /target/etc/wisptools/credentials.env; \
@@ -266,7 +272,7 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Aggressively disable framebuffer/KMS - prevent initrd from initializing it
+  # ⚠️  SERIAL-ONLY INSTALL: Output only to serial console (ttyS0)
   # Multiple redundant parameters ensure text-only mode:
   # - fb=false: Disable framebuffer device
   # - nomodeset: Disable Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
@@ -274,10 +280,10 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # - vga=normal: Set standard VESA mode for text console (works with nomodeset for automated installs)
   # - d-i debconf/frontend=text: Direct installer instruction to use text frontend
   # - DEBIAN_FRONTEND=text: Environment variable for text-only installer
-  # - console=ttyS0,115200n8 console=tty1: Dual console output (serial and virtual)
+  # - console=ttyS0,115200n8: Serial-only console output (115200 baud, 8N1)
   # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
   # SSH server enabled during installation - connect via "ssh installer@<machine-ip>" to monitor progress
-  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset video=off vga=normal d-i\ debconf/frontend=text DEBIAN_FRONTEND=text preseed/file=/preseed.cfg console=ttyS0,115200n8 console=tty1 ---
+  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset video=off vga=normal d-i\ debconf/frontend=text DEBIAN_FRONTEND=text preseed/file=/preseed.cfg console=ttyS0,115200n8 ---
   initrd /debian/initrd.gz
 }
 
@@ -538,7 +544,9 @@ d-i preseed/early_command string \
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
-    in-target bash -c 'if [ -f /etc/default/grub ]; then echo "GRUB_GFXMODE=1024x768" >> /etc/default/grub; echo "GRUB_GFXPAYLOAD_LINUX=keep" >> /etc/default/grub; fi'; \\
+    in-target bash -c 'if [ -f /etc/default/grub ]; then sed -i "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"fb=false nomodeset vga=normal video=vesafb:off video=efifb:off video=simplefb:off console=ttyS0,115200n8\"/" /etc/default/grub; sed -i "s/^#GRUB_TERMINAL=.*/GRUB_TERMINAL=serial/" /etc/default/grub; sed -i "s/^GRUB_TERMINAL_OUTPUT=.*/GRUB_TERMINAL_OUTPUT=serial/" /etc/default/grub; echo "GRUB_SERIAL_COMMAND=\"serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1\"" >> /etc/default/grub; update-grub; fi'; \\
+    in-target systemctl enable ssh; \\
+    in-target systemctl enable sshd; \\
     in-target mkdir -p /etc/wisptools /opt/wisptools; \\
     in-target /bin/sh -c 'cat > /etc/wisptools/credentials.env <<"CREDS"\\nEPC_ID=${epc_id}\\nTENANT_ID=${tenant_id}\\nEPC_AUTH_CODE=${auth_code}\\nEPC_API_KEY=${api_key}\\nEPC_SECRET_KEY=${secret_key}\\nGCE_SERVER=${GCE_PUBLIC_IP}\\nHSS_PORT=${HSS_PORT}\\nORIGIN_HOST_FQDN=${originHostFQDN}\\nCREDS'; \\
     in-target wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \\
@@ -560,18 +568,15 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer/KMS - prevent initrd from initializing it
-  # nomodeset - Disables Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
-  # nofb - Disables framebuffer device completely
-  # FRAMEBUFFER=n - Tells Debian installer to skip framebuffer initialization
+  # ⚠️  SERIAL-ONLY INSTALL: Output only to serial console (ttyS0)
   # Aggressively disable framebuffer with redundant parameters for text-only mode
   # - FRAMEBUFFER=n: Tells Debian installer to skip framebuffer initialization
   # - fb=false nomodeset nofb video=off: Multiple redundant video/framebuffer disable parameters
   # - vga=normal: Set standard VESA mode for text console
   # - d-i debconf/frontend=text: Direct installer instruction to use text frontend
   # - modprobe.blacklist=videodev,uvcvideo: Prevent video input device detection
-  # - console=ttyS0,115200n8 console=tty1: Dual console output (serial and virtual)
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical d-i\ debconf/frontend=text preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off vga=normal modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
+  # - console=ttyS0,115200n8: Serial-only console output (115200 baud, 8N1)
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical d-i\ debconf/frontend=text preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off vga=normal modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 ---
   initrd /debian/initrd.gz
 }
 
