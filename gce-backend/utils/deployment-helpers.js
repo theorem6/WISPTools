@@ -132,8 +132,9 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 
 print_status "Installing essential build tools and dependencies..."
-# Install all required packages for EPC deployment - no GUI dependencies
-apt-get install -y \\
+# Install all required packages for EPC deployment - explicitly exclude GUI dependencies
+# Using --no-install-recommends to prevent pulling in GUI packages
+apt-get install -y --no-install-recommends \\
     wget curl gnupg software-properties-common apt-transport-https ca-certificates \\
     build-essential git make gcc g++ autoconf automake libtool pkg-config \\
     libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev \\
@@ -143,11 +144,7 @@ apt-get install -y \\
     logrotate rsyslog cron \\
     vim nano less \\
     jq \\
-    bash-completion
-
-# Explicitly exclude any GUI packages that might be pulled as dependencies
-apt-get install -y --no-install-recommends \\
-    || print_warning "Some recommended packages were excluded (intentional - no GUI)"
+    bash-completion || print_warning "Some packages may have failed (continuing...)"
 
 print_header "Installing Node.js"
 if ! command -v node &> /dev/null; then
