@@ -207,6 +207,12 @@ d-i preseed/early_command string \
     echo 'blacklist vga16fb' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo 'blacklist vesafb' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo 'blacklist fbcon' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist videodev' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist v4l2loopback' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist uvcvideo' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist video' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist videobuf2_core' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist videobuf2_v4l2' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo FRAMEBUFFER=n > /etc/initramfs-tools/conf.d/no-framebuffer.conf 2>/dev/null || true; \
     anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
@@ -268,7 +274,7 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # video=off - Disable all video drivers
   # fb=false - Explicit disable at kernel level
   # Preseed early_command will blacklist framebuffer drivers
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off text console=ttyS0,115200n8 console=tty1 ---
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
@@ -515,6 +521,12 @@ d-i preseed/early_command string \
     echo 'blacklist vga16fb' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo 'blacklist vesafb' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo 'blacklist fbcon' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist videodev' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist v4l2loopback' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist uvcvideo' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist video' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist videobuf2_core' >> /etc/modprobe.d/blacklist-fb.conf; \
+    echo 'blacklist videobuf2_v4l2' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo FRAMEBUFFER=n > /etc/initramfs-tools/conf.d/no-framebuffer.conf 2>/dev/null || true; \
     anna-install selinux-utils || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
@@ -548,7 +560,7 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # video=off - Disable all video drivers
   # fb=false - Explicit disable at kernel level
   # Preseed early_command will blacklist framebuffer drivers
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off text console=ttyS0,115200n8 console=tty1 ---
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
