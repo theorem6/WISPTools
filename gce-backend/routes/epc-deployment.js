@@ -100,6 +100,9 @@ router.post('/generate-epc-iso', async (req, res) => {
     await fs.writeFile(path.join(autoinstallDir, 'meta-data'), 
       `instance-id: epc-${epc_id}\nlocal-hostname: ${siteName.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}\n`);
     
+    // Extract admin email from contact info (fallback to default if not provided)
+    const adminEmail = contact?.email || `admin@${tenant_id}.wisptools.io`;
+    
     // Build a bootable ISO using Debian netboot
     const buildScript = path.join(buildDir, 'build.sh');
     const buildScriptContent = `#!/bin/bash
@@ -141,9 +144,10 @@ find "$NETBOOT_DIR" -name "preseed-*.cfg" -mtime +1 -delete 2>/dev/null || true
 # Generate unique preseed for this EPC build (will be embedded in initrd)
 GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
 HSS_PORT="${HSS_PORT}"
+ROOT_PASSWORD="${adminEmail}"
 PRESEED_TMP="/tmp/preseed-${epc_id}-$(date +%s).cfg"
 echo "[Build] Creating preseed file for embedding in initrd..."
-cat > "$PRESEED_TMP" << 'PRESEED_EOF'
+cat > "$PRESEED_TMP" << PRESEED_EOF
 ### --- BASIC SETTINGS ---
 d-i debian-installer/framebuffer boolean false
 d-i debian-installer/locale string en_US.UTF-8
@@ -164,8 +168,9 @@ d-i mirror/http/directory string /debian
 d-i mirror/http/proxy string
 
 ### --- USERS ---
-d-i passwd/root-password password changeme
-d-i passwd/root-password-again password changeme
+d-i passwd/root-login boolean true
+d-i passwd/root-password password ${ROOT_PASSWORD}
+d-i passwd/root-password-again password ${ROOT_PASSWORD}
 d-i passwd/make-user boolean false
 
 ### --- CLOCK ---
