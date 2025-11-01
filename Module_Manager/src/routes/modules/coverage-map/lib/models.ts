@@ -142,7 +142,17 @@ export interface BackhaulLink {
   licensing?: {
     licenseType?: string;
     licenseNumber?: string;
+    fccCallSign?: string;
+    licenseHolderName?: string;
+    licenseHolderAddress?: string;
+    licenseStatus?: 'active' | 'pending' | 'expired' | 'suspended' | 'revoked';
     expirationDate?: Date;
+    renewalDate?: Date;
+    fccFileNumber?: string;
+    partNumber?: string;  // Part 101, Part 90, etc.
+    frequencyBand?: string;
+    authorizedBandwidth?: string;
+    emissionDesignator?: string;
   };
   
   // For Fiber

@@ -40,9 +40,20 @@
     frequency: 5800,
     bandwidth: 80,
     beamwidth: 10,
+    // FCC Licensing - Comprehensive fields
     licenseType: '',
     licenseNumber: '',
+    fccCallSign: '',
+    licenseHolderName: '',
+    licenseHolderAddress: '',
+    licenseStatus: 'active',
     licenseExpiration: '',
+    licenseRenewalDate: '',
+    fccFileNumber: '',
+    partNumber: '',  // Part 101, Part 90, etc.
+    frequencyBand: '',
+    authorizedBandwidth: '',
+    emissionDesignator: '',
     
     // Fiber
     provider: '',
@@ -166,9 +177,19 @@
               bandwidth: formData.bandwidth,
               beamwidth: formData.beamwidth,
               licensing: formData.backhaulType === 'fixed-wireless-licensed' ? {
-                licenseType: formData.licenseType,
-                licenseNumber: formData.licenseNumber,
-                expirationDate: formData.licenseExpiration || undefined
+                licenseType: formData.licenseType || undefined,
+                licenseNumber: formData.licenseNumber || undefined,
+                fccCallSign: formData.fccCallSign || undefined,
+                licenseHolderName: formData.licenseHolderName || undefined,
+                licenseHolderAddress: formData.licenseHolderAddress || undefined,
+                licenseStatus: formData.licenseStatus || 'active',
+                expirationDate: formData.licenseExpiration || undefined,
+                renewalDate: formData.licenseRenewalDate || undefined,
+                fccFileNumber: formData.fccFileNumber || undefined,
+                partNumber: formData.partNumber || undefined,
+                frequencyBand: formData.frequencyBand || undefined,
+                authorizedBandwidth: formData.authorizedBandwidth || undefined,
+                emissionDesignator: formData.emissionDesignator || undefined
               } : undefined
             }
           }),
@@ -370,7 +391,9 @@
           <!-- Licensed Spectrum -->
           {#if formData.backhaulType === 'fixed-wireless-licensed'}
             <div class="license-section">
-              <h4>📜 FCC Licensing</h4>
+              <h4>📜 FCC Licensing Information</h4>
+              <p class="section-help">Required FCC licensing details for licensed wireless backhaul links</p>
+              
               <div class="form-grid">
                 <div class="form-group">
                   <label>License Type *</label>
@@ -382,13 +405,95 @@
                 </div>
                 
                 <div class="form-group">
-                  <label>FCC License Number *</label>
-                  <input type="text" bind:value={formData.licenseNumber} placeholder="Call Sign or License #" />
+                  <label>FCC Call Sign *</label>
+                  <input type="text" bind:value={formData.fccCallSign} placeholder="WXYZ123" />
+                  <p class="help-text">FCC-assigned call sign</p>
                 </div>
                 
                 <div class="form-group">
-                  <label>Expiration Date</label>
+                  <label>FCC License Number</label>
+                  <input type="text" bind:value={formData.licenseNumber} placeholder="Additional license identifier" />
+                  <p class="help-text">Additional license number if different from call sign</p>
+                </div>
+                
+                <div class="form-group">
+                  <label>FCC File Number</label>
+                  <input type="text" bind:value={formData.fccFileNumber} placeholder="0000123456" />
+                  <p class="help-text">FCC application/file number</p>
+                </div>
+                
+                <div class="form-group">
+                  <label>License Status</label>
+                  <select bind:value={formData.licenseStatus}>
+                    <option value="active">✅ Active</option>
+                    <option value="pending">⏳ Pending</option>
+                    <option value="expired">❌ Expired</option>
+                    <option value="suspended">⚠️ Suspended</option>
+                    <option value="revoked">🚫 Revoked</option>
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label>Part Number</label>
+                  <select bind:value={formData.partNumber}>
+                    <option value="">-- Select --</option>
+                    <option value="Part 101">Part 101 - Fixed Microwave Services</option>
+                    <option value="Part 90">Part 90 - Private Land Mobile Radio</option>
+                    <option value="Part 22">Part 22 - Public Mobile Services</option>
+                    <option value="Part 24">Part 24 - Personal Communications Services</option>
+                    <option value="Part 27">Part 27 - Miscellaneous Wireless Services</option>
+                    <option value="Part 94">Part 94 - Private Operational-Fixed Microwave Service</option>
+                    <option value="Part 97">Part 97 - Amateur Radio Service</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Frequency Band</label>
+                  <input type="text" bind:value={formData.frequencyBand} placeholder="6 GHz, 11 GHz, 18 GHz, 23 GHz, 80 GHz" />
+                  <p class="help-text">Authorized frequency band (e.g., "6 GHz", "18-23 GHz")</p>
+                </div>
+                
+                <div class="form-group">
+                  <label>Authorized Bandwidth</label>
+                  <input type="text" bind:value={formData.authorizedBandwidth} placeholder="50 MHz, 100 MHz" />
+                  <p class="help-text">Total authorized bandwidth for this license</p>
+                </div>
+                
+                <div class="form-group">
+                  <label>Emission Designator</label>
+                  <input type="text" bind:value={formData.emissionDesignator} placeholder="8K00F1D" />
+                  <p class="help-text">FCC emission designator code</p>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label>License Holder Name *</label>
+                <input type="text" bind:value={formData.licenseHolderName} placeholder="Company Name" />
+              </div>
+              
+              <div class="form-group">
+                <label>License Holder Address</label>
+                <textarea 
+                  bind:value={formData.licenseHolderAddress} 
+                  placeholder="123 Business St, City, State ZIP"
+                  rows="2"
+                ></textarea>
+                <p class="help-text">Full address of license holder as registered with FCC</p>
+              </div>
+              
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>License Expiration Date</label>
                   <input type="date" bind:value={formData.licenseExpiration} />
+                  <p class="help-text">When the license expires</p>
+                </div>
+                
+                <div class="form-group">
+                  <label>Renewal Date</label>
+                  <input type="date" bind:value={formData.licenseRenewalDate} />
+                  <p class="help-text">Recommended renewal date (before expiration)</p>
                 </div>
               </div>
             </div>
