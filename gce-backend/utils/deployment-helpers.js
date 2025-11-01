@@ -88,7 +88,9 @@ print_status "All EPC components will use: \$MME_IP"
 echo ""
 
 # Persist framebuffer/console settings in GRUB to avoid graphics initialization
-# ⚠️  Permanently disable framebuffer using nomodeset and nofb (not deprecated vga=normal)
+# ⚠️  Permanently disable framebuffer using nomodeset and nofb (modern approach, not deprecated vga=normal)
+# nomodeset disables Kernel Mode Setting (KMS) - prevents graphics drivers from setting high-res modes early
+# nofb disables framebuffer device completely
 print_header "Configuring GRUB for headless/text-only operation"
 if [ -f /etc/default/grub ]; then
   print_status "Updating /etc/default/grub kernel parameters"
@@ -96,7 +98,7 @@ if [ -f /etc/default/grub ]; then
   if ! grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
     echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"' >> /etc/default/grub
   fi
-  # Update kernel parameters: nomodeset nofb (disable framebuffer), text mode, serial console
+  # Update kernel parameters: nomodeset (disables KMS) nofb (disables framebuffer), text mode, serial console
   # Remove any existing nomodeset/nofb to avoid duplicates, then add them
   sed -i 's/ nomodeset//g; s/ nofb//g' /etc/default/grub
   sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\\(.*\\)"/GRUB_CMDLINE_LINUX_DEFAULT="\\1 nomodeset nofb text console=ttyS0,115200n8 console=tty1"/g' /etc/default/grub

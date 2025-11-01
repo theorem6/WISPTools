@@ -268,12 +268,13 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer - prevent initrd from initializing it
-  # FRAMEBUFFER=n environment variable tells Debian installer to skip framebuffer
-  # nomodeset nofb - Disable kernel mode setting and framebuffer
-  # video=off - Disable all video drivers
-  # fb=false - Explicit disable at kernel level
-  # Preseed early_command will blacklist framebuffer drivers
+  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer/KMS - prevent initrd from initializing it
+  # nomodeset - Disables Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
+  # nofb - Disables framebuffer device completely
+  # FRAMEBUFFER=n - Tells Debian installer to skip framebuffer initialization
+  # video=off fb=false - Additional video/framebuffer disable parameters
+  # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
+  # Preseed early_command will blacklist framebuffer and video drivers
   linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
@@ -554,12 +555,13 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer - prevent initrd from initializing it
-  # FRAMEBUFFER=n environment variable tells Debian installer to skip framebuffer
-  # nomodeset nofb - Disable kernel mode setting and framebuffer
-  # video=off - Disable all video drivers
-  # fb=false - Explicit disable at kernel level
-  # Preseed early_command will blacklist framebuffer drivers
+  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer/KMS - prevent initrd from initializing it
+  # nomodeset - Disables Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
+  # nofb - Disables framebuffer device completely
+  # FRAMEBUFFER=n - Tells Debian installer to skip framebuffer initialization
+  # video=off fb=false - Additional video/framebuffer disable parameters
+  # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
+  # Preseed early_command will blacklist framebuffer and video drivers
   linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
