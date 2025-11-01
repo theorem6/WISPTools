@@ -88,6 +88,15 @@ export default function HomeScreen() {
           <Text style={styles.menuSubtext}>Tickets & installations</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => navigation.navigate('Plans' as never)}
+        >
+          <Text style={styles.menuIcon}>📋</Text>
+          <Text style={styles.menuText}>Deployment Plans</Text>
+          <Text style={styles.menuSubtext}>View assigned plans</Text>
+        </TouchableOpacity>
+
         <View style={styles.menuRow}>
           <TouchableOpacity
             style={[styles.menuButton, styles.halfWidth]}

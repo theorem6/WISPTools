@@ -23,6 +23,8 @@ import CheckoutScreen from './src/screens/CheckoutScreen';
 import DeploymentWizardScreen from './src/screens/DeploymentWizardScreen';
 import WorkOrdersScreen from './src/screens/WorkOrdersScreen';
 import HelpScreen from './src/screens/HelpScreen';
+import PlansScreen from './src/screens/PlansScreen';
+import PlanDetailsScreen from './src/screens/PlanDetailsScreen';
 
 // Ignore specific warnings
 LogBox.ignoreLogs([

@@ -188,6 +188,45 @@ class APIService {
     const response = await this.client.post(`/api/work-orders/${workOrderId}/logs`, log);
     return response.data;
   }
+
+  // ============================================================================
+  // PLANS API - Role-based plan distribution
+  // ============================================================================
+
+  /**
+   * Get plans for mobile app user based on their role
+   * @param userId - User ID
+   * @param role - User role: 'engineer', 'tower-crew', 'installer', 'manager', 'supervisor'
+   */
+  async getPlans(userId: string, role: string = 'tower-crew') {
+    try {
+      const response = await this.client.get(`/api/plans/mobile/${userId}`, {
+        params: { role }
+      });
+      return response.data.plans || [];
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get detailed plan information for mobile app
+   * @param userId - User ID
+   * @param planId - Plan ID
+   * @param role - User role
+   */
+  async getPlanDetails(userId: string, planId: string, role: string = 'tower-crew') {
+    try {
+      const response = await this.client.get(`/api/plans/mobile/${userId}/${planId}`, {
+        params: { role }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching plan details:', error);
+      return null;
+    }
+  }
 }
 
 export const apiService = new APIService();
