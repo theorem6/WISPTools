@@ -144,34 +144,34 @@ HSS_PORT="${HSS_PORT}"
 PRESEED_TMP="/tmp/preseed-${epc_id}-$(date +%s).cfg"
 echo "[Build] Creating preseed file for embedding in initrd..."
 cat > "$PRESEED_TMP" << 'PRESEED_EOF'
-# Force non-interactive installation (no GUI, no prompts)
-# CRITICAL: Set debconf frontend to noninteractive to prevent graphical installer
-d-i debconf/frontend select noninteractive
+### --- BASIC SETTINGS ---
+d-i debian-installer/framebuffer boolean false
 d-i debian-installer/locale string en_US.UTF-8
-d-i debian-installer/country string US
-d-i debian-installer/language string en
-d-i console-keymaps-at/keymap select us
-d-i keyboard-configuration/xkb-keymap select us
-d-i keyboard-configuration/layoutcode string us
-
-# Prevent keyboard detection which can involve graphics components
 d-i console-setup/ask_detect boolean false
+d-i console-setup/layoutcode string us
+d-i keyboard-configuration/xkb-keymap select us
 
-# Enable SSH server during installation (allows remote monitoring)
-# The openssh-server-udeb module enables SSH access during installation
-# Connect via: ssh installer@<machine-ip> (no password required)
-d-i anna/choose_modules string openssh-server-udeb
-
-# Skip all interactive prompts
-d-i debconf/priority select critical
+### --- NETWORK ---
 d-i netcfg/choose_interface select auto
-d-i netcfg/get_hostname string epc-host
+d-i netcfg/get_hostname string debian
 d-i netcfg/get_domain string local
-d-i netcfg/wireless_wep string
+d-i netcfg/disable_dhcp boolean false
+
+### --- MIRROR ---
+d-i mirror/country string manual
 d-i mirror/http/hostname string deb.debian.org
 d-i mirror/http/directory string /debian
 d-i mirror/http/proxy string
-d-i mirror/country string US
+
+### --- USERS ---
+d-i passwd/root-password password changeme
+d-i passwd/root-password-again password changeme
+d-i passwd/make-user boolean false
+
+### --- CLOCK ---
+d-i clock-setup/utc boolean true
+d-i time/zone string UTC
+d-i clock-setup/ntp boolean true
 
 # Partitioning - fully automatic
 d-i partman-auto/method string regular
@@ -195,55 +195,31 @@ d-i partman-lvm/device_remove_lvm boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 
-# Package selection - MINIMAL TEXT-ONLY INSTALL (NO GUI/X11)
-# ⚠️  DO NOT MODIFY: EPC requires minimal headless installation
-# Use 'standard' task (base system) - DO NOT select desktop task
-# This ensures no graphical components are installed
-tasksel tasksel/first multiselect standard
-tasksel tasksel/skip-tasks string .*
-# Prevent installation of language support packages (can pull in graphical dependencies)
-d-i pkgsel/install-language-support boolean false
-# Explicitly exclude all GUI/X11 packages
-d-i pkgsel/exclude string x11-common xserver-xorg xserver-common xorg xfonts-base xfonts-utils libx11-data libx11-6 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxtst6 libxxf86vm1 at-spi2-core fonts-dejavu-core fonts-dejavu fonts-liberation libgl1 libglib2.0-0 libgtk-3-0 libgtk-3-bin libgtk-3-common gvfs gvfs-common gvfs-daemons gvfs-libs dbus-x11 policykit-1 xdg-utils
-# Minimal packages - include openssh-server for installed system, plus basic utilities
-d-i pkgsel/include string openssh-server curl wget ca-certificates gnupg lsb-release
-d-i pkgsel/upgrade select none
-d-i pkgsel/update-policy select none
+### --- PACKAGES ---
+tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/include string openssh-server build-essential git make gcc g++ autoconf automake libtool pkg-config libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev libyaml-dev libffi-dev python3 python3-pip libsctp-dev libidn11-dev libmongoc-dev libbson-dev libmicrohttpd-dev libcurl4-openssl-dev libnghttp2-dev libtins-dev libtalloc-dev meson ninja-build curl wget ca-certificates gnupg lsb-release
+popularity-contest popularity-contest/participate boolean false
 
-# Grub installation
+### --- GRUB INSTALL ---
 d-i grub-installer/only_debian boolean true
-d-i grub-installer/with_other_os boolean true
-d-i finish-install/keep-consoles boolean true
-d-i debian-installer/exit/poweroff boolean false
-d-i debian-installer/exit/halt boolean false
-d-i preseed/early_command string \
-    echo 'blacklist vga16fb' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist vesafb' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist fbcon' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist videodev' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist v4l2loopback' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist uvcvideo' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist video' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist videobuf2_core' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo 'blacklist videobuf2_v4l2' >> /etc/modprobe.d/blacklist-fb.conf; \
-    echo FRAMEBUFFER=n > /etc/initramfs-tools/conf.d/no-framebuffer.conf 2>/dev/null || true; \
-    anna-install selinux-utils openssh-server-udeb || true
-d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
-d-i finish-install/reboot_in_progress note
-d-i preseed/late_command string \\
-    mkdir -p /target/etc/wisptools /target/opt/wisptools /target/var/lib/wisptools; \\
-    echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \\
-    echo 'TENANT_ID=${tenant_id}' >> /target/etc/wisptools/credentials.env; \\
-    echo 'EPC_AUTH_CODE=${auth_code}' >> /target/etc/wisptools/credentials.env; \\
-    in-target bash -c 'if [ -f /etc/default/grub ]; then echo "GRUB_GFXMODE=1024x768" >> /etc/default/grub; echo "GRUB_GFXPAYLOAD_LINUX=keep" >> /etc/default/grub; fi'; \\
-    echo 'EPC_API_KEY=${api_key}' >> /target/etc/wisptools/credentials.env; \\
-    echo 'EPC_SECRET_KEY=${secret_key}' >> /target/etc/wisptools/credentials.env; \\
-    echo 'GCE_SERVER=${GCE_PUBLIC_IP}' >> /target/etc/wisptools/credentials.env; \\
-    echo 'HSS_PORT=${HSS_PORT}' >> /target/etc/wisptools/credentials.env; \\
-    echo 'ORIGIN_HOST_FQDN=${originHostFQDN}' >> /target/etc/wisptools/credentials.env; \\
-    chmod 600 /target/etc/wisptools/credentials.env; \\
-    wget -O /target/opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \\
-    chmod +x /target/opt/wisptools/bootstrap.sh; \\
+d-i grub-installer/with_other_os boolean false
+
+### --- POST-INSTALL ---
+d-i preseed/late_command string \
+    in-target sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="fb=false nomodeset vga=normal console=ttyS0,115200n8"/' /etc/default/grub; \
+    in-target update-grub; \
+    mkdir -p /target/etc/wisptools /target/opt/wisptools /target/var/lib/wisptools; \
+    echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \
+    echo 'TENANT_ID=${tenant_id}' >> /target/etc/wisptools/credentials.env; \
+    echo 'EPC_AUTH_CODE=${auth_code}' >> /target/etc/wisptools/credentials.env; \
+    echo 'EPC_API_KEY=${api_key}' >> /target/etc/wisptools/credentials.env; \
+    echo 'EPC_SECRET_KEY=${secret_key}' >> /target/etc/wisptools/credentials.env; \
+    echo 'GCE_SERVER=${GCE_PUBLIC_IP}' >> /target/etc/wisptools/credentials.env; \
+    echo 'HSS_PORT=${HSS_PORT}' >> /target/etc/wisptools/credentials.env; \
+    echo 'ORIGIN_HOST_FQDN=${originHostFQDN}' >> /target/etc/wisptools/credentials.env; \
+    chmod 600 /target/etc/wisptools/credentials.env; \
+    wget -O /target/opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \
+    chmod +x /target/opt/wisptools/bootstrap.sh; \
     cat > /target/etc/systemd/system/wisptools-bootstrap.service << 'EOF_SERVICE' \\
 [Unit]\\
 Description=WISPTools EPC Bootstrap and Deployment\\
@@ -262,7 +238,7 @@ TimeoutStartSec=3600\\
 [Install]\\
 WantedBy=multi-user.target\\
 EOF_SERVICE\\
-    chroot /target systemctl enable wisptools-bootstrap.service; \\
+    chroot /target systemctl enable wisptools-bootstrap.service; \
     echo "WISPTools EPC bootstrap service configured for EPC ${epc_id}"
 PRESEED_EOF
 
@@ -302,9 +278,8 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
   # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
   # SSH server enabled during installation - connect via "ssh installer@<machine-ip>" to monitor progress
-  # Key boot parameters: install non-interactive vga=normal priority=critical debconf/frontend=text auto=true
-  # vga=normal ensures text mode without framebuffer issues
-  linux /debian/vmlinuz install non-interactive vga=normal priority=critical debconf/frontend=text auto=true preseed/file=/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 text console=ttyS0,115200n8 console=tty1 quiet ---
+  # Boot parameters: auto=true priority=critical interface=auto fb=false vga=normal nomodeset console=ttyS0,115200n8
+  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false vga=normal nomodeset console=ttyS0,115200n8 preseed/file=/preseed.cfg DEBIAN_FRONTEND=text ---
   initrd /debian/initrd.gz
 }
 
