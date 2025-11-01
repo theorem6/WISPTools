@@ -131,8 +131,23 @@ print_status "Updating package lists..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 
-print_status "Installing required packages..."
-apt-get install -y wget curl gnupg software-properties-common apt-transport-https ca-certificates
+print_status "Installing essential build tools and dependencies..."
+# Install all required packages for EPC deployment - no GUI dependencies
+apt-get install -y \\
+    wget curl gnupg software-properties-common apt-transport-https ca-certificates \\
+    build-essential git make gcc g++ autoconf automake libtool pkg-config \\
+    libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev \\
+    libyaml-dev libffi-dev python3 python3-pip \\
+    systemd networkd-dispatcher net-tools iproute2 iputils-ping \\
+    dbus dbus-user-session \\
+    logrotate rsyslog cron \\
+    vim nano less \\
+    jq \\
+    bash-completion
+
+# Explicitly exclude any GUI packages that might be pulled as dependencies
+apt-get install -y --no-install-recommends \\
+    || print_warning "Some recommended packages were excluded (intentional - no GUI)"
 
 print_header "Installing Node.js"
 if ! command -v node &> /dev/null; then

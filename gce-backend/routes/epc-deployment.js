@@ -185,11 +185,15 @@ d-i partman-lvm/device_remove_lvm boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 
-# Package selection - TEXT-ONLY INSTALL (NO DESKTOP/GUI)
-# ⚠️  DO NOT MODIFY: EPC requires headless text-only installation
-tasksel tasksel/first multiselect standard, ssh-server
-tasksel tasksel/skip-tasks string ^.*desktop^, ^.*x11^, ^.*gnome^, ^.*kde^
-d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
+# Package selection - MINIMAL TEXT-ONLY INSTALL (NO GUI/X11)
+# ⚠️  DO NOT MODIFY: EPC requires minimal headless installation
+# Install only base system + SSH - all other dependencies installed by deployment script
+tasksel tasksel/first multiselect ssh-server
+tasksel tasksel/skip-tasks string .*
+# Explicitly exclude all GUI/X11 packages
+d-i pkgsel/exclude string x11-common xserver-xorg xserver-common xorg xfonts-base xfonts-utils libx11-data libx11-6 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxtst6 libxxf86vm1 at-spi2-core fonts-dejavu-core fonts-dejavu fonts-liberation libgl1 libglib2.0-0 libgtk-3-0 libgtk-3-bin libgtk-3-common gvfs gvfs-common gvfs-daemons gvfs-libs dbus-x11 policykit-1 xdg-utils
+# Minimal packages - deployment script will install everything else
+d-i pkgsel/include string curl wget ca-certificates gnupg lsb-release
 d-i pkgsel/upgrade select none
 d-i pkgsel/update-policy select none
 
@@ -489,11 +493,15 @@ d-i partman-lvm/device_remove_lvm boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 
-# Package selection - TEXT-ONLY INSTALL (NO DESKTOP/GUI)
-# ⚠️  DO NOT MODIFY: EPC requires headless text-only installation
-tasksel tasksel/first multiselect standard, ssh-server
-tasksel tasksel/skip-tasks string ^.*desktop^, ^.*x11^, ^.*gnome^, ^.*kde^
-d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
+# Package selection - MINIMAL TEXT-ONLY INSTALL (NO GUI/X11)
+# ⚠️  DO NOT MODIFY: EPC requires minimal headless installation
+# Install only base system + SSH - all other dependencies installed by deployment script
+tasksel tasksel/first multiselect ssh-server
+tasksel tasksel/skip-tasks string .*
+# Explicitly exclude all GUI/X11 packages
+d-i pkgsel/exclude string x11-common xserver-xorg xserver-common xorg xfonts-base xfonts-utils libx11-data libx11-6 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxtst6 libxxf86vm1 at-spi2-core fonts-dejavu-core fonts-dejavu fonts-liberation libgl1 libglib2.0-0 libgtk-3-0 libgtk-3-bin libgtk-3-common gvfs gvfs-common gvfs-daemons gvfs-libs dbus-x11 policykit-1 xdg-utils
+# Minimal packages - deployment script will install everything else
+d-i pkgsel/include string curl wget ca-certificates gnupg lsb-release
 d-i pkgsel/upgrade select none
 d-i pkgsel/update-policy select none
 
