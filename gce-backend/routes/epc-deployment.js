@@ -145,12 +145,17 @@ PRESEED_TMP="/tmp/preseed-${epc_id}-$(date +%s).cfg"
 echo "[Build] Creating preseed file for embedding in initrd..."
 cat > "$PRESEED_TMP" << 'PRESEED_EOF'
 # Force non-interactive installation (no GUI, no prompts)
+# CRITICAL: Set debconf frontend to noninteractive to prevent graphical installer
+d-i debconf/frontend select noninteractive
 d-i debian-installer/locale string en_US.UTF-8
 d-i debian-installer/country string US
 d-i debian-installer/language string en
 d-i console-keymaps-at/keymap select us
 d-i keyboard-configuration/xkb-keymap select us
 d-i keyboard-configuration/layoutcode string us
+
+# Prevent keyboard detection which can involve graphics components
+d-i console-setup/ask_detect boolean false
 
 # Enable SSH server during installation (allows remote monitoring)
 # The openssh-server-udeb module enables SSH access during installation
@@ -192,13 +197,16 @@ d-i partman-lvm/confirm_nooverwrite boolean true
 
 # Package selection - MINIMAL TEXT-ONLY INSTALL (NO GUI/X11)
 # ⚠️  DO NOT MODIFY: EPC requires minimal headless installation
-# Install only base system + SSH - all other dependencies installed by deployment script
-tasksel tasksel/first multiselect ssh-server
+# Use 'standard' task (base system) - DO NOT select desktop task
+# This ensures no graphical components are installed
+tasksel tasksel/first multiselect standard
 tasksel tasksel/skip-tasks string .*
+# Prevent installation of language support packages (can pull in graphical dependencies)
+d-i pkgsel/install-language-support boolean false
 # Explicitly exclude all GUI/X11 packages
 d-i pkgsel/exclude string x11-common xserver-xorg xserver-common xorg xfonts-base xfonts-utils libx11-data libx11-6 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxtst6 libxxf86vm1 at-spi2-core fonts-dejavu-core fonts-dejavu fonts-liberation libgl1 libglib2.0-0 libgtk-3-0 libgtk-3-bin libgtk-3-common gvfs gvfs-common gvfs-daemons gvfs-libs dbus-x11 policykit-1 xdg-utils
-# Minimal packages - deployment script will install everything else
-d-i pkgsel/include string curl wget ca-certificates gnupg lsb-release
+# Minimal packages - include openssh-server for installed system, plus basic utilities
+d-i pkgsel/include string openssh-server curl wget ca-certificates gnupg lsb-release
 d-i pkgsel/upgrade select none
 d-i pkgsel/update-policy select none
 
@@ -294,7 +302,9 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
   # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
   # SSH server enabled during installation - connect via "ssh installer@<machine-ip>" to monitor progress
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/file=/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
+  # Key boot parameters: install non-interactive vga=normal priority=critical debconf/frontend=text auto=true
+  # vga=normal ensures text mode without framebuffer issues
+  linux /debian/vmlinuz install non-interactive vga=normal priority=critical debconf/frontend=text auto=true preseed/file=/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 text console=ttyS0,115200n8 console=tty1 quiet ---
   initrd /debian/initrd.gz
 }
 
@@ -521,13 +531,16 @@ d-i partman-lvm/confirm_nooverwrite boolean true
 
 # Package selection - MINIMAL TEXT-ONLY INSTALL (NO GUI/X11)
 # ⚠️  DO NOT MODIFY: EPC requires minimal headless installation
-# Install only base system + SSH - all other dependencies installed by deployment script
-tasksel tasksel/first multiselect ssh-server
+# Use 'standard' task (base system) - DO NOT select desktop task
+# This ensures no graphical components are installed
+tasksel tasksel/first multiselect standard
 tasksel tasksel/skip-tasks string .*
+# Prevent installation of language support packages (can pull in graphical dependencies)
+d-i pkgsel/install-language-support boolean false
 # Explicitly exclude all GUI/X11 packages
 d-i pkgsel/exclude string x11-common xserver-xorg xserver-common xorg xfonts-base xfonts-utils libx11-data libx11-6 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxinerama1 libxrandr2 libxrender1 libxtst6 libxxf86vm1 at-spi2-core fonts-dejavu-core fonts-dejavu fonts-liberation libgl1 libglib2.0-0 libgtk-3-0 libgtk-3-bin libgtk-3-common gvfs gvfs-common gvfs-daemons gvfs-libs dbus-x11 policykit-1 xdg-utils
-# Minimal packages - deployment script will install everything else
-d-i pkgsel/include string curl wget ca-certificates gnupg lsb-release
+# Minimal packages - include openssh-server for installed system, plus basic utilities
+d-i pkgsel/include string openssh-server curl wget ca-certificates gnupg lsb-release
 d-i pkgsel/upgrade select none
 d-i pkgsel/update-policy select none
 
