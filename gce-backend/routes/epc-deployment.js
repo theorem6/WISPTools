@@ -148,7 +148,7 @@ ROOT_PASSWORD="${adminEmail}"
 PRESEED_TMP="/tmp/preseed-${epc_id}-$(date +%s).cfg"
 echo "[Build] Creating preseed file for embedding in initrd..."
 cat > "$PRESEED_TMP" << PRESEED_EOF
-### --- BASIC SETTINGS ---
+### --- BASIC INSTALL SETTINGS ---
 d-i debian-installer/framebuffer boolean false
 d-i debian-installer/locale string en_US.UTF-8
 d-i console-setup/ask_detect boolean false
@@ -167,8 +167,10 @@ d-i mirror/http/hostname string deb.debian.org
 d-i mirror/http/directory string /debian
 d-i mirror/http/proxy string
 
-### --- USERS ---
+### --- USERS / PASSWORDS ---
+# Enable root account and set automatic password
 d-i passwd/root-login boolean true
+# Plaintext password (admin email from tenant)
 d-i passwd/root-password password ${ROOT_PASSWORD}
 d-i passwd/root-password-again password ${ROOT_PASSWORD}
 d-i passwd/make-user boolean false
@@ -178,40 +180,29 @@ d-i clock-setup/utc boolean true
 d-i time/zone string UTC
 d-i clock-setup/ntp boolean true
 
-# Partitioning - fully automatic
+### --- PARTITIONING ---
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
-d-i partman-auto/expert_recipe string atomic :: \
-    1000 1000 1000 ext4 \
-    \$primary{ } \$bootable{ } \
-    method{ format } \
-    format{ } \
-    use_filesystem{ } \
-    filesystem{ ext4 } \
-    mountpoint{ / } .
-d-i partman-partitioning/confirm_write_new_label boolean true
-d-i partman/choose_partition select finish
-d-i partman/confirm boolean true
 d-i partman/confirm_write_new_label boolean true
-d-i partman-auto/disk string /dev/sda
-d-i partman-auto/init_automatically_partition select biggest_free
-d-i partman-md/device_remove_md boolean true
-d-i partman-lvm/device_remove_lvm boolean true
-d-i partman-lvm/confirm boolean true
-d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
 
-### --- PACKAGES ---
+### --- PACKAGE SELECTION ---
 tasksel tasksel/first multiselect standard, ssh-server
 d-i pkgsel/include string openssh-server build-essential git make gcc g++ autoconf automake libtool pkg-config libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev libyaml-dev libffi-dev python3 python3-pip libsctp-dev libidn11-dev libmongoc-dev libbson-dev libmicrohttpd-dev libcurl4-openssl-dev libnghttp2-dev libtins-dev libtalloc-dev meson ninja-build curl wget ca-certificates gnupg lsb-release
 popularity-contest popularity-contest/participate boolean false
 
-### --- GRUB INSTALL ---
+### --- BOOTLOADER ---
 d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean false
 
-### --- POST-INSTALL ---
+### --- POST-INSTALL FIXES ---
+# Disable framebuffer modules permanently and enforce serial console
 d-i preseed/late_command string \
-    in-target sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="fb=false nomodeset vga=normal console=ttyS0,115200n8"/' /etc/default/grub; \
+    echo "blacklist vesafb" > /target/etc/modprobe.d/blacklist-framebuffer.conf; \
+    echo "blacklist efifb" >> /target/etc/modprobe.d/blacklist-framebuffer.conf; \
+    echo "blacklist simplefb" >> /target/etc/modprobe.d/blacklist-framebuffer.conf; \
+    in-target sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="fb=false nomodeset vga=normal video=vesafb:off video=efifb:off video=simplefb:off console=ttyS0,115200n8"/' /etc/default/grub; \
     in-target update-grub; \
     mkdir -p /target/etc/wisptools /target/opt/wisptools /target/var/lib/wisptools; \
     echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \
