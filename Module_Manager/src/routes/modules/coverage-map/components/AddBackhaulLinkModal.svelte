@@ -216,6 +216,11 @@
         })
       };
       
+      // Add planId if in plan mode
+      if (planId) {
+        backhaulData.planId = planId;
+      }
+      
       await coverageMapService.createEquipment(tenantId, backhaulData);
       
       dispatch('saved');

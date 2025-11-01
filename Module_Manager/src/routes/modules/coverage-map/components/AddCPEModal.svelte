@@ -74,7 +74,7 @@
     error = '';
     
     try {
-      const cpeData = {
+      const cpeData: any = {
         siteId: formData.siteId || undefined,
         name: formData.name,
         location: {
@@ -101,6 +101,11 @@
         band: formData.band || undefined,
         status: formData.status
       };
+      
+      // Add planId if in plan mode
+      if (planId) {
+        cpeData.planId = planId;
+      }
       
       await coverageMapService.createCPE(tenantId, cpeData);
       
