@@ -246,28 +246,28 @@ EOF_SERVICE\\
 PRESEED_EOF
 
 # Embed preseed in initrd (extract, add preseed.cfg, repack)
-# Also disable framebuffer in initrd's early initialization scripts
-echo "[Build] Embedding preseed file in initrd and disabling framebuffer in initrd..."
+# IMPORTANT: Only add preseed.cfg - do NOT modify initrd scripts (can break initrd)
+echo "[Build] Embedding preseed file in initrd..."
 INITRD_WORK_DIR="/tmp/initrd-${epc_id}-$(date +%s)"
 mkdir -p "$INITRD_WORK_DIR"
 cd "$INITRD_WORK_DIR"
 gunzip < "$INITRD_PATH" | cpio -id >/dev/null 2>&1 || { echo "[Build] ERROR: Failed to extract initrd"; exit 1; }
+# Copy preseed to initrd root - this is safe and standard practice
 cp "$PRESEED_TMP" "./preseed.cfg" || { echo "[Build] ERROR: Failed to copy preseed to initrd"; exit 1; }
-# Disable framebuffer in initrd scripts if they exist - modify any scripts that might enable it
-if [ -d "./scripts" ]; then
-  find ./scripts -type f -name "*.sh" -exec sed -i 's/framebuffer/framebuffer_disabled_by_build/g' {} \; 2>/dev/null || true
-  find ./scripts -type f -name "*.sh" -exec sed -i 's/FRAMEBUFFER/FRAMEBUFFER_DISABLED/g' {} \; 2>/dev/null || true
-  find ./scripts -type f -name "*fb*" -exec rm -f {} \; 2>/dev/null || true
+# Repack initrd - use find with explicit sorting to ensure stable order
+# Use -depth to process directories before their contents (important for cpio)
+find . -depth -print0 | cpio -o -H newc --null 2>/dev/null | gzip > "$INITRD_PATH.new" || { echo "[Build] ERROR: Failed to repack initrd"; exit 1; }
+# Verify the repacked initrd is valid and not empty
+if [ ! -s "$INITRD_PATH.new" ]; then
+  echo "[Build] ERROR: Repacked initrd is empty or invalid"
+  exit 1
 fi
-# Add environment file to disable framebuffer at initrd level
-mkdir -p ./etc 2>/dev/null || true
-echo 'FRAMEBUFFER=0' > ./etc/framebuffer-disable.env 2>/dev/null || true
-echo 'export FRAMEBUFFER=0' >> ./etc/framebuffer-disable.env 2>/dev/null || true
-find . | cpio -o -H newc | gzip > "$INITRD_PATH.new" || { echo "[Build] ERROR: Failed to repack initrd"; exit 1; }
+# Verify it can be read back (basic sanity check)
+gunzip -t "$INITRD_PATH.new" >/dev/null 2>&1 || { echo "[Build] ERROR: Repacked initrd is corrupted"; exit 1; }
 mv "$INITRD_PATH.new" "$INITRD_PATH" || { echo "[Build] ERROR: Failed to replace initrd"; exit 1; }
 cd - >/dev/null
 rm -rf "$INITRD_WORK_DIR" "$PRESEED_TMP" 2>/dev/null || true
-echo "[Build] Preseed embedded and framebuffer disabled in initrd scripts"
+echo "[Build] Preseed embedded in initrd successfully"
 
 # Build tiny ISO containing only netboot kernel/initrd and GRUB
 ISO_ROOT="$BUILD_DIR/iso_root"
