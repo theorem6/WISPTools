@@ -45,12 +45,39 @@ const UnifiedSiteSchema = new mongoose.Schema({
   // Location
   location: LocationSchema,
   
-  // Contact Information
+  // Contact Information - Multiple contact types for different site types
   contact: {
     name: String,
     email: String,
     phone: String
   },
+  // Tower-specific contact (for tower owner/manager)
+  towerContact: {
+    name: String,
+    email: String,
+    phone: String,
+    company: String
+  },
+  // Building-specific contact (for building owner/manager)
+  buildingContact: {
+    name: String,
+    email: String,
+    phone: String,
+    company: String,
+    buildingManager: String
+  },
+  // On-site contact (site manager/maintenance)
+  siteContact: {
+    name: String,
+    email: String,
+    phone: String,
+    role: String  // e.g., "Site Manager", "Maintenance", "Technician"
+  },
+  // Access Information
+  accessInstructions: String,  // Instructions for accessing the site
+  gateCode: String,  // Gate/entry code
+  safetyNotes: String,  // Safety warnings/requirements
+  accessHours: String,  // When site is accessible
   
   // Physical Properties
   height: {
