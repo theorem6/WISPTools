@@ -19,6 +19,20 @@ const PlanProjectSchema = new mongoose.Schema({
     enum: ['draft', 'active', 'ready', 'approved', 'rejected', 'deployed', 'cancelled'],
     default: 'draft'
   },
+  // Plan visibility on map
+  showOnMap: {
+    type: Boolean,
+    default: false  // Plans are hidden by default until enabled
+  },
+  // Approval workflow
+  approval: {
+    approvedBy: String,
+    approvedAt: Date,
+    rejectedBy: String,
+    rejectedAt: Date,
+    rejectionReason: String,  // e.g., "budget", "technical", "timing", etc.
+    approvalNotes: String
+  },
   
   // Ownership
   tenantId: {

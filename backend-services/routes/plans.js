@@ -111,6 +111,142 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// PUT /plans/:id/toggle-visibility - Toggle plan visibility on map
+router.put('/:id/toggle-visibility', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    plan.showOnMap = !plan.showOnMap;
+    plan.updatedAt = new Date();
+    await plan.save();
+    
+    res.json({ 
+      plan,
+      message: plan.showOnMap ? 'Plan is now visible on map' : 'Plan is now hidden on map'
+    });
+  } catch (error) {
+    console.error('Error toggling plan visibility:', error);
+    res.status(500).json({ error: 'Failed to toggle plan visibility', message: error.message });
+  }
+});
+
+// POST /plans/:id/approve - Approve plan for deployment
+router.post('/:id/approve', async (req, res) => {
+  try {
+    const { notes } = req.body;
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    if (plan.status !== 'ready') {
+      return res.status(400).json({ error: 'Plan must be in "ready" status to approve' });
+    }
+    
+    plan.status = 'approved';
+    plan.approval = {
+      approvedBy: req.user?.email || req.user?.name || 'System',
+      approvedAt: new Date(),
+      approvalNotes: notes || ''
+    };
+    plan.updatedAt = new Date();
+    await plan.save();
+    
+    res.json({ plan, message: 'Plan approved for deployment' });
+  } catch (error) {
+    console.error('Error approving plan:', error);
+    res.status(500).json({ error: 'Failed to approve plan', message: error.message });
+  }
+});
+
+// POST /plans/:id/reject - Reject plan with reason
+router.post('/:id/reject', async (req, res) => {
+  try {
+    const { reason, notes } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ error: 'Rejection reason is required' });
+    }
+    
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    if (plan.status !== 'ready' && plan.status !== 'approved') {
+      return res.status(400).json({ error: 'Plan must be in "ready" or "approved" status to reject' });
+    }
+    
+    plan.status = 'rejected';
+    plan.approval = {
+      rejectedBy: req.user?.email || req.user?.name || 'System',
+      rejectedAt: new Date(),
+      rejectionReason: reason,
+      approvalNotes: notes || ''
+    };
+    plan.updatedAt = new Date();
+    await plan.save();
+    
+    res.json({ plan, message: 'Plan rejected' });
+  } catch (error) {
+    console.error('Error rejecting plan:', error);
+    res.status(500).json({ error: 'Failed to reject plan', message: error.message });
+  }
+});
+
+// GET /plans/:id/sites - Get all sites/equipment associated with a plan
+router.get('/:id/sites', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).lean();
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    // Get all sites/equipment with this planId
+    const [towers, sectors, cpe, equipment] = await Promise.all([
+      UnifiedTower.find({ tenantId: req.tenantId, planId: req.params.id }).lean(),
+      UnifiedSector.find({ tenantId: req.tenantId, planId: req.params.id }).lean(),
+      UnifiedCPE.find({ tenantId: req.tenantId, planId: req.params.id }).lean(),
+      NetworkEquipment.find({ tenantId: req.tenantId, planId: req.params.id }).lean()
+    ]);
+    
+    res.json({
+      plan: {
+        id: plan._id,
+        name: plan.name,
+        status: plan.status,
+        showOnMap: plan.showOnMap
+      },
+      sites: towers,
+      sectors,
+      cpeDevices: cpe,
+      equipment
+    });
+  } catch (error) {
+    console.error('Error fetching plan sites:', error);
+    res.status(500).json({ error: 'Failed to fetch plan sites', message: error.message });
+  }
+});
+
 // DELETE /plans/:id - Delete plan
 router.delete('/:id', async (req, res) => {
   try {

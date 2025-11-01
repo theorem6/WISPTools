@@ -101,6 +101,7 @@ const UnifiedSiteSchema = new mongoose.Schema({
   
   // Integration
   inventoryId: String, // Link to inventory system
+  planId: String, // Link to plan project (if created within a plan)
   modules: {
     pci: {
       enabled: Boolean,
@@ -181,6 +182,7 @@ const UnifiedSectorSchema = new mongoose.Schema({
   
   // Integration
   inventoryId: String, // Link to inventory system
+  planId: String, // Link to plan project (if created within a plan)
   modules: {
     pci: {
       enabled: Boolean,
@@ -261,6 +263,7 @@ const UnifiedCPESchema = new mongoose.Schema({
   
   // Integration
   inventoryId: String, // Link to inventory system
+  planId: String, // Link to plan project (if created within a plan)
   modules: {
     acs: {
       enabled: Boolean,
@@ -332,6 +335,7 @@ const NetworkEquipmentSchema = new mongoose.Schema({
   
   // Integration
   inventoryId: String, // Link to inventory system
+  planId: String, // Link to plan project (if created within a plan)
   
   // Additional configuration/notes (stores JSON for complex equipment like backhaul)
   notes: String,  // JSON string for complex configurations (backhaul licensing, fiber details, etc.)
@@ -354,8 +358,10 @@ const NetworkEquipmentSchema = new mongoose.Schema({
 // Indexes
 UnifiedSiteSchema.index({ tenantId: 1, status: 1 });
 UnifiedSiteSchema.index({ tenantId: 1, name: 1 });
+UnifiedSiteSchema.index({ tenantId: 1, planId: 1 }); // Index for plan filtering
 UnifiedSectorSchema.index({ tenantId: 1, siteId: 1 });
 UnifiedSectorSchema.index({ tenantId: 1, status: 1 });
+UnifiedSectorSchema.index({ tenantId: 1, planId: 1 }); // Index for plan filtering
 UnifiedCPESchema.index({ tenantId: 1, status: 1 });
 UnifiedCPESchema.index({ tenantId: 1, serialNumber: 1 });
 NetworkEquipmentSchema.index({ tenantId: 1, type: 1 });
