@@ -376,8 +376,9 @@
   {#if showCPEModal && selectedSiteForCPE}
     <AddCPEModal
       show={showCPEModal}
-      site={selectedSiteForCPE}
       sites={allSites}
+      initialLatitude={selectedSiteForCPE.location?.latitude || null}
+      initialLongitude={selectedSiteForCPE.location?.longitude || null}
       tenantId={$currentTenant?.id || ''}
       on:saved={async () => {
         showCPEModal = false;
