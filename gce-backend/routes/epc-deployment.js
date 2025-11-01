@@ -210,6 +210,7 @@ d-i preseed/late_command string \
     in-target update-grub; \
     in-target systemctl enable ssh; \
     in-target systemctl enable sshd; \
+    in-target systemctl enable serial-getty@ttyS0.service; \
     mkdir -p /target/etc/wisptools /target/opt/wisptools /target/var/lib/wisptools; \
     echo 'EPC_ID=${epc_id}' > /target/etc/wisptools/credentials.env; \
     echo 'TENANT_ID=${tenant_id}' >> /target/etc/wisptools/credentials.env; \
