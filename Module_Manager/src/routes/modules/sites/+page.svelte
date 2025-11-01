@@ -5,7 +5,9 @@
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
   import SiteEditModal from '../coverage-map/components/SiteEditModal.svelte';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
-  import HardwareDeploymentModal from '../coverage-map/components/HardwareDeploymentModal.svelte';
+  import AddSectorModal from '../coverage-map/components/AddSectorModal.svelte';
+  import AddCPEModal from '../coverage-map/components/AddCPEModal.svelte';
+  import AddBackhaulLinkModal from '../coverage-map/components/AddBackhaulLinkModal.svelte';
   
   let sites: any[] = [];
   let loading = true;
@@ -17,10 +19,15 @@
   // Modals
   let showEditModal = false;
   let showDeployModal = false;
-  let showHardwareModal = false;
+  let showSectorModal = false;
+  let showCPEModal = false;
+  let showBackhaulModal = false;
   let selectedSite: any = null;
   let selectedSiteForEPC: any = null;
-  let selectedSiteForHardware: any = null;
+  let selectedSiteForSector: any = null;
+  let selectedSiteForCPE: any = null;
+  let selectedSiteForBackhaul: any = null;
+  let allSites: any[] = [];  // For backhaul endpoint selection
   
   $: filteredSites = sites.filter(site => {
     const matchesSearch = !searchQuery || 
@@ -36,6 +43,14 @@
   
   onMount(async () => {
     await loadSites();
+    // Load all sites for backhaul selection
+    if ($currentTenant?.id) {
+      try {
+        allSites = await coverageMapService.getTowerSites($currentTenant.id);
+      } catch (err) {
+        console.error('Failed to load all sites for backhaul:', err);
+      }
+    }
   });
   
   async function loadSites() {
@@ -69,9 +84,19 @@
     showDeployModal = true;
   }
   
-  function handleDeployHardware(site: any) {
-    selectedSiteForHardware = site;
-    showHardwareModal = true;
+  function handleDeploySector(site: any) {
+    selectedSiteForSector = site;
+    showSectorModal = true;
+  }
+  
+  function handleDeployCPE(site: any) {
+    selectedSiteForCPE = site;
+    showCPEModal = true;
+  }
+  
+  function handleDeployBackhaul(site: any) {
+    selectedSiteForBackhaul = site;
+    showBackhaulModal = true;
   }
   
   function handleSiteSaved() {
@@ -280,20 +305,28 @@
                     >
                       ✏️
                     </button>
-                    <button 
-                      class="btn-icon" 
-                      on:click={() => handleDeployEPC(site)}
-                      title="Deploy EPC"
-                    >
-                      🚀
-                    </button>
-                    <button 
-                      class="btn-icon" 
-                      on:click={() => handleDeployHardware(site)}
-                      title="Deploy Hardware"
-                    >
-                      📦
-                    </button>
+                    <div class="deploy-menu">
+                      <button 
+                        class="btn-icon btn-deploy" 
+                        title="Deploy Equipment"
+                      >
+                        🚀
+                      </button>
+                      <div class="deploy-dropdown">
+                        <button on:click={() => handleDeployEPC(site)}>
+                          🖥️ Deploy EPC
+                        </button>
+                        <button on:click={() => handleDeploySector(site)}>
+                          📡 Deploy LTE/5G Sector
+                        </button>
+                        <button on:click={() => handleDeployCPE(site)}>
+                          📱 Deploy FWA (CPE)
+                        </button>
+                        <button on:click={() => handleDeployBackhaul(site)}>
+                          🔗 Deploy Backhaul (Wireless/Fiber)
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -323,18 +356,51 @@
     />
   {/if}
   
-  <!-- Hardware Deployment Modal -->
-  {#if showHardwareModal && selectedSiteForHardware}
-    <HardwareDeploymentModal
-      show={showHardwareModal}
-      site={selectedSiteForHardware}
+  <!-- Sector Deployment Modal -->
+  {#if showSectorModal && selectedSiteForSector}
+    <AddSectorModal
+      show={showSectorModal}
+      selectedSite={selectedSiteForSector}
+      sites={allSites}
       tenantId={$currentTenant?.id || ''}
       on:saved={async () => {
-        showHardwareModal = false;
-        selectedSiteForHardware = null;
+        showSectorModal = false;
+        selectedSiteForSector = null;
         await loadSites();
       }}
-      on:close={() => { showHardwareModal = false; selectedSiteForHardware = null; }}
+      on:close={() => { showSectorModal = false; selectedSiteForSector = null; }}
+    />
+  {/if}
+  
+  <!-- CPE/FWA Deployment Modal -->
+  {#if showCPEModal && selectedSiteForCPE}
+    <AddCPEModal
+      show={showCPEModal}
+      site={selectedSiteForCPE}
+      sites={allSites}
+      tenantId={$currentTenant?.id || ''}
+      on:saved={async () => {
+        showCPEModal = false;
+        selectedSiteForCPE = null;
+        await loadSites();
+      }}
+      on:close={() => { showCPEModal = false; selectedSiteForCPE = null; }}
+    />
+  {/if}
+  
+  <!-- Backhaul Deployment Modal -->
+  {#if showBackhaulModal && selectedSiteForBackhaul}
+    <AddBackhaulLinkModal
+      show={showBackhaulModal}
+      fromSite={selectedSiteForBackhaul}
+      sites={allSites}
+      tenantId={$currentTenant?.id || ''}
+      on:saved={async () => {
+        showBackhaulModal = false;
+        selectedSiteForBackhaul = null;
+        await loadSites();
+      }}
+      on:close={() => { showBackhaulModal = false; selectedSiteForBackhaul = null; }}
     />
   {/if}
 </TenantGuard>
@@ -594,6 +660,7 @@
   .action-buttons {
     display: flex;
     gap: 0.5rem;
+    align-items: center;
   }
   
   .btn-icon {
@@ -604,12 +671,59 @@
     cursor: pointer;
     font-size: 1.2rem;
     transition: all 0.2s;
+    position: relative;
   }
   
   .btn-icon:hover {
     background: var(--bg-tertiary);
     border-color: var(--brand-primary);
     transform: translateY(-2px);
+  }
+  
+  .deploy-menu {
+    position: relative;
+  }
+  
+  .btn-deploy:hover + .deploy-dropdown,
+  .deploy-dropdown:hover {
+    display: block;
+  }
+  
+  .deploy-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.25rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 220px;
+    overflow: hidden;
+  }
+  
+  .deploy-dropdown button {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+  
+  .deploy-dropdown button:last-child {
+    border-bottom: none;
+  }
+  
+  .deploy-dropdown button:hover {
+    background: var(--bg-hover);
   }
   
   .btn-primary,
