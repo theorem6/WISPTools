@@ -268,23 +268,27 @@ cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz" || { echo "[Build] ERROR: Failed 
 chmod 0644 "$ISO_ROOT/debian/vmlinuz" "$ISO_ROOT/debian/initrd.gz" || true
 
 cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
+# Force GRUB to use serial console - must be set before any menu entries
+serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
+terminal_input serial console
+terminal_output serial console
+
 set timeout=3
 set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  SERIAL-ONLY INSTALL: Output only to serial console (ttyS0)
-  # Multiple redundant parameters ensure text-only mode:
-  # - fb=false: Disable framebuffer device
-  # - nomodeset: Disable Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
-  # - video=off: Additional video disable parameter
-  # - vga=normal: Set standard VESA mode for text console (works with nomodeset for automated installs)
-  # - d-i debconf/frontend=text: Direct installer instruction to use text frontend
-  # - DEBIAN_FRONTEND=text: Environment variable for text-only installer
-  # - console=ttyS0,115200n8: Serial-only console output (115200 baud, 8N1)
+  # ⚠️  SERIAL-ONLY INSTALL: Maximum framebuffer disabling
+  # GRUB itself is configured for serial-only output above
+  # Kernel parameters to completely bypass framebuffer initialization:
+  # - fb=false nomodeset nofb: Triple-redundant framebuffer disable
+  # - video=off: Disable video subsystem entirely
+  # - vga=ask: Prompt but then skip (safer than vga=normal which may trigger framebuffer)
+  # - text: Explicit text mode installer
+  # - console=ttyS0,115200n8: Only serial console, no VGA
+  # - FRAMEBUFFER=0: Environment variable to disable framebuffer
   # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
-  # SSH server enabled during installation - connect via "ssh installer@<machine-ip>" to monitor progress
-  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset video=off vga=normal d-i\ debconf/frontend=text DEBIAN_FRONTEND=text preseed/file=/preseed.cfg console=ttyS0,115200n8 ---
+  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset nofb video=off text d-i\ debconf/frontend=text DEBIAN_FRONTEND=text FRAMEBUFFER=0 preseed/file=/preseed.cfg console=ttyS0,115200n8 console=tty0 ---
   initrd /debian/initrd.gz
 }
 
@@ -564,20 +568,26 @@ cp "$KERNEL_PATH" "$ISO_ROOT/debian/vmlinuz" || { echo "[Build] ERROR: Failed to
 cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz" || { echo "[Build] ERROR: Failed to copy initrd"; exit 1; }
 
 cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
+# Force GRUB to use serial console - must be set before any menu entries
+serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
+terminal_input serial console
+terminal_output serial console
+
 set timeout=0
 set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  SERIAL-ONLY INSTALL: Output only to serial console (ttyS0)
-  # Aggressively disable framebuffer with redundant parameters for text-only mode
-  # - FRAMEBUFFER=n: Tells Debian installer to skip framebuffer initialization
-  # - fb=false nomodeset nofb video=off: Multiple redundant video/framebuffer disable parameters
-  # - vga=normal: Set standard VESA mode for text console
-  # - d-i debconf/frontend=text: Direct installer instruction to use text frontend
+  # ⚠️  SERIAL-ONLY INSTALL: Maximum framebuffer disabling
+  # GRUB itself is configured for serial-only output above
+  # Kernel parameters to completely bypass framebuffer initialization:
+  # - FRAMEBUFFER=0: Environment variable (stronger than FRAMEBUFFER=n)
+  # - fb=false nomodeset nofb: Triple-redundant framebuffer disable
+  # - video=off: Disable video subsystem entirely
+  # - text: Explicit text mode installer
+  # - console=ttyS0,115200n8: Only serial console, no VGA
   # - modprobe.blacklist=videodev,uvcvideo: Prevent video input device detection
-  # - console=ttyS0,115200n8: Serial-only console output (115200 baud, 8N1)
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical d-i\ debconf/frontend=text preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off vga=normal modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 ---
+  linux /debian/vmlinuz FRAMEBUFFER=0 auto=true priority=critical d-i\ debconf/frontend=text preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off text modprobe.blacklist=videodev modprobe.blacklist=uvcvideo console=ttyS0,115200n8 console=tty0 ---
   initrd /debian/initrd.gz
 }
 
