@@ -10,7 +10,14 @@
  */
 
 const { admin, auth, firestore } = require('../config/firebase');
-const { UserTenant } = require('./user-schema');
+const { UserTenant } = require('../models/user');
+const { 
+  determineRoleFromEmail, 
+  getCreatableRoles, 
+  canManageRole,
+  getRoleDisplayName,
+  getRoleDescription
+} = require('../config/user-hierarchy');
 
 // ============================================================================
 // ROLE DEFINITIONS (must match frontend TypeScript)
@@ -23,6 +30,7 @@ const VALID_ROLES = [
   'engineer',
   'installer',
   'helpdesk',
+  'sales',
   'viewer'
 ];
 
@@ -94,16 +102,21 @@ const DEFAULT_MODULE_ACCESS = {
     tenantSettings: false,
     backendManagement: false,
     billing: false,
-    tenantManagement: false
+    tenantManagement: false,
+    planCreation: true,  // Can create deployment plans
+    planApproval: false, // Cannot approve plans (admin/owner only)
+    planView: true,      // Can view all plans
+    siteManagement: true, // Full site management access
+    deployment: true     // Can deploy equipment
   },
   installer: {
     pciResolution: false,
     cbrsManagement: false,
     acsManagement: false,
     hssManagement: false,
-    coverageMap: true,
-    inventory: true,
-    workOrders: true,
+    coverageMap: true,    // Can view sites for installation
+    inventory: true,      // Can check out/return equipment
+    workOrders: true,     // Can view assigned work orders
     helpDesk: false,
     distributedEpc: false,
     monitoring: false,
@@ -111,7 +124,13 @@ const DEFAULT_MODULE_ACCESS = {
     tenantSettings: false,
     backendManagement: false,
     billing: false,
-    tenantManagement: false
+    tenantManagement: false,
+    planCreation: false,  // Cannot create plans
+    planApproval: false,  // Cannot approve plans
+    planView: true,       // Can view assigned plans (mobile app)
+    siteManagement: false, // Cannot create/edit sites
+    deployment: true,     // Can deploy equipment in field
+    mobileAccess: true    // Full mobile app access
   },
   helpdesk: {
     pciResolution: false,
@@ -131,21 +150,52 @@ const DEFAULT_MODULE_ACCESS = {
     tenantManagement: false
   },
   viewer: {
-    pciResolution: true,
-    cbrsManagement: true,
-    acsManagement: true,
-    hssManagement: true,
-    coverageMap: true,
-    inventory: true,
-    workOrders: true,
-    helpDesk: true,
-    distributedEpc: true,
-    monitoring: true,
+    pciResolution: true,   // Read-only
+    cbrsManagement: true,  // Read-only
+    acsManagement: true,   // Read-only
+    hssManagement: true,   // Read-only
+    coverageMap: true,     // Read-only
+    inventory: true,       // Read-only
+    workOrders: true,      // Read-only
+    helpDesk: true,        // Read-only
+    distributedEpc: true,  // Read-only
+    monitoring: true,      // Read-only
     userManagement: false,
     tenantSettings: false,
     backendManagement: false,
     billing: false,
-    tenantManagement: false
+    tenantManagement: false,
+    planCreation: false,   // Cannot create plans
+    planApproval: false,   // Cannot approve plans
+    planView: true,        // Can view plans (read-only)
+    siteManagement: false, // Cannot edit sites
+    deployment: false,     // Cannot deploy
+    mobileAccess: false    // No mobile app access
+  },
+  
+  // Sales role (new)
+  sales: {
+    pciResolution: false,
+    cbrsManagement: false,
+    acsManagement: false,
+    hssManagement: false,
+    coverageMap: true,     // Can view coverage map for sales presentations
+    inventory: true,       // Can view inventory availability
+    workOrders: false,
+    helpDesk: true,        // Can view customer tickets
+    distributedEpc: false,
+    monitoring: false,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: true,         // Can view billing for customers
+    tenantManagement: false,
+    planCreation: false,   // Cannot create plans
+    planApproval: false,   // Cannot approve plans
+    planView: true,        // Can view plans for customer discussions
+    siteManagement: false, // Cannot edit sites
+    deployment: false,     // Cannot deploy
+    mobileAccess: false    // Limited mobile access
   }
 };
 
@@ -214,6 +264,16 @@ const WORK_ORDER_PERMISSIONS = {
   viewer: {
     canViewAll: true,
     canViewAssigned: true,
+    canCreate: false,
+    canAssign: false,
+    canReassign: false,
+    canClose: false,
+    canDelete: false,
+    canEscalate: false
+  },
+  sales: {
+    canViewAll: false,
+    canViewAssigned: false,
     canCreate: false,
     canAssign: false,
     canReassign: false,

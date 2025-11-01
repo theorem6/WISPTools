@@ -14,7 +14,7 @@ const UserTenantSchema = new mongoose.Schema({
   role: { 
     type: String, 
     required: true,
-    enum: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'viewer']
+    enum: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer']
   },
   
   // Status

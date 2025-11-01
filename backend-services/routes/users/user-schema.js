@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   displayName: { type: String },
   photoURL: { type: String },
-  role: { type: String, enum: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'viewer'], default: 'viewer' },
+  role: { type: String, enum: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'], default: 'viewer' },
   tenantId: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema({
 const userTenantSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   tenantId: { type: String, required: true },
-  role: { type: String, enum: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'viewer'], default: 'viewer' },
+  role: { type: String, enum: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'], default: 'viewer' },
   moduleAccess: { type: Object, default: {} },
   workOrderPermissions: { type: Object, default: {} },
   status: { type: String, enum: ['active', 'suspended', 'pending'], default: 'pending' },

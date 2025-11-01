@@ -13,13 +13,14 @@
 
 const express = require('express');
 const { admin, auth, firestore } = require('../../config/firebase');
-const { UserTenant } = require('./user-schema');
+const { UserTenant } = require('../../models/user');
 const { 
   verifyAuth, 
   extractTenantId, 
   requireRole,
   VALID_ROLES 
-} = require('./role-auth-middleware');
+} = require('../../middleware/auth');
+const { getCreatableRoles, canManageRole, determineRoleFromEmail } = require('../../config/user-hierarchy');
 
 const router = express.Router();
 
@@ -203,10 +204,36 @@ router.post('/invite', requireAdmin, async (req, res) => {
     const { email, role, tenantId, customModuleAccess } = req.body;
     
     // Validate input
-    if (!email || !role || !tenantId) {
+    if (!email) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Email, role, and tenantId are required'
+        message: 'Email is required'
+      });
+    }
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Tenant ID is required'
+      });
+    }
+    
+    // Auto-assign role based on email if requested
+    let role = requestedRole;
+    if (autoAssign && !role) {
+      role = determineRoleFromEmail(email);
+      if (!role) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Could not auto-assign role from email pattern. Please specify role manually.'
+        });
+      }
+    }
+    
+    if (!role) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Role is required (or use autoAssign: true)'
       });
     }
     
@@ -227,11 +254,10 @@ router.post('/invite', requireAdmin, async (req, res) => {
     }
     
     // Check if requester can create this role
-    const creatableRoles = getCreatableRoles(req.userRole);
-    if (!creatableRoles.includes(role)) {
+    if (!canManageRole(req.userRole, role)) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: `You cannot create users with role: ${role}`
+        message: `You cannot create users with role: ${role}. Your role can only create: ${getCreatableRoles(req.userRole).join(', ')}`
       });
     }
     
@@ -624,21 +650,6 @@ router.get('/:userId/activity', requireAdmin, async (req, res) => {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Get roles that can be created by the given role
- */
-function getCreatableRoles(role) {
-  switch (role) {
-    case 'platform_admin':
-      return ['owner', 'admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
-    case 'owner':
-    case 'admin':
-      return ['admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
-    default:
-      return [];
-  }
-}
 
 // ============================================================================
 // EXPORTS

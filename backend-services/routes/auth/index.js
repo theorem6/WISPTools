@@ -5,8 +5,9 @@
 
 const express = require('express');
 const { admin, auth, firestore } = require('../../config/firebase');
-const { UserTenant } = require('../users/user-schema');
-const { verifyAuth, extractTenantId, getUserTenantRole, isPlatformAdmin } = require('../users/role-auth-middleware');
+const { UserTenant } = require('../../models/user');
+const { verifyAuth, extractTenantId, getUserTenantRole, isPlatformAdmin } = require('../../middleware/auth');
+const { determineRoleFromEmail } = require('../../config/user-hierarchy');
 
 const router = express.Router();
 

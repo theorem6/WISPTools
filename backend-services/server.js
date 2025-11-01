@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
 });
 
 // Use existing route files - ALL MODULES
-app.use('/api/users', require('./routes/users'));
+app.use('/api/users', require('./routes/users')); // Includes auto-assign routes
 app.use('/api/tenants', require('./routes/users/tenants'));
 app.use('/api/user-tenants', require('./routes/users/tenant-details'));
 app.use('/api/customers', require('./routes/customers'));
