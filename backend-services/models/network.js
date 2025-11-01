@@ -299,7 +299,7 @@ const NetworkEquipmentSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['router', 'switch', 'power-supply', 'ups', 'generator', 'cable', 'connector', 'mounting-hardware', 'other'],
+    enum: ['router', 'switch', 'power-supply', 'ups', 'generator', 'cable', 'connector', 'mounting-hardware', 'backhaul', 'antenna', 'radio', 'other'],
     required: true
   },
   status: {
@@ -332,6 +332,9 @@ const NetworkEquipmentSchema = new mongoose.Schema({
   
   // Integration
   inventoryId: String, // Link to inventory system
+  
+  // Additional configuration/notes (stores JSON for complex equipment like backhaul)
+  notes: String,  // JSON string for complex configurations (backhaul licensing, fiber details, etc.)
   
   // Metadata
   createdBy: String,
