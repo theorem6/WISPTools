@@ -564,10 +564,14 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # nomodeset - Disables Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
   # nofb - Disables framebuffer device completely
   # FRAMEBUFFER=n - Tells Debian installer to skip framebuffer initialization
-  # video=off fb=false - Additional video/framebuffer disable parameters
-  # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
-  # Preseed early_command will blacklist framebuffer and video drivers
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
+  # Aggressively disable framebuffer with redundant parameters for text-only mode
+  # - FRAMEBUFFER=n: Tells Debian installer to skip framebuffer initialization
+  # - fb=false nomodeset nofb video=off: Multiple redundant video/framebuffer disable parameters
+  # - vga=normal: Set standard VESA mode for text console
+  # - d-i debconf/frontend=text: Direct installer instruction to use text frontend
+  # - modprobe.blacklist=videodev,uvcvideo: Prevent video input device detection
+  # - console=ttyS0,115200n8 console=tty1: Dual console output (serial and virtual)
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical d-i\ debconf/frontend=text preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off vga=normal modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
