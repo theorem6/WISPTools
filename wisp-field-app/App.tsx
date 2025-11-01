@@ -188,6 +188,16 @@ export default function App() {
                 component={HelpScreen}
                 options={{ title: 'Help & Documentation' }}
               />
+              <Stack.Screen
+                name="Plans"
+                component={PlansScreen}
+                options={{ title: 'Deployment Plans' }}
+              />
+              <Stack.Screen
+                name="PlanDetails"
+                component={PlanDetailsScreen}
+                options={{ title: 'Plan Details' }}
+              />
             </>
           )}
         </Stack.Navigator>
