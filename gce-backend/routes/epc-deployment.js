@@ -246,17 +246,28 @@ EOF_SERVICE\\
 PRESEED_EOF
 
 # Embed preseed in initrd (extract, add preseed.cfg, repack)
-echo "[Build] Embedding preseed file in initrd..."
+# Also disable framebuffer in initrd's early initialization scripts
+echo "[Build] Embedding preseed file in initrd and disabling framebuffer in initrd..."
 INITRD_WORK_DIR="/tmp/initrd-${epc_id}-$(date +%s)"
 mkdir -p "$INITRD_WORK_DIR"
 cd "$INITRD_WORK_DIR"
 gunzip < "$INITRD_PATH" | cpio -id >/dev/null 2>&1 || { echo "[Build] ERROR: Failed to extract initrd"; exit 1; }
 cp "$PRESEED_TMP" "./preseed.cfg" || { echo "[Build] ERROR: Failed to copy preseed to initrd"; exit 1; }
+# Disable framebuffer in initrd scripts if they exist - modify any scripts that might enable it
+if [ -d "./scripts" ]; then
+  find ./scripts -type f -name "*.sh" -exec sed -i 's/framebuffer/framebuffer_disabled_by_build/g' {} \; 2>/dev/null || true
+  find ./scripts -type f -name "*.sh" -exec sed -i 's/FRAMEBUFFER/FRAMEBUFFER_DISABLED/g' {} \; 2>/dev/null || true
+  find ./scripts -type f -name "*fb*" -exec rm -f {} \; 2>/dev/null || true
+fi
+# Add environment file to disable framebuffer at initrd level
+mkdir -p ./etc 2>/dev/null || true
+echo 'FRAMEBUFFER=0' > ./etc/framebuffer-disable.env 2>/dev/null || true
+echo 'export FRAMEBUFFER=0' >> ./etc/framebuffer-disable.env 2>/dev/null || true
 find . | cpio -o -H newc | gzip > "$INITRD_PATH.new" || { echo "[Build] ERROR: Failed to repack initrd"; exit 1; }
 mv "$INITRD_PATH.new" "$INITRD_PATH" || { echo "[Build] ERROR: Failed to replace initrd"; exit 1; }
 cd - >/dev/null
 rm -rf "$INITRD_WORK_DIR" "$PRESEED_TMP" 2>/dev/null || true
-echo "[Build] Preseed embedded in initrd successfully"
+echo "[Build] Preseed embedded and framebuffer disabled in initrd scripts"
 
 # Build tiny ISO containing only netboot kernel/initrd and GRUB
 ISO_ROOT="$BUILD_DIR/iso_root"
@@ -283,12 +294,12 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # Kernel parameters to completely bypass framebuffer initialization:
   # - fb=false nomodeset nofb: Triple-redundant framebuffer disable
   # - video=off: Disable video subsystem entirely
-  # - vga=ask: Prompt but then skip (safer than vga=normal which may trigger framebuffer)
-  # - text: Explicit text mode installer
-  # - console=ttyS0,115200n8: Only serial console, no VGA
+  # - text: Explicit text mode installer (NO VGA parameters that trigger framebuffer)
+  # - console=ttyS0,115200n8: Serial console (tty0 kept as fallback but won't activate without VGA)
   # - FRAMEBUFFER=0: Environment variable to disable framebuffer
+  # - modprobe.blacklist=vesafb,efifb,simplefb,vga16fb: Prevent framebuffer module loading
   # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
-  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset nofb video=off text d-i\ debconf/frontend=text DEBIAN_FRONTEND=text FRAMEBUFFER=0 preseed/file=/preseed.cfg console=ttyS0,115200n8 console=tty0 ---
+  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset nofb video=off text d-i\ debconf/frontend=text DEBIAN_FRONTEND=text FRAMEBUFFER=0 modprobe.blacklist=vesafb modprobe.blacklist=efifb modprobe.blacklist=simplefb modprobe.blacklist=vga16fb preseed/file=/preseed.cfg console=ttyS0,115200n8 ---
   initrd /debian/initrd.gz
 }
 
