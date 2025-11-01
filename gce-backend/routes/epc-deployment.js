@@ -266,16 +266,18 @@ set default=auto
 insmod gzio
 
 menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
-  # ⚠️  TEXT-ONLY INSTALL: Disable framebuffer/KMS - prevent initrd from initializing it
-  # nomodeset - Disables Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
-  # nofb - Disables framebuffer device completely
-  # FRAMEBUFFER=n - Tells Debian installer to skip framebuffer initialization
-  # video=off fb=false - Additional video/framebuffer disable parameters
-  # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
+  # ⚠️  TEXT-ONLY INSTALL: Aggressively disable framebuffer/KMS - prevent initrd from initializing it
+  # Multiple redundant parameters ensure text-only mode:
+  # - fb=false: Disable framebuffer device
+  # - nomodeset: Disable Kernel Mode Setting (KMS), prevents graphics drivers from setting high-res modes early in boot
+  # - video=off: Additional video disable parameter
+  # - vga=normal: Set standard VESA mode for text console (works with nomodeset for automated installs)
+  # - d-i debconf/frontend=text: Direct installer instruction to use text frontend
+  # - DEBIAN_FRONTEND=text: Environment variable for text-only installer
+  # - console=ttyS0,115200n8 console=tty1: Dual console output (serial and virtual)
   # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
   # SSH server enabled during installation - connect via "ssh installer@<machine-ip>" to monitor progress
-  # Boot parameters: auto=true priority=critical interface=auto fb=false vga=normal nomodeset console=ttyS0,115200n8
-  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false vga=normal nomodeset console=ttyS0,115200n8 preseed/file=/preseed.cfg DEBIAN_FRONTEND=text ---
+  linux /debian/vmlinuz auto=true priority=critical interface=auto fb=false nomodeset video=off vga=normal d-i\ debconf/frontend=text DEBIAN_FRONTEND=text preseed/file=/preseed.cfg console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
