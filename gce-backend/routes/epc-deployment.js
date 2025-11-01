@@ -189,7 +189,7 @@ d-i partman/confirm_nooverwrite boolean true
 
 ### --- PACKAGE SELECTION ---
 tasksel tasksel/first multiselect standard, ssh-server
-d-i pkgsel/include string openssh-server build-essential git make gcc g++ autoconf automake libtool pkg-config libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev libyaml-dev libffi-dev python3 python3-pip libsctp-dev libidn11-dev libmongoc-dev libbson-dev libmicrohttpd-dev libcurl4-openssl-dev libnghttp2-dev libtins-dev libtalloc-dev meson ninja-build curl wget ca-certificates gnupg lsb-release
+d-i pkgsel/include string openssh-server build-essential git make gcc g++ autoconf automake libtool pkg-config flex bison libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev libyaml-dev libffi-dev python3 python3-pip python3-setuptools python3-wheel libsctp-dev libidn11-dev libmongoc-dev libbson-dev libmicrohttpd-dev libcurl4-openssl-dev libnghttp2-dev libtins-dev libtalloc-dev libpcsclite-dev libgnutls28-dev libgcrypt20-dev meson ninja-build curl wget ca-certificates gnupg lsb-release vim nano less jq
 popularity-contest popularity-contest/participate boolean false
 
 ### --- BOOTLOADER ---
