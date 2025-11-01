@@ -138,12 +138,12 @@ mkdir -p "$NETBOOT_DIR"
 # Clean up preseed files older than 1 day
 find "$NETBOOT_DIR" -name "preseed-*.cfg" -mtime +1 -delete 2>/dev/null || true
 
-# Generate unique preseed for this EPC build
-PRESEED_NAME="preseed-${epc_id}-$(date +%s).cfg"
+# Generate unique preseed for this EPC build (will be embedded in initrd)
 GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
 HSS_PORT="${HSS_PORT}"
-echo "[Build] Creating unique preseed: $PRESEED_NAME"
-cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
+PRESEED_TMP="/tmp/preseed-${epc_id}-$(date +%s).cfg"
+echo "[Build] Creating preseed file for embedding in initrd..."
+cat > "$PRESEED_TMP" << 'PRESEED_EOF'
 # Force non-interactive installation (no GUI, no prompts)
 d-i debian-installer/locale string en_US.UTF-8
 d-i debian-installer/country string US
@@ -151,6 +151,11 @@ d-i debian-installer/language string en
 d-i console-keymaps-at/keymap select us
 d-i keyboard-configuration/xkb-keymap select us
 d-i keyboard-configuration/layoutcode string us
+
+# Enable SSH server during installation (allows remote monitoring)
+# The openssh-server-udeb module enables SSH access during installation
+# Connect via: ssh installer@<machine-ip> (no password required)
+d-i anna/choose_modules string openssh-server-udeb
 
 # Skip all interactive prompts
 d-i debconf/priority select critical
@@ -214,7 +219,7 @@ d-i preseed/early_command string \
     echo 'blacklist videobuf2_core' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo 'blacklist videobuf2_v4l2' >> /etc/modprobe.d/blacklist-fb.conf; \
     echo FRAMEBUFFER=n > /etc/initramfs-tools/conf.d/no-framebuffer.conf 2>/dev/null || true; \
-    anna-install selinux-utils || true
+    anna-install selinux-utils openssh-server-udeb || true
 d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \\
@@ -253,6 +258,19 @@ EOF_SERVICE\\
     echo "WISPTools EPC bootstrap service configured for EPC ${epc_id}"
 PRESEED_EOF
 
+# Embed preseed in initrd (extract, add preseed.cfg, repack)
+echo "[Build] Embedding preseed file in initrd..."
+INITRD_WORK_DIR="/tmp/initrd-${epc_id}-$(date +%s)"
+mkdir -p "$INITRD_WORK_DIR"
+cd "$INITRD_WORK_DIR"
+gunzip < "$INITRD_PATH" | cpio -id >/dev/null 2>&1 || { echo "[Build] ERROR: Failed to extract initrd"; exit 1; }
+cp "$PRESEED_TMP" "./preseed.cfg" || { echo "[Build] ERROR: Failed to copy preseed to initrd"; exit 1; }
+find . | cpio -o -H newc | gzip > "$INITRD_PATH.new" || { echo "[Build] ERROR: Failed to repack initrd"; exit 1; }
+mv "$INITRD_PATH.new" "$INITRD_PATH" || { echo "[Build] ERROR: Failed to replace initrd"; exit 1; }
+cd - >/dev/null
+rm -rf "$INITRD_WORK_DIR" "$PRESEED_TMP" 2>/dev/null || true
+echo "[Build] Preseed embedded in initrd successfully"
+
 # Build tiny ISO containing only netboot kernel/initrd and GRUB
 ISO_ROOT="$BUILD_DIR/iso_root"
 rm -rf "$ISO_ROOT" 2>/dev/null || true
@@ -274,8 +292,9 @@ menuentry "Debian 12 Netboot (Automated EPC Install)" --id auto {
   # FRAMEBUFFER=n - Tells Debian installer to skip framebuffer initialization
   # video=off fb=false - Additional video/framebuffer disable parameters
   # modprobe.blacklist=videodev,uvcvideo - Prevent video input device detection
-  # Preseed early_command will blacklist framebuffer and video drivers
-  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} preseed/file=/cdrom/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
+  # Preseed is embedded in initrd - use preseed/file=/preseed.cfg to load from initrd root
+  # SSH server enabled during installation - connect via "ssh installer@<machine-ip>" to monitor progress
+  linux /debian/vmlinuz FRAMEBUFFER=n auto=true priority=critical preseed/file=/preseed.cfg preseed/interactive=false DEBIAN_FRONTEND=text DEBCONF_NONINTERACTIVE_SEEN=true net.ifnames=0 biosdevname=0 fb=false nomodeset nofb video=off modprobe.blacklist=videodev modprobe.blacklist=uvcvideo text console=ttyS0,115200n8 console=tty1 ---
   initrd /debian/initrd.gz
 }
 
