@@ -45,6 +45,9 @@
   // Project workflow states
   let activeProject: PlanProject | null = null;
   let showProjectActions = false;
+  
+  // Plan visibility toggle
+  let visiblePlans: Set<string> = new Set(); // Plans currently visible on map
 
   // Module context for object state management
   let moduleContext: ModuleContext = {
@@ -225,6 +228,9 @@
       if (tenantId) {
         existingHardware = await planService.getAllExistingHardware(tenantId);
         projects = await planService.getPlans(tenantId);
+        
+        // Initialize visibility set from loaded plans
+        visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
       }
     } catch (error) {
       console.error('Error loading plan data:', error);
@@ -403,9 +409,43 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       await planService.updatePlan(project.id, { status: 'active' });
       await loadData();
       alert(`Project "${project.name}" is now active. All map changes will be saved to this project.`);
+      
+      // Reload iframe to update URL with planId
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
+      if (iframe) {
+        iframe.src = `/modules/coverage-map?hideStats=true&planId=${project.id}&planMode=true`;
+      }
     } catch (error) {
       console.error('Error starting project:', error);
       alert('Failed to start project');
+    }
+  }
+  
+  // Toggle plan visibility on map
+  async function togglePlanVisibility(project: PlanProject) {
+    try {
+      const updatedPlan = await planService.togglePlanVisibility(project.id);
+      // Update local state
+      const index = projects.findIndex(p => p.id === project.id);
+      if (index !== -1) {
+        projects[index] = updatedPlan;
+      }
+      if (activeProject?.id === project.id) {
+        activeProject = updatedPlan;
+      }
+      
+      // Update visibility set
+      if (updatedPlan.showOnMap) {
+        visiblePlans.add(project.id);
+      } else {
+        visiblePlans.delete(project.id);
+      }
+      
+      // Reload map to reflect visibility changes
+      await loadData();
+    } catch (error) {
+      console.error('Error toggling plan visibility:', error);
+      alert('Failed to toggle plan visibility');
     }
   }
 
@@ -467,7 +507,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     <!-- Full Screen Map -->
     <div class="map-fullscreen" bind:this={mapContainer}>
       <iframe 
-        src="/modules/coverage-map?hideStats=true" 
+        src={activeProject ? `/modules/coverage-map?hideStats=true&planId=${activeProject.id}&planMode=true` : '/modules/coverage-map?hideStats=true'} 
         title="Plan"
         class="coverage-map-iframe"
       ></iframe>
@@ -498,6 +538,13 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <button class="control-btn" on:click={openAddRequirementModal} title="Add Hardware Requirement">
             📋
           </button>
+          <button 
+            class="control-btn {selectedProject.showOnMap ? 'active' : ''}" 
+            on:click={() => togglePlanVisibility(selectedProject)} 
+            title={selectedProject.showOnMap ? "Hide plan on map" : "Show plan on map"}
+          >
+            {selectedProject.showOnMap ? "👁️" : "👁️‍🗨️"}
+          </button>
         {/if}
         
         <!-- Project Workflow Actions -->
@@ -507,6 +554,13 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           </button>
           <button class="control-btn cancel-btn" on:click={cancelProject} title="Cancel Project">
             ❌
+          </button>
+          <button 
+            class="control-btn {activeProject.showOnMap ? 'active' : ''}" 
+            on:click={() => togglePlanVisibility(activeProject)} 
+            title={activeProject.showOnMap ? "Hide plan on map" : "Show plan on map"}
+          >
+            {activeProject.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
           </button>
         {/if}
       </div>
@@ -671,6 +725,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   {#if project.status === 'active'}
                     <span class="active-indicator" title="This project is currently active - all map changes will be saved to this project">🔄 Active</span>
                   {/if}
+                  
+                  <button 
+                    class="action-btn {project.showOnMap ? 'visibility-active' : 'visibility-inactive'}" 
+                    on:click={() => togglePlanVisibility(project)} 
+                    title={project.showOnMap ? "Hide on map" : "Show on map"}
+                  >
+                    {project.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
+                  </button>
                   
                   {#if project.status === 'approved'}
                     <span class="approved-indicator" title="This project has been approved and is ready for deployment">✅ Approved</span>

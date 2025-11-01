@@ -3,10 +3,17 @@
  * Manages deployment plans and project workflows
  */
 
+import { browser } from '$app/environment';
+import { authService } from './authService';
 import { inventoryService } from './inventoryService';
 import { coverageMapService } from '../../routes/modules/coverage-map/lib/coverageMapService.mongodb';
 import type { InventoryItem } from './inventoryService';
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../routes/modules/coverage-map/lib/models';
+
+// API Configuration
+const API_URL = browser 
+  ? 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'
+  : '';
 
 export interface PlanProject {
   id: string;
@@ -54,6 +61,17 @@ export interface PlanProject {
     }>;
   };
   
+  // Plan visibility on map
+  showOnMap?: boolean;
+  // Approval workflow
+  approval?: {
+    approvedBy?: string;
+    approvedAt?: Date;
+    rejectedBy?: string;
+    rejectedAt?: Date;
+    rejectionReason?: string;
+    approvalNotes?: string;
+  };
   // Purchase Planning
   purchasePlan: {
     totalEstimatedCost: number;
@@ -118,7 +136,41 @@ export interface HardwareView {
 }
 
 class PlanService {
-  private plans: Map<string, PlanProject> = new Map();
+  private async getAuthToken(): Promise<string> {
+    const token = await authService.getAuthToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    return token;
+  }
+  
+  private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
+    const token = await this.getAuthToken();
+    const tenantId = localStorage.getItem('selectedTenantId');
+    
+    if (!tenantId) {
+      throw new Error('No tenant selected');
+    }
+    
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'X-Tenant-ID': tenantId,
+      ...options.headers as Record<string, string>
+    };
+    
+    const response = await fetch(`${API_URL}/api/plans${endpoint}`, {
+      ...options,
+      headers
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      throw new Error(error.error || error.message || 'Request failed');
+    }
+    
+    return await response.json();
+  }
   
   /**
    * Get all existing hardware from all modules
@@ -241,188 +293,235 @@ class PlanService {
    * Create a new plan project
    */
   async createPlan(tenantId: string, planData: Partial<PlanProject>): Promise<PlanProject> {
-    const plan: PlanProject = {
-      id: `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: planData.name || 'New Plan',
-      description: planData.description || '',
-      status: 'draft',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: planData.createdBy || '',
-      tenantId,
-      scope: {
-        towers: [],
-        sectors: [],
-        cpeDevices: [],
-        equipment: [],
-        backhauls: []
-      },
-      hardwareRequirements: {
-        existing: [],
-        needed: []
-      },
-      purchasePlan: {
-        totalEstimatedCost: 0,
-        missingHardware: [],
-        procurementStatus: 'pending'
-      },
-      deployment: {},
-      ...planData
-    };
+    const plan = await this.apiCall('', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: planData.name || 'New Plan',
+        description: planData.description || '',
+        status: 'draft',
+        createdBy: planData.createdBy || '',
+        showOnMap: false,
+        scope: {
+          towers: [],
+          sectors: [],
+          cpeDevices: [],
+          equipment: [],
+          backhauls: []
+        },
+        hardwareRequirements: {
+          existing: [],
+          needed: []
+        },
+        purchasePlan: {
+          totalEstimatedCost: 0,
+          missingHardware: [],
+          procurementStatus: 'pending'
+        },
+        deployment: {},
+        ...planData
+      })
+    });
     
-    this.plans.set(plan.id, plan);
-    return plan;
+    return this.mapBackendPlanToFrontend(plan);
   }
   
   /**
    * Get all plans for a tenant
    */
-  async getPlans(tenantId: string): Promise<PlanProject[]> {
-    return Array.from(this.plans.values()).filter(plan => plan.tenantId === tenantId);
+  async getPlans(tenantId: string, status?: string): Promise<PlanProject[]> {
+    const query = status ? `?status=${status}` : '';
+    const plans = await this.apiCall(query);
+    return Array.isArray(plans) ? plans.map(p => this.mapBackendPlanToFrontend(p)) : [];
   }
   
   /**
    * Get a specific plan
    */
   async getPlan(planId: string): Promise<PlanProject | null> {
-    return this.plans.get(planId) || null;
+    try {
+      const plan = await this.apiCall(`/${planId}`);
+      return this.mapBackendPlanToFrontend(plan);
+    } catch (error: any) {
+      if (error.message.includes('404')) {
+        return null;
+      }
+      throw error;
+    }
   }
   
   /**
    * Update a plan
    */
   async updatePlan(planId: string, updates: Partial<PlanProject>): Promise<PlanProject | null> {
-    const plan = this.plans.get(planId);
-    if (!plan) return null;
-    
-    const updatedPlan = {
-      ...plan,
-      ...updates,
-      updatedAt: new Date()
+    const plan = await this.apiCall(`/${planId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+    return this.mapBackendPlanToFrontend(plan);
+  }
+  
+  /**
+   * Toggle plan visibility on map
+   */
+  async togglePlanVisibility(planId: string): Promise<PlanProject> {
+    const result = await this.apiCall(`/${planId}/toggle-visibility`, {
+      method: 'PUT'
+    });
+    return this.mapBackendPlanToFrontend(result.plan);
+  }
+  
+  /**
+   * Approve plan for deployment
+   */
+  async approvePlan(planId: string, notes?: string): Promise<PlanProject> {
+    const result = await this.apiCall(`/${planId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+    return this.mapBackendPlanToFrontend(result.plan);
+  }
+  
+  /**
+   * Reject plan with reason
+   */
+  async rejectPlan(planId: string, reason: string, notes?: string): Promise<PlanProject> {
+    const result = await this.apiCall(`/${planId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, notes })
+    });
+    return this.mapBackendPlanToFrontend(result.plan);
+  }
+  
+  /**
+   * Get all sites/equipment in a plan
+   */
+  async getPlanSites(planId: string): Promise<{
+    plan: { id: string; name: string; status: string; showOnMap: boolean };
+    sites: TowerSite[];
+    sectors: Sector[];
+    cpeDevices: CPEDevice[];
+    equipment: NetworkEquipment[];
+  }> {
+    return await this.apiCall(`/${planId}/sites`);
+  }
+  
+  /**
+   * Map backend plan format to frontend format
+   */
+  private mapBackendPlanToFrontend(plan: any): PlanProject {
+    return {
+      id: plan._id || plan.id,
+      name: plan.name,
+      description: plan.description || '',
+      status: plan.status,
+      createdAt: plan.createdAt ? new Date(plan.createdAt) : new Date(),
+      updatedAt: plan.updatedAt ? new Date(plan.updatedAt) : new Date(),
+      createdBy: plan.createdBy,
+      tenantId: plan.tenantId,
+      showOnMap: plan.showOnMap || false,
+      scope: plan.scope || {
+        towers: [],
+        sectors: [],
+        cpeDevices: [],
+        equipment: [],
+        backhauls: []
+      },
+      hardwareRequirements: plan.hardwareRequirements || {
+        existing: [],
+        needed: []
+      },
+      purchasePlan: plan.purchasePlan || {
+        totalEstimatedCost: 0,
+        missingHardware: [],
+        procurementStatus: 'pending'
+      },
+      approval: plan.approval || {},
+      deployment: plan.deployment || {}
     };
-    
-    this.plans.set(planId, updatedPlan);
-    return updatedPlan;
   }
   
   /**
    * Add hardware to a plan
    */
   async addHardwareToPlan(planId: string, hardwareId: string, hardwareType: string): Promise<boolean> {
-    const plan = this.plans.get(planId);
-    if (!plan) return false;
-    
-    const scopeKey = `${hardwareType}s` as keyof typeof plan.scope;
-    if (scopeKey in plan.scope && !plan.scope[scopeKey].includes(hardwareId)) {
-      plan.scope[scopeKey].push(hardwareId);
-      plan.updatedAt = new Date();
-      this.plans.set(planId, plan);
-      return true;
+    try {
+      const plan = await this.getPlan(planId);
+      if (!plan) return false;
+      
+      const scopeKey = `${hardwareType}s` as keyof typeof plan.scope;
+      if (scopeKey in plan.scope && !plan.scope[scopeKey].includes(hardwareId)) {
+        plan.scope[scopeKey].push(hardwareId);
+        await this.updatePlan(planId, { scope: plan.scope });
+        return true;
+      }
+      
+      return false;
+    } catch {
+      return false;
     }
-    
-    return false;
   }
   
   /**
    * Remove hardware from a plan
    */
   async removeHardwareFromPlan(planId: string, hardwareId: string, hardwareType: string): Promise<boolean> {
-    const plan = this.plans.get(planId);
-    if (!plan) return false;
-    
-    const scopeKey = `${hardwareType}s` as keyof typeof plan.scope;
-    if (scopeKey in plan.scope) {
-      plan.scope[scopeKey] = plan.scope[scopeKey].filter(id => id !== hardwareId);
-      plan.updatedAt = new Date();
-      this.plans.set(planId, plan);
-      return true;
+    try {
+      const plan = await this.getPlan(planId);
+      if (!plan) return false;
+      
+      const scopeKey = `${hardwareType}s` as keyof typeof plan.scope;
+      if (scopeKey in plan.scope) {
+        plan.scope[scopeKey] = plan.scope[scopeKey].filter(id => id !== hardwareId);
+        await this.updatePlan(planId, { scope: plan.scope });
+        return true;
+      }
+      
+      return false;
+    } catch {
+      return false;
     }
-    
-    return false;
   }
   
   /**
    * Mark plan as ready for deployment
    */
   async markPlanReady(planId: string): Promise<boolean> {
-    const plan = this.plans.get(planId);
-    if (!plan) return false;
-    
-    plan.status = 'ready';
-    plan.updatedAt = new Date();
-    this.plans.set(planId, plan);
-    return true;
+    try {
+      await this.updatePlan(planId, { status: 'ready' });
+      return true;
+    } catch {
+      return false;
+    }
   }
   
   /**
    * Get plans ready for deployment
    */
   async getReadyPlans(tenantId: string): Promise<PlanProject[]> {
-    return Array.from(this.plans.values()).filter(
-      plan => plan.tenantId === tenantId && plan.status === 'ready'
-    );
+    return await this.getPlans(tenantId, 'ready');
   }
   
   /**
    * Delete a plan
    */
   async deletePlan(planId: string): Promise<boolean> {
-    return this.plans.delete(planId);
+    try {
+      await this.apiCall(`/${planId}`, { method: 'DELETE' });
+      return true;
+    } catch {
+      return false;
+    }
   }
   
   /**
    * Analyze project requirements and identify missing hardware
    */
   async analyzeMissingHardware(planId: string): Promise<PlanProject | null> {
-    const plan = this.plans.get(planId);
-    if (!plan) return null;
-    
     try {
-      const tenantId = plan.tenantId;
-      const existingInventory = await inventoryService.getInventory(tenantId);
-      
-      // Clear existing missing hardware analysis
-      plan.purchasePlan.missingHardware = [];
-      plan.purchasePlan.totalEstimatedCost = 0;
-      
-      // Analyze each hardware requirement
-      for (const requirement of plan.hardwareRequirements.needed) {
-        const available = existingInventory.filter(item => 
-          item.category === requirement.category &&
-          item.equipmentType === requirement.equipmentType &&
-          (item.status === 'available' || item.status === 'reserved')
-        );
-        
-        const availableQuantity = available.reduce((sum, item) => sum + 1, 0);
-        const neededQuantity = requirement.quantity;
-        
-        if (availableQuantity < neededQuantity) {
-          const missingQuantity = neededQuantity - availableQuantity;
-          const estimatedCost = this.estimateHardwareCost(requirement);
-          
-          plan.purchasePlan.missingHardware.push({
-            id: `missing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            category: requirement.category,
-            equipmentType: requirement.equipmentType,
-            manufacturer: requirement.manufacturer,
-            model: requirement.model,
-            quantity: missingQuantity,
-            estimatedCost: estimatedCost * missingQuantity,
-            priority: requirement.priority,
-            specifications: requirement.specifications,
-            reason: this.generateMissingHardwareReason(requirement, missingQuantity, availableQuantity),
-            alternatives: this.generateAlternatives(requirement)
-          });
-          
-          plan.purchasePlan.totalEstimatedCost += estimatedCost * missingQuantity;
-        }
-      }
-      
-      // Update plan
-      plan.updatedAt = new Date();
-      this.plans.set(planId, plan);
-      
-      return plan;
+      const plan = await this.apiCall(`/${planId}/analyze`, {
+        method: 'POST'
+      });
+      return this.mapBackendPlanToFrontend(plan);
     } catch (error) {
       console.error('Error analyzing missing hardware:', error);
       return null;
@@ -444,40 +543,29 @@ class PlanService {
       specifications?: any;
     }
   ): Promise<boolean> {
-    const plan = this.plans.get(planId);
-    if (!plan) return false;
-    
-    plan.hardwareRequirements.needed.push({
-      ...requirement,
-      estimatedCost: this.estimateHardwareCost(requirement)
-    });
-    
-    plan.updatedAt = new Date();
-    this.plans.set(planId, plan);
-    
-    // Re-analyze missing hardware
-    await this.analyzeMissingHardware(planId);
-    
-    return true;
+    try {
+      await this.apiCall(`/${planId}/requirements`, {
+        method: 'POST',
+        body: JSON.stringify(requirement)
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
   
   /**
    * Remove hardware requirement from a plan
    */
   async removeHardwareRequirement(planId: string, requirementIndex: number): Promise<boolean> {
-    const plan = this.plans.get(planId);
-    if (!plan || requirementIndex < 0 || requirementIndex >= plan.hardwareRequirements.needed.length) {
+    try {
+      await this.apiCall(`/${planId}/requirements/${requirementIndex}`, {
+        method: 'DELETE'
+      });
+      return true;
+    } catch {
       return false;
     }
-    
-    plan.hardwareRequirements.needed.splice(requirementIndex, 1);
-    plan.updatedAt = new Date();
-    this.plans.set(planId, plan);
-    
-    // Re-analyze missing hardware
-    await this.analyzeMissingHardware(planId);
-    
-    return true;
   }
   
   /**
@@ -494,24 +582,20 @@ class PlanService {
     totalCost: number;
     generatedAt: Date;
   } | null> {
-    const plan = this.plans.get(planId);
-    if (!plan || plan.purchasePlan.missingHardware.length === 0) return null;
-    
-    const purchaseOrderId = `PO_${planId}_${Date.now()}`;
-    
-    const items = plan.purchasePlan.missingHardware.map(item => ({
-      equipmentType: `${item.manufacturer || 'Generic'} ${item.model || item.equipmentType}`,
-      quantity: item.quantity,
-      estimatedCost: item.estimatedCost,
-      priority: item.priority
-    }));
-    
-    return {
-      purchaseOrderId,
-      items,
-      totalCost: plan.purchasePlan.totalEstimatedCost,
-      generatedAt: new Date()
-    };
+    try {
+      const purchaseOrder = await this.apiCall(`/${planId}/purchase-order`, {
+        method: 'POST'
+      });
+      
+      return {
+        purchaseOrderId: purchaseOrder.purchaseOrderId,
+        items: purchaseOrder.items,
+        totalCost: purchaseOrder.totalCost,
+        generatedAt: new Date(purchaseOrder.generatedAt)
+      };
+    } catch {
+      return null;
+    }
   }
   
   /**

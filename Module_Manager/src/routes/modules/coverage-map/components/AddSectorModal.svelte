@@ -7,6 +7,7 @@
   export let sites: TowerSite[] = [];
   export let selectedSite: TowerSite | null = null;
   export let tenantId: string;
+  export let planId: string | null = null; // Plan ID if creating sector within a plan
   
   const dispatch = createEventDispatcher();
   
@@ -77,7 +78,7 @@
     error = '';
     
     try {
-      const sectorData = {
+      const sectorData: any = {
         siteId: formData.siteId,
         name: formData.name,
         location: {
@@ -99,6 +100,11 @@
         radioSerialNumber: formData.radioSerialNumber || undefined,
         status: formData.status
       };
+      
+      // Add planId if in plan mode
+      if (planId) {
+        sectorData.planId = planId;
+      }
       
       await coverageMapService.createSector(tenantId, sectorData);
       

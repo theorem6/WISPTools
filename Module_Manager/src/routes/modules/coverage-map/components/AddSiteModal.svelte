@@ -7,6 +7,7 @@
   export let initialLongitude: number | null = null;
   export let initialType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
   export let tenantId: string;
+  export let planId: string | null = null; // Plan ID if creating site within a plan
   
   const dispatch = createEventDispatcher();
   
@@ -87,6 +88,11 @@
         },
         tenantId
       };
+      
+      // Add planId if in plan mode
+      if (planId) {
+        siteData.planId = planId;
+      }
       
       // Add optional location fields only if they have values
       if (formData.address?.trim()) siteData.location.address = formData.address.trim();

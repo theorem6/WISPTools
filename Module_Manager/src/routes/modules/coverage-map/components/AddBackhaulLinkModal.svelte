@@ -7,6 +7,7 @@
   export let sites: TowerSite[] = [];
   export let fromSite: TowerSite | null = null;
   export let tenantId: string;
+  export let planId: string | null = null; // Plan ID if creating backhaul within a plan
   
   const dispatch = createEventDispatcher();
   

@@ -108,6 +108,9 @@
   
   // Check if stats should be hidden (for plan module)
   $: hideStats = $page.url.searchParams.get('hideStats') === 'true';
+  // Plan mode - when creating sites within a plan
+  $: planId = $page.url.searchParams.get('planId') || null;
+  $: planMode = $page.url.searchParams.get('planMode') === 'true';
   
   onMount(async () => {
     if (tenantId) {
@@ -116,8 +119,13 @@
     isLoading = false;
   });
   
-  // Watch for tenant changes
+  // Watch for tenant changes and plan visibility changes
   $: if (browser && tenantId) {
+    loadAllData();
+  }
+  
+  // Reload when plan visibility changes
+  $: if (browser && planId !== null) {
     loadAllData();
   }
   
@@ -126,24 +134,58 @@
     error = '';
     
     try {
+      // Import planService dynamically to avoid circular dependencies
+      const { planService } = await import('$lib/services/planService');
+      
       const [
         loadedTowers,
         loadedSectors,
         loadedCPE,
-        loadedEquipment
+        loadedEquipment,
+        plans
       ] = await Promise.all([
         coverageMapService.getTowerSites(tenantId),
         coverageMapService.getSectors(tenantId),
         coverageMapService.getCPEDevices(tenantId),
-        coverageMapService.getEquipment(tenantId)
+        coverageMapService.getEquipment(tenantId),
+        tenantId ? planService.getPlans(tenantId).catch(() => []) : Promise.resolve([])
       ]);
       
-      towers = loadedTowers;
-      sectors = loadedSectors;
-      cpeDevices = loadedCPE;
-      equipment = loadedEquipment;
+      // Get visible plan IDs
+      const visiblePlanIds = new Set(
+        plans.filter((p: any) => p.showOnMap).map((p: any) => p.id || p._id)
+      );
       
-      console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment`);
+      // Filter sites/equipment based on plan visibility
+      // Show sites if: 
+      // 1. They have no planId (not part of any plan)
+      // 2. They belong to a visible plan (showOnMap === true)
+      // 3. We're in plan mode and they belong to the active plan
+      towers = loadedTowers.filter((site: any) => {
+        if (!site.planId) return true; // Sites without plans always visible
+        if (planMode && site.planId === planId) return true; // In plan mode, show all sites for this plan
+        return visiblePlanIds.has(site.planId); // Otherwise, only show if plan is visible
+      });
+      
+      sectors = loadedSectors.filter((sector: any) => {
+        if (!sector.planId) return true;
+        if (planMode && sector.planId === planId) return true;
+        return visiblePlanIds.has(sector.planId);
+      });
+      
+      cpeDevices = loadedCPE.filter((cpe: any) => {
+        if (!cpe.planId) return true;
+        if (planMode && cpe.planId === planId) return true;
+        return visiblePlanIds.has(cpe.planId);
+      });
+      
+      equipment = loadedEquipment.filter((eq: any) => {
+        if (!eq.planId) return true;
+        if (planMode && eq.planId === planId) return true;
+        return visiblePlanIds.has(eq.planId);
+      });
+      
+      console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment (filtered by ${visiblePlanIds.size} visible plans)`);
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';
@@ -430,6 +472,8 @@
     <CoverageMapView 
       bind:this={mapComponent}
       {towers}
+      {planId}
+      {planMode}
       {sectors}
       {cpeDevices}
       {equipment}
@@ -669,6 +713,7 @@
   sites={towers}
   selectedSite={selectedSiteForSector}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -678,6 +723,7 @@
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -686,6 +732,7 @@
   fromSite={selectedSiteForBackhaul}
   sites={towers}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 

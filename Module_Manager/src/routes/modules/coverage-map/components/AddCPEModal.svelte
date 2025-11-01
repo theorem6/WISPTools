@@ -8,6 +8,7 @@
   export let initialLatitude: number | null = null;
   export let initialLongitude: number | null = null;
   export let tenantId: string;
+  export let planId: string | null = null; // Plan ID if creating CPE within a plan
   
   const dispatch = createEventDispatcher();
   

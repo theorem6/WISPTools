@@ -12,6 +12,7 @@
   import SettingsButton from '$lib/components/SettingsButton.svelte';
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
+  import PlanApprovalModal from './components/PlanApprovalModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -25,6 +26,7 @@
   let readyPlans: PlanProject[] = [];
   let selectedPlan: PlanProject | null = null;
   let isLoadingPlans = false;
+  let approvalMode: 'approve' | 'reject' | null = null;
   
   // PCI Planner
   let showPCIPlannerModal = false;
@@ -62,6 +64,7 @@
       }
       
       await loadAvailableHardware();
+      await loadReadyPlans();
     }
     
     return () => {
@@ -114,8 +117,11 @@
     try {
       const tenantId = $currentTenant?.id;
       if (tenantId) {
-        const plans = await planService.getPlans(tenantId);
-        readyPlans = plans.filter(plan => plan.status === 'ready');
+        // Get plans that are ready for approval OR approved (for deployment)
+        const allPlans = await planService.getPlans(tenantId);
+        readyPlans = allPlans.filter(plan => 
+          plan.status === 'ready' || plan.status === 'approved'
+        );
       }
     } catch (err) {
       console.error('Failed to load ready plans:', err);
@@ -123,6 +129,7 @@
       isLoadingPlans = false;
     }
   }
+  
 
   function goBack() {
     goto('/dashboard');
@@ -158,56 +165,38 @@
   // Plan approval functions
   function openPlanApproval() {
     showPlanApprovalModal = true;
+    if (readyPlans.length > 0 && !selectedPlan) {
+      selectedPlan = readyPlans[0];
+    }
   }
 
   function closePlanApprovalModal() {
     showPlanApprovalModal = false;
     selectedPlan = null;
+    approvalMode = null;
   }
 
   function selectPlanForApproval(plan: PlanProject) {
     selectedPlan = plan;
+    showPlanApprovalModal = true;
   }
-
-  async function approvePlan() {
-    if (!selectedPlan) return;
-    
-    try {
-      await planService.updatePlan(selectedPlan.id, { status: 'approved' });
-      await loadReadyPlans();
-      alert(`Plan "${selectedPlan.name}" has been approved for deployment.`);
-      closePlanApprovalModal();
-    } catch (error) {
-      console.error('Error approving plan:', error);
-      alert('Failed to approve plan');
+  
+  async function handlePlanApproved(event: CustomEvent) {
+    await loadReadyPlans();
+    // Keep modal open but update selected plan
+    if (selectedPlan) {
+      const updatedPlan = readyPlans.find(p => p.id === selectedPlan?.id);
+      if (updatedPlan) {
+        selectedPlan = updatedPlan;
+      }
     }
   }
-
-  async function rejectPlan() {
-    if (!selectedPlan) return;
-    
-    try {
-      await planService.updatePlan(selectedPlan.id, { status: 'rejected' });
-      await loadReadyPlans();
-      alert(`Plan "${selectedPlan.name}" has been rejected.`);
-      closePlanApprovalModal();
-    } catch (error) {
-      console.error('Error rejecting plan:', error);
-      alert('Failed to reject plan');
-    }
-  }
-
-  async function refactorPlan() {
-    if (!selectedPlan) return;
-    
-    try {
-      await planService.updatePlan(selectedPlan.id, { status: 'draft' });
-      await loadReadyPlans();
-      alert(`Plan "${selectedPlan.name}" has been sent back for refactoring.`);
-      closePlanApprovalModal();
-    } catch (error) {
-      console.error('Error refactoring plan:', error);
-      alert('Failed to refactor plan');
+  
+  async function handlePlanRejected(event: CustomEvent) {
+    await loadReadyPlans();
+    // Remove rejected plan from selection
+    if (selectedPlan && selectedPlan.status === 'rejected') {
+      selectedPlan = readyPlans.find(p => p.status === 'ready' || p.status === 'approved') || null;
     }
   }
 
@@ -413,7 +402,63 @@
     tenantId={$currentTenant?.id || ''}
     on:close={closeFrequencyPlannerModal}
   />
-
+  
+  <!-- Plan Approval Modal -->
+  {#if showPlanApprovalModal && selectedPlan}
+    <PlanApprovalModal
+      show={showPlanApprovalModal}
+      plan={selectedPlan}
+      on:close={closePlanApprovalModal}
+      on:approved={handlePlanApproved}
+      on:rejected={handlePlanRejected}
+    />
+  {/if}
+  
+  <!-- Plan Selection Modal (if no plan selected) -->
+  {#if showPlanApprovalModal && !selectedPlan && readyPlans.length > 0}
+    <div class="modal-overlay" on:click={closePlanApprovalModal}>
+      <div class="plan-list-modal" on:click|stopPropagation>
+        <div class="modal-header">
+          <h2>📋 Select Plan to Approve/Reject</h2>
+          <button class="close-btn" on:click={closePlanApprovalModal}>✕</button>
+        </div>
+        
+        <div class="modal-body">
+          {#if isLoadingPlans}
+            <div class="loading">Loading plans...</div>
+          {:else if readyPlans.length === 0}
+            <div class="empty-state">
+              <p>No plans ready for approval</p>
+            </div>
+          {:else}
+            <div class="plan-list">
+              {#each readyPlans as plan}
+                <div class="plan-item" on:click={() => selectPlanForApproval(plan)}>
+                  <div class="plan-header">
+                    <h3>{plan.name}</h3>
+                    <span class="status-badge {plan.status}">{plan.status}</span>
+                  </div>
+                  {#if plan.description}
+                    <p class="plan-description">{plan.description}</p>
+                  {/if}
+                  <div class="plan-meta">
+                    <span>Scope: {plan.scope.towers.length} towers, {plan.scope.sectors.length} sectors</span>
+                    {#if plan.purchasePlan?.totalEstimatedCost}
+                      <span>Cost: ${plan.purchasePlan.totalEstimatedCost.toLocaleString()}</span>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" on:click={closePlanApprovalModal}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  {/if}
   
   <!-- Global Settings Button -->
   <SettingsButton />
@@ -793,5 +838,143 @@
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
     transform: none;
+  }
+  
+  /* Plan Approval Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .plan-list-modal {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+  }
+  
+  .plan-list-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .plan-list-modal .modal-header h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  
+  .plan-list-modal .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: var(--transition);
+  }
+  
+  .plan-list-modal .close-btn:hover {
+    color: var(--text-primary);
+  }
+  
+  .plan-list-modal .modal-body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+  }
+  
+  .plan-list-modal .modal-footer {
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .plan-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .plan-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .plan-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--brand-primary);
+    transform: translateY(-1px);
+  }
+  
+  .plan-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .plan-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  
+  .plan-description {
+    margin: 0.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+  
+  .plan-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+  
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .status-badge.ready {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  }
+  
+  .status-badge.approved {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+  }
+  
+  .loading,
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
   }
 </style>
