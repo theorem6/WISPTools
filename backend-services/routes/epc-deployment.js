@@ -164,7 +164,7 @@ d-i partman/confirm_write_new_label boolean true
 d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 tasksel tasksel/first multiselect standard, ssh-server
-d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release
+d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release cmake flex bison
 d-i finish-install/reboot_in_progress note
 d-i preseed/late_command string \
     in-target mkdir -p /etc/wisptools /opt/wisptools; \

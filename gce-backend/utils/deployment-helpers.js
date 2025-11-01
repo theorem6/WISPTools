@@ -142,6 +142,7 @@ print_status "Installing essential build tools and dependencies..."
 apt-get install -y --no-install-recommends \\
     wget curl gnupg software-properties-common apt-transport-https ca-certificates \\
     build-essential git make gcc g++ autoconf automake libtool pkg-config \\
+    cmake flex bison \\
     libssl-dev libpcre3-dev zlib1g-dev libncurses5-dev libreadline-dev \\
     libyaml-dev libffi-dev python3 python3-pip \\
     systemd networkd-dispatcher net-tools iproute2 iputils-ping \\
