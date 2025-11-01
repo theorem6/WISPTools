@@ -88,6 +88,7 @@ print_status "All EPC components will use: \$MME_IP"
 echo ""
 
 # Persist framebuffer/console settings in GRUB to avoid graphics initialization
+# ⚠️  Permanently disable framebuffer using nomodeset and nofb (not deprecated vga=normal)
 print_header "Configuring GRUB for headless/text-only operation"
 if [ -f /etc/default/grub ]; then
   print_status "Updating /etc/default/grub kernel parameters"
@@ -95,7 +96,9 @@ if [ -f /etc/default/grub ]; then
   if ! grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' /etc/default/grub; then
     echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet"' >> /etc/default/grub
   fi
-  # Inject parameters idempotently: nomodeset nofb text and serial consoles (removed vga=normal, deprecated)
+  # Update kernel parameters: nomodeset nofb (disable framebuffer), text mode, serial console
+  # Remove any existing nomodeset/nofb to avoid duplicates, then add them
+  sed -i 's/ nomodeset//g; s/ nofb//g' /etc/default/grub
   sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\\(.*\\)"/GRUB_CMDLINE_LINUX_DEFAULT="\\1 nomodeset nofb text console=ttyS0,115200n8 console=tty1"/g' /etc/default/grub
   # Configure GRUB graphics mode for VirtualBox compatibility
   if ! grep -q '^GRUB_GFXMODE=' /etc/default/grub; then
@@ -110,7 +113,7 @@ if [ -f /etc/default/grub ]; then
   else
     grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 || true
   fi
-  print_success "GRUB updated for headless boot with VirtualBox compatibility"
+  print_success "GRUB updated: framebuffer disabled (nomodeset nofb), text-only boot"
 else
   print_status "/etc/default/grub not found, skipping persistent framebuffer disable"
 fi
