@@ -1309,5 +1309,7 @@ async function checkMetricsForAlerts(epc, metrics) {
   }
 }
 
+// Export script generator for use in other modules
 module.exports = router;
+module.exports.generateDeploymentScript = generateDeploymentScript;
 

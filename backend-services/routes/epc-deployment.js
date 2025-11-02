@@ -9,6 +9,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const { Tenant } = require('../models/tenant');
+const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 const execAsync = promisify(exec);
 const router = express.Router();
@@ -536,27 +537,23 @@ router.get('/:epc_id/full-deployment', async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    // In production, this would fetch EPC config from database
-    // and generate the full deployment script with script-generator.js
-    const deploymentScript = `#!/bin/bash
-# Full EPC Deployment Script
-# EPC: ${epc_id}
-# Generated on GCE server
-
-echo "🚀 Starting full EPC deployment for ${epc_id}..."
-
-# This would be the full script from script-generator.js
-# Including Open5GS installation, HSS configuration, etc.
-
-# For now, placeholder
-echo "Installing Open5GS components..."
-echo "Configuring Cloud HSS at ${GCE_PUBLIC_IP}:${HSS_PORT}..."
-echo "Setting up metrics agent..."
-echo "✅ Deployment complete!"
-`;
+    // Fetch EPC config from database
+    const epc = await RemoteEPC.findOne({
+      epc_id: epc_id,
+      auth_code: auth_code,
+      enabled: true
+    }).lean();
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found or authentication failed' });
+    }
+    
+    // Generate full deployment script using the script generator from epc.js
+    const epcRoute = require('./epc');
+    const deploymentScript = epcRoute.generateDeploymentScript(epc);
     
     res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', `attachment; filename="deploy-${epc_id}.sh"`);
+    res.setHeader('Content-Disposition', `attachment; filename="deploy-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh"`);
     res.send(deploymentScript);
     
   } catch (error) {
@@ -711,44 +708,44 @@ set -e
 # Load credentials
 source /etc/wisptools/credentials.env
 
-echo "🚀 WISPTools.io EPC Bootstrap"
+echo "?? WISPTools.io EPC Bootstrap"
 echo "EPC ID: $EPC_ID"
 echo "Tenant ID: $TENANT_ID"
 echo ""
 
 # Check network connectivity
-echo "📡 Checking network..."
+echo "?? Checking network..."
 MAX_RETRIES=30
 RETRY=0
 while ! ping -c 1 ${gce_ip} > /dev/null 2>&1; do
     RETRY=$((RETRY + 1))
     if [ $RETRY -gt $MAX_RETRIES ]; then
-        echo "❌ Cannot reach GCE server at ${gce_ip}"
+        echo "? Cannot reach GCE server at ${gce_ip}"
         exit 1
     fi
     echo "Waiting for network... ($RETRY/$MAX_RETRIES)"
     sleep 2
 done
 
-echo "✅ Network connectivity confirmed"
+echo "? Network connectivity confirmed"
 echo ""
 
 # Download full deployment script from GCE
-echo "📥 Downloading full deployment script from GCE server..."
+echo "?? Downloading full deployment script from GCE server..."
 wget -O /tmp/full-deployment.sh \\
     "http://${gce_ip}:${hss_port}/api/epc/$EPC_ID/full-deployment?auth_code=$EPC_AUTH_CODE"
 
 if [ $? -ne 0 ]; then
-    echo "❌ Failed to download deployment script"
+    echo "? Failed to download deployment script"
     exit 1
 fi
 
-echo "✅ Deployment script downloaded"
+echo "? Deployment script downloaded"
 echo ""
 
 # Make executable and run
 chmod +x /tmp/full-deployment.sh
-echo "🚀 Executing full deployment..."
+echo "?? Executing full deployment..."
 bash /tmp/full-deployment.sh
 
 # Mark as bootstrapped
@@ -756,7 +753,7 @@ mkdir -p /var/lib/wisptools
 touch /var/lib/wisptools/.bootstrapped
 
 echo ""
-echo "✅ Bootstrap complete!"
+echo "? Bootstrap complete!"
 echo "EPC $EPC_ID is now deployed and connected to Cloud HSS"
 echo ""
 
