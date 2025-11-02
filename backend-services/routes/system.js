@@ -6,20 +6,14 @@ const { execSync } = require('child_process');
 const os = require('os');
 const router = express.Router();
 
-// Platform admin middleware
-function requirePlatformAdmin(req, res, next) {
-  // In production, verify the user is david@david.com via Firebase token
-  // For now, we'll add basic validation
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Authorization required' });
-  }
-  
-  // TODO: Verify Firebase token and check email === 'david@david.com'
-  // For now, allow if auth header is present
-  next();
-}
+// Use reusable admin middleware
+const { requireAuth, requireAdmin: requireAdminMiddleware } = require('../middleware/admin-auth');
+
+// All system routes require authentication
+router.use(requireAuth);
+
+// Platform admin middleware - only platform_admin role allowed
+const requirePlatformAdmin = requireAdminMiddleware({ allowedRoles: ['platform_admin'] });
 
 /**
  * Get all services status (PM2 + systemd)
@@ -272,7 +266,7 @@ router.post('/system/restart-all', requirePlatformAdmin, (req, res) => {
  */
 router.post('/system/reboot', requirePlatformAdmin, (req, res) => {
   try {
-    console.log('[System Management] ⚠️ REBOOTING VM');
+    console.log('[System Management] ?? REBOOTING VM');
     
     // Send response before rebooting
     res.json({ success: true, message: 'VM reboot initiated. System will be back online in 1-2 minutes.' });

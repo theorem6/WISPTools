@@ -184,6 +184,15 @@ class APIService {
     return response.data;
   }
 
+  async acceptWorkOrder(id: string, userId: string) {
+    const response = await this.client.put(`/api/work-orders/${id}`, {
+      status: 'assigned',
+      assignedTo: userId,
+      assignedAt: new Date().toISOString()
+    });
+    return response.data;
+  }
+
   async addWorkLog(workOrderId: string, log: any) {
     const response = await this.client.post(`/api/work-orders/${workOrderId}/logs`, log);
     return response.data;
