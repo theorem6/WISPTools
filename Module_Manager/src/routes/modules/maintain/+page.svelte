@@ -91,6 +91,15 @@
       path: '/modules/inventory',
       status: 'active',
       features: ['Hardware Upload', 'Equipment Tracking', 'Asset Tagging', 'Inventory Management']
+    },
+    {
+      id: 'customer-management',
+      name: 'Customer Management',
+      description: 'Manage tenant customers, subscribers, and service accounts',
+      icon: '👥',
+      path: '/modules/customers',
+      status: 'active',
+      features: ['Customer Database', 'Service Management', 'Billing Information', 'Installation History', 'Customer Support', 'Service Plans']
     }
   ];
 
