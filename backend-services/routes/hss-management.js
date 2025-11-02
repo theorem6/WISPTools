@@ -753,22 +753,39 @@ router.get('/mme-connections', async (req, res) => {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
 
-    // This would typically query Open5GS HSS for active MME connections
-    // For now, return mock data
-    const connections = [
-      {
-        mme_id: 'mme-001',
-        ip_address: '192.168.1.100',
-        status: 'active',
-        last_seen: new Date(),
-        tenant_id: tenantId
-      }
-    ];
+    // Query RemoteEPC for active EPC connections (MMEs connect via EPCs)
+    const { RemoteEPC } = require('../models/distributed-epc-schema');
+    
+    const epcs = await RemoteEPC.find({
+      tenant_id: tenantId,
+      status: { $in: ['online', 'registered'] }
+    })
+      .select('epc_id site_name status last_heartbeat last_seen network_config location')
+      .lean();
+    
+    // Map EPCs to MME connection format
+    const connections = epcs.map(epc => {
+      // Extract IP from network_config or use location-based IP
+      const mmeIp = epc.network_config?.mme_address || 
+                    epc.location?.coordinates || 
+                    'N/A';
+      
+      return {
+        mme_id: epc.epc_id,
+        epc_id: epc.epc_id,
+        site_name: epc.site_name,
+        ip_address: typeof mmeIp === 'object' ? 'auto-detected' : mmeIp,
+        status: epc.status === 'online' ? 'active' : 'inactive',
+        last_seen: epc.last_seen || epc.last_heartbeat || epc.updated_at,
+        tenant_id: tenantId,
+        location: epc.location
+      };
+    });
 
     res.json(connections);
   } catch (error) {
     console.error('Error fetching MME connections:', error);
-    res.status(500).json({ error: 'Failed to fetch MME connections' });
+    res.status(500).json({ error: 'Failed to fetch MME connections', message: error.message });
   }
 });
 

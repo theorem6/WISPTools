@@ -2,27 +2,13 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
-  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
-  import { currentTenant } from '$lib/stores/tenantStore';
-  import { authService } from '$lib/services/authService';
-  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
-  import SettingsButton from '$lib/components/SettingsButton.svelte';
 
-  let currentUser: any = null;
-  let mapContainer: HTMLDivElement;
-
-  onMount(async () => {
+  onMount(() => {
+    // Redirect to monitoring module (the actual monitoring implementation)
     if (browser) {
-      currentUser = await authService.getCurrentUser();
-      if (!currentUser) {
-        goto('/login');
-      }
+      goto('/modules/monitoring');
     }
   });
-
-  function goBack() {
-    goto('/dashboard');
-  }
 </script>
 
 <TenantGuard>
