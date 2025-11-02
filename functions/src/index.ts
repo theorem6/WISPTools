@@ -243,7 +243,7 @@ export const hssProxy = onRequest({
   // Use domain with HTTPS for port 3001 (proxied through nginx), IP with HTTP for port 3002 (direct access)
   // Prefer direct IP over HTTP to avoid nginx/DNS issues
   const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
-  const backendHost = `http://${backendIp}:3001`;
+  const backendHost = `http://${backendIp}:3000`;
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
