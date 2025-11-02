@@ -220,8 +220,7 @@ export const hssProxy = onRequest({
   region: 'us-central1',
   memory: '256MiB',
   timeoutSeconds: 60,
-  cors: true,
-  consumeAwsRequestId: true
+  cors: true
 }, async (req, res) => {
   // Set CORS headers explicitly and reflect origin
   const origin = (req.headers.origin as string) || '*';
