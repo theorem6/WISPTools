@@ -199,6 +199,85 @@ class APIService {
   }
 
   // ============================================================================
+  // INSTALLATION DOCUMENTATION API
+  // ============================================================================
+
+  async createInstallationDocumentation(data: any) {
+    const response = await this.client.post('/api/installation-documentation', data);
+    return response.data;
+  }
+
+  async getInstallationDocumentation(id: string) {
+    const response = await this.client.get(`/api/installation-documentation/${id}`);
+    return response.data;
+  }
+
+  async uploadInstallationPhotos(docId: string, photos: any[], photoData: any[]) {
+    const formData = new FormData();
+    
+    photos.forEach((photo, index) => {
+      formData.append('photos', {
+        uri: photo.uri,
+        type: photo.type || 'image/jpeg',
+        name: photo.filename || `photo-${Date.now()}-${index}.jpg`
+      } as any);
+      
+      if (photoData[index]?.description) {
+        formData.append(`description_${photo.filename || `photo-${index}.jpg`}`, photoData[index].description);
+      }
+      if (photoData[index]?.category) {
+        formData.append(`category_${photo.filename || `photo-${index}.jpg`}`, photoData[index].category);
+      }
+    });
+    
+    if (photoData[0]?.location) {
+      formData.append('location', JSON.stringify(photoData[0].location));
+    }
+    
+    const response = await this.client.post(
+      `/api/installation-documentation/${docId}/photos`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+    return response.data;
+  }
+
+  async updateInstallationDocumentation(id: string, data: any) {
+    const response = await this.client.put(`/api/installation-documentation/${id}`, data);
+    return response.data;
+  }
+
+  async submitInstallationDocumentation(id: string) {
+    const response = await this.client.post(`/api/installation-documentation/${id}/submit`);
+    return response.data;
+  }
+
+  async getPendingApprovals() {
+    const response = await this.client.get('/api/installation-documentation', {
+      params: { approvalStatus: 'submitted' }
+    });
+    return response.data;
+  }
+
+  // ============================================================================
+  // SUBCONTRACTORS API
+  // ============================================================================
+
+  async getSubcontractors() {
+    const response = await this.client.get('/api/subcontractors');
+    return response.data;
+  }
+
+  async getSubcontractor(id: string) {
+    const response = await this.client.get(`/api/subcontractors/${id}`);
+    return response.data;
+  }
+
+  // ============================================================================
   // PLANS API - Role-based plan distribution
   // ============================================================================
 

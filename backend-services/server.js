@@ -56,6 +56,8 @@ app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
 app.use('/api/billing', require('./billing-api'));
 app.use('/api/equipment-pricing', require('./routes/equipment-pricing'));
+app.use('/api/installation-documentation', require('./routes/installation-documentation'));
+app.use('/api/subcontractors', require('./routes/subcontractors'));
 app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
 app.use('/setup-admin', require('./routes/setup'));

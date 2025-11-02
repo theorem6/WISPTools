@@ -56,9 +56,21 @@ const WorkOrderSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ['open', 'assigned', 'in-progress', 'waiting-parts', 'resolved', 'closed', 'cancelled'],
+    enum: ['open', 'assigned', 'in-progress', 'waiting-parts', 'waiting-approval', 'resolved', 'closed', 'cancelled'],
     default: 'open'
   },
+  
+  // Approval Workflow (for installations)
+  requiresApproval: { type: Boolean, default: false },
+  approvalStatus: {
+    type: String,
+    enum: ['not-required', 'pending', 'under-review', 'approved', 'rejected'],
+    default: 'not-required'
+  },
+  approvedAt: Date,
+  approvedBy: String, // User ID (management)
+  approvedByName: String,
+  approvalNotes: String,
   
   // Assignment
   assignedTo: String,      // User ID

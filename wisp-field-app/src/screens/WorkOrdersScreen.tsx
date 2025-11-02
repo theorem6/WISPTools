@@ -169,11 +169,23 @@ export default function WorkOrdersScreen() {
           <TouchableOpacity
             style={styles.startButton}
             onPress={() => {
-              // Navigate to ticket details to start work
-              navigation.navigate('TicketDetails' as never, { ticket: item } as never);
+              // For installations, navigate to documentation screen
+              if (item.type === 'installation') {
+                navigation.navigate('InstallationDocumentation' as never, {
+                  workOrder: item,
+                  siteId: item.affectedSites?.[0]?.siteId,
+                  siteName: item.affectedSites?.[0]?.siteName,
+                  installationType: item.issueCategory || 'equipment'
+                } as never);
+              } else {
+                // Other types go to ticket details
+                navigation.navigate('TicketDetails' as never, { ticket: item } as never);
+              }
             }}
           >
-            <Text style={styles.startText}>Start Work</Text>
+            <Text style={styles.startText}>
+              {item.type === 'installation' ? '📸 Document' : 'Start Work'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
