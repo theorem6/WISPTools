@@ -19,6 +19,7 @@
     features: string[];
   }
 
+  // Updated: 2025-11-02 - Combined ticketing features
   const maintainFeatures: MaintainFeature[] = [
     {
       id: 'comprehensive-ticketing',
