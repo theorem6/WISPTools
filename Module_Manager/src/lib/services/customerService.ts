@@ -5,8 +5,6 @@
 
 import { browser } from '$app/environment';
 import { authService } from './authService';
-import { currentTenant } from '../stores/tenantStore';
-import { get } from 'svelte/store';
 
 const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
@@ -73,15 +71,12 @@ class CustomerService {
       throw new Error('Not authenticated');
     }
 
-    const tenant = get(currentTenant);
-    const tenantId = tenant?.id;
+    // Use localStorage like all other working services (workOrderService, inventoryService, planService)
+    const tenantId = localStorage.getItem('selectedTenantId');
     
     if (!tenantId) {
-      console.error('[CustomerService] No tenant ID available. Current tenant:', tenant);
       throw new Error('No tenant selected');
     }
-    
-    console.log('[CustomerService] Making request with tenant ID:', tenantId);
 
     const response = await fetch(`${API_URL}/api/customers${endpoint}`, {
       ...options,

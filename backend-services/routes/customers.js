@@ -7,6 +7,18 @@ const express = require('express');
 const router = express.Router();
 const { Customer } = require('../models/customer');
 
+// Middleware to extract tenant ID (matching pattern used by work-orders, plans, etc.)
+const requireTenant = (req, res, next) => {
+  const tenantId = req.headers['x-tenant-id'];
+  if (!tenantId) {
+    return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+  }
+  req.tenantId = tenantId;
+  next();
+};
+
+router.use(requireTenant);
+
 // ============================================================================
 // CUSTOMER CRUD ENDPOINTS
 // ============================================================================
@@ -17,11 +29,7 @@ const { Customer } = require('../models/customer');
  */
 router.get('/', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
-    
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = req.tenantId;
     
     const { status, search, limit = 100 } = req.query;
     
@@ -65,11 +73,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
-    
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
+    const tenantId = req.tenantId;
     
     // Generate customer ID
     const count = await Customer.countDocuments({ tenantId });
@@ -106,7 +110,7 @@ router.post('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { id } = req.params;
     
     const customer = await Customer.findOne({ 
@@ -134,7 +138,7 @@ router.get('/:id', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { id } = req.params;
     
     const customer = await Customer.findOneAndUpdate(
@@ -163,7 +167,7 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { id } = req.params;
     
     const customer = await Customer.findOneAndUpdate(
@@ -196,7 +200,7 @@ router.delete('/:id', async (req, res) => {
  */
 router.post('/:id/service-history', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { id } = req.params;
     
     const customer = await Customer.findOneAndUpdate(
@@ -237,7 +241,7 @@ router.post('/:id/service-history', async (req, res) => {
  */
 router.post('/:id/complaints', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { id } = req.params;
     
     const customer = await Customer.findOneAndUpdate(
@@ -275,7 +279,7 @@ router.post('/:id/complaints', async (req, res) => {
  */
 router.put('/:id/complaints/:complaintId', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { id, complaintId } = req.params;
     
     const customer = await Customer.findOneAndUpdate(
@@ -317,7 +321,7 @@ router.put('/:id/complaints/:complaintId', async (req, res) => {
  */
 router.get('/search/phone/:phone', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { phone } = req.params;
     
     const customers = await Customer.find({
@@ -342,7 +346,7 @@ router.get('/search/phone/:phone', async (req, res) => {
  */
 router.get('/search/email/:email', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { email } = req.params;
     
     const customers = await Customer.find({
@@ -364,7 +368,7 @@ router.get('/search/email/:email', async (req, res) => {
  */
 router.get('/search/imsi/:imsi', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     const { imsi } = req.params;
     
     const customers = await Customer.find({
@@ -390,7 +394,7 @@ router.get('/search/imsi/:imsi', async (req, res) => {
  */
 router.get('/stats/summary', async (req, res) => {
   try {
-    const tenantId = req.headers['x-tenant-id'];
+    const tenantId = req.tenantId;
     
     const total = await Customer.countDocuments({ tenantId, isActive: true });
     const active = await Customer.countDocuments({ tenantId, isActive: true, serviceStatus: 'active' });
