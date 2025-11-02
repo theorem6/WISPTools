@@ -3,31 +3,8 @@
 //
 const express = require('express');
 const router = express.Router();
-// Use schema files that match server structure
-// On server: files are in /opt/hss-api/ (work-order-schema.js, customer-schema.js)
-// On dev: files are in models/ directory
-// Load models - server uses schema files at root, dev uses models/ directory
-let WorkOrder, Customer;
-try {
-  // Server structure: /opt/hss-api/work-order-schema.js
-  const workOrderSchema = require('../work-order-schema');
-  const customerSchema = require('../customer-schema');
-  WorkOrder = workOrderSchema.WorkOrder || workOrderSchema;
-  Customer = customerSchema.Customer || customerSchema;
-} catch (e) {
-  // Dev structure fallback
-  try {
-    const workOrderModel = require('../models/work-order');
-    const customerModel = require('../models/customer');
-    WorkOrder = workOrderModel.WorkOrder;
-    Customer = customerModel.Customer;
-  } catch (e2) {
-    console.error('Could not load models:', e2.message);
-    // Don't throw - allow partial functionality
-    WorkOrder = null;
-    Customer = null;
-  }
-}
+const { WorkOrder } = require('./work-order-schema');
+const { Customer } = require('./customer-schema');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
