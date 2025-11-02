@@ -6,6 +6,8 @@
   export let y = 0;
   export let latitude = 0;
   export let longitude = 0;
+  export let planMode = false; // Whether we're in plan mode
+  export let planName: string | null = null; // Name of the active plan (optional)
   
   const dispatch = createEventDispatcher();
   
@@ -31,28 +33,35 @@
     <span class="coords">
       📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}
     </span>
+    {#if planMode}
+      <div class="plan-mode-indicator">
+        📋 Plan Mode{planName ? `: ${planName}` : ''}
+      </div>
+    {/if}
   </div>
   
   <div class="menu-section">
-    <div class="section-label">Create Site</div>
+    <div class="section-label">
+      {planMode ? 'Add Site to Plan' : 'Create Site'}
+    </div>
     <button class="menu-item" on:click={() => handleAction('create-site-tower')}>
       <span class="menu-icon">📡</span>
-      <span>Create Tower Site</span>
+      <span>Add Tower Site{planMode ? ' to Plan' : ''}</span>
     </button>
     
     <button class="menu-item" on:click={() => handleAction('create-site-noc')}>
       <span class="menu-icon">🖥️</span>
-      <span>Create NOC</span>
+      <span>Add NOC{planMode ? ' to Plan' : ''}</span>
     </button>
     
     <button class="menu-item" on:click={() => handleAction('create-site-warehouse')}>
       <span class="menu-icon">🏭</span>
-      <span>Create Warehouse</span>
+      <span>Add Warehouse{planMode ? ' to Plan' : ''}</span>
     </button>
     
     <button class="menu-item" on:click={() => handleAction('create-site-other')}>
       <span class="menu-icon">📍</span>
-      <span>Create Other Site</span>
+      <span>Add Other Site{planMode ? ' to Plan' : ''}</span>
     </button>
   </div>
   
@@ -87,6 +96,19 @@
     font-size: 0.85rem;
     color: var(--text-secondary);
     font-family: monospace;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  
+  .plan-mode-indicator {
+    font-size: 0.75rem;
+    color: var(--brand-primary);
+    font-weight: 600;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 4px;
+    display: inline-block;
   }
   
   .menu-item {

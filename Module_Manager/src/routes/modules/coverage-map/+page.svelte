@@ -111,6 +111,7 @@
   // Plan mode - when creating sites within a plan
   $: planId = $page.url.searchParams.get('planId') || null;
   $: planMode = $page.url.searchParams.get('planMode') === 'true';
+  let activePlanName: string | null = null;
   
   onMount(async () => {
     if (tenantId) {
@@ -155,6 +156,14 @@
       const visiblePlanIds = new Set(
         plans.filter((p: any) => p.showOnMap).map((p: any) => p.id || p._id)
       );
+      
+      // Load active plan name if in plan mode
+      if (planMode && planId) {
+        const activePlan = plans.find((p: any) => (p.id || p._id) === planId);
+        activePlanName = activePlan?.name || null;
+      } else {
+        activePlanName = null;
+      }
       
       // Filter sites/equipment based on plan visibility
       // Show sites if: 
@@ -750,6 +759,8 @@
   y={contextMenuY}
   latitude={contextMenuLat}
   longitude={contextMenuLon}
+  planMode={planMode}
+  planName={activePlanName}
   on:action={handleContextMenuAction}
 />
 

@@ -30,7 +30,7 @@
       return false;
     }
   });
-  
+
   // Find internet access points (sites marked as internet access)
   $: internetAccessPoints = towers.filter(tower => 
     tower.type === 'internet-access' || tower.type === 'internet'
