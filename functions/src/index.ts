@@ -275,7 +275,9 @@ export const hssProxy = onRequest({
     originalUrl: (req as any).originalUrl,
     processedPath: proxiedPath,
     finalUrl: url,
-    headers: Object.keys(req.headers || {})
+    headers: Object.keys(req.headers || {}),
+    bodyType: typeof req.body,
+    bodyKeys: req.body ? Object.keys(req.body) : 'null/undefined'
   });
   
   try {
@@ -299,7 +301,18 @@ export const hssProxy = onRequest({
     };
     
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      options.body = JSON.stringify(req.body);
+      // Firebase Functions v2 automatically parses JSON bodies
+      // Check if body is already a string or an object
+      if (typeof req.body === 'string') {
+        options.body = req.body;
+        console.log('[hssProxy] Body is already a string, using as-is');
+      } else if (req.body === null || req.body === undefined) {
+        options.body = undefined;
+        console.log('[hssProxy] Body is null/undefined');
+      } else {
+        options.body = JSON.stringify(req.body);
+        console.log('[hssProxy] Body stringified:', options.body.substring(0, 200));
+      }
     }
     
     const response = await fetch(url, options);
