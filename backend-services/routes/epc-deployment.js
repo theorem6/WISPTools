@@ -120,88 +120,146 @@ ISO_PATH="${iso_path}"
 KERNEL_PATH="${KERNEL_PATH}"
 INITRD_PATH="${INITRD_PATH}"
 
-echo "[Build] Starting bootable ISO creation (Debian netboot)..."
-echo "[Build] Output: $ISO_PATH"
+    echo "[Build] Starting bootable ISO creation (Ubuntu 22.04 LTS netboot)..."
+    echo "[Build] Output: $ISO_PATH"
 
-MIN_DIR_FOR_KERNEL="$(dirname "$KERNEL_PATH")"
-mkdir -p "$MIN_DIR_FOR_KERNEL"
+    MIN_DIR_FOR_KERNEL="$(dirname "$KERNEL_PATH")"
+    mkdir -p "$MIN_DIR_FOR_KERNEL"
 
-# ALWAYS download fresh Debian netboot kernel/initrd (no caching)
-echo "[Build] Downloading fresh Debian netboot kernel/initrd..."
-DEBIAN_NETBOOT_BASE="https://deb.debian.org/debian/dists/bookworm/main/installer-amd64/current/images/netboot/debian-installer/amd64"
-rm -f "$KERNEL_PATH" "$INITRD_PATH" 2>/dev/null || true
-wget -q --timeout=30 --tries=3 -O "$KERNEL_PATH" "$DEBIAN_NETBOOT_BASE/linux" || { echo "[Build] ERROR: Failed to download kernel"; exit 1; }
-wget -q --timeout=30 --tries=3 -O "$INITRD_PATH" "$DEBIAN_NETBOOT_BASE/initrd.gz" || { echo "[Build] ERROR: Failed to download initrd"; exit 1; }
+    # ALWAYS download fresh Ubuntu 22.04 LTS netboot kernel/initrd (Open5GS compatible)
+    echo "[Build] Downloading fresh Ubuntu 22.04 LTS netboot kernel/initrd..."
+    UBUNTU_NETBOOT_BASE="http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64"
+    rm -f "$KERNEL_PATH" "$INITRD_PATH" 2>/dev/null || true
+    wget -q --timeout=30 --tries=3 -O "$KERNEL_PATH" "$UBUNTU_NETBOOT_BASE/linux" || { echo "[Build] ERROR: Failed to download kernel"; exit 1; }
+    wget -q --timeout=30 --tries=3 -O "$INITRD_PATH" "$UBUNTU_NETBOOT_BASE/initrd.gz" || { echo "[Build] ERROR: Failed to download initrd"; exit 1; }
 
-# Verify downloads succeeded
-if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
-  echo "[Build] ERROR: Downloaded files are empty or missing"
-  exit 1
-fi
-echo "[Build] Debian netboot files downloaded successfully"
+    # Verify downloads succeeded
+    if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
+      echo "[Build] ERROR: Downloaded files are empty or missing"
+      exit 1
+    fi
+    echo "[Build] Ubuntu 22.04 LTS netboot files downloaded successfully"
 
-# Clean up old build directories and old preseed files before starting
-echo "[Build] Cleaning up old build artifacts..."
-rm -rf "$BUILD_DIR" 2>/dev/null || true
-NETBOOT_DIR="/var/www/html/downloads/netboot"
-mkdir -p "$NETBOOT_DIR"
-# Clean up preseed files older than 1 day
-find "$NETBOOT_DIR" -name "preseed-*.cfg" -mtime +1 -delete 2>/dev/null || true
+    # Clean up old build directories and old autoinstall files before starting
+    echo "[Build] Cleaning up old build artifacts..."
+    rm -rf "$BUILD_DIR" 2>/dev/null || true
+    NETBOOT_DIR="/var/www/html/downloads/netboot"
+    mkdir -p "$NETBOOT_DIR"
+    # Clean up autoinstall directories older than 1 day
+    find "$NETBOOT_DIR" -type d -name "epc_*" -mtime +1 -exec rm -rf {} + 2>/dev/null || true
 
-# Generate unique preseed for this EPC build
-PRESEED_NAME="preseed-${epc_id}-$(date +%s).cfg"
-GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
-HSS_PORT="${HSS_PORT}"
-echo "[Build] Creating unique preseed: $PRESEED_NAME"
-cat > "$NETBOOT_DIR/$PRESEED_NAME" << 'PRESEED_EOF'
-d-i debian-installer/locale string en_US
-d-i keyboard-configuration/xkb-keymap select us
-d-i netcfg/choose_interface select auto
-d-i mirror/http/hostname string deb.debian.org
-d-i mirror/http/directory string /debian
-d-i partman-auto/method string regular
-d-i partman-auto/choose_recipe select atomic
-d-i partman/confirm_write_new_label boolean true
-d-i partman/choose_partition select finish
-d-i partman/confirm boolean true
-tasksel tasksel/first multiselect standard, ssh-server
-d-i pkgsel/include string curl wget ca-certificates jq gnupg lsb-release cmake flex bison
-d-i finish-install/reboot_in_progress note
-d-i preseed/late_command string \
-    in-target mkdir -p /etc/wisptools /opt/wisptools; \
-    in-target /bin/sh -c 'cat > /etc/wisptools/credentials.env <<"CREDS"\nEPC_ID=${epc_id}\nTENANT_ID=${tenant_id}\nEPC_AUTH_CODE=${auth_code}\nEPC_API_KEY=${api_key}\nEPC_SECRET_KEY=${secret_key}\nGCE_SERVER=${GCE_PUBLIC_IP}\nHSS_PORT=${HSS_PORT}\nORIGIN_HOST_FQDN=${originHostFQDN}\nCREDS'; \
-    in-target wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}; \
-    in-target chmod +x /opt/wisptools/bootstrap.sh; \
-    in-target /bin/sh -c 'cat > /etc/systemd/system/wisptools-bootstrap.service <<"UNIT"\n[Unit]\nDescription=WISPTools EPC Bootstrap\nAfter=network-online.target\nWants=network-online.target\nConditionPathExists=!/var/lib/wisptools/.bootstrapped\n\n[Service]\nType=oneshot\nExecStart=/opt/wisptools/bootstrap.sh\nRemainAfterExit=yes\n\n[Install]\nWantedBy=multi-user.target\nUNIT'; \
-    in-target systemctl enable wisptools-bootstrap.service
-PRESEED_EOF
+    # Generate unique autoinstall config for this EPC build (Ubuntu 22.04 uses autoinstall)
+    # Ubuntu autoinstall expects user-data and meta-data files in a subdirectory
+    AUTOINSTALL_DIR="${epc_id}-$(date +%s)"
+    AUTOINSTALL_BASE="$NETBOOT_DIR/$AUTOINSTALL_DIR"
+    mkdir -p "$AUTOINSTALL_BASE"
+    GCE_PUBLIC_IP="${GCE_PUBLIC_IP}"
+    HSS_PORT="${HSS_PORT}"
+    SITE_NAME="${siteName}"
+    echo "[Build] Creating autoinstall config in: $AUTOINSTALL_DIR/"
+    cat > "$AUTOINSTALL_BASE/user-data" << AUTOINSTALL_EOF
+    #cloud-config
+    autoinstall:
+      version: 1
+      locale: en_US
+      keyboard:
+        layout: us
+      network:
+        network:
+          version: 2
+          ethernets:
+            any:
+              match:
+                name: "en*"
+              dhcp4: true
+      storage:
+        layout:
+          name: direct
+      packages:
+        - curl
+        - wget
+        - ca-certificates
+        - jq
+        - gnupg
+        - lsb-release
+        - openssh-server
+      user-data:
+        users:
+          - name: wisp
+            groups: [adm, sudo]
+            shell: /bin/bash
+            lock-passwd: false
+            passwd: \$6\$rounds=4096\$saltsalt\$hBHuZm7adhEYRKKp7oSfFkFq8C5L5CfLXqJ3qvQZQBfVZb9kCL3HH8wJOhZ8L5nKkTRqy8FqKLMnLmKMnLM8.
+        runcmd:
+          - mkdir -p /etc/wisptools /opt/wisptools
+          - |
+            cat > /etc/wisptools/credentials.env << 'CREDS'
+            EPC_ID=${epc_id}
+            TENANT_ID=${tenant_id}
+            EPC_AUTH_CODE=${auth_code}
+            EPC_API_KEY=${api_key}
+            EPC_SECRET_KEY=${secret_key}
+            GCE_SERVER=${GCE_PUBLIC_IP}
+            HSS_PORT=${HSS_PORT}
+            ORIGIN_HOST_FQDN=${originHostFQDN}
+            CREDS
+          - chmod 600 /etc/wisptools/credentials.env
+          - wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}
+          - chmod +x /opt/wisptools/bootstrap.sh
+          - |
+            cat > /etc/systemd/system/wisptools-bootstrap.service << 'UNIT'
+            [Unit]
+            Description=WISPTools EPC Bootstrap
+            After=network-online.target
+            Wants=network-online.target
+            ConditionPathExists=!/var/lib/wisptools/.bootstrapped
 
-# Build tiny ISO containing only netboot kernel/initrd and GRUB
-# Clean ISO root directory to ensure fresh build
-ISO_ROOT="$BUILD_DIR/iso_root"
-rm -rf "$ISO_ROOT" 2>/dev/null || true
-mkdir -p "$ISO_ROOT/debian" "$ISO_ROOT/boot/grub"
-echo "[Build] Copying Debian netboot files to ISO root..."
-cp "$KERNEL_PATH" "$ISO_ROOT/debian/vmlinuz" || { echo "[Build] ERROR: Failed to copy kernel"; exit 1; }
-cp "$INITRD_PATH" "$ISO_ROOT/debian/initrd.gz" || { echo "[Build] ERROR: Failed to copy initrd"; exit 1; }
-chmod 0644 "$ISO_ROOT/debian/vmlinuz" "$ISO_ROOT/debian/initrd.gz" || true
-echo "[Build] Verified ISO root contains: $(ls -lh "$ISO_ROOT/debian/")"
+            [Service]
+            Type=oneshot
+            ExecStart=/opt/wisptools/bootstrap.sh
+            RemainAfterExit=yes
 
-cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
-set timeout=0
-set default=auto
-insmod gzio
+            [Install]
+            WantedBy=multi-user.target
+            UNIT
+          - systemctl enable wisptools-bootstrap.service
+      late-commands:
+        - curtin in-target --target=/target -- systemctl enable ssh
+    AUTOINSTALL_EOF
 
-menuentry "Debian 12 Netboot (Automated)" --id auto {
-  linux /debian/vmlinuz auto priority=critical preseed/url=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${PRESEED_NAME} net.ifnames=0 biosdevname=0 ---
-  initrd /debian/initrd.gz
-}
+    # Create meta-data file for cloud-init (Ubuntu autoinstall requirement)
+    SITE_HOSTNAME=$(echo "${siteName}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+    echo "instance-id: epc-${epc_id}" > "$AUTOINSTALL_BASE/meta-data"
+    echo "local-hostname: $SITE_HOSTNAME" >> "$AUTOINSTALL_BASE/meta-data"
+    echo "[Build] Created user-data and meta-data in $AUTOINSTALL_DIR/"
 
-menuentry "Debian 12 Netboot (Manual)" {
-  linux /debian/vmlinuz ---
-  initrd /debian/initrd.gz
-}
-GRUBCFG
+    # Build tiny ISO containing only netboot kernel/initrd and GRUB
+    # Clean ISO root directory to ensure fresh build
+    ISO_ROOT="$BUILD_DIR/iso_root"
+    rm -rf "$ISO_ROOT" 2>/dev/null || true
+    mkdir -p "$ISO_ROOT/ubuntu" "$ISO_ROOT/boot/grub"
+    echo "[Build] Copying Ubuntu 22.04 LTS netboot files to ISO root..."
+    cp "$KERNEL_PATH" "$ISO_ROOT/ubuntu/vmlinuz" || { echo "[Build] ERROR: Failed to copy kernel"; exit 1; }
+    cp "$INITRD_PATH" "$ISO_ROOT/ubuntu/initrd.gz" || { echo "[Build] ERROR: Failed to copy initrd"; exit 1; }
+    chmod 0644 "$ISO_ROOT/ubuntu/vmlinuz" "$ISO_ROOT/ubuntu/initrd.gz" || true
+    echo "[Build] Verified ISO root contains: $(ls -lh "$ISO_ROOT/ubuntu/")"
+
+    cat > "$ISO_ROOT/boot/grub/grub.cfg" << GRUBCFG
+    set timeout=0
+    set default=auto
+    insmod gzio
+
+    menuentry "Ubuntu 22.04 LTS Server (Automated - Open5GS Compatible)" --id auto {
+      linux /ubuntu/vmlinuz autoinstall ds=nocloud-net\\;s=http://\${GCE_PUBLIC_IP}/downloads/netboot/\${AUTOINSTALL_DIR}/ ip=dhcp net.ifnames=0 biosdevname=0 ---
+      initrd /ubuntu/initrd.gz
+    }
+
+    menuentry "Ubuntu 22.04 LTS Server (Manual)" {
+      linux /ubuntu/vmlinuz ---
+      initrd /ubuntu/initrd.gz
+    }
+    GRUBCFG
+
 
 # Remove any existing ISO with same name to avoid conflicts
 rm -f "$ISO_PATH" 2>/dev/null || true
