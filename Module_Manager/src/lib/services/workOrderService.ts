@@ -155,12 +155,13 @@ export interface WorkOrderStats {
 
 class WorkOrderService {
   private async getAuthToken(): Promise<string> {
-    const { auth } = await import('$lib/firebase');
-    const currentUser = auth().currentUser;
-    if (!currentUser) {
+    // Use authService for consistent token retrieval
+    const { authService } = await import('$lib/services/authService');
+    const token = await authService.getIdToken();
+    if (!token) {
       throw new Error('Not authenticated');
     }
-    return await currentUser.getIdToken();
+    return token;
   }
 
   private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
