@@ -18,49 +18,33 @@ const {
 
 const router = express.Router();
 
-// PayPal Configuration - LIVE PRODUCTION
-const environment = new paypal.core.LiveEnvironment(
-  'ARcw63HPgW_YB1FdF3kH2...', // Your PayPal Live Client ID
-  'EK3CMbxefpxzA4We4tQMDO_FwLHw5cGIeXn0nhBppezAVsTnTPw0d1RN5ifRThxZb1qMmyrwN5GU1I7P' // Your PayPal Live Client Secret
-);
+// PayPal Configuration - Load from environment variables
+const paypalClientId = process.env.PAYPAL_CLIENT_ID;
+const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET;
+const paypalEnv = process.env.PAYPAL_ENVIRONMENT || 'sandbox';
 
-const client = new paypal.core.PayPalHttpClient(environment);
+if (!paypalClientId || !paypalClientSecret) {
+  console.error('? PayPal credentials not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in environment variables.');
+  // Don't throw error here - let individual routes handle it
+}
 
-/**
- * Authentication middleware
- */
-const authenticateUser = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No valid authorization header' });
-    }
+const environment = paypalClientId && paypalClientSecret
+  ? (paypalEnv === 'live'
+      ? new paypal.core.LiveEnvironment(paypalClientId, paypalClientSecret)
+      : new paypal.core.SandboxEnvironment(paypalClientId, paypalClientSecret))
+  : null;
 
-    const token = authHeader.split(' ')[1];
-    // Verify Firebase token here (implement Firebase Admin SDK verification)
-    // For now, we'll assume the token is valid
-    
-    req.user = { token }; // Add user info from token verification
-    next();
-  } catch (error) {
-    console.error('Authentication error:', error);
-    res.status(401).json({ error: 'Authentication failed' });
-  }
-};
+const client = environment ? new paypal.core.PayPalHttpClient(environment) : null;
 
 /**
- * Admin middleware
+ * Authentication and Authorization Middleware
+ * Uses reusable admin-auth middleware
  */
-const requireAdmin = async (req, res, next) => {
-  try {
-    // Check if user is admin (implement admin check logic)
-    // For now, we'll allow all authenticated users
-    next();
-  } catch (error) {
-    console.error('Admin check error:', error);
-    res.status(403).json({ error: 'Admin access required' });
-  }
-};
+const { requireAuth, requireAdmin: requireAdminMiddleware, auditLog } = require('./middleware/admin-auth');
+
+// Use reusable middleware
+const authenticateUser = requireAuth;
+const requireAdmin = requireAdminMiddleware();
 
 /**
  * Get all subscription plans
@@ -102,6 +86,14 @@ router.get('/subscription/:tenantId', authenticateUser, async (req, res) => {
  */
 router.post('/subscription/create', authenticateUser, async (req, res) => {
   try {
+    // Check PayPal client is configured
+    if (!client) {
+      return res.status(500).json({ 
+        error: 'PayPal not configured',
+        message: 'PayPal credentials are not configured. Please contact support.'
+      });
+    }
+    
     const { tenantId, planId, successUrl, cancelUrl } = req.body;
     
     // Get the plan details
@@ -117,7 +109,9 @@ router.post('/subscription/create', authenticateUser, async (req, res) => {
     request.requestBody({
       plan_id: plan.paypalPlanId || `plan_${planId}`, // PayPal plan ID
       subscriber: {
-        email_address: req.user.email || 'user@example.com' // Get from auth
+        email_address: req.user?.email || (() => {
+          throw new Error('User email is required for billing operations');
+        })()
       },
       application_context: {
         brand_name: 'WispTools.io',
@@ -161,13 +155,32 @@ router.post('/subscription/create', authenticateUser, async (req, res) => {
 
 /**
  * Handle PayPal webhook for subscription updates
- * Webhook URL: https://wisptools.io/api/billing/webhook/paypal
+ * Webhook URL: https://your-domain.com/api/billing/webhook/paypal
+ * Configure this URL in PayPal Developer Dashboard
+ * 
+ * Note: PayPal webhook signature verification should be implemented for production
+ * See: https://developer.paypal.com/docs/api-basics/notifications/webhooks/notification-messages/
  */
-router.post('/webhook/paypal', async (req, res) => {
+// PayPal webhook - needs raw body for signature verification
+router.post('/webhook/paypal', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
-    const event = req.body;
+    // Parse JSON from raw body
+    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    
+    // TODO: Implement PayPal webhook signature verification for production
+    // For now, log the webhook for debugging
+    console.log(`?? PayPal webhook received: ${event.event_type}`, {
+      id: event.id,
+      resource_type: event.resource_type,
+      summary: event.summary
+    });
     
     // Verify webhook signature (implement PayPal webhook verification)
+    // const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+    // const isValid = await verifyPayPalWebhook(req, webhookId);
+    // if (!isValid) {
+    //   return res.status(401).send('Unauthorized');
+    // }
     
     switch (event.event_type) {
       case 'BILLING.SUBSCRIPTION.ACTIVATED':
@@ -199,6 +212,14 @@ router.post('/webhook/paypal', async (req, res) => {
  */
 router.post('/subscription/:subscriptionId/cancel', authenticateUser, async (req, res) => {
   try {
+    // Check PayPal client is configured
+    if (!client) {
+      return res.status(500).json({ 
+        error: 'PayPal not configured',
+        message: 'PayPal credentials are not configured. Please contact support.'
+      });
+    }
+    
     const { subscriptionId } = req.params;
     const { tenantId } = req.body;
     

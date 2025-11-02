@@ -658,7 +658,7 @@ class MonitoringService {
         }
       }
 
-      console.log(`✅ Resolution notifications sent for: ${alert.rule_name}`);
+      console.log(`? Resolution notifications sent for: ${alert.rule_name}`);
     } catch (error) {
       console.error('Error sending resolution notification:', error);
     }
@@ -695,8 +695,37 @@ class MonitoringService {
   }
 
   async calculateAvailableSpectrum(tenantId) {
-    // Placeholder - calculate from CBRS grants
-    return 150; // MHz
+    try {
+      // Query CBRS metrics to calculate available spectrum
+      // Total CBRS band is 150 MHz (3550-3700 MHz)
+      const CBRS_TOTAL_SPECTRUM = 150; // MHz
+      
+      // Get CBRS metrics to calculate used spectrum
+      const cbrsMetrics = await this.collectCBRSMetrics(tenantId);
+      
+      // If we have active grants data, calculate from that
+      // Otherwise, estimate based on active CBSDs
+      if (cbrsMetrics && cbrsMetrics.active_grants) {
+        // Each grant typically uses 10-20 MHz, estimate 15 MHz average per grant
+        const usedSpectrum = cbrsMetrics.active_grants * 15;
+        const availableSpectrum = Math.max(0, CBRS_TOTAL_SPECTRUM - usedSpectrum);
+        return availableSpectrum;
+      }
+      
+      // Fallback: if we have total CBSDs, estimate usage
+      if (cbrsMetrics && cbrsMetrics.total_cbsds) {
+        // Estimate 10 MHz per active CBSD (conservative)
+        const estimatedUsed = Math.min(CBRS_TOTAL_SPECTRUM, cbrsMetrics.total_cbsds * 10);
+        return CBRS_TOTAL_SPECTRUM - estimatedUsed;
+      }
+      
+      // Default: assume 50% utilization (75 MHz used, 75 MHz available)
+      return 75;
+    } catch (error) {
+      console.error('Error calculating available spectrum:', error);
+      // Return default on error
+      return 75;
+    }
   }
 
   // ============================================
@@ -736,7 +765,7 @@ class MonitoringService {
   // ============================================
 
   startMonitoring() {
-    console.log('🔍 Starting monitoring service...');
+    console.log('?? Starting monitoring service...');
 
     // Collect metrics every 60 seconds
     setInterval(async () => {
@@ -763,7 +792,7 @@ class MonitoringService {
       }
     }, 60000); // Every 60 seconds
 
-    console.log('✅ Monitoring service started');
+    console.log('? Monitoring service started');
   }
 
   async getActiveTenants() {

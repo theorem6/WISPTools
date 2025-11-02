@@ -97,16 +97,81 @@
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
 
+  // Dashboard data
+  let dashboardData = {
+    openTickets: 0,
+    scheduledMaintenance: 0,
+    responseTime: '0h',
+    satisfactionScore: 'N/A'
+  };
+  let loadingDashboard = true;
+
   // Module context for object state management
   let moduleContext: ModuleContext = {
     module: 'maintain',
     userRole: 'admin' // This should be determined from user permissions
   };
 
+  async function loadDashboardData() {
+    if (!browser || !$currentTenant) return;
+    
+    try {
+      loadingDashboard = true;
+      const token = await authService.getIdToken();
+      const tenantId = $currentTenant.id;
+
+      // Fetch work orders stats
+      const workOrdersResponse = await fetch('/api/work-orders?tenantId=' + tenantId, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (workOrdersResponse.ok) {
+        const workOrders = await workOrdersResponse.json();
+        
+        // Calculate stats
+        const openTickets = workOrders.filter((wo: any) => 
+          ['open', 'assigned', 'in-progress'].includes(wo.status)
+        ).length;
+        
+        const scheduledMaintenance = workOrders.filter((wo: any) => 
+          wo.type === 'maintenance' && wo.status !== 'closed' && wo.status !== 'cancelled'
+        ).length;
+        
+        // Calculate average response time (time from created to assigned)
+        const assignedOrders = workOrders.filter((wo: any) => wo.assignedAt && wo.createdAt);
+        if (assignedOrders.length > 0) {
+          const totalResponseTime = assignedOrders.reduce((sum: number, wo: any) => {
+            const responseTime = new Date(wo.assignedAt).getTime() - new Date(wo.createdAt).getTime();
+            return sum + (responseTime / (1000 * 60 * 60)); // Convert to hours
+          }, 0);
+          const avgResponseTime = (totalResponseTime / assignedOrders.length).toFixed(1);
+          dashboardData.responseTime = `${avgResponseTime}h`;
+        }
+
+        dashboardData.openTickets = openTickets;
+        dashboardData.scheduledMaintenance = scheduledMaintenance;
+      }
+
+      // TODO: Fetch customer satisfaction from help desk API if available
+      // For now, leave as N/A
+      
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      loadingDashboard = false;
+    }
+  }
+
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
       isAdmin = isPlatformAdmin(currentUser?.email || null);
+      
+      // Load dashboard data
+      await loadDashboardData();
       
       // Initialize iframe communication
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
@@ -213,28 +278,32 @@
       <!-- Maintenance Dashboard Preview -->
       <div class="dashboard-preview">
         <h2>Maintenance Dashboard</h2>
-        <div class="dashboard-grid">
-          <div class="dashboard-card">
-            <h3>Open Tickets</h3>
-            <div class="ticket-count">12</div>
-            <p>Active support tickets</p>
+        {#if loadingDashboard}
+          <div class="loading-state">Loading dashboard data...</div>
+        {:else}
+          <div class="dashboard-grid">
+            <div class="dashboard-card">
+              <h3>Open Tickets</h3>
+              <div class="ticket-count">{dashboardData.openTickets}</div>
+              <p>Active support tickets</p>
+            </div>
+            <div class="dashboard-card">
+              <h3>Scheduled Maintenance</h3>
+              <div class="maintenance-count">{dashboardData.scheduledMaintenance}</div>
+              <p>Upcoming maintenance tasks</p>
+            </div>
+            <div class="dashboard-card">
+              <h3>Response Time</h3>
+              <div class="response-time">{dashboardData.responseTime}</div>
+              <p>Average ticket response</p>
+            </div>
+            <div class="dashboard-card">
+              <h3>Customer Satisfaction</h3>
+              <div class="satisfaction-score">{dashboardData.satisfactionScore}</div>
+              <p>Support rating</p>
+            </div>
           </div>
-          <div class="dashboard-card">
-            <h3>Scheduled Maintenance</h3>
-            <div class="maintenance-count">5</div>
-            <p>Upcoming maintenance tasks</p>
-          </div>
-          <div class="dashboard-card">
-            <h3>Response Time</h3>
-            <div class="response-time">2.3h</div>
-            <p>Average ticket response</p>
-          </div>
-          <div class="dashboard-card">
-            <h3>Customer Satisfaction</h3>
-            <div class="satisfaction-score">4.8/5</div>
-            <p>Support rating</p>
-          </div>
-        </div>
+        {/if}
       </div>
 
       <!-- Maintenance Workflow -->
@@ -532,6 +601,13 @@
     font-size: 0.8rem;
     color: var(--text-color-light);
     margin: 0;
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-color-light);
+    font-style: italic;
   }
 
   /* SLA Section */

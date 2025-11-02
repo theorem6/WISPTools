@@ -123,9 +123,10 @@ router.get('/epc/:epc_id/deployment-script', requireTenant, async (req, res) => 
     // Generate the deployment script with embedded credentials
     const script = generateDeploymentScript(epc);
     
-    // Set headers for file download
+    // Set headers for file download with customer note
     res.setHeader('Content-Type', 'text/x-shellscript');
     res.setHeader('Content-Disposition', `attachment; filename="deploy-epc-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh"`);
+    res.setHeader('X-Requirement-Note', 'This script requires Ubuntu 22.04 LTS Server');
     
     res.send(script);
   } catch (error) {
@@ -145,6 +146,18 @@ function generateDeploymentScript(epc) {
 # Site: ${epc.site_name}
 # EPC ID: ${epc.epc_id}
 # Generated: ${new Date().toISOString()}
+#
+# ⚠️ REQUIREMENTS:
+#   - Ubuntu 22.04 LTS (Jammy) Server is REQUIRED
+#   - This script is designed specifically for Ubuntu 22.04 LTS
+#   - Open5GS PPA packages are optimized for Ubuntu 22.04 LTS
+#   - Other Ubuntu/Debian versions may not work correctly
+#
+# 📋 Pre-Installation Checklist:
+#   ✓ Ubuntu 22.04 LTS Server installed
+#   ✓ Root or sudo access available
+#   ✓ Network connectivity configured
+#   ✓ At least 2GB RAM and 10GB disk space
 
 set -e
 
@@ -193,6 +206,25 @@ if [ "$EUID" -ne 0 ]; then
   print_error "Please run as root (use sudo)"
   exit 1
 fi
+
+# Verify Ubuntu 22.04 LTS
+print_header "System Verification"
+if [ ! -f /etc/os-release ]; then
+  print_error "Cannot determine OS version. This script requires Ubuntu 22.04 LTS."
+  exit 1
+fi
+
+source /etc/os-release
+if [ "$ID" != "ubuntu" ] || [ "$VERSION_ID" != "22.04" ]; then
+  print_error "This script REQUIRES Ubuntu 22.04 LTS (Jammy)"
+  print_error "Detected: $PRETTY_NAME ($VERSION_ID)"
+  print_error ""
+  print_error "Please install Ubuntu 22.04 LTS Server before running this script."
+  print_error "Download: https://ubuntu.com/download/server"
+  exit 1
+fi
+
+print_success "Ubuntu 22.04 LTS detected ✓"
 
 # Interactive IP configuration
 print_header "Network Configuration"
@@ -298,11 +330,12 @@ print_status "Installing monitoring tools..."
 apt-get install -y sysstat net-tools iftop vnstat
 
 print_header "Installing Open5GS"
-print_status "Adding Open5GS repository..."
+print_status "Adding Open5GS repository (Ubuntu 22.04 LTS compatible)..."
 add-apt-repository -y ppa:open5gs/latest
 apt-get update -qq
 
-print_status "Installing Open5GS EPC components..."
+print_status "Installing Open5GS EPC components (pre-built packages, no compilation)..."
+print_status "Note: These packages are optimized for Ubuntu 22.04 LTS"
 apt-get install -y open5gs-mme open5gs-sgwc open5gs-sgwu open5gs-smf open5gs-upf open5gs-pcrf
 
 print_header "Configuring EPC Components"
@@ -1309,5 +1342,7 @@ async function checkMetricsForAlerts(epc, metrics) {
   }
 }
 
+// Export script generator for use in other modules
 module.exports = router;
+module.exports.generateDeploymentScript = generateDeploymentScript;
 

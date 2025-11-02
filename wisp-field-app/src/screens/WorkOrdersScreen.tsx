@@ -44,17 +44,22 @@ export default function WorkOrdersScreen() {
     setIsLoading(true);
     
     try {
-      // TODO: Add work order API endpoint
-      // For now, return empty array
-      setTickets([]);
+      if (!userId) {
+        console.warn('No userId available, cannot load tickets');
+        setTickets([]);
+        return;
+      }
       
-      /* When backend is deployed:
-      const response = await apiService.getMyTickets(userId);
-      setTickets(response);
-      */
+      // Get tickets assigned to this user
+      const tickets = await apiService.getMyTickets(userId);
+      setTickets(tickets || []);
     } catch (error: any) {
       console.error('Failed to load tickets:', error);
-      Alert.alert('Error', error.message || 'Failed to load tickets');
+      // Don't show alert for empty state - just log
+      if (error.response?.status !== 404) {
+        Alert.alert('Error', error.message || 'Failed to load tickets');
+      }
+      setTickets([]); // Set empty array on error
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -89,18 +94,25 @@ export default function WorkOrdersScreen() {
   const handleAcceptTicket = async (ticket: any) => {
     Alert.alert(
       'Accept Ticket',
-      `Accept ${ticket.ticketNumber}?`,
+      `Accept ${ticket.ticketNumber || ticket._id}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Accept',
           onPress: async () => {
             try {
-              // TODO: Call API to accept ticket
+              setIsLoading(true);
+              await apiService.acceptWorkOrder(ticket._id || ticket.id, userId);
               Alert.alert('Success', 'Ticket accepted');
-              loadTickets();
+              await loadTickets(); // Reload tickets to refresh list
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to accept ticket');
+              console.error('Error accepting ticket:', error);
+              Alert.alert(
+                'Error', 
+                error.response?.data?.message || error.message || 'Failed to accept ticket'
+              );
+            } finally {
+              setIsLoading(false);
             }
           }
         }
@@ -157,11 +169,23 @@ export default function WorkOrdersScreen() {
           <TouchableOpacity
             style={styles.startButton}
             onPress={() => {
-              // Navigate to ticket details to start work
-              navigation.navigate('TicketDetails' as never, { ticket: item } as never);
+              // For installations, navigate to documentation screen
+              if (item.type === 'installation') {
+                navigation.navigate('InstallationDocumentation' as never, {
+                  workOrder: item,
+                  siteId: item.affectedSites?.[0]?.siteId,
+                  siteName: item.affectedSites?.[0]?.siteName,
+                  installationType: item.issueCategory || 'equipment'
+                } as never);
+              } else {
+                // Other types go to ticket details
+                navigation.navigate('TicketDetails' as never, { ticket: item } as never);
+              }
             }}
           >
-            <Text style={styles.startText}>Start Work</Text>
+            <Text style={styles.startText}>
+              {item.type === 'installation' ? '📸 Document' : 'Start Work'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -205,7 +229,7 @@ export default function WorkOrdersScreen() {
         <FlatList
           data={tickets}
           renderItem={renderTicket}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item._id || item.id || String(item.ticketNumber)}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl

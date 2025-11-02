@@ -15,6 +15,17 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
+import TowerSelector from '../components/TowerSelector';
+
+interface Tower {
+  id: string;
+  name: string;
+  location: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
+}
 
 export default function AssetDetailsScreen() {
   const route = useRoute();
@@ -22,6 +33,7 @@ export default function AssetDetailsScreen() {
   const { item } = route.params as any;
   
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showTowerSelector, setShowTowerSelector] = useState(false);
 
   const handleDeploy = async () => {
     Alert.alert(
@@ -30,14 +42,40 @@ export default function AssetDetailsScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Deploy',
-          onPress: async () => {
-            // TODO: Navigate to tower selection screen
-            Alert.alert('Feature Coming Soon', 'Tower selection will be available in next update');
+          text: 'Select Tower',
+          onPress: () => {
+            setShowTowerSelector(true);
           }
         }
       ]
     );
+  };
+
+  const handleTowerSelect = async (tower: Tower) => {
+    try {
+      setIsUpdating(true);
+      
+      // Update asset location with selected tower
+      await apiService.put(`/api/inventory/${item._id}`, {
+        location: {
+          ...item.location,
+          towerId: tower.id,
+          towerName: tower.name,
+          latitude: tower.location.latitude,
+          longitude: tower.location.longitude,
+          address: tower.location.address
+        },
+        status: 'deployed'
+      });
+      
+      Alert.alert('Success', `Equipment deployed to ${tower.name}`);
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to deploy equipment');
+    } finally {
+      setIsUpdating(false);
+      setShowTowerSelector(false);
+    }
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -65,6 +103,7 @@ export default function AssetDetailsScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -178,6 +217,14 @@ export default function AssetDetailsScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    
+    <TowerSelector
+      visible={showTowerSelector}
+      onClose={() => setShowTowerSelector(false)}
+      onSelect={handleTowerSelect}
+      selectedTowerId={item.location?.towerId}
+    />
+  </View>
   );
 }
 

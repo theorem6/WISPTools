@@ -466,9 +466,13 @@ router.post('/:id/requirements', async (req, res) => {
       return res.status(404).json({ error: 'Plan not found' });
     }
     
+    const costEstimate = await estimateHardwareCost(req.tenantId, req.body);
+    
     const requirement = {
       ...req.body,
-      estimatedCost: estimateHardwareCost(req.body)
+      estimatedCost: costEstimate.estimatedCost,
+      costConfidence: costEstimate.confidence,
+      costSource: costEstimate.source
     };
     
     plan.hardwareRequirements.needed.push(requirement);
@@ -645,7 +649,7 @@ router.get('/hardware/existing', async (req, res) => {
       hardware.push({
         id: sector._id.toString(),
         type: 'sector',
-        name: `${sector.name} - Sector ${sector.azimuth}°`,
+        name: `${sector.name} - Sector ${sector.azimuth}?`,
         location: {
           latitude: sector.location.latitude,
           longitude: sector.location.longitude
@@ -734,7 +738,8 @@ async function analyzeMissingHardware(plan) {
       
       if (availableQuantity < neededQuantity) {
         const missingQuantity = neededQuantity - availableQuantity;
-        const estimatedCost = estimateHardwareCost(requirement);
+        const costEstimate = await estimateHardwareCost(plan.tenantId, requirement);
+        const estimatedCost = costEstimate.estimatedCost;
         
         plan.purchasePlan.missingHardware.push({
           id: `missing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -747,7 +752,9 @@ async function analyzeMissingHardware(plan) {
           priority: requirement.priority,
           specifications: requirement.specifications,
           reason: generateMissingHardwareReason(requirement, missingQuantity, availableQuantity),
-          alternatives: generateAlternatives(requirement)
+          alternatives: generateAlternatives(requirement),
+          costConfidence: costEstimate.confidence,
+          costSource: costEstimate.source
         });
         
         plan.purchasePlan.totalEstimatedCost += estimatedCost * missingQuantity;
@@ -762,24 +769,89 @@ async function analyzeMissingHardware(plan) {
   }
 }
 
-function estimateHardwareCost(requirement) {
-  const costEstimates = {
-    'tower': 50000,
-    'sector-antenna': 2000,
-    'cpe-device': 500,
-    'router': 300,
-    'switch': 200,
-    'power-supply': 150,
-    'cable': 5,
-    'connector': 10,
-    'mounting-hardware': 100,
-    'backhaul-radio': 3000,
-    'fiber-optic': 2,
-    'ups': 800,
-    'generator': 5000
-  };
-  
-  return costEstimates[requirement.equipmentType] || 1000;
+/**
+ * Estimate hardware cost using pricing database
+ * Falls back to inventory averages, then hardcoded defaults
+ */
+async function estimateHardwareCost(tenantId, requirement) {
+  try {
+    // Try to get price from pricing database
+    const axios = require('axios');
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    
+    const params = new URLSearchParams({
+      category: requirement.category || '',
+      equipmentType: requirement.equipmentType || '',
+      manufacturer: requirement.manufacturer || '',
+      model: requirement.model || ''
+    });
+    
+    try {
+      const response = await axios.get(`${baseUrl}/api/equipment-pricing/price?${params}`, {
+        headers: {
+          'x-tenant-id': tenantId
+        },
+        timeout: 5000 // 5 second timeout
+      });
+      
+      if (response.data?.price) {
+        return {
+          estimatedCost: response.data.price * (requirement.quantity || 1),
+          confidence: response.data.confidence || 'high',
+          source: response.data.source || 'pricing_database'
+        };
+      }
+    } catch (apiError) {
+      console.warn('Pricing API not available, using fallback:', apiError.message);
+    }
+    
+    // Fallback to hardcoded estimates (last resort)
+    const costEstimates = {
+      'tower': 50000,
+      'sector-antenna': 2000,
+      'cpe-device': 500,
+      'router': 300,
+      'switch': 200,
+      'power-supply': 150,
+      'cable': 5,
+      'connector': 10,
+      'mounting-hardware': 100,
+      'backhaul-radio': 3000,
+      'fiber-optic': 2,
+      'ups': 800,
+      'generator': 5000,
+      // Add more defaults
+      'Base Station (eNodeB/gNodeB)': 15000,
+      'Remote Radio Head (RRH)': 3000,
+      'Radio Unit (RU)': 2500,
+      'Baseband Unit (BBU)': 8000,
+      'Sector Antenna': 2000,
+      'Panel Antenna': 1500,
+      'Parabolic Dish': 2500,
+      'LTE CPE': 500,
+      'CBRS CPE': 600,
+      'Rectifier': 800,
+      'Battery Bank': 1500,
+      'UPS': 800,
+      'Generator': 5000
+    };
+    
+    const basePrice = costEstimates[requirement.equipmentType] || 1000;
+    
+    return {
+      estimatedCost: basePrice * (requirement.quantity || 1),
+      confidence: 'low',
+      source: 'fallback_default'
+    };
+  } catch (error) {
+    console.error('Error estimating cost:', error);
+    // Ultimate fallback
+    return {
+      estimatedCost: 1000 * (requirement.quantity || 1),
+      confidence: 'low',
+      source: 'error_fallback'
+    };
+  }
 }
 
 function generateMissingHardwareReason(requirement, missingQuantity, availableQuantity) {
@@ -804,8 +876,8 @@ function generateAlternatives(requirement) {
       break;
     case 'sector-antenna':
       alternatives.push(
-        { manufacturer: 'RFS', model: 'Sector Antenna 120°', estimatedCost: 1800, availability: 'in-stock' },
-        { manufacturer: 'CommScope', model: 'Sector Antenna 90°', estimatedCost: 2200, availability: 'in-stock' }
+        { manufacturer: 'RFS', model: 'Sector Antenna 120?', estimatedCost: 1800, availability: 'in-stock' },
+        { manufacturer: 'CommScope', model: 'Sector Antenna 90?', estimatedCost: 2200, availability: 'in-stock' }
       );
       break;
     case 'router':
