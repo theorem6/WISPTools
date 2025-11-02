@@ -90,7 +90,13 @@ router.post('/', async (req, res) => {
     res.status(201).json(customer);
   } catch (error) {
     console.error('Error creating customer:', error);
-    res.status(500).json({ error: 'Failed to create customer' });
+    console.error('Request body:', JSON.stringify(req.body));
+    console.error('Error details:', error.message, error.stack);
+    res.status(500).json({ 
+      error: 'Failed to create customer',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
