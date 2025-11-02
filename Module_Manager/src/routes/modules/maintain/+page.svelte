@@ -1,725 +1,828 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { authService } from '$lib/services/authService';
-  import { isPlatformAdmin } from '$lib/services/adminService';
-  import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
-  import { workOrderService } from '$lib/services/workOrderService';
-
-  interface MaintainFeature {
-    id: string;
-    name: string;
-    description: string;
-    icon: string;
-    path: string;
-    status: 'active' | 'coming-soon';
-    features: string[];
-  }
-
-  // Updated: 2025-11-02 - Combined ticketing features
-  const maintainFeatures: MaintainFeature[] = [
-    {
-      id: 'comprehensive-ticketing',
-      name: 'Comprehensive Ticketing System',
-      description: 'Complete ticketing, maintenance scheduling, and incident management',
-      icon: '🎫',
-      path: '/modules/help-desk',
-      status: 'active',
-      features: ['Issue Tracking', 'Customer Support', 'Ticket Management', 'Priority Handling', 'Scheduled Maintenance', 'Equipment Inspections', 'Preventive Tasks', 'Maintenance History', 'Outage Response', 'Incident Tracking', 'Resolution Management', 'Post-Incident Analysis']
-    },
-    {
-      id: 'customer-support',
-      name: 'Customer Support',
-      description: 'Help desk and support ticket management',
-      icon: '🎧',
-      path: '/modules/help-desk',
-      status: 'active',
-      features: ['Help Desk', 'Support Tickets', 'Customer Communication', 'Knowledge Base']
-    },
-    {
-      id: 'vendor-management',
-      name: 'Vendor Management',
-      description: 'Third-party service coordination',
-      icon: '🤝',
-      path: '/modules/work-orders', // Link to work orders for vendor management
-      status: 'active',
-      features: ['Vendor Coordination', 'Service Contracts', 'Third-party Management', 'Service Level Tracking']
-    },
-    {
-      id: 'knowledge-base',
-      name: 'Knowledge Base',
-      description: 'Documentation and troubleshooting guides',
-      icon: '📚',
-      path: '/modules/help-desk', // Link to help desk for knowledge base
-      status: 'active',
-      features: ['Documentation', 'Troubleshooting Guides', 'Best Practices', 'Training Materials']
-    },
-    {
-      id: 'sla-management',
-      name: 'SLA Management',
-      description: 'Service level tracking and reporting',
-      icon: '📋',
-      path: '/modules/monitoring', // Link to monitoring for SLA management
-      status: 'active',
-      features: ['SLA Tracking', 'Service Level Reporting', 'Compliance Monitoring', 'Performance Metrics']
-    },
-    {
-      id: 'asset-management',
-      name: 'Asset Management',
-      description: 'Hardware inventory and equipment tracking',
-      icon: '📦',
-      path: '/modules/inventory',
-      status: 'active',
-      features: ['Hardware Upload', 'Equipment Tracking', 'Asset Tagging', 'Inventory Management']
-    },
-    {
-      id: 'customer-management',
-      name: 'Customer Management',
-      description: 'Manage tenant customers, subscribers, and service accounts',
-      icon: '👥',
-      path: '/modules/customers',
-      status: 'active',
-      features: ['Customer Database', 'Service Management', 'Billing Information', 'Installation History', 'Customer Support', 'Service Plans']
-    }
-  ];
-
-  let isAdmin = false;
-  let currentUser: any = null;
-  let mapContainer: HTMLDivElement;
-
-  // Dashboard data
-  let dashboardData = {
+  import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
+  import { customerService, type Customer } from '$lib/services/customerService';
+  import CreateTicketModal from '../help-desk/components/CreateTicketModal.svelte';
+  import TicketDetailsModal from '../help-desk/components/TicketDetailsModal.svelte';
+  import CustomerLookupModal from '../help-desk/components/CustomerLookupModal.svelte';
+  import AddEditCustomerModal from '../customers/components/AddEditCustomerModal.svelte';
+  
+  // Tab management
+  type Tab = 'overview' | 'tickets' | 'maintenance' | 'customers' | 'incidents';
+  let activeTab: Tab = 'overview';
+  
+  // Dashboard stats
+  let dashboardStats = {
     openTickets: 0,
+    criticalTickets: 0,
     scheduledMaintenance: 0,
-    responseTime: '0h',
-    satisfactionScore: 'N/A'
+    totalCustomers: 0,
+    activeCustomers: 0,
+    avgResponseTime: '0h',
+    resolvedTickets: 0
   };
-  let loadingDashboard = true;
-
-  // Module context for object state management
-  let moduleContext: ModuleContext = {
-    module: 'maintain',
-    userRole: 'admin' // This should be determined from user permissions
-  };
-
-  async function loadDashboardData() {
-    if (!browser || !$currentTenant) return;
+  let loadingStats = true;
+  
+  // Tickets
+  let tickets: WorkOrder[] = [];
+  let filteredTickets: WorkOrder[] = [];
+  let loadingTickets = false;
+  
+  // Customers
+  let customers: Customer[] = [];
+  let filteredCustomers: Customer[] = [];
+  let loadingCustomers = false;
+  
+  // Filters
+  let ticketStatusFilter: WorkOrder['status'] | 'all' = 'all';
+  let ticketPriorityFilter: WorkOrder['priority'] | 'all' = 'all';
+  let ticketSearchQuery = '';
+  let customerSearchQuery = '';
+  let customerStatusFilter = '';
+  
+  // Modals
+  let showCreateTicket = false;
+  let showTicketDetails = false;
+  let showCustomerLookup = false;
+  let showAddCustomer = false;
+  let showEditCustomer = false;
+  let selectedTicket: WorkOrder | null = null;
+  let selectedCustomer: Customer | null = null;
+  
+  // Recent activity
+  let recentActivity: any[] = [];
+  
+  $: tenantId = $currentTenant?.id || '';
+  
+  onMount(() => {
+    if (tenantId) {
+      loadDashboardStats();
+      loadTickets();
+      loadCustomers();
+      loadRecentActivity();
+    }
+  });
+  
+  $: if (tenantId) {
+    if (activeTab === 'tickets') loadTickets();
+    if (activeTab === 'customers') loadCustomers();
+    if (activeTab === 'overview') {
+      loadDashboardStats();
+      loadRecentActivity();
+    }
+  }
+  
+  $: applyTicketFilters();
+  $: applyCustomerFilters();
+  
+  // ========== API Calls ==========
+  async function loadDashboardStats() {
+    if (!tenantId || !browser) return;
+    
+    loadingStats = true;
+    try {
+      // Try unified maintain API first
+      const response = await fetch(`${getApiUrl()}/api/maintain/dashboard/stats`, {
+        headers: {
+          'Authorization': `Bearer ${await getAuthToken()}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        dashboardStats = {
+          openTickets: data.tickets?.open || 0,
+          criticalTickets: data.tickets?.critical || 0,
+          scheduledMaintenance: data.tickets?.scheduled || 0,
+          totalCustomers: data.customers?.total || 0,
+          activeCustomers: data.customers?.active || 0,
+          avgResponseTime: data.metrics?.avgResponseTime || '0h',
+          resolvedTickets: data.metrics?.resolvedTickets || 0
+        };
+      } else {
+        // Fallback to individual API calls
+        await loadStatsFallback();
+      }
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+      await loadStatsFallback();
+    } finally {
+      loadingStats = false;
+    }
+  }
+  
+  async function loadStatsFallback() {
+    try {
+      const allTickets = await workOrderService.getWorkOrders();
+      dashboardStats.openTickets = allTickets.filter(t => 
+        ['open', 'assigned', 'in-progress'].includes(t.status)
+      ).length;
+      dashboardStats.criticalTickets = allTickets.filter(t => 
+        t.priority === 'critical' && ['open', 'assigned', 'in-progress'].includes(t.status)
+      ).length;
+      dashboardStats.scheduledMaintenance = allTickets.filter(t => 
+        t.type === 'maintenance' && !['closed', 'cancelled'].includes(t.status)
+      ).length;
+      dashboardStats.resolvedTickets = allTickets.filter(t => 
+        ['resolved', 'closed'].includes(t.status)
+      ).length;
+      
+      const allCustomers = await customerService.searchCustomers();
+      dashboardStats.totalCustomers = allCustomers.length;
+      dashboardStats.activeCustomers = allCustomers.filter(c => c.serviceStatus === 'active').length;
+    } catch (error) {
+      console.error('Error loading fallback stats:', error);
+    }
+  }
+  
+  async function loadTickets() {
+    if (!tenantId || !browser) return;
+    
+    loadingTickets = true;
+    try {
+      tickets = await workOrderService.getWorkOrders();
+      applyTicketFilters();
+    } catch (error: any) {
+      console.error('Error loading tickets:', error);
+    } finally {
+      loadingTickets = false;
+    }
+  }
+  
+  async function loadCustomers() {
+    if (!tenantId || !browser) return;
+    
+    loadingCustomers = true;
+    try {
+      customers = await customerService.searchCustomers();
+      applyCustomerFilters();
+    } catch (error: any) {
+      console.error('Error loading customers:', error);
+    } finally {
+      loadingCustomers = false;
+    }
+  }
+  
+  async function loadRecentActivity() {
+    if (!tenantId || !browser) return;
     
     try {
-      loadingDashboard = true;
+      const response = await fetch(`${getApiUrl()}/api/maintain/dashboard/activity?limit=10`, {
+        headers: {
+          'Authorization': `Bearer ${await getAuthToken()}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        }
+      });
       
-      // Ensure user is authenticated before getting token
-      if (!currentUser) {
-        currentUser = await authService.getCurrentUser();
+      if (response.ok) {
+        recentActivity = await response.json();
       }
-      
-      if (!currentUser) {
-        console.warn('User not authenticated, skipping dashboard data load');
-        return;
-      }
-
-      // Fetch work orders using the service
-      const workOrders = await workOrderService.getWorkOrders();
-      
-      // Calculate stats
-      const openTickets = workOrders.filter((wo: any) => 
-        ['open', 'assigned', 'in-progress'].includes(wo.status)
-      ).length;
-      
-      const scheduledMaintenance = workOrders.filter((wo: any) => 
-        wo.type === 'maintenance' && wo.status !== 'closed' && wo.status !== 'cancelled'
-      ).length;
-      
-      // Calculate average response time (time from created to assigned)
-      const assignedOrders = workOrders.filter((wo: any) => wo.assignedAt && wo.createdAt);
-      if (assignedOrders.length > 0) {
-        const totalResponseTime = assignedOrders.reduce((sum: number, wo: any) => {
-          const responseTime = new Date(wo.assignedAt).getTime() - new Date(wo.createdAt).getTime();
-          return sum + (responseTime / (1000 * 60 * 60)); // Convert to hours
-        }, 0);
-        const avgResponseTime = (totalResponseTime / assignedOrders.length).toFixed(1);
-        dashboardData.responseTime = `${avgResponseTime}h`;
-      }
-
-      dashboardData.openTickets = openTickets;
-      dashboardData.scheduledMaintenance = scheduledMaintenance;
-
-      // TODO: Fetch customer satisfaction from help desk API if available
-      // For now, leave as N/A
-      
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      loadingDashboard = false;
+      console.error('Error loading recent activity:', error);
     }
   }
-
-  onMount(async () => {
-    if (browser) {
-      currentUser = await authService.getCurrentUser();
-      isAdmin = isPlatformAdmin(currentUser?.email || null);
-      
-      // Load dashboard data
-      await loadDashboardData();
-      
-      // Initialize iframe communication
-      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
-      if (iframe) {
-        iframeCommunicationService.initialize(iframe, moduleContext);
-        
-        // Listen for iframe object actions
-        window.addEventListener('iframe-object-action', handleIframeObjectAction);
+  
+  // ========== Filters ==========
+  function applyTicketFilters() {
+    filteredTickets = tickets.filter(ticket => {
+      if (ticketStatusFilter !== 'all' && ticket.status !== ticketStatusFilter) return false;
+      if (ticketPriorityFilter !== 'all' && ticket.priority !== ticketPriorityFilter) return false;
+      if (ticketSearchQuery) {
+        const query = ticketSearchQuery.toLowerCase();
+        if (!ticket.title?.toLowerCase().includes(query) &&
+            !ticket.description?.toLowerCase().includes(query) &&
+            !ticket.ticketNumber?.toLowerCase().includes(query)) {
+          return false;
+        }
       }
-    }
+      return true;
+    });
     
-    return () => {
-      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
-      iframeCommunicationService.destroy();
+    filteredTickets.sort((a, b) => {
+      const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+      const priorityDiff = (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3);
+      if (priorityDiff !== 0) return priorityDiff;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }
+  
+  function applyCustomerFilters() {
+    filteredCustomers = customers.filter(customer => {
+      if (customerStatusFilter && customer.serviceStatus !== customerStatusFilter) return false;
+      if (customerSearchQuery) {
+        const query = customerSearchQuery.toLowerCase();
+        if (!customer.fullName?.toLowerCase().includes(query) &&
+            !customer.primaryPhone?.includes(query) &&
+            !customer.email?.toLowerCase().includes(query) &&
+            !customer.customerId?.toLowerCase().includes(query)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+  
+  // ========== Helpers ==========
+  async function getAuthToken(): Promise<string> {
+    const { authService } = await import('$lib/services/authService');
+    const token = await authService.getIdToken();
+    if (!token) throw new Error('Not authenticated');
+    return token;
+  }
+  
+  function getApiUrl(): string {
+    return import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+  }
+  
+  function formatDate(date: Date | string | undefined): string {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  function getStatusColor(status: string): string {
+    const colors: Record<string, string> = {
+      open: 'var(--warning)',
+      'in-progress': 'var(--info)',
+      resolved: 'var(--success)',
+      closed: 'var(--text-secondary)',
+      active: 'var(--success)',
+      pending: 'var(--warning)',
+      suspended: 'var(--danger)',
+      cancelled: 'var(--text-secondary)'
     };
-  });
-
-  // Handle iframe object actions
-  function handleIframeObjectAction(event: CustomEvent) {
-    const { objectId, action, allowed, message, state } = event.detail;
-    
-    if (!allowed) {
-      // Show user-friendly error message
-      console.warn(`Action '${action}' denied for object ${objectId}: ${message}`);
-      // In maintain module, we might want to show this differently
-    } else {
-      // Handle allowed actions
-      console.log(`Action '${action}' allowed for object ${objectId}`);
-      // Add specific handling for different actions here
-    }
+    return colors[status] || 'var(--text-secondary)';
   }
-
-  function handleFeatureClick(feature: MaintainFeature) {
-    if (feature.status === 'active') {
-      goto(feature.path);
-    }
+  
+  function getPriorityColor(priority: string): string {
+    const colors: Record<string, string> = {
+      critical: 'var(--danger)',
+      high: 'var(--warning)',
+      medium: 'var(--info)',
+      low: 'var(--text-secondary)'
+    };
+    return colors[priority] || 'var(--text-secondary)';
   }
-
-  function goBack() {
-    goto('/dashboard');
+  
+  function handleTicketCreated() {
+    showCreateTicket = false;
+    loadTickets();
+    loadDashboardStats();
+  }
+  
+  function handleCustomerCreated() {
+    showAddCustomer = false;
+    showEditCustomer = false;
+    loadCustomers();
+    loadDashboardStats();
   }
 </script>
 
-<TenantGuard requireTenant={false}>
+<TenantGuard requireTenant={true}>
   <div class="maintain-module">
     <!-- Header -->
     <div class="module-header">
-      <div class="header-content">
-        <button class="back-btn" on:click={goBack}>
-          <span class="back-icon">←</span>
-          Back to Dashboard
+      <div class="header-top">
+        <button class="back-btn" on:click={() => goto('/dashboard')}>
+          <span>←</span> Back
         </button>
-        <div class="module-title">
-          <h1>🔧 Maintain Module</h1>
-          <p>Traditional interface for ticketing and maintenance management</p>
-        </div>
-        <div class="user-info">
-          {#if currentUser}
-            <span class="user-name">{currentUser.email}</span>
-            <span class="user-role">{$currentTenant?.name || 'No Tenant'}</span>
+        <h1>🔧 Maintain Module</h1>
+        <div class="header-actions">
+          {#if activeTab === 'tickets'}
+            <button class="btn btn-primary" on:click={() => showCreateTicket = true}>
+              + Create Ticket
+            </button>
+          {:else if activeTab === 'customers'}
+            <button class="btn btn-primary" on:click={() => { selectedCustomer = null; showAddCustomer = true; }}>
+              + Add Customer
+            </button>
           {/if}
         </div>
       </div>
+      
+      <!-- Tabs -->
+      <div class="tabs">
+        <button 
+          class="tab {activeTab === 'overview' ? 'active' : ''}" 
+          on:click={() => activeTab = 'overview'}>
+          📊 Overview
+        </button>
+        <button 
+          class="tab {activeTab === 'tickets' ? 'active' : ''}" 
+          on:click={() => activeTab = 'tickets'}>
+          🎫 Tickets
+        </button>
+        <button 
+          class="tab {activeTab === 'maintenance' ? 'active' : ''}" 
+          on:click={() => activeTab = 'maintenance'}>
+          🔧 Maintenance
+        </button>
+        <button 
+          class="tab {activeTab === 'customers' ? 'active' : ''}" 
+          on:click={() => activeTab = 'customers'}>
+          👥 Customers
+        </button>
+        <button 
+          class="tab {activeTab === 'incidents' ? 'active' : ''}" 
+          on:click={() => activeTab = 'incidents'}>
+          🚨 Incidents
+        </button>
+      </div>
     </div>
-
-    <!-- Main Content -->
+    
+    <!-- Content -->
     <div class="module-content">
-      <!-- Overview -->
-      <div class="overview-section">
-        <h2>Maintenance Overview</h2>
-        <p>The Maintain module provides comprehensive tools for managing customer support, maintenance operations, incident response, and service level agreements. This module ensures optimal service delivery and customer satisfaction through proactive maintenance and efficient issue resolution.</p>
-      </div>
-
-      <!-- Features Grid -->
-      <div class="features-section">
-        <h2>Maintenance Features</h2>
-        <div class="features-grid">
-          {#each maintainFeatures as feature (feature.id)}
-            <div class="feature-card" on:click={() => handleFeatureClick(feature)}>
-              <div class="feature-header">
-                <span class="feature-icon">{feature.icon}</span>
-                <div class="feature-info">
-                  <h3 class="feature-name">{feature.name}</h3>
-                  <p class="feature-description">{feature.description}</p>
-                </div>
-                <span class="feature-status {feature.status}">
-                  {feature.status === 'active' ? '✅' : '🚧'}
+      {#if activeTab === 'overview'}
+        <!-- Overview Dashboard -->
+        <div class="dashboard-grid">
+          <div class="stat-card">
+            <div class="stat-icon">🎫</div>
+            <div class="stat-info">
+              <div class="stat-value">{dashboardStats.openTickets}</div>
+              <div class="stat-label">Open Tickets</div>
+              <div class="stat-sub">{dashboardStats.criticalTickets} critical</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">🔧</div>
+            <div class="stat-info">
+              <div class="stat-value">{dashboardStats.scheduledMaintenance}</div>
+              <div class="stat-label">Scheduled Maintenance</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info">
+              <div class="stat-value">{dashboardStats.activeCustomers}</div>
+              <div class="stat-label">Active Customers</div>
+              <div class="stat-sub">of {dashboardStats.totalCustomers} total</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon">⏱️</div>
+            <div class="stat-info">
+              <div class="stat-value">{dashboardStats.avgResponseTime}</div>
+              <div class="stat-label">Avg Response Time</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="activity-section">
+          <h2>Recent Activity</h2>
+          <div class="activity-list">
+            {#each recentActivity.slice(0, 10) as activity}
+              <div class="activity-item">
+                <span class="activity-icon">
+                  {activity.type === 'ticket' ? '🎫' : '👥'}
                 </span>
+                <div class="activity-content">
+                  <div class="activity-title">{activity.title}</div>
+                  <div class="activity-meta">
+                    <span class="activity-status" style="color: {getStatusColor(activity.status)}">
+                      {activity.status}
+                    </span>
+                    <span class="activity-time">{formatDate(activity.timestamp)}</span>
+                  </div>
+                </div>
               </div>
-              <div class="feature-features">
-                <h4>Key Features:</h4>
-                <ul>
-                  {#each feature.features as feat}
-                    <li>{feat}</li>
-                  {/each}
-                </ul>
-              </div>
-              <div class="feature-arrow">→</div>
-            </div>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Maintenance Dashboard Preview -->
-      <div class="dashboard-preview">
-        <h2>Maintenance Dashboard</h2>
-        {#if loadingDashboard}
-          <div class="loading-state">Loading dashboard data...</div>
-        {:else}
-          <div class="dashboard-grid">
-            <div class="dashboard-card">
-              <h3>Open Tickets</h3>
-              <div class="ticket-count">{dashboardData.openTickets}</div>
-              <p>Active support tickets</p>
-            </div>
-            <div class="dashboard-card">
-              <h3>Scheduled Maintenance</h3>
-              <div class="maintenance-count">{dashboardData.scheduledMaintenance}</div>
-              <p>Upcoming maintenance tasks</p>
-            </div>
-            <div class="dashboard-card">
-              <h3>Response Time</h3>
-              <div class="response-time">{dashboardData.responseTime}</div>
-              <p>Average ticket response</p>
-            </div>
-            <div class="dashboard-card">
-              <h3>Customer Satisfaction</h3>
-              <div class="satisfaction-score">{dashboardData.satisfactionScore}</div>
-              <p>Support rating</p>
-            </div>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Maintenance Workflow -->
-      <div class="workflow-section">
-        <h2>Maintenance Workflow</h2>
-        <div class="workflow-steps">
-          <div class="workflow-step">
-            <div class="step-number">1</div>
-            <div class="step-content">
-              <h3>Issue Detection</h3>
-              <p>Monitor systems and detect issues or receive customer reports</p>
-            </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">2</div>
-            <div class="step-content">
-              <h3>Ticket Creation</h3>
-              <p>Create support tickets and assign priority levels</p>
-            </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">3</div>
-            <div class="step-content">
-              <h3>Resolution</h3>
-              <p>Work on resolving issues and implementing fixes</p>
-            </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">4</div>
-            <div class="step-content">
-              <h3>Follow-up</h3>
-              <p>Verify resolution and gather customer feedback</p>
-            </div>
+            {:else}
+              <div class="empty-state">No recent activity</div>
+            {/each}
           </div>
         </div>
-      </div>
-
-      <!-- Service Level Indicators -->
-      <div class="sla-section">
-        <h2>Service Level Indicators</h2>
-        <div class="sla-grid">
-          <div class="sla-card">
-            <h3>Uptime SLA</h3>
-            <div class="sla-value">99.9%</div>
-            <div class="sla-bar">
-              <div class="sla-progress" style="width: 99.9%"></div>
-            </div>
-            <p>Target: 99.5%</p>
+        
+      {:else if activeTab === 'tickets'}
+        <!-- Tickets Tab -->
+        <div class="tab-content">
+          <!-- Filters -->
+          <div class="filters-bar">
+            <input 
+              type="text" 
+              class="search-input" 
+              placeholder="Search tickets..." 
+              bind:value={ticketSearchQuery}
+            />
+            <select bind:value={ticketStatusFilter} class="filter-select">
+              <option value="all">All Status</option>
+              <option value="open">Open</option>
+              <option value="assigned">Assigned</option>
+              <option value="in-progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+            <select bind:value={ticketPriorityFilter} class="filter-select">
+              <option value="all">All Priority</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
           </div>
-          <div class="sla-card">
-            <h3>Response Time</h3>
-            <div class="sla-value">2.3h</div>
-            <div class="sla-bar">
-              <div class="sla-progress" style="width: 85%"></div>
-            </div>
-            <p>Target: 4h</p>
-          </div>
-          <div class="sla-card">
-            <h3>Resolution Time</h3>
-            <div class="sla-value">8.5h</div>
-            <div class="sla-bar">
-              <div class="sla-progress" style="width: 70%"></div>
-            </div>
-            <p>Target: 24h</p>
+          
+          <!-- Tickets List -->
+          <div class="items-list">
+            {#if loadingTickets}
+              <div class="loading">Loading tickets...</div>
+            {:else if filteredTickets.length === 0}
+              <div class="empty-state">No tickets found</div>
+            {:else}
+              {#each filteredTickets as ticket}
+                <div class="ticket-card" on:click={() => { selectedTicket = ticket; showTicketDetails = true; }}>
+                  <div class="ticket-header">
+                    <div class="ticket-id">#{ticket.ticketNumber || ticket._id?.slice(-6)}</div>
+                    <span class="priority-badge" style="background: {getPriorityColor(ticket.priority)}">
+                      {ticket.priority}
+                    </span>
+                    <span class="status-badge" style="background: {getStatusColor(ticket.status)}">
+                      {ticket.status}
+                    </span>
+                  </div>
+                  <div class="ticket-title">{ticket.title}</div>
+                  <div class="ticket-meta">
+                    <span>Type: {ticket.type}</span>
+                    <span>{formatDate(ticket.createdAt)}</span>
+                    {#if ticket.assignedToName}
+                      <span>Assigned: {ticket.assignedToName}</span>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            {/if}
           </div>
         </div>
-      </div>
+        
+      {:else if activeTab === 'customers'}
+        <!-- Customers Tab -->
+        <div class="tab-content">
+          <!-- Filters -->
+          <div class="filters-bar">
+            <input 
+              type="text" 
+              class="search-input" 
+              placeholder="Search customers..." 
+              bind:value={customerSearchQuery}
+            />
+            <select bind:value={customerStatusFilter} class="filter-select">
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="suspended">Suspended</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          
+          <!-- Customers List -->
+          <div class="items-list">
+            {#if loadingCustomers}
+              <div class="loading">Loading customers...</div>
+            {:else if filteredCustomers.length === 0}
+              <div class="empty-state">No customers found</div>
+            {:else}
+              {#each filteredCustomers as customer}
+                <div class="customer-card" on:click={() => { selectedCustomer = customer; showEditCustomer = true; }}>
+                  <div class="customer-header">
+                    <div class="customer-name">{customer.fullName}</div>
+                    <span class="status-badge" style="background: {getStatusColor(customer.serviceStatus)}">
+                      {customer.serviceStatus}
+                    </span>
+                  </div>
+                  <div class="customer-info">
+                    <span>ID: {customer.customerId}</span>
+                    <span>Phone: {customer.primaryPhone}</span>
+                    {#if customer.email}
+                      <span>Email: {customer.email}</span>
+                    {/if}
+                  </div>
+                  {#if customer.serviceAddress?.city}
+                    <div class="customer-address">
+                      {customer.serviceAddress.city}, {customer.serviceAddress.state}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
+          </div>
+        </div>
+        
+      {:else if activeTab === 'maintenance'}
+        <!-- Maintenance Tab -->
+        <div class="tab-content">
+          <div class="info-section">
+            <h2>Scheduled Maintenance</h2>
+            <p>View and manage scheduled maintenance tasks, preventive maintenance schedules, and equipment inspections.</p>
+            <button class="btn btn-primary" on:click={() => { activeTab = 'tickets'; ticketStatusFilter = 'in-progress'; }}>
+              View Maintenance Tickets
+            </button>
+          </div>
+        </div>
+        
+      {:else if activeTab === 'incidents'}
+        <!-- Incidents Tab -->
+        <div class="tab-content">
+          <div class="info-section">
+            <h2>Incident Management</h2>
+            <p>Track and manage network incidents, outages, and critical issues.</p>
+            <button class="btn btn-primary" on:click={() => { activeTab = 'tickets'; ticketPriorityFilter = 'critical'; }}>
+              View Critical Incidents
+            </button>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
+  
+  <!-- Modals -->
+  {#if showCreateTicket}
+    <CreateTicketModal on:close={() => showCreateTicket = false} on:created={handleTicketCreated} />
+  {/if}
+  
+  {#if showTicketDetails && selectedTicket}
+    <TicketDetailsModal ticket={selectedTicket} on:close={() => { showTicketDetails = false; selectedTicket = null; }} />
+  {/if}
+  
+  {#if showAddCustomer}
+    <AddEditCustomerModal customer={null} on:close={() => showAddCustomer = false} on:saved={handleCustomerCreated} />
+  {/if}
+  
+  {#if showEditCustomer && selectedCustomer}
+    <AddEditCustomerModal customer={selectedCustomer} on:close={() => { showEditCustomer = false; selectedCustomer = null; }} on:saved={handleCustomerCreated} />
+  {/if}
 </TenantGuard>
 
 <style>
-  /* General Module Styling */
   .maintain-module {
-    background: var(--background-color);
-    min-height: 100vh;
-    padding: 2rem;
-    color: var(--text-color);
-  }
-
-  .module-header {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    border-radius: var(--border-radius-lg);
-    padding: 1.5rem 2rem;
-    margin-bottom: 2rem;
-    box-shadow: var(--shadow-md);
-    color: white;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .back-btn {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius-md);
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: background 0.2s ease;
-  }
-
-  .back-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-
-  .back-icon {
-    font-size: 1.2rem;
-  }
-
-  .module-title h1 {
-    font-size: 2rem;
-    margin: 0;
-    font-weight: 700;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  .module-title p {
-    font-size: 0.9rem;
-    margin: 0;
-    opacity: 0.8;
-  }
-
-  .user-info {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    font-size: 0.85rem;
-    opacity: 0.9;
+    height: 100vh;
+    background: var(--bg-primary);
   }
-
-  .user-name {
-    font-weight: 600;
+  
+  .module-header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem;
   }
-
-  .user-role {
-    font-style: italic;
-  }
-
-  .module-content {
-    background: var(--card-bg);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    box-shadow: var(--shadow-lg);
-  }
-
-  .overview-section, .features-section, .dashboard-preview, .workflow-section, .sla-section {
-    margin-bottom: 2rem;
-  }
-
-  h2 {
-    font-size: 1.8rem;
-    color: var(--primary-color);
-    margin-bottom: 1.5rem;
-    border-bottom: 2px solid var(--border-color);
-    padding-bottom: 0.5rem;
-  }
-
-  /* Features Grid */
-  .features-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 1.5rem;
-  }
-
-  .feature-card {
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
-  }
-
-  .feature-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-color);
-  }
-
-  .feature-header {
+  
+  .header-top {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 1rem;
     margin-bottom: 1rem;
   }
-
-  .feature-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
+  
+  .back-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
   }
-
-  .feature-info {
-    flex-grow: 1;
-  }
-
-  .feature-name {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0 0 0.5rem 0;
-  }
-
-  .feature-description {
-    font-size: 0.9rem;
-    color: var(--text-color-light);
+  
+  .header-top h1 {
     margin: 0;
+    flex: 1;
+    font-size: 1.5rem;
   }
-
-  .feature-status {
-    font-size: 1.2rem;
-    flex-shrink: 0;
+  
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
   }
-
-  .feature-features {
-    margin-bottom: 1rem;
+  
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
   }
-
-  .feature-features h4 {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--text-color);
-    margin: 0 0 0.5rem 0;
+  
+  .tab {
+    background: transparent;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
   }
-
-  .feature-features ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+  
+  .tab:hover {
+    color: var(--text-primary);
   }
-
-  .feature-features li {
-    font-size: 0.8rem;
-    color: var(--text-color-light);
-    margin-bottom: 0.25rem;
-    padding-left: 1rem;
-    position: relative;
+  
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
   }
-
-  .feature-features li::before {
-    content: '•';
-    color: var(--primary-color);
-    position: absolute;
-    left: 0;
+  
+  .module-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
   }
-
-  .feature-arrow {
-    text-align: right;
-    font-size: 1.2rem;
-    color: var(--primary-color);
-    opacity: 0.7;
-  }
-
-  /* Dashboard Preview */
+  
   .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-  }
-
-  .dashboard-card {
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    text-align: center;
-  }
-
-  .dashboard-card h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0 0 1rem 0;
-  }
-
-  .ticket-count, .maintenance-count, .response-time, .satisfaction-score {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-  }
-
-  .dashboard-card p {
-    font-size: 0.8rem;
-    color: var(--text-color-light);
-    margin: 0;
-  }
-
-  .loading-state {
-    text-align: center;
-    padding: 2rem;
-    color: var(--text-color-light);
-    font-style: italic;
-  }
-
-  /* SLA Section */
-  .sla-grid {
-    display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
     gap: 1rem;
   }
-
-  .sla-card {
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius-md);
-    padding: 1.5rem;
-    box-shadow: var(--shadow-sm);
-    text-align: center;
+  
+  .stat-icon {
+    font-size: 2.5rem;
   }
-
-  .sla-card h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0 0 1rem 0;
-  }
-
-  .sla-value {
+  
+  .stat-value {
     font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 1rem;
+    font-weight: bold;
+    color: var(--primary);
   }
-
-  .sla-bar {
-    background: var(--border-color);
-    height: 8px;
+  
+  .stat-label {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  .stat-sub {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+  
+  .filters-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .search-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
-    margin-bottom: 0.5rem;
-    overflow: hidden;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
-
-  .sla-progress {
-    background: var(--primary-color);
-    height: 100%;
-    transition: width 0.3s ease;
+  
+  .filter-select {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
-
-  .sla-card p {
-    font-size: 0.8rem;
-    color: var(--text-color-light);
-    margin: 0;
-  }
-
-  /* Workflow Section */
-  .workflow-steps {
+  
+  .items-list {
     display: flex;
     flex-direction: column;
     gap: 1rem;
   }
-
-  .workflow-step {
+  
+  .ticket-card, .customer-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .ticket-card:hover, .customer-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  
+  .ticket-header, .customer-header {
     display: flex;
     align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .ticket-id {
+    font-weight: bold;
+    color: var(--primary);
+  }
+  
+  .priority-badge, .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    color: white;
+    text-transform: capitalize;
+  }
+  
+  .ticket-title, .customer-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  .ticket-meta, .customer-info {
+    display: flex;
+    gap: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+  
+  .customer-address {
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+  
+  .activity-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  
+  .activity-list {
+    margin-top: 1rem;
+  }
+  
+  .activity-item {
+    display: flex;
     gap: 1rem;
     padding: 1rem;
-    background: var(--secondary-bg);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid var(--border-color);
   }
-
-  .step-number {
-    background: var(--primary-color);
-    color: white;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
+  
+  .activity-item:last-child {
+    border-bottom: none;
+  }
+  
+  .activity-icon {
+    font-size: 1.5rem;
+  }
+  
+  .activity-title {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+  
+  .activity-meta {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    flex-shrink: 0;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
   }
-
-  .step-content h3 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--primary-color);
-    margin: 0 0 0.25rem 0;
+  
+  .empty-state, .loading {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
   }
-
-  .step-content p {
-    font-size: 0.9rem;
-    color: var(--text-color-light);
-    margin: 0;
+  
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
   }
-
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .header-content {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .user-info {
-      align-items: flex-start;
-    }
-
-    .features-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .dashboard-grid, .sla-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .module-content {
-      padding: 1rem;
-    }
-
-    .workflow-step {
-      flex-direction: column;
-      text-align: center;
-    }
+  
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+  
+  .info-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+  }
+  
+  .info-section h2 {
+    margin-bottom: 1rem;
   }
 </style>

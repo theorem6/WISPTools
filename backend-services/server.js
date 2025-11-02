@@ -47,6 +47,7 @@ app.use('/api/user-tenants', require('./routes/users/tenant-details'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/work-orders', require('./routes/work-orders'));
+app.use('/api/maintain', require('./routes/maintain'));
 app.use('/api/network', require('./routes/network'));
 app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
