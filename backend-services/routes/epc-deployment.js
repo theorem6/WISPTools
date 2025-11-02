@@ -610,8 +610,11 @@ router.get('/:epc_id/full-deployment', async (req, res) => {
     const epcRoute = require('./epc');
     const deploymentScript = epcRoute.generateDeploymentScript(epc);
     
-    res.setHeader('Content-Type', 'text/plain');
+    // Set headers with Ubuntu 22.04 requirement note
+    res.setHeader('Content-Type', 'text/x-shellscript');
     res.setHeader('Content-Disposition', `attachment; filename="deploy-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh"`);
+    res.setHeader('X-Requirement-Note', 'This script requires Ubuntu 22.04 LTS Server');
+    
     res.send(deploymentScript);
     
   } catch (error) {

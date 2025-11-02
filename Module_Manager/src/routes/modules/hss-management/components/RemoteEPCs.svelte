@@ -332,6 +332,21 @@
   }
   
   async function downloadDeploymentScript(epc: any) {
+    // Show requirement notice before download
+    const confirmed = confirm(
+      '⚠️ REQUIREMENT NOTICE\n\n' +
+      'This deployment script REQUIRES Ubuntu 22.04 LTS Server.\n\n' +
+      '• The script will verify Ubuntu 22.04 LTS before proceeding\n' +
+      '• Open5GS packages are optimized for Ubuntu 22.04 LTS\n' +
+      '• Other versions may not work correctly\n\n' +
+      'Do you have Ubuntu 22.04 LTS installed?\n' +
+      'Click OK to download, or Cancel to install Ubuntu 22.04 LTS first.'
+    );
+    
+    if (!confirmed) {
+      window.open('https://ubuntu.com/download/server', '_blank');
+      return;
+    }
     try {
       const user = auth().currentUser;
       if (!user) return;
