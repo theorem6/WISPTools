@@ -73,10 +73,15 @@ class CustomerService {
       throw new Error('Not authenticated');
     }
 
-    const tenantId = get(currentTenant)?.id;
+    const tenant = get(currentTenant);
+    const tenantId = tenant?.id;
+    
     if (!tenantId) {
+      console.error('[CustomerService] No tenant ID available. Current tenant:', tenant);
       throw new Error('No tenant selected');
     }
+    
+    console.log('[CustomerService] Making request with tenant ID:', tenantId);
 
     const response = await fetch(`${API_URL}/api/customers${endpoint}`, {
       ...options,
