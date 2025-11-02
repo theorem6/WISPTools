@@ -21,31 +21,13 @@
 
   const maintainFeatures: MaintainFeature[] = [
     {
-      id: 'ticketing-system',
-      name: 'Ticketing System',
-      description: 'Customer support and issue tracking',
+      id: 'comprehensive-ticketing',
+      name: 'Comprehensive Ticketing System',
+      description: 'Complete ticketing, maintenance scheduling, and incident management',
       icon: '🎫',
       path: '/modules/help-desk',
       status: 'active',
-      features: ['Issue Tracking', 'Customer Support', 'Ticket Management', 'Priority Handling']
-    },
-    {
-      id: 'preventive-maintenance',
-      name: 'Preventive Maintenance',
-      description: 'Scheduled maintenance and inspections',
-      icon: '🔧',
-      path: '/modules/work-orders', // Link to work orders for maintenance
-      status: 'active',
-      features: ['Scheduled Maintenance', 'Equipment Inspections', 'Preventive Tasks', 'Maintenance History']
-    },
-    {
-      id: 'incident-management',
-      name: 'Incident Management',
-      description: 'Outage response and resolution',
-      icon: '🚨',
-      path: '/modules/help-desk', // Link to help desk for incidents
-      status: 'active',
-      features: ['Outage Response', 'Incident Tracking', 'Resolution Management', 'Post-Incident Analysis']
+      features: ['Issue Tracking', 'Customer Support', 'Ticket Management', 'Priority Handling', 'Scheduled Maintenance', 'Equipment Inspections', 'Preventive Tasks', 'Maintenance History', 'Outage Response', 'Incident Tracking', 'Resolution Management', 'Post-Incident Analysis']
     },
     {
       id: 'customer-support',
