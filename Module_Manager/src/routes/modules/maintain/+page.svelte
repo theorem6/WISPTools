@@ -7,6 +7,7 @@
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
   import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
+  import { workOrderService } from '$lib/services/workOrderService';
 
   interface MaintainFeature {
     id: string;
@@ -127,50 +128,32 @@
         console.warn('User not authenticated, skipping dashboard data load');
         return;
       }
-      
-      const token = await authService.getIdToken();
-      
-      if (!token) {
-        console.warn('Failed to get auth token, skipping dashboard data load');
-        return;
-      }
-      
-      const tenantId = $currentTenant.id;
 
-      // Fetch work orders stats
-      const workOrdersResponse = await fetch('/api/work-orders?tenantId=' + tenantId, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
-        }
-      });
+      // Fetch work orders using the service
+      const workOrders = await workOrderService.getWorkOrders();
       
-      if (workOrdersResponse.ok) {
-        const workOrders = await workOrdersResponse.json();
-        
-        // Calculate stats
-        const openTickets = workOrders.filter((wo: any) => 
-          ['open', 'assigned', 'in-progress'].includes(wo.status)
-        ).length;
-        
-        const scheduledMaintenance = workOrders.filter((wo: any) => 
-          wo.type === 'maintenance' && wo.status !== 'closed' && wo.status !== 'cancelled'
-        ).length;
-        
-        // Calculate average response time (time from created to assigned)
-        const assignedOrders = workOrders.filter((wo: any) => wo.assignedAt && wo.createdAt);
-        if (assignedOrders.length > 0) {
-          const totalResponseTime = assignedOrders.reduce((sum: number, wo: any) => {
-            const responseTime = new Date(wo.assignedAt).getTime() - new Date(wo.createdAt).getTime();
-            return sum + (responseTime / (1000 * 60 * 60)); // Convert to hours
-          }, 0);
-          const avgResponseTime = (totalResponseTime / assignedOrders.length).toFixed(1);
-          dashboardData.responseTime = `${avgResponseTime}h`;
-        }
-
-        dashboardData.openTickets = openTickets;
-        dashboardData.scheduledMaintenance = scheduledMaintenance;
+      // Calculate stats
+      const openTickets = workOrders.filter((wo: any) => 
+        ['open', 'assigned', 'in-progress'].includes(wo.status)
+      ).length;
+      
+      const scheduledMaintenance = workOrders.filter((wo: any) => 
+        wo.type === 'maintenance' && wo.status !== 'closed' && wo.status !== 'cancelled'
+      ).length;
+      
+      // Calculate average response time (time from created to assigned)
+      const assignedOrders = workOrders.filter((wo: any) => wo.assignedAt && wo.createdAt);
+      if (assignedOrders.length > 0) {
+        const totalResponseTime = assignedOrders.reduce((sum: number, wo: any) => {
+          const responseTime = new Date(wo.assignedAt).getTime() - new Date(wo.createdAt).getTime();
+          return sum + (responseTime / (1000 * 60 * 60)); // Convert to hours
+        }, 0);
+        const avgResponseTime = (totalResponseTime / assignedOrders.length).toFixed(1);
+        dashboardData.responseTime = `${avgResponseTime}h`;
       }
+
+      dashboardData.openTickets = openTickets;
+      dashboardData.scheduledMaintenance = scheduledMaintenance;
 
       // TODO: Fetch customer satisfaction from help desk API if available
       // For now, leave as N/A
