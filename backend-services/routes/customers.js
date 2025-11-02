@@ -75,10 +75,14 @@ router.post('/', async (req, res) => {
     const count = await Customer.countDocuments({ tenantId });
     const customerId = `CUST-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
     
+    // Generate fullName if not provided
+    const fullName = req.body.fullName || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim();
+    
     const customer = new Customer({
       ...req.body,
       tenantId,
-      customerId
+      customerId,
+      fullName
     });
     
     await customer.save();

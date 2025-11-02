@@ -127,9 +127,14 @@
     error = '';
     
     try {
+      const firstName = formData.firstName.trim();
+      const lastName = formData.lastName.trim();
+      const fullName = `${firstName} ${lastName}`.trim();
+      
       const customerData: Partial<Customer> = {
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
+        firstName,
+        lastName,
+        fullName,
         primaryPhone: formData.primaryPhone.trim(),
         alternatePhone: formData.alternatePhone.trim() || undefined,
         email: formData.email.trim() || undefined,
@@ -171,6 +176,7 @@
       dispatch('saved');
       handleClose();
     } catch (err: any) {
+      console.error('Error saving customer:', err);
       error = err.message || 'Failed to save customer';
     } finally {
       isSaving = false;

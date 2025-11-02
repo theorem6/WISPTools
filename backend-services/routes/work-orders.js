@@ -63,14 +63,23 @@ router.get('/:id', async (req, res) => {
 // Create work order
 router.post('/', async (req, res) => {
   try {
+    // Generate ticket number if not provided
+    let ticketNumber = req.body.ticketNumber;
+    if (!ticketNumber) {
+      const count = await WorkOrder.countDocuments({ tenantId: req.tenantId });
+      ticketNumber = `TKT-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    }
+    
     const workOrder = new WorkOrder({
       ...req.body,
-      tenantId: req.tenantId
+      tenantId: req.tenantId,
+      ticketNumber
     });
     
     await workOrder.save();
     res.status(201).json(workOrder);
   } catch (error) {
+    console.error('Error creating work order:', error);
     res.status(500).json({ error: 'Failed to create work order', details: error.message });
   }
 });
