@@ -238,12 +238,24 @@ export const hssProxy = onRequest({
   }
   
   // Compute backend upstream based on path. Multiple backend services:
-  // - Port 3001: Core HSS/management API (/api/**, /admin/**, tenants, users, etc.)
+  // - Port 3000: HSS API (hss-api service) - Open5GS HSS management
+  // - Port 3001: Core User Management System API (/api/**, /admin/**, tenants, users, customers, etc.)
   // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
-  // Use domain with HTTPS for port 3001 (proxied through nginx), IP with HTTP for port 3002 (direct access)
-  // Prefer direct IP over HTTP to avoid nginx/DNS issues
+  // All tenant, user, customer, work-order, inventory, etc. routes are on port 3001
+  // HSS-specific routes may be on port 3000
   const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
-  const backendHost = `http://${backendIp}:3000`;
+  
+  // Determine which port based on the path
+  // Most API routes (tenants, users, customers, inventory, work-orders, maintain, etc.) are on port 3001
+  // HSS routes and deploy routes may be on different ports
+  let backendHost: string;
+  if (proxiedPath.startsWith('/api/deploy')) {
+    // Deployment routes go to port 3002 (or 3001 if configured there)
+    backendHost = `http://${backendIp}:3001`;
+  } else {
+    // All other API routes (tenants, users, customers, etc.) go to port 3001
+    backendHost = `http://${backendIp}:3001`;
+  }
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
