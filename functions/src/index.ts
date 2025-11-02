@@ -237,26 +237,6 @@ export const hssProxy = onRequest({
     return;
   }
   
-  // Compute backend upstream based on path. Multiple backend services:
-  // - Port 3000: HSS API (hss-api service) - Open5GS HSS management
-  // - Port 3001: Core User Management System API (/api/**, /admin/**, tenants, users, customers, etc.)
-  // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
-  // All tenant, user, customer, work-order, inventory, etc. routes are on port 3001
-  // HSS-specific routes may be on port 3000
-  const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
-  
-  // Determine which port based on the path
-  // Most API routes (tenants, users, customers, inventory, work-orders, maintain, etc.) are on port 3001
-  // HSS routes and deploy routes may be on different ports
-  let backendHost: string;
-  if (proxiedPath.startsWith('/api/deploy')) {
-    // Deployment routes go to port 3002 (or 3001 if configured there)
-    backendHost = `http://${backendIp}:3001`;
-  } else {
-    // All other API routes (tenants, users, customers, etc.) go to port 3001
-    backendHost = `http://${backendIp}:3001`;
-  }
-  
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
   // When called via Firebase Hosting rewrite, path is: /api/deploy/...
@@ -273,11 +253,17 @@ export const hssProxy = onRequest({
   // Ensure path starts with / for backend URL construction
   const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
 
-  // isoProxy always routes to port 3001 (HSS API) where /api/deploy routes exist
-  // The /api/deploy routes are in backend-services/routes/epc-deployment.js (port 3001)
-  // Port 3002 (gce-backend) does not have these routes properly configured
-  const upstreamHost = backendHost;  // Always use port 3001 for isoProxy
-  const url = `${upstreamHost}${proxiedPath}`;
+  // Compute backend upstream based on path. Multiple backend services:
+  // - Port 3000: HSS API (hss-api service) - Open5GS HSS management (separate service)
+  // - Port 3001: Core User Management System API (/api/**, /admin/**, tenants, users, customers, etc.)
+  // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
+  // All tenant, user, customer, work-order, inventory, maintain, etc. routes are on port 3001
+  // This is the main API server (backend-services/server.js)
+  const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
+  
+  // All API routes go to port 3001 (the main user management system API)
+  const backendHost = `http://${backendIp}:3001`;
+  const url = `${backendHost}${proxiedPath}`;
   
   // Log request details for debugging
   console.log('[hssProxy] Request details:', {
