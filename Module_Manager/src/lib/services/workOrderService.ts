@@ -3,6 +3,8 @@
  * Manages trouble tickets, installations, and field operations
  */
 
+import { authService } from '$lib/services/authService';
+
 const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
 
 export interface WorkOrder {
@@ -156,7 +158,6 @@ export interface WorkOrderStats {
 class WorkOrderService {
   private async getAuthToken(): Promise<string> {
     // Use authService for consistent token retrieval
-    const { authService } = await import('$lib/services/authService');
     const token = await authService.getIdToken();
     if (!token) {
       throw new Error('Not authenticated');
