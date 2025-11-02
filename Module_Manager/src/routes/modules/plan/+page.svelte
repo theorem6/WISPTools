@@ -24,6 +24,8 @@
   let projects: PlanProject[] = [];
   let selectedProject: PlanProject | null = null;
   let isLoading = false;
+  let error: string = '';
+  let successMessage: string = '';
   
   // New project form
   let newProject = {
@@ -277,22 +279,42 @@
   }
 
   async function createProject() {
-    if (!newProject.name.trim()) return;
+    if (!newProject.name.trim()) {
+      error = 'Project name is required';
+      setTimeout(() => error = '', 5000);
+      return;
+    }
+    
+    isLoading = true;
+    error = '';
+    successMessage = '';
     
     try {
       const tenantId = localStorage.getItem('selectedTenantId');
-      if (tenantId) {
-        const project = await planService.createPlan(tenantId, {
-          name: newProject.name,
-          description: newProject.description,
-          createdBy: currentUser.email
-        });
-        
-        projects.push(project);
-        closeCreateProjectModal();
+      if (!tenantId) {
+        throw new Error('No tenant selected');
       }
-    } catch (error) {
-      console.error('Error creating project:', error);
+      
+      const project = await planService.createPlan(tenantId, {
+        name: newProject.name,
+        description: newProject.description,
+        createdBy: currentUser.email
+      });
+      
+      // Reload projects list
+      await loadData();
+      
+      successMessage = `Project "${project.name}" created successfully`;
+      closeCreateProjectModal();
+      
+      // Show success message briefly
+      setTimeout(() => successMessage = '', 3000);
+    } catch (err: any) {
+      console.error('Error creating project:', err);
+      error = err.message || 'Failed to create project. Please check the console for details.';
+      setTimeout(() => error = '', 8000);
+    } finally {
+      isLoading = false;
     }
   }
 
@@ -778,6 +800,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
         
         <div class="modal-body">
+          {#if error}
+            <div class="alert alert-error">
+              <strong>Error:</strong> {error}
+            </div>
+          {/if}
+          {#if successMessage}
+            <div class="alert alert-success">
+              <strong>Success:</strong> {successMessage}
+            </div>
+          {/if}
           <form on:submit|preventDefault={createProject}>
             <div class="form-group">
               <label for="projectName">Project Name *</label>
@@ -787,6 +819,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 bind:value={newProject.name}
                 placeholder="Enter project name"
                 required
+                disabled={isLoading}
               />
             </div>
             
@@ -797,15 +830,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 bind:value={newProject.description}
                 placeholder="Describe the project scope and objectives"
                 rows="3"
+                disabled={isLoading}
               ></textarea>
             </div>
           </form>
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeCreateProjectModal}>Cancel</button>
-          <button class="btn-primary" on:click={createProject} disabled={!newProject.name.trim()}>
-            Create Project
+          <button class="btn-secondary" on:click={closeCreateProjectModal} disabled={isLoading}>Cancel</button>
+          <button class="btn-primary" on:click={createProject} disabled={!newProject.name.trim() || isLoading}>
+            {isLoading ? 'Creating...' : 'Create Project'}
           </button>
         </div>
       </div>
@@ -1965,5 +1999,31 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   .form-group select:focus {
     outline: none;
     border-color: var(--brand-primary);
+  }
+
+  /* Alert Styles */
+  .alert {
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .alert-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid #ef4444;
+    color: #dc2626;
+  }
+
+  .alert-success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid #22c55e;
+    color: #16a34a;
+  }
+
+  .alert strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
   }
 </style>

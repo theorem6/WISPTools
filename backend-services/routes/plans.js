@@ -72,8 +72,27 @@ router.post('/', async (req, res) => {
     const planData = {
       ...req.body,
       tenantId: req.tenantId,
-      createdBy: req.user?.email || req.user?.name,
-      createdById: req.user?.uid
+      createdBy: req.body.createdBy || req.user?.email || req.user?.name || 'System',
+      createdById: req.user?.uid || req.body.createdById,
+      status: req.body.status || 'draft',
+      showOnMap: req.body.showOnMap !== undefined ? req.body.showOnMap : false,
+      scope: req.body.scope || {
+        towers: [],
+        sectors: [],
+        cpeDevices: [],
+        equipment: [],
+        backhauls: []
+      },
+      hardwareRequirements: req.body.hardwareRequirements || {
+        existing: [],
+        needed: []
+      },
+      purchasePlan: req.body.purchasePlan || {
+        totalEstimatedCost: 0,
+        missingHardware: [],
+        procurementStatus: 'pending'
+      },
+      deployment: req.body.deployment || {}
     };
     
     const plan = new PlanProject(planData);
