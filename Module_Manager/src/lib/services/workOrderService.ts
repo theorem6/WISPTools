@@ -158,6 +158,9 @@ export interface WorkOrderStats {
 class WorkOrderService {
   private async getAuthToken(): Promise<string> {
     // Use authService for consistent token retrieval
+    if (!authService || typeof authService.getIdToken !== 'function') {
+      throw new Error('AuthService not properly initialized');
+    }
     const token = await authService.getIdToken();
     if (!token) {
       throw new Error('Not authenticated');
