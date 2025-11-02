@@ -135,6 +135,15 @@ class CustomerService {
       body: JSON.stringify(updates)
     });
   }
+
+  /**
+   * Delete customer (soft delete - sets isActive to false)
+   */
+  async deleteCustomer(id: string): Promise<void> {
+    return await this.apiCall(`/${id}`, {
+      method: 'DELETE'
+    });
+  }
 }
 
 export const customerService = new CustomerService();

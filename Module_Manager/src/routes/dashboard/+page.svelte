@@ -61,6 +61,16 @@
               status: 'active',
               path: '/modules/maintain',
               features: ['Ticketing System', 'Preventive Maintenance', 'Incident Management', 'Customer Support', 'Vendor Management', 'Knowledge Base']
+            },
+            {
+              id: 'customers',
+              name: '👥 Customers',
+              description: 'Manage tenant customers, subscribers, and service accounts',
+              icon: '👥',
+              color: 'var(--info)', // Blue
+              status: 'active',
+              path: '/modules/customers',
+              features: ['Customer Database', 'Service Management', 'Billing Information', 'Installation History', 'Customer Support', 'Service Plans']
             }
   ];
 
