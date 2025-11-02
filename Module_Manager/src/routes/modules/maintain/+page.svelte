@@ -117,7 +117,24 @@
     
     try {
       loadingDashboard = true;
+      
+      // Ensure user is authenticated before getting token
+      if (!currentUser) {
+        currentUser = await authService.getCurrentUser();
+      }
+      
+      if (!currentUser) {
+        console.warn('User not authenticated, skipping dashboard data load');
+        return;
+      }
+      
       const token = await authService.getIdToken();
+      
+      if (!token) {
+        console.warn('Failed to get auth token, skipping dashboard data load');
+        return;
+      }
+      
       const tenantId = $currentTenant.id;
 
       // Fetch work orders stats

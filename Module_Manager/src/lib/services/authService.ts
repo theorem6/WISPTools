@@ -281,6 +281,14 @@ export class AuthService {
   }
 
   /**
+   * Get the current user's authentication token (alias for getAuthToken)
+   * This method exists for backward compatibility with existing code
+   */
+  async getIdToken(): Promise<string | null> {
+    return this.getAuthToken();
+  }
+
+  /**
    * Get user-friendly error messages
    */
   private getAuthErrorMessage(error: any): string {
