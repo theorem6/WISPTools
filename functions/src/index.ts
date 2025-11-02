@@ -283,9 +283,13 @@ export const hssProxy = onRequest({
       'Content-Type': 'application/json'
     };
     
-    // Forward x-tenant-id if present
-    if (req.headers['x-tenant-id']) {
-      headers['x-tenant-id'] = req.headers['x-tenant-id'] as string;
+    // Forward x-tenant-id if present (check both lowercase and camelCase)
+    const tenantId = req.headers['x-tenant-id'] || req.headers['X-Tenant-ID'];
+    if (tenantId) {
+      headers['x-tenant-id'] = tenantId as string;
+      console.log('[hssProxy] Forwarding tenant ID:', tenantId);
+    } else {
+      console.warn('[hssProxy] No tenant ID header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('tenant')));
     }
     
     // Forward Authorization header if present
