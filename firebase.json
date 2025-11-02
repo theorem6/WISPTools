@@ -70,10 +70,6 @@
     ],
     "rewrites": [
       {
-        "source": "/api/billing/**",
-        "function": "billingApi"
-      },
-      {
         "source": "/api/deploy/**",
         "function": "isoProxy"
       },

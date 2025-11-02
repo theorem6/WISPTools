@@ -3,9 +3,13 @@
  * Manages trouble tickets, installations, and field operations
  */
 
-import { authService } from '$lib/services/authService';
-
 const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+
+// Lazy import to avoid circular dependencies and ensure authService is fully initialized
+async function getAuthService() {
+  const { authService } = await import('$lib/services/authService');
+  return authService;
+}
 
 export interface WorkOrder {
   _id?: string;
@@ -157,7 +161,8 @@ export interface WorkOrderStats {
 
 class WorkOrderService {
   private async getAuthToken(): Promise<string> {
-    // Use authService for consistent token retrieval
+    // Use authService for consistent token retrieval (lazy import to avoid timing issues)
+    const authService = await getAuthService();
     if (!authService || typeof authService.getIdToken !== 'function') {
       throw new Error('AuthService not properly initialized');
     }
