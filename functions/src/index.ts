@@ -299,27 +299,21 @@ export const hssProxy = onRequest({
     };
     
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      // Firebase Functions v2 automatically parses JSON bodies into objects
-      // We need to stringify it back to JSON for the backend
-      if (req.body === null || req.body === undefined || (typeof req.body === 'object' && Object.keys(req.body).length === 0)) {
-        // Empty body - don't send it or send empty object
+      // Firebase Functions v2 onRequest with cors: true automatically parses JSON bodies
+      // req.body is already a parsed object, so we need to stringify it for the backend
+      if (!req.body || (typeof req.body === 'object' && Object.keys(req.body).length === 0)) {
+        // Empty body
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
           options.body = '{}';
-        } else {
-          options.body = undefined;
         }
       } else if (typeof req.body === 'string') {
-        // Body is already a string (shouldn't happen with JSON, but handle it)
+        // If body is already a string, use it directly (rare case)
         options.body = req.body;
+        console.log('[hssProxy] Body is already string, length:', req.body.length);
       } else {
         // Body is an object - stringify it
-        try {
-          options.body = JSON.stringify(req.body);
-          console.log('[hssProxy] Body stringified successfully, length:', options.body.length);
-        } catch (e) {
-          console.error('[hssProxy] Error stringifying body:', e);
-          options.body = '{}';
-        }
+        options.body = JSON.stringify(req.body);
+        console.log('[hssProxy] Body stringified, length:', options.body.length, 'first 100 chars:', options.body.substring(0, 100));
       }
     }
     
