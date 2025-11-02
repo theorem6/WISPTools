@@ -2,6 +2,8 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
   import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
+  import CustomerLookupModal from '../../help-desk/components/CustomerLookupModal.svelte';
+  import type { Customer } from '$lib/services/customerService';
   
   export let show = false;
   export let tenantId: string;
@@ -11,6 +13,8 @@
   let isSaving = false;
   let error = '';
   let sites: any[] = [];
+  let showCustomerLookup = false;
+  let selectedCustomer: Customer | null = null;
   
   let formData = {
     type: 'troubleshoot' as WorkOrder['type'],
@@ -26,6 +30,7 @@
     customerReported: false,
     customerName: '',
     customerPhone: '',
+    customerId: '',
     scheduledDate: '',
     estimatedDuration: 120,
     slaResponseHours: 4,
@@ -106,7 +111,25 @@
       }
       
       // Add customer info if customer-reported
-      if (formData.customerReported && formData.customerName) {
+      if (formData.customerReported && selectedCustomer) {
+        workOrderData.customerReported = true;
+        workOrderData.customerContact = {
+          name: formData.customerName,
+          phone: formData.customerPhone,
+          email: selectedCustomer.email
+        };
+        
+        // Add to affectedCustomers array
+        workOrderData.affectedCustomers = [{
+          customerId: formData.customerId || selectedCustomer._id || selectedCustomer.customerId,
+          customerName: formData.customerName,
+          phoneNumber: formData.customerPhone,
+          serviceAddress: selectedCustomer.serviceAddress?.street 
+            ? `${selectedCustomer.serviceAddress.street}, ${selectedCustomer.serviceAddress.city || ''}`.trim()
+            : ''
+        }];
+      } else if (formData.customerReported && formData.customerName) {
+        // Manual entry fallback
         workOrderData.customerReported = true;
         workOrderData.customerContact = {
           name: formData.customerName,
@@ -140,10 +163,36 @@
     }
   }
   
+  function handleCustomerSelect(customer: Customer) {
+    selectedCustomer = customer;
+    formData.customerReported = true;
+    formData.customerName = customer.fullName || `${customer.firstName} ${customer.lastName}`;
+    formData.customerPhone = customer.primaryPhone;
+    formData.customerId = customer.customerId || customer._id || '';
+    
+    // Pre-fill location if customer has service address
+    if (customer.serviceAddress?.latitude && customer.serviceAddress?.longitude) {
+      // Could set GPS coordinates here
+    }
+    
+    // Auto-fill title if empty and customer selected
+    if (!formData.title && customer.serviceStatus === 'active') {
+      formData.title = `Service Issue - ${customer.fullName || customer.firstName} ${customer.lastName}`;
+    }
+  }
+  
+  function clearCustomer() {
+    selectedCustomer = null;
+    formData.customerName = '';
+    formData.customerPhone = '';
+    formData.customerId = '';
+  }
+  
   function handleClose() {
     show = false;
     error = '';
     sitesLoaded = false; // Reset for next time modal opens
+    selectedCustomer = null;
     // Reset form
     formData = {
       type: 'troubleshoot',
@@ -155,6 +204,7 @@
       customerReported: false,
       customerName: '',
       customerPhone: '',
+      customerId: '',
       scheduledDate: '',
       estimatedDuration: 120,
       slaResponseHours: 4,
@@ -266,17 +316,45 @@
         </div>
         
         {#if formData.customerReported}
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Customer Name</label>
-              <input type="text" bind:value={formData.customerName} placeholder="John Smith" />
+          {#if selectedCustomer}
+            <div class="selected-customer">
+              <div class="customer-card">
+                <div class="customer-info">
+                  <strong>{selectedCustomer.fullName || `${selectedCustomer.firstName} ${selectedCustomer.lastName}`}</strong>
+                  <span class="customer-id">{selectedCustomer.customerId}</span>
+                  {#if selectedCustomer.primaryPhone}
+                    <div class="customer-phone">📞 {selectedCustomer.primaryPhone}</div>
+                  {/if}
+                  {#if selectedCustomer.email}
+                    <div class="customer-email">📧 {selectedCustomer.email}</div>
+                  {/if}
+                </div>
+                <button type="button" class="btn-remove" on:click={clearCustomer}>✕</button>
+              </div>
             </div>
-            
-            <div class="form-group">
-              <label>Phone</label>
-              <input type="tel" bind:value={formData.customerPhone} placeholder="555-1234" />
+          {:else}
+            <div class="customer-lookup-section">
+              <button 
+                type="button" 
+                class="btn-lookup" 
+                on:click={() => showCustomerLookup = true}
+              >
+                🔍 Lookup Customer from Database
+              </button>
+              <p class="or-divider">OR</p>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Customer Name</label>
+                  <input type="text" bind:value={formData.customerName} placeholder="John Smith" />
+                </div>
+                
+                <div class="form-group">
+                  <label>Phone</label>
+                  <input type="tel" bind:value={formData.customerPhone} placeholder="555-1234" />
+                </div>
+              </div>
             </div>
-          </div>
+          {/if}
         {/if}
       </div>
       
@@ -323,6 +401,14 @@
     </div>
   </div>
 </div>
+
+{#if showCustomerLookup}
+  <CustomerLookupModal 
+    on:close={() => showCustomerLookup = false}
+    on:selected={(e) => handleCustomerSelect(e.detail)}
+    onSelect={handleCustomerSelect}
+  />
+{/if}
 {/if}
 
 <style>
@@ -495,6 +581,96 @@
   .btn-secondary:hover {
     background: var(--bg-tertiary);
     transform: translateY(-1px);
+  }
+  
+  .customer-lookup-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .btn-lookup {
+    padding: var(--spacing-md);
+    background: var(--gradient-primary);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .btn-lookup:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .or-divider {
+    text-align: center;
+    color: var(--text-secondary);
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  
+  .selected-customer {
+    margin-top: 0.5rem;
+  }
+  
+  .customer-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--success-light, #d4edda);
+    border: 1px solid var(--success, #28a745);
+    border-radius: var(--border-radius);
+  }
+  
+  .customer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .customer-info strong {
+    color: var(--text-primary);
+    font-size: 1rem;
+  }
+  
+  .customer-id {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+  }
+  
+  .customer-phone,
+  .customer-email {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+  
+  .btn-remove {
+    background: var(--danger, #dc3545);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 2rem;
+    height: 2rem;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+  }
+  
+  .btn-remove:hover {
+    background: var(--danger-dark, #c82333);
+    transform: scale(1.1);
   }
 </style>
 
