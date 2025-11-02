@@ -220,7 +220,8 @@ export const hssProxy = onRequest({
   region: 'us-central1',
   memory: '256MiB',
   timeoutSeconds: 60,
-  cors: true
+  cors: true,
+  consumeAwsRequestId: true
 }, async (req, res) => {
   // Set CORS headers explicitly and reflect origin
   const origin = (req.headers.origin as string) || '*';
@@ -301,17 +302,27 @@ export const hssProxy = onRequest({
     };
     
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      // Firebase Functions v2 automatically parses JSON bodies
-      // Check if body is already a string or an object
-      if (typeof req.body === 'string') {
+      // Firebase Functions v2 automatically parses JSON bodies into objects
+      // We need to stringify it back to JSON for the backend
+      if (req.body === null || req.body === undefined || (typeof req.body === 'object' && Object.keys(req.body).length === 0)) {
+        // Empty body - don't send it or send empty object
+        if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+          options.body = '{}';
+        } else {
+          options.body = undefined;
+        }
+      } else if (typeof req.body === 'string') {
+        // Body is already a string (shouldn't happen with JSON, but handle it)
         options.body = req.body;
-        console.log('[hssProxy] Body is already a string, using as-is');
-      } else if (req.body === null || req.body === undefined) {
-        options.body = undefined;
-        console.log('[hssProxy] Body is null/undefined');
       } else {
-        options.body = JSON.stringify(req.body);
-        console.log('[hssProxy] Body stringified:', options.body.substring(0, 200));
+        // Body is an object - stringify it
+        try {
+          options.body = JSON.stringify(req.body);
+          console.log('[hssProxy] Body stringified successfully, length:', options.body.length);
+        } catch (e) {
+          console.error('[hssProxy] Error stringifying body:', e);
+          options.body = '{}';
+        }
       }
     }
     
