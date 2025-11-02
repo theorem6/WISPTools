@@ -41,6 +41,17 @@ export interface Customer {
     ipAddress?: string;
     cpeSerialNumber?: string;
   };
+  billingAddress?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+    sameAsService?: boolean;
+  };
+  notes?: string;
+  tags?: string[];
+  isActive?: boolean;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
