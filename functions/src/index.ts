@@ -240,16 +240,22 @@ export const apiProxy = onRequest({
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
   // When called via direct Cloud Function URL, path may be: /apiProxy/api/customers
-  // When called via Firebase Hosting rewrite, path is: /api/customers
+  // When called via Firebase Hosting rewrite, the original path is preserved in req.url
   // When called via Cloud Run service directly, path is: /api/customers
-  let incoming = (req as any).originalUrl || req.url || req.path || '';
+  // For Firebase Functions v2 onRequest, req.url contains the full path including query string
+  // req.path may be just '/' for rewrites, so we prioritize req.url
+  let incoming = '';
   
-  // Handle Firebase Hosting rewrite: when rewritten, the path is in req.url
-  // Firebase Hosting passes the full original path in req.url when using rewrites
-  // Check all possible locations for the path
-  if (!incoming || incoming === '/') {
-    // Try to get path from Firebase Hosting rewrite
-    incoming = (req as any).rawRequest?.url || req.url || (req as any).originalUrl || '';
+  // Priority order for getting the path:
+  // 1. req.url (Firebase Hosting rewrites preserve the original URL here)
+  // 2. originalUrl (if available)
+  // 3. req.path (fallback)
+  if (req.url && req.url !== '/') {
+    incoming = req.url;
+  } else if ((req as any).originalUrl && (req as any).originalUrl !== '/') {
+    incoming = (req as any).originalUrl;
+  } else if (req.path && req.path !== '/') {
+    incoming = req.path;
   }
   
   // Strip /apiProxy prefix if present (when called directly via Cloud Function URL)
