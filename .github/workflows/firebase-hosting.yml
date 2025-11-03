@@ -1,4 +1,4 @@
-name: Deploy to Firebase App Hosting
+name: Deploy to Firebase Hosting
 
 on:
   push:
@@ -36,7 +36,7 @@ env:
 
 jobs:
   deploy:
-    name: Deploy to Firebase App Hosting
+    name: Deploy to Firebase Hosting
     runs-on: ubuntu-latest
     
     steps:
@@ -110,18 +110,35 @@ jobs:
           export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
           firebase login:ci --token $FIREBASE_TOKEN
 
-      - name: Deploy to Firebase App Hosting
+      - name: Verify build output
+        if: steps.changes.outputs.frontend == 'true'
+        working-directory: ./Module_Manager
+        run: |
+          if [ ! -f "build/client/index.html" ]; then
+            echo "❌ Error: build/client/index.html not found!"
+            echo "Build may have failed. Checking build directory..."
+            ls -la build/ || echo "Build directory does not exist"
+            exit 1
+          fi
+          echo "✅ Build output verified: build/client/index.html exists"
+          echo "📦 Build size:"
+          du -sh build/client || true
+
+      - name: Deploy to Firebase Hosting
         if: steps.changes.outputs.frontend == 'true'
         run: |
           export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
-          firebase deploy --only apphosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
+          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
 
       - name: Deployment summary
         if: steps.changes.outputs.frontend == 'true'
         run: |
           echo "✅ Deployment successful!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Service**: Firebase App Hosting" >> $GITHUB_STEP_SUMMARY
+          echo "**Service**: Firebase Hosting" >> $GITHUB_STEP_SUMMARY
           echo "**Project**: ${{ env.FIREBASE_PROJECT_ID }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status**: Frontend deployed successfully via Firebase CLI" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Type**: Git-based automated deployment" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: Frontend deployed successfully from Git commit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View deployment**: https://console.firebase.google.com/project/${{ env.FIREBASE_PROJECT_ID }}/hosting" >> $GITHUB_STEP_SUMMARY
 
