@@ -75,12 +75,56 @@ router.post('/', async (req, res) => {
   try {
     const tenantId = req.tenantId;
     
+    console.log('[Customer API] Creating customer:', {
+      tenantId,
+      hasFirstName: !!req.body.firstName,
+      hasLastName: !!req.body.lastName,
+      hasPhone: !!req.body.primaryPhone,
+      bodyKeys: Object.keys(req.body || {})
+    });
+    
+    // Validate required fields
+    if (!req.body.firstName || !req.body.lastName) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        message: 'firstName and lastName are required',
+        received: {
+          firstName: req.body.firstName,
+          lastName: req.body.lastName
+        }
+      });
+    }
+    
+    if (!req.body.primaryPhone) {
+      return res.status(400).json({ 
+        error: 'Missing required field',
+        message: 'primaryPhone is required'
+      });
+    }
+    
     // Generate customer ID
-    const count = await Customer.countDocuments({ tenantId });
+    let count;
+    try {
+      count = await Customer.countDocuments({ tenantId });
+    } catch (dbError) {
+      console.error('[Customer API] Database count error:', dbError);
+      return res.status(500).json({ 
+        error: 'Database connection error',
+        message: dbError.message,
+        details: 'Failed to count existing customers'
+      });
+    }
+    
     const customerId = `CUST-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
     
     // Generate fullName if not provided
     const fullName = req.body.fullName || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim();
+    
+    console.log('[Customer API] Creating customer object:', {
+      customerId,
+      fullName,
+      tenantId
+    });
     
     const customer = new Customer({
       ...req.body,
@@ -89,16 +133,57 @@ router.post('/', async (req, res) => {
       fullName
     });
     
+    // Validate the customer object before saving
+    const validationError = customer.validateSync();
+    if (validationError) {
+      console.error('[Customer API] Validation error:', validationError);
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        message: validationError.message,
+        errors: validationError.errors
+      });
+    }
+    
+    console.log('[Customer API] Saving customer to database...');
     await customer.save();
+    
+    console.log('[Customer API] Customer created successfully:', customer._id);
     
     res.status(201).json(customer);
   } catch (error) {
-    console.error('Error creating customer:', error);
-    console.error('Request body:', JSON.stringify(req.body));
-    console.error('Error details:', error.message, error.stack);
+    console.error('[Customer API] Error creating customer:', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      requestBody: req.body,
+      tenantId: req.tenantId
+    });
+    
+    // Handle specific MongoDB errors
+    if (error.name === 'MongoServerError') {
+      if (error.code === 11000) {
+        return res.status(409).json({ 
+          error: 'Duplicate customer',
+          message: 'A customer with this ID already exists',
+          duplicateField: Object.keys(error.keyPattern || {})[0]
+        });
+      }
+    }
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        message: error.message,
+        errors: error.errors
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Failed to create customer',
       message: error.message,
+      errorType: error.name,
+      errorCode: error.code,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }

@@ -323,32 +323,100 @@ export const hssProxy = onRequest({
     
     const response = await fetch(url, options);
     
+    // Log response status for debugging
+    console.log('[hssProxy] Backend response:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: url,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
     // Check content type to determine how to handle response
     const contentType = response.headers.get('content-type') || '';
     
     if (contentType.includes('application/json')) {
       const data = await response.json();
+      
+      // Log error responses with full details
+      if (!response.ok) {
+        console.error('[hssProxy] Backend returned error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          errorData: data
+        });
+      }
+      
       res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
     } else if (contentType.includes('text/') || url.includes('deployment-script')) {
       // Handle text responses (like shell scripts)
       const text = await response.text();
+      
+      // Log error responses
+      if (!response.ok) {
+        console.error('[hssProxy] Backend returned text error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          text: text.substring(0, 500) // First 500 chars
+        });
+      }
+      
       res.set('Access-Control-Allow-Origin', origin).status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
     } else {
       // Fallback: try JSON, then text
       try {
         const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('[hssProxy] Backend returned error (fallback JSON):', {
+            status: response.status,
+            statusText: response.statusText,
+            url: url,
+            errorData: data
+          });
+        }
+        
         res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
       } catch {
         const text = await response.text();
+        
+        if (!response.ok) {
+          console.error('[hssProxy] Backend returned error (fallback text):', {
+            status: response.status,
+            statusText: response.statusText,
+            url: url,
+            text: text.substring(0, 500)
+          });
+        }
+        
         res.set('Access-Control-Allow-Origin', origin).status(response.status).send(text);
       }
     }
   } catch (error: any) {
-    console.error('HSS Proxy Error:', error);
-    res.set('Access-Control-Allow-Origin', origin).status(500).json({ 
-      error: 'Proxy error', 
+    console.error('[hssProxy] Proxy fetch error:', {
       message: error.message,
-      details: error.toString()
+      stack: error.stack,
+      url: url,
+      errorType: error.constructor?.name,
+      code: (error as any).code,
+      errno: (error as any).errno
+    });
+    
+    // Check if it's a connection error
+    const isConnectionError = 
+      error.message?.includes('ECONNREFUSED') ||
+      error.message?.includes('ETIMEDOUT') ||
+      error.message?.includes('ENOTFOUND') ||
+      error.code === 'ECONNREFUSED' ||
+      error.code === 'ETIMEDOUT';
+    
+    res.set('Access-Control-Allow-Origin', origin).status(500).json({ 
+      error: isConnectionError ? 'Backend service unavailable' : 'Proxy error',
+      message: error.message,
+      details: error.toString(),
+      url: url,
+      errorType: error.constructor?.name
     });
   }
 });
