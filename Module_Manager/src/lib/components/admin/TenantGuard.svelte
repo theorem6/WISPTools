@@ -38,12 +38,17 @@
       // Step 1: Check Firebase authentication with retry logic
       let currentUser = authService.getCurrentUser();
       if (!currentUser) {
-        // Wait a bit for auth state to initialize
-        await new Promise(resolve => setTimeout(resolve, 100));
-        currentUser = authService.getCurrentUser();
+        // Wait for auth state to initialize (with multiple retries)
+        let retries = 0;
+        const maxRetries = 15; // 1.5 seconds total wait
+        while (!currentUser && retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          currentUser = authService.getCurrentUser();
+          retries++;
+        }
         
         if (!currentUser) {
-          console.log('[TenantGuard] Not authenticated, redirecting to login');
+          console.log('[TenantGuard] Not authenticated after retries, redirecting to login');
           await goto('/login', { replaceState: true });
           return;
         }

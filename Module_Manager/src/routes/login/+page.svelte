@@ -73,7 +73,29 @@
       }
 
       if (result.success) {
-        console.log('[Login Page] Authentication successful, redirecting to dashboard');
+        console.log('[Login Page] Authentication successful, waiting for auth state...');
+        
+        // Wait for Firebase auth state to fully update before redirecting
+        // This prevents redirect loops where dashboard checks auth before state is ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verify auth state is ready
+        let user = authService.getCurrentUser();
+        let retries = 0;
+        while (!user && retries < 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          user = authService.getCurrentUser();
+          retries++;
+        }
+        
+        if (!user) {
+          console.error('[Login Page] Auth state not ready after login, retrying...');
+          error = 'Authentication state not ready. Please try again.';
+          isLoading = false;
+          return;
+        }
+        
+        console.log('[Login Page] Auth state ready, redirecting to dashboard');
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
@@ -102,7 +124,28 @@
       const result = await authService.signInWithGoogle();
 
       if (result.success) {
-        console.log('[Login Page] Google authentication successful, redirecting to dashboard');
+        console.log('[Login Page] Google authentication successful, waiting for auth state...');
+        
+        // Wait for Firebase auth state to fully update before redirecting
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Verify auth state is ready
+        let user = authService.getCurrentUser();
+        let retries = 0;
+        while (!user && retries < 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          user = authService.getCurrentUser();
+          retries++;
+        }
+        
+        if (!user) {
+          console.error('[Login Page] Auth state not ready after Google login');
+          error = 'Authentication state not ready. Please try again.';
+          isLoading = false;
+          return;
+        }
+        
+        console.log('[Login Page] Auth state ready, redirecting to dashboard');
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
