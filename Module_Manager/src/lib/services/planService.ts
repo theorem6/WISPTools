@@ -12,7 +12,7 @@ import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../route
 
 // API Configuration
 const API_URL = browser 
-  ? 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'
+  ? 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy'
   : '';
 
 export interface PlanProject {

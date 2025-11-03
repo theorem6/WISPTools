@@ -46,7 +46,7 @@
       
       const token = await user.getIdToken();
       
-      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/system/services/status', {
+      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/system/services/status', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -84,7 +84,7 @@
       
       const token = await user.getIdToken();
       
-      const response = await fetch(`https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/system/services/${serviceName}/${action}`, {
+      const response = await fetch(`https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/system/services/${serviceName}/${action}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

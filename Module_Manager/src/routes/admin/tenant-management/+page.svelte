@@ -28,7 +28,7 @@
   let newOwnerEmail = '';
   
   const PLATFORM_ADMIN_EMAIL = 'david@david.com';
-  const API_BASE = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+  const API_BASE = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
   
   onMount(async () => {
     // Check if user is platform admin

@@ -117,7 +117,7 @@
       console.log('[HSSRegistration] Registering site with HSS...');
       
       // HSS API endpoint
-      const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/hss';
+      const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/hss';
       
       const response = await fetch(`${HSS_API}/sites/register`, {
         method: 'POST',

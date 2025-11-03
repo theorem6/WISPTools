@@ -25,7 +25,7 @@
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
   // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
   
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {

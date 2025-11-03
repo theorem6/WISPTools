@@ -23,7 +23,7 @@
   const ISO_API_PORT = '3002';
   
   // Use Cloud Function proxies for HTTPS (backend has no domain yet)
-  const HSS_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+  const HSS_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
   const ISO_PROXY = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
   const NETWORK_API = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/coverageMapProxy';
   

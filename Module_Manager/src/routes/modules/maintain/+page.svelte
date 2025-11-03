@@ -238,7 +238,7 @@
   }
   
   function getApiUrl(): string {
-    return import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy';
+    return import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
   }
   
   function formatDate(date: Date | string | undefined): string {

@@ -23,7 +23,7 @@
       
       const token = await user.getIdToken();
       
-      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy/api/system/resources', {
+      const response = await fetch('https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/system/resources', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
