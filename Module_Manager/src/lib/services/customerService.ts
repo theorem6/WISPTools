@@ -81,6 +81,8 @@ class CustomerService {
     }
 
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    // For Firebase Hosting: '/api' works with rewrites
+    // For App Hosting: would need direct function URL, but we're using standard Hosting
     const apiPath = API_URL || '/api';
     const response = await fetch(`${apiPath}/customers${endpoint}`, {
       ...options,
