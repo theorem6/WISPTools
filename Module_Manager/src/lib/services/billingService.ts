@@ -10,7 +10,9 @@
 
 import { auth } from '$lib/firebase';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+// Use relative URL to leverage Firebase Hosting rewrites
+// This goes through Firebase Hosting rewrite to apiProxy function
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Subscription Plan
@@ -235,7 +237,9 @@ export async function getTenantPaymentMethods(tenantId: string): Promise<Payment
   try {
     const headers = await getAuthHeaders(tenantId);
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/payment-methods/${tenantId}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_BASE_URL || '/api';
+    const response = await fetch(`${apiPath}/billing/payment-methods/${tenantId}`, {
       method: 'GET',
       headers
     });
@@ -295,7 +299,9 @@ export async function getBillingAnalytics(): Promise<{
   try {
     const headers = await getAuthHeaders();
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/analytics`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_BASE_URL || '/api';
+    const response = await fetch(`${apiPath}/billing/analytics`, {
       method: 'GET',
       headers
     });
@@ -319,7 +325,9 @@ export async function getAllSubscriptions(): Promise<Subscription[]> {
   try {
     const headers = await getAuthHeaders();
     
-    const response = await fetch(`${API_BASE_URL}/api/billing/subscriptions`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_BASE_URL || '/api';
+    const response = await fetch(`${apiPath}/billing/subscriptions`, {
       method: 'GET',
       headers
     });

@@ -6,7 +6,9 @@
 import { browser } from '$app/environment';
 import { authService } from './authService';
 
-const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+// Use relative URL to leverage Firebase Hosting rewrites
+// This goes through Firebase Hosting rewrite to apiProxy function
+const API_URL = import.meta.env.VITE_HSS_API_URL || '';
 
 export interface Customer {
   _id?: string;
@@ -78,7 +80,9 @@ class CustomerService {
       throw new Error('No tenant selected');
     }
 
-    const response = await fetch(`${API_URL}/api/customers${endpoint}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/customers${endpoint}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,

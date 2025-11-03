@@ -3,7 +3,9 @@
 
 import { authService } from './authService';
 
-const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+// Use relative URL to leverage Firebase Hosting rewrites
+// This goes through Firebase Hosting rewrite to apiProxy function
+const API_URL = import.meta.env.VITE_HSS_API_URL || '';
 
 export interface InventoryItem {
   _id?: string;
@@ -160,7 +162,9 @@ class InventoryService {
       throw new Error('No tenant selected');
     }
     
-    const response = await fetch(`${API_URL}/api/inventory${endpoint}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/inventory${endpoint}`, {
       ...options,
       headers
     });
@@ -323,7 +327,9 @@ class InventoryService {
     const token = await this.getAuthToken();
     const tenantId = localStorage.getItem('selectedTenantId');
     
-    const response = await fetch(`${API_URL}/api/inventory/export/csv`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/inventory/export/csv`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'X-Tenant-ID': tenantId!

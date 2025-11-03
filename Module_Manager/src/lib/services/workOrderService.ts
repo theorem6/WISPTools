@@ -3,7 +3,9 @@
  * Manages trouble tickets, installations, and field operations
  */
 
-const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+// Use relative URL to leverage Firebase Hosting rewrites
+// This goes through Firebase Hosting rewrite to apiProxy function
+const API_URL = import.meta.env.VITE_HSS_API_URL || '';
 
 // Lazy import to avoid circular dependencies and ensure authService is fully initialized
 async function getAuthService() {
@@ -181,7 +183,9 @@ class WorkOrderService {
       throw new Error('No tenant selected');
     }
     
-    const response = await fetch(`${API_URL}/api/work-orders${endpoint}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/work-orders${endpoint}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -10,10 +10,9 @@ import { coverageMapService } from '../../routes/modules/coverage-map/lib/covera
 import type { InventoryItem } from './inventoryService';
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../routes/modules/coverage-map/lib/models';
 
-// API Configuration
-const API_URL = browser 
-  ? 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy'
-  : '';
+// API Configuration - Use relative URL to leverage Firebase Hosting rewrites
+// This goes through Firebase Hosting rewrite to apiProxy function
+const API_URL = browser ? '' : '';
 
 export interface PlanProject {
   id: string;
@@ -159,7 +158,9 @@ class PlanService {
       ...options.headers as Record<string, string>
     };
     
-    const response = await fetch(`${API_URL}/api/plans${endpoint}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/plans${endpoint}`, {
       ...options,
       headers
     });
