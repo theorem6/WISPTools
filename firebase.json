@@ -23,6 +23,15 @@
     ],
     "headers": [
       {
+        "source": "/api/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate, max-age=0"
+          }
+        ]
+      },
+      {
         "source": "**/_app/**",
         "headers": [
           {
