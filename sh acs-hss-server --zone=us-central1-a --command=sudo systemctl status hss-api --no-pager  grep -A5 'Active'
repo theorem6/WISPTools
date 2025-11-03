@@ -1,0 +1,185 @@
+[1mdiff --git a/backend-services/routes/customers.js b/backend-services/routes/customers.js[m
+[1mindex 1d7a28a..3576203 100644[m
+[1m--- a/backend-services/routes/customers.js[m
+[1m+++ b/backend-services/routes/customers.js[m
+[36m@@ -7,6 +7,18 @@[m [mconst express = require('express');[m
+ const router = express.Router();[m
+ const { Customer } = require('../models/customer');[m
+ [m
+[32m+[m[32m// Middleware to extract tenant ID (matching pattern used by work-orders, plans, etc.)[m
+[32m+[m[32mconst requireTenant = (req, res, next) => {[m
+[32m+[m[32m  const tenantId = req.headers['x-tenant-id'];[m
+[32m+[m[32m  if (!tenantId) {[m
+[32m+[m[32m    return res.status(400).json({ error: 'X-Tenant-ID header is required' });[m
+[32m+[m[32m  }[m
+[32m+[m[32m  req.tenantId = tenantId;[m
+[32m+[m[32m  next();[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mrouter.use(requireTenant);[m
+[32m+[m
+ // ============================================================================[m
+ // CUSTOMER CRUD ENDPOINTS[m
+ // ============================================================================[m
+[36m@@ -17,11 +29,7 @@[m [mconst { Customer } = require('../models/customer');[m
+  */[m
+ router.get('/', async (req, res) => {[m
+   try {[m
+[31m-    const tenantId = req.headers['x-tenant-id'];[m
+[31m-    [m
+[31m-    if (!tenantId) {[m
+[31m-      return res.status(400).json({ error: 'Tenant ID required' });[m
+[31m-    }[m
+[32m+[m[32m    const tenantId = req.tenantId;[m
+     [m
+     const { status, search, limit = 100 } = req.query;[m
+     [m
+[36m@@ -65,19 +73,59 @@[m [mrouter.get('/', async (req, res) => {[m
+  */[m
+ router.post('/', async (req, res) => {[m
+   try {[m
+[31m-    const tenantId = req.headers['x-tenant-id'];[m
+[32m+[m[32m    const tenantId = req.tenantId;[m
+[32m+[m[41m    [m
+[32m+[m[32m    console.log('[Customer API] Creating customer:', {[m
+[32m+[m[32m      tenantId,[m
+[32m+[m[32m      hasFirstName: !!req.body.firstName,[m
+[32m+[m[32m      hasLastName: !!req.body.lastName,[m
+[32m+[m[32m      hasPhone: !!req.body.primaryPhone,[m
+[32m+[m[32m      bodyKeys: Object.keys(req.body || {})[m
+[32m+[m[32m    });[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Validate required fields[m
+[32m+[m[32m    if (!req.body.firstName || !req.body.lastName) {[m
+[32m+[m[32m      return res.status(400).json({[m[41m [m
+[32m+[m[32m        error: 'Missing required fields',[m
+[32m+[m[32m        message: 'firstName and lastName are required',[m
+[32m+[m[32m        received: {[m
+[32m+[m[32m          firstName: req.body.firstName,[m
+[32m+[m[32m          lastName: req.body.lastName[m
+[32m+[m[32m        }[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+     [m
+[31m-    if (!tenantId) {[m
+[31m-      return res.status(400).json({ error: 'Tenant ID required' });[m
+[32m+[m[32m    if (!req.body.primaryPhone) {[m
+[32m+[m[32m      return res.status(400).json({[m[41m [m
+[32m+[m[32m        error: 'Missing required field',[m
+[32m+[m[32m        message: 'primaryPhone is required'[m
+[32m+[m[32m      });[m
+     }[m
+     [m
+     // Generate customer ID[m
+[31m-    const count = await Customer.countDocuments({ tenantId });[m
+[32m+[m[32m    let count;[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      count = await Customer.countDocuments({ tenantId });[m
+[32m+[m[32m    } catch (dbError) {[m
+[32m+[m[32m      console.error('[Customer API] Database count error:', dbError);[m
+[32m+[m[32m      return res.status(500).json({[m[41m [m
+[32m+[m[32m        error: 'Database connection error',[m
+[32m+[m[32m        message: dbError.message,[m
+[32m+[m[32m        details: 'Failed to count existing customers'[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+     const customerId = `CUST-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;[m
+     [m
+     // Generate fullName if not provided[m
+     const fullName = req.body.fullName || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim();[m
+     [m
+[32m+[m[32m    console.log('[Customer API] Creating customer object:', {[m
+[32m+[m[32m      customerId,[m
+[32m+[m[32m      fullName,[m
+[32m+[m[32m      tenantId[m
+[32m+[m[32m    });[m
+[32m+[m[41m    [m
+     const customer = new Customer({[m
+       ...req.body,[m
+       tenantId,[m
+[36m@@ -85,16 +133,57 @@[m [mrouter.post('/', async (req, res) => {[m
+       fullName[m
+     });[m
+     [m
+[32m+[m[32m    // Validate the customer object before saving[m
+[32m+[m[32m    const validationError = customer.validateSync();[m
+[32m+[m[32m    if (validationError) {[m
+[32m+[m[32m      console.error('[Customer API] Validation error:', validationError);[m
+[32m+[m[32m      return res.status(400).json({[m[41m [m
+[32m+[m[32m        error: 'Validation failed',[m
+[32m+[m[32m        message: validationError.message,[m
+[32m+[m[32m        errors: validationError.errors[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    console.log('[Customer API] Saving customer to database...');[m
+     await customer.save();[m
+     [m
+[32m+[m[32m    console.log('[Customer API] Customer created successfully:', customer._id);[m
+[32m+[m[41m    [m
+     res.status(201).json(customer);[m
+   } catch (error) {[m
+[31m-    console.error('Error creating customer:', error);[m
+[31m-    console.error('Request body:', JSON.stringify(req.body));[m
+[31m-    console.error('Error details:', error.message, error.stack);[m
+[32m+[m[32m    console.error('[Customer API] Error creating customer:', {[m
+[32m+[m[32m      error: error.message,[m
+[32m+[m[32m      stack: error.stack,[m
+[32m+[m[32m      name: error.name,[m
+[32m+[m[32m      code: error.code,[m
+[32m+[m[32m      requestBody: req.body,[m
+[32m+[m[32m      tenantId: req.tenantId[m
+[32m+[m[32m    });[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Handle specific MongoDB errors[m
+[32m+[m[32m    if (error.name === 'MongoServerError') {[m
+[32m+[m[32m      if (error.code === 11000) {[m
+[32m+[m[32m        return res.status(409).json({[m[41m [m
+[32m+[m[32m          error: 'Duplicate customer',[m
+[32m+[m[32m          message: 'A customer with this ID already exists',[m
+[32m+[m[32m          duplicateField: Object.keys(error.keyPattern || {})[0][m
+[32m+[m[32m        });[m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    if (error.name === 'ValidationError') {[m
+[32m+[m[32m      return res.status(400).json({[m[41m [m
+[32m+[m[32m        error: 'Validation failed',[m
+[32m+[m[32m        message: error.message,[m
+[32m+[m[32m        errors: error.errors[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+     res.status(500).json({ [m
+       error: 'Failed to create customer',[m
+       message: error.message,[m
+[32m+[m[32m      errorType: error.name,[m
+[32m+[m[32m      errorCode: error.code,[m
+       details: process.env.NODE_ENV === 'development' ? error.stack : undefined[m
+     });[m
+   }[m
+[36m@@ -106,7 +195,7 @@[m [mrouter.post('/', async (req, res) => {[m
+  */[m
+ router.get('/:id', async (req, res) => {[m
+   try {[m
+[31m-    const tenantId = req.headers['x-tenant-id'];[m
+[32m+[m[32m    const tenantId = req.tenantId;[m
+     const { id } = req.params;[m
+     [m
+     const customer = await Customer.findOne({ [m
+[36m@@ -134,7 +223,7 @@[m [mrouter.get('/:id', async (req, res) => {[m
+  */[m
+ router.put('/:id', async (req, res) => {[m
+   try {[m
+[31m-    const tenantId = req.headers['x-tenant-id'];[m
+[32m+[m[32m    const tenantId = req.tenantId;[m
+     const { id } = req.params;[m
+     [m
+     const customer = await Customer.findOneAndUpdate([m
+[36m@@ -163,7 +252,7 @@[m [mrouter.put('/:id', async (req, res) => {[m
+  */[m
+ router.delete('/:id', async (req, res) => {[m
+   try {[m
+[31m-    const tenantId = req.headers['x-tenant-id'];[m
+[32m+[m[32m    const tenantId = req.tenantId;

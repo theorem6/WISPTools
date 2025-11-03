@@ -214,9 +214,10 @@ function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
 
-// HSS API Proxy - Provides HTTPS endpoint for HTTP backend (Port 3001)
+// Main API Proxy - Provides HTTPS endpoint for unified backend API (Port 3001)
+// Handles all API routes: customers, work-orders, inventory, plans, HSS, billing, etc.
 // Updated: Improved path handling for Firebase Hosting rewrites
-export const hssProxy = onRequest({
+export const apiProxy = onRequest({
   region: 'us-central1',
   memory: '256MiB',
   timeoutSeconds: 60,
@@ -238,35 +239,35 @@ export const hssProxy = onRequest({
   }
   
   // Build the full path from originalUrl (falls back to url/path) and strip the function mount if present
-  // When called via direct Cloud Function URL, path may be: /hssProxy/api/deploy/...
-  // When called via Firebase Hosting rewrite, path is: /api/deploy/...
-  // When called via Cloud Run service directly, path is: /api/deploy/...
+  // When called via direct Cloud Function URL, path may be: /apiProxy/api/customers
+  // When called via Firebase Hosting rewrite, path is: /api/customers
+  // When called via Cloud Run service directly, path is: /api/customers
   let incoming = (req as any).originalUrl || req.url || req.path || '';
   
-  // Strip /hssProxy prefix if present (when called directly via Cloud Function URL)
-  if (incoming.startsWith('/hssProxy')) {
-    incoming = incoming.substring('/hssProxy'.length);
-  } else if (incoming.startsWith('hssProxy/')) {
-    incoming = incoming.substring('hssProxy/'.length);
+  // Strip /apiProxy prefix if present (when called directly via Cloud Function URL)
+  if (incoming.startsWith('/apiProxy')) {
+    incoming = incoming.substring('/apiProxy'.length);
+  } else if (incoming.startsWith('apiProxy/')) {
+    incoming = incoming.substring('apiProxy/'.length);
   }
   
   // Ensure path starts with / for backend URL construction
   const proxiedPath = incoming.startsWith('/') ? incoming : `/${incoming}`;
 
-  // Compute backend upstream based on path. Multiple backend services:
-  // - Port 3000: HSS API (hss-api service) - Open5GS HSS management (separate service)
-  // - Port 3001: Core User Management System API (/api/**, /admin/**, tenants, users, customers, etc.)
-  // - Port 3002: EPC deployment/ISO API (/api/deploy/**)
-  // All tenant, user, customer, work-order, inventory, maintain, etc. routes are on port 3001
-  // This is the main API server (backend-services/server.js)
+  // Backend Service Architecture:
+  // - Port 3001: Unified Main API Server (backend-services/server.js)
+  //   Handles ALL routes: /api/customers, /api/work-orders, /api/hss, /api/inventory,
+  //   /api/plans, /api/maintain, /api/billing, /admin/** etc.
+  // - Port 3002: EPC/ISO Generation API (min-epc-server.js) - Handles /api/deploy/**
+  // Note: Port 3000 is available for separate HSS service if needed in future
   const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
   
-  // All API routes go to port 3001 (the main user management system API)
+  // Route all API requests to the unified main API server on port 3001
   const backendHost = `http://${backendIp}:3001`;
   const url = `${backendHost}${proxiedPath}`;
   
   // Log request details for debugging
-  console.log('[hssProxy] Request details:', {
+  console.log('[apiProxy] Request details:', {
     method: req.method,
     path: req.path,
     url: req.url,
@@ -287,9 +288,9 @@ export const hssProxy = onRequest({
     const tenantId = req.headers['x-tenant-id'] || req.headers['X-Tenant-ID'];
     if (tenantId) {
       headers['x-tenant-id'] = tenantId as string;
-      console.log('[hssProxy] Forwarding tenant ID:', tenantId);
+      console.log('[apiProxy] Forwarding tenant ID:', tenantId);
     } else {
-      console.warn('[hssProxy] No tenant ID header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('tenant')));
+      console.warn('[apiProxy] No tenant ID header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('tenant')));
     }
     
     // Forward Authorization header if present
@@ -313,18 +314,18 @@ export const hssProxy = onRequest({
       } else if (typeof req.body === 'string') {
         // If body is already a string, use it directly (rare case)
         options.body = req.body;
-        console.log('[hssProxy] Body is already string, length:', req.body.length);
+        console.log('[apiProxy] Body is already string, length:', req.body.length);
       } else {
         // Body is an object - stringify it
         options.body = JSON.stringify(req.body);
-        console.log('[hssProxy] Body stringified, length:', options.body.length, 'first 100 chars:', options.body.substring(0, 100));
+        console.log('[apiProxy] Body stringified, length:', options.body.length, 'first 100 chars:', options.body.substring(0, 100));
       }
     }
     
     const response = await fetch(url, options);
     
     // Log response status for debugging
-    console.log('[hssProxy] Backend response:', {
+    console.log('[apiProxy] Backend response:', {
       status: response.status,
       statusText: response.statusText,
       url: url,
@@ -339,7 +340,7 @@ export const hssProxy = onRequest({
       
       // Log error responses with full details
       if (!response.ok) {
-        console.error('[hssProxy] Backend returned error:', {
+        console.error('[apiProxy] Backend returned error:', {
           status: response.status,
           statusText: response.statusText,
           url: url,
@@ -354,7 +355,7 @@ export const hssProxy = onRequest({
       
       // Log error responses
       if (!response.ok) {
-        console.error('[hssProxy] Backend returned text error:', {
+        console.error('[apiProxy] Backend returned text error:', {
           status: response.status,
           statusText: response.statusText,
           url: url,
@@ -369,7 +370,7 @@ export const hssProxy = onRequest({
         const data = await response.json();
         
         if (!response.ok) {
-          console.error('[hssProxy] Backend returned error (fallback JSON):', {
+          console.error('[apiProxy] Backend returned error (fallback JSON):', {
             status: response.status,
             statusText: response.statusText,
             url: url,
@@ -382,7 +383,7 @@ export const hssProxy = onRequest({
         const text = await response.text();
         
         if (!response.ok) {
-          console.error('[hssProxy] Backend returned error (fallback text):', {
+          console.error('[apiProxy] Backend returned error (fallback text):', {
             status: response.status,
             statusText: response.statusText,
             url: url,
@@ -394,7 +395,7 @@ export const hssProxy = onRequest({
       }
     }
   } catch (error: any) {
-    console.error('[hssProxy] Proxy fetch error:', {
+    console.error('[apiProxy] Proxy fetch error:', {
       message: error.message,
       stack: error.stack,
       url: url,

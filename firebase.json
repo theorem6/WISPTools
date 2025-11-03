@@ -75,11 +75,11 @@
       },
       {
         "source": "/api/**",
-        "function": "hssProxy"
+        "function": "apiProxy"
       },
       {
         "source": "/admin/**",
-        "function": "hssProxy"
+        "function": "apiProxy"
       },
       {
         "source": "**",

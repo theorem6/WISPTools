@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3001; // Open5GS HSS Service
+const PORT = process.env.PORT || 3001; // Unified Main API Server - handles all routes (customers, work-orders, HSS, billing, etc.)
 
 // CORS configuration
 app.use(cors({
