@@ -244,11 +244,25 @@ export const apiProxy = onRequest({
   // When called via Cloud Run service directly, path is: /api/customers
   let incoming = (req as any).originalUrl || req.url || req.path || '';
   
+  // Handle Firebase Hosting rewrite: when rewritten, the path is in req.url
+  // Firebase Hosting passes the full original path in req.url when using rewrites
+  // Check all possible locations for the path
+  if (!incoming || incoming === '/') {
+    // Try to get path from Firebase Hosting rewrite
+    incoming = (req as any).rawRequest?.url || req.url || (req as any).originalUrl || '';
+  }
+  
   // Strip /apiProxy prefix if present (when called directly via Cloud Function URL)
   if (incoming.startsWith('/apiProxy')) {
     incoming = incoming.substring('/apiProxy'.length);
   } else if (incoming.startsWith('apiProxy/')) {
     incoming = incoming.substring('apiProxy/'.length);
+  }
+  
+  // For Firebase Hosting rewrites, the path might include query string
+  // Extract just the pathname if query string is present
+  if (incoming.includes('?')) {
+    incoming = incoming.split('?')[0];
   }
   
   // Ensure path starts with / for backend URL construction
@@ -272,12 +286,34 @@ export const apiProxy = onRequest({
     path: req.path,
     url: req.url,
     originalUrl: (req as any).originalUrl,
+    rawRequestUrl: (req as any).rawRequest?.url,
     processedPath: proxiedPath,
     finalUrl: url,
     headers: Object.keys(req.headers || {}),
     bodyType: typeof req.body,
     bodyKeys: req.body ? Object.keys(req.body) : 'null/undefined'
   });
+  
+  // Validate that we have a valid path
+  if (!proxiedPath || proxiedPath === '/') {
+    console.error('[apiProxy] ERROR: Empty or invalid path after processing:', {
+      incoming,
+      proxiedPath,
+      originalUrl: (req as any).originalUrl,
+      url: req.url,
+      path: req.path
+    });
+    res.set('Access-Control-Allow-Origin', origin).status(400).json({
+      error: 'Invalid request path',
+      message: 'No valid API path found in request',
+      details: {
+        originalUrl: (req as any).originalUrl,
+        url: req.url,
+        path: req.path
+      }
+    });
+    return;
+  }
   
   try {
     const headers: HeadersInit = {
