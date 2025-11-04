@@ -224,11 +224,29 @@
           return;
         }
         
-        console.log('[Login Page] Auth state ready, redirecting to dashboard');
+        console.log('[Login Page] Google auth state ready');
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', result.data?.email || '');
+        localStorage.setItem('userEmail', user.email || '');
+        
+        // Check if this is a new user (no tenants) and create tenant automatically
+        if (user) {
+          try {
+            // Check if user has any tenants - if not, create one automatically
+            const existingTenants = await tenantStore.loadUserTenants(user.uid, user.email || undefined);
+            if (existingTenants.length === 0) {
+              console.log('[Login Page] New Google user detected, creating automatic tenant...');
+              await createAutomaticTenant(user, user.email || '');
+              console.log('[Login Page] Automatic tenant created for Google user');
+            }
+          } catch (tenantError: any) {
+            console.error('[Login Page] Error creating tenant for Google user:', tenantError);
+            // Don't block login if tenant creation fails - user can create manually later
+          }
+        }
+        
+        console.log('[Login Page] Redirecting to dashboard');
         
         // Redirect to dashboard
         await goto('/dashboard', { replaceState: true });
