@@ -224,10 +224,25 @@ export const apiProxy = onRequest({
   cors: true
 }, async (req, res) => {
   // Set CORS headers explicitly and reflect origin
-  const origin = (req.headers.origin as string) || '*';
-  res.set('Access-Control-Allow-Origin', origin);
+  // Allow all authorized Firebase Hosting domains
+  const allowedOrigins = [
+    'https://wisptools.io',
+    'https://wisptools-io.web.app',
+    'https://wisptools-io.firebaseapp.com',
+    'https://lte-pci-mapper-65450042-bbf71.web.app',
+    'https://lte-pci-mapper-65450042-bbf71.firebaseapp.com',
+    'https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app',
+    'https://pci-mapper--lte-pci-mapper-65450042-bbf71.us-central1.hosted.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  
+  const origin = (req.headers.origin as string) || '';
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '*');
+  
+  res.set('Access-Control-Allow-Origin', allowedOrigin);
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id, X-Tenant-ID');
   res.set('Access-Control-Max-Age', '3600');
   res.set('Access-Control-Allow-Credentials', 'true');
   res.set('Vary', 'Origin');

@@ -6,9 +6,19 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001; // Unified Main API Server - handles all routes (customers, work-orders, HSS, billing, etc.)
 
-// CORS configuration
+// CORS configuration - All authorized Firebase Hosting domains
 app.use(cors({
-  origin: ['https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app', 'https://wisptools.io'],
+  origin: [
+    'https://wisptools.io',
+    'https://wisptools-io.web.app',
+    'https://wisptools-io.firebaseapp.com',
+    'https://lte-pci-mapper-65450042-bbf71.web.app',
+    'https://lte-pci-mapper-65450042-bbf71.firebaseapp.com',
+    'https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app',
+    'https://pci-mapper--lte-pci-mapper-65450042-bbf71.us-central1.hosted.app',
+    'http://localhost:5173', // Development
+    'http://localhost:3000' // Development
+  ],
   credentials: true
 }));
 

@@ -7,9 +7,26 @@ import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 
 // Firebase configuration with fallbacks
+// authDomain: Can be any authorized domain - Firebase will work with any domain in the authorized list
+// Using the default Firebase domain as fallback, but it will work with wisptools.io once authorized
+const getAuthDomain = (): string => {
+  // Check if we have an explicit authDomain override
+  if (env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN) {
+    return env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+  }
+  
+  // If on custom domain, use it (will work if authorized)
+  if (typeof window !== 'undefined' && window.location.hostname === 'wisptools.io') {
+    return 'wisptools.io';
+  }
+  
+  // Default Firebase domain (always authorized)
+  return 'lte-pci-mapper-65450042-bbf71.firebaseapp.com';
+};
+
 const firebaseConfig = {
   apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0',
-  authDomain: env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'lte-pci-mapper-65450042-bbf71.firebaseapp.com',
+  authDomain: getAuthDomain(),
   projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lte-pci-mapper-65450042-bbf71',
   storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'lte-pci-mapper-65450042-bbf71.firebasestorage.app',
   messagingSenderId: env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1044782186913',
