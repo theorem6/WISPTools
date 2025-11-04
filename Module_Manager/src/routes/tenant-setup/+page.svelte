@@ -44,8 +44,8 @@
       // 1. Platform admin (always allowed)
       // 2. First-time user with no tenants (allowed to create their first tenant)
       if (!isPlatformAdmin && existingTenants.length > 0) {
-        console.log('[Tenant Setup] ACCESS DENIED - User already has tenants');
-        error = 'You already have an organization. Please contact support to create additional organizations.';
+        console.log('[Tenant Setup] ACCESS DENIED - User already has a tenant');
+        error = 'You already have an organization. Each user can only create one tenant.';
         await goto('/tenant-selector', { replaceState: true });
         return;
       }

@@ -109,12 +109,18 @@
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', email);
         
-        // For new signups, automatically create a tenant
+        // For new signups, automatically create a tenant (only if they don't have one)
         if (mode === 'signup' && user) {
           try {
-            console.log('[Login Page] Creating automatic tenant for new user...');
-            await createAutomaticTenant(user, email);
-            console.log('[Login Page] Automatic tenant created successfully');
+            // Check if user already has a tenant
+            const existingTenants = await tenantStore.loadUserTenants(user.uid, user.email || undefined);
+            if (existingTenants.length === 0) {
+              console.log('[Login Page] Creating automatic tenant for new user...');
+              await createAutomaticTenant(user, email);
+              console.log('[Login Page] Automatic tenant created successfully');
+            } else {
+              console.log('[Login Page] User already has a tenant, skipping auto-creation');
+            }
           } catch (tenantError: any) {
             console.error('[Login Page] Error creating automatic tenant:', tenantError);
             // Don't block signup if tenant creation fails - user can create manually later

@@ -59,7 +59,17 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.adminBaseUrl}/tenants`, {
+      // Get current user to check if they're platform admin
+      const user = auth().currentUser;
+      const isPlatformAdmin = user?.email === 'david@david.com' || user?.email === 'david@4gengineer.com';
+      
+      // For regular users, use /api/tenants (enforces one tenant per user)
+      // For platform admins, use /admin/tenants (unlimited tenants)
+      const endpoint = isPlatformAdmin 
+        ? `${this.adminBaseUrl}/tenants`
+        : `${this.apiBaseUrl}/tenants`;
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({
