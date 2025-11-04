@@ -151,7 +151,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants`, {
         method: 'GET',
         headers
       });
@@ -203,7 +203,7 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/admin/tenants/${tenantId}`, {
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}`, {
         method: 'DELETE',
         headers
       });
