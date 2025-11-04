@@ -227,6 +227,8 @@ export const apiProxy = onRequest({
   // Allow all authorized Firebase Hosting domains
   const allowedOrigins = [
     'https://wisptools.io',
+    'https://wisptools-prod.web.app',
+    'https://wisptools-prod.firebaseapp.com',
     'https://wisptools-production.web.app',
     'https://wisptools-production.firebaseapp.com',
     'http://localhost:5173',
