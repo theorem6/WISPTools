@@ -7,10 +7,9 @@
 
 const express = require('express');
 const router = express.Router();
-const { verifyAuth } = require('./role-auth-middleware');
-const { Tenant } = require('../../models/tenant');
-const { UserTenant } = require('./user-schema');
-const admin = require('firebase-admin');
+const { verifyAuth } = require('./users/role-auth-middleware');
+const { Tenant } = require('../models/tenant');
+const { UserTenant } = require('./users/user-schema');
 
 /**
  * POST /api/tenants
