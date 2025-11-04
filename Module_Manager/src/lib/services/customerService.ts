@@ -18,10 +18,12 @@ const getApiUrl = (): string => {
   // This bypasses Firebase Hosting rewrite issues on custom domains
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
+    console.log('[CustomerService] getApiUrl check:', { hostname, isWisptools: hostname === 'wisptools.io' || hostname.includes('wisptools.io') });
     if (hostname === 'wisptools.io' || hostname.includes('wisptools.io')) {
-      console.log('[CustomerService] Detected wisptools.io, using direct Cloud Function URL');
+      console.log('[CustomerService] ✅ Detected wisptools.io, using direct Cloud Function URL');
       return 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
     }
+    console.log('[CustomerService] Using relative URL for Firebase Hosting rewrites');
   }
   // Otherwise use relative URL for Firebase Hosting rewrites
   return '';
