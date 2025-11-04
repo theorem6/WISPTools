@@ -15,6 +15,7 @@
     "runtime": "nodejs20"
   },
   "hosting": {
+    "site": "lte-pci-mapper-65450042-bbf71",
     "public": "Module_Manager/build/client",
     "ignore": [
       "firebase.json",
