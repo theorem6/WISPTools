@@ -70,15 +70,32 @@ function getFirebaseApp(): FirebaseApp {
     try {
       console.log('🔥 Initializing Firebase app:', {
         projectId: firebaseConfig.projectId,
-        authDomain: firebaseConfig.authDomain
+        authDomain: firebaseConfig.authDomain,
+        apiKey: firebaseConfig.apiKey?.substring(0, 20) + '...'
       });
       
-      // Check if there's an existing app with wrong project ID
+      // FORCE check for existing apps and clear them if wrong project
       const existingApps = getApps();
-      const existingApp = existingApps.find(app => app.options.projectId !== firebaseConfig.projectId);
+      const existingApp = existingApps.find(app => 
+        app.options.projectId !== firebaseConfig.projectId ||
+        app.options.apiKey !== firebaseConfig.apiKey
+      );
       
       if (existingApp) {
-        console.log('🔥 Found existing app with wrong project ID, clearing:', existingApp.options.projectId);
+        console.log('🔥 Found existing app with wrong config, deleting:', {
+          existingProjectId: existingApp.options.projectId,
+          existingApiKey: existingApp.options.apiKey?.substring(0, 20) + '...',
+          correctProjectId: firebaseConfig.projectId
+        });
+        
+        // Delete the existing app
+        try {
+          existingApp.delete();
+          console.log('🔥 Deleted existing Firebase app');
+        } catch (deleteError) {
+          console.warn('⚠️ Could not delete existing app:', deleteError);
+        }
+        
         // Clear singleton instances
         firebaseAuth = null;
         firebaseDb = null;
@@ -86,16 +103,14 @@ function getFirebaseApp(): FirebaseApp {
         firebaseFunctions = null;
       }
       
-      // Always use the correct config - don't reuse existing app if project ID doesn't match
-      if (existingApps.length === 0 || existingApp) {
-        firebaseApp = initializeApp(firebaseConfig);
-      } else {
-        firebaseApp = getApp();
-      }
+      // Always initialize with correct config
+      firebaseApp = initializeApp(firebaseConfig, 'wisptools-production');
       
       console.log('🔥 Firebase app initialized successfully:', {
         name: firebaseApp.name,
-        projectId: firebaseApp.options.projectId
+        projectId: firebaseApp.options.projectId,
+        apiKey: firebaseApp.options.apiKey?.substring(0, 20) + '...',
+        authDomain: firebaseApp.options.authDomain
       });
     } catch (error) {
       console.error('❌ Firebase initialization error:', error);
