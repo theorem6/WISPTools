@@ -25,7 +25,7 @@ const getAuthDomain = (): string => {
 };
 
 const firebaseConfig = {
-  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyD_XK8eTNOfbEugJ27yucf_VLizOTgzkfA',
+  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyDb5KthFS4DY4hZ_B8jsA3uxEsu6snQqWA',
   authDomain: getAuthDomain(),
   projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || 'wisptools-production',
   storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'wisptools-production.firebasestorage.app',
