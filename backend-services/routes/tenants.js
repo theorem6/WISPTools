@@ -123,17 +123,28 @@ router.post('/', verifyAuth, async (req, res) => {
     // ALWAYS add david@david.com as platform admin for every tenant
     try {
       const platformAdminEmail = 'david@david.com';
-      const platformAdminUser = await admin.auth().getUserByEmail(platformAdminEmail);
+      const platformAdminUid = '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1'; // Known UID for david@david.com
+      
+      let platformAdminUserId;
+      try {
+        // Try to get user by email first
+        const platformAdminUser = await admin.auth().getUserByEmail(platformAdminEmail);
+        platformAdminUserId = platformAdminUser.uid;
+      } catch (emailError) {
+        // If email lookup fails, use the known UID
+        console.warn(`Could not find user by email ${platformAdminEmail}, using known UID:`, emailError.message);
+        platformAdminUserId = platformAdminUid;
+      }
       
       // Check if platform admin already has a record for this tenant
       const existingPlatformAdmin = await UserTenant.findOne({
-        userId: platformAdminUser.uid,
+        userId: platformAdminUserId,
         tenantId: tenant._id.toString()
       });
       
       if (!existingPlatformAdmin) {
         const platformAdminTenant = new UserTenant({
-          userId: platformAdminUser.uid,
+          userId: platformAdminUserId,
           tenantId: tenant._id.toString(),
           role: 'admin', // Platform admin gets admin role in all tenants
           status: 'active',
@@ -144,10 +155,11 @@ router.post('/', verifyAuth, async (req, res) => {
         });
         
         await platformAdminTenant.save();
-        console.log(`✅ Added platform admin ${platformAdminEmail} as admin to tenant "${displayName}"`);
+        console.log(`✅ Added platform admin ${platformAdminEmail} (${platformAdminUserId}) as admin to tenant "${displayName}"`);
       }
     } catch (error) {
       console.error(`⚠️ Failed to add platform admin to tenant:`, error.message);
+      console.error(`⚠️ Error stack:`, error.stack);
       // Don't fail tenant creation if platform admin addition fails
     }
     
@@ -162,6 +174,27 @@ router.post('/', verifyAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating tenant:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors || {}).map((err) => err.message);
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: validationErrors.join(', ')
+      });
+    }
+    
+    // Handle MongoDB duplicate key errors
+    if (error.code === 11000 || error.code === 11001) {
+      return res.status(400).json({
+        error: 'Duplicate Entry',
+        message: 'A tenant with this subdomain already exists'
+      });
+    }
+    
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message
