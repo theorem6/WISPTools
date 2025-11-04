@@ -15,7 +15,7 @@
     "runtime": "nodejs20"
   },
   "hosting": {
-    "site": "wisptools-production",
+    "site": "wisptools-prod",
     "public": "Module_Manager/build/client",
     "ignore": [
       "firebase.json",
