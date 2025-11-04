@@ -42,11 +42,20 @@
         ]
       },
       {
-        "source": "**/*.@(js|css)",
+        "source": "**/*.@(css)",
         "headers": [
           {
             "key": "Cache-Control",
             "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "**/*.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
           }
         ]
       },
@@ -59,24 +68,33 @@
           }
         ]
       },
-      {
-        "source": "**/*.@(html|json)",
-        "headers": [
           {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/",
-        "headers": [
+            "source": "**/*.@(html|json)",
+            "headers": [
+              {
+                "key": "Cache-Control",
+                "value": "no-cache, no-store, must-revalidate"
+              }
+            ]
+          },
           {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
+            "source": "/",
+            "headers": [
+              {
+                "key": "Cache-Control",
+                "value": "no-cache, no-store, must-revalidate"
+              }
+            ]
+          },
+          {
+            "source": "**/*.js",
+            "headers": [
+              {
+                "key": "Cache-Control",
+                "value": "no-cache, no-store, must-revalidate"
+              }
+            ]
           }
-        ]
-      }
     ],
     "rewrites": [
       {

@@ -72,7 +72,27 @@ function getFirebaseApp(): FirebaseApp {
         projectId: firebaseConfig.projectId,
         authDomain: firebaseConfig.authDomain
       });
-      firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      
+      // Check if there's an existing app with wrong project ID
+      const existingApps = getApps();
+      const existingApp = existingApps.find(app => app.options.projectId !== firebaseConfig.projectId);
+      
+      if (existingApp) {
+        console.log('🔥 Found existing app with wrong project ID, clearing:', existingApp.options.projectId);
+        // Clear singleton instances
+        firebaseAuth = null;
+        firebaseDb = null;
+        firebaseStorage = null;
+        firebaseFunctions = null;
+      }
+      
+      // Always use the correct config - don't reuse existing app if project ID doesn't match
+      if (existingApps.length === 0 || existingApp) {
+        firebaseApp = initializeApp(firebaseConfig);
+      } else {
+        firebaseApp = getApp();
+      }
+      
       console.log('🔥 Firebase app initialized successfully:', {
         name: firebaseApp.name,
         projectId: firebaseApp.options.projectId
