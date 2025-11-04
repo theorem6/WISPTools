@@ -21,16 +21,16 @@ const getAuthDomain = (): string => {
   }
   
   // Default Firebase domain (always authorized)
-  return 'lte-pci-mapper-65450042-bbf71.firebaseapp.com';
+  return 'wisptools-production.firebaseapp.com';
 };
 
 const firebaseConfig = {
-  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCaMoHY6ZKcV_uazY0HlwolxVgPwwLT8V0',
+  apiKey: env.PUBLIC_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyD_XK8eTNOfbEugJ27yucf_VLizOTgzkfA',
   authDomain: getAuthDomain(),
-  projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || 'lte-pci-mapper-65450042-bbf71',
-  storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'lte-pci-mapper-65450042-bbf71.firebasestorage.app',
-  messagingSenderId: env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1044782186913',
-  appId: env.PUBLIC_FIREBASE_APP_ID || import.meta.env.VITE_FIREBASE_APP_ID || '1:1044782186913:web:a5367441ce136118948be0', // pci-mapper app (linked to hosting)
+  projectId: env.PUBLIC_FIREBASE_PROJECT_ID || import.meta.env.VITE_FIREBASE_PROJECT_ID || 'wisptools-production',
+  storageBucket: env.PUBLIC_FIREBASE_STORAGE_BUCKET || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'wisptools-production.firebasestorage.app',
+  messagingSenderId: env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1048161130237',
+  appId: env.PUBLIC_FIREBASE_APP_ID || import.meta.env.VITE_FIREBASE_APP_ID || '1:1048161130237:web:160789736967985b655094', // wisptools-web app
   measurementId: env.PUBLIC_FIREBASE_MEASUREMENT_ID || import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ''
 };
 

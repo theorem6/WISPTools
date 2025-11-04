@@ -31,7 +31,7 @@ on:
       - 'firebase.json'
 
 env:
-  FIREBASE_PROJECT_ID: lte-pci-mapper-65450042-bbf71
+  FIREBASE_PROJECT_ID: wisptools-production
   NODE_VERSION: '20'
 
 jobs:
@@ -128,7 +128,7 @@ jobs:
         if: steps.changes.outputs.frontend == 'true'
         run: |
           export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
-          firebase deploy --only hosting:wisptools-io --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
+          firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
 
       - name: Deployment summary
         if: steps.changes.outputs.frontend == 'true'

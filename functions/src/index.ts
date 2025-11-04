@@ -227,12 +227,8 @@ export const apiProxy = onRequest({
   // Allow all authorized Firebase Hosting domains
   const allowedOrigins = [
     'https://wisptools.io',
-    'https://wisptools-io.web.app',
-    'https://wisptools-io.firebaseapp.com',
-    'https://lte-pci-mapper-65450042-bbf71.web.app',
-    'https://lte-pci-mapper-65450042-bbf71.firebaseapp.com',
-    'https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app',
-    'https://pci-mapper--lte-pci-mapper-65450042-bbf71.us-central1.hosted.app',
+    'https://wisptools-production.web.app',
+    'https://wisptools-production.firebaseapp.com',
     'http://localhost:5173',
     'http://localhost:3000'
   ];
