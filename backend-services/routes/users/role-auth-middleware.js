@@ -4,16 +4,36 @@ const verifyAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Auth middleware: No authorization header');
       return res.status(401).json({ error: 'No token provided' });
     }
 
     const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await auth.verifyIdToken(token);
+    console.log('🔐 Auth middleware: Verifying token...');
     
-    req.user = decodedToken;
-    next();
+    try {
+      const decodedToken = await auth.verifyIdToken(token);
+      console.log('✅ Auth middleware: Token verified successfully:', {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        projectId: decodedToken.firebase?.project_id || 'unknown'
+      });
+      
+      req.user = decodedToken;
+      next();
+    } catch (tokenError) {
+      console.error('❌ Auth middleware: Token verification failed:', {
+        error: tokenError.message,
+        code: tokenError.code,
+        stack: tokenError.stack
+      });
+      return res.status(401).json({ 
+        error: 'Invalid token',
+        message: tokenError.message || 'Token verification failed'
+      });
+    }
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('❌ Auth middleware error:', error);
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
