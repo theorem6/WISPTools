@@ -15,8 +15,13 @@ const getApiUrl = (): string => {
     return import.meta.env.VITE_HSS_API_URL;
   }
   // If on custom domain (wisptools.io), use direct Cloud Function URL as fallback
-  if (typeof window !== 'undefined' && window.location.hostname === 'wisptools.io') {
-    return 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+  // This bypasses Firebase Hosting rewrite issues on custom domains
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'wisptools.io' || hostname.includes('wisptools.io')) {
+      console.log('[CustomerService] Detected wisptools.io, using direct Cloud Function URL');
+      return 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+    }
   }
   // Otherwise use relative URL for Firebase Hosting rewrites
   return '';
@@ -94,7 +99,9 @@ class CustomerService {
 
     // Get API URL - uses direct Cloud Function URL for wisptools.io due to rewrite issues
     const apiPath = getApiUrl() || '/api';
-    const response = await fetch(`${apiPath}/customers${endpoint}`, {
+    const fullUrl = `${apiPath}/customers${endpoint}`;
+    console.log('[CustomerService] API call:', { apiPath, fullUrl, hostname: typeof window !== 'undefined' ? window.location.hostname : 'server' });
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
