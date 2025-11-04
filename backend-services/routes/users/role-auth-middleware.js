@@ -44,9 +44,30 @@ const requireRole = (requiredRole) => {
 
 const VALID_ROLES = ['admin', 'user', 'tenant_admin'];
 
-// Check if user is platform admin
+// Check if user is platform admin (by UID - preferred)
+const isPlatformAdminByUid = (uid) => {
+  const PLATFORM_ADMIN_UIDS = [
+    '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1' // david@david.com
+  ];
+  return uid && PLATFORM_ADMIN_UIDS.includes(uid);
+};
+
+// Check if user is platform admin (by email - legacy fallback)
 const isPlatformAdmin = (email) => {
   return email === 'david@david.com' || email === 'david@4gengineer.com';
+};
+
+// Check if user is platform admin (checks both UID and email)
+const isPlatformAdminUser = (user) => {
+  if (!user) return false;
+  
+  // Check by UID first (most reliable)
+  if (isPlatformAdminByUid(user.uid)) {
+    return true;
+  }
+  
+  // Fallback to email check
+  return isPlatformAdmin(user.email);
 };
 
 module.exports = {
@@ -54,5 +75,7 @@ module.exports = {
   extractTenantId,
   requireRole,
   isPlatformAdmin,
+  isPlatformAdminByUid,
+  isPlatformAdminUser,
   VALID_ROLES
 };

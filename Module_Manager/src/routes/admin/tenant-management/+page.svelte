@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
   import { goto } from '$app/navigation';
+  import { isCurrentUserPlatformAdmin, isPlatformAdminByUid } from '$lib/services/adminService';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   
   let loading = true;
@@ -27,13 +28,19 @@
   
   let newOwnerEmail = '';
   
-  const PLATFORM_ADMIN_EMAIL = 'david@david.com';
-  const API_BASE = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+  const API_BASE = 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy';
   
   onMount(async () => {
-    // Check if user is platform admin
+    // Check if user is platform admin (by UID)
     const user = auth().currentUser;
-    if (!user || user.email !== PLATFORM_ADMIN_EMAIL) {
+    if (!user) {
+      error = 'Please log in to access this page.';
+      loading = false;
+      return;
+    }
+    
+    const isAdmin = isPlatformAdminByUid(user.uid) || await isCurrentUserPlatformAdmin();
+    if (!isAdmin) {
       error = 'Access denied. Platform admin only.';
       loading = false;
       return;

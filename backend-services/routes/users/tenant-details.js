@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { verifyAuth } = require('./role-auth-middleware');
+const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
 const { Tenant } = require('../../models/tenant');
 const { UserTenant } = require('./user-schema');
 
@@ -19,13 +19,13 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     const { userId } = req.params;
     const requestingUserId = req.user.uid;
     
-    // Users can only query their own tenants (unless they're platform admin)
-    if (userId !== requestingUserId && req.user.email !== 'david@david.com') {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'You can only view your own tenants'
-      });
-    }
+        // Users can only query their own tenants (unless they're platform admin)
+        if (userId !== requestingUserId && !isPlatformAdminUser(req.user)) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'You can only view your own tenants'
+          });
+        }
     
     // Get all tenant associations for this user
     const userTenants = await UserTenant.find({ 

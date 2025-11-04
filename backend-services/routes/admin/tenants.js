@@ -9,14 +9,14 @@ const express = require('express');
 const admin = require('firebase-admin');
 const { Tenant } = require('../../models/tenant');
 const { UserTenant } = require('../users/user-schema');
-const { verifyAuth, isPlatformAdmin } = require('../users/role-auth-middleware');
+const { verifyAuth, isPlatformAdminUser } = require('../users/role-auth-middleware');
 
 const router = express.Router();
 
-// All routes require platform admin
+// All routes require platform admin (checked by UID, not email)
 router.use(verifyAuth);
 router.use((req, res, next) => {
-  if (!isPlatformAdmin(req.user.email)) {
+  if (!isPlatformAdminUser(req.user)) {
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Platform admin access required'

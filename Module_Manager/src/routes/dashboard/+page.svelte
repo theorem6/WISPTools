@@ -5,7 +5,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { isPlatformAdmin } from '$lib/services/adminService';
+  import { isCurrentUserPlatformAdmin, isPlatformAdminByUid, getCurrentUserUid } from '$lib/services/adminService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import SettingsButton from '$lib/components/SettingsButton.svelte';
 
@@ -85,6 +85,17 @@
       path: '/admin/management',
       adminOnly: true,
       features: ['User Management', 'Tenant Management', 'System Settings', 'Billing & Subscriptions']
+    },
+    {
+      id: 'system-management',
+      name: '🔧 System Management',
+      description: 'System-wide tenant management and deletion (Platform Admin Only)',
+      icon: '🔧',
+      color: '#f44336', // Red
+      status: 'active',
+      path: '/admin/system-management',
+      adminOnly: true,
+      features: ['View All Tenants', 'Delete Tenants', 'Suspend/Activate Tenants', 'System Overview']
     }
   ];
 
@@ -95,7 +106,14 @@
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
-      isAdmin = isPlatformAdmin(currentUser?.email || null);
+      // Check admin status by UID first (most reliable)
+      const uid = getCurrentUserUid();
+      if (uid) {
+        isAdmin = isPlatformAdminByUid(uid) || await isCurrentUserPlatformAdmin();
+      } else {
+        // Fallback to email check
+        isAdmin = isPlatformAdmin(currentUser?.email || null);
+      }
       isLoggedIn = !!currentUser;
     }
   });
