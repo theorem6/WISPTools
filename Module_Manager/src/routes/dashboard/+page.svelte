@@ -5,7 +5,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { isCurrentUserPlatformAdmin, isPlatformAdminByUid, getCurrentUserUid } from '$lib/services/adminService';
+  import { isCurrentUserPlatformAdmin, isPlatformAdminByUid, getCurrentUserUid, isPlatformAdmin } from '$lib/services/adminService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import SettingsButton from '$lib/components/SettingsButton.svelte';
 
