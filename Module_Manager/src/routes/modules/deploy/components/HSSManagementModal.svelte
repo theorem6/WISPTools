@@ -22,7 +22,7 @@
   let error = '';
 
   // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/hss';
+  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy/api/hss';
 
   // Reactive statement to load data when modal opens
   $: if (show && tenantId) {
