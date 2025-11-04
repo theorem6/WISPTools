@@ -8,7 +8,19 @@ import { authService } from './authService';
 
 // Use relative URL to leverage Firebase Hosting rewrites
 // This goes through Firebase Hosting rewrite to apiProxy function
-const API_URL = import.meta.env.VITE_HSS_API_URL || '';
+// Fallback to direct Cloud Function URL if on custom domain (wisptools.io)
+// due to Firebase Hosting custom domain rewrite issues
+const getApiUrl = (): string => {
+  if (import.meta.env.VITE_HSS_API_URL) {
+    return import.meta.env.VITE_HSS_API_URL;
+  }
+  // If on custom domain (wisptools.io), use direct Cloud Function URL as fallback
+  if (typeof window !== 'undefined' && window.location.hostname === 'wisptools.io') {
+    return 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+  }
+  // Otherwise use relative URL for Firebase Hosting rewrites
+  return '';
+};
 
 export interface Customer {
   _id?: string;
@@ -80,10 +92,8 @@ class CustomerService {
       throw new Error('No tenant selected');
     }
 
-    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    // For Firebase Hosting: '/api' works with rewrites
-    // For App Hosting: would need direct function URL, but we're using standard Hosting
-    const apiPath = API_URL || '/api';
+    // Get API URL - uses direct Cloud Function URL for wisptools.io due to rewrite issues
+    const apiPath = getApiUrl() || '/api';
     const response = await fetch(`${apiPath}/customers${endpoint}`, {
       ...options,
       headers: {
