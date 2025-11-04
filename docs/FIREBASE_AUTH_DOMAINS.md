@@ -76,12 +76,20 @@ After adding domains, test authentication:
 
 ## Current Status
 
-- [x] wisptools-io.web.app ✅ Added
-- [x] wisptools-io.firebaseapp.com ✅ Added
-- [x] lte-pci-mapper-65450042-bbf71.web.app ✅ Added
-- [x] lte-pci-mapper-65450042-bbf71.firebaseapp.com ✅ Added
-- [x] wisptools.io ✅ Added
-- [x] localhost ✅ Verified
+- [x] wisptools-io.web.app ✅ Added (Custom)
+- [x] wisptools-io.firebaseapp.com ✅ Added (Custom)
+- [x] lte-pci-mapper-65450042-bbf71.web.app ✅ Added (Default)
+- [x] lte-pci-mapper-65450042-bbf71.firebaseapp.com ✅ Added (Default)
+- [x] wisptools.io ✅ Added (Custom)
+- [x] localhost ✅ Verified (Default)
+
+### Additional Authorized Domains
+
+The following domains are also authorized (for reference):
+- `72.47.46.94` (Custom - IP address)
+- `177.249.27.131` (Custom - IP address)
+- `pci-mapper--lte-pci-mapper-65450042-bbf71.us-central1.hosted.app` (Custom - App Hosting)
+- `lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app` (Custom - App Hosting)
 
 ## Troubleshooting
 
