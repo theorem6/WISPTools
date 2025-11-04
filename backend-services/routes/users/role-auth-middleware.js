@@ -67,7 +67,8 @@ const VALID_ROLES = ['admin', 'user', 'tenant_admin'];
 // Check if user is platform admin (by UID - preferred)
 const isPlatformAdminByUid = (uid) => {
   const PLATFORM_ADMIN_UIDS = [
-    '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1' // david@david.com
+    '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1', // david@david.com (expected UID)
+    'RXxGyzxnIngJ3TWKyWmAgSimfwG2'  // david@david.com (actual UID)
   ];
   return uid && PLATFORM_ADMIN_UIDS.includes(uid);
 };

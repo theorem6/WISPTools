@@ -6,7 +6,8 @@ import { auth } from '$lib/firebase';
 
 // Platform admin UIDs - only these users can manage ALL tenants
 const PLATFORM_ADMIN_UIDS = [
-  '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1' // david@david.com
+  '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1', // david@david.com (expected UID)
+  'RXxGyzxnIngJ3TWKyWmAgSimfwG2'  // david@david.com (actual UID)
 ];
 
 // Legacy email fallback (for backwards compatibility)
