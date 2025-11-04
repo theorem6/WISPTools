@@ -3,6 +3,9 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { authService } from '$lib/services/authService';
+  import { tenantService } from '$lib/services/tenantService';
+  import { tenantStore } from '$lib/stores/tenantStore';
+  import type { User } from 'firebase/auth';
 
   let email = '';
   let password = '';
@@ -100,11 +103,26 @@
           return;
         }
         
-        console.log('[Login Page] Auth state ready, redirecting to dashboard');
+        console.log('[Login Page] Auth state ready');
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', email);
+        
+        // For new signups, automatically create a tenant
+        if (mode === 'signup' && user) {
+          try {
+            console.log('[Login Page] Creating automatic tenant for new user...');
+            await createAutomaticTenant(user, email);
+            console.log('[Login Page] Automatic tenant created successfully');
+          } catch (tenantError: any) {
+            console.error('[Login Page] Error creating automatic tenant:', tenantError);
+            // Don't block signup if tenant creation fails - user can create manually later
+            // Just log the error and continue
+          }
+        }
+        
+        console.log('[Login Page] Redirecting to dashboard');
         
         // Redirect to dashboard
         await goto('/dashboard', { replaceState: true });
@@ -118,6 +136,61 @@
       console.error('[Login Page] Error stack:', err.stack);
     } finally {
       isLoading = false;
+    }
+  }
+
+  /**
+   * Create an automatic tenant for a new user
+   * Uses email domain or generates a name from email
+   */
+  async function createAutomaticTenant(user: User, email: string): Promise<void> {
+    try {
+      // Extract organization name from email domain or use email prefix
+      const emailParts = email.split('@');
+      const domain = emailParts[1] || '';
+      const domainParts = domain.split('.');
+      const orgName = domainParts[0] || emailParts[0] || 'My Organization';
+      
+      // Capitalize first letter
+      const displayName = orgName.charAt(0).toUpperCase() + orgName.slice(1);
+      
+      // Generate subdomain (lowercase, alphanumeric + hyphens)
+      const subdomain = orgName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').trim();
+      
+      console.log('[Login Page] Creating tenant:', {
+        name: orgName,
+        displayName,
+        subdomain,
+        contactEmail: email,
+        userId: user.uid
+      });
+      
+      // Create tenant with user as owner
+      const result = await tenantService.createTenant(
+        orgName,
+        displayName,
+        email,
+        user.uid,
+        subdomain,
+        true,  // Create owner association
+        email  // Owner email
+      );
+      
+      if (result.success && result.tenantId) {
+        console.log('[Login Page] Tenant created:', result.tenantId);
+        
+        // Load the newly created tenant and set it as current
+        const tenant = await tenantService.getTenant(result.tenantId);
+        if (tenant) {
+          tenantStore.setCurrentTenant(tenant);
+          console.log('[Login Page] Tenant set as current:', tenant.displayName);
+        }
+      } else {
+        throw new Error(result.error || 'Failed to create tenant');
+      }
+    } catch (error: any) {
+      console.error('[Login Page] Automatic tenant creation failed:', error);
+      throw error;
     }
   }
 
