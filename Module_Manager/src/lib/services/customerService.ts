@@ -21,7 +21,7 @@ const getApiUrl = (): string => {
     console.log('[CustomerService] getApiUrl check:', { hostname, isWisptools: hostname === 'wisptools.io' || hostname.includes('wisptools.io') });
     if (hostname === 'wisptools.io' || hostname.includes('wisptools.io')) {
       console.log('[CustomerService] ✅ Detected wisptools.io, using direct Cloud Function URL');
-      return 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+      return 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy';
     }
     console.log('[CustomerService] Using relative URL for Firebase Hosting rewrites');
   }

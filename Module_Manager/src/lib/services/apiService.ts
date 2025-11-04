@@ -10,7 +10,7 @@ export class ApiService {
   constructor() {
     // Use Firebase Functions URL or local dev
     this.baseUrl = browser ? 
-      (import.meta.env.VITE_FUNCTIONS_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net') : 
+      (import.meta.env.VITE_FUNCTIONS_URL || 'https://us-central1-wisptools-production.cloudfunctions.net') : 
       '';
   }
 
