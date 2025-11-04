@@ -40,7 +40,16 @@ if (browser && typeof window !== 'undefined') {
     apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing',
     authDomain: firebaseConfig.authDomain ? '✅ Set' : '❌ Missing',
     projectId: firebaseConfig.projectId ? '✅ Set' : '❌ Missing',
-    appId: firebaseConfig.appId ? '✅ Set' : '❌ Missing'
+    appId: firebaseConfig.appId ? '✅ Set' : '❌ Missing',
+    storageBucket: firebaseConfig.storageBucket ? '✅ Set' : '❌ Missing',
+    messagingSenderId: firebaseConfig.messagingSenderId ? '✅ Set' : '❌ Missing'
+  });
+  console.log('🔥 Firebase Config Values:', {
+    apiKey: firebaseConfig.apiKey?.substring(0, 20) + '...',
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+    appId: firebaseConfig.appId,
+    storageBucket: firebaseConfig.storageBucket
   });
 }
 
@@ -58,8 +67,20 @@ function getFirebaseApp(): FirebaseApp {
   }
 
   if (!firebaseApp) {
-    firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    console.log('🔥 Firebase app initialized');
+    try {
+      console.log('🔥 Initializing Firebase app:', {
+        projectId: firebaseConfig.projectId,
+        authDomain: firebaseConfig.authDomain
+      });
+      firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+      console.log('🔥 Firebase app initialized successfully:', {
+        name: firebaseApp.name,
+        projectId: firebaseApp.options.projectId
+      });
+    } catch (error) {
+      console.error('❌ Firebase initialization error:', error);
+      throw error;
+    }
   }
 
   return firebaseApp;

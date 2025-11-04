@@ -149,12 +149,19 @@ export class AuthService {
    */
   async signIn(email: string, password: string): Promise<AuthResult<UserProfile>> {
     try {
-      const userCredential = await signInWithEmailAndPassword(getAuth(), email, password);
+      console.log('[AuthService] Attempting sign in with:', { email, projectId: 'wisptools-production' });
+      const auth = getAuth();
+      console.log('[AuthService] Auth instance:', { app: auth.app.name, config: auth.app.options });
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('[AuthService] Sign in successful:', { email: userCredential.user.email, uid: userCredential.user.uid });
       return {
         success: true,
         data: this.mapUserToProfile(userCredential.user)
       };
     } catch (error: any) {
+      console.error('[AuthService] Sign in error:', error);
+      console.error('[AuthService] Error code:', error?.code);
+      console.error('[AuthService] Error message:', error?.message);
       return {
         success: false,
         error: this.getAuthErrorMessage(error)
