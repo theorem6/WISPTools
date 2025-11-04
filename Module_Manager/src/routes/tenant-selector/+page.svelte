@@ -34,9 +34,10 @@
       console.log('[Tenant Selector] Loaded', tenants.length, 'tenants');
       
       if (tenants.length === 0) {
-        // No tenants, redirect to tenant setup
-        console.log('[Tenant Selector] No tenants, redirecting to setup');
-        await goto('/tenant-setup');
+        // No tenants - allow user to create their first tenant
+        console.log('[Tenant Selector] No tenants, allowing tenant creation');
+        // Don't redirect - show the "Create New Organization" button instead
+        // The error card will show, but users can click "Create New Organization"
       } else if (tenants.length === 1) {
         // Only one tenant, auto-select and redirect
         console.log('[Tenant Selector] Auto-selecting single tenant');

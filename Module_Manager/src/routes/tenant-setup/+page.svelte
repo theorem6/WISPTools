@@ -32,13 +32,30 @@
       return;
     }
 
-    // CRITICAL: Only platform admin can create tenants
-    const isPlatformAdmin = currentUser.email === 'david@david.com';
-    if (!isPlatformAdmin) {
-      console.log('[Tenant Setup] ACCESS DENIED - Only platform admin can create tenants');
-      error = 'Access Denied: Only platform administrators can create new organizations.';
-      await goto('/dashboard', { replaceState: true });
-      return;
+    // Allow first-time users to create their own tenant
+    // Check if user has any tenants - if not, allow creation
+    try {
+      const existingTenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
+      console.log('[Tenant Setup] User has', existingTenants.length, 'existing tenants');
+      
+      const isPlatformAdmin = currentUser.email === 'david@david.com' || currentUser.email === 'david@4gengineer.com';
+      
+      // Only allow if:
+      // 1. Platform admin (always allowed)
+      // 2. First-time user with no tenants (allowed to create their first tenant)
+      if (!isPlatformAdmin && existingTenants.length > 0) {
+        console.log('[Tenant Setup] ACCESS DENIED - User already has tenants');
+        error = 'You already have an organization. Please contact support to create additional organizations.';
+        await goto('/tenant-selector', { replaceState: true });
+        return;
+      }
+      
+      console.log('[Tenant Setup] Access granted -', isPlatformAdmin ? 'platform admin' : 'first-time user');
+    } catch (err: any) {
+      console.error('[Tenant Setup] Error checking existing tenants:', err);
+      // If we can't check (e.g., 401 error), allow first-time setup
+      // The backend will handle authorization when creating
+      console.log('[Tenant Setup] Allowing tenant creation despite check error');
     }
 
     console.log('[Tenant Setup] Platform admin access confirmed');
@@ -73,15 +90,19 @@
     }
 
     try {
+      // Check if this is platform admin or first-time user
+      const isPlatformAdmin = currentUser.email === 'david@david.com' || currentUser.email === 'david@4gengineer.com';
+      
       // Platform admin creating tenant should NOT be added as owner
-      // They will assign an owner separately via the admin panel
+      // First-time users creating their own tenant SHOULD be added as owner
       const result = await tenantService.createTenant(
         tenantName,
         displayName,
         contactEmail,
         currentUser.uid,
         subdomain,
-        false  // Do NOT create owner association for platform admin
+        !isPlatformAdmin,  // Create owner association for first-time users, not for platform admin
+        isPlatformAdmin ? undefined : currentUser.email  // Owner email for first-time users
       );
 
       if (result.success && result.tenantId) {

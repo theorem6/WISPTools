@@ -87,14 +87,27 @@
               console.log('[TenantGuard] User UID:', currentUser.uid);
               console.log('[TenantGuard] User Email:', currentUser.email);
               
-              const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
-              console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
+              let tenants: any[] = [];
+              try {
+                tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
+                console.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
+              } catch (err: any) {
+                console.error('[TenantGuard] Error loading tenants:', err);
+                // If 401 error, backend auth is misconfigured - show helpful message
+                if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+                  error = 'Authentication error: Backend cannot verify your login. Please contact support.';
+                  isChecking = false;
+                  return;
+                }
+                // Other errors - redirect to tenant selector anyway
+                tenants = [];
+              }
               
               if (tenants.length === 0) {
-                // No tenants - guide user to tenant selector instead of logging out
-                console.log('[TenantGuard] No tenants found - redirecting to tenant selector');
+                // No tenants - guide user to tenant setup (allow first-time users to create)
+                console.log('[TenantGuard] No tenants found - redirecting to tenant setup');
                 isChecking = false;
-                await goto('/tenant-selector?empty=1', { replaceState: true });
+                await goto('/tenant-setup', { replaceState: true });
                 return;
               } else if (tenants.length === 1) {
                 // Auto-select single tenant
