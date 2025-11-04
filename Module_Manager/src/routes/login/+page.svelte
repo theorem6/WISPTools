@@ -62,14 +62,19 @@
     }
 
     try {
+      console.log('[Login Page] Form submitted:', { email, mode });
+      console.log('[Login Page] Calling authService.signIn...');
+      
       let result;
       
       if (mode === 'signin') {
         console.log('[Login Page] Attempting sign in...');
         result = await authService.signIn(email, password);
+        console.log('[Login Page] Sign in result:', result);
       } else {
         console.log('[Login Page] Attempting sign up...');
         result = await authService.signUp(email, password);
+        console.log('[Login Page] Sign up result:', result);
       }
 
       if (result.success) {
@@ -110,6 +115,7 @@
     } catch (err: any) {
       error = err.message || 'An unexpected error occurred';
       console.error('[Login Page] Authentication error:', err);
+      console.error('[Login Page] Error stack:', err.stack);
     } finally {
       isLoading = false;
     }

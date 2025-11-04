@@ -44,24 +44,44 @@ export class AuthService {
    * Initialize Firebase auth state listener with error recovery
    */
   private initializeAuthListener(): void {
-    onAuthStateChanged(getAuth(), (user) => {
-      this.currentUser = user;
+    try {
+      const auth = getAuth();
+      console.log('[AuthService] Initializing auth listener with:', {
+        app: auth.app.name,
+        projectId: auth.app.options.projectId,
+        authDomain: auth.app.options.authDomain
+      });
       
-      // Log auth state changes for debugging
-      if (user) {
-        console.log('Auth state: User signed in', user.email);
-        console.log('Token expiration:', user.metadata.lastSignInTime);
-      } else {
-        console.log('Auth state: User signed out');
-      }
+      onAuthStateChanged(auth, (user) => {
+        this.currentUser = user;
+        
+        // Log auth state changes for debugging
+        if (user) {
+          console.log('[AuthService] Auth state: User signed in', user.email);
+          console.log('[AuthService] User metadata:', {
+            uid: user.uid,
+            email: user.email,
+            lastSignInTime: user.metadata.lastSignInTime
+          });
+        } else {
+          console.log('[AuthService] Auth state: User signed out');
+        }
+        
+        this.notifyListeners(user);
+      }, (error) => {
+        console.error('[AuthService] Auth state change error:', error);
+        console.error('[AuthService] Error code:', error?.code);
+        console.error('[AuthService] Error message:', error?.message);
+        // Handle auth errors (expired tokens, etc.)
+        this.currentUser = null;
+        this.notifyListeners(null);
+      });
       
-      this.notifyListeners(user);
-    }, (error) => {
-      console.error('Auth state change error:', error);
-      // Handle auth errors (expired tokens, etc.)
-      this.currentUser = null;
-      this.notifyListeners(null);
-    });
+      console.log('[AuthService] Auth listener initialized successfully');
+    } catch (error) {
+      console.error('[AuthService] Failed to initialize auth listener:', error);
+      throw error;
+    }
   }
 
   /**
