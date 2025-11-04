@@ -7,6 +7,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { admin } = require('../config/firebase');
 const { verifyAuth } = require('./users/role-auth-middleware');
 const { Tenant } = require('../models/tenant');
 const { UserTenant } = require('./users/user-schema');
@@ -118,6 +119,37 @@ router.post('/', verifyAuth, async (req, res) => {
     });
     
     await userTenant.save();
+    
+    // ALWAYS add david@david.com as platform admin for every tenant
+    try {
+      const platformAdminEmail = 'david@david.com';
+      const platformAdminUser = await admin.auth().getUserByEmail(platformAdminEmail);
+      
+      // Check if platform admin already has a record for this tenant
+      const existingPlatformAdmin = await UserTenant.findOne({
+        userId: platformAdminUser.uid,
+        tenantId: tenant._id.toString()
+      });
+      
+      if (!existingPlatformAdmin) {
+        const platformAdminTenant = new UserTenant({
+          userId: platformAdminUser.uid,
+          tenantId: tenant._id.toString(),
+          role: 'admin', // Platform admin gets admin role in all tenants
+          status: 'active',
+          invitedBy: userId,
+          invitedAt: new Date(),
+          acceptedAt: new Date(),
+          addedAt: new Date()
+        });
+        
+        await platformAdminTenant.save();
+        console.log(`✅ Added platform admin ${platformAdminEmail} as admin to tenant "${displayName}"`);
+      }
+    } catch (error) {
+      console.error(`⚠️ Failed to add platform admin to tenant:`, error.message);
+      // Don't fail tenant creation if platform admin addition fails
+    }
     
     console.log(`✅ User ${userEmail} created their tenant "${displayName}" (${tenant._id})`);
     
