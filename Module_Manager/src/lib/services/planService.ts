@@ -11,9 +11,8 @@ import type { InventoryItem } from './inventoryService';
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../routes/modules/coverage-map/lib/models';
 
 // API Configuration
-const API_URL = browser 
-  ? 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/hssProxy'
-  : '';
+// This goes through Firebase Hosting rewrite to apiProxy function
+const API_URL = import.meta.env.VITE_HSS_API_URL || '';
 
 export interface PlanProject {
   id: string;
@@ -152,16 +151,16 @@ class PlanService {
       throw new Error('No tenant selected');
     }
     
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-Tenant-ID': tenantId,
-      ...options.headers as Record<string, string>
-    };
-    
-    const response = await fetch(`${API_URL}/api/plans${endpoint}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/plans${endpoint}`, {
       ...options,
-      headers
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Tenant-ID': tenantId,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
     });
     
     if (!response.ok) {
