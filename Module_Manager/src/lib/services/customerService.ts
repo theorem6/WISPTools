@@ -8,22 +8,9 @@ import { authService } from './authService';
 
 // Use relative URL to leverage Firebase Hosting rewrites
 // This goes through Firebase Hosting rewrite to apiProxy function
-// Fallback to direct Cloud Function URL if on custom domain (wisptools.io)
-// due to Firebase Hosting custom domain rewrite issues
+// Works for all domains: wisptools.io, wisptools-production.web.app, wisptools-production.firebaseapp.com
 const getApiUrl = (): string => {
-  // DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
-  // If on custom domain (wisptools.io), use direct Cloud Function URL as fallback
-  // This bypasses Firebase Hosting rewrite issues on custom domains
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    console.log('[CustomerService] getApiUrl check:', { hostname, isWisptools: hostname === 'wisptools.io' || hostname.includes('wisptools.io') });
-    if (hostname === 'wisptools.io' || hostname.includes('wisptools.io')) {
-      console.log('[CustomerService] ✅ Detected wisptools.io, using direct Cloud Function URL');
-      return 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy';
-    }
-    console.log('[CustomerService] Using relative URL for Firebase Hosting rewrites');
-  }
-  // Otherwise use relative URL for Firebase Hosting rewrites
+  // Always use relative URL - Firebase Hosting rewrites handle all domains
   return '';
 };
 
@@ -97,7 +84,7 @@ class CustomerService {
       throw new Error('No tenant selected');
     }
 
-    // Get API URL - uses direct Cloud Function URL for wisptools.io due to rewrite issues
+    // Get API URL - uses relative URL, works for all domains via Firebase Hosting rewrites
     const apiPath = getApiUrl() || '/api';
     const fullUrl = `${apiPath}/customers${endpoint}`;
     console.log('[CustomerService] API call:', { apiPath, fullUrl, hostname: typeof window !== 'undefined' ? window.location.hostname : 'server' });
