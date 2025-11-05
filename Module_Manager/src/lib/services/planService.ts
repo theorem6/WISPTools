@@ -180,106 +180,116 @@ class PlanService {
     try {
       // Get towers from coverage map
       const towers = await coverageMapService.getTowerSites(tenantId);
-      towers.forEach(tower => {
-        hardware.push({
-          id: tower.id,
-          type: 'tower',
-          name: tower.name,
-          location: {
-            latitude: tower.latitude,
-            longitude: tower.longitude,
-            address: tower.address
-          },
-          status: tower.status,
-          module: 'manual',
-          lastUpdated: new Date(tower.updatedAt),
-          isReadOnly: true, // Existing hardware is read-only in plan
-          inventoryId: tower.inventoryId
+      if (Array.isArray(towers)) {
+        towers.forEach(tower => {
+          hardware.push({
+            id: tower.id,
+            type: 'tower',
+            name: tower.name,
+            location: {
+              latitude: tower.latitude,
+              longitude: tower.longitude,
+              address: tower.address
+            },
+            status: tower.status,
+            module: 'manual',
+            lastUpdated: new Date(tower.updatedAt),
+            isReadOnly: true, // Existing hardware is read-only in plan
+            inventoryId: tower.inventoryId
+          });
         });
-      });
+      }
       
       // Get sectors from coverage map
       const sectors = await coverageMapService.getSectors(tenantId);
-      sectors.forEach(sector => {
-        hardware.push({
-          id: sector.id,
-          type: 'sector',
-          name: `${sector.towerName} - Sector ${sector.azimuth}°`,
-          location: {
-            latitude: sector.latitude,
-            longitude: sector.longitude
-          },
-          status: sector.status,
-          module: sector.modules?.pci ? 'pci' : 'manual',
-          lastUpdated: new Date(sector.updatedAt),
-          isReadOnly: true,
-          inventoryId: sector.inventoryId
+      if (Array.isArray(sectors)) {
+        sectors.forEach(sector => {
+          hardware.push({
+            id: sector.id,
+            type: 'sector',
+            name: `${sector.towerName} - Sector ${sector.azimuth}°`,
+            location: {
+              latitude: sector.latitude,
+              longitude: sector.longitude
+            },
+            status: sector.status,
+            module: sector.modules?.pci ? 'pci' : 'manual',
+            lastUpdated: new Date(sector.updatedAt),
+            isReadOnly: true,
+            inventoryId: sector.inventoryId
+          });
         });
-      });
+      }
       
       // Get CPE devices from coverage map
       const cpeDevices = await coverageMapService.getCPEDevices(tenantId);
-      cpeDevices.forEach(cpe => {
-        hardware.push({
-          id: cpe.id,
-          type: 'cpe',
-          name: `${cpe.manufacturer} ${cpe.model} - ${cpe.serialNumber}`,
-          location: {
-            latitude: cpe.latitude,
-            longitude: cpe.longitude,
-            address: cpe.address
-          },
-          status: cpe.status,
-          module: cpe.modules?.acs ? 'acs' : cpe.modules?.hss ? 'hss' : 'manual',
-          lastUpdated: new Date(cpe.updatedAt),
-          isReadOnly: true,
-          inventoryId: cpe.inventoryId
+      if (Array.isArray(cpeDevices)) {
+        cpeDevices.forEach(cpe => {
+          hardware.push({
+            id: cpe.id,
+            type: 'cpe',
+            name: `${cpe.manufacturer} ${cpe.model} - ${cpe.serialNumber}`,
+            location: {
+              latitude: cpe.latitude,
+              longitude: cpe.longitude,
+              address: cpe.address
+            },
+            status: cpe.status,
+            module: cpe.modules?.acs ? 'acs' : cpe.modules?.hss ? 'hss' : 'manual',
+            lastUpdated: new Date(cpe.updatedAt),
+            isReadOnly: true,
+            inventoryId: cpe.inventoryId
+          });
         });
-      });
+      }
       
       // Get equipment from coverage map
       const equipment = await coverageMapService.getEquipment(tenantId);
-      equipment.forEach(item => {
-        hardware.push({
-          id: item.id,
-          type: 'equipment',
-          name: `${item.manufacturer} ${item.model} - ${item.serialNumber}`,
-          location: {
-            latitude: item.latitude,
-            longitude: item.longitude,
-            address: item.address
-          },
-          status: item.status,
-          module: 'inventory',
-          lastUpdated: new Date(item.updatedAt),
-          isReadOnly: true,
-          inventoryId: item.inventoryId
+      if (Array.isArray(equipment)) {
+        equipment.forEach(item => {
+          hardware.push({
+            id: item.id,
+            type: 'equipment',
+            name: `${item.manufacturer} ${item.model} - ${item.serialNumber}`,
+            location: {
+              latitude: item.latitude,
+              longitude: item.longitude,
+              address: item.address
+            },
+            status: item.status,
+            module: 'inventory',
+            lastUpdated: new Date(item.updatedAt),
+            isReadOnly: true,
+            inventoryId: item.inventoryId
+          });
         });
-      });
+      }
       
       // Get inventory items
       const inventoryItems = await inventoryService.getInventory(tenantId);
-      inventoryItems.forEach(item => {
-        // Only include items that aren't already mapped to coverage map
-        const alreadyMapped = hardware.some(h => h.inventoryId === item._id);
-        if (!alreadyMapped) {
-          hardware.push({
-            id: item._id || '',
-            type: 'equipment',
-            name: `${item.manufacturer || 'Unknown'} ${item.model || 'Unknown'} - ${item.serialNumber}`,
-            location: {
-              latitude: item.currentLocation?.latitude || 0,
-              longitude: item.currentLocation?.longitude || 0,
-              address: item.currentLocation?.address
-            },
-            status: item.status,
-            module: item.modules?.acs ? 'acs' : item.modules?.hss ? 'hss' : 'inventory',
-            lastUpdated: new Date(item.updatedAt),
-            isReadOnly: true,
-            inventoryId: item._id
-          });
-        }
-      });
+      if (Array.isArray(inventoryItems)) {
+        inventoryItems.forEach(item => {
+          // Only include items that aren't already mapped to coverage map
+          const alreadyMapped = hardware.some(h => h.inventoryId === item._id);
+          if (!alreadyMapped) {
+            hardware.push({
+              id: item._id || '',
+              type: 'equipment',
+              name: `${item.manufacturer || 'Unknown'} ${item.model || 'Unknown'} - ${item.serialNumber}`,
+              location: {
+                latitude: item.currentLocation?.latitude || 0,
+                longitude: item.currentLocation?.longitude || 0,
+                address: item.currentLocation?.address
+              },
+              status: item.status,
+              module: item.modules?.acs ? 'acs' : item.modules?.hss ? 'hss' : 'inventory',
+              lastUpdated: new Date(item.updatedAt),
+              isReadOnly: true,
+              inventoryId: item._id
+            });
+          }
+        });
+      }
       
     } catch (error) {
       console.error('Error loading existing hardware:', error);
