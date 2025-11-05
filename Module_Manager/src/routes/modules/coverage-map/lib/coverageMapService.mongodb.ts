@@ -1,8 +1,8 @@
 // Coverage Map Service - MongoDB Backend Version
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
 
-// Backend API URL - goes through apiProxy Cloud Function
-const API_URL = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+// Backend API URL - goes through Firebase Hosting rewrite to apiProxy Cloud Function
+const API_URL = import.meta.env.VITE_HSS_API_URL || '';
 
 export class CoverageMapService {
   
@@ -25,7 +25,9 @@ export class CoverageMapService {
       throw new Error('No tenant selected');
     }
     
-    const response = await fetch(`${API_URL}/api/network/${endpoint}`, {
+    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    const apiPath = API_URL || '/api';
+    const response = await fetch(`${apiPath}/network/${endpoint}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,

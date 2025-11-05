@@ -819,7 +819,7 @@
 
 <!-- Site Edit Modal -->
 <SiteEditModal
-  bind:show={showSiteEditModal}
+  show={showSiteEditModal}
   site={selectedSiteForEdit}
   {tenantId}
   on:saved={handleModalSaved}
