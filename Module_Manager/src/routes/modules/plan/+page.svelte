@@ -26,6 +26,7 @@
   let isLoading = false;
   let error: string = '';
   let successMessage: string = '';
+  let loadedTenantId: string | null = null; // Track which tenant's data is loaded
   
   // New project form
   let newProject = {
@@ -180,6 +181,11 @@
   // Reactive variable for available equipment types based on selected category
   $: availableTypes = equipmentCategories[newRequirement.category as keyof typeof equipmentCategories] || [];
 
+  // Watch for tenant changes and load data when tenant is available
+  $: if ($currentTenant && $currentTenant.id && browser && !isLoading && currentUser && loadedTenantId !== $currentTenant.id) {
+    loadData();
+  }
+
   onMount(async () => {
     if (browser) {
       currentUser = await authService.getCurrentUser();
@@ -197,7 +203,7 @@
         window.addEventListener('iframe-object-action', handleIframeObjectAction);
       }
       
-      await loadData();
+      // Don't load data here - wait for tenant store to initialize via reactive statement
     }
     
     return () => {
@@ -224,15 +230,21 @@
   async function loadData() {
     if (!currentUser) return;
     
+    // Wait for tenant to be available
+    if (!$currentTenant || !$currentTenant.id) {
+      console.log('[Plan] Waiting for tenant to be available...');
+      return;
+    }
+    
+    // Prevent duplicate loads for the same tenant
+    if (isLoading || loadedTenantId === $currentTenant.id) {
+      return;
+    }
+    
     isLoading = true;
     error = '';
     try {
-      const tenantId = localStorage.getItem('selectedTenantId');
-      if (!tenantId) {
-        error = 'No tenant selected. Please select a tenant first.';
-        setTimeout(() => error = '', 5000);
-        return;
-      }
+      const tenantId = $currentTenant.id;
       
       // Load existing hardware and projects in parallel
       const [hardware, plans] = await Promise.all([
@@ -250,6 +262,7 @@
       
       existingHardware = hardware;
       projects = plans;
+      loadedTenantId = tenantId; // Mark this tenant's data as loaded
       
       // Initialize visibility set from loaded plans
       visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
@@ -261,6 +274,7 @@
       console.error('Error loading plan data:', err);
       error = err.message || 'Failed to load plan data. Please try again.';
       setTimeout(() => error = '', 8000);
+      loadedTenantId = null; // Reset on error so we can retry
     } finally {
       isLoading = false;
     }
