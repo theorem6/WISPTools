@@ -15,10 +15,7 @@ const config = {
 			fallback: 'index.html',
 			precompress: false,
 			strict: false // Allow dynamic routes to work with fallback
-		}),
-		prerender: {
-			entries: ['*'] // Prerender all routes
-		}
+		})
 	},
 
 	// Suppress non-critical accessibility warnings
