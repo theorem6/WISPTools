@@ -66,7 +66,7 @@ app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
-app.use('/api/billing', require('./billing-api'));
+// app.use('/api/billing', require('./billing-api')); // Temporarily disabled - missing dependencies
 app.use('/api/equipment-pricing', require('./routes/equipment-pricing'));
 app.use('/api/installation-documentation', require('./routes/installation-documentation'));
 app.use('/api/subcontractors', require('./routes/subcontractors'));

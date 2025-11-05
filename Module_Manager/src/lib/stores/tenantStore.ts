@@ -175,8 +175,22 @@ function createTenantStore() {
         
         console.log('[TenantStore] Loaded', tenants.length, 'tenants for user');
         return tenants;
-      } catch (error) {
+      } catch (error: any) {
         console.error('[TenantStore] Error loading user tenants:', error);
+        
+        // Handle 401 errors gracefully - don't block the app
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+          console.warn('[TenantStore] Auth error - user may not be authenticated yet');
+          update(state => ({
+            ...state,
+            isLoading: false,
+            error: null, // Don't set error for auth issues - they're expected during login
+            userTenants: []
+          }));
+          return [];
+        }
+        
+        // For other errors, still return empty array but log the error
         update(state => ({
           ...state,
           isLoading: false,
