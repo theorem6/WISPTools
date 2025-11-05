@@ -82,19 +82,12 @@ function getFirebaseApp(): FirebaseApp {
       );
       
       if (existingApp) {
-        console.log('🔥 Found existing app with wrong config, deleting:', {
+        console.warn('⚠️ Found existing app with different config:', {
           existingProjectId: existingApp.options.projectId,
           existingApiKey: existingApp.options.apiKey?.substring(0, 20) + '...',
           correctProjectId: firebaseConfig.projectId
         });
-        
-        // Delete the existing app
-        try {
-          existingApp.delete();
-          console.log('🔥 Deleted existing Firebase app');
-        } catch (deleteError) {
-          console.warn('⚠️ Could not delete existing app:', deleteError);
-        }
+        console.warn('⚠️ Firebase apps cannot be deleted. Using new app instance with unique name.');
         
         // Clear singleton instances
         firebaseAuth = null;

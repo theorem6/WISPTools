@@ -112,7 +112,7 @@ export class GenieACSNBIClient {
       }
     } catch (error) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('Request timeout');
       }
       throw error;
@@ -377,7 +377,9 @@ export class GenieACSNBIClient {
    */
   async uploadFile(filename: string, content: string | Blob): Promise<void> {
     const formData = new FormData();
-    formData.append('file', content, filename);
+    // Convert string to Blob if needed
+    const blob = typeof content === 'string' ? new Blob([content], { type: 'text/plain' }) : content;
+    formData.append('file', blob, filename);
 
     const url = `${this.config.baseUrl}/files/${encodeURIComponent(filename)}`;
     

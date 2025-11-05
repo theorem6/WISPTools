@@ -2,7 +2,7 @@
 // Main service for managing TR-069 CPE devices and integrating with PCI Mapper
 
 import { GenieACSNBIClient, type GenieACSConfig, type GenieACSDevice } from '../api/nbiClient';
-import { CPEDevice, CPEDeviceUtils, TR069_PARAMETER_PATHS } from '../models/cpeDevice';
+import { type CPEDevice, CPEDeviceUtils, TR069_PARAMETER_PATHS } from '../models/cpeDevice';
 import { TR069ParameterUtils } from '../models/tr069Parameters';
 import type { TR069Parameter } from '../models/cpeDevice';
 

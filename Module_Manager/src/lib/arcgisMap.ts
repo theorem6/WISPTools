@@ -79,8 +79,7 @@ export class PCIArcGISMapper {
           enabled: false
         },
         browserTouchPanEnabled: true,
-        momentumEnabled: true,
-        frictionFactor: 0.9
+        momentumEnabled: true
       },
       // Mobile-optimized popup
       popup: {
@@ -170,7 +169,6 @@ export class PCIArcGISMapper {
       if (isMobile && navigator.geolocation) {
         const locate = new Locate({
           view: this.mapView,
-          useHeadingEnabled: false,
           goToOverride: (view, options) => {
             options.target.scale = 15000; // Zoom level for mobile
             return view.goTo(options.target);
@@ -283,7 +281,7 @@ export class PCIArcGISMapper {
       rings[0].push([cell.longitude, cell.latitude]);
       
       const sectorPolygon = {
-        type: "polygon",
+        type: "polygon" as const,
         rings: rings,
         spatialReference: { wkid: 4326 }
       };
@@ -354,7 +352,7 @@ export class PCIArcGISMapper {
       
       // Create line between conflicting cells
       const polyline = {
-        type: "polyline",
+        type: "polyline" as const,
         paths: [
           [primaryCell.longitude, primaryCell.latitude],
           [conflictingCell.longitude, conflictingCell.latitude]
@@ -364,10 +362,10 @@ export class PCIArcGISMapper {
       
       const color = this.getConflictColorArray(conflict.severity);
       const symbol = {
-        type: "simple-line",
+        type: "simple-line" as const,
         color: color,
         width: this.getConflictWidth(conflict.severity),
-        style: "solid"
+        style: "solid" as const
       };
       
       const graphic = new Graphic({
@@ -414,25 +412,21 @@ export class PCIArcGISMapper {
     const s = 0.8;
     const l = 0.5;
     
-    let r, g, b;
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-      
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
-    }
+    // s is always 0.8, so we skip the s === 0 check
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const r = hue2rgb(p, q, h + 1/3);
+    const g = hue2rgb(p, q, h);
+    const b = hue2rgb(p, q, h - 1/3);
     
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255];
   }
@@ -657,7 +651,7 @@ export class PCIArcGISMapper {
     return {
       center: this.mapView.center,
       zoom: this.mapView.zoom,
-      layers: this.map.layers.items.map(layer => ({
+      layers: this.map.layers.items.map((layer: any) => ({
         id: layer.id,
         visible: layer.visible
       }))
@@ -674,7 +668,7 @@ export class PCIArcGISMapper {
     });
     
     state.layers.forEach((layerState: any) => {
-      const layer = this.map.layers.items.find(l => l.id === layerState.id);
+      const layer = this.map.layers.items.find((l: any) => l.id === layerState.id);
       if (layer) {
         layer.visible = layerState.visible;
       }
