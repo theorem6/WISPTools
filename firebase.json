@@ -107,10 +107,6 @@
         "function": "apiProxy"
       },
       {
-        "source": "!/_app/**",
-        "destination": "/index.html"
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }
