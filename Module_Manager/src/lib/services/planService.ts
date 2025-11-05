@@ -153,7 +153,9 @@ class PlanService {
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
     const apiPath = API_URL || '/api';
-    const response = await fetch(`${apiPath}/plans${endpoint}`, {
+    const fullUrl = `${apiPath}/plans${endpoint}`;
+    console.log('[planService] API URL:', { API_URL, apiPath, fullUrl, endpoint });
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
