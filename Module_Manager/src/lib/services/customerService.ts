@@ -11,9 +11,7 @@ import { authService } from './authService';
 // Fallback to direct Cloud Function URL if on custom domain (wisptools.io)
 // due to Firebase Hosting custom domain rewrite issues
 const getApiUrl = (): string => {
-  if (import.meta.env.VITE_HSS_API_URL) {
-    return import.meta.env.VITE_HSS_API_URL;
-  }
+  // DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
   // If on custom domain (wisptools.io), use direct Cloud Function URL as fallback
   // This bypasses Firebase Hosting rewrite issues on custom domains
   if (typeof window !== 'undefined') {

@@ -1,8 +1,9 @@
 // Coverage Map Service - MongoDB Backend Version
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
 
-// Backend API URL - goes through Firebase Hosting rewrite to apiProxy Cloud Function
-const API_URL = import.meta.env.VITE_HSS_API_URL || '';
+// Backend API URL - Always use relative URL, goes through Firebase Hosting rewrite to apiProxy Cloud Function
+// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
+const API_URL = '';
 
 export class CoverageMapService {
   

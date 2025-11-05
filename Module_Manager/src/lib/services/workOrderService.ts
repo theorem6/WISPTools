@@ -5,7 +5,8 @@
 
 // Use relative URL to leverage Firebase Hosting rewrites
 // This goes through Firebase Hosting rewrite to apiProxy function
-const API_URL = import.meta.env.VITE_HSS_API_URL || '';
+// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
+const API_URL = '';
 
 // Lazy import to avoid circular dependencies and ensure authService is fully initialized
 async function getAuthService() {
