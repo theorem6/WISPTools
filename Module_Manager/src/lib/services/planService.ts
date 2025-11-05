@@ -11,8 +11,9 @@ import type { InventoryItem } from './inventoryService';
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../routes/modules/coverage-map/lib/models';
 
 // API Configuration
-// This goes through Firebase Hosting rewrite to apiProxy function
-const API_URL = import.meta.env.VITE_HSS_API_URL || '';
+// Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
+// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
+const API_URL = '';
 
 export interface PlanProject {
   id: string;
