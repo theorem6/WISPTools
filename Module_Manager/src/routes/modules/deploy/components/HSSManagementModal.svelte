@@ -21,8 +21,8 @@
   let loading = true;
   let error = '';
 
-  // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy/api/hss';
+  // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
+  const HSS_API = '/api/hss';
 
   // Reactive statement to load data when modal opens
   $: if (show && tenantId) {

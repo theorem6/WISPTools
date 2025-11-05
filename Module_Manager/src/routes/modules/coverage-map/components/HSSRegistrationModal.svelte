@@ -116,8 +116,8 @@
     try {
       console.log('[HSSRegistration] Registering site with HSS...');
       
-      // HSS API endpoint
-      const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy/api/hss';
+      // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
+      const HSS_API = '/api/hss';
       
       const response = await fetch(`${HSS_API}/sites/register`, {
         method: 'POST',

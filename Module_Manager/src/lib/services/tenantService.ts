@@ -22,10 +22,9 @@ export class TenantService {
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
     
-    // Backend API URLs - route directly via Cloud Function proxy to avoid Hosting rewrite inconsistencies
-    const proxyBase = 'https://us-central1-wisptools-production.cloudfunctions.net/apiProxy';
-    this.apiBaseUrl = `${proxyBase}/api`;      // for backend routes mounted under /api
-    this.adminBaseUrl = `${proxyBase}/admin`;  // for backend routes mounted under /admin
+    // Always use relative URLs - goes through Firebase Hosting rewrite to apiProxy function
+    this.apiBaseUrl = '/api';      // for backend routes mounted under /api
+    this.adminBaseUrl = '/admin';  // for backend routes mounted under /admin
   }
 
   /**

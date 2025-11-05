@@ -238,7 +238,8 @@
   }
   
   function getApiUrl(): string {
-    return import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+    // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
+    return '/api';
   }
   
   function formatDate(date: Date | string | undefined): string {

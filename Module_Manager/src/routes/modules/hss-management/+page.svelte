@@ -24,8 +24,8 @@
   $: tenantId = $currentTenant?.id || '';
   $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
   
-  // HSS API endpoint
-  const HSS_API = import.meta.env.VITE_HSS_API_URL || 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/apiProxy';
+  // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
+  const HSS_API = '/api';
   
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {
