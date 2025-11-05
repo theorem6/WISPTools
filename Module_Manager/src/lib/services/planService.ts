@@ -144,11 +144,13 @@ class PlanService {
     return token;
   }
   
-  private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
+  private async apiCall(endpoint: string, options: RequestInit = {}, tenantId?: string): Promise<any> {
     const token = await this.getAuthToken();
-    const tenantId = localStorage.getItem('selectedTenantId');
     
-    if (!tenantId) {
+    // Use provided tenantId or fall back to localStorage
+    const resolvedTenantId = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null);
+    
+    if (!resolvedTenantId) {
       throw new Error('No tenant selected');
     }
     
@@ -160,7 +162,7 @@ class PlanService {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
-        'X-Tenant-ID': tenantId,
+        'X-Tenant-ID': resolvedTenantId,
         'Content-Type': 'application/json',
         ...options.headers
       }
@@ -269,7 +271,8 @@ class PlanService {
       }
       
       // Get inventory items
-      const inventoryItems = await inventoryService.getInventory(tenantId);
+      const inventoryResult = await inventoryService.getInventory({}, tenantId);
+      const inventoryItems = inventoryResult?.items || [];
       if (Array.isArray(inventoryItems)) {
         inventoryItems.forEach(item => {
           // Only include items that aren't already mapped to coverage map
@@ -342,7 +345,7 @@ class PlanService {
    */
   async getPlans(tenantId: string, status?: string): Promise<PlanProject[]> {
     const query = status ? `?status=${status}` : '';
-    const plans = await this.apiCall(query);
+    const plans = await this.apiCall(query, {}, tenantId);
     return Array.isArray(plans) ? plans.map(p => this.mapBackendPlanToFrontend(p)) : [];
   }
   

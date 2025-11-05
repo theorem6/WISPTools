@@ -18,11 +18,13 @@ export class CoverageMapService {
   }
   
   // Helper for API calls
-  private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
+  private async apiCall(endpoint: string, options: RequestInit = {}, tenantId?: string): Promise<any> {
     const token = await this.getAuthToken();
-    const tenantId = localStorage.getItem('selectedTenantId');
     
-    if (!tenantId) {
+    // Use provided tenantId or fall back to localStorage
+    const resolvedTenantId = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null);
+    
+    if (!resolvedTenantId) {
       throw new Error('No tenant selected');
     }
     
@@ -32,7 +34,7 @@ export class CoverageMapService {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
-        'X-Tenant-ID': tenantId,
+        'X-Tenant-ID': resolvedTenantId,
         'Content-Type': 'application/json',
         ...options.headers
       }
@@ -56,7 +58,7 @@ export class CoverageMapService {
   }
   
   async getTowerSites(tenantId: string): Promise<TowerSite[]> {
-    const sites = await this.apiCall('sites');
+    const sites = await this.apiCall('sites', {}, tenantId);
     return sites.map((s: any) => ({ ...s, id: s._id }));
   }
   
@@ -92,7 +94,7 @@ export class CoverageMapService {
   }
   
   async getSectors(tenantId: string): Promise<Sector[]> {
-    const sectors = await this.apiCall('sectors');
+    const sectors = await this.apiCall('sectors', {}, tenantId);
     return sectors.map((s: any) => ({ ...s, id: s._id }));
   }
   
@@ -129,7 +131,7 @@ export class CoverageMapService {
   }
   
   async getCPEDevices(tenantId: string): Promise<CPEDevice[]> {
-    const devices = await this.apiCall('cpe');
+    const devices = await this.apiCall('cpe', {}, tenantId);
     return devices.map((d: any) => ({ ...d, id: d._id }));
   }
   
@@ -156,7 +158,7 @@ export class CoverageMapService {
   }
   
   async getEquipment(tenantId: string): Promise<NetworkEquipment[]> {
-    const equipment = await this.apiCall('equipment');
+    const equipment = await this.apiCall('equipment', {}, tenantId);
     return equipment.map((e: any) => ({ ...e, id: e._id }));
   }
   

@@ -138,15 +138,17 @@ class InventoryService {
     return await currentUser.getIdToken();
   }
   
-  private async apiCall(endpoint: string, options: RequestInit = {}): Promise<any> {
+  private async apiCall(endpoint: string, options: RequestInit = {}, tenantId?: string): Promise<any> {
     const token = await this.getAuthToken();
-    const tenantId = localStorage.getItem('selectedTenantId');
+    
+    // Use provided tenantId or fall back to localStorage
+    const resolvedTenantId = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null);
     
     // Check if user is admin - if so, tenant is optional
     const currentUser = await this.getCurrentUser();
     const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
     
-    if (!tenantId && !isAdmin) {
+    if (!resolvedTenantId && !isAdmin) {
       throw new Error('No tenant selected');
     }
     
@@ -157,8 +159,8 @@ class InventoryService {
     };
     
     // Only add X-Tenant-ID header if we have a tenant or if user is not admin
-    if (tenantId) {
-      headers['X-Tenant-ID'] = tenantId;
+    if (resolvedTenantId) {
+      headers['X-Tenant-ID'] = resolvedTenantId;
     } else if (!isAdmin) {
       throw new Error('No tenant selected');
     }
@@ -182,7 +184,7 @@ class InventoryService {
   // CRUD Operations
   // ============================================================================
   
-  async getInventory(filters: InventoryFilters = {}): Promise<{ items: InventoryItem[]; pagination: any }> {
+  async getInventory(filters: InventoryFilters = {}, tenantId?: string): Promise<{ items: InventoryItem[]; pagination: any }> {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -191,7 +193,7 @@ class InventoryService {
     });
     
     const queryString = params.toString();
-    return await this.apiCall(queryString ? `?${queryString}` : '');
+    return await this.apiCall(queryString ? `?${queryString}` : '', {}, tenantId);
   }
   
   async getItem(id: string): Promise<InventoryItem> {
