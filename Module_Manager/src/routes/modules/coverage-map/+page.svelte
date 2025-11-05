@@ -140,19 +140,38 @@
       // Import planService dynamically to avoid circular dependencies
       const { planService } = await import('$lib/services/planService');
       
+      // Use Promise.allSettled to ensure all calls complete even if some fail
       const [
-        loadedTowers,
-        loadedSectors,
-        loadedCPE,
-        loadedEquipment,
-        plans
-      ] = await Promise.all([
-        coverageMapService.getTowerSites(tenantId),
-        coverageMapService.getSectors(tenantId),
-        coverageMapService.getCPEDevices(tenantId),
-        coverageMapService.getEquipment(tenantId),
+        towersResult,
+        sectorsResult,
+        cpeResult,
+        equipmentResult,
+        plansResult
+      ] = await Promise.allSettled([
+        coverageMapService.getTowerSites(tenantId).catch(err => {
+          console.error('Failed to load towers:', err);
+          return [];
+        }),
+        coverageMapService.getSectors(tenantId).catch(err => {
+          console.error('Failed to load sectors:', err);
+          return [];
+        }),
+        coverageMapService.getCPEDevices(tenantId).catch(err => {
+          console.error('Failed to load CPE:', err);
+          return [];
+        }),
+        coverageMapService.getEquipment(tenantId).catch(err => {
+          console.error('Failed to load equipment:', err);
+          return [];
+        }),
         tenantId ? planService.getPlans(tenantId).catch(() => []) : Promise.resolve([])
       ]);
+      
+      const loadedTowers = towersResult.status === 'fulfilled' ? towersResult.value : [];
+      const loadedSectors = sectorsResult.status === 'fulfilled' ? sectorsResult.value : [];
+      const loadedCPE = cpeResult.status === 'fulfilled' ? cpeResult.value : [];
+      const loadedEquipment = equipmentResult.status === 'fulfilled' ? equipmentResult.value : [];
+      const plans = plansResult.status === 'fulfilled' ? plansResult.value : [];
       
       // Get visible plan IDs
       const visiblePlanIds = new Set(
