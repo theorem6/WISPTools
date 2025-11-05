@@ -102,7 +102,7 @@
         
         // Load deployed hardware count
         try {
-          const { coverageMapService } = await import('../../coverage-map/lib/coverageMapService.mongodb');
+          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           const deployments = await coverageMapService.getAllHardwareDeployments(tenantId);
           deployedCount = deployments.length;
         } catch (err) {
