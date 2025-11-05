@@ -181,7 +181,7 @@ class PlanService {
     
     try {
       // Get towers from coverage map
-      const towers = await coverageMapService.getTowers(tenantId);
+      const towers = await coverageMapService.getTowerSites(tenantId);
       towers.forEach(tower => {
         hardware.push({
           id: tower.id,
