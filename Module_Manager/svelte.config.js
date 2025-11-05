@@ -14,8 +14,11 @@ const config = {
 			assets: 'build/client',
 			fallback: 'index.html',
 			precompress: false,
-			strict: true
-		})
+			strict: false // Allow dynamic routes to work with fallback
+		}),
+		prerender: {
+			entries: ['*'] // Prerender all routes
+		}
 	},
 
 	// Suppress non-critical accessibility warnings
