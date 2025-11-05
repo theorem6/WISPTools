@@ -225,17 +225,42 @@
     if (!currentUser) return;
     
     isLoading = true;
+    error = '';
     try {
       const tenantId = localStorage.getItem('selectedTenantId');
-      if (tenantId) {
-        existingHardware = await planService.getAllExistingHardware(tenantId);
-        projects = await planService.getPlans(tenantId);
-        
-        // Initialize visibility set from loaded plans
-        visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
+      if (!tenantId) {
+        error = 'No tenant selected. Please select a tenant first.';
+        setTimeout(() => error = '', 5000);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading plan data:', error);
+      
+      // Load existing hardware and projects in parallel
+      const [hardware, plans] = await Promise.all([
+        planService.getAllExistingHardware(tenantId).catch(err => {
+          console.error('Error loading hardware:', err);
+          error = `Failed to load hardware: ${err.message}`;
+          return [];
+        }),
+        planService.getPlans(tenantId).catch(err => {
+          console.error('Error loading projects:', err);
+          error = `Failed to load projects: ${err.message}`;
+          return [];
+        })
+      ]);
+      
+      existingHardware = hardware;
+      projects = plans;
+      
+      // Initialize visibility set from loaded plans
+      visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
+      
+      if (error) {
+        setTimeout(() => error = '', 5000);
+      }
+    } catch (err: any) {
+      console.error('Error loading plan data:', err);
+      error = err.message || 'Failed to load plan data. Please try again.';
+      setTimeout(() => error = '', 8000);
     } finally {
       isLoading = false;
     }

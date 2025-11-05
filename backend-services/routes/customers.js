@@ -276,6 +276,130 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ============================================================================
+// HSS SUBSCRIBER MANAGEMENT
+// ============================================================================
+
+/**
+ * POST /api/customers/:id/create-subscriber
+ * Create HSS subscriber from customer record
+ */
+router.post('/:id/create-subscriber', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+    const { imsi, msisdn, ki, opc, group_id, bandwidth_plan_id } = req.body;
+    
+    // Get customer
+    const customer = await Customer.findOne({ 
+      tenantId, 
+      $or: [{ _id: id }, { customerId: id }]
+    });
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    // Required fields
+    if (!imsi) {
+      return res.status(400).json({ error: 'IMSI is required' });
+    }
+    
+    // Create subscriber in HSS (via HSS API)
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+    
+    const db = mongoose.connection.db;
+    const subscriber = {
+      imsi: imsi,
+      msisdn: msisdn || customer.primaryPhone?.replace(/\D/g, '') || '',
+      full_name: customer.fullName || `${customer.firstName} ${customer.lastName}`,
+      ki: ki || '',
+      opc: opc || '',
+      qci: req.body.qci || 9,
+      group_id: group_id || 'default',
+      bandwidth_plan_id: bandwidth_plan_id || null,
+      enabled: customer.serviceStatus === 'active',
+      tenant_id: tenantId,
+      customer_id: customer._id.toString(),
+      customer_customerId: customer.customerId,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+    
+    const result = await db.collection('subscribers').insertOne(subscriber);
+    
+    // Update customer with subscriber reference
+    await Customer.findOneAndUpdate(
+      { _id: customer._id },
+      { 
+        $set: { 
+          hssSubscriberId: result.insertedId.toString(),
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    res.status(201).json({
+      subscriber: { id: result.insertedId.toString(), ...subscriber },
+      message: 'HSS subscriber created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating HSS subscriber:', error);
+    res.status(500).json({ error: 'Failed to create HSS subscriber', message: error.message });
+  }
+});
+
+/**
+ * GET /api/customers/:id/subscriber
+ * Get HSS subscriber for customer
+ */
+router.get('/:id/subscriber', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+    
+    const customer = await Customer.findOne({ 
+      tenantId, 
+      $or: [{ _id: id }, { customerId: id }]
+    });
+    
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    if (!customer.hssSubscriberId) {
+      return res.status(404).json({ error: 'No HSS subscriber found for this customer' });
+    }
+    
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ error: 'Database not connected' });
+    }
+    
+    const db = mongoose.connection.db;
+    const subscriber = await db.collection('subscribers').findOne({
+      $or: [
+        { _id: customer.hssSubscriberId },
+        { customer_id: customer._id.toString() },
+        { customer_customerId: customer.customerId }
+      ],
+      tenant_id: tenantId
+    });
+    
+    if (!subscriber) {
+      return res.status(404).json({ error: 'HSS subscriber not found' });
+    }
+    
+    res.json(subscriber);
+  } catch (error) {
+    console.error('Error fetching HSS subscriber:', error);
+    res.status(500).json({ error: 'Failed to fetch HSS subscriber' });
+  }
+});
+
+// ============================================================================
 // SERVICE HISTORY
 // ============================================================================
 

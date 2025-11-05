@@ -180,6 +180,31 @@ class CustomerService {
       method: 'DELETE'
     });
   }
+
+  /**
+   * Create HSS subscriber from customer
+   */
+  async createHSSSubscriber(customerId: string, subscriberData: {
+    imsi: string;
+    msisdn?: string;
+    ki?: string;
+    opc?: string;
+    group_id?: string;
+    bandwidth_plan_id?: string;
+    qci?: number;
+  }): Promise<any> {
+    return await this.apiCall(`/${customerId}/create-subscriber`, {
+      method: 'POST',
+      body: JSON.stringify(subscriberData)
+    });
+  }
+
+  /**
+   * Get HSS subscriber for customer
+   */
+  async getHSSSubscriber(customerId: string): Promise<any> {
+    return await this.apiCall(`/${customerId}/subscriber`);
+  }
 }
 
 export const customerService = new CustomerService();

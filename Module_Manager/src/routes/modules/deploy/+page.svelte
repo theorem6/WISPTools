@@ -12,6 +12,7 @@
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';
+  import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -28,6 +29,11 @@
 
   // Frequency Planner
   let showFrequencyPlannerModal = false;
+  
+  // Deployed Hardware
+  let showDeployedHardwareModal = false;
+  let deployedCount = 0;
+  let error = '';
 
 
   // Module context for object state management
@@ -93,6 +99,15 @@
         readyPlans = allPlans.filter(plan => 
           plan.status === 'ready' || plan.status === 'approved'
         );
+        
+        // Load deployed hardware count
+        try {
+          const { coverageMapService } = await import('../../coverage-map/lib/coverageMapService.mongodb');
+          const deployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+          deployedCount = deployments.length;
+        } catch (err) {
+          console.error('Failed to load deployment count:', err);
+        }
       }
     } catch (err) {
       console.error('Failed to load ready plans:', err);
@@ -256,6 +271,13 @@
         >
           📡 Frequency
         </button>
+        <button 
+          class="control-btn" 
+          on:click={() => showDeployedHardwareModal = true}
+          title="View and Edit Deployed Hardware"
+        >
+          🔧 Deployed ({deployedCount})
+        </button>
       </div>
     </div>
 
@@ -285,6 +307,13 @@
       on:rejected={handlePlanRejected}
     />
   {/if}
+  
+  <!-- Deployed Hardware Modal -->
+  <DeployedHardwareModal
+    show={showDeployedHardwareModal}
+    tenantId={$currentTenant?.id || ''}
+    on:close={() => showDeployedHardwareModal = false}
+  />
   
   <!-- Plan Selection Modal (if no plan selected) -->
   {#if showPlanApprovalModal && !selectedPlan && readyPlans.length > 0}

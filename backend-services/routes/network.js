@@ -364,7 +364,7 @@ router.get('/sites/:siteId/hardware', async (req, res) => {
 router.post('/sites/:siteId/hardware', async (req, res) => {
   try {
     const { siteId } = req.params;
-    const { hardware_type, name, config, epc_config, inventory_item_id } = req.body;
+    const { hardware_type, name, config, epc_config, inventory_item_id, planId } = req.body;
     
     // Verify site exists and belongs to tenant
     const site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId });
@@ -379,7 +379,10 @@ router.post('/sites/:siteId/hardware', async (req, res) => {
       name,
       config,
       epc_config,
-      inventory_item_id
+      inventory_item_id,
+      planId, // Link to project/plan if provided
+      deployedAt: new Date(),
+      status: 'deployed'
     });
     
     await hardware.save();
@@ -439,6 +442,113 @@ router.delete('/hardware-deployments/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting hardware:', error);
     res.status(500).json({ error: 'Failed to delete hardware deployment' });
+  }
+});
+
+// ========== IMPORT FROM OTHER MODULES ==========
+
+// Import CPE devices from GenieACS/ACS module
+router.post('/import/acs', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    let imported = 0;
+    const errors = [];
+    
+    // Try to fetch from GenieACS NBI API
+    // This would typically connect to GenieACS running on the tenant's infrastructure
+    const genieacsUrl = process.env.GENIEACS_URL || 'http://localhost:7557';
+    
+    try {
+      // Fetch devices from GenieACS
+      const devicesResponse = await fetch(`${genieacsUrl}/devices`, {
+        headers: {
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (!devicesResponse.ok) {
+        throw new Error(`GenieACS API returned ${devicesResponse.status}`);
+      }
+      
+      const devices = await devicesResponse.json();
+      
+      for (const device of devices) {
+        try {
+          // Extract location from device parameters
+          const location = device.location || {};
+          const latitude = location.latitude || device['Device.DeviceInfo.Location']?.latitude || 0;
+          const longitude = location.longitude || device['Device.DeviceInfo.Location']?.longitude || 0;
+          
+          // Check if CPE already exists by serial number
+          const existingCPE = await UnifiedCPE.findOne({
+            tenantId,
+            serialNumber: device.serialNumber || device._id
+          });
+          
+          if (!existingCPE && latitude && longitude) {
+            // Create new CPE from GenieACS device
+            const cpe = new UnifiedCPE({
+              tenantId,
+              name: device.productClass || device._id,
+              manufacturer: device.manufacturer || 'Unknown',
+              model: device.modelName || 'Unknown',
+              serialNumber: device.serialNumber || device._id,
+              location: {
+                latitude,
+                longitude,
+                address: location.address || ''
+              },
+              status: device.online ? 'active' : 'inactive',
+              modules: {
+                acs: true
+              },
+              technology: device.productClass?.includes('LTE') ? 'LTE' : 'Unknown',
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+            
+            await cpe.save();
+            imported++;
+          }
+        } catch (err) {
+          errors.push(`Failed to import device ${device._id}: ${err.message}`);
+        }
+      }
+      
+      res.json({
+        imported,
+        errors,
+        message: `Successfully imported ${imported} CPE devices from ACS`
+      });
+    } catch (fetchError) {
+      // If GenieACS is not available, return empty result
+      console.warn('GenieACS not available or unreachable:', fetchError.message);
+      res.json({
+        imported: 0,
+        errors: [`GenieACS not available: ${fetchError.message}`],
+        message: 'GenieACS not available - no devices imported'
+      });
+    }
+  } catch (error) {
+    console.error('Error importing from ACS:', error);
+    res.status(500).json({ error: 'Failed to import from ACS', message: error.message });
+  }
+});
+
+// Import from CBRS (if needed)
+router.post('/import/cbrs', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    // CBRS import would go here
+    // This would typically fetch from CBRS API endpoints
+    res.json({
+      imported: 0,
+      errors: [],
+      message: 'CBRS import not yet implemented'
+    });
+  } catch (error) {
+    console.error('Error importing from CBRS:', error);
+    res.status(500).json({ error: 'Failed to import from CBRS', message: error.message });
   }
 });
 

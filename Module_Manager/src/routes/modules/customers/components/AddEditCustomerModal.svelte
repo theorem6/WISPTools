@@ -9,6 +9,7 @@
   
   let isSaving = false;
   let error = '';
+  let success = '';
   
   let formData = {
     firstName: '',
@@ -47,6 +48,22 @@
   
   let tagInput = '';
   
+  // HSS Subscriber Management
+  let showHSSSubscriber = false;
+  let hssSubscriber: any = null;
+  let isLoadingSubscriber = false;
+  let hssGroups: any[] = [];
+  let hssBandwidthPlans: any[] = [];
+  let hssSubscriberForm = {
+    imsi: '',
+    msisdn: '',
+    ki: '',
+    opc: '',
+    group_id: '',
+    bandwidth_plan_id: '',
+    qci: 9
+  };
+  
   onMount(() => {
     if (customer) {
       loadCustomerData();
@@ -55,6 +72,102 @@
   
   $: if (customer && show) {
     loadCustomerData();
+    if (customer._id) {
+      loadHSSSubscriber();
+      loadHSSData();
+    }
+  }
+  
+  async function loadHSSData() {
+    if (!customer?._id) return;
+    
+    try {
+      const tenantId = localStorage.getItem('selectedTenantId');
+      if (!tenantId) return;
+      
+      const apiPath = import.meta.env.VITE_HSS_API_URL || '/api';
+      const token = await (await import('$lib/services/authService')).authService.getIdToken();
+      
+      // Load groups and bandwidth plans
+      const [groupsRes, plansRes] = await Promise.all([
+        fetch(`${apiPath}/hss/groups`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId
+          }
+        }).catch(() => null),
+        fetch(`${apiPath}/hss/bandwidth-plans`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId
+          }
+        }).catch(() => null)
+      ]);
+      
+      if (groupsRes?.ok) {
+        const groupsData = await groupsRes.json();
+        hssGroups = Array.isArray(groupsData.groups) ? groupsData.groups : groupsData;
+      }
+      
+      if (plansRes?.ok) {
+        const plansData = await plansRes.json();
+        hssBandwidthPlans = Array.isArray(plansData.plans) ? plansData.plans : plansData;
+      }
+    } catch (err) {
+      console.error('Error loading HSS data:', err);
+    }
+  }
+  
+  async function loadHSSSubscriber() {
+    if (!customer?._id) return;
+    
+    isLoadingSubscriber = true;
+    try {
+      hssSubscriber = await customerService.getHSSSubscriber(customer._id);
+      if (hssSubscriber) {
+        hssSubscriberForm = {
+          imsi: hssSubscriber.imsi || '',
+          msisdn: hssSubscriber.msisdn || formData.primaryPhone.replace(/\D/g, '') || '',
+          ki: hssSubscriber.ki || '',
+          opc: hssSubscriber.opc || '',
+          group_id: hssSubscriber.group_id || '',
+          bandwidth_plan_id: hssSubscriber.bandwidth_plan_id || '',
+          qci: hssSubscriber.qci || 9
+        };
+        showHSSSubscriber = true;
+      }
+    } catch (err: any) {
+      // No subscriber exists yet - that's OK
+      if (!err.message?.includes('404')) {
+        console.error('Error loading HSS subscriber:', err);
+      }
+      // Pre-fill MSISDN from phone
+      hssSubscriberForm.msisdn = formData.primaryPhone.replace(/\D/g, '');
+    } finally {
+      isLoadingSubscriber = false;
+    }
+  }
+  
+  async function createHSSSubscriber() {
+    if (!customer?._id || !hssSubscriberForm.imsi.trim()) {
+      error = 'IMSI is required';
+      return;
+    }
+    
+    isSaving = true;
+    error = '';
+    
+    try {
+      hssSubscriber = await customerService.createHSSSubscriber(customer._id, hssSubscriberForm);
+      showHSSSubscriber = true;
+      success = 'HSS subscriber created successfully';
+      setTimeout(() => success = '', 3000);
+    } catch (err: any) {
+      console.error('Error creating HSS subscriber:', err);
+      error = err.message || 'Failed to create HSS subscriber';
+    } finally {
+      isSaving = false;
+    }
   }
   
   function loadCustomerData() {
@@ -238,6 +351,10 @@
       <div class="error-banner">{error}</div>
     {/if}
     
+    {#if success}
+      <div class="success">{success}</div>
+    {/if}
+    
     <div class="modal-body">
       <!-- Basic Information -->
       <div class="section">
@@ -409,6 +526,109 @@
           ></textarea>
         </div>
       </div>
+      
+      <!-- HSS Subscriber Management -->
+      {#if customer?._id}
+        <div class="section">
+          <div class="section-header">
+            <h3>📡 HSS Subscriber</h3>
+            <button 
+              class="btn-toggle" 
+              on:click={() => showHSSSubscriber = !showHSSSubscriber}
+            >
+              {showHSSSubscriber ? '▼' : '▶'}
+            </button>
+          </div>
+          
+          {#if isLoadingSubscriber}
+            <div class="loading">Loading subscriber data...</div>
+          {:else if showHSSSubscriber}
+            {#if hssSubscriber}
+              <div class="subscriber-info">
+                <div class="info-row">
+                  <span class="label">IMSI:</span>
+                  <span class="value">{hssSubscriber.imsi}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">MSISDN:</span>
+                  <span class="value">{hssSubscriber.msisdn || '-'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Group:</span>
+                  <span class="value">{hssSubscriber.group_id || '-'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Bandwidth Plan:</span>
+                  <span class="value">{hssSubscriber.bandwidth_plan_id || '-'}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Status:</span>
+                  <span class="value {hssSubscriber.enabled ? 'enabled' : 'disabled'}">
+                    {hssSubscriber.enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            {:else}
+              <div class="subscriber-form">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>IMSI *</label>
+                    <input type="text" bind:value={hssSubscriberForm.imsi} placeholder="123456789012345" required />
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>MSISDN</label>
+                    <input type="text" bind:value={hssSubscriberForm.msisdn} placeholder={formData.primaryPhone.replace(/\D/g, '')} />
+                  </div>
+                </div>
+                
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>KI (Authentication Key)</label>
+                    <input type="text" bind:value={hssSubscriberForm.ki} placeholder="Optional" />
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>OPc (Operator Variant)</label>
+                    <input type="text" bind:value={hssSubscriberForm.opc} placeholder="Optional" />
+                  </div>
+                </div>
+                
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label>Group ID</label>
+                    <select bind:value={hssSubscriberForm.group_id}>
+                      <option value="">Select Group</option>
+                      {#each hssGroups as group}
+                        <option value={group.group_id || group.id}>{group.name}</option>
+                      {/each}
+                    </select>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label>Bandwidth Plan</label>
+                    <select bind:value={hssSubscriberForm.bandwidth_plan_id}>
+                      <option value="">Select Plan</option>
+                      {#each hssBandwidthPlans as plan}
+                        <option value={plan.plan_id || plan.id}>{plan.name} ({plan.download_mbps}/{plan.upload_mbps} Mbps)</option>
+                      {/each}
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label>QCI (Quality of Service)</label>
+                  <input type="number" bind:value={hssSubscriberForm.qci} min="1" max="9" />
+                </div>
+                
+                <button class="btn-primary" on:click={createHSSSubscriber} disabled={isSaving}>
+                  {isSaving ? 'Creating...' : '📡 Create HSS Subscriber'}
+                </button>
+              </div>
+            {/if}
+          {/if}
+        </div>
+      {/if}
     </div>
     
     <div class="modal-footer">
@@ -642,6 +862,81 @@
   .btn-secondary:hover {
     background: var(--bg-tertiary);
     transform: translateY(-1px);
+  }
+  
+  /* HSS Subscriber Styles */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .btn-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .btn-toggle:hover {
+    color: var(--text-primary);
+  }
+  
+  .subscriber-info {
+    background: var(--bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    margin-top: var(--spacing-md);
+  }
+  
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .info-row:last-child {
+    border-bottom: none;
+  }
+  
+  .info-row .label {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  
+  .info-row .value {
+    color: var(--text-primary);
+  }
+  
+  .value.enabled {
+    color: var(--success);
+  }
+  
+  .value.disabled {
+    color: var(--danger);
+  }
+  
+  .subscriber-form {
+    margin-top: var(--spacing-md);
+  }
+  
+  .loading {
+    text-align: center;
+    padding: var(--spacing-md);
+    color: var(--text-secondary);
+  }
+  
+  .success {
+    background: var(--success-light);
+    color: var(--success);
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--success);
   }
 </style>
 
