@@ -66,10 +66,34 @@ app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
-// app.use('/api/billing', require('./billing-api')); // Temporarily disabled - missing dependencies
-// app.use('/api/equipment-pricing', require('./routes/equipment-pricing')); // Temporarily disabled - missing dependencies
-// app.use('/api/installation-documentation', require('./routes/installation-documentation')); // Temporarily disabled - missing dependencies
-// app.use('/api/subcontractors', require('./routes/subcontractors')); // Temporarily disabled - missing dependencies
+// Enable billing API (with graceful handling if PayPal not configured)
+try {
+  app.use('/api/billing', require('./billing-api'));
+  console.log('✅ Billing API enabled');
+} catch (error) {
+  console.warn('⚠️ Billing API disabled:', error.message);
+}
+// Enable equipment pricing API
+try {
+  app.use('/api/equipment-pricing', require('./routes/equipment-pricing'));
+  console.log('✅ Equipment Pricing API enabled');
+} catch (error) {
+  console.warn('⚠️ Equipment Pricing API disabled:', error.message);
+}
+// Enable installation documentation API
+try {
+  app.use('/api/installation-documentation', require('./routes/installation-documentation'));
+  console.log('✅ Installation Documentation API enabled');
+} catch (error) {
+  console.warn('⚠️ Installation Documentation API disabled:', error.message);
+}
+// Enable subcontractors API
+try {
+  app.use('/api/subcontractors', require('./routes/subcontractors'));
+  console.log('✅ Subcontractors API enabled');
+} catch (error) {
+  console.warn('⚠️ Subcontractors API disabled:', error.message);
+}
 app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
 app.use('/setup-admin', require('./routes/setup'));

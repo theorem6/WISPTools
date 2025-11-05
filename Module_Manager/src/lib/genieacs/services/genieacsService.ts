@@ -248,8 +248,21 @@ export class GenieACSService {
     const hardwareVersion = this.getParameterValue(parameters, TR069_PARAMETER_PATHS.HARDWARE_VERSION);
     const connectionRequestURL = this.getParameterValue(parameters, TR069_PARAMETER_PATHS.CONNECTION_REQUEST_URL);
     
-    // Determine device status
-    const status = this.determineDeviceStatus(genieDevice);
+    // Load tasks and faults for this device
+    let tasks: any[] = [];
+    let faults: any[] = [];
+    
+    try {
+      tasks = await this.client.getDeviceTasks(genieDevice._id);
+    } catch (error) {
+      console.warn(`Failed to load tasks for device ${genieDevice._id}:`, error);
+    }
+    
+    try {
+      faults = await this.client.getDeviceFaults(genieDevice._id);
+    } catch (error) {
+      console.warn(`Failed to load faults for device ${genieDevice._id}:`, error);
+    }
     
     const cpeDevice: CPEDevice = {
       id: CPEDeviceUtils.generateDeviceId(deviceId),
@@ -268,8 +281,8 @@ export class GenieACSService {
       softwareVersion: softwareVersion as string,
       hardwareVersion: hardwareVersion as string,
       parameters,
-      tasks: [], // TODO: Load tasks
-      faults: [], // TODO: Load faults
+      tasks,
+      faults,
       createdAt: genieDevice._registered || new Date(),
       updatedAt: new Date(),
       tags: genieDevice._tags || []
@@ -335,12 +348,49 @@ export class GenieACSService {
   private extractPerformanceMetricsFromParameters(parameters: TR069Parameter[]): any {
     const signalStrength = this.getParameterValue(parameters, TR069_PARAMETER_PATHS.SIGNAL_STRENGTH);
     const uptime = this.getParameterValue(parameters, TR069_PARAMETER_PATHS.UPTIME);
+    const bytesRx = this.getParameterValue(parameters, TR069_PARAMETER_PATHS.BANDWIDTH_RX);
+    const bytesTx = this.getParameterValue(parameters, TR069_PARAMETER_PATHS.BANDWIDTH_TX);
+    
+    // Calculate bandwidth from bytes received/sent (if available)
+    // Estimate bandwidth based on periodic inform interval (typically 3600 seconds = 1 hour)
+    // Use last known values to estimate Mbps
+    let bandwidth = 0;
+    if (bytesRx && bytesTx) {
+      // If we have byte counters, estimate bandwidth based on inform interval
+      // This is a rough estimate - actual bandwidth would require time-based sampling
+      const totalBytes = Number(bytesRx) + Number(bytesTx);
+      // Estimate assuming 1-hour sampling window (conservative estimate)
+      const estimatedMbps = (totalBytes * 8) / (3600 * 1000000); // Convert bytes to Mbps over 1 hour
+      bandwidth = Math.round(estimatedMbps * 10) / 10; // Round to 1 decimal
+    }
+    
+    // Latency: Try to get from ping diagnostics if available, otherwise use default
+    let latency = 0;
+    const pingResponseTime = this.getParameterValue(parameters, 'Device.IP.Diagnostics.IPPing.1.AverageResponseTime');
+    if (pingResponseTime) {
+      latency = Number(pingResponseTime);
+    }
+    
+    // Packet loss: Calculate from error stats if available
+    let packetLoss = 0;
+    const packetsRx = this.getParameterValue(parameters, 'Device.Ethernet.Interface.1.Stats.PacketsReceived');
+    const packetsTx = this.getParameterValue(parameters, 'Device.Ethernet.Interface.1.Stats.PacketsSent');
+    const errorsRx = this.getParameterValue(parameters, 'Device.Ethernet.Interface.1.Stats.ErrorsReceived');
+    const errorsTx = this.getParameterValue(parameters, 'Device.Ethernet.Interface.1.Stats.ErrorsSent');
+    
+    if (packetsRx && errorsRx) {
+      const totalPackets = Number(packetsRx) + (Number(packetsTx) || 0);
+      const totalErrors = Number(errorsRx) + (Number(errorsTx) || 0);
+      if (totalPackets > 0) {
+        packetLoss = Math.round((totalErrors / totalPackets) * 100 * 10) / 10; // Percentage with 1 decimal
+      }
+    }
     
     return {
       signalStrength: signalStrength ? Number(signalStrength) : -100,
-      bandwidth: 0, // TODO: Calculate from traffic stats
-      latency: 0, // TODO: Implement ping-based latency measurement
-      packetLoss: 0, // TODO: Calculate from error stats
+      bandwidth,
+      latency,
+      packetLoss,
       uptime: uptime ? Number(uptime) : 0,
       lastUpdate: new Date()
     };

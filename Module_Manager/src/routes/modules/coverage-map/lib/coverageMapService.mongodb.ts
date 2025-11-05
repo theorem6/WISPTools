@@ -212,8 +212,16 @@ export class CoverageMapService {
     let imported = 0;
     
     try {
-      // TODO: Call backend endpoint to import from CBRS collection
-      console.log('CBRS import - backend endpoint to be implemented');
+      // Call backend endpoint to import from CBRS collection
+      const result = await this.apiCall('import/cbrs', {
+        method: 'POST',
+        body: JSON.stringify({ tenantId })
+      });
+      
+      imported = result.imported || 0;
+      if (result.errors) {
+        errors.push(...result.errors);
+      }
     } catch (error: any) {
       errors.push(`CBRS import failed: ${error.message}`);
     }
@@ -229,8 +237,16 @@ export class CoverageMapService {
     let imported = 0;
     
     try {
-      // TODO: Call backend endpoint to import from GenieACS data
-      console.log('ACS import - backend endpoint to be implemented');
+      // Call backend endpoint to import from GenieACS data
+      const result = await this.apiCall('import/acs', {
+        method: 'POST',
+        body: JSON.stringify({ tenantId })
+      });
+      
+      imported = result.imported || 0;
+      if (result.errors) {
+        errors.push(...result.errors);
+      }
     } catch (error: any) {
       errors.push(`ACS import failed: ${error.message}`);
     }

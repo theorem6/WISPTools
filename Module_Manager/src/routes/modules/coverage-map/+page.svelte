@@ -22,6 +22,7 @@
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import HardwareDeploymentModal from './components/HardwareDeploymentModal.svelte';
+  import SiteEditModal from './components/SiteEditModal.svelte';
   import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
@@ -69,6 +70,7 @@
   let selectedSiteForInventory: TowerSite | null = null;
   let selectedTowerForMenu: TowerSite | null = null;
   let selectedTowerForEPC: TowerSite | null = null;
+  let selectedSiteForEdit: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
   let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
@@ -385,8 +387,10 @@
     
     switch (action) {
       case 'edit-site':
-        success = 'Edit functionality coming soon';
-        setTimeout(() => success = '', 3000);
+        if (tower) {
+          selectedSiteForEdit = tower;
+          showSiteEditModal = true;
+        }
         break;
       case 'add-sector':
         selectedSiteForSector = tower;
@@ -415,9 +419,11 @@
         showHardwareDeploymentModal = true;
         break;
       case 'change-site-type':
-        // Show site type change modal
-        success = 'Site type change feature coming soon';
-        setTimeout(() => success = '', 3000);
+        // Change site type via edit modal
+        if (tower) {
+          selectedSiteForEdit = tower;
+          showSiteEditModal = true;
+        }
         break;
       case 'view-details':
         if (tower) {
@@ -808,6 +814,18 @@
     selectedTowerForEPC = e.detail;
     showHardwareDeploymentModal = false;
     showEPCDeploymentModal = true;
+  }}
+/>
+
+<!-- Site Edit Modal -->
+<SiteEditModal
+  bind:show={showSiteEditModal}
+  site={selectedSiteForEdit}
+  {tenantId}
+  on:saved={handleModalSaved}
+  on:close={() => {
+    showSiteEditModal = false;
+    selectedSiteForEdit = null;
   }}
 />
 
