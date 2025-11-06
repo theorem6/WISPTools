@@ -323,6 +323,31 @@ export class TenantService {
         headerKeys: Object.keys(headers)
       });
       
+      // First, test token validation with debug endpoint
+      try {
+        const debugUrl = `${this.apiBaseUrl}/debug/token`;
+        const debugResponse = await fetch(debugUrl, {
+          method: 'GET',
+          headers
+        });
+        const debugData = await debugResponse.json();
+        console.log('[TenantService] Token debug test:', debugData);
+        
+        if (!debugData.success) {
+          console.error('[TenantService] Token validation failed in debug endpoint:', {
+            error: debugData.error,
+            code: debugData.code,
+            authAppProjectId: debugData.authAppProjectId,
+            backendProjectId: debugData.backendProjectId,
+            tokenLength: debugData.tokenLength
+          });
+          // Continue anyway - maybe debug endpoint has different behavior
+        }
+      } catch (debugError) {
+        console.warn('[TenantService] Debug endpoint test failed:', debugError);
+        // Continue with actual request
+      }
+      
       const response = await fetch(url, {
         method: 'GET',
         headers

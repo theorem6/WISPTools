@@ -68,7 +68,7 @@ app.get('/api/debug/token', async (req, res) => {
   const token = authHeader.split('Bearer ')[1];
   
   try {
-    const decodedToken = await auth.verifyIdToken(token);
+    const decodedToken = await auth.verifyIdToken(token, true); // Check revoked tokens
     res.json({
       success: true,
       decoded: {
@@ -76,7 +76,8 @@ app.get('/api/debug/token', async (req, res) => {
         email: decodedToken.email,
         projectId: decodedToken.firebase?.project_id || 'unknown'
       },
-      authAppProjectId: auth.app?.options?.projectId || 'unknown'
+      authAppProjectId: auth.app?.options?.projectId || 'unknown',
+      backendProjectId: process.env.FIREBASE_PROJECT_ID || 'wisptools-production'
     });
   } catch (error) {
     res.json({
@@ -85,7 +86,9 @@ app.get('/api/debug/token', async (req, res) => {
       code: error.code,
       tokenLength: token.length,
       tokenStart: token.substring(0, 50) + '...',
-      authAppProjectId: auth.app?.options?.projectId || 'unknown'
+      authAppProjectId: auth.app?.options?.projectId || 'unknown',
+      backendProjectId: process.env.FIREBASE_PROJECT_ID || 'wisptools-production',
+      errorStack: error.stack?.split('\n').slice(0, 5).join('\n')
     });
   }
 });
