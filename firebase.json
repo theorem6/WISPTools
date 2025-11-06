@@ -112,6 +112,7 @@
       }
     ],
     "cleanUrls": true,
-    "trailingSlash": false
+    "trailingSlash": false,
+    "errorDocument": "404.html"
   }
 }
