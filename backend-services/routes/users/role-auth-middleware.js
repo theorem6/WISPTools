@@ -47,11 +47,13 @@ const verifyAuth = async (req, res, next) => {
       
       console.error('❌ Auth middleware: Token verification failed:', errorDetails);
       
-      // Return detailed error for debugging (always include code and message)
+      // ALWAYS return code and message in the main response (not just in details)
+      // This ensures frontend can always access error information
       return res.status(401).json({ 
         error: 'Invalid token',
         message: tokenError.message || 'Token verification failed',
         code: tokenError.code || 'unknown',
+        projectId: admin.apps.length > 0 ? admin.apps[0].options.projectId : 'unknown',
         details: process.env.NODE_ENV === 'development' ? errorDetails : {
           code: tokenError.code,
           message: tokenError.message,
@@ -61,7 +63,13 @@ const verifyAuth = async (req, res, next) => {
     }
   } catch (error) {
     console.error('❌ Auth middleware error:', error);
-    return res.status(401).json({ error: 'Invalid token' });
+    // Don't swallow errors - return detailed error information
+    return res.status(401).json({ 
+      error: 'Invalid token',
+      message: error.message || 'Authentication failed',
+      code: error.code || 'unknown',
+      projectId: admin.apps.length > 0 ? admin.apps[0].options.projectId : 'unknown'
+    });
   }
 };
 
