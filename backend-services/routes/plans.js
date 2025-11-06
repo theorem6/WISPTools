@@ -70,7 +70,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     // Ensure createdBy is always set (required field)
-    const createdBy = req.body.createdBy || req.user?.email || req.user?.name || req.body.createdBy || 'System';
+    const createdBy = req.body.createdBy || req.user?.email || req.user?.name || 'System';
     
     const planData = {
       ...req.body,
