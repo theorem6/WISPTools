@@ -124,8 +124,9 @@
           // Continue anyway - getAuthHeaders will retry
         }
         
-        // Wait a bit more to ensure Firebase auth state is fully propagated
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait longer to ensure Firebase auth state is fully propagated
+        // This is critical for tenant API calls to work
+        await new Promise(resolve => setTimeout(resolve, 800));
         
         // Robust tenant connection for ALL logins (signin and signup)
         await ensureTenantConnection(user, email, mode === 'signup');
