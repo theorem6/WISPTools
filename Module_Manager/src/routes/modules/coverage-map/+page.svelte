@@ -328,6 +328,14 @@
         initialSiteType = 'other';
         showAddSiteModal = true;
         break;
+      case 'create-sector':
+        // Create sector at clicked location (need to select site first)
+        // For now, just show add sector modal
+        showAddSectorModal = true;
+        break;
+      case 'create-cpe':
+        showAddCPEModal = true;
+        break;
       case 'copy-coords':
         navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
         success = 'Coordinates copied to clipboard';
@@ -707,6 +715,7 @@
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   initialType={initialSiteType}
+  planId={planId}
   {tenantId}
   on:saved={handleModalSaved}
 />
