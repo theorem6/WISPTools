@@ -153,15 +153,48 @@ function createTenantStore() {
           return [];
         }
         
-        // Ensure token is ready by getting it once
-        try {
-          const token = await user.getIdToken(true); // Force refresh to ensure valid token
-          console.log('[TenantStore] Token ready:', { hasToken: !!token, tokenLength: token?.length });
-        } catch (tokenError: any) {
-          console.warn('[TenantStore] Token not ready yet, waiting...', tokenError);
-          // Wait a bit more and try again
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Ensure token is ready by getting it once and verifying it's valid
+        let tokenReady = false;
+        let tokenRetries = 0;
+        const maxTokenRetries = 10;
+        
+        while (!tokenReady && tokenRetries < maxTokenRetries) {
+          try {
+            const token = await user.getIdToken(true); // Force refresh to ensure valid token
+            if (token && token.length > 100) { // Basic validation - tokens are usually long
+              console.log('[TenantStore] Token ready:', { 
+                hasToken: !!token, 
+                tokenLength: token?.length,
+                userId: user.uid 
+              });
+              tokenReady = true;
+            } else {
+              throw new Error('Token invalid or too short');
+            }
+          } catch (tokenError: any) {
+            console.warn('[TenantStore] Token not ready yet, retrying...', {
+              attempt: tokenRetries + 1,
+              error: tokenError?.message
+            });
+            // Wait with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, 200 * (tokenRetries + 1)));
+            tokenRetries++;
+          }
         }
+        
+        if (!tokenReady) {
+          console.error('[TenantStore] Failed to get valid token after retries');
+          update(state => ({
+            ...state,
+            isLoading: false,
+            error: 'Failed to get authentication token',
+            userTenants: []
+          }));
+          return [];
+        }
+        
+        // Wait a bit more to ensure token is fully propagated
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         const { tenantService } = await import('../services/tenantService');
         console.log('[TenantStore] Calling tenantService.getUserTenants...');

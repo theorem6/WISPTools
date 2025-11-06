@@ -337,7 +337,22 @@ export class TenantService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[TenantService] getUserTenants error response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        
+        console.error('[TenantService] getUserTenants error response:', errorData);
+        console.error('[TenantService] Full error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          url,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+        
         throw new Error(`Failed to get user tenants: ${response.statusText}`);
       }
 
