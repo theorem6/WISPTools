@@ -10,30 +10,49 @@ const verifyAuth = async (req, res, next) => {
     }
 
     const token = authHeader.split('Bearer ')[1];
-    console.log('🔐 Auth middleware: Verifying token...');
+    console.log('🔐 Auth middleware: Verifying token...', {
+      tokenLength: token.length,
+      tokenStart: token.substring(0, 30) + '...',
+      timestamp: new Date().toISOString()
+    });
     
     try {
-      const decodedToken = await auth.verifyIdToken(token);
+      const decodedToken = await auth.verifyIdToken(token, true); // Check revoked tokens
       console.log('✅ Auth middleware: Token verified successfully:', {
         uid: decodedToken.uid,
         email: decodedToken.email,
-        projectId: decodedToken.firebase?.project_id || 'unknown'
+        projectId: decodedToken.firebase?.project_id || 'unknown',
+        auth_time: decodedToken.auth_time,
+        exp: decodedToken.exp,
+        iat: decodedToken.iat
       });
       
       req.user = decodedToken;
       next();
     } catch (tokenError) {
-      console.error('❌ Auth middleware: Token verification failed:', {
+      const errorDetails = {
         error: tokenError.message,
         code: tokenError.code,
         tokenLength: token.length,
         tokenStart: token.substring(0, 50) + '...',
-        authAppProjectId: auth.app?.options?.projectId || 'unknown',
-        stack: tokenError.stack?.split('\n').slice(0, 5).join('\n')
-      });
+        authAppProjectId: admin.apps.length > 0 ? admin.apps[0].options.projectId : 'unknown',
+        authInitialized: admin.apps.length > 0,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Add stack trace if available
+      if (tokenError.stack) {
+        errorDetails.stack = tokenError.stack.split('\n').slice(0, 10).join('\n');
+      }
+      
+      console.error('❌ Auth middleware: Token verification failed:', errorDetails);
+      
+      // Return detailed error for debugging (remove in production)
       return res.status(401).json({ 
         error: 'Invalid token',
-        message: tokenError.message || 'Token verification failed'
+        message: tokenError.message || 'Token verification failed',
+        code: tokenError.code || 'unknown',
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
       });
     }
   } catch (error) {
