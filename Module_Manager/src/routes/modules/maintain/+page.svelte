@@ -6,6 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
   import { customerService, type Customer } from '$lib/services/customerService';
+  import { authService } from '$lib/services/authService';
   import CreateTicketModal from '../help-desk/components/CreateTicketModal.svelte';
   import TicketDetailsModal from '../help-desk/components/TicketDetailsModal.svelte';
   import CustomerLookupModal from '../help-desk/components/CustomerLookupModal.svelte';
@@ -62,8 +63,17 @@
   
   $: tenantId = $currentTenant?.id || '';
   
+  // Sync tenantId to localStorage for services that use it
+  $: if (tenantId && browser) {
+    localStorage.setItem('selectedTenantId', tenantId);
+  }
+  
   onMount(() => {
     if (tenantId) {
+      // Ensure localStorage is set
+      if (browser) {
+        localStorage.setItem('selectedTenantId', tenantId);
+      }
       loadDashboardStats();
       loadTickets();
       loadCustomers();
@@ -122,7 +132,13 @@
   }
   
   async function loadStatsFallback() {
+    if (!tenantId || !browser) return;
+    
+    // Ensure localStorage is set
+    localStorage.setItem('selectedTenantId', tenantId);
+    
     try {
+      // Services use localStorage for tenantId
       const allTickets = await workOrderService.getWorkOrders();
       dashboardStats.openTickets = allTickets.filter(t => 
         ['open', 'assigned', 'in-progress'].includes(t.status)
@@ -148,8 +164,12 @@
   async function loadTickets() {
     if (!tenantId || !browser) return;
     
+    // Ensure localStorage is set
+    localStorage.setItem('selectedTenantId', tenantId);
+    
     loadingTickets = true;
     try {
+      // Services use localStorage for tenantId
       tickets = await workOrderService.getWorkOrders();
       applyTicketFilters();
     } catch (error: any) {
@@ -162,8 +182,12 @@
   async function loadCustomers() {
     if (!tenantId || !browser) return;
     
+    // Ensure localStorage is set
+    localStorage.setItem('selectedTenantId', tenantId);
+    
     loadingCustomers = true;
     try {
+      // Services use localStorage for tenantId
       customers = await customerService.searchCustomers();
       applyCustomerFilters();
     } catch (error: any) {
@@ -235,8 +259,7 @@
   
   // ========== Helpers ==========
   async function getAuthToken(): Promise<string> {
-    const { authService } = await import('$lib/services/authService');
-    const token = await authService.getIdToken();
+    const token = await authService.getAuthToken();
     if (!token) throw new Error('Not authenticated');
     return token;
   }
