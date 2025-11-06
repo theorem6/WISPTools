@@ -349,11 +349,20 @@ export class TenantService {
           status: response.status,
           statusText: response.statusText,
           errorData,
+          errorCode: errorData.code,
+          errorMessage: errorData.message,
+          errorDetails: errorData.details,
           url,
-          headers: Object.fromEntries(response.headers.entries())
+          headers: Object.fromEntries(response.headers.entries()),
+          // Log the token info (first 50 chars only for security)
+          tokenInfo: headers['Authorization'] ? {
+            hasToken: true,
+            tokenLength: headers['Authorization'].split('Bearer ')[1]?.length,
+            tokenStart: headers['Authorization'].split('Bearer ')[1]?.substring(0, 50) + '...'
+          } : { hasToken: false }
         });
         
-        throw new Error(`Failed to get user tenants: ${response.statusText}`);
+        throw new Error(`Failed to get user tenants: ${response.statusText} - ${errorData.message || errorData.error} (code: ${errorData.code || 'unknown'})`);
       }
 
       const tenants = await response.json();

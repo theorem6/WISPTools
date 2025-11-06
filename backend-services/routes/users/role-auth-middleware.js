@@ -47,12 +47,16 @@ const verifyAuth = async (req, res, next) => {
       
       console.error('❌ Auth middleware: Token verification failed:', errorDetails);
       
-      // Return detailed error for debugging (remove in production)
+      // Return detailed error for debugging (always include code and message)
       return res.status(401).json({ 
         error: 'Invalid token',
         message: tokenError.message || 'Token verification failed',
         code: tokenError.code || 'unknown',
-        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+        details: process.env.NODE_ENV === 'development' ? errorDetails : {
+          code: tokenError.code,
+          message: tokenError.message,
+          projectId: admin.apps.length > 0 ? admin.apps[0].options.projectId : 'unknown'
+        }
       });
     }
   } catch (error) {
