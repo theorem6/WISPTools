@@ -2,7 +2,7 @@
 // Uses backend API instead of direct Firestore for consistency with MongoDB user-tenant associations
 
 import { browser } from '$app/environment';
-import { auth } from '../firebase';
+import { authService } from './authService';
 import { API_CONFIG } from '$lib/config/api';
 import type {
   Tenant,
@@ -30,45 +30,13 @@ export class TenantService {
 
   /**
    * Get authentication headers for API calls
-   * Includes retry logic and token refresh to handle timing issues after login
+   * Uses authService for consistent token retrieval (same pattern as customerService, workOrderService)
    */
-  private async getAuthHeaders(retries: number = 3): Promise<HeadersInit> {
-    let user = auth().currentUser;
-    
-    // If no user immediately available, wait and retry (handles timing after login)
-    if (!user && retries > 0) {
-      console.log('[TenantService] User not immediately available, waiting for auth state...', { retries });
-      await new Promise(resolve => setTimeout(resolve, 200));
-      return this.getAuthHeaders(retries - 1);
-    }
-    
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Get token with force refresh on first attempt after login
-    let token: string;
-    try {
-      // Force refresh token to ensure it's valid (especially important right after login)
-      token = await user.getIdToken(true);
-    } catch (tokenError: any) {
-      // If force refresh fails, try without forcing (might be a timing issue)
-      console.warn('[TenantService] Token force refresh failed, trying without force:', tokenError);
-      try {
-        token = await user.getIdToken(false);
-      } catch (retryError: any) {
-        // If still failing and we have retries, wait and try again
-        if (retries > 0) {
-          console.log('[TenantService] Token retrieval failed, retrying...', { retries });
-          await new Promise(resolve => setTimeout(resolve, 300));
-          return this.getAuthHeaders(retries - 1);
-        }
-        throw new Error(`Failed to get auth token: ${retryError.message}`);
-      }
-    }
-    
+  private async getAuthHeaders(): Promise<HeadersInit> {
+    // Use authService.getIdToken() - same pattern as other working services
+    const token = await authService.getIdToken();
     if (!token) {
-      throw new Error('Failed to get auth token');
+      throw new Error('User not authenticated');
     }
     
     const headers = {
@@ -76,12 +44,13 @@ export class TenantService {
       'Content-Type': 'application/json'
     };
     
+    const user = authService.getCurrentUser();
     console.log('[TenantService] Auth headers prepared:', {
       hasToken: !!token,
       tokenLength: token?.length,
       tokenStart: token?.substring(0, 20) + '...',
       headerKeys: Object.keys(headers),
-      userId: user.uid
+      userId: user?.uid || 'none'
     });
     
     return headers;
@@ -103,7 +72,7 @@ export class TenantService {
       const headers = await this.getAuthHeaders();
       
       // Get current user to check if they're platform admin
-      const user = auth().currentUser;
+      const user = authService.getCurrentUser();
       const isPlatformAdmin = user?.email === 'david@david.com' || user?.email === 'david@4gengineer.com';
       
       // For regular users, use /api/tenants (enforces one tenant per user)
