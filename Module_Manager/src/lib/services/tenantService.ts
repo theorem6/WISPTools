@@ -2,7 +2,7 @@
 // Uses backend API instead of direct Firestore for consistency with MongoDB user-tenant associations
 
 import { browser } from '$app/environment';
-import { auth } from '../firebase';
+import { authService } from './authService';
 import { API_CONFIG } from '$lib/config/api';
 import type {
   Tenant,
@@ -30,27 +30,42 @@ export class TenantService {
 
   /**
    * Get authentication headers for API calls
-   * Uses Firebase auth directly - same pattern as userManagementService, billingService (working services)
+   * Uses authService.getIdToken() to ensure we use the same user reference that authService maintains
+   * This is more reliable than auth().currentUser which might lag behind after login
+   * Includes retry logic to wait for auth state to be ready
    */
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const user = auth().currentUser;
-    if (!user) {
-      throw new Error('User not authenticated');
+    // Wait for auth state to be ready (important after login)
+    let token: string | null = null;
+    let retries = 0;
+    const maxRetries = 10;
+    
+    while (!token && retries < maxRetries) {
+      token = await authService.getIdToken();
+      if (!token) {
+        // Wait a bit for auth state to propagate
+        await new Promise(resolve => setTimeout(resolve, 100 * (retries + 1)));
+        retries++;
+      }
     }
     
-    const token = await user.getIdToken();
+    if (!token) {
+      throw new Error('User not authenticated - auth state not ready');
+    }
     
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
     
+    const user = authService.getCurrentUser();
     console.log('[TenantService] Auth headers prepared:', {
       hasToken: !!token,
       tokenLength: token?.length,
       tokenStart: token?.substring(0, 20) + '...',
       headerKeys: Object.keys(headers),
-      userId: user?.uid || 'none'
+      userId: user?.uid || 'none',
+      retries
     });
     
     return headers;
@@ -72,7 +87,7 @@ export class TenantService {
       const headers = await this.getAuthHeaders();
       
       // Get current user to check if they're platform admin
-      const user = auth().currentUser;
+      const user = authService.getCurrentUser();
       const isPlatformAdmin = user?.email === 'david@david.com' || user?.email === 'david@4gengineer.com';
       
       // For regular users, use /api/tenants (enforces one tenant per user)
