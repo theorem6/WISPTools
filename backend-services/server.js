@@ -16,6 +16,21 @@ app.use(cors({
 app.use(express.json({ limit: appConfig.limits.jsonBodySize }));
 app.use(express.urlencoded({ extended: true, limit: appConfig.limits.urlEncodedBodySize }));
 
+// Request logging middleware - log ALL requests
+app.use((req, res, next) => {
+  console.log('[REQUEST]', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    ip: req.ip,
+    headers: Object.keys(req.headers),
+    hasAuth: !!(req.headers.authorization || req.headers.Authorization),
+    authLength: (req.headers.authorization || req.headers.Authorization || '').length,
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
+
 // MongoDB Connection - Atlas
 const MONGODB_URI = appConfig.mongodb.uri;
 
@@ -41,22 +56,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Test endpoint to verify requests are reaching the backend
-app.get('/api/test-auth', (req, res) => {
-  console.log('[test-auth] Request received:', {
-    method: req.method,
-    path: req.path,
-    url: req.url,
-    headers: Object.keys(req.headers),
-    authHeader: req.headers.authorization ? 'present' : 'missing',
-    authHeaderValue: req.headers.authorization ? req.headers.authorization.substring(0, 50) + '...' : 'none'
-  });
-  res.json({
-    message: 'Test endpoint reached',
-    hasAuthHeader: !!req.headers.authorization,
-    authHeaderLength: req.headers.authorization?.length || 0
-  });
-});
 
 // Use existing route files - ALL MODULES
 app.use('/api/auth', require('./routes/auth')); // Authentication routes
