@@ -238,7 +238,13 @@ router.get('/cpe/:id', async (req, res) => {
 
 router.post('/cpe', async (req, res) => {
   try {
-    const cpe = new UnifiedCPE({ ...req.body, tenantId: req.tenantId });
+    // Ensure createdBy is set
+    const createdBy = req.body.createdBy || req.body.email || req.user?.email || 'System';
+    const cpe = new UnifiedCPE({ 
+      ...req.body, 
+      tenantId: req.tenantId,
+      createdBy: createdBy
+    });
     await cpe.save();
     res.status(201).json(cpe);
   } catch (error) {
@@ -248,12 +254,27 @@ router.post('/cpe', async (req, res) => {
 
 router.put('/cpe/:id', async (req, res) => {
   try {
+    // Find CPE first to check authorization
+    const existingCPE = await UnifiedCPE.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!existingCPE) return res.status(404).json({ error: 'CPE not found' });
+    
+    // Authorization check
+    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
+    const isOwner = existingCPE.createdBy === userEmail;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
+    
+    if (!isOwner && !isAdmin && existingCPE.createdBy) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You can only edit CPE devices you created' 
+      });
+    }
+    
     const cpe = await UnifiedCPE.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { ...req.body, updatedAt: new Date() },
+      { ...req.body, updatedAt: new Date(), updatedBy: userEmail || 'System' },
       { new: true, runValidators: true }
     );
-    if (!cpe) return res.status(404).json({ error: 'CPE not found' });
     res.json(cpe);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update CPE' });
