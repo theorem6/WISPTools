@@ -107,7 +107,7 @@
         "function": "apiProxy"
       },
       {
-        "source": "/*",
+        "source": "/",
         "destination": "/index.html"
       },
       {
@@ -115,7 +115,7 @@
         "destination": "/index.html"
       }
     ],
-    "cleanUrls": true,
+    "cleanUrls": false,
     "trailingSlash": false
   }
 }
