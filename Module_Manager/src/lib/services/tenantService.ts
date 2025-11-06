@@ -2,7 +2,7 @@
 // Uses backend API instead of direct Firestore for consistency with MongoDB user-tenant associations
 
 import { browser } from '$app/environment';
-import { authService } from './authService';
+import { auth } from '../firebase';
 import { API_CONFIG } from '$lib/config/api';
 import type {
   Tenant,
@@ -30,29 +30,15 @@ export class TenantService {
 
   /**
    * Get authentication headers for API calls
-   * Uses authService for consistent token retrieval with force refresh to ensure valid token
+   * Uses Firebase auth directly - same pattern as userManagementService, billingService (working services)
    */
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const user = authService.getCurrentUser();
+    const user = auth().currentUser;
     if (!user) {
       throw new Error('User not authenticated');
     }
     
-    // Force refresh token to ensure it's valid (especially important after login)
-    // This matches the pattern we use in login page
-    let token: string;
-    try {
-      // Force refresh to get a fresh token
-      token = await user.getIdToken(true);
-    } catch (error: any) {
-      // If force refresh fails, try without forcing
-      console.warn('[TenantService] Token force refresh failed, trying without force:', error);
-      token = await user.getIdToken(false);
-    }
-    
-    if (!token) {
-      throw new Error('Failed to get auth token');
-    }
+    const token = await user.getIdToken();
     
     const headers = {
       'Authorization': `Bearer ${token}`,
@@ -86,7 +72,7 @@ export class TenantService {
       const headers = await this.getAuthHeaders();
       
       // Get current user to check if they're platform admin
-      const user = authService.getCurrentUser();
+      const user = auth().currentUser;
       const isPlatformAdmin = user?.email === 'david@david.com' || user?.email === 'david@4gengineer.com';
       
       // For regular users, use /api/tenants (enforces one tenant per user)
