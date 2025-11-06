@@ -33,24 +33,35 @@ export class TenantService {
    * Uses authService.getIdToken() to ensure we use the same user reference that authService maintains
    * This is more reliable than auth().currentUser which might lag behind after login
    * Includes retry logic to wait for auth state to be ready
+   * Forces token refresh to ensure token is valid for backend
    */
   private async getAuthHeaders(): Promise<HeadersInit> {
     // Wait for auth state to be ready (important after login)
+    const user = authService.getCurrentUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
+    // Force refresh token to ensure it's valid (especially important after login)
+    // This ensures we get a fresh token that the backend will accept
     let token: string | null = null;
     let retries = 0;
-    const maxRetries = 10;
+    const maxRetries = 5;
     
     while (!token && retries < maxRetries) {
-      token = await authService.getIdToken();
-      if (!token) {
-        // Wait a bit for auth state to propagate
-        await new Promise(resolve => setTimeout(resolve, 100 * (retries + 1)));
+      try {
+        // Force refresh to get a fresh token
+        token = await user.getIdToken(true);
+      } catch (error: any) {
+        console.warn('[TenantService] Token refresh failed, retrying:', error);
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 200 * (retries + 1)));
         retries++;
       }
     }
     
     if (!token) {
-      throw new Error('User not authenticated - auth state not ready');
+      throw new Error('User not authenticated - failed to get valid token');
     }
     
     const headers = {
@@ -58,14 +69,14 @@ export class TenantService {
       'Content-Type': 'application/json'
     };
     
-    const user = authService.getCurrentUser();
     console.log('[TenantService] Auth headers prepared:', {
       hasToken: !!token,
       tokenLength: token?.length,
       tokenStart: token?.substring(0, 20) + '...',
       headerKeys: Object.keys(headers),
       userId: user?.uid || 'none',
-      retries
+      retries,
+      forcedRefresh: true
     });
     
     return headers;
