@@ -101,7 +101,8 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
-      const response = await fetch(`${this.apiBaseUrl}/tenants/${tenantId}`, {
+      // Use the correct endpoint: /api/user-tenants/tenant/:tenantId
+      const response = await fetch(`${this.apiBaseUrl}/user-tenants/tenant/${tenantId}`, {
         method: 'GET',
         headers
       });
