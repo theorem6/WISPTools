@@ -76,6 +76,46 @@
         await tenantStore.initialize();
       }
       
+      // Step 4.5: Ensure token is ready before making API calls
+      // This is critical - tokens need time to propagate after login
+      console.log('[TenantGuard] Ensuring token is ready...');
+      let tokenReady = false;
+      let tokenRetries = 0;
+      const maxTokenRetries = 10;
+      
+      while (!tokenReady && tokenRetries < maxTokenRetries) {
+        try {
+          const token = await currentUser.getIdToken(true); // Force refresh
+          if (token && token.length > 100) {
+            console.log('[TenantGuard] Token ready:', { 
+              hasToken: !!token, 
+              tokenLength: token?.length,
+              userId: currentUser.uid 
+            });
+            tokenReady = true;
+          } else {
+            throw new Error('Token invalid or too short');
+          }
+        } catch (tokenError: any) {
+          console.warn('[TenantGuard] Token not ready yet, retrying...', {
+            attempt: tokenRetries + 1,
+            error: tokenError?.message
+          });
+          await new Promise(resolve => setTimeout(resolve, 200 * (tokenRetries + 1)));
+          tokenRetries++;
+        }
+      }
+      
+      if (!tokenReady) {
+        console.error('[TenantGuard] Failed to get valid token after retries');
+        error = 'Authentication token not ready. Please refresh the page.';
+        isChecking = false;
+        return;
+      }
+      
+      // Wait a bit more to ensure token is fully propagated
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Step 5: Check tenant requirement
       if (requireTenant) {
         if (!isAdmin) {
