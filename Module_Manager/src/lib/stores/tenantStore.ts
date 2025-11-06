@@ -120,6 +120,7 @@ function createTenantStore() {
     /**
      * Load all tenants for a user
      * Auto-selects the tenant if user has exactly one (non-admin users)
+     * Includes retry logic to wait for auth state to be ready
      */
     async loadUserTenants(userId: string, userEmail?: string): Promise<Tenant[]> {
       if (!browser) return [];
@@ -128,6 +129,40 @@ function createTenantStore() {
       update(state => ({ ...state, isLoading: true }));
       
       try {
+        // Wait for auth to be ready before making API calls
+        // This prevents 401 errors from calling API before token is ready
+        const { authService } = await import('../services/authService');
+        let retries = 0;
+        let user = authService.getCurrentUser();
+        
+        // Wait for user to be available (up to 2 seconds)
+        while (!user && retries < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          user = authService.getCurrentUser();
+          retries++;
+        }
+        
+        if (!user) {
+          console.warn('[TenantStore] User not available after waiting, auth may not be ready');
+          update(state => ({
+            ...state,
+            isLoading: false,
+            error: null,
+            userTenants: []
+          }));
+          return [];
+        }
+        
+        // Ensure token is ready by getting it once
+        try {
+          const token = await user.getIdToken(true); // Force refresh to ensure valid token
+          console.log('[TenantStore] Token ready:', { hasToken: !!token, tokenLength: token?.length });
+        } catch (tokenError: any) {
+          console.warn('[TenantStore] Token not ready yet, waiting...', tokenError);
+          // Wait a bit more and try again
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         const { tenantService } = await import('../services/tenantService');
         console.log('[TenantStore] Calling tenantService.getUserTenants...');
         const tenants = await tenantService.getUserTenants(userId);
