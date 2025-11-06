@@ -107,16 +107,11 @@
         "function": "apiProxy"
       },
       {
-        "source": "/*",
-        "destination": "/index.html"
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }
     ],
     "cleanUrls": true,
-    "trailingSlash": false,
-    "errorDocument": "404.html"
+    "trailingSlash": false
   }
 }
