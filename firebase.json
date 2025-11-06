@@ -108,8 +108,7 @@
       },
       {
         "source": "**",
-        "destination": "/index.html",
-        "exclude": ["**/*.{js,css,map,json,png,jpg,jpeg,gif,svg,webp,ico,woff,woff2,ttf,eot}"]
+        "destination": "/index.html"
       }
     ],
     "cleanUrls": true,
