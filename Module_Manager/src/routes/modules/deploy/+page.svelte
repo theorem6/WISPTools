@@ -184,24 +184,17 @@
     console.log('[Deploy] Opening PCI Planner modal');
     console.log('[Deploy] Current tenant:', $currentTenant);
     console.log('[Deploy] Tenant ID:', $currentTenant?.id);
-    console.log('[Deploy] Tenant store state:', $currentTenant);
     
-    // Wait a bit for tenant state to update
-    setTimeout(() => {
-      console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
-      console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
-      
-      // Check if user is admin - if so, allow opening without tenant
-      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
-      
-      if (!isAdmin && !$currentTenant) {
-        console.error('[Deploy] No tenant available and user is not admin - cannot open PCI Planner');
-        alert('No tenant selected. Please ensure you are properly logged in.');
-        return;
-      }
-      
-      showPCIPlannerModal = true;
-    }, 100);
+    // Check if user is admin - if so, allow opening without tenant
+    const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+    
+    if (!isAdmin && !$currentTenant?.id) {
+      console.error('[Deploy] No tenant available and user is not admin - cannot open PCI Planner');
+      alert('No tenant selected. Please ensure you are properly logged in and have selected a tenant.');
+      return;
+    }
+    
+    showPCIPlannerModal = true;
   }
 
   function closePCIPlannerModal() {
@@ -214,24 +207,17 @@
     console.log('[Deploy] Opening Frequency Planner modal');
     console.log('[Deploy] Current tenant:', $currentTenant);
     console.log('[Deploy] Tenant ID:', $currentTenant?.id);
-    console.log('[Deploy] Tenant store state:', $currentTenant);
     
-    // Wait a bit for tenant state to update
-    setTimeout(() => {
-      console.log('[Deploy] After timeout - Current tenant:', $currentTenant);
-      console.log('[Deploy] After timeout - Tenant ID:', $currentTenant?.id);
-      
-      // Check if user is admin - if so, allow opening without tenant
-      const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
-      
-      if (!isAdmin && !$currentTenant) {
-        console.error('[Deploy] No tenant available and user is not admin - cannot open Frequency Planner');
-        alert('No tenant selected. Please ensure you are properly logged in.');
-        return;
-      }
-      
-      showFrequencyPlannerModal = true;
-    }, 100);
+    // Check if user is admin - if so, allow opening without tenant
+    const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+    
+    if (!isAdmin && !$currentTenant?.id) {
+      console.error('[Deploy] No tenant available and user is not admin - cannot open Frequency Planner');
+      alert('No tenant selected. Please ensure you are properly logged in and have selected a tenant.');
+      return;
+    }
+    
+    showFrequencyPlannerModal = true;
   }
 
   function closeFrequencyPlannerModal() {
@@ -312,18 +298,22 @@
   </div>
 
   <!-- PCI Planner Modal -->
-  <PCIPlannerModal
-    show={showPCIPlannerModal}
-    tenantId={$currentTenant?.id || ''}
-    on:close={closePCIPlannerModal}
-  />
+  {#if showPCIPlannerModal && ($currentTenant?.id || isAdmin)}
+    <PCIPlannerModal
+      show={showPCIPlannerModal}
+      tenantId={$currentTenant?.id || ''}
+      on:close={closePCIPlannerModal}
+    />
+  {/if}
 
   <!-- Frequency Planner Modal -->
-  <FrequencyPlannerModal
-    show={showFrequencyPlannerModal}
-    tenantId={$currentTenant?.id || ''}
-    on:close={closeFrequencyPlannerModal}
-  />
+  {#if showFrequencyPlannerModal && ($currentTenant?.id || isAdmin)}
+    <FrequencyPlannerModal
+      show={showFrequencyPlannerModal}
+      tenantId={$currentTenant?.id || ''}
+      on:close={closeFrequencyPlannerModal}
+    />
+  {/if}
 
   <!-- Plan Approval Modal -->
   {#if showPlanApprovalModal && selectedPlan}

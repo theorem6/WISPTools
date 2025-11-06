@@ -114,8 +114,74 @@ export interface PlanProject {
     estimatedEndDate?: Date;
     actualStartDate?: Date;
     actualEndDate?: Date;
-    assignedTo?: string;
+    assignedTo?: string; // User ID or email
+    assignedToName?: string; // Display name
+    assignedTeam?: string[]; // Array of user IDs/emails for team assignments
+    deploymentStage?: 'planning' | 'procurement' | 'preparation' | 'in_progress' | 'testing' | 'completed' | 'on_hold' | 'cancelled';
+    fieldTechs?: Array<{
+      userId: string;
+      email: string;
+      name: string;
+      assignedAt?: Date;
+      status?: 'assigned' | 'in_progress' | 'completed' | 'blocked';
+      tasks?: Array<{
+        taskId: string;
+        description: string;
+        status?: 'pending' | 'in_progress' | 'completed' | 'blocked';
+        completedAt?: Date;
+        notes?: string;
+      }>;
+    }>;
+    hardwareDeployment?: Array<{
+      inventoryId: string;
+      assetTag: string;
+      equipmentType: string;
+      location: {
+        siteId: string;
+        siteName: string;
+        coordinates: {
+          lat: number;
+          lng: number;
+        };
+      };
+      deployedBy?: string; // User ID
+      deployedAt?: Date;
+      status?: 'pending' | 'in_transit' | 'on_site' | 'installed' | 'tested' | 'completed' | 'failed';
+      installationNotes?: string;
+      photos?: string[]; // URLs to photos
+      testResults?: {
+        testedAt?: Date;
+        testedBy?: string;
+        passed?: boolean;
+        notes?: string;
+        metrics?: any;
+      };
+    }>;
+    documentation?: {
+      installationPhotos?: string[];
+      testReports?: string[];
+      asBuiltDrawings?: string[];
+      completionCertificate?: string;
+      notes?: string;
+    };
+    milestones?: Array<{
+      name: string;
+      description: string;
+      targetDate?: Date;
+      completedDate?: Date;
+      status?: 'pending' | 'in_progress' | 'completed' | 'overdue';
+    }>;
     notes?: string;
+    issues?: Array<{
+      reportedBy: string;
+      reportedAt?: Date;
+      severity?: 'low' | 'medium' | 'high' | 'critical';
+      description: string;
+      status?: 'open' | 'investigating' | 'resolved' | 'closed';
+      resolvedAt?: Date;
+      resolvedBy?: string;
+      resolution?: string;
+    }>;
   };
 }
 

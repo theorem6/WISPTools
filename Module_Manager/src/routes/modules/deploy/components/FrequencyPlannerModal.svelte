@@ -31,10 +31,18 @@
     loadNetworkData();
   }
 
+  // Also watch for tenantId changes from store
+  $: if (show && $currentTenant?.id && (!$tenantId || $tenantId !== $currentTenant.id)) {
+    tenantId = $currentTenant.id;
+  }
+
   async function loadNetworkData() {
-    if (!tenantId || tenantId.trim() === '') {
+    // Use tenantId prop or fallback to store
+    const effectiveTenantId = tenantId || $currentTenant?.id;
+    
+    if (!effectiveTenantId || effectiveTenantId.trim() === '') {
       console.warn('[FrequencyPlanner] No tenant ID provided');
-      error = 'No tenant selected';
+      error = 'No tenant selected. Please select a tenant to use the Frequency Planner.';
       isLoading = false;
       return;
     }
@@ -43,8 +51,8 @@
     error = '';
 
     try {
-      console.log(`[FrequencyPlanner] Loading network data for tenant: ${tenantId}`);
-      const sites = await coverageMapService.getTowerSites(tenantId);
+      console.log(`[FrequencyPlanner] Loading network data for tenant: ${effectiveTenantId}`);
+      const sites = await coverageMapService.getTowerSites(effectiveTenantId);
       console.log(`[FrequencyPlanner] Loaded ${sites.length} sites from coverage map service`);
 
       sectors = sites.map(site => ({
@@ -76,7 +84,8 @@
   }
 
   async function performAnalysis() {
-    if (!tenantId || tenantId.trim() === '') {
+    const effectiveTenantId = tenantId || $currentTenant?.id;
+    if (!effectiveTenantId || effectiveTenantId.trim() === '') {
       error = 'No tenant selected';
       return;
     }
@@ -86,7 +95,7 @@
 
     try {
       console.log('[FrequencyPlanner] Starting frequency analysis...');
-      const result = await frequencyService.performAnalysis(tenantId);
+      const result = await frequencyService.performAnalysis(effectiveTenantId);
       
       if (result.success && result.data) {
         plan = result.data;
@@ -106,7 +115,8 @@
   }
 
   async function generateOptimizations() {
-    if (!tenantId || tenantId.trim() === '') {
+    const effectiveTenantId = tenantId || $currentTenant?.id;
+    if (!effectiveTenantId || effectiveTenantId.trim() === '') {
       error = 'No tenant selected';
       return;
     }
@@ -116,7 +126,7 @@
 
     try {
       console.log('[FrequencyPlanner] Generating optimization suggestions...');
-      const result = await frequencyService.getOptimizations(tenantId);
+      const result = await frequencyService.getOptimizations(effectiveTenantId);
       
       if (result.success && result.data) {
         optimizations = result.data;

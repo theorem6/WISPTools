@@ -155,8 +155,102 @@ const PlanProjectSchema = new mongoose.Schema({
     estimatedEndDate: Date,
     actualStartDate: Date,
     actualEndDate: Date,
-    assignedTo: String,
-    notes: String
+    assignedTo: String, // User ID or email
+    assignedToName: String, // Display name
+    assignedTeam: [String], // Array of user IDs/emails for team assignments
+    deploymentStage: {
+      type: String,
+      enum: ['planning', 'procurement', 'preparation', 'in_progress', 'testing', 'completed', 'on_hold', 'cancelled'],
+      default: 'planning'
+    },
+    fieldTechs: [{
+      userId: String,
+      email: String,
+      name: String,
+      assignedAt: Date,
+      status: {
+        type: String,
+        enum: ['assigned', 'in_progress', 'completed', 'blocked'],
+        default: 'assigned'
+      },
+      tasks: [{
+        taskId: String,
+        description: String,
+        status: {
+          type: String,
+          enum: ['pending', 'in_progress', 'completed', 'blocked'],
+          default: 'pending'
+        },
+        completedAt: Date,
+        notes: String
+      }]
+    }],
+    hardwareDeployment: [{
+      inventoryId: String,
+      assetTag: String,
+      equipmentType: String,
+      location: {
+        siteId: String,
+        siteName: String,
+        coordinates: {
+          lat: Number,
+          lng: Number
+        }
+      },
+      deployedBy: String, // User ID
+      deployedAt: Date,
+      status: {
+        type: String,
+        enum: ['pending', 'in_transit', 'on_site', 'installed', 'tested', 'completed', 'failed'],
+        default: 'pending'
+      },
+      installationNotes: String,
+      photos: [String], // URLs to photos
+      testResults: {
+        testedAt: Date,
+        testedBy: String,
+        passed: Boolean,
+        notes: String,
+        metrics: mongoose.Schema.Types.Mixed
+      }
+    }],
+    documentation: {
+      installationPhotos: [String],
+      testReports: [String],
+      asBuiltDrawings: [String],
+      completionCertificate: String,
+      notes: String
+    },
+    milestones: [{
+      name: String,
+      description: String,
+      targetDate: Date,
+      completedDate: Date,
+      status: {
+        type: String,
+        enum: ['pending', 'in_progress', 'completed', 'overdue'],
+        default: 'pending'
+      }
+    }],
+    notes: String,
+    issues: [{
+      reportedBy: String,
+      reportedAt: Date,
+      severity: {
+        type: String,
+        enum: ['low', 'medium', 'high', 'critical'],
+        default: 'medium'
+      },
+      description: String,
+      status: {
+        type: String,
+        enum: ['open', 'investigating', 'resolved', 'closed'],
+        default: 'open'
+      },
+      resolvedAt: Date,
+      resolvedBy: String,
+      resolution: String
+    }]
   },
   
   // Metadata

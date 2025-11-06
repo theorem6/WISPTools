@@ -40,11 +40,19 @@
   $: if (show && tenantId && tenantId.trim() !== '') {
     loadNetworkData();
   }
-  
+
+  // Also watch for tenantId changes from store
+  $: if (show && $currentTenant?.id && (!$tenantId || $tenantId !== $currentTenant.id)) {
+    tenantId = $currentTenant.id;
+  }
+
   async function loadNetworkData() {
-    if (!tenantId || tenantId.trim() === '') {
+    // Use tenantId prop or fallback to store
+    const effectiveTenantId = tenantId || $currentTenant?.id;
+    
+    if (!effectiveTenantId || effectiveTenantId.trim() === '') {
       console.warn('[PCIPlanner] No tenant ID provided');
-      error = 'No tenant selected';
+      error = 'No tenant selected. Please select a tenant to use the PCI Planner.';
       isLoading = false;
       return;
     }
@@ -53,9 +61,10 @@
     error = '';
     
     try {
-      console.log(`[PCIPlanner] Loading network data for tenant: ${tenantId}`);
+      const effectiveTenantId = tenantId || $currentTenant?.id;
+      console.log(`[PCIPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       // Load tower sites and convert to cells
-      const sites = await coverageMapService.getTowerSites(tenantId);
+      const sites = await coverageMapService.getTowerSites(effectiveTenantId);
       console.log(`[PCIPlanner] Loaded ${sites.length} sites from coverage map service`);
       
       cells = sites.map(site => ({
