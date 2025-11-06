@@ -30,14 +30,47 @@ export class TenantService {
 
   /**
    * Get authentication headers for API calls
+   * Includes retry logic and token refresh to handle timing issues after login
    */
-  private async getAuthHeaders(): Promise<HeadersInit> {
-    const user = auth().currentUser;
+  private async getAuthHeaders(retries: number = 3): Promise<HeadersInit> {
+    let user = auth().currentUser;
+    
+    // If no user immediately available, wait and retry (handles timing after login)
+    if (!user && retries > 0) {
+      console.log('[TenantService] User not immediately available, waiting for auth state...', { retries });
+      await new Promise(resolve => setTimeout(resolve, 200));
+      return this.getAuthHeaders(retries - 1);
+    }
+    
     if (!user) {
       throw new Error('User not authenticated');
     }
     
-    const token = await user.getIdToken();
+    // Get token with force refresh on first attempt after login
+    let token: string;
+    try {
+      // Force refresh token to ensure it's valid (especially important right after login)
+      token = await user.getIdToken(true);
+    } catch (tokenError: any) {
+      // If force refresh fails, try without forcing (might be a timing issue)
+      console.warn('[TenantService] Token force refresh failed, trying without force:', tokenError);
+      try {
+        token = await user.getIdToken(false);
+      } catch (retryError: any) {
+        // If still failing and we have retries, wait and try again
+        if (retries > 0) {
+          console.log('[TenantService] Token retrieval failed, retrying...', { retries });
+          await new Promise(resolve => setTimeout(resolve, 300));
+          return this.getAuthHeaders(retries - 1);
+        }
+        throw new Error(`Failed to get auth token: ${retryError.message}`);
+      }
+    }
+    
+    if (!token) {
+      throw new Error('Failed to get auth token');
+    }
+    
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -47,7 +80,8 @@ export class TenantService {
       hasToken: !!token,
       tokenLength: token?.length,
       tokenStart: token?.substring(0, 20) + '...',
-      headerKeys: Object.keys(headers)
+      headerKeys: Object.keys(headers),
+      userId: user.uid
     });
     
     return headers;

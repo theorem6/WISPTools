@@ -110,6 +110,23 @@
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', email);
         
+        // Ensure token is ready before making API calls
+        // Force token refresh to ensure it's valid for backend
+        try {
+          const token = await user.getIdToken(true);
+          console.log('[Login Page] Token ready:', { 
+            hasToken: !!token, 
+            tokenLength: token?.length,
+            userId: user.uid 
+          });
+        } catch (tokenError: any) {
+          console.warn('[Login Page] Token refresh warning:', tokenError);
+          // Continue anyway - getAuthHeaders will retry
+        }
+        
+        // Wait a bit more to ensure Firebase auth state is fully propagated
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         // Robust tenant connection for ALL logins (signin and signup)
         await ensureTenantConnection(user, email, mode === 'signup');
         
@@ -308,6 +325,23 @@
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', user.email || '');
+        
+        // Ensure token is ready before making API calls
+        // Force token refresh to ensure it's valid for backend
+        try {
+          const token = await user.getIdToken(true);
+          console.log('[Login Page] Google token ready:', { 
+            hasToken: !!token, 
+            tokenLength: token?.length,
+            userId: user.uid 
+          });
+        } catch (tokenError: any) {
+          console.warn('[Login Page] Google token refresh warning:', tokenError);
+          // Continue anyway - getAuthHeaders will retry
+        }
+        
+        // Wait a bit more to ensure Firebase auth state is fully propagated
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         // Robust tenant connection for Google sign-in
         await ensureTenantConnection(user, user.email || '', true);
