@@ -30,13 +30,28 @@ export class TenantService {
 
   /**
    * Get authentication headers for API calls
-   * Uses authService for consistent token retrieval (same pattern as customerService, workOrderService)
+   * Uses authService for consistent token retrieval with force refresh to ensure valid token
    */
   private async getAuthHeaders(): Promise<HeadersInit> {
-    // Use authService.getIdToken() - same pattern as other working services
-    const token = await authService.getIdToken();
-    if (!token) {
+    const user = authService.getCurrentUser();
+    if (!user) {
       throw new Error('User not authenticated');
+    }
+    
+    // Force refresh token to ensure it's valid (especially important after login)
+    // This matches the pattern we use in login page
+    let token: string;
+    try {
+      // Force refresh to get a fresh token
+      token = await user.getIdToken(true);
+    } catch (error: any) {
+      // If force refresh fails, try without forcing
+      console.warn('[TenantService] Token force refresh failed, trying without force:', error);
+      token = await user.getIdToken(false);
+    }
+    
+    if (!token) {
+      throw new Error('Failed to get auth token');
     }
     
     const headers = {
@@ -44,7 +59,6 @@ export class TenantService {
       'Content-Type': 'application/json'
     };
     
-    const user = authService.getCurrentUser();
     console.log('[TenantService] Auth headers prepared:', {
       hasToken: !!token,
       tokenLength: token?.length,
