@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
+  import { get } from 'svelte/store';
   import { authService } from '$lib/services/authService';
   import { tenantService } from '$lib/services/tenantService';
   import { tenantStore } from '$lib/stores/tenantStore';
@@ -109,24 +110,8 @@
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', email);
         
-        // For new signups, automatically create a tenant (only if they don't have one)
-        if (mode === 'signup' && user) {
-          try {
-            // Check if user already has a tenant
-            const existingTenants = await tenantStore.loadUserTenants(user.uid, user.email || undefined);
-            if (existingTenants.length === 0) {
-              console.log('[Login Page] Creating automatic tenant for new user...');
-              await createAutomaticTenant(user, email);
-              console.log('[Login Page] Automatic tenant created successfully');
-            } else {
-              console.log('[Login Page] User already has a tenant, skipping auto-creation');
-            }
-          } catch (tenantError: any) {
-            console.error('[Login Page] Error creating automatic tenant:', tenantError);
-            // Don't block signup if tenant creation fails - user can create manually later
-            // Just log the error and continue
-          }
-        }
+        // Robust tenant connection for ALL logins (signin and signup)
+        await ensureTenantConnection(user, email, mode === 'signup');
         
         console.log('[Login Page] Redirecting to dashboard');
         
@@ -142,6 +127,94 @@
       console.error('[Login Page] Error stack:', err.stack);
     } finally {
       isLoading = false;
+    }
+  }
+
+  /**
+   * Robust tenant connection after login
+   * Ensures tenant is loaded, set, and available for all services
+   */
+  async function ensureTenantConnection(user: User, email: string, isNewUser: boolean = false): Promise<void> {
+    try {
+      console.log('[Login Page] Ensuring tenant connection...', { userId: user.uid, email, isNewUser });
+      
+      // Initialize tenant store first
+      await tenantStore.initialize();
+      console.log('[Login Page] Tenant store initialized');
+      
+      // Load user's tenants
+      const tenants = await tenantStore.loadUserTenants(user.uid, email);
+      console.log('[Login Page] Loaded tenants:', tenants.length);
+      
+      // Check if we have a saved tenant in localStorage
+      const savedTenantId = localStorage.getItem('selectedTenantId');
+      let currentTenant = null;
+      
+      if (savedTenantId) {
+        // Try to find the saved tenant in the loaded list
+        currentTenant = tenants.find(t => t.id === savedTenantId);
+        if (currentTenant) {
+          console.log('[Login Page] Found saved tenant:', currentTenant.displayName);
+          tenantStore.setCurrentTenant(currentTenant);
+        } else {
+          console.warn('[Login Page] Saved tenant not found in user tenants, clearing saved tenant');
+          localStorage.removeItem('selectedTenantId');
+          localStorage.removeItem('selectedTenantName');
+        }
+      }
+      
+      // If no current tenant set yet, try auto-selection
+      if (!currentTenant && tenants.length > 0) {
+        // Auto-select single tenant for non-admin users
+        const isPlatformAdmin = email === 'david@david.com';
+        if (tenants.length === 1 && !isPlatformAdmin) {
+          console.log('[Login Page] Auto-selecting single tenant:', tenants[0].displayName);
+          currentTenant = tenants[0];
+          tenantStore.setCurrentTenant(currentTenant);
+        } else if (tenants.length > 0) {
+          // Multiple tenants or admin - use first tenant as default if none selected
+          console.log('[Login Page] Multiple tenants available, using first as default');
+          currentTenant = tenants[0];
+          tenantStore.setCurrentTenant(currentTenant);
+        }
+      }
+      
+      // For new users, create tenant if none exists
+      if (isNewUser && tenants.length === 0) {
+        console.log('[Login Page] New user with no tenants, creating automatic tenant...');
+        try {
+          await createAutomaticTenant(user, email);
+          // Reload tenants after creation
+          const updatedTenants = await tenantStore.loadUserTenants(user.uid, email);
+          if (updatedTenants.length > 0) {
+            currentTenant = updatedTenants[0];
+            tenantStore.setCurrentTenant(currentTenant);
+            console.log('[Login Page] Automatic tenant created and set:', currentTenant.displayName);
+          }
+        } catch (tenantError: any) {
+          console.error('[Login Page] Error creating automatic tenant:', tenantError);
+          // Don't block login - user can create tenant manually later
+        }
+      }
+      
+      // Ensure tenantId is in localStorage for services
+      const finalTenant = get(tenantStore).currentTenant;
+      if (finalTenant) {
+        localStorage.setItem('selectedTenantId', finalTenant.id);
+        localStorage.setItem('selectedTenantName', finalTenant.displayName);
+        console.log('[Login Page] Tenant connection complete:', finalTenant.displayName);
+      } else {
+        console.warn('[Login Page] No tenant available after connection attempt');
+        // Clear any stale tenant data
+        localStorage.removeItem('selectedTenantId');
+        localStorage.removeItem('selectedTenantName');
+      }
+    } catch (error: any) {
+      console.error('[Login Page] Error ensuring tenant connection:', error);
+      // Don't block login - tenant can be set later
+      // Clear any stale tenant data
+      localStorage.removeItem('selectedTenantId');
+      localStorage.removeItem('selectedTenantName');
     }
   }
 
@@ -236,21 +309,8 @@
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userEmail', user.email || '');
         
-        // Check if this is a new user (no tenants) and create tenant automatically
-        if (user) {
-          try {
-            // Check if user has any tenants - if not, create one automatically
-            const existingTenants = await tenantStore.loadUserTenants(user.uid, user.email || undefined);
-            if (existingTenants.length === 0) {
-              console.log('[Login Page] New Google user detected, creating automatic tenant...');
-              await createAutomaticTenant(user, user.email || '');
-              console.log('[Login Page] Automatic tenant created for Google user');
-            }
-          } catch (tenantError: any) {
-            console.error('[Login Page] Error creating tenant for Google user:', tenantError);
-            // Don't block login if tenant creation fails - user can create manually later
-          }
-        }
+        // Robust tenant connection for Google sign-in
+        await ensureTenantConnection(user, user.email || '', true);
         
         console.log('[Login Page] Redirecting to dashboard');
         
