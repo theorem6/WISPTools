@@ -341,9 +341,13 @@ export const apiProxy = onRequest({
       console.warn('[apiProxy] No tenant ID header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('tenant')));
     }
     
-    // Forward Authorization header if present
-    if (req.headers['authorization']) {
-      headers['Authorization'] = req.headers['authorization'] as string;
+    // Forward Authorization header if present (check both cases - Firebase Functions normalizes to lowercase)
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader) {
+      headers['Authorization'] = authHeader as string;
+      console.log('[apiProxy] Forwarding Authorization header');
+    } else {
+      console.warn('[apiProxy] No Authorization header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth')));
     }
     
     const options: RequestInit = {
@@ -574,9 +578,13 @@ export const isoProxy = onRequest({
       headers['x-tenant-id'] = req.headers['x-tenant-id'] as string;
     }
     
-    // Forward Authorization header if present
-    if (req.headers['authorization']) {
-      headers['Authorization'] = req.headers['authorization'] as string;
+    // Forward Authorization header if present (check both cases - Firebase Functions normalizes to lowercase)
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    if (authHeader) {
+      headers['Authorization'] = authHeader as string;
+      console.log('[apiProxy] Forwarding Authorization header');
+    } else {
+      console.warn('[apiProxy] No Authorization header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth')));
     }
     
     const options: RequestInit = {

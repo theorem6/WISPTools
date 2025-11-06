@@ -2,9 +2,10 @@ const { admin, auth, firestore } = require('../../config/firebase');
 
 const verifyAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    // Check both lowercase and capitalized versions (headers can be normalized)
+    const authHeader = req.headers.authorization || req.headers.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('❌ Auth middleware: No authorization header');
+      console.error('❌ Auth middleware: No authorization header. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth')));
       return res.status(401).json({ error: 'No token provided' });
     }
 
