@@ -47,7 +47,13 @@ router.get('/sites/:id', async (req, res) => {
 
 router.post('/sites', async (req, res) => {
   try {
-    const site = new UnifiedSite({ ...req.body, tenantId: req.tenantId });
+    // Ensure createdBy is set
+    const createdBy = req.body.createdBy || req.body.email || req.user?.email || 'System';
+    const site = new UnifiedSite({ 
+      ...req.body, 
+      tenantId: req.tenantId,
+      createdBy: createdBy
+    });
     await site.save();
     res.status(201).json(site);
   } catch (error) {
@@ -57,12 +63,27 @@ router.post('/sites', async (req, res) => {
 
 router.put('/sites/:id', async (req, res) => {
   try {
+    // Find site first to check authorization
+    const existingSite = await UnifiedSite.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!existingSite) return res.status(404).json({ error: 'Site not found' });
+    
+    // Authorization check: Only allow updates if user created the site or is admin
+    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
+    const isOwner = existingSite.createdBy === userEmail;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
+    
+    if (!isOwner && !isAdmin && existingSite.createdBy) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You can only edit sites you created' 
+      });
+    }
+    
     const site = await UnifiedSite.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { ...req.body, updatedAt: new Date() },
+      { ...req.body, updatedAt: new Date(), updatedBy: userEmail || 'System' },
       { new: true, runValidators: true }
     );
-    if (!site) return res.status(404).json({ error: 'Site not found' });
     res.json(site);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update site' });
@@ -115,7 +136,13 @@ router.get('/sectors/:id', async (req, res) => {
 
 router.post('/sectors', async (req, res) => {
   try {
-    const sector = new UnifiedSector({ ...req.body, tenantId: req.tenantId });
+    // Ensure createdBy is set
+    const createdBy = req.body.createdBy || req.body.email || req.user?.email || 'System';
+    const sector = new UnifiedSector({ 
+      ...req.body, 
+      tenantId: req.tenantId,
+      createdBy: createdBy
+    });
     await sector.save();
     res.status(201).json(sector);
   } catch (error) {
@@ -125,12 +152,27 @@ router.post('/sectors', async (req, res) => {
 
 router.put('/sectors/:id', async (req, res) => {
   try {
+    // Find sector first to check authorization
+    const existingSector = await UnifiedSector.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!existingSector) return res.status(404).json({ error: 'Sector not found' });
+    
+    // Authorization check
+    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
+    const isOwner = existingSector.createdBy === userEmail;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
+    
+    if (!isOwner && !isAdmin && existingSector.createdBy) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You can only edit sectors you created' 
+      });
+    }
+    
     const sector = await UnifiedSector.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { ...req.body, updatedAt: new Date() },
+      { ...req.body, updatedAt: new Date(), updatedBy: userEmail || 'System' },
       { new: true, runValidators: true }
     );
-    if (!sector) return res.status(404).json({ error: 'Sector not found' });
     res.json(sector);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update sector' });
@@ -252,7 +294,13 @@ router.get('/equipment', async (req, res) => {
 
 router.post('/equipment', async (req, res) => {
   try {
-    const equipment = new NetworkEquipment({ ...req.body, tenantId: req.tenantId });
+    // Ensure createdBy is set
+    const createdBy = req.body.createdBy || req.body.email || req.user?.email || 'System';
+    const equipment = new NetworkEquipment({ 
+      ...req.body, 
+      tenantId: req.tenantId,
+      createdBy: createdBy
+    });
     await equipment.save();
     res.status(201).json(equipment);
   } catch (error) {
@@ -262,12 +310,27 @@ router.post('/equipment', async (req, res) => {
 
 router.put('/equipment/:id', async (req, res) => {
   try {
+    // Find equipment first to check authorization
+    const existingEquipment = await NetworkEquipment.findOne({ _id: req.params.id, tenantId: req.tenantId });
+    if (!existingEquipment) return res.status(404).json({ error: 'Equipment not found' });
+    
+    // Authorization check
+    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
+    const isOwner = existingEquipment.createdBy === userEmail;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
+    
+    if (!isOwner && !isAdmin && existingEquipment.createdBy) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You can only edit equipment you created' 
+      });
+    }
+    
     const equipment = await NetworkEquipment.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { ...req.body, updatedAt: new Date() },
+      { ...req.body, updatedAt: new Date(), updatedBy: userEmail || 'System' },
       { new: true, runValidators: true }
     );
-    if (!equipment) return res.status(404).json({ error: 'Equipment not found' });
     res.json(equipment);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update equipment' });
