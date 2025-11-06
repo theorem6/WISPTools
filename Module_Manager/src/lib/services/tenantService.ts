@@ -38,10 +38,19 @@ export class TenantService {
     }
     
     const token = await user.getIdToken();
-    return {
+    const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
+    
+    console.log('[TenantService] Auth headers prepared:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenStart: token?.substring(0, 20) + '...',
+      headerKeys: Object.keys(headers)
+    });
+    
+    return headers;
   }
 
   /**
@@ -275,13 +284,31 @@ export class TenantService {
   async getUserTenants(userId: string): Promise<Tenant[]> {
     try {
       const headers = await this.getAuthHeaders();
+      const url = `${this.apiBaseUrl}/user-tenants/${userId}`;
       
-      const response = await fetch(`${this.apiBaseUrl}/user-tenants/${userId}`, {
+      console.log('[TenantService] getUserTenants request:', {
+        url,
+        apiBaseUrl: this.apiBaseUrl,
+        method: 'GET',
+        hasAuthHeader: !!headers['Authorization'],
+        headerKeys: Object.keys(headers)
+      });
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers
       });
 
+      console.log('[TenantService] getUserTenants response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[TenantService] getUserTenants error response:', errorText);
         throw new Error(`Failed to get user tenants: ${response.statusText}`);
       }
 
