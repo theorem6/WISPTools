@@ -24,7 +24,7 @@ process.env.NODE_PATH = `${process.env.NODE_PATH || ''}:${parentDir}`;
 require('module').Module._initPaths();
 
 const mongoose = require('mongoose');
-const { UnifiedTower, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
 const appConfig = require('../config/app');
 
 // Patterns that indicate fake/test data
@@ -90,27 +90,27 @@ async function cleanupFakeData(tenantId = null, dryRun = true) {
 
   const query = tenantId ? { tenantId } : {};
 
-  // Cleanup Towers
-  console.log('📡 Checking Towers...');
-  const towers = await UnifiedTower.find(query).lean();
+  // Cleanup Towers/Sites
+  console.log('📡 Checking Towers/Sites...');
+  const towers = await UnifiedSite.find(query).lean();
   const fakeTowers = towers.filter(tower => 
     isFakeName(tower.name) || 
-    isFakeAddress(tower.address) ||
-    isFakeName(tower.siteName)
+    (tower.location && isFakeAddress(tower.location.address))
   );
   
-  console.log(`   Found ${towers.length} total towers`);
-  console.log(`   Found ${fakeTowers.length} fake towers`);
+  console.log(`   Found ${towers.length} total towers/sites`);
+  console.log(`   Found ${fakeTowers.length} fake towers/sites`);
   if (fakeTowers.length > 0) {
-    console.log('   Fake towers:');
+    console.log('   Fake towers/sites:');
     fakeTowers.forEach(t => {
-      console.log(`     - ${t.name || t.siteName} (${t._id}) - ${t.address || 'No address'}`);
+      const address = t.location?.address || 'No address';
+      console.log(`     - ${t.name} (${t._id}) - ${address}`);
     });
     
     if (!dryRun) {
       const towerIds = fakeTowers.map(t => t._id);
-      await UnifiedTower.deleteMany({ _id: { $in: towerIds } });
-      console.log(`   ✅ Deleted ${fakeTowers.length} fake towers`);
+      await UnifiedSite.deleteMany({ _id: { $in: towerIds } });
+      console.log(`   ✅ Deleted ${fakeTowers.length} fake towers/sites`);
     }
   }
   console.log('');
@@ -121,7 +121,7 @@ async function cleanupFakeData(tenantId = null, dryRun = true) {
   const fakeSectors = sectors.filter(sector => 
     isFakeName(sector.name) ||
     isFakeName(sector.towerName) ||
-    (sector.siteId && fakeTowers.some(t => t._id.toString() === sector.siteId.toString()))
+    (sector.siteId && fakeTowers.some(t => t._id.toString() === sector.siteId?.toString()))
   );
   
   console.log(`   Found ${sectors.length} total sectors`);
@@ -146,8 +146,8 @@ async function cleanupFakeData(tenantId = null, dryRun = true) {
   const fakeCPE = cpeDevices.filter(cpe => 
     isFakeName(cpe.name) ||
     isFakeSerialNumber(cpe.serialNumber) ||
-    isFakeAddress(cpe.address) ||
-    (cpe.siteId && fakeTowers.some(t => t._id.toString() === cpe.siteId.toString()))
+    (cpe.location && isFakeAddress(cpe.location.address)) ||
+    (cpe.siteId && fakeTowers.some(t => t._id.toString() === cpe.siteId?.toString()))
   );
   
   console.log(`   Found ${cpeDevices.length} total CPE devices`);
@@ -155,7 +155,8 @@ async function cleanupFakeData(tenantId = null, dryRun = true) {
   if (fakeCPE.length > 0) {
     console.log('   Fake CPE devices:');
     fakeCPE.forEach(cpe => {
-      console.log(`     - ${cpe.name || cpe.serialNumber} (${cpe._id}) - ${cpe.address || 'No address'}`);
+      const address = cpe.location?.address || 'No address';
+      console.log(`     - ${cpe.name || cpe.serialNumber} (${cpe._id}) - ${address}`);
     });
     
     if (!dryRun) {
@@ -172,8 +173,8 @@ async function cleanupFakeData(tenantId = null, dryRun = true) {
   const fakeEquipment = equipment.filter(eq => 
     isFakeName(eq.name) ||
     isFakeSerialNumber(eq.serialNumber) ||
-    isFakeAddress(eq.address) ||
-    (eq.siteId && fakeTowers.some(t => t._id.toString() === eq.siteId.toString()))
+    (eq.location && isFakeAddress(eq.location.address)) ||
+    (eq.siteId && fakeTowers.some(t => t._id.toString() === eq.siteId?.toString()))
   );
   
   console.log(`   Found ${equipment.length} total equipment`);
@@ -181,7 +182,8 @@ async function cleanupFakeData(tenantId = null, dryRun = true) {
   if (fakeEquipment.length > 0) {
     console.log('   Fake equipment:');
     fakeEquipment.forEach(eq => {
-      console.log(`     - ${eq.name || eq.serialNumber} (${eq._id}) - ${eq.address || 'No address'}`);
+      const address = eq.location?.address || 'No address';
+      console.log(`     - ${eq.name || eq.serialNumber} (${eq._id}) - ${address}`);
     });
     
     if (!dryRun) {
