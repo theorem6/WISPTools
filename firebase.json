@@ -19,6 +19,7 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "errorDocument": "404.html",
     "headers": [
       {
         "source": "/api/**",
