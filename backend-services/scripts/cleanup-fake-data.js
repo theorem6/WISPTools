@@ -16,6 +16,13 @@
  */
 
 require('dotenv').config();
+const path = require('path');
+
+// Add parent directory to module path
+const parentDir = path.resolve(__dirname, '..');
+process.env.NODE_PATH = `${process.env.NODE_PATH || ''}:${parentDir}`;
+require('module').Module._initPaths();
+
 const mongoose = require('mongoose');
 const { UnifiedTower, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
 const appConfig = require('../config/app');
