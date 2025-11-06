@@ -1,7 +1,7 @@
 @import '@arcgis/core/assets/esri/themes/light/main.css';
 
 /* Import centralized theme CSS variables */
-@import '../lib/config/theme.css';
+@import './lib/config/theme.css';
 
 :root {
   /* Legacy variable mappings - Backward compatibility */
