@@ -26,7 +26,10 @@ const verifyAuth = async (req, res, next) => {
       console.error('❌ Auth middleware: Token verification failed:', {
         error: tokenError.message,
         code: tokenError.code,
-        stack: tokenError.stack
+        tokenLength: token.length,
+        tokenStart: token.substring(0, 50) + '...',
+        authAppProjectId: auth.app?.options?.projectId || 'unknown',
+        stack: tokenError.stack?.split('\n').slice(0, 5).join('\n')
       });
       return res.status(401).json({ 
         error: 'Invalid token',
