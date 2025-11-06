@@ -71,9 +71,19 @@ router.post('/', async (req, res) => {
   try {
     // Ensure createdBy is always set (required field)
     // Priority: req.body.createdBy (if truthy) > req.body.email > 'System'
-    const createdBy = (req.body.createdBy && req.body.createdBy.trim()) 
-      || req.body.email 
-      || 'System';
+    let createdBy = 'System'; // Default fallback
+    
+    if (req.body.createdBy && typeof req.body.createdBy === 'string' && req.body.createdBy.trim()) {
+      createdBy = req.body.createdBy.trim();
+    } else if (req.body.email && typeof req.body.email === 'string' && req.body.email.trim()) {
+      createdBy = req.body.email.trim();
+    }
+    
+    // Log for debugging
+    console.log('[plans] Creating plan with createdBy:', createdBy, 'from req.body:', {
+      createdBy: req.body.createdBy,
+      email: req.body.email
+    });
     
     const planData = {
       ...req.body,
