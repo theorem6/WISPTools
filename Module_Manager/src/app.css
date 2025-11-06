@@ -1,129 +1,137 @@
 @import '@arcgis/core/assets/esri/themes/light/main.css';
 
+/* Import centralized theme CSS variables */
+@import '../lib/config/theme.css';
+
 :root {
-  /* Modern Grey Scale Theme - Light Mode */
-  --bg-primary: #f1f5f9;
-  --bg-secondary: #e2e8f0;
-  --bg-tertiary: #cbd5e1;
-  --bg-quaternary: #94a3b8;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --text-inverse: #ffffff;
-  --border-color: #cbd5e1;
-  --border-light: #e2e8f0;
-  --card-bg: #ffffff;
-  --input-bg: #f8fafc;
-  --hover-bg: #e2e8f0;
-  --focus-bg: #cbd5e1;
+  /* Legacy variable mappings - Backward compatibility */
+  /* These map to centralized theme variables */
+  --bg-primary: var(--color-background-primary);
+  --bg-secondary: var(--color-background-secondary);
+  --bg-tertiary: var(--color-background-tertiary);
+  --bg-quaternary: var(--color-gray-400);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-tertiary);
+  --text-inverse: var(--color-text-inverse);
+  --border-color: var(--color-border);
+  --border-light: var(--color-border-light);
+  --card-bg: var(--color-background-primary);
+  --input-bg: var(--color-background-secondary);
+  --hover-bg: var(--color-background-secondary);
+  --focus-bg: var(--color-background-tertiary);
   
-  /* Modern Accent Colors - Unified Naming */
-  --primary: #3b82f6;
-  --primary-color: #3b82f6; /* Legacy support */
-  --primary-hover: #2563eb;
-  --primary-light: #dbeafe;
-  --secondary: #64748b;
-  --secondary-color: #64748b; /* Legacy support */
-  --secondary-hover: #475569;
-  --success: #10b981;
-  --success-color: #10b981; /* Legacy support */
-  --success-light: #d1fae5;
-  --warning: #f59e0b;
-  --warning-color: #f59e0b; /* Legacy support */
-  --warning-light: #fef3c7;
-  --danger: #ef4444;
-  --danger-color: #ef4444; /* Legacy support */
-  --danger-light: #fee2e2;
-  --info: #06b6d4;
-  --info-color: #06b6d4; /* Legacy support */
-  --info-light: #cffafe;
+  /* Modern Accent Colors - Mapped to centralized theme */
+  --primary: var(--color-primary);
+  --primary-color: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-light: var(--color-primary-light);
+  --secondary: var(--color-secondary);
+  --secondary-color: var(--color-secondary);
+  --secondary-hover: var(--color-secondary-hover);
+  --success: var(--color-success);
+  --success-color: var(--color-success);
+  --success-light: var(--color-success-light);
+  --warning: var(--color-warning);
+  --warning-color: var(--color-warning);
+  --warning-light: var(--color-warning-light);
+  --danger: var(--color-danger);
+  --danger-color: var(--color-danger);
+  --danger-light: var(--color-danger-light);
+  --info: var(--color-info);
+  --info-color: var(--color-info);
+  --info-light: var(--color-info-light);
   
   /* Additional Theme Variables */
-  --accent-color: #10b981;
-  --brand-primary: #3b82f6;
-  --brand-secondary: #7c3aed;
-  --brand-accent: #10b981;
+  --accent-color: var(--color-success);
+  --brand-primary: var(--color-primary);
+  --brand-secondary: var(--color-secondary);
+  --brand-accent: var(--color-success);
   
-  /* UI Elements */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  /* UI Elements - Mapped to centralized theme */
+  --shadow-xs: var(--shadow-sm);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
   
-  /* Layout */
-  --border-radius: 12px;
-  --border-radius-sm: 8px;
-  --border-radius-lg: 16px;
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-xxl: 2.5rem;
-  --spacing-2xl: 3rem;
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Layout - Mapped to centralized theme */
+  --border-radius: var(--radius-md);
+  --border-radius-sm: var(--radius-sm);
+  --border-radius-lg: var(--radius-lg);
+  --spacing-xs: var(--spacing-xs);
+  --spacing-sm: var(--spacing-sm);
+  --spacing-md: var(--spacing-md);
+  --spacing-lg: var(--spacing-lg);
+  --spacing-xl: var(--spacing-xl);
+  --spacing-xxl: var(--spacing-xl);
+  --spacing-2xl: var(--spacing-xxl);
+  --transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
   
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  --gradient-surface: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  /* Gradients - Using centralized theme colors */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+  --gradient-success: linear-gradient(135deg, var(--color-success) 0%, var(--color-success-hover) 100%);
+  --gradient-warning: linear-gradient(135deg, var(--color-warning) 0%, var(--color-warning-hover) 100%);
+  --gradient-surface: linear-gradient(135deg, var(--color-background-primary) 0%, var(--color-background-secondary) 100%);
 }
 
-/* Modern Grey Scale Theme - Dark Mode */
+/* Dark Mode - Uses centralized theme variables from theme.css */
 [data-theme="dark"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --bg-quaternary: #475569;
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-inverse: #0f172a;
-  --border-color: #334155;
-  --border-light: #475569;
-  --card-bg: #1e293b;
-  --input-bg: #334155;
-  --hover-bg: #334155;
-  --focus-bg: #475569;
+  /* Legacy variables map to dark mode theme variables */
+  --bg-primary: var(--color-background-primary);
+  --bg-secondary: var(--color-background-secondary);
+  --bg-tertiary: var(--color-background-tertiary);
+  --bg-quaternary: var(--color-gray-600);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-tertiary);
+  --text-inverse: var(--color-text-inverse);
+  --border-color: var(--color-border);
+  --border-light: var(--color-border-light);
+  --card-bg: var(--color-background-primary);
+  --input-bg: var(--color-background-secondary);
+  --hover-bg: var(--color-background-secondary);
+  --focus-bg: var(--color-background-tertiary);
   
-  --primary: #60a5fa;
-  --primary-color: #60a5fa; /* Legacy support */
-  --primary-hover: #3b82f6;
-  --primary-light: #1e3a8a;
-  --secondary: #94a3b8;
-  --secondary-color: #94a3b8; /* Legacy support */
-  --secondary-hover: #cbd5e1;
-  --success: #34d399;
-  --success-color: #34d399; /* Legacy support */
-  --success-light: #065f46;
-  --warning: #fbbf24;
-  --warning-color: #fbbf24; /* Legacy support */
-  --warning-light: #92400e;
-  --danger: #f87171;
-  --danger-color: #f87171; /* Legacy support */
-  --danger-light: #991b1b;
-  --info: #22d3ee;
-  --info-color: #22d3ee; /* Legacy support */
-  --info-light: #164e63;
+  /* Colors use dark mode values from theme.css */
+  --primary: var(--color-primary);
+  --primary-color: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-light: var(--color-primary-dark);
+  --secondary: var(--color-secondary);
+  --secondary-color: var(--color-secondary);
+  --secondary-hover: var(--color-secondary-hover);
+  --success: var(--color-success);
+  --success-color: var(--color-success);
+  --success-light: var(--color-success);
+  --warning: var(--color-warning);
+  --warning-color: var(--color-warning);
+  --warning-light: var(--color-warning);
+  --danger: var(--color-danger);
+  --danger-color: var(--color-danger);
+  --danger-light: var(--color-danger);
+  --info: var(--color-info);
+  --info-color: var(--color-info);
+  --info-light: var(--color-info);
   
   /* Additional Theme Variables */
-  --accent-color: #34d399;
-  --brand-primary: #60a5fa;
-  --brand-secondary: #a78bfa;
-  --brand-accent: #34d399;
+  --accent-color: var(--color-success);
+  --brand-primary: var(--color-primary);
+  --brand-secondary: var(--color-secondary);
+  --brand-accent: var(--color-success);
   
+  /* Shadows - Enhanced for dark mode */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
   
-  --gradient-primary: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-  --gradient-success: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  --gradient-warning: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  --gradient-surface: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  /* Gradients - Using dark mode theme colors */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
+  --gradient-success: linear-gradient(135deg, var(--color-success) 0%, var(--color-success-hover) 100%);
+  --gradient-warning: linear-gradient(135deg, var(--color-warning) 0%, var(--color-warning-hover) 100%);
+  --gradient-surface: linear-gradient(135deg, var(--color-background-primary) 0%, var(--color-background-secondary) 100%);
 }
 
 /* Global Styles */

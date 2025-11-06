@@ -24,8 +24,12 @@ const ISO_OUTPUT_DIR = '/var/www/html/downloads/isos';
 const MINIMAL_DIR = '/opt/base-images/minimal';
 const KERNEL_PATH = `${MINIMAL_DIR}/vmlinuz`;
 const INITRD_PATH = `${MINIMAL_DIR}/initrd`;
-const GCE_PUBLIC_IP = process.env.GCE_PUBLIC_IP || '136.112.111.167';
-const HSS_PORT = process.env.HSS_PORT || '3001';
+const appConfig = require('../config/app');
+
+// Hosted on GCE server (136.112.111.167)
+// Use centralized configuration
+const GCE_PUBLIC_IP = appConfig.externalServices.hss.ipAddress;
+const HSS_PORT = appConfig.externalServices.hss.port;
 
 /**
  * Generate EPC ISO from frontend deployment modal

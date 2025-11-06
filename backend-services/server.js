@@ -2,31 +2,22 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const appConfig = require('./config/app');
 
 const app = express();
-const PORT = process.env.PORT || 3001; // Unified Main API Server - handles all routes (customers, work-orders, HSS, billing, etc.)
+const PORT = appConfig.server.port;
 
 // CORS configuration - All authorized Firebase Hosting domains
 app.use(cors({
-  origin: [
-    'https://wisptools.io',
-    'https://wisptools-io.web.app',
-    'https://wisptools-io.firebaseapp.com',
-    'https://lte-pci-mapper-65450042-bbf71.web.app',
-    'https://lte-pci-mapper-65450042-bbf71.firebaseapp.com',
-    'https://lte-pci-mapper--lte-pci-mapper-65450042-bbf71.us-east4.hosted.app',
-    'https://pci-mapper--lte-pci-mapper-65450042-bbf71.us-central1.hosted.app',
-    'http://localhost:5173', // Development
-    'http://localhost:3000' // Development
-  ],
-  credentials: true
+  origin: appConfig.cors.origins,
+  credentials: appConfig.cors.credentials
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: appConfig.limits.jsonBodySize }));
+app.use(express.urlencoded({ extended: true, limit: appConfig.limits.urlEncodedBodySize }));
 
 // MongoDB Connection - Atlas
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = appConfig.mongodb.uri;
 
 console.log('🔗 Connecting to MongoDB Atlas...');
 console.log('📍 MongoDB URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@'));

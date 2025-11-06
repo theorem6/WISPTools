@@ -6,21 +6,20 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import * as fs from 'fs';
 import * as path from 'path';
+import { FUNCTIONS_CONFIG } from './config.js';
 
 // Initialize Firebase Admin once
 if (getApps().length === 0) {
   try {
     // Try to load service account key file
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || 
-                                process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-                                path.join(__dirname, '..', 'wisptools-production-firebase-adminsdk.json');
+    const serviceAccountPath = FUNCTIONS_CONFIG.firebase.serviceAccountPath;
     
     if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
       // Use service account file if provided
       const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
       initializeApp({
         credential: cert(serviceAccount),
-        projectId: serviceAccount.project_id || 'wisptools-production'
+        projectId: serviceAccount.project_id || FUNCTIONS_CONFIG.firebase.projectId
       });
       console.log('✅ Firebase Admin initialized with service account file:', serviceAccountPath);
     } else {

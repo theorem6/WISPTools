@@ -13,14 +13,15 @@ export { setupAdmin } from './setupAdmin.js';
 import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
 import { FieldValue } from 'firebase-admin/firestore';
+import { FUNCTIONS_CONFIG } from './config.js';
 
-const corsHandler = cors({ origin: true });
+const corsHandler = cors({ origin: FUNCTIONS_CONFIG.cors.origins });
 
 // PCI Analysis Function (existing)
 export const analyzePCI = onRequest({
-  region: 'us-central1',
-  memory: '512MiB',
-  timeoutSeconds: 30
+  region: FUNCTIONS_CONFIG.functions.defaultOptions.region,
+  memory: FUNCTIONS_CONFIG.functions.defaultOptions.memory,
+  timeoutSeconds: FUNCTIONS_CONFIG.functions.defaultOptions.timeoutSeconds
 }, async (req, res) => {
   return corsHandler(req, res, async () => {
     if (req.method !== 'POST') {
@@ -218,22 +219,14 @@ function toRadians(degrees: number): number {
 // Handles all API routes: customers, work-orders, inventory, plans, HSS, billing, etc.
 // Updated: Improved path handling for Firebase Hosting rewrites
 export const apiProxy = onRequest({
-  region: 'us-central1',
-  memory: '256MiB',
-  timeoutSeconds: 60,
+  region: FUNCTIONS_CONFIG.functions.apiProxy.region,
+  memory: FUNCTIONS_CONFIG.functions.apiProxy.memory,
+  timeoutSeconds: FUNCTIONS_CONFIG.functions.apiProxy.timeoutSeconds,
   cors: true
 }, async (req, res) => {
   // Set CORS headers explicitly and reflect origin
-  // Allow all authorized Firebase Hosting domains
-  const allowedOrigins = [
-    'https://wisptools.io',
-    'https://wisptools-prod.web.app',
-    'https://wisptools-prod.firebaseapp.com',
-    'https://wisptools-production.web.app',
-    'https://wisptools-production.firebaseapp.com',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ];
+  // Allow all authorized Firebase Hosting domains (from centralized config)
+  const allowedOrigins = FUNCTIONS_CONFIG.cors.origins;
   
   const origin = (req.headers.origin as string) || '';
   const allowedOrigin = allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '*');

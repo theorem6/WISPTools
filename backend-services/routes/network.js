@@ -291,7 +291,8 @@ router.post('/geocode', async (req, res) => {
     const { address } = req.body;
     if (!address) return res.status(400).json({ error: 'Address is required' });
     
-    const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates`;
+    const appConfig = require('../../config/app');
+    const url = appConfig.externalServices.arcgis.geocodeUrl;
     const params = new URLSearchParams({
       f: 'json',
       singleLine: address,
@@ -323,7 +324,8 @@ router.post('/reverse-geocode', async (req, res) => {
       return res.status(400).json({ error: 'Latitude and longitude are required' });
     }
     
-    const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode`;
+    const appConfig = require('../../config/app');
+    const url = appConfig.externalServices.arcgis.reverseGeocodeUrl;
     const params = new URLSearchParams({
       f: 'json',
       location: `${longitude},${latitude}`,
@@ -456,7 +458,8 @@ router.post('/import/acs', async (req, res) => {
     
     // Try to fetch from GenieACS NBI API
     // This would typically connect to GenieACS running on the tenant's infrastructure
-    const genieacsUrl = process.env.GENIEACS_URL || 'http://localhost:7557';
+    const appConfig = require('../../config/app');
+    const genieacsUrl = appConfig.externalServices.genieacs.baseUrl;
     
     try {
       // Fetch devices from GenieACS
