@@ -302,6 +302,11 @@ export const apiProxy = onRequest({
     processedPath: proxiedPath,
     finalUrl: url,
     headers: Object.keys(req.headers || {}),
+    authHeaders: {
+      authorization: req.headers['authorization'] ? 'present' : 'missing',
+      Authorization: req.headers['Authorization'] ? 'present' : 'missing',
+      allAuthKeys: Object.keys(req.headers || {}).filter(h => h.toLowerCase().includes('auth'))
+    },
     bodyType: typeof req.body,
     bodyKeys: req.body ? Object.keys(req.body) : 'null/undefined'
   });
@@ -344,10 +349,12 @@ export const apiProxy = onRequest({
     // Forward Authorization header if present (check both cases - Firebase Functions normalizes to lowercase)
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
     if (authHeader) {
-      headers['Authorization'] = authHeader as string;
-      console.log('[apiProxy] Forwarding Authorization header');
+      const authValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+      headers['Authorization'] = authValue as string;
+      console.log('[apiProxy] Forwarding Authorization header (length:', authValue.length, 'starts with:', authValue.substring(0, 20) + '...)');
     } else {
-      console.warn('[apiProxy] No Authorization header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth')));
+      console.error('[apiProxy] ❌ No Authorization header found! Available headers:', Object.keys(req.headers));
+      console.error('[apiProxy] All header keys:', JSON.stringify(Object.keys(req.headers || {})));
     }
     
     const options: RequestInit = {
