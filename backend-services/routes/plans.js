@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
     const planData = {
       ...req.body,
       tenantId: req.tenantId,
-      createdBy: createdBy, // Always ensure this is set
+      createdBy: createdBy, // Always ensure this is set before validation
       createdById: req.user?.uid || req.body.createdById,
       status: req.body.status || 'draft',
       showOnMap: req.body.showOnMap !== undefined ? req.body.showOnMap : false,
