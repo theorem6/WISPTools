@@ -80,18 +80,21 @@ router.post('/', async (req, res) => {
     }
     
     // Log for debugging
-    console.log('[plans] Creating plan with createdBy:', createdBy, 'from req.body:', {
+    console.log('[plans] Creating plan with createdBy:', createdBy, 'from req.body:', JSON.stringify({
       createdBy: req.body.createdBy,
-      email: req.body.email
-    });
+      email: req.body.email,
+      name: req.body.name
+    }));
     
+    // Build planData WITHOUT spreading req.body first (to avoid overwriting createdBy)
     const planData = {
-      ...req.body,
-      tenantId: req.tenantId,
-      createdBy: createdBy, // Always ensure this is set before validation (never empty)
-      createdById: req.body.createdById || req.body.uid || null,
+      name: req.body.name || 'New Plan',
+      description: req.body.description || '',
       status: req.body.status || 'draft',
       showOnMap: req.body.showOnMap !== undefined ? req.body.showOnMap : false,
+      tenantId: req.tenantId,
+      createdBy: createdBy, // ALWAYS set this explicitly - never overwritten
+      createdById: req.body.createdById || req.body.uid || null,
       scope: req.body.scope || {
         towers: [],
         sectors: [],
@@ -111,6 +114,13 @@ router.post('/', async (req, res) => {
       deployment: req.body.deployment || {}
     };
     
+    // Verify createdBy is set before validation
+    if (!planData.createdBy || planData.createdBy.trim() === '') {
+      planData.createdBy = 'System';
+    }
+    
+    console.log('[plans] Final planData.createdBy:', planData.createdBy);
+    
     const plan = new PlanProject(planData);
     await plan.save();
     
@@ -124,20 +134,46 @@ router.post('/', async (req, res) => {
 // PUT /plans/:id - Update plan
 router.put('/:id', async (req, res) => {
   try {
+    // Find the plan first to check authorization
+    const existingPlan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+    
+    if (!existingPlan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    // Authorization check: Only allow updates if user created the plan or is admin
+    // Get user email from request headers or body
+    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
+    const isOwner = existingPlan.createdBy === userEmail;
+    const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
+    
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You can only edit plans you created' 
+      });
+    }
+    
     const plan = await PlanProject.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       { 
-        ...req.body, 
+        name: req.body.name !== undefined ? req.body.name : existingPlan.name,
+        description: req.body.description !== undefined ? req.body.description : existingPlan.description,
+        status: req.body.status !== undefined ? req.body.status : existingPlan.status,
+        showOnMap: req.body.showOnMap !== undefined ? req.body.showOnMap : existingPlan.showOnMap,
+        scope: req.body.scope !== undefined ? req.body.scope : existingPlan.scope,
+        hardwareRequirements: req.body.hardwareRequirements !== undefined ? req.body.hardwareRequirements : existingPlan.hardwareRequirements,
+        purchasePlan: req.body.purchasePlan !== undefined ? req.body.purchasePlan : existingPlan.purchasePlan,
+        deployment: req.body.deployment !== undefined ? req.body.deployment : existingPlan.deployment,
         updatedAt: new Date(),
-        updatedBy: req.user?.email || req.user?.name,
-        updatedById: req.user?.uid
+        updatedBy: userEmail || 'System',
+        updatedById: req.user?.uid || req.body.uid || null
       },
       { new: true, runValidators: true }
     );
-    
-    if (!plan) {
-      return res.status(404).json({ error: 'Plan not found' });
-    }
     
     res.json(plan);
   } catch (error) {
