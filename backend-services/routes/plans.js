@@ -69,10 +69,13 @@ router.get('/:id', async (req, res) => {
 // POST /plans - Create new plan
 router.post('/', async (req, res) => {
   try {
+    // Ensure createdBy is always set (required field)
+    const createdBy = req.body.createdBy || req.user?.email || req.user?.name || req.body.createdBy || 'System';
+    
     const planData = {
       ...req.body,
       tenantId: req.tenantId,
-      createdBy: req.body.createdBy || req.user?.email || req.user?.name || 'System',
+      createdBy: createdBy, // Always ensure this is set
       createdById: req.user?.uid || req.body.createdById,
       status: req.body.status || 'draft',
       showOnMap: req.body.showOnMap !== undefined ? req.body.showOnMap : false,
