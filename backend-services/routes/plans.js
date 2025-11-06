@@ -70,13 +70,15 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     // Ensure createdBy is always set (required field)
-    // Priority: req.body.createdBy > req.body.email > 'System'
-    const createdBy = req.body.createdBy || req.body.email || 'System';
+    // Priority: req.body.createdBy (if truthy) > req.body.email > 'System'
+    const createdBy = (req.body.createdBy && req.body.createdBy.trim()) 
+      || req.body.email 
+      || 'System';
     
     const planData = {
       ...req.body,
       tenantId: req.tenantId,
-      createdBy: createdBy, // Always ensure this is set before validation
+      createdBy: createdBy, // Always ensure this is set before validation (never empty)
       createdById: req.body.createdById || req.body.uid || null,
       status: req.body.status || 'draft',
       showOnMap: req.body.showOnMap !== undefined ? req.body.showOnMap : false,
