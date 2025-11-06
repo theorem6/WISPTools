@@ -6,6 +6,7 @@ const router = express.Router();
 const { PlanProject } = require('../models/plan');
 const { InventoryItem } = require('../models/inventory');
 const { UnifiedTower, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const { createProjectApprovalNotification } = require('./notifications');
 
 // ============================================================================
 // MIDDLEWARE
@@ -233,6 +234,19 @@ router.post('/:id/approve', async (req, res) => {
     };
     plan.updatedAt = new Date();
     await plan.save();
+    
+    // Create notifications for field techs
+    try {
+      await createProjectApprovalNotification(
+        plan._id.toString(),
+        plan.name,
+        req.tenantId,
+        plan.approval.approvedBy
+      );
+    } catch (notifError) {
+      console.error('Failed to create notifications (non-blocking):', notifError);
+      // Don't fail the approval if notifications fail
+    }
     
     res.json({ plan, message: 'Plan approved for deployment' });
   } catch (error) {

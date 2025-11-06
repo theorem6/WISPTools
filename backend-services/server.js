@@ -46,6 +46,7 @@ app.use('/api/auth', require('./routes/auth')); // Authentication routes
 app.use('/api/users', require('./routes/users')); // Includes auto-assign routes
 app.use('/api/tenants', require('./routes/tenants')); // User tenant creation (first tenant only)
 app.use('/api/user-tenants', require('./routes/users/tenant-details'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/work-orders', require('./routes/work-orders'));

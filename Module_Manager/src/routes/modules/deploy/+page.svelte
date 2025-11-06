@@ -13,6 +13,7 @@
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';
   import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
+  import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -23,6 +24,11 @@
   let selectedPlan: PlanProject | null = null;
   let isLoadingPlans = false;
   let approvalMode: 'approve' | 'reject' | null = null;
+  
+  // Project filtering
+  let showProjectFilters = false;
+  let approvedPlans: PlanProject[] = [];
+  let visiblePlanIds: Set<string> = new Set();
   
   // PCI Planner
   let showPCIPlannerModal = false;
@@ -100,6 +106,14 @@
           plan.status === 'ready' || plan.status === 'approved'
         );
         
+        // Separate approved plans for filtering
+        approvedPlans = allPlans.filter(plan => plan.status === 'approved');
+        
+        // Initialize visible plan IDs from plans with showOnMap = true
+        visiblePlanIds = new Set(
+          approvedPlans.filter(p => p.showOnMap).map(p => p.id)
+        );
+        
         // Load deployed hardware count
         try {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
@@ -141,12 +155,18 @@
   }
 
   async function handlePlanApproved(event: CustomEvent) {
-      await loadReadyPlans();
+    await loadReadyPlans();
     // Keep modal open but update selected plan
     if (selectedPlan) {
       const updatedPlan = readyPlans.find(p => p.id === selectedPlan?.id);
       if (updatedPlan) {
         selectedPlan = updatedPlan;
+        // Automatically show approved plan on map
+        if (updatedPlan.status === 'approved') {
+          await planService.updatePlan(updatedPlan.id, { showOnMap: true });
+          visiblePlanIds.add(updatedPlan.id);
+          visiblePlanIds = new Set(visiblePlanIds);
+        }
       }
     }
   }
@@ -245,6 +265,14 @@
         <h1>🚀 Deploy</h1>
       </div>
       <div class="header-controls">
+        <button 
+          class="control-btn" 
+          class:active={showProjectFilters}
+          on:click={() => showProjectFilters = !showProjectFilters} 
+          title="Project Filters"
+        >
+          🔍 Projects ({approvedPlans.length})
+        </button>
         <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
           📋 Plans ({readyPlans.length})
         </button>
@@ -313,6 +341,17 @@
     show={showDeployedHardwareModal}
     tenantId={$currentTenant?.id || ''}
     on:close={() => showDeployedHardwareModal = false}
+  />
+  
+  <!-- Project Filter Panel -->
+  <ProjectFilterPanel
+    show={showProjectFilters}
+    approvedPlans={approvedPlans}
+    visiblePlanIds={visiblePlanIds}
+    on:close={() => showProjectFilters = false}
+    on:visibility-changed={async (event: CustomEvent) => {
+      await loadReadyPlans(); // Reload to sync with map
+    }}
   />
   
   <!-- Plan Selection Modal (if no plan selected) -->

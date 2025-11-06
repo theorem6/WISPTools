@@ -43,7 +43,11 @@
     
     try {
       await planService.approvePlan(plan.id, approvalNotes);
-      success = `Plan "${plan.name}" has been approved for deployment.`;
+      
+      // Automatically show approved plan on map
+      await planService.updatePlan(plan.id, { showOnMap: true });
+      
+      success = `Plan "${plan.name}" has been approved for deployment and is now visible on the map.`;
       setTimeout(() => {
         dispatch('approved', { planId: plan?.id });
         handleClose();
