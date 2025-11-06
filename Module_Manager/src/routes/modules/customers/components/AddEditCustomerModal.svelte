@@ -85,8 +85,8 @@
       const tenantId = localStorage.getItem('selectedTenantId');
       if (!tenantId) return;
       
-      // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-      const apiPath = '/api';
+      // Use centralized API configuration
+      const apiPath = API_CONFIG.PATHS.CUSTOMERS.split('/customers')[0];
       const token = await (await import('$lib/services/authService')).authService.getIdToken();
       
       // Load groups and bandwidth plans

@@ -3,10 +3,10 @@
  * Manages trouble tickets, installations, and field operations
  */
 
-// Use relative URL to leverage Firebase Hosting rewrites
-// This goes through Firebase Hosting rewrite to apiProxy function
-// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
-const API_URL = '';
+import { getApiUrl } from '$lib/config/api';
+
+// API Configuration - Use centralized config
+const API_URL = getApiUrl();
 
 // Lazy import to avoid circular dependencies and ensure authService is fully initialized
 async function getAuthService() {
@@ -185,7 +185,7 @@ class WorkOrderService {
     }
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_URL || '/api';
+    const apiPath = API_URL;
     const response = await fetch(`${apiPath}/work-orders${endpoint}`, {
       ...options,
       headers: {

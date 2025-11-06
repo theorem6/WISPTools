@@ -10,6 +10,10 @@
   import TicketDetailsModal from '../help-desk/components/TicketDetailsModal.svelte';
   import CustomerLookupModal from '../help-desk/components/CustomerLookupModal.svelte';
   import AddEditCustomerModal from '../customers/components/AddEditCustomerModal.svelte';
+  import { API_CONFIG } from '$lib/config/api';
+  
+  // Use centralized API configuration
+  const MAINTAIN_API = API_CONFIG.PATHS.MAINTAIN;
   
   // Tab management
   type Tab = 'overview' | 'tickets' | 'maintenance' | 'customers' | 'incidents';
@@ -86,7 +90,7 @@
     loadingStats = true;
     try {
       // Try unified maintain API first
-      const response = await fetch(`${getApiUrl()}/api/maintain/dashboard/stats`, {
+      const response = await fetch(`${MAINTAIN_API}/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'X-Tenant-ID': tenantId,
@@ -173,7 +177,7 @@
     if (!tenantId || !browser) return;
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/maintain/dashboard/activity?limit=10`, {
+      const response = await fetch(`${MAINTAIN_API}/dashboard/activity?limit=10`, {
         headers: {
           'Authorization': `Bearer ${await getAuthToken()}`,
           'X-Tenant-ID': tenantId,
@@ -238,8 +242,8 @@
   }
   
   function getApiUrl(): string {
-    // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-    return '/api';
+    // Use centralized API configuration
+    return MAINTAIN_API;
   }
   
   function formatDate(date: Date | string | undefined): string {

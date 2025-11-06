@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
+  import { API_CONFIG } from '$lib/config/api';
   import type { TowerSite } from '../lib/models';
 
   export let show = false;
@@ -116,8 +117,8 @@
     try {
       console.log('[HSSRegistration] Registering site with HSS...');
       
-      // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-      const HSS_API = '/api/hss';
+      // Use centralized API configuration
+      const HSS_API = API_CONFIG.PATHS.HSS;
       
       const response = await fetch(`${HSS_API}/sites/register`, {
         method: 'POST',

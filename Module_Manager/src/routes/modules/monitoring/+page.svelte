@@ -8,8 +8,10 @@
   import EPCMonitor from './components/EPCMonitor.svelte';
   import MMEConnections from './components/MMEConnections.svelte';
   
-  // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-  const MONITORING_API = '/api';
+  import { API_CONFIG } from '$lib/config/api';
+  
+  // Use centralized API configuration
+  const MONITORING_API = API_CONFIG.PATHS.MONITORING;
   
   let activeTab = 'overview';
   let loading = true;

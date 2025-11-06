@@ -12,20 +12,12 @@
   import BulkImport from './components/BulkImport.svelte';
   import RemoteEPCs from './components/RemoteEPCs.svelte';
   import DeployEPC from './components/DeployEPC.svelte';
+  import { API_CONFIG } from '$lib/config/api';
+  
+  // Use centralized API configuration
+  const HSS_API = API_CONFIG.PATHS.HSS;
   
   let activeTab = 'dashboard';
-  let stats: any = null;
-  let loading = true;
-  let error = '';
-  let groups: any[] = [];
-  let bandwidthPlans: any[] = [];
-  
-  // Tenant info - use currentTenant store
-  $: tenantId = $currentTenant?.id || '';
-  $: tenantName = $currentTenant?.displayName || 'No Tenant Selected';
-  
-  // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-  const HSS_API = '/api';
   
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {

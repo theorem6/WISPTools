@@ -61,6 +61,7 @@
   let showEPCDeploymentModal = false;
   let showHSSRegistrationModal = false;
   let showHardwareDeploymentModal = false;
+  let showSiteEditModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat = 0;

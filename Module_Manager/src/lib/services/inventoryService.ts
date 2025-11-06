@@ -2,11 +2,10 @@
 // Communicates with backend inventory API
 
 import { authService } from './authService';
+import { getApiUrl } from '$lib/config/api';
 
-// Use relative URL to leverage Firebase Hosting rewrites
-// This goes through Firebase Hosting rewrite to apiProxy function
-// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
-const API_URL = '';
+// API Configuration - Use centralized config
+const API_URL = getApiUrl('INVENTORY');
 
 export interface InventoryItem {
   _id?: string;
@@ -165,9 +164,9 @@ class InventoryService {
       throw new Error('No tenant selected');
     }
     
-    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_URL || '/api';
-    const response = await fetch(`${apiPath}/inventory${endpoint}`, {
+    // Use centralized API configuration
+    const apiPath = API_URL;
+    const response = await fetch(`${apiPath}${endpoint}`, {
       ...options,
       headers
     });
@@ -331,7 +330,7 @@ class InventoryService {
     const tenantId = localStorage.getItem('selectedTenantId');
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_URL || '/api';
+    const apiPath = API_URL;
     const response = await fetch(`${apiPath}/inventory/export/csv`, {
       headers: {
         'Authorization': `Bearer ${token}`,

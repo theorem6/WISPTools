@@ -10,10 +10,10 @@ import { coverageMapService } from '../../routes/modules/coverage-map/lib/covera
 import type { InventoryItem } from './inventoryService';
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from '../../routes/modules/coverage-map/lib/models';
 
-// API Configuration
-// Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
-const API_URL = '';
+import { getApiUrl } from '$lib/config/api';
+
+// API Configuration - Use centralized config
+const API_URL = getApiUrl('PLANS');
 
 export interface PlanProject {
   id: string;
@@ -154,9 +154,9 @@ class PlanService {
       throw new Error('No tenant selected');
     }
     
-    // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_URL || '/api';
-    const fullUrl = `${apiPath}/plans${endpoint}`;
+    // Use centralized API configuration
+    const apiPath = API_URL;
+    const fullUrl = `${apiPath}${endpoint}`;
     console.log('[planService] API URL:', { API_URL, apiPath, fullUrl, endpoint });
     const response = await fetch(fullUrl, {
       ...options,

@@ -1,9 +1,9 @@
 // Coverage Map Service - MongoDB Backend Version
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
+import { getApiUrl } from '$lib/config/api';
 
-// Backend API URL - Always use relative URL, goes through Firebase Hosting rewrite to apiProxy Cloud Function
-// DO NOT use VITE_HSS_API_URL as it may point to deprecated hssProxy
-const API_URL = '';
+// API Configuration - Use centralized config
+const API_URL = getApiUrl('NETWORK');
 
 export class CoverageMapService {
   
@@ -29,8 +29,9 @@ export class CoverageMapService {
     }
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_URL || '/api';
-    const response = await fetch(`${apiPath}/network/${endpoint}`, {
+    // Use centralized API configuration
+    const apiPath = API_URL;
+    const response = await fetch(`${apiPath}/${endpoint}`, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,

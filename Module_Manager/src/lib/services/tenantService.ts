@@ -3,6 +3,7 @@
 
 import { browser } from '$app/environment';
 import { auth } from '../firebase';
+import { API_CONFIG } from '$lib/config/api';
 import type {
   Tenant,
   UserTenantAssociation,
@@ -22,9 +23,9 @@ export class TenantService {
     this.baseUrl = browser ? window.location.origin : 
       process.env.VITE_CWMP_BASE_URL || 'https://your-domain.com';
     
-    // Always use relative URLs - goes through Firebase Hosting rewrite to apiProxy function
-    this.apiBaseUrl = '/api';      // for backend routes mounted under /api
-    this.adminBaseUrl = '/admin';  // for backend routes mounted under /admin
+    // Use centralized API configuration
+    this.apiBaseUrl = API_CONFIG.PATHS.TENANTS.split('/tenants')[0] || '/api';
+    this.adminBaseUrl = API_CONFIG.PATHS.ADMIN;
   }
 
   /**

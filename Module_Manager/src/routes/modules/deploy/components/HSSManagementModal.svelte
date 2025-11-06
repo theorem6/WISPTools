@@ -8,21 +8,12 @@
   import RemoteEPCs from '../../hss-management/components/RemoteEPCs.svelte';
   import HSSStats from '../../hss-management/components/HSSStats.svelte';
   import MMEConnections from '../../hss-management/components/MMEConnections.svelte';
+  import { API_CONFIG } from '$lib/config/api';
+  
+  // Use centralized API configuration
+  const HSS_API = API_CONFIG.PATHS.HSS;
 
   export let show = false;
-  export let tenantId: string;
-
-  const dispatch = createEventDispatcher();
-
-  let activeTab: 'dashboard' | 'subscribers' | 'groups' | 'plans' | 'epcs' | 'import' | 'connections' = 'dashboard';
-  let stats: any = null;
-  let groups: any[] = [];
-  let bandwidthPlans: any[] = [];
-  let loading = true;
-  let error = '';
-
-  // Always use relative URL - goes through Firebase Hosting rewrite to apiProxy function
-  const HSS_API = '/api/hss';
 
   // Reactive statement to load data when modal opens
   $: if (show && tenantId) {
