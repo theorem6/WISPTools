@@ -134,12 +134,10 @@ export class PCIArcGISMapper {
       const [
         { default: Zoom },
         { default: BasemapToggle },
-        { default: Locate },
         { default: Compass }
       ] = await Promise.all([
         import('@arcgis/core/widgets/Zoom.js'),
         import('@arcgis/core/widgets/BasemapToggle.js'),
-        import('@arcgis/core/widgets/Locate.js'),
         import('@arcgis/core/widgets/Compass.js')
       ]);
       
@@ -165,21 +163,9 @@ export class PCIArcGISMapper {
         index: 0
       });
       
-      // Add locate button for mobile users
-      if (isMobile && navigator.geolocation) {
-        const locate = new Locate({
-          view: this.mapView,
-          goToOverride: (view, options) => {
-            options.target.scale = 15000; // Zoom level for mobile
-            return view.goTo(options.target);
-          }
-        });
-        
-        this.mapView.ui.add(locate, {
-          position: "top-left",
-          index: 0
-        });
-      }
+      // Note: Locate widget removed due to deprecation (ArcGIS 4.32+)
+      // Users can use browser's native geolocation or manually navigate to their location
+      // Future: Consider implementing <arcgis-locate> web component if needed
       
       // Add compass for mobile
       if (isMobile) {

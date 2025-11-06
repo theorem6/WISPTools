@@ -15,7 +15,7 @@ import cors from 'cors';
 import { FieldValue } from 'firebase-admin/firestore';
 import { FUNCTIONS_CONFIG } from './config.js';
 
-const corsHandler = cors({ origin: FUNCTIONS_CONFIG.cors.origins });
+const corsHandler = cors({ origin: [...FUNCTIONS_CONFIG.cors.origins] });
 
 // PCI Analysis Function (existing)
 export const analyzePCI = onRequest({
@@ -226,7 +226,7 @@ export const apiProxy = onRequest({
 }, async (req, res) => {
   // Set CORS headers explicitly and reflect origin
   // Allow all authorized Firebase Hosting domains (from centralized config)
-  const allowedOrigins = FUNCTIONS_CONFIG.cors.origins;
+  const allowedOrigins: string[] = [...FUNCTIONS_CONFIG.cors.origins];
   
   const origin = (req.headers.origin as string) || '';
   const allowedOrigin = allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '*');

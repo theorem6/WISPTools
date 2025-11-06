@@ -223,11 +223,9 @@
       // Add zoom controls
       const [
         { default: Zoom },
-        { default: Locate },
         { default: Compass }
       ] = await Promise.all([
         import('@arcgis/core/widgets/Zoom.js'),
-        import('@arcgis/core/widgets/Locate.js'),
         import('@arcgis/core/widgets/Compass.js')
       ]);
       
@@ -244,22 +242,9 @@
       
       // Basemap toggle is now handled by the <arcgis-basemap-toggle> web component
       
-      // Add locate button for mobile users
-      if (isMobile && navigator.geolocation) {
-        const locate = new Locate({
-          view: mapView,
-          useHeadingEnabled: false,
-          goToOverride: (view, options) => {
-            options.target.scale = 15000; // Zoom level for mobile
-            return view.goTo(options.target);
-          }
-        });
-        
-        mapView.ui.add(locate, {
-          position: "top-left",
-          index: 0
-        });
-      }
+      // Note: Locate widget removed due to deprecation (ArcGIS 4.32+)
+      // Users can use browser's native geolocation or manually navigate to their location
+      // Future: Consider implementing <arcgis-locate> web component if needed
       
       // Add compass for mobile
       if (isMobile) {

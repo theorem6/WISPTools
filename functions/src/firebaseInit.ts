@@ -5,7 +5,6 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import * as fs from 'fs';
-import * as path from 'path';
 import { FUNCTIONS_CONFIG } from './config.js';
 
 // Initialize Firebase Admin once
