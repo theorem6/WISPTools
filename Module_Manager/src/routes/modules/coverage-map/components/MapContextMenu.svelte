@@ -65,6 +65,23 @@
     </button>
   </div>
   
+  {#if planMode}
+  <div class="menu-divider"></div>
+  
+  <div class="menu-section">
+    <div class="section-label">Add Equipment to Plan</div>
+    <button class="menu-item" on:click={() => handleAction('create-sector')}>
+      <span class="menu-icon">📶</span>
+      <span>Add Sector to Plan</span>
+    </button>
+    
+    <button class="menu-item" on:click={() => handleAction('create-cpe')}>
+      <span class="menu-icon">📱</span>
+      <span>Add CPE Device to Plan</span>
+    </button>
+  </div>
+  {/if}
+  
   <div class="menu-divider"></div>
   
   <button class="menu-item" on:click={() => handleAction('copy-coords')}>
