@@ -56,6 +56,40 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to test token verification
+app.get('/api/debug/token', async (req, res) => {
+  const { auth } = require('./config/firebase');
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.json({ error: 'No token provided', hasHeader: !!authHeader });
+  }
+  
+  const token = authHeader.split('Bearer ')[1];
+  
+  try {
+    const decodedToken = await auth.verifyIdToken(token);
+    res.json({
+      success: true,
+      decoded: {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        projectId: decodedToken.firebase?.project_id || 'unknown'
+      },
+      authAppProjectId: auth.app?.options?.projectId || 'unknown'
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      code: error.code,
+      tokenLength: token.length,
+      tokenStart: token.substring(0, 50) + '...',
+      authAppProjectId: auth.app?.options?.projectId || 'unknown'
+    });
+  }
+});
+
 
 // Use existing route files - ALL MODULES
 app.use('/api/auth', require('./routes/auth')); // Authentication routes
