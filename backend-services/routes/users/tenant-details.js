@@ -16,6 +16,13 @@ const router = express.Router();
  */
 router.get('/:userId', verifyAuth, async (req, res) => {
   try {
+    console.log('[tenant-details] GET /api/user-tenants/:userId called:', {
+      userId: req.params.userId,
+      requestingUserId: req.user?.uid,
+      userEmail: req.user?.email,
+      headers: Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth'))
+    });
+    
     const { userId } = req.params;
     const requestingUserId = req.user.uid;
     

@@ -41,6 +41,23 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test endpoint to verify requests are reaching the backend
+app.get('/api/test-auth', (req, res) => {
+  console.log('[test-auth] Request received:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    headers: Object.keys(req.headers),
+    authHeader: req.headers.authorization ? 'present' : 'missing',
+    authHeaderValue: req.headers.authorization ? req.headers.authorization.substring(0, 50) + '...' : 'none'
+  });
+  res.json({
+    message: 'Test endpoint reached',
+    hasAuthHeader: !!req.headers.authorization,
+    authHeaderLength: req.headers.authorization?.length || 0
+  });
+});
+
 // Use existing route files - ALL MODULES
 app.use('/api/auth', require('./routes/auth')); // Authentication routes
 app.use('/api/users', require('./routes/users')); // Includes auto-assign routes
