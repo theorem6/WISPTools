@@ -159,17 +159,20 @@ router.put('/:id', async (req, res) => {
     
     // Authorization check: Only allow updates if user created the plan or is admin
     // Get user email from request headers or body
-    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
-    const isOwner = existingPlan.createdBy === userEmail;
+    const userEmail = (req.user?.email || req.body.email || req.headers['x-user-email'] || '').trim();
+    const normalizedCreator = (existingPlan.createdBy || '').trim();
+    const isOwner = normalizedCreator && userEmail && normalizedCreator.toLowerCase() === userEmail.toLowerCase();
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
-    
-    if (!isOwner && !isAdmin) {
+
+    const adoptableOwner = !normalizedCreator || ['system', 'auto', 'automated', 'unknown'].includes(normalizedCreator.toLowerCase());
+
+    if (!isOwner && !isAdmin && !adoptableOwner) {
       return res.status(403).json({ 
         error: 'Forbidden', 
         message: 'You can only edit plans you created' 
       });
     }
-    
+     
     const plan = await PlanProject.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       { 
@@ -183,7 +186,8 @@ router.put('/:id', async (req, res) => {
         deployment: req.body.deployment !== undefined ? req.body.deployment : existingPlan.deployment,
         updatedAt: new Date(),
         updatedBy: userEmail || 'System',
-        updatedById: req.user?.uid || req.body.uid || null
+        updatedById: req.user?.uid || req.body.uid || null,
+        ...(adoptableOwner && userEmail ? { createdBy: userEmail, createdById: req.user?.uid || req.body.uid || null } : {})
       },
       { new: true, runValidators: true }
     );
