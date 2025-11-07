@@ -10,6 +10,7 @@ const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('..
 const UnifiedTower = UnifiedSite; // Backwards compatibility alias
 const { createProjectApprovalNotification } = require('./notifications');
 const { PlanLayerFeature } = require('../models/plan-layer-feature');
+const { verifyAuth } = require('./users/role-auth-middleware');
 
 // ============================================================================
 // MIDDLEWARE
@@ -25,6 +26,7 @@ const requireTenant = (req, res, next) => {
   next();
 };
 
+router.use(verifyAuth);
 router.use(requireTenant);
 
 // ============================================================================

@@ -233,7 +233,7 @@ export const apiProxy = onRequest({
   
   res.set('Access-Control-Allow-Origin', allowedOrigin);
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id, X-Tenant-ID');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id, X-Tenant-ID, x-user-email, X-User-Email');
   res.set('Access-Control-Max-Age', '3600');
   res.set('Access-Control-Allow-Credentials', 'true');
   res.set('Vary', 'Origin');
@@ -355,6 +355,13 @@ export const apiProxy = onRequest({
     } else {
       console.error('[apiProxy] ❌ No Authorization header found! Available headers:', Object.keys(req.headers));
       console.error('[apiProxy] All header keys:', JSON.stringify(Object.keys(req.headers || {})));
+    }
+    
+    const userEmailHeader = req.headers['x-user-email'] || req.headers['X-User-Email'];
+    if (userEmailHeader) {
+      const emailValue = Array.isArray(userEmailHeader) ? userEmailHeader[0] : userEmailHeader;
+      headers['x-user-email'] = emailValue as string;
+      console.log('[apiProxy] Forwarding user email header:', emailValue);
     }
     
     const options: RequestInit = {
