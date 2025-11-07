@@ -5,6 +5,9 @@
   import type { PlanLayerFeature } from '$lib/services/planService';
   import { createLocationIcon } from '$lib/mapIcons';
   import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
+  import { buildArcGISConfig } from '$lib/config';
+
+  const arcgisConfig = buildArcGISConfig();
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -63,12 +66,26 @@
       const [
         { default: Map },
         { default: MapView },
-        { default: GraphicsLayer }
+        { default: GraphicsLayer },
+        esriConfigModule
       ] = await Promise.all([
         import('@arcgis/core/Map.js'),
         import('@arcgis/core/views/MapView.js'),
-        import('@arcgis/core/layers/GraphicsLayer.js')
+        import('@arcgis/core/layers/GraphicsLayer.js'),
+        import('@arcgis/core/config.js')
       ]);
+
+      const esriConfig = esriConfigModule?.default;
+      if (esriConfig) {
+        if (arcgisConfig.apiKey) {
+          esriConfig.apiKey = arcgisConfig.apiKey;
+        } else {
+          console.warn('[CoverageMap] ArcGIS API key is not configured. Basemap access may fail.');
+        }
+        esriConfig.portalUrl = esriConfig.portalUrl || 'https://www.arcgis.com';
+        esriConfig.request = esriConfig.request || {};
+        esriConfig.assetsPath = esriConfig.assetsPath || 'https://js.arcgis.com/4.33/assets';
+      }
 
       // Create graphics layers
       backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
