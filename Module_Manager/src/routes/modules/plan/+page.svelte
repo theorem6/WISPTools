@@ -29,12 +29,20 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
   let error: string = '';
   let successMessage: string = '';
   let loadedTenantId: string | null = null; // Track which tenant's data is loaded
-  let mapState: MapLayerManagerState | undefined;
-  let mapMode: MapModuleMode = 'plan';
+let mapState: MapLayerManagerState | undefined;
+let mapMode: MapModuleMode = 'plan';
+let contextActivePlan: PlanProject | null = null;
 
-  $: mapState = $mapContext as MapLayerManagerState;
-  $: mapMode = (mapState?.mode ?? 'plan');
-  $: mapLocked = !activeProject;
+$: mapState = $mapContext as MapLayerManagerState;
+$: mapMode = (mapState?.mode ?? 'plan');
+$: contextActivePlan = mapState?.activePlan ?? null;
+$: {
+  if (!activeProject && contextActivePlan) {
+    activeProject = contextActivePlan;
+    selectedProject = selectedProject ?? contextActivePlan;
+  }
+}
+$: mapLocked = !(activeProject || contextActivePlan);
 
   function applyPlanningCapabilities(lock: boolean) {
     if (lock) {
@@ -105,7 +113,7 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     moduleContext = {
       module: 'plan',
       userRole: normalizedRole,
-      projectId: activeProject?.id
+      projectId: (activeProject || contextActivePlan)?.id
     };
   }
 
@@ -519,25 +527,27 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     const { autoStart = false } = options;
     try {
       const updatedPlan = await planService.updatePlan(project.id, { status: 'active', showOnMap: true });
-      const active = updatedPlan ?? project;
+      let active = updatedPlan ?? { ...project, status: 'active', showOnMap: true };
+
+      if ($currentTenant?.id) {
+        await loadData();
+        const refreshed = projects.find(p => p.id === project.id);
+        if (refreshed) {
+          active = refreshed;
+        }
+        await mapLayerManager.loadPlan($currentTenant.id, active);
+      }
 
       activeProject = active;
       selectedProject = active;
       showProjectActions = true;
-
-      const exists = projects.some(p => p.id === active.id);
-      projects = exists ? projects.map(p => (p.id === active.id ? active : p)) : [active, ...projects];
-
-      visiblePlans = new Set(visiblePlans);
-      visiblePlans.add(active.id);
-
-      if ($currentTenant?.id) {
-        await mapLayerManager.loadPlan($currentTenant.id, active);
-      }
+      const updatedVisibility = new Set(visiblePlans);
+      updatedVisibility.add(active.id);
+      visiblePlans = updatedVisibility;
 
       successMessage = autoStart
-        ? `Plan "${active.name}" started. You can now place sites and hardware.`
-        : `Project "${active.name}" is active. All map changes will be saved to this plan.`;
+        ? `Plan "${active.name}" started. You can now stage sites and hardware on the map.`
+        : `Plan "${active.name}" is now active. All map edits will be saved to this plan.`;
       setTimeout(() => successMessage = '', 6000);
     } catch (err: any) {
       console.error('Error starting project:', err);
@@ -647,6 +657,47 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       alert('Failed to authorize project');
     }
   }
+
+  async function deleteProject(project: PlanProject) {
+    const allowedStatuses = ['draft', 'ready', 'cancelled', 'rejected'];
+
+    if (!allowedStatuses.includes(project.status)) {
+      error = 'Only draft, ready, cancelled, or rejected plans can be deleted.';
+      setTimeout(() => error = '', 5000);
+      return;
+    }
+
+    if (!confirm(`Delete plan "${project.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const deleted = await planService.deletePlan(project.id);
+      if (!deleted) {
+        throw new Error('Delete request failed');
+      }
+
+      projects = projects.filter(p => p.id !== project.id);
+      const updatedVisibility = new Set(visiblePlans);
+      updatedVisibility.delete(project.id);
+      visiblePlans = updatedVisibility;
+
+      if (activeProject?.id === project.id) {
+        activeProject = null;
+        selectedProject = null;
+        showProjectActions = false;
+        mapLayerManager.setMode('plan');
+        mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
+      }
+
+      successMessage = `Plan "${project.name}" deleted.`;
+      setTimeout(() => successMessage = '', 5000);
+    } catch (err: any) {
+      console.error('Error deleting project:', err);
+      error = err?.message || 'Failed to delete plan';
+      setTimeout(() => error = '', 5000);
+    }
+  }
 </script>
 
 <TenantGuard>
@@ -748,6 +799,12 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-icon">{activeProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
             <span class="control-label">{activeProject.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
+          {#if ['draft','ready','cancelled','rejected'].includes(activeProject.status)}
+            <button class="control-btn delete-btn" on:click={() => deleteProject(activeProject)} title="Delete Plan">
+              <span class="control-icon">🗑️</span>
+              <span class="control-label">Delete</span>
+            </button>
+          {/if}
         {/if}
       </div>
     </div>
@@ -897,6 +954,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
                     </button>
+                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Plan">
+                      🗑️ Delete
+                    </button>
                   {/if}
                   
                   {#if project.status === 'ready'}
@@ -905,6 +965,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     </button>
                     <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project - Send back for revision">
                       ❌ Reject
+                    </button>
+                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Plan">
+                      🗑️ Delete
                     </button>
                   {/if}
                   
@@ -1440,6 +1503,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
+  }
+
+  .control-btn.delete-btn {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.35);
+  }
+
+  .control-btn.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.28);
+    border-color: rgba(239, 68, 68, 0.55);
   }
 
   /* Modal Styles */
@@ -2285,5 +2358,21 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     display: block;
     margin-bottom: 0.25rem;
     font-weight: 600;
+  }
+
+  .action-btn.visibility-inactive {
+    background: rgba(148, 163, 184, 0.15);
+    color: rgba(148, 163, 184, 0.9);
+  }
+
+  .action-btn.delete-btn {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fee2e2;
+    border-color: rgba(239, 68, 68, 0.45);
+  }
+
+  .action-btn.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.6);
   }
 </style>
