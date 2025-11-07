@@ -122,16 +122,6 @@
     }
   }
 
-  async function focusPlanOnMap(planId: string | null) {
-    const tenantId = $currentTenant?.id;
-    if (!tenantId || !planId) return;
-    const plan = approvedPlans.find(p => p.id === planId);
-    if (plan) {
-      await mapLayerManager.loadPlan(tenantId, plan);
-    }
-  }
-  
-
   function goBack() {
     goto('/dashboard');
   }
@@ -773,7 +763,5 @@
     text-align: center;
     padding: 2rem;
     color: var(--text-secondary);
-  }
-</style>
   }
 </style>
