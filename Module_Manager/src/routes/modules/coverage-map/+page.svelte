@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
@@ -30,6 +30,8 @@
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
     CoverageMapFilters, Location 
   } from './lib/models';
+  import type { PlanLayerFeature, PlanFeatureSummary, HardwareView } from '$lib/services/planService';
+  import type { MapModuleMode } from '$lib/map/MapCapabilities';
   
   // Data
   let towers: TowerSite[] = [];
@@ -147,11 +149,27 @@
   $: planId = $page.url.searchParams.get('planId') || null;
   let activePlanName: string | null = null;
   
+  let externalPlanFeatures: PlanLayerFeature[] = [];
+  let externalPlanSummary: PlanFeatureSummary | null = null;
+  let sharedMapMode: MapModuleMode | null = null;
+  let externalProductionHardware: HardwareView[] = [];
+  let sharedMapStateTimestamp: Date | null = null;
+
   onMount(async () => {
+    window.addEventListener('message', handleSharedMapMessage);
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ source: 'coverage-map', type: 'request-state' }, '*');
+    }
+
     if (tenantId) {
       await loadAllData();
     }
     isLoading = false;
+  });
+  
+  onDestroy(() => {
+    window.removeEventListener('message', handleSharedMapMessage);
   });
   
   // Watch for tenant changes and plan visibility changes
@@ -340,6 +358,23 @@
       await loadAllData();
     }
     setTimeout(() => { error = ''; success = ''; }, 5000);
+  }
+
+  function handleSharedMapMessage(event: MessageEvent) {
+    const { source, type, payload } = event.data || {};
+    if (source !== 'shared-map' || type !== 'state-update') return;
+
+    const state = payload?.state ?? {};
+
+    sharedMapMode = payload?.mode ?? state.mode ?? null;
+    externalPlanFeatures = state.stagedFeatures ?? [];
+    externalPlanSummary = state.stagedSummary ?? null;
+    externalProductionHardware = state.productionHardware ?? [];
+    sharedMapStateTimestamp = state.lastUpdated ? new Date(state.lastUpdated) : null;
+
+    if (state.activePlanId && state.activePlanId !== planId) {
+      planId = state.activePlanId;
+    }
   }
   
   function handleMapRightClick(event: CustomEvent) {
@@ -570,6 +605,7 @@
       {cpeDevices}
       {equipment}
       {filters}
+      externalPlanFeatures={externalPlanFeatures}
       on:map-right-click={handleMapRightClick}
       on:asset-click={handleAssetClick}
     />
@@ -590,6 +626,26 @@
       ☰
     </button>
   </div>
+
+  {#if externalPlanSummary && (isPlanMode || sharedMapMode === 'plan' || sharedMapMode === 'deploy')}
+    <div class="plan-summary-card">
+      <div class="plan-summary-header">
+        <span>Plan Drafts</span>
+        {#if sharedMapStateTimestamp}
+          <small>Updated {sharedMapStateTimestamp.toLocaleTimeString()}</small>
+        {/if}
+      </div>
+      <div class="plan-summary-total">{externalPlanSummary.total} objects</div>
+      <div class="plan-summary-grid">
+        {#each Object.entries(externalPlanSummary.byType ?? {}) as [type, count]}
+          <div class="plan-summary-item">
+            <span class="label">{type}</span>
+            <span class="value">{count}</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
 
 
   <!-- Main Menu Modal -->
@@ -1206,6 +1262,71 @@
     background: rgba(255, 255, 255, 0.1);
   }
 
+  .plan-summary-card {
+    position: absolute;
+    bottom: 2.5rem;
+    right: 1rem;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.88);
+    border-radius: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: #e2e8f0;
+    min-width: 220px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  }
+
+  .plan-summary-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+    color: #38bdf8;
+  }
+
+  .plan-summary-header small {
+    font-weight: 400;
+    color: rgba(226, 232, 240, 0.65);
+  }
+
+  .plan-summary-total {
+    font-size: 1.65rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: #f8fafc;
+  }
+
+  .plan-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .plan-summary-item {
+    padding: 0.5rem 0.6rem;
+    background: rgba(30, 41, 59, 0.85);
+    border-radius: 0.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+
+  .plan-summary-item .label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(148, 163, 184, 0.85);
+  }
+
+  .plan-summary-item .value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #f8fafc;
+  }
+
   @media (max-width: 768px) {
     .floating-controls {
       display: none;
@@ -1329,6 +1450,15 @@
     /* Prevent zoom on input focus */
     input, select, textarea {
       font-size: 16px;
+    }
+
+    .plan-summary-card {
+      position: static;
+      margin: 0.75rem;
+      min-width: unset;
+    }
+    .plan-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>

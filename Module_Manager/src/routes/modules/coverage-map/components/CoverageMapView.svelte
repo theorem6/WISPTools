@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import type { TowerSite, Sector, CPEDevice, NetworkEquipment, CoverageMapFilters } from '../lib/models';
+  import type { PlanLayerFeature } from '$lib/services/planService';
   import { createLocationIcon } from '$lib/mapIcons';
   import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
 
@@ -10,6 +11,7 @@
   export let cpeDevices: CPEDevice[] = [];
   export let equipment: NetworkEquipment[] = [];
   export let filters: CoverageMapFilters;
+  export let externalPlanFeatures: PlanLayerFeature[] = [];
 
   const dispatch = createEventDispatcher();
   
@@ -18,6 +20,8 @@
   let mapView: any = null;
   let graphicsLayer: any = null;
   let backhaulLayer: any = null;
+  let planDraftLayer: any = null;
+  let mapReady = false;
   let currentBasemap = 'topo-vector'; // Use valid ArcGIS basemap ID
   
   // Extract backhaul links from equipment
@@ -47,6 +51,8 @@
     if (map) {
       map.destroy();
     }
+    mapReady = false;
+    planDraftLayer = null;
   });
 
   async function initializeMap() {
@@ -67,19 +73,20 @@
       // Create graphics layers
       backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
       graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
+      planDraftLayer = new GraphicsLayer({ title: 'Plan Drafts', listMode: 'hide' });
 
       // Create map with fallback basemap
       try {
         map = new Map({
           basemap: currentBasemap,
-          layers: [backhaulLayer, graphicsLayer]
+          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
         });
       } catch (basemapError) {
         console.warn('Failed to load basemap, trying fallback...', basemapError);
         // Fallback to a simpler basemap
         map = new Map({
           basemap: 'gray-vector',
-          layers: [backhaulLayer, graphicsLayer]
+          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
         });
         currentBasemap = 'gray-vector';
       }
@@ -207,6 +214,8 @@
       
       // Render all assets
       await renderAllAssets();
+      await renderPlanDrafts(externalPlanFeatures);
+      mapReady = true;
     } catch (err) {
       console.error('Failed to initialize Coverage Map:', err);
       throw err;
@@ -878,6 +887,170 @@
     `;
   }
 
+  const planFeaturePalette: Record<string, string> = {
+    site: '#f97316',
+    sector: '#facc15',
+    cpe: '#fb7185',
+    equipment: '#4ade80',
+    link: '#38bdf8',
+    note: '#c084fc'
+  };
+
+  const getPlanFeatureColor = (type?: string) => planFeaturePalette[type ?? ''] ?? '#f97316';
+
+  async function renderPlanDrafts(features: PlanLayerFeature[] = externalPlanFeatures) {
+    if (!planDraftLayer) return;
+
+    planDraftLayer.removeAll();
+    if (!features || features.length === 0) {
+      return;
+    }
+
+    try {
+      const [
+        { default: Graphic },
+        { default: Point },
+        { default: Polyline },
+        { default: Polygon },
+        { default: SimpleMarkerSymbol },
+        { default: SimpleLineSymbol },
+        { default: SimpleFillSymbol },
+        { default: TextSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/geometry/Polyline.js'),
+        import('@arcgis/core/geometry/Polygon.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/SimpleLineSymbol.js'),
+        import('@arcgis/core/symbols/SimpleFillSymbol.js'),
+        import('@arcgis/core/symbols/TextSymbol.js')
+      ]);
+
+      features.forEach(feature => {
+        const type = feature.featureType || feature.properties?.featureType || 'site';
+        const color = getPlanFeatureColor(type);
+        const status = feature.status || 'draft';
+        const label = feature.properties?.name || feature.properties?.label || feature.properties?.id || type;
+
+        let esriGeometry: __esri.Geometry | null = null;
+        const geo = feature.geometry;
+
+        if (geo && geo.type === 'Point' && Array.isArray(geo.coordinates)) {
+          const [lon, lat] = geo.coordinates;
+          if (!Number.isNaN(lon) && !Number.isNaN(lat)) {
+            esriGeometry = new Point({ longitude: lon, latitude: lat });
+          }
+        } else if (geo && geo.type === 'LineString' && Array.isArray(geo.coordinates)) {
+          esriGeometry = new Polyline({ paths: [geo.coordinates] });
+        } else if (geo && geo.type === 'Polygon' && Array.isArray(geo.coordinates)) {
+          esriGeometry = new Polygon({ rings: geo.coordinates });
+        } else {
+          const loc = feature.properties?.location || feature.properties?.coordinates;
+          if (Array.isArray(loc) && loc.length >= 2) {
+            const [lon, lat] = loc;
+            if (!Number.isNaN(lon) && !Number.isNaN(lat)) {
+              esriGeometry = new Point({ longitude: lon, latitude: lat });
+            }
+          } else if (loc?.longitude !== undefined && loc?.latitude !== undefined) {
+            esriGeometry = new Point({ longitude: loc.longitude, latitude: loc.latitude });
+          }
+        }
+
+        if (!esriGeometry) {
+          return;
+        }
+
+        if (esriGeometry.type === 'point') {
+          const symbol = new SimpleMarkerSymbol({
+            style: 'diamond',
+            color,
+            size: 12,
+            outline: {
+              color: '#111827',
+              width: 1.5
+            }
+          });
+
+          planDraftLayer.add(new Graphic({
+            geometry: esriGeometry,
+            symbol,
+            attributes: {
+              id: feature.id,
+              type,
+              status,
+              name: label
+            },
+            popupTemplate: {
+              title: '{name}',
+              content: `Type: {type}<br>Status: {status}`
+            }
+          }));
+
+          if (label) {
+            const textSymbol = new TextSymbol({
+              text: label,
+              color: '#f8fafc',
+              haloColor: '#0f172a',
+              haloSize: 1.5,
+              font: {
+                size: 10,
+                weight: 'bold'
+              },
+              yoffset: 12
+            });
+
+            planDraftLayer.add(new Graphic({ geometry: esriGeometry, symbol: textSymbol }));
+          }
+        } else if (esriGeometry.type === 'polyline') {
+          const symbol = new SimpleLineSymbol({
+            color,
+            width: 2,
+            style: 'short-dash'
+          });
+
+          planDraftLayer.add(new Graphic({
+            geometry: esriGeometry,
+            symbol,
+            attributes: {
+              id: feature.id,
+              type,
+              status
+            },
+            popupTemplate: {
+              title: label,
+              content: `Type: ${type}<br>Status: ${status}`
+            }
+          }));
+        } else if (esriGeometry.type === 'polygon') {
+          const symbol = new SimpleFillSymbol({
+            color: `${color}40`,
+            outline: {
+              color,
+              width: 1.5
+            }
+          });
+
+          planDraftLayer.add(new Graphic({
+            geometry: esriGeometry,
+            symbol,
+            attributes: {
+              id: feature.id,
+              type,
+              status
+            },
+            popupTemplate: {
+              title: label,
+              content: `Type: ${type}<br>Status: ${status}`
+            }
+          }));
+        }
+      });
+    } catch (err) {
+      console.error('[CoverageMap] Failed to render plan drafts:', err);
+    }
+  }
+
   async function handleMapClick(event: any) {
     // Only handle left-clicks, right-clicks are handled by pointer-down
     if (event.native && event.native.button !== 0) {
@@ -911,9 +1084,13 @@
     });
   }
 
-  // Reactive statement to re-render when data changes
+  // Reactive statements to re-render when data changes
   $: if (mapView && graphicsLayer) {
     renderAllAssets();
+  }
+
+  $: if (mapReady && planDraftLayer) {
+    renderPlanDrafts(externalPlanFeatures).catch(err => console.error('[CoverageMap] Plan draft render error:', err));
   }
 </script>
 

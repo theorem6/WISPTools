@@ -3,17 +3,19 @@
   import { get } from 'svelte/store';
   import { mapContext } from './mapContext';
   import type { MapModuleMode } from './MapCapabilities';
+  import type { MapLayerState } from './mapContext';
 
   export let mode: MapModuleMode = 'plan';
 
   let iframeEl: HTMLIFrameElement | null = null;
+  let iframeWindow: Window | null = null;
   let iframeLoaded = false;
   let currentUrl = '';
-  let mapState = get(mapContext);
+  let mapState: MapLayerState = get(mapContext);
 
   let unsubscribe: (() => void) | undefined;
 
-  const buildUrl = () => {
+  const buildUrl = (state: MapLayerState = mapState) => {
     const params = new URLSearchParams();
 
     if (mode === 'plan') {
@@ -25,7 +27,7 @@
       params.set('hideStats', 'true');
     }
 
-    const planId = mapState?.activePlan?.id;
+    const planId = state?.activePlan?.id;
     if (planId) {
       params.set('planId', planId);
     }
@@ -34,39 +36,89 @@
     return query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
   };
 
-  const updateIframeSrc = (force = false) => {
+  const navigateIframe = (nextUrl: string) => {
     if (!iframeEl) return;
-    const nextUrl = buildUrl();
-    if (force || nextUrl !== currentUrl) {
-      currentUrl = nextUrl;
-      iframeLoaded = false;
-      iframeEl.src = nextUrl;
+    currentUrl = nextUrl;
+    iframeLoaded = false;
+    iframeEl.src = nextUrl;
+  };
+
+  const postStateToIframe = (targetWindow: Window | null = iframeWindow) => {
+    if (!targetWindow) return;
+
+    try {
+      targetWindow.postMessage(
+        {
+          source: 'shared-map',
+          type: 'state-update',
+          payload: {
+            mode,
+            state: {
+              mode: mapState.mode,
+              activePlanId: mapState.activePlan?.id ?? null,
+              stagedSummary: mapState.stagedSummary,
+              stagedFeatures: mapState.stagedFeatures,
+              productionHardware: mapState.productionHardware,
+              lastUpdated: mapState.lastUpdated,
+              capabilities: mapState.capabilities
+            }
+          }
+        },
+        '*'
+      );
+    } catch (err) {
+      console.error('[SharedMap] Failed to post state to iframe:', err);
     }
   };
 
   const handleLoad = () => {
     iframeLoaded = true;
+    iframeWindow = iframeEl?.contentWindow ?? null;
+    postStateToIframe();
+  };
+
+  const handleMessage = (event: MessageEvent) => {
+    const { source, type } = event.data || {};
+    if (source !== 'coverage-map') return;
+
+    if (type === 'request-state') {
+      const replyTarget = (event.source as Window) || iframeWindow;
+      postStateToIframe(replyTarget);
+    }
   };
 
   onMount(() => {
+    window.addEventListener('message', handleMessage);
+
     unsubscribe = mapContext.subscribe(state => {
       mapState = state;
-      updateIframeSrc();
+      const nextUrl = buildUrl(state);
+      if (nextUrl !== currentUrl) {
+        navigateIframe(nextUrl);
+      } else {
+        postStateToIframe();
+      }
     });
 
-    updateIframeSrc(true);
+    navigateIframe(buildUrl(mapState));
   });
 
   onDestroy(() => {
+    window.removeEventListener('message', handleMessage);
     unsubscribe?.();
   });
 
   $: if (iframeEl) {
-    updateIframeSrc();
+    const nextUrl = buildUrl(mapState);
+    if (nextUrl !== currentUrl) {
+      navigateIframe(nextUrl);
+    } else if (iframeLoaded) {
+      postStateToIframe();
+    }
   }
 
-  $: if (mode) {
-    updateIframeSrc();
+  $: if (mode && iframeLoaded) {
+    postStateToIframe();
   }
 </script>
 
