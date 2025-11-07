@@ -293,7 +293,7 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     }
   }
 
-  async function loadData() {
+  async function loadData(force = false) {
     if (!currentUser) return;
 
     if (!$currentTenant || !$currentTenant.id) {
@@ -301,7 +301,7 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
       return;
     }
 
-    if (isLoading || loadedTenantId === $currentTenant.id) {
+    if (isLoading || (!force && loadedTenantId === $currentTenant.id)) {
       return;
     }
 
@@ -398,7 +398,7 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
       isLoading = false;
 
       // Reload projects list to include the new plan
-      await loadData();
+      await loadData(true);
 
       const createdPlan = projects.find(p => p.id === project.id) || project;
       selectedProject = createdPlan;
@@ -419,6 +419,9 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     closeProjectModal();
     if ($currentTenant?.id) {
       await mapLayerManager.loadPlan($currentTenant.id, project);
+    }
+    if (project.status === 'active') {
+      await enterProject(project, { reload: false, message: `Continuing work on "${project.name}".` });
     }
   }
 
@@ -463,7 +466,7 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     
     try {
       await planService.addHardwareRequirement(selectedProject.id, newRequirement);
-      await loadData(); // Reload to get updated project
+      await loadData(true); // Reload to get updated project
       closeAddRequirementModal();
     } catch (error) {
       console.error('Error adding hardware requirement:', error);
@@ -530,7 +533,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       let active = updatedPlan ?? { ...project, status: 'active', showOnMap: true };
 
       if ($currentTenant?.id) {
-        await loadData();
+        await loadData(true);
         const refreshed = projects.find(p => p.id === project.id);
         if (refreshed) {
           active = refreshed;
@@ -545,10 +548,12 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       updatedVisibility.add(active.id);
       visiblePlans = updatedVisibility;
 
-      successMessage = autoStart
-        ? `Plan "${active.name}" started. You can now stage sites and hardware on the map.`
-        : `Plan "${active.name}" is now active. All map edits will be saved to this plan.`;
-      setTimeout(() => successMessage = '', 6000);
+      await enterProject(active, {
+        reload: false,
+        message: autoStart
+          ? `Plan "${active.name}" started. You can now stage sites and hardware on the map.`
+          : `Plan "${active.name}" is now active. All map edits will be saved to this plan.`
+      });
     } catch (err: any) {
       console.error('Error starting project:', err);
       error = err?.message || 'Failed to start project';
@@ -593,7 +598,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
     try {
       await planService.updatePlan(activeProject.id, { status: 'ready' });
-      await loadData();
+      await loadData(true);
       alert(`Project "${activeProject.name}" has been marked as ready for deployment.`);
       activeProject = null;
       showProjectActions = false;
@@ -609,7 +614,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     
     try {
       await planService.updatePlan(activeProject.id, { status: 'cancelled' });
-      await loadData();
+      await loadData(true);
       alert(`Project "${activeProject.name}" has been cancelled.`);
       activeProject = null;
       showProjectActions = false;
@@ -622,7 +627,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   async function approveProject(project: PlanProject) {
     try {
       await planService.updatePlan(project.id, { status: 'approved' });
-      await loadData();
+      await loadData(true);
       alert(`Project "${project.name}" has been approved for deployment.`);
       if ($currentTenant?.id && activeProject?.id === project.id) {
         await mapLayerManager.refreshPlan(project.id);
@@ -636,7 +641,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   async function rejectProject(project: PlanProject) {
     try {
       await planService.updatePlan(project.id, { status: 'rejected' });
-      await loadData();
+      await loadData(true);
       alert(`Project "${project.name}" has been rejected.`);
     } catch (error) {
       console.error('Error rejecting project:', error);
@@ -647,7 +652,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   async function authorizeProject(project: PlanProject) {
     try {
       await planService.authorizePlan(project.id);
-      await loadData();
+      await loadData(true);
       alert(`Project "${project.name}" has been authorized and promoted to production.`);
       if ($currentTenant?.id) {
         await mapLayerManager.loadProductionHardware($currentTenant.id);
@@ -696,6 +701,43 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       console.error('Error deleting project:', err);
       error = err?.message || 'Failed to delete plan';
       setTimeout(() => error = '', 5000);
+    }
+  }
+
+  async function enterProject(project: PlanProject, options: { reload?: boolean; message?: string } = {}) {
+    const { reload = true, message } = options;
+
+    try {
+      if ($currentTenant?.id && reload) {
+        await mapLayerManager.loadPlan($currentTenant.id, project);
+      }
+
+      activeProject = project;
+      selectedProject = project;
+      showProjectActions = true;
+      mapLayerManager.setMode('plan');
+      mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
+      mapLocked = false;
+
+      successMessage = message ?? `Now planning "${project.name}".`;
+      setTimeout(() => successMessage = '', 5000);
+    } catch (err: any) {
+      console.error('Error entering project:', err);
+      error = err?.message || 'Failed to load plan. Please try again';
+      setTimeout(() => error = '', 6000);
+    }
+  }
+
+  async function reopenProject(project: PlanProject) {
+    try {
+      const updatedPlan = await planService.updatePlan(project.id, { status: 'active' });
+      await loadData(true);
+      const refreshed = projects.find(p => p.id === project.id) || updatedPlan || project;
+      await enterProject(refreshed, { reload: true, message: `Plan "${refreshed.name}" reopened for editing.` });
+    } catch (err: any) {
+      console.error('Error reopening project:', err);
+      error = err?.message || 'Failed to reopen plan';
+      setTimeout(() => error = '', 6000);
     }
   }
 </script>
@@ -779,6 +821,18 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-icon">{selectedProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
             <span class="control-label">{selectedProject.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
++          {#if selectedProject.status === 'active' && (!activeProject || activeProject.id !== selectedProject.id)}
++            <button class="control-btn resume-btn" on:click={() => enterProject(selectedProject)} title="Resume planning this project">
++              <span class="control-icon">🔁</span>
++              <span class="control-label">Resume</span>
++            </button>
++          {/if}
++          {#if ['ready','approved','rejected','cancelled'].includes(selectedProject.status)}
++            <button class="control-btn reopen-btn" on:click={() => reopenProject(selectedProject)} title="Reopen plan for updates">
++              <span class="control-icon">♻️</span>
++              <span class="control-label">Reopen</span>
++            </button>
++          {/if}
         {/if}
         
         <!-- Project Workflow Actions -->
@@ -972,6 +1026,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   {/if}
                   
                   {#if project.status === 'active'}
+                    <button class="action-btn resume-btn" on:click={() => enterProject(project)} title="Resume planning this project">
+                      🔁 Resume
+                    </button>
                     <span class="active-indicator" title="This project is currently active - all map changes will be saved to this project">🔄 Active</span>
                   {/if}
                   
@@ -984,6 +1041,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     {project.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
                   </button>
                   
+                  {#if ['ready','approved','rejected','cancelled'].includes(project.status)}
+                    <button 
+                      class="action-btn reopen-btn" 
+                      on:click={() => reopenProject(project)} 
+                      title="Reopen this plan for additional planning work"
+                    >
+                      ♻️ Reopen
+                    </button>
+                  {/if}
+
                   {#if project.status === 'approved'}
                     <button 
                       class="action-btn authorize-btn" 
@@ -2374,5 +2441,47 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   .action-btn.delete-btn:hover {
     background: rgba(239, 68, 68, 0.3);
     border-color: rgba(239, 68, 68, 0.6);
+  }
+
+  .control-btn.resume-btn {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.35);
+  }
+
+  .control-btn.resume-btn:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.55);
+  }
+
+  .control-btn.reopen-btn {
+    background: rgba(250, 204, 21, 0.18);
+    border-color: rgba(250, 204, 21, 0.35);
+  }
+
+  .control-btn.reopen-btn:hover {
+    background: rgba(250, 204, 21, 0.28);
+    border-color: rgba(250, 204, 21, 0.55);
+  }
+
+  .action-btn.resume-btn {
+    background: rgba(59, 130, 246, 0.2);
+    color: #dbeafe;
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .action-btn.resume-btn:hover {
+    background: rgba(59, 130, 246, 0.32);
+    border-color: rgba(59, 130, 246, 0.65);
+  }
+
+  .action-btn.reopen-btn {
+    background: rgba(250, 204, 21, 0.2);
+    color: #fef3c7;
+    border-color: rgba(250, 204, 21, 0.5);
+  }
+
+  .action-btn.reopen-btn:hover {
+    background: rgba(250, 204, 21, 0.32);
+    border-color: rgba(250, 204, 21, 0.65);
   }
 </style>

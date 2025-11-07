@@ -528,15 +528,27 @@ class PlanService {
    * Get staged features for a plan
    */
   async getPlanFeatures(planId: string): Promise<{ features: PlanLayerFeature[]; summary: PlanFeatureSummary }> {
-    const response = await this.apiCall(`/${planId}/features`);
-    const features: PlanLayerFeature[] = Array.isArray(response.features)
-      ? response.features.map((feature: any) => this.mapBackendFeatureToFrontend(feature))
-      : [];
+    try {
+      const response = await this.apiCall(`/${planId}/features`);
+      const features: PlanLayerFeature[] = Array.isArray(response.features)
+        ? response.features.map((feature: any) => this.mapBackendFeatureToFrontend(feature))
+        : [];
 
-    return {
-      features,
-      summary: this.normalizeSummary(response.summary)
-    };
+      return {
+        features,
+        summary: this.normalizeSummary(response.summary)
+      };
+    } catch (error: any) {
+      const message = (error?.message || '').toLowerCase();
+      if (message.includes('plan not found') || message.includes('404')) {
+        console.warn('[planService] Plan features not found, returning empty set for plan:', planId);
+        return {
+          features: [],
+          summary: this.normalizeSummary({ total: 0, byType: {}, byStatus: {} })
+        };
+      }
+      throw error;
+    }
   }
 
   async createPlanFeature(planId: string, payload: {
