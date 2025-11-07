@@ -16,6 +16,7 @@
   import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
   import { mapContext } from '$lib/map/mapContext';
   import type { MapModuleMode } from '$lib/map/MapCapabilities';
+import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -47,6 +48,16 @@
   let deploymentMessage = '';
 
 
+  // Map/Iframe coordination
+  let moduleContext: ModuleContext = {
+    module: 'deploy',
+    userRole: 'admin',
+    projectId: undefined
+  };
+  let iframeReady = false;
+  let iframeListenerAttached = false;
+
+
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
   $: isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
@@ -54,6 +65,25 @@
 
   $: mapState = $mapContext as MapLayerManagerState;
   $: mapMode = mapState?.mode ?? 'deploy';
+
+  $: {
+    const tenantRole = $currentTenant?.userRole;
+    const normalizedRole: 'admin' | 'operator' | 'viewer' = tenantRole === 'viewer'
+      ? 'viewer'
+      : tenantRole === 'operator'
+        ? 'operator'
+        : 'admin';
+
+    moduleContext = {
+      module: 'deploy',
+      userRole: normalizedRole,
+      projectId: mapState?.activePlan?.id
+    };
+  }
+
+  $: if (iframeReady) {
+    iframeCommunicationService.updateContext(moduleContext);
+  }
 
   onMount(async () => {
     if (browser) {
@@ -63,13 +93,41 @@
         return;
       }
       
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+      if (iframe) {
+        iframeCommunicationService.initialize(iframe, moduleContext);
+        iframeReady = true;
+        window.addEventListener('iframe-object-action', handleIframeObjectAction);
+        iframeListenerAttached = true;
+      }
+
       mapLayerManager.setMode('deploy');
       await loadReadyPlans();
     }
     
     return () => {
+      if (iframeListenerAttached) {
+        window.removeEventListener('iframe-object-action', handleIframeObjectAction);
+        iframeListenerAttached = false;
+      }
+      iframeCommunicationService.destroy();
+      iframeReady = false;
     };
   });
+
+
+  function handleIframeObjectAction(event: Event) {
+    const detail = (event as CustomEvent).detail;
+    if (!detail) return;
+
+    const { objectId, action, allowed, message } = detail;
+    if (!allowed) {
+      error = message || `Action '${action}' is not allowed for this object.`;
+      setTimeout(() => (error = ''), 5000);
+    } else {
+      console.log(`[Deploy] Action '${action}' allowed for object ${objectId}`, detail);
+    }
+  }
 
 
   async function loadReadyPlans() {
@@ -340,6 +398,10 @@
     <div class="deployment-toast">{deploymentMessage}</div>
   {/if}
 
+  {#if error}
+    <div class="error-toast">{error}</div>
+  {/if}
+
   <!-- PCI Planner Modal -->
   {#if showPCIPlannerModal && ($currentTenant?.id || isAdmin)}
     <PCIPlannerModal
@@ -604,6 +666,18 @@
     padding: 0.75rem 1.25rem;
     border-radius: var(--border-radius-md);
     box-shadow: 0 12px 30px rgba(16, 185, 129, 0.35);
+    font-weight: 600;
+  }
+
+  .error-toast {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(239, 68, 68, 0.95);
+    color: #f9fafb;
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 12px 30px rgba(239, 68, 68, 0.35);
     font-weight: 600;
   }
 

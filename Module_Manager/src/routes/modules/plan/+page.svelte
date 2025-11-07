@@ -6,11 +6,12 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject } from '$lib/services/planService';
-  import SettingsButton from '$lib/components/SettingsButton.svelte';
-  import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
-  import { mapContext } from '$lib/map/mapContext';
-  import SharedMap from '$lib/map/SharedMap.svelte';
-  import type { MapModuleMode } from '$lib/map/MapCapabilities';
+import SettingsButton from '$lib/components/SettingsButton.svelte';
+import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
+import { mapContext } from '$lib/map/mapContext';
+import SharedMap from '$lib/map/SharedMap.svelte';
+import type { MapModuleMode } from '$lib/map/MapCapabilities';
+import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -59,11 +60,13 @@
   let visiblePlans: Set<string> = new Set(); // Plans currently visible on map
 
   // Module context for object state management
-  let moduleContext: ModuleContext = {
+let moduleContext: ModuleContext = {
     module: 'plan',
     userRole: 'admin',
     projectId: undefined
   };
+
+let iframeReady = false;
 
   $: {
     const tenantRole = $currentTenant?.userRole;
@@ -237,6 +240,7 @@
     return () => {
       window.removeEventListener('iframe-object-action', handleIframeObjectAction);
       iframeCommunicationService.destroy();
+      iframeReady = false;
     };
   });
 
