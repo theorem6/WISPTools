@@ -23,15 +23,16 @@
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import HardwareDeploymentModal from './components/HardwareDeploymentModal.svelte';
   import SiteEditModal from './components/SiteEditModal.svelte';
-  import { coverageMapService } from './lib/coverageMapService.mongodb';
+import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
+import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { 
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
     CoverageMapFilters, Location 
   } from './lib/models';
-  import type { PlanLayerFeature, PlanFeatureSummary, HardwareView } from '$lib/services/planService';
-  import type { MapModuleMode } from '$lib/map/MapCapabilities';
+import type { PlanLayerFeature, PlanFeatureSummary, HardwareView } from '$lib/services/planService';
+import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   // Data
   let towers: TowerSite[] = [];
@@ -90,6 +91,9 @@
   $: isPlanMode = mapMode === 'plan';
   $: isDeployMode = mapMode === 'deploy';
   $: isMonitorMode = mapMode === 'monitor';
+
+  let sharedCapabilities: MapCapabilities | null = null;
+  let planEditingEnabled = false;
 
   // Module context for permissions
   $: moduleContext = (() => {
@@ -367,19 +371,33 @@
     const state = payload?.state ?? {};
 
     sharedMapMode = payload?.mode ?? state.mode ?? null;
+    sharedCapabilities = state.capabilities ?? sharedCapabilities;
     externalPlanFeatures = state.stagedFeatures ?? [];
     externalPlanSummary = state.stagedSummary ?? null;
     externalProductionHardware = state.productionHardware ?? [];
     sharedMapStateTimestamp = state.lastUpdated ? new Date(state.lastUpdated) : null;
 
-    if (state.activePlanId && state.activePlanId !== planId) {
-      planId = state.activePlanId;
+    const activePlanIdFromState = state.activePlanId ?? null;
+    if (activePlanIdFromState && activePlanIdFromState !== planId) {
+      planId = activePlanIdFromState;
     }
+
+    const mapInPlanMode = sharedMapMode === 'plan' || isPlanMode || mapMode === 'plan';
+    planEditingEnabled = Boolean(mapInPlanMode && activePlanIdFromState && !(sharedCapabilities?.readOnly));
   }
   
   function handleMapRightClick(event: CustomEvent) {
     const { latitude, longitude, screenX, screenY } = event.detail;
     console.log('Right-click at:', latitude, longitude);
+
+    if ((isPlanMode || sharedMapMode === 'plan') && !planEditingEnabled) {
+      showContextMenu = false;
+      if (!error) {
+        error = 'Start a plan to add sites or hardware.';
+        setTimeout(() => error = '', 4000);
+      }
+      return;
+    }
     
     // Show context menu
     showContextMenu = true;
@@ -394,6 +412,11 @@
     
     contextMenuLat = latitude;
     contextMenuLon = longitude;
+
+    if ((isPlanMode || sharedMapMode === 'plan') && !planEditingEnabled) {
+      showContextMenu = false;
+      return;
+    }
     
     switch (action) {
       case 'create-site-tower':
@@ -433,6 +456,15 @@
   function handleAssetClick(event: CustomEvent) {
     const { type, id, data, screenX, screenY, isRightClick } = event.detail;
     console.log(`Clicked ${type}:`, id, data);
+
+    const planningMode = isPlanMode || sharedMapMode === 'plan';
+    if (planningMode && !planEditingEnabled && isRightClick) {
+      if (!error) {
+        error = 'Start a plan to edit or deploy assets.';
+        setTimeout(() => error = '', 4000);
+      }
+      return;
+    }
     
     // Check if this is a read-only item from ACS or CBRS
     if (data.modules?.acs || data.modules?.cbrs) {
@@ -580,10 +612,21 @@
     showAddCPEModal = true;
   }
   
-  async function handleModalSaved() {
-    success = 'Equipment added successfully';
+  async function handleModalSaved(event?: CustomEvent<{ message?: string }>) {
+    success = event?.detail?.message || 'Changes saved to plan.';
     setTimeout(() => success = '', 3000);
-    await loadAllData();
+
+    try {
+      if (planId && (isPlanMode || sharedMapMode === 'plan')) {
+        await mapLayerManager.refreshPlan(planId);
+      } else {
+        await loadAllData();
+      }
+    } catch (err: any) {
+      console.error('Error refreshing data after modal save:', err);
+      error = err?.message || 'Unable to refresh map data.';
+      setTimeout(() => error = '', 4000);
+    }
   }
 </script>
 
@@ -830,6 +873,7 @@
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -838,6 +882,7 @@
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -846,6 +891,7 @@
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -854,6 +900,7 @@
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -889,6 +936,7 @@
   bind:show={showAddInventoryModal}
   site={selectedSiteForInventory}
   {tenantId}
+  planId={planId}
   on:saved={handleModalSaved}
 />
 
@@ -899,8 +947,9 @@
   y={contextMenuY}
   latitude={contextMenuLat}
   longitude={contextMenuLon}
-  planMode={isPlanMode}
+  planMode={isPlanMode || sharedMapMode === 'plan'}
   planName={activePlanName}
+  disabled={(isPlanMode || sharedMapMode === 'plan') && !planEditingEnabled}
   on:action={handleContextMenuAction}
 />
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { TowerSite } from '../lib/models';
   
   export let show = false;
@@ -78,37 +79,64 @@
     error = '';
     
     try {
-      const sectorData: any = {
-        siteId: formData.siteId,
-        name: formData.name,
-        location: {
-          latitude: site.location.latitude,
-          longitude: site.location.longitude
-        },
-        azimuth: formData.azimuth,
-        beamwidth: formData.beamwidth,
-        tilt: formData.tilt || undefined,
-        technology: formData.technology,
-        band: formData.band || undefined,
-        frequency: formData.frequency || undefined,
-        bandwidth: formData.bandwidth || undefined,
-        antennaModel: formData.antennaModel || undefined,
-        antennaManufacturer: formData.antennaManufacturer || undefined,
-        antennaSerialNumber: formData.antennaSerialNumber || undefined,
-        radioModel: formData.radioModel || undefined,
-        radioManufacturer: formData.radioManufacturer || undefined,
-        radioSerialNumber: formData.radioSerialNumber || undefined,
-        status: planId ? 'planned' : formData.status
-      };
-      
-      // Add planId if in plan mode
       if (planId) {
-        sectorData.planId = planId;
+        const properties: Record<string, any> = {
+          siteId: site.id,
+          siteName: site.name,
+          name: formData.name,
+          azimuth: formData.azimuth,
+          beamwidth: formData.beamwidth,
+          tilt: formData.tilt || undefined,
+          technology: formData.technology,
+          band: formData.band || undefined,
+          frequency: formData.frequency || undefined,
+          bandwidth: formData.bandwidth || undefined,
+          antennaModel: formData.antennaModel || undefined,
+          antennaManufacturer: formData.antennaManufacturer || undefined,
+          antennaSerialNumber: formData.antennaSerialNumber || undefined,
+          radioModel: formData.radioModel || undefined,
+          radioManufacturer: formData.radioManufacturer || undefined,
+          radioSerialNumber: formData.radioSerialNumber || undefined
+        };
+
+        await mapLayerManager.addFeature(planId, {
+          featureType: 'sector',
+          geometry: {
+            type: 'Point',
+            coordinates: [site.location.longitude, site.location.latitude]
+          },
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'Sector staged in plan.' });
+      } else {
+        const sectorData: any = {
+          siteId: formData.siteId,
+          name: formData.name,
+          location: {
+            latitude: site.location.latitude,
+            longitude: site.location.longitude
+          },
+          azimuth: formData.azimuth,
+          beamwidth: formData.beamwidth,
+          tilt: formData.tilt || undefined,
+          technology: formData.technology,
+          band: formData.band || undefined,
+          frequency: formData.frequency || undefined,
+          bandwidth: formData.bandwidth || undefined,
+          antennaModel: formData.antennaModel || undefined,
+          antennaManufacturer: formData.antennaManufacturer || undefined,
+          antennaSerialNumber: formData.antennaSerialNumber || undefined,
+          radioModel: formData.radioModel || undefined,
+          radioManufacturer: formData.radioManufacturer || undefined,
+          radioSerialNumber: formData.radioSerialNumber || undefined,
+          status: formData.status
+        };
+
+        await coverageMapService.createSector(tenantId, sectorData);
+        dispatch('saved', { message: 'Sector created successfully.' });
       }
-      
-      await coverageMapService.createSector(tenantId, sectorData);
-      
-      dispatch('saved');
       handleClose();
     } catch (err: any) {
       error = err.message || 'Failed to create sector';

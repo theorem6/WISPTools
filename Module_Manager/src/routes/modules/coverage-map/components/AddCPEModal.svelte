@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { TowerSite } from '../lib/models';
   
   export let show = false;
@@ -65,8 +66,15 @@
   }
   
   async function handleSave() {
-    if (!formData.name.trim() || !formData.manufacturer || !formData.model || !formData.serialNumber) {
-      error = 'Name, manufacturer, model, and serial number are required';
+    const isPlanMode = Boolean(planId);
+
+    if (!formData.name.trim()) {
+      error = 'Device name is required';
+      return;
+    }
+
+    if (!isPlanMode && (!formData.manufacturer || !formData.model || !formData.serialNumber)) {
+      error = 'Manufacturer, model, and serial number are required';
       return;
     }
     
@@ -74,42 +82,71 @@
     error = '';
     
     try {
-      const cpeData: any = {
-        siteId: formData.siteId || undefined,
-        name: formData.name,
-        location: {
-          latitude: formData.latitude,
-          longitude: formData.longitude,
-          address: formData.address || undefined
-        },
-        azimuth: formData.azimuth,
-        beamwidth: formData.beamwidth,
-        heightAGL: formData.heightAGL || undefined,
-        manufacturer: formData.manufacturer,
-        model: formData.model,
-        serialNumber: formData.serialNumber,
-        macAddress: formData.macAddress || undefined,
-        subscriberName: formData.subscriberName || undefined,
-        subscriberContact: formData.subscriberName ? {
-          name: formData.subscriberName,
-          phone: formData.subscriberPhone,
-          email: formData.subscriberEmail
-        } : undefined,
-        accountNumber: formData.accountNumber || undefined,
-        serviceType: formData.serviceType,
-        technology: formData.technology,
-        band: formData.band || undefined,
-        status: planId ? 'planned' : formData.status
-      };
-      
-      // Add planId if in plan mode
-      if (planId) {
-        cpeData.planId = planId;
+      if (isPlanMode) {
+        const properties: Record<string, any> = {
+          siteId: formData.siteId || undefined,
+          name: formData.name,
+          manufacturer: formData.manufacturer || undefined,
+          model: formData.model || undefined,
+          serialNumber: formData.serialNumber || undefined,
+          macAddress: formData.macAddress || undefined,
+          serviceType: formData.serviceType,
+          technology: formData.technology,
+          band: formData.band || undefined,
+          azimuth: formData.azimuth,
+          beamwidth: formData.beamwidth,
+          heightAGL: formData.heightAGL || undefined,
+          subscriber: formData.subscriberName ? {
+            name: formData.subscriberName,
+            phone: formData.subscriberPhone || undefined,
+            email: formData.subscriberEmail || undefined,
+            accountNumber: formData.accountNumber || undefined
+          } : undefined
+        };
+
+        await mapLayerManager.addFeature(planId!, {
+          featureType: 'cpe',
+          geometry: {
+            type: 'Point',
+            coordinates: [formData.longitude, formData.latitude]
+          },
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'CPE staged in plan.' });
+      } else {
+        const cpeData: any = {
+          siteId: formData.siteId || undefined,
+          name: formData.name,
+          location: {
+            latitude: formData.latitude,
+            longitude: formData.longitude,
+            address: formData.address || undefined
+          },
+          azimuth: formData.azimuth,
+          beamwidth: formData.beamwidth,
+          heightAGL: formData.heightAGL || undefined,
+          manufacturer: formData.manufacturer,
+          model: formData.model,
+          serialNumber: formData.serialNumber,
+          macAddress: formData.macAddress || undefined,
+          subscriberName: formData.subscriberName || undefined,
+          subscriberContact: formData.subscriberName ? {
+            name: formData.subscriberName,
+            phone: formData.subscriberPhone,
+            email: formData.subscriberEmail
+          } : undefined,
+          accountNumber: formData.accountNumber || undefined,
+          serviceType: formData.serviceType,
+          technology: formData.technology,
+          band: formData.band || undefined,
+          status: formData.status
+        };
+
+        await coverageMapService.createCPE(tenantId, cpeData);
+        dispatch('saved', { message: 'CPE device created successfully.' });
       }
-      
-      await coverageMapService.createCPE(tenantId, cpeData);
-      
-      dispatch('saved');
       handleClose();
     } catch (err: any) {
       error = err.message || 'Failed to create CPE';

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
   
   export let show = false;
   export let initialLatitude: number | null = null;
@@ -79,57 +80,89 @@
     error = '';
     
     try {
-      const siteData: any = {
-        name: formData.name,
-        type: formData.type,
-        location: {
-          latitude: formData.latitude,
-          longitude: formData.longitude
-        },
-        tenantId,
-        status: planId ? 'planned' : 'active'
-      };
-      
-      // Add planId if in plan mode
       if (planId) {
-        siteData.planId = planId;
-      }
-      
-      // Add optional location fields only if they have values
-      if (formData.address?.trim()) siteData.location.address = formData.address.trim();
-      if (formData.city?.trim()) siteData.location.city = formData.city.trim();
-      if (formData.state?.trim()) siteData.location.state = formData.state.trim();
-      if (formData.zipCode?.trim()) siteData.location.zipCode = formData.zipCode.trim();
-      
-      // Add tower-specific fields only if provided
-      if (formData.height) siteData.height = formData.height;
-      if (formData.fccId?.trim()) siteData.fccId = formData.fccId.trim();
-      if (formData.towerOwner?.trim()) siteData.towerOwner = formData.towerOwner.trim();
-      if (formData.gateCode?.trim()) siteData.gateCode = formData.gateCode.trim();
-      if (formData.accessInstructions?.trim()) siteData.accessInstructions = formData.accessInstructions.trim();
-      if (formData.safetyNotes?.trim()) siteData.safetyNotes = formData.safetyNotes.trim();
-      
-      // Add tower contact only if name is provided
-      if (formData.towerContactName?.trim()) {
-        siteData.towerContact = {
-          name: formData.towerContactName.trim(),
-          phone: formData.towerContactPhone?.trim() || '',
-          email: formData.towerContactEmail?.trim() || ''
+        const properties: Record<string, any> = {
+          name: formData.name.trim(),
+          siteType: formData.type,
+          address: formData.address?.trim() || undefined,
+          city: formData.city?.trim() || undefined,
+          state: formData.state?.trim() || undefined,
+          zipCode: formData.zipCode?.trim() || undefined,
+          height: formData.height || undefined,
+          fccId: formData.fccId?.trim() || undefined,
+          towerOwner: formData.towerOwner?.trim() || undefined,
+          gateCode: formData.gateCode?.trim() || undefined,
+          accessInstructions: formData.accessInstructions?.trim() || undefined,
+          safetyNotes: formData.safetyNotes?.trim() || undefined,
+          towerContact: formData.towerContactName?.trim()
+            ? {
+                name: formData.towerContactName.trim(),
+                phone: formData.towerContactPhone?.trim() || undefined,
+                email: formData.towerContactEmail?.trim() || undefined
+              }
+            : undefined,
+          siteContact: formData.siteContactName?.trim()
+            ? {
+                name: formData.siteContactName.trim(),
+                phone: formData.siteContactPhone?.trim() || undefined,
+                email: formData.siteContactEmail?.trim() || undefined
+              }
+            : undefined
         };
-      }
-      
-      // Add site contact only if name is provided
-      if (formData.siteContactName?.trim()) {
-        siteData.siteContact = {
-          name: formData.siteContactName.trim(),
-          phone: formData.siteContactPhone?.trim() || '',
-          email: formData.siteContactEmail?.trim() || ''
+
+        await mapLayerManager.addFeature(planId, {
+          featureType: 'site',
+          geometry: {
+            type: 'Point',
+            coordinates: [formData.longitude, formData.latitude]
+          },
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'Site staged in plan.' });
+      } else {
+        const siteData: any = {
+          name: formData.name,
+          type: formData.type,
+          location: {
+            latitude: formData.latitude,
+            longitude: formData.longitude
+          },
+          tenantId,
+          status: 'active'
         };
+
+        if (formData.address?.trim()) siteData.location.address = formData.address.trim();
+        if (formData.city?.trim()) siteData.location.city = formData.city.trim();
+        if (formData.state?.trim()) siteData.location.state = formData.state.trim();
+        if (formData.zipCode?.trim()) siteData.location.zipCode = formData.zipCode.trim();
+        if (formData.height) siteData.height = formData.height;
+        if (formData.fccId?.trim()) siteData.fccId = formData.fccId.trim();
+        if (formData.towerOwner?.trim()) siteData.towerOwner = formData.towerOwner.trim();
+        if (formData.gateCode?.trim()) siteData.gateCode = formData.gateCode.trim();
+        if (formData.accessInstructions?.trim()) siteData.accessInstructions = formData.accessInstructions.trim();
+        if (formData.safetyNotes?.trim()) siteData.safetyNotes = formData.safetyNotes.trim();
+
+        if (formData.towerContactName?.trim()) {
+          siteData.towerContact = {
+            name: formData.towerContactName.trim(),
+            phone: formData.towerContactPhone?.trim() || '',
+            email: formData.towerContactEmail?.trim() || ''
+          };
+        }
+
+        if (formData.siteContactName?.trim()) {
+          siteData.siteContact = {
+            name: formData.siteContactName.trim(),
+            phone: formData.siteContactPhone?.trim() || '',
+            email: formData.siteContactEmail?.trim() || ''
+          };
+        }
+
+        await coverageMapService.createTowerSite(tenantId, siteData);
+        dispatch('saved', { message: 'Site created successfully.' });
       }
-      
-      await coverageMapService.createTowerSite(tenantId, siteData);
-      
-      dispatch('saved');
       handleClose();
     } catch (err: any) {
       error = err.message || 'Failed to create site';

@@ -6,8 +6,9 @@
   export let y = 0;
   export let latitude = 0;
   export let longitude = 0;
-  export let planMode = false; // Whether we're in plan mode
+export let planMode = false; // Whether we're in plan mode
   export let planName: string | null = null; // Name of the active plan (optional)
+export let disabled = false;
   
   const dispatch = createEventDispatcher();
   
@@ -23,7 +24,7 @@
 
 <svelte:window on:click={handleClickOutside} />
 
-{#if show}
+{#if show && !disabled}
 <div 
   class="context-menu" 
   style="left: {x}px; top: {y}px"

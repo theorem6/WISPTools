@@ -143,90 +143,146 @@
     error = '';
     
     try {
-      const backhaulData: any = {
-        siteId: formData.fromSiteId, // Primary site
-        name: formData.name,
-        type: 'backhaul',
-        locationType: 'tower',
-        manufacturer: formData.equipmentManufacturer || (isWireless ? 'Wireless' : formData.provider || 'Fiber'),
-        model: formData.equipmentModel || 'N/A',
-        serialNumber: formData.equipmentSerialNumber || `BH-${Date.now()}`,
-        status: planId ? 'planned' : formData.status,
-        location: sites.find(s => s.id === formData.fromSiteId)?.location || { latitude: 0, longitude: 0 },
-        installDate: formData.installDate || undefined,
-        
-        notes: JSON.stringify({
+      if (planId) {
+        const fromSiteObj = sites.find(s => s.id === formData.fromSiteId);
+        const toSiteObj = sites.find(s => s.id === formData.toSiteId);
+
+        if (!fromSiteObj || !toSiteObj || !fromSiteObj.location || !toSiteObj.location) {
+          throw new Error('Selected sites are missing coordinates');
+        }
+
+        const properties: Record<string, any> = {
+          name: formData.name,
           backhaulType: formData.backhaulType,
           fromSiteId: formData.fromSiteId,
           toSiteId: formData.toSiteId,
-          
-          ...(isWireless && {
-            wireless: {
-              siteA: {
-                azimuth: formData.siteA_azimuth,
-                antennaHeight: formData.siteA_antennaHeight,
-                antennaGain: formData.siteA_antennaGain,
-                txPower: formData.siteA_txPower
-              },
-              siteB: {
-                azimuth: formData.siteB_azimuth,
-                antennaHeight: formData.siteB_antennaHeight,
-                antennaGain: formData.siteB_antennaGain,
-                txPower: formData.siteB_txPower
-              },
-              frequency: formData.frequency,
-              bandwidth: formData.bandwidth,
-              beamwidth: formData.beamwidth,
-              licensing: formData.backhaulType === 'fixed-wireless-licensed' ? {
-                licenseType: formData.licenseType || undefined,
-                licenseNumber: formData.licenseNumber || undefined,
-                fccCallSign: formData.fccCallSign || undefined,
-                licenseHolderName: formData.licenseHolderName || undefined,
-                licenseHolderAddress: formData.licenseHolderAddress || undefined,
-                licenseStatus: formData.licenseStatus || 'active',
-                expirationDate: formData.licenseExpiration || undefined,
-                renewalDate: formData.licenseRenewalDate || undefined,
-                fccFileNumber: formData.fccFileNumber || undefined,
-                partNumber: formData.partNumber || undefined,
-                frequencyBand: formData.frequencyBand || undefined,
-                authorizedBandwidth: formData.authorizedBandwidth || undefined,
-                emissionDesignator: formData.emissionDesignator || undefined
-              } : undefined
-            }
-          }),
-          
-          ...(isFiber && {
-            fiber: {
-              provider: formData.provider,
-              circuitId: formData.circuitId,
-              handoffType: formData.handoffType,
-              connectorType: formData.connectorType,
-              fiberCount: formData.fiberCount,
-              fiberSpeed: formData.fiberSpeed,
-              demarcLocation: formData.demarcLocation
-            }
-          }),
-          
-          capacity: formData.capacity,
-          financial: {
-            monthlyRecurringCost: formData.monthlyRecurringCost || 0,
-            contractTermMonths: formData.contractTermMonths || 12
+          wireless: isWireless ? {
+            siteA: {
+              azimuth: formData.siteA_azimuth,
+              antennaHeight: formData.siteA_antennaHeight,
+              antennaGain: formData.siteA_antennaGain,
+              txPower: formData.siteA_txPower
+            },
+            siteB: {
+              azimuth: formData.siteB_azimuth,
+              antennaHeight: formData.siteB_antennaHeight,
+              antennaGain: formData.siteB_antennaGain,
+              txPower: formData.siteB_txPower
+            },
+            frequency: formData.frequency,
+            bandwidth: formData.bandwidth,
+            beamwidth: formData.beamwidth,
+            licensing: formData.backhaulType === 'fixed-wireless-licensed' ? {
+              licenseType: formData.licenseType || undefined,
+              licenseNumber: formData.licenseNumber || undefined,
+              fccCallSign: formData.fccCallSign || undefined,
+              licenseHolderName: formData.licenseHolderName || undefined,
+              licenseHolderAddress: formData.licenseHolderAddress || undefined,
+              licenseStatus: formData.licenseStatus || 'active',
+              expirationDate: formData.licenseExpiration || undefined,
+              renewalDate: formData.licenseRenewalDate || undefined,
+              fccFileNumber: formData.fccFileNumber || undefined,
+              partNumber: formData.partNumber || undefined,
+              frequencyBand: formData.frequencyBand || undefined,
+              authorizedBandwidth: formData.authorizedBandwidth || undefined,
+              emissionDesignator: formData.emissionDesignator || undefined
+            } : undefined
+          } : undefined,
+          fiber: isFiber ? {
+            provider: formData.provider || undefined,
+            circuitId: formData.circuitId || undefined,
+            handoffType: formData.handoffType,
+            connectorType: formData.connectorType,
+            fiberCount: formData.fiberCount,
+            fiberSpeed: formData.fiberSpeed,
+            demarcLocation: formData.demarcLocation || undefined
+          } : undefined,
+          capacityMbps: formData.capacity,
+          manufacturer: formData.equipmentManufacturer || undefined,
+          equipmentModel: formData.equipmentModel || undefined,
+          notes: formData.notes || undefined,
+          costs: {
+            monthlyRecurringCost: formData.monthlyRecurringCost || undefined,
+            contractTermMonths: formData.contractTermMonths || undefined
+          }
+        };
+
+        await mapLayerManager.addFeature(planId, {
+          featureType: 'link',
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [fromSiteObj.location.longitude, fromSiteObj.location.latitude],
+              [toSiteObj.location.longitude, toSiteObj.location.latitude]
+            ]
           },
-          additionalNotes: formData.notes
-        })
-      };
-      
-      // Add planId if in plan mode
-      if (planId) {
-        backhaulData.planId = planId;
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'Backhaul link staged in plan.' });
+      } else {
+        const backhaulData: any = {
+          siteId: formData.fromSiteId,
+          name: formData.name,
+          type: 'backhaul',
+          locationType: 'tower',
+          manufacturer: formData.equipmentManufacturer || (isWireless ? 'Wireless' : formData.provider || 'Fiber'),
+          model: formData.equipmentModel || 'N/A',
+          serialNumber: formData.equipmentSerialNumber || `BH-${Date.now()}`,
+          status: formData.status,
+          location: sites.find(s => s.id === formData.fromSiteId)?.location || { latitude: 0, longitude: 0 },
+          installDate: formData.installDate || undefined,
+          notes: JSON.stringify({
+            backhaulType: formData.backhaulType,
+            fromSiteId: formData.fromSiteId,
+            toSiteId: formData.toSiteId,
+            ...(isWireless && {
+              wireless: {
+                siteA: {
+                  azimuth: formData.siteA_azimuth,
+                  antennaHeight: formData.siteA_antennaHeight,
+                  antennaGain: formData.siteA_antennaGain,
+                  txPower: formData.siteA_txPower
+                },
+                siteB: {
+                  azimuth: formData.siteB_azimuth,
+                  antennaHeight: formData.siteB_antennaHeight,
+                  antennaGain: formData.siteB_antennaGain,
+                  txPower: formData.siteB_txPower
+                },
+                frequency: formData.frequency,
+                bandwidth: formData.bandwidth,
+                beamwidth: formData.beamwidth
+              }
+            }),
+            ...(isFiber && {
+              fiber: {
+                provider: formData.provider,
+                circuitId: formData.circuitId,
+                handoffType: formData.handoffType,
+                connectorType: formData.connectorType,
+                fiberCount: formData.fiberCount,
+                fiberSpeed: formData.fiberSpeed,
+                demarcLocation: formData.demarcLocation
+              }
+            }),
+            capacity: formData.capacity,
+            financial: {
+              monthlyRecurringCost: formData.monthlyRecurringCost || 0,
+              contractTermMonths: formData.contractTermMonths || 12
+            },
+            additionalNotes: formData.notes
+          })
+        };
+
+        await coverageMapService.createEquipment(tenantId, backhaulData);
+        dispatch('saved', { message: 'Backhaul link created successfully.' });
       }
-      
-      await coverageMapService.createEquipment(tenantId, backhaulData);
-      
-      dispatch('saved');
+
       handleClose();
     } catch (err: any) {
-      error = err.message || 'Failed to create backhaul';
+      error = err.message || 'Failed to create backhaul link';
     } finally {
       isSaving = false;
     }

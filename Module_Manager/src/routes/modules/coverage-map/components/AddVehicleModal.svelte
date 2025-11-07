@@ -1,11 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
   
   export let show = false;
   export let initialLatitude: number | null = null;
   export let initialLongitude: number | null = null;
   export let tenantId: string;
+export let planId: string | null = null;
   
   const dispatch = createEventDispatcher();
   let isSaving = false;
@@ -34,35 +36,56 @@
     error = '';
     
     try {
-      const siteData: any = {
-        name: formData.name,
-        type: 'vehicle',
-        location: { 
-          latitude: formData.latitude, 
-          longitude: formData.longitude 
-        },
-        tenantId
-      };
-      
-      // Add driver contact if provided
-      if (formData.driver?.trim()) {
-        siteData.siteContact = {
-          name: formData.driver.trim(),
-          phone: formData.driverPhone?.trim() || '',
-          role: 'Driver'
+      if (planId) {
+        const properties: Record<string, any> = {
+          name: formData.name.trim(),
+          siteType: 'vehicle',
+          vehicleNumber: formData.vehicleNumber?.trim() || undefined,
+          driver: formData.driver?.trim() || undefined,
+          driverPhone: formData.driverPhone?.trim() || undefined,
+          notes: formData.notes?.trim() || undefined
         };
+
+        await mapLayerManager.addFeature(planId, {
+          featureType: 'site',
+          geometry: {
+            type: 'Point',
+            coordinates: [formData.longitude, formData.latitude]
+          },
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'Vehicle staged in plan.' });
+      } else {
+        const siteData: any = {
+          name: formData.name,
+          type: 'vehicle',
+          location: { 
+            latitude: formData.latitude, 
+            longitude: formData.longitude 
+          },
+          tenantId
+        };
+
+        if (formData.driver?.trim()) {
+          siteData.siteContact = {
+            name: formData.driver.trim(),
+            phone: formData.driverPhone?.trim() || '',
+            role: 'Driver'
+          };
+        }
+
+        const instructions = [];
+        if (formData.vehicleNumber?.trim()) instructions.push(`Vehicle #${formData.vehicleNumber.trim()}`);
+        if (formData.notes?.trim()) instructions.push(formData.notes.trim());
+        if (instructions.length > 0) {
+          siteData.accessInstructions = instructions.join('. ');
+        }
+
+        await coverageMapService.createTowerSite(tenantId, siteData);
+        dispatch('saved', { message: 'Vehicle created successfully.' });
       }
-      
-      // Build access instructions
-      const instructions = [];
-      if (formData.vehicleNumber?.trim()) instructions.push(`Vehicle #${formData.vehicleNumber.trim()}`);
-      if (formData.notes?.trim()) instructions.push(formData.notes.trim());
-      if (instructions.length > 0) {
-        siteData.accessInstructions = instructions.join('. ');
-      }
-      
-      await coverageMapService.createTowerSite(tenantId, siteData);
-      dispatch('saved');
       handleClose();
     } catch (err: any) {
       error = err.message || 'Failed to create vehicle';

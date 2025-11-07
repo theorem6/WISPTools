@@ -1,11 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
   
   export let show = false;
   export let initialLatitude: number | null = null;
   export let initialLongitude: number | null = null;
   export let tenantId: string;
+export let planId: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -40,39 +42,66 @@
     error = '';
     
     try {
-      const siteData: any = {
-        name: formData.name,
-        type: 'noc',
-        location: {
-          latitude: formData.latitude,
-          longitude: formData.longitude
-        },
-        tenantId
-      };
-      
-      // Add optional location fields only if they have values
-      if (formData.address?.trim()) siteData.location.address = formData.address.trim();
-      if (formData.city?.trim()) siteData.location.city = formData.city.trim();
-      if (formData.state?.trim()) siteData.location.state = formData.state.trim();
-      if (formData.zipCode?.trim()) siteData.location.zipCode = formData.zipCode.trim();
-      
-      // Add optional contact only if name is provided
-      if (formData.contactName?.trim()) {
-        siteData.siteContact = {
-          name: formData.contactName.trim(),
-          phone: formData.contactPhone?.trim() || '',
-          email: formData.contactEmail?.trim() || ''
+      if (planId) {
+        const properties: Record<string, any> = {
+          name: formData.name.trim(),
+          siteType: 'noc',
+          address: formData.address?.trim() || undefined,
+          city: formData.city?.trim() || undefined,
+          state: formData.state?.trim() || undefined,
+          zipCode: formData.zipCode?.trim() || undefined,
+          contact: formData.contactName?.trim()
+            ? {
+                name: formData.contactName.trim(),
+                phone: formData.contactPhone?.trim() || undefined,
+                email: formData.contactEmail?.trim() || undefined
+              }
+            : undefined,
+          notes: formData.notes?.trim() || undefined
         };
+
+        await mapLayerManager.addFeature(planId, {
+          featureType: 'site',
+          geometry: {
+            type: 'Point',
+            coordinates: [formData.longitude, formData.latitude]
+          },
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'NOC staged in plan.' });
+      } else {
+        const siteData: any = {
+          name: formData.name,
+          type: 'noc',
+          location: {
+            latitude: formData.latitude,
+            longitude: formData.longitude
+          },
+          tenantId
+        };
+
+        if (formData.address?.trim()) siteData.location.address = formData.address.trim();
+        if (formData.city?.trim()) siteData.location.city = formData.city.trim();
+        if (formData.state?.trim()) siteData.location.state = formData.state.trim();
+        if (formData.zipCode?.trim()) siteData.location.zipCode = formData.zipCode.trim();
+
+        if (formData.contactName?.trim()) {
+          siteData.siteContact = {
+            name: formData.contactName.trim(),
+            phone: formData.contactPhone?.trim() || '',
+            email: formData.contactEmail?.trim() || ''
+          };
+        }
+
+        if (formData.notes?.trim()) {
+          siteData.accessInstructions = formData.notes.trim();
+        }
+
+        await coverageMapService.createTowerSite(tenantId, siteData);
+        dispatch('saved', { message: 'NOC created successfully.' });
       }
-      
-      // Add notes if provided
-      if (formData.notes?.trim()) {
-        siteData.accessInstructions = formData.notes.trim();
-      }
-      
-      await coverageMapService.createTowerSite(tenantId, siteData);
-      
-      dispatch('saved');
       handleClose();
     } catch (err: any) {
       error = err.message || 'Failed to create NOC';

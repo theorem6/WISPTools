@@ -10,7 +10,7 @@ import SettingsButton from '$lib/components/SettingsButton.svelte';
 import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
 import { mapContext } from '$lib/map/mapContext';
 import SharedMap from '$lib/map/SharedMap.svelte';
-import type { MapModuleMode } from '$lib/map/MapCapabilities';
+import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from '$lib/map/MapCapabilities';
 import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
@@ -34,6 +34,17 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
 
   $: mapState = $mapContext as MapLayerManagerState;
   $: mapMode = (mapState?.mode ?? 'plan');
+  $: mapLocked = !activeProject;
+
+  function applyPlanningCapabilities(lock: boolean) {
+    if (lock) {
+      mapLayerManager.setCapabilities(PLANNING_LOCK_CAPABILITIES);
+    } else {
+      mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
+    }
+  }
+
+  $: applyPlanningCapabilities(mapLocked);
   
   // New project form
   let newProject = {
@@ -67,6 +78,21 @@ let moduleContext: ModuleContext = {
   };
 
 let iframeReady = false;
+
+const PLANNING_LOCK_CAPABILITIES: MapCapabilities = {
+  mode: 'plan',
+  canAddTemporary: false,
+  canEditTemporary: false,
+  canDeleteTemporary: false,
+  canApprove: false,
+  canAssignTasks: false,
+  canMarkProgress: false,
+  readOnly: true
+};
+
+let mapLocked = true;
+
+$: draftPlanSuggestion = projects.find(p => p.status === 'draft');
 
   $: {
     const tenantRole = $currentTenant?.userRole;
@@ -347,7 +373,6 @@ let iframeReady = false;
     
     isLoading = true;
     error = '';
-    successMessage = '';
     
     try {
       const tenantId = localStorage.getItem('selectedTenantId');
@@ -361,14 +386,17 @@ let iframeReady = false;
         createdBy: currentUser.email
       });
       
-      // Reload projects list
-      await loadData();
-      
-      successMessage = `Project "${project.name}" created successfully`;
       closeCreateProjectModal();
+      isLoading = false;
+
+      // Reload projects list to include the new plan
+      await loadData();
+
+      const createdPlan = projects.find(p => p.id === project.id) || project;
+      selectedProject = createdPlan;
+
+      await startProject(createdPlan, { autoStart: true });
       
-      // Show success message briefly
-      setTimeout(() => successMessage = '', 3000);
     } catch (err: any) {
       console.error('Error creating project:', err);
       error = err.message || 'Failed to create project. Please check the console for details.';
@@ -487,20 +515,34 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   }
 
   // Project workflow functions
-  async function startProject(project: PlanProject) {
+  async function startProject(project: PlanProject, options: { autoStart?: boolean } = {}) {
+    const { autoStart = false } = options;
     try {
-      activeProject = project;
+      const updatedPlan = await planService.updatePlan(project.id, { status: 'active', showOnMap: true });
+      const active = updatedPlan ?? project;
+
+      activeProject = active;
+      selectedProject = active;
       showProjectActions = true;
-      await planService.updatePlan(project.id, { status: 'active' });
-      await loadData();
-      alert(`Project "${project.name}" is now active. All map changes will be saved to this project.`);
+
+      const exists = projects.some(p => p.id === active.id);
+      projects = exists ? projects.map(p => (p.id === active.id ? active : p)) : [active, ...projects];
+
+      visiblePlans = new Set(visiblePlans);
+      visiblePlans.add(active.id);
 
       if ($currentTenant?.id) {
-        await mapLayerManager.loadPlan($currentTenant.id, project);
+        await mapLayerManager.loadPlan($currentTenant.id, active);
       }
-    } catch (error) {
-      console.error('Error starting project:', error);
-      alert('Failed to start project');
+
+      successMessage = autoStart
+        ? `Plan "${active.name}" started. You can now place sites and hardware.`
+        : `Project "${active.name}" is active. All map changes will be saved to this plan.`;
+      setTimeout(() => successMessage = '', 6000);
+    } catch (err: any) {
+      console.error('Error starting project:', err);
+      error = err?.message || 'Failed to start project';
+      setTimeout(() => error = '', 6000);
     }
   }
   
@@ -610,8 +652,42 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 <TenantGuard>
   <div class="app">
     <!-- Full Screen Map -->
-    <div class="map-fullscreen" bind:this={mapContainer}>
+    <div class="map-fullscreen {mapLocked ? 'locked' : ''}" bind:this={mapContainer}>
       <SharedMap mode={mapMode} />
+
+      {#if mapLocked}
+        <div class="map-lock-overlay">
+          <div class="map-lock-card">
+            <h2>Start Planning</h2>
+            <p>The map is read-only until you start a deployment plan. Create a new plan or resume a draft to begin staging sites and hardware.</p>
+
+            <div class="lock-actions">
+              <button class="btn-primary" on:click={openCreateProject}>
+                ➕ Create Plan
+              </button>
+
+              {#if projects.length > 0}
+                <button class="btn-secondary" on:click={openProjectList}>
+                  📁 View Plans
+                </button>
+              {/if}
+
+              {#if draftPlanSuggestion}
+                <button
+                  class="btn-accent"
+                  on:click={() => {
+                    if (draftPlanSuggestion) {
+                      startProject(draftPlanSuggestion, { autoStart: true });
+                    }
+                  }}
+                >
+                  ▶️ Start "{draftPlanSuggestion.name}"
+                </button>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
 
     <!-- Enhanced Header Overlay -->
@@ -624,44 +700,53 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       </div>
       <div class="header-controls">
         <button class="control-btn" on:click={openHardwareView} title="View All Hardware">
-          🔧
+          <span class="control-icon">🔧</span>
+          <span class="control-label">Hardware</span>
         </button>
         <button class="control-btn" on:click={openProjectList} title="Project List">
-          📁
+          <span class="control-icon">📁</span>
+          <span class="control-label">Plans</span>
         </button>
         <button class="control-btn" on:click={openCreateProject} title="Create New Project">
-          ➕
+          <span class="control-icon">➕</span>
+          <span class="control-label">New Plan</span>
         </button>
         {#if selectedProject}
           <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
-            🛒
+            <span class="control-icon">🛒</span>
+            <span class="control-label">Gaps</span>
           </button>
           <button class="control-btn" on:click={openAddRequirementModal} title="Add Hardware Requirement">
-            📋
+            <span class="control-icon">📋</span>
+            <span class="control-label">Needs</span>
           </button>
           <button 
             class="control-btn {selectedProject.showOnMap ? 'active' : ''}" 
             on:click={() => togglePlanVisibility(selectedProject)} 
             title={selectedProject.showOnMap ? "Hide plan on map" : "Show plan on map"}
           >
-            {selectedProject.showOnMap ? "👁️" : "👁️‍🗨️"}
+            <span class="control-icon">{selectedProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
+            <span class="control-label">{selectedProject.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
         {/if}
         
         <!-- Project Workflow Actions -->
         {#if activeProject}
           <button class="control-btn finish-btn" on:click={finishProject} title="Finish Project">
-            ✅
+            <span class="control-icon">✅</span>
+            <span class="control-label">Finish</span>
           </button>
           <button class="control-btn cancel-btn" on:click={cancelProject} title="Cancel Project">
-            ❌
+            <span class="control-icon">❌</span>
+            <span class="control-label">Cancel</span>
           </button>
           <button 
             class="control-btn {activeProject.showOnMap ? 'active' : ''}" 
             on:click={() => togglePlanVisibility(activeProject)} 
             title={activeProject.showOnMap ? "Hide plan on map" : "Show plan on map"}
           >
-            {activeProject.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
+            <span class="control-icon">{activeProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
+            <span class="control-label">{activeProject.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
         {/if}
       </div>
@@ -1215,6 +1300,58 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     z-index: 0;
   }
 
+  .map-fullscreen.locked .shared-map,
+  .map-fullscreen.locked .shared-map iframe {
+    pointer-events: none;
+    filter: saturate(0.4) brightness(0.85);
+  }
+
+  .map-lock-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.78), rgba(30, 64, 175, 0.55));
+    backdrop-filter: blur(6px);
+    padding: 2rem;
+    z-index: 6;
+  }
+
+  .map-lock-card {
+    max-width: 460px;
+    width: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.4);
+    color: #e2e8f0;
+    text-align: center;
+  }
+
+  .map-lock-card h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .map-lock-card p {
+    margin: 0;
+    line-height: 1.6;
+    color: rgba(226, 232, 240, 0.75);
+  }
+
+  .lock-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
   /* Left Horizontal Menu */
   .header-overlay {
     position: absolute;
@@ -1273,13 +1410,18 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   .control-btn {
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    min-width: 72px;
     cursor: pointer;
     color: white;
     transition: all 0.2s;
     backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
   }
 
   .control-btn:hover {
@@ -1288,31 +1430,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     transform: translateY(-1px);
   }
 
-  /* Enhanced Tooltips */
-  .control-btn {
-    position: relative;
+  .control-btn .control-icon {
+    font-size: 1.2rem;
+    line-height: 1;
   }
 
-  .control-btn::after {
-    content: attr(title);
-    position: absolute;
-    bottom: -35px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    z-index: 1000;
-  }
-
-  .control-btn:hover::after {
-    opacity: 1;
+  .control-btn .control-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
   }
 
   /* Modal Styles */
@@ -1422,6 +1549,23 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .btn-secondary:hover {
     background: var(--bg-tertiary);
+  }
+
+  .btn-accent {
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    border: none;
+    background: linear-gradient(135deg, #38bdf8, #6366f1);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .btn-accent:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(99, 102, 241, 0.45);
   }
 
   .modal-footer {

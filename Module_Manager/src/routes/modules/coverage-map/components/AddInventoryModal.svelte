@@ -142,70 +142,114 @@
   
   async function handleSave() {
     const finalEquipmentType = useCustomType ? formData.customType : formData.equipmentType;
-    
+    const isPlanMode = Boolean(planId);
+
     if (!finalEquipmentType.trim()) {
       error = 'Equipment type is required';
       return;
     }
-    
-    if (!formData.serialNumber.trim()) {
+
+    if (!isPlanMode && !formData.serialNumber.trim()) {
       error = 'Serial number is required for inventory tracking';
       return;
     }
-    
+
     if (!site) {
       error = 'No site selected';
       return;
     }
-    
+
     isSaving = true;
     error = '';
-    
+
     try {
-      const equipmentData = {
-        siteId: site.id,
-        name: `${finalEquipmentType} - ${formData.serialNumber}`,
-        type: 'tower-equipment',
-        locationType: 'tower',
-        manufacturer: formData.manufacturer,
-        model: formData.model,
-        serialNumber: formData.serialNumber,
-        status: formData.status,
-        location: site.location,
-        installDate: formData.installDate || undefined,
-        
-        // Store detailed inventory data in notes as JSON
-        notes: JSON.stringify({
+      if (isPlanMode) {
+        if (!site.location || site.location.longitude === undefined || site.location.latitude === undefined) {
+          throw new Error('Selected site is missing coordinates');
+        }
+
+        const properties: Record<string, any> = {
           category: formData.category,
           equipmentType: finalEquipmentType,
-          partNumber: formData.partNumber,
-          firmwareVersion: formData.firmwareVersion,
-          hardwareVersion: formData.hardwareVersion,
-          warrantyExpiration: formData.warrantyExpiration,
-          purchase: {
-            date: formData.purchaseDate,
-            orderNumber: formData.purchaseOrderNumber,
-            vendor: formData.vendor,
-            price: formData.purchasePrice
-          },
+          manufacturer: formData.manufacturer || undefined,
+          model: formData.model || undefined,
+          quantity: formData.quantity || 1,
+          status: formData.status,
           condition: formData.condition,
-          location: {
-            rack: formData.rackLocation,
-            rackUnit: formData.rackUnit
+          siteId: site.id,
+          siteName: site.name,
+          partNumber: formData.partNumber || undefined,
+          firmwareVersion: formData.firmwareVersion || undefined,
+          hardwareVersion: formData.hardwareVersion || undefined,
+          installDate: formData.installDate || undefined,
+          powerRequirements: formData.powerRequirements || undefined,
+          ipAddress: formData.ipAddress || undefined,
+          macAddress: formData.macAddress || undefined,
+          managementUrl: formData.managementUrl || undefined,
+          vendor: formData.vendor || undefined,
+          purchaseDate: formData.purchaseDate || undefined,
+          purchaseOrderNumber: formData.purchaseOrderNumber || undefined,
+          purchasePrice: formData.purchasePrice || undefined,
+          rackLocation: formData.rackLocation || undefined,
+          rackUnit: formData.rackUnit || undefined,
+          notes: formData.notes || undefined
+        };
+
+        await mapLayerManager.addFeature(planId!, {
+          featureType: 'equipment',
+          geometry: {
+            type: 'Point',
+            coordinates: [site.location.longitude, site.location.latitude]
           },
-          technical: {
-            powerRequirements: formData.powerRequirements,
-            ipAddress: formData.ipAddress,
-            macAddress: formData.macAddress,
-            managementUrl: formData.managementUrl
-          },
-          additionalNotes: formData.notes
-        })
-      };
-      
-      await coverageMapService.createEquipment(tenantId, equipmentData);
-      
-      dispatch('saved');
+          properties,
+          status: 'draft'
+        });
+
+        dispatch('saved', { message: 'Hardware staged in plan.' });
+      } else {
+        const equipmentData = {
+          siteId: site.id,
+          name: `${finalEquipmentType} - ${formData.serialNumber}`,
+          type: 'tower-equipment',
+          locationType: 'tower',
+          manufacturer: formData.manufacturer,
+          model: formData.model,
+          serialNumber: formData.serialNumber,
+          status: formData.status,
+          location: site.location,
+          installDate: formData.installDate || undefined,
+          notes: JSON.stringify({
+            category: formData.category,
+            equipmentType: finalEquipmentType,
+            partNumber: formData.partNumber,
+            firmwareVersion: formData.firmwareVersion,
+            hardwareVersion: formData.hardwareVersion,
+            warrantyExpiration: formData.warrantyExpiration,
+            purchase: {
+              date: formData.purchaseDate,
+              orderNumber: formData.purchaseOrderNumber,
+              vendor: formData.vendor,
+              price: formData.purchasePrice
+            },
+            condition: formData.condition,
+            location: {
+              rack: formData.rackLocation,
+              rackUnit: formData.rackUnit
+            },
+            technical: {
+              powerRequirements: formData.powerRequirements,
+              ipAddress: formData.ipAddress,
+              macAddress: formData.macAddress,
+              managementUrl: formData.managementUrl
+            },
+            additionalNotes: formData.notes
+          })
+        };
+
+        await coverageMapService.createEquipment(tenantId, equipmentData);
+        dispatch('saved', { message: 'Hardware added to inventory.' });
+      }
+
       handleClose();
     } catch (err: any) {
       error = err.message || 'Failed to add inventory';
