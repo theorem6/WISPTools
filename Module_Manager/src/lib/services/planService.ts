@@ -250,6 +250,7 @@ class PlanService {
   
   private async apiCall(endpoint: string, options: RequestInit = {}, tenantId?: string): Promise<any> {
     const token = await this.getAuthToken();
+    const currentUser = await authService.getCurrentUser();
     
     // Use provided tenantId or fall back to localStorage
     const resolvedTenantId = tenantId || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null);
@@ -267,6 +268,7 @@ class PlanService {
       headers: {
         'Authorization': `Bearer ${token}`,
         'X-Tenant-ID': resolvedTenantId,
+        'X-User-Email': currentUser?.email || '',
         'Content-Type': 'application/json',
         ...options.headers
       }

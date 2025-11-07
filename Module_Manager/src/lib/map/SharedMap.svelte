@@ -32,6 +32,11 @@
       params.set('planId', planId);
     }
 
+    const versionSeed = state?.lastUpdated
+      ? new Date(state.lastUpdated).getTime()
+      : Date.now();
+    params.set('v', String(versionSeed));
+
     const query = params.toString();
     return query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
   };
