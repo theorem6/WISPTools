@@ -19,7 +19,7 @@ export interface PlanProject {
   id: string;
   name: string;
   description: string;
-  status: 'draft' | 'active' | 'ready' | 'approved' | 'rejected' | 'deployed' | 'cancelled';
+  status: 'draft' | 'active' | 'ready' | 'approved' | 'authorized' | 'rejected' | 'deployed' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
@@ -71,6 +71,11 @@ export interface PlanProject {
     rejectedAt?: Date;
     rejectionReason?: string;
     approvalNotes?: string;
+  };
+  authorization?: {
+    authorizedBy?: string;
+    authorizedAt?: Date;
+    notes?: string;
   };
   // Purchase Planning
   purchasePlan: {
@@ -199,6 +204,39 @@ export interface HardwareView {
   lastUpdated: Date;
   isReadOnly: boolean; // True for existing hardware from other modules
   inventoryId?: string; // Link to inventory if available
+}
+
+export type PlanFeatureType = 'site' | 'sector' | 'cpe' | 'equipment' | 'link' | 'note';
+
+export interface PlanFeatureGeometry {
+  type: 'Point' | 'LineString' | 'Polygon';
+  coordinates: any;
+}
+
+export interface PlanLayerFeature {
+  id: string;
+  tenantId: string;
+  planId: string;
+  featureType: PlanFeatureType;
+  geometry?: PlanFeatureGeometry;
+  properties: Record<string, any>;
+  status: 'draft' | 'pending-review' | 'approved' | 'rejected' | 'authorized';
+  metadata?: Record<string, any>;
+  originFeatureId?: string;
+  promotedResourceId?: string;
+  promotedResourceType?: string;
+  createdBy?: string;
+  createdById?: string;
+  updatedBy?: string;
+  updatedById?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PlanFeatureSummary {
+  total: number;
+  byType: Record<string, number>;
+  byStatus: Record<string, number>;
 }
 
 class PlanService {
@@ -472,6 +510,70 @@ class PlanService {
     });
     return this.mapBackendPlanToFrontend(result.plan);
   }
+
+  /**
+   * Authorize plan (promote plan-layer assets to production)
+   */
+  async authorizePlan(planId: string, notes?: string): Promise<PlanProject> {
+    const result = await this.apiCall(`/${planId}/authorize`, {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+    return this.mapBackendPlanToFrontend(result.plan);
+  }
+
+  /**
+   * Get staged features for a plan
+   */
+  async getPlanFeatures(planId: string): Promise<{ features: PlanLayerFeature[]; summary: PlanFeatureSummary }> {
+    const response = await this.apiCall(`/${planId}/features`);
+    const features: PlanLayerFeature[] = Array.isArray(response.features)
+      ? response.features.map((feature: any) => this.mapBackendFeatureToFrontend(feature))
+      : [];
+
+    return {
+      features,
+      summary: this.normalizeSummary(response.summary)
+    };
+  }
+
+  async createPlanFeature(planId: string, payload: {
+    featureType: PlanFeatureType;
+    geometry?: PlanFeatureGeometry;
+    properties?: Record<string, any>;
+    status?: PlanLayerFeature['status'];
+    metadata?: Record<string, any>;
+  }): Promise<{ feature: PlanLayerFeature; summary: PlanFeatureSummary }> {
+    const response = await this.apiCall(`/${planId}/features`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    return {
+      feature: this.mapBackendFeatureToFrontend(response.feature),
+      summary: this.normalizeSummary(response.summary)
+    };
+  }
+
+  async updatePlanFeature(planId: string, featureId: string, updates: Partial<PlanLayerFeature>): Promise<{ feature: PlanLayerFeature; summary: PlanFeatureSummary }> {
+    const response = await this.apiCall(`/${planId}/features/${featureId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    });
+
+    return {
+      feature: this.mapBackendFeatureToFrontend(response.feature),
+      summary: this.normalizeSummary(response.summary)
+    };
+  }
+
+  async deletePlanFeature(planId: string, featureId: string): Promise<PlanFeatureSummary> {
+    const response = await this.apiCall(`/${planId}/features/${featureId}`, {
+      method: 'DELETE'
+    });
+
+    return this.normalizeSummary(response.summary);
+  }
   
   /**
    * Get all sites/equipment in a plan
@@ -517,7 +619,38 @@ class PlanService {
         procurementStatus: 'pending'
       },
       approval: plan.approval || {},
+      authorization: plan.authorization || undefined,
       deployment: plan.deployment || {}
+    };
+  }
+
+  private mapBackendFeatureToFrontend(feature: any): PlanLayerFeature {
+    return {
+      id: feature._id || feature.id,
+      tenantId: feature.tenantId,
+      planId: feature.planId,
+      featureType: feature.featureType,
+      geometry: feature.geometry,
+      properties: feature.properties || {},
+      status: feature.status || 'draft',
+      metadata: feature.metadata || {},
+      originFeatureId: feature.originFeatureId,
+      promotedResourceId: feature.promotedResourceId,
+      promotedResourceType: feature.promotedResourceType,
+      createdBy: feature.createdBy,
+      createdById: feature.createdById,
+      updatedBy: feature.updatedBy,
+      updatedById: feature.updatedById,
+      createdAt: feature.createdAt ? new Date(feature.createdAt) : new Date(),
+      updatedAt: feature.updatedAt ? new Date(feature.updatedAt) : new Date()
+    };
+  }
+
+  private normalizeSummary(summary: any): PlanFeatureSummary {
+    return {
+      total: summary?.total ?? 0,
+      byType: summary?.byType ?? {},
+      byStatus: summary?.byStatus ?? {}
     };
   }
   

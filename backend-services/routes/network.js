@@ -18,13 +18,55 @@ const requireTenant = (req, res, next) => {
 
 router.use(requireTenant);
 
+// Helper utilities for plan-layer filtering
+function extractPlanIdList(query) {
+  const ids = [];
+  if (query.planId) {
+    ids.push(String(query.planId));
+  }
+  if (query.planIds) {
+    const splitIds = String(query.planIds)
+      .split(',')
+      .map(id => id.trim())
+      .filter(Boolean);
+    ids.push(...splitIds);
+  }
+  // Ensure uniqueness
+  return [...new Set(ids)];
+}
+
+function applyPlanVisibilityFilter(baseQuery, req, options = {}) {
+  const includePlanLayer = req.query.includePlanLayer === 'true';
+  const planIdList = options.planIds || extractPlanIdList(req.query);
+
+  if (!includePlanLayer) {
+    // Exclude plan-layer objects by default
+    baseQuery.$or = [
+      { planId: { $exists: false } },
+      { planId: null },
+      { planId: '' }
+    ];
+  } else if (planIdList.length > 0) {
+    // Include requested plan-layer objects along with production assets
+    baseQuery.$or = [
+      { planId: { $in: planIdList } },
+      { planId: { $exists: false } },
+      { planId: null },
+      { planId: '' }
+    ];
+  }
+
+  return baseQuery;
+}
+
 // ========== UNIFIED SITES ==========
 
 router.get('/sites', async (req, res) => {
   try {
     console.log(`🔍 Fetching sites for tenant: ${req.tenantId}`);
     
-    const sites = await UnifiedSite.find({ tenantId: req.tenantId }).sort({ name: 1 }).lean();
+    const query = applyPlanVisibilityFilter({ tenantId: req.tenantId }, req);
+    const sites = await UnifiedSite.find(query).sort({ name: 1 }).lean();
     
     console.log(`📊 Found ${sites.length} sites for tenant ${req.tenantId}`);
     
@@ -105,7 +147,7 @@ router.delete('/sites/:id', async (req, res) => {
 router.get('/sectors', async (req, res) => {
   try {
     const { band, technology, siteId } = req.query;
-    const query = { tenantId: req.tenantId };
+    const query = applyPlanVisibilityFilter({ tenantId: req.tenantId }, req);
     
     if (band) query.band = band;
     if (technology) query.technology = technology;
@@ -207,7 +249,7 @@ router.get('/sites/:siteId/sectors', async (req, res) => {
 router.get('/cpe', async (req, res) => {
   try {
     const { status, technology, siteId } = req.query;
-    const query = { tenantId: req.tenantId };
+    const query = applyPlanVisibilityFilter({ tenantId: req.tenantId }, req);
     
     if (status) query.status = status;
     if (technology) query.technology = technology;
@@ -296,7 +338,7 @@ router.delete('/cpe/:id', async (req, res) => {
 router.get('/equipment', async (req, res) => {
   try {
     const { locationType, status, type } = req.query;
-    const query = { tenantId: req.tenantId };
+    const query = applyPlanVisibilityFilter({ tenantId: req.tenantId }, req);
     
     if (locationType) query.locationType = locationType;
     if (status) query.status = status;

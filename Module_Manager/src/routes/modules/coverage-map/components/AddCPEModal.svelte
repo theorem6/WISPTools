@@ -99,7 +99,7 @@
         serviceType: formData.serviceType,
         technology: formData.technology,
         band: formData.band || undefined,
-        status: formData.status
+        status: planId ? 'planned' : formData.status
       };
       
       // Add planId if in plan mode

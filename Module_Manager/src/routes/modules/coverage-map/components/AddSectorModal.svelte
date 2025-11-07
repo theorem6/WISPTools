@@ -98,7 +98,7 @@
         radioModel: formData.radioModel || undefined,
         radioManufacturer: formData.radioManufacturer || undefined,
         radioSerialNumber: formData.radioSerialNumber || undefined,
-        status: formData.status
+        status: planId ? 'planned' : formData.status
       };
       
       // Add planId if in plan mode

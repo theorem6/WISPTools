@@ -5,18 +5,22 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
   import { planService, type PlanProject } from '$lib/services/planService';
-  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import SettingsButton from '$lib/components/SettingsButton.svelte';
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';
   import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
   import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
+  import SharedMap from '$lib/map/SharedMap.svelte';
+  import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
+  import { mapContext } from '$lib/map/mapContext';
+  import type { MapModuleMode } from '$lib/map/MapCapabilities';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
+  let mapState: MapLayerManagerState | undefined;
+  let mapMode: MapModuleMode = 'deploy';
   
   // Plan approval workflow
   let showPlanApprovalModal = false;
@@ -40,18 +44,16 @@
   let showDeployedHardwareModal = false;
   let deployedCount = 0;
   let error = '';
+  let deploymentMessage = '';
 
-
-  // Module context for object state management
-  let moduleContext: ModuleContext = {
-    module: 'deploy',
-    userRole: 'admin' // This should be determined from user permissions
-  };
 
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
   $: isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
   $: buttonsDisabled = !isAdmin && !$currentTenant;
+
+  $: mapState = $mapContext as MapLayerManagerState;
+  $: mapMode = mapState?.mode ?? 'deploy';
 
   onMount(async () => {
     if (browser) {
@@ -61,38 +63,13 @@
         return;
       }
       
-      // Initialize iframe communication
-      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
-      if (iframe) {
-        iframeCommunicationService.initialize(iframe, moduleContext);
-        
-        // Listen for iframe object actions
-        window.addEventListener('iframe-object-action', handleIframeObjectAction);
-      }
-      
+      mapLayerManager.setMode('deploy');
       await loadReadyPlans();
     }
     
     return () => {
-      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
-      iframeCommunicationService.destroy();
     };
   });
-
-  // Handle iframe object actions
-  function handleIframeObjectAction(event: CustomEvent) {
-    const { objectId, action, allowed, message, state } = event.detail;
-    
-    if (!allowed) {
-      // Show user-friendly error message
-      error = message || `Action '${action}' is not allowed for this object.`;
-      setTimeout(() => error = '', 5000);
-    } else {
-      // Handle allowed actions
-      console.log(`Action '${action}' allowed for object ${objectId}`);
-      // Add specific handling for different actions here
-    }
-  }
 
 
   async function loadReadyPlans() {
@@ -103,16 +80,22 @@
         // Get plans that are ready for approval OR approved (for deployment)
         const allPlans = await planService.getPlans(tenantId);
         readyPlans = allPlans.filter(plan => 
-          plan.status === 'ready' || plan.status === 'approved'
+          plan.status === 'ready' || plan.status === 'approved' || plan.status === 'authorized'
         );
         
         // Separate approved plans for filtering
-        approvedPlans = allPlans.filter(plan => plan.status === 'approved');
+        approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
         
         // Initialize visible plan IDs from plans with showOnMap = true
         visiblePlanIds = new Set(
           approvedPlans.filter(p => p.showOnMap).map(p => p.id)
         );
+        
+        await mapLayerManager.loadProductionHardware(tenantId);
+        const planToLoad = approvedPlans.find(p => p.showOnMap) || approvedPlans[0];
+        if (planToLoad) {
+          await mapLayerManager.loadPlan(tenantId, planToLoad);
+        }
         
         // Load deployed hardware count
         try {
@@ -129,10 +112,54 @@
       isLoadingPlans = false;
     }
   }
+
+  async function focusPlanOnMap(planId: string | null) {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId || !planId) return;
+    const plan = approvedPlans.find(p => p.id === planId);
+    if (plan) {
+      await mapLayerManager.loadPlan(tenantId, plan);
+    }
+  }
+
+  async function focusPlanOnMap(planId: string | null) {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId || !planId) return;
+    const plan = approvedPlans.find(p => p.id === planId);
+    if (plan) {
+      await mapLayerManager.loadPlan(tenantId, plan);
+    }
+  }
   
 
   function goBack() {
     goto('/dashboard');
+  }
+
+  async function pushActivePlanToField() {
+    const tenantId = $currentTenant?.id;
+    const plan = mapState?.activePlan;
+
+    if (!tenantId || !plan) {
+      deploymentMessage = 'Select an authorized plan to deploy.';
+      setTimeout(() => (deploymentMessage = ''), 4000);
+      return;
+    }
+
+    try {
+      const { features } = await planService.getPlanFeatures(plan.id);
+      console.log('[Deploy] Preparing deployment package', {
+        planId: plan.id,
+        tenantId,
+        featureCount: features.length
+      });
+      deploymentMessage = `Deployment package for "${plan.name}" prepared (${features.length} items).`;
+    } catch (err: any) {
+      console.error('Failed to prepare deployment package:', err);
+      deploymentMessage = err?.message || 'Failed to prepare deployment package.';
+    } finally {
+      setTimeout(() => (deploymentMessage = ''), 6000);
+    }
   }
 
   // Plan approval functions
@@ -166,6 +193,12 @@
           await planService.updatePlan(updatedPlan.id, { showOnMap: true });
           visiblePlanIds.add(updatedPlan.id);
           visiblePlanIds = new Set(visiblePlanIds);
+          await focusPlanOnMap(updatedPlan.id);
+        } else if (updatedPlan.status === 'authorized') {
+          visiblePlanIds.delete(updatedPlan.id);
+          visiblePlanIds = new Set(visiblePlanIds);
+          const nextPlanId = [...visiblePlanIds][0] || null;
+          await focusPlanOnMap(nextPlanId);
         }
       }
     }
@@ -175,7 +208,9 @@
       await loadReadyPlans();
     // Remove rejected plan from selection
     if (selectedPlan && selectedPlan.status === 'rejected') {
-      selectedPlan = readyPlans.find(p => p.status === 'ready' || p.status === 'approved') || null;
+      selectedPlan = readyPlans.find(p => p.status === 'ready' || p.status === 'approved' || p.status === 'authorized') || null;
+      const nextPlanId = [...visiblePlanIds][0] || null;
+      await focusPlanOnMap(nextPlanId);
     }
   }
 
@@ -231,11 +266,7 @@
   <div class="app">
     <!-- Full Screen Map -->
     <div class="map-fullscreen" bind:this={mapContainer}>
-      <iframe 
-        src="/modules/coverage-map" 
-        title="Network Coverage Map"
-        class="coverage-map-iframe"
-      ></iframe>
+      <SharedMap mode={mapMode} />
     </div>
 
     <!-- Minimal Header Overlay -->
@@ -292,10 +323,32 @@
         >
           🔧 Deployed ({deployedCount})
         </button>
+        <button 
+          class="control-btn deploy-btn" 
+          class:disabled={!mapState?.activePlan}
+          disabled={!mapState?.activePlan}
+          on:click={pushActivePlanToField}
+          title={mapState?.activePlan ? `Push ${mapState.activePlan.name} to field teams` : 'Select a plan to deploy'}
+        >
+          🚀 Deploy Plan
+        </button>
       </div>
     </div>
 
   </div>
+
+  {#if mapState?.activePlan}
+    <div class="plan-summary">
+      <h3>Active Plan: {mapState.activePlan.name}</h3>
+      <p class="summary-line">
+        {mapState.stagedSummary.total} staged features • {mapState.productionHardware.length} production assets in view
+      </p>
+    </div>
+  {/if}
+
+  {#if deploymentMessage}
+    <div class="deployment-toast">{deploymentMessage}</div>
+  {/if}
 
   <!-- PCI Planner Modal -->
   {#if showPCIPlannerModal && ($currentTenant?.id || isAdmin)}
@@ -339,10 +392,20 @@
     approvedPlans={approvedPlans}
     visiblePlanIds={visiblePlanIds}
     on:close={() => showProjectFilters = false}
-    on:visibility-changed={async (event: CustomEvent) => {
-      await loadReadyPlans(); // Reload to sync with map
+    on:visibility-changed={async (event: CustomEvent<{ planId: string; visible: boolean }>) => {
+      const { planId, visible } = event.detail;
+      await loadReadyPlans();
+      if (visible) {
+        await focusPlanOnMap(planId);
+      } else {
+        const nextPlanId = [...visiblePlanIds][0] || null;
+        await focusPlanOnMap(nextPlanId);
+      }
     }}
   />
+
+  <!-- TODO: replace placeholder SharedMap overlay with interactive map layers -->
+  <!-- TODO: integrate deploy task assignment workflow once backend endpoints are ready -->
   
   <!-- Plan Selection Modal (if no plan selected) -->
   {#if showPlanApprovalModal && !selectedPlan && readyPlans.length > 0}
@@ -409,13 +472,6 @@
     position: absolute;
     inset: 0;
     z-index: 0;
-  }
-
-  .coverage-map-iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    display: block;
   }
 
   /* Left Horizontal Menu */
@@ -510,6 +566,55 @@
     font-size: 0.9rem;
     transition: all 0.2s ease;
     backdrop-filter: blur(10px);
+  }
+
+  .control-btn.deploy-btn {
+    background: rgba(59, 130, 246, 0.25);
+  }
+
+  .control-btn.deploy-btn:hover {
+    background: rgba(59, 130, 246, 0.35);
+  }
+
+  .control-btn.deploy-btn.disabled,
+  .control-btn.deploy-btn:disabled {
+    background: rgba(148, 163, 184, 0.25);
+  }
+
+  .plan-summary {
+    position: absolute;
+    bottom: 40px;
+    left: 20px;
+    background: rgba(15, 23, 42, 0.75);
+    padding: 0.85rem 1.2rem;
+    border-radius: var(--border-radius-md);
+    color: #e2e8f0;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(8px);
+    max-width: 320px;
+  }
+
+  .plan-summary h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+  }
+
+  .plan-summary .summary-line {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(226, 232, 240, 0.85);
+  }
+
+  .deployment-toast {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(34, 197, 94, 0.9);
+    color: #0f172a;
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.35);
+    font-weight: 600;
   }
 
   .control-btn:hover {
@@ -668,5 +773,7 @@
     text-align: center;
     padding: 2rem;
     color: var(--text-secondary);
+  }
+</style>
   }
 </style>

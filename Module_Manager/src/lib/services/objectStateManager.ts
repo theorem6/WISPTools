@@ -16,7 +16,7 @@ export interface ObjectState {
 }
 
 export interface ModuleContext {
-  module: 'plan' | 'deploy' | 'maintain' | 'coverage-map' | 'pci' | 'frequency';
+  module: 'plan' | 'deploy' | 'maintain' | 'monitor' | 'coverage-map' | 'pci' | 'frequency';
   projectId?: string;
   userRole: 'admin' | 'operator' | 'viewer';
 }
@@ -45,12 +45,15 @@ export class ObjectStateManager {
       throw new Error('Object must have an id property');
     }
     
+    const planId = object.planId ? String(object.planId) : undefined;
+    const projectId = object.projectId ? String(object.projectId) : planId;
+
     const state: ObjectState = {
       id: object.id,
       type: object.type || 'tower',
       status: this.determineObjectStatus(object),
       source: this.determineObjectSource(object),
-      projectId: object.projectId,
+      projectId,
       isReadOnly: false,
       allowedActions: [],
       restrictedActions: []
@@ -66,6 +69,9 @@ export class ObjectStateManager {
         break;
       case 'maintain':
         this.applyMaintainModuleRules(state, context);
+        break;
+      case 'monitor':
+        this.applyMonitorModuleRules(state, context);
         break;
       case 'pci':
       case 'frequency':
@@ -85,6 +91,8 @@ export class ObjectStateManager {
    * Determine object status based on object properties
    */
   private determineObjectStatus(object: any): ObjectState['status'] {
+    if (object.status === 'planned') return 'planning';
+    if (object.planId && !object.deployed) return 'planning';
     if (object.status) return object.status;
     if (object.projectId && !object.deployed) return 'planning';
     if (object.deployed) return 'deployed';
@@ -111,7 +119,7 @@ export class ObjectStateManager {
     state.allowedActions = ['view', 'select'];
     
     // Objects in planning stage can be edited
-    if (state.status === 'planning' && state.projectId === context.projectId) {
+    if (state.status === 'planning' && state.projectId && context.projectId && state.projectId === context.projectId) {
       state.allowedActions.push('edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment');
       state.isReadOnly = false;
     } else {
@@ -174,6 +182,19 @@ export class ObjectStateManager {
     if (state.source === 'acs') {
       state.allowedActions = ['view', 'edit-gps', 'edit-customer', 'create-work-order'];
       state.restrictedActions = ['delete', 'move', 'edit-technical'];
+    }
+  }
+
+  /**
+   * Apply monitor module rules (read-only operational view)
+   */
+  private applyMonitorModuleRules(state: ObjectState, context: ModuleContext): void {
+    state.allowedActions = ['view', 'select'];
+    state.isReadOnly = true;
+    state.restrictedActions = ['edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment', 'deploy-hardware'];
+
+    if (context.userRole === 'admin' || context.userRole === 'operator') {
+      state.allowedActions.push('view-details');
     }
   }
 

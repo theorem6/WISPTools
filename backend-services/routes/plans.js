@@ -2,11 +2,14 @@
 // Manages deployment plans and project workflows
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { PlanProject } = require('../models/plan');
 const { InventoryItem } = require('../models/inventory');
-const { UnifiedTower, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const UnifiedTower = UnifiedSite; // Backwards compatibility alias
 const { createProjectApprovalNotification } = require('./notifications');
+const { PlanLayerFeature } = require('../models/plan-layer-feature');
 
 // ============================================================================
 // MIDDLEWARE
@@ -41,6 +44,12 @@ router.get('/', async (req, res) => {
       .sort({ updatedAt: -1 })
       .lean();
     
+    plans.forEach(plan => {
+      if (!plan.stagedFeatureCounts) {
+        plan.stagedFeatureCounts = { total: 0, byType: {}, byStatus: {} };
+      }
+    });
+
     res.json(plans);
   } catch (error) {
     console.error('Error fetching plans:', error);
@@ -58,6 +67,9 @@ router.get('/:id', async (req, res) => {
     
     if (!plan) {
       return res.status(404).json({ error: 'Plan not found' });
+    }
+    if (!plan.stagedFeatureCounts) {
+      plan.stagedFeatureCounts = { total: 0, byType: {}, byStatus: {} };
     }
     
     res.json(plan);
@@ -291,6 +303,256 @@ router.post('/:id/reject', async (req, res) => {
   } catch (error) {
     console.error('Error rejecting plan:', error);
     res.status(500).json({ error: 'Failed to reject plan', message: error.message });
+  }
+});
+
+// POST /plans/:id/authorize - Promote plan-layer assets to production
+router.post('/:id/authorize', async (req, res) => {
+  const session = await mongoose.startSession();
+  let updatedPlan;
+  let promotionResults = [];
+
+  try {
+    const { notes } = req.body;
+    const existingPlan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).lean();
+
+    if (!existingPlan) {
+      await session.endSession();
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    if (existingPlan.status !== 'approved') {
+      await session.endSession();
+      return res.status(400).json({ error: 'Plan must be approved before authorization' });
+    }
+
+    await session.withTransaction(async () => {
+      const planDoc = await PlanProject.findOne({
+        _id: req.params.id,
+        tenantId: req.tenantId
+      }).session(session);
+
+      if (!planDoc) {
+        throw new Error('plan_missing');
+      }
+
+      const planId = planDoc._id.toString();
+      const timestamp = new Date();
+
+      promotionResults = await promotePlanLayerFeatures(planDoc, req.tenantId, req.user, session);
+
+      const updatePayload = {
+        planId: null,
+        status: 'active',
+        originPlanId: planId,
+        updatedAt: timestamp
+      };
+
+      await Promise.all([
+        UnifiedTower.updateMany({ tenantId: req.tenantId, planId }, { $set: updatePayload }).session(session),
+        UnifiedSector.updateMany({ tenantId: req.tenantId, planId }, { $set: updatePayload }).session(session),
+        UnifiedCPE.updateMany({ tenantId: req.tenantId, planId }, { $set: updatePayload }).session(session),
+        NetworkEquipment.updateMany({ tenantId: req.tenantId, planId }, { $set: updatePayload }).session(session)
+      ]);
+
+      planDoc.status = 'authorized';
+      planDoc.authorization = {
+        authorizedBy: req.user?.email || req.user?.name || 'System',
+        authorizedAt: timestamp,
+        notes: notes || ''
+      };
+      planDoc.showOnMap = false;
+      planDoc.updatedAt = timestamp;
+      planDoc.stagedFeatureCounts = await PlanLayerFeature.countByPlan(req.tenantId, planId);
+      await planDoc.save({ session });
+
+      updatedPlan = planDoc.toObject();
+    });
+
+    await session.endSession();
+
+    if (!updatedPlan) {
+      return res.status(500).json({ error: 'Failed to authorize plan', message: 'Authorization transaction did not complete' });
+    }
+
+    res.json({
+      plan: updatedPlan,
+      promotionResults,
+      message: 'Plan authorized and promoted to production'
+    });
+  } catch (error) {
+    await session.endSession();
+    if (error.message === 'plan_missing') {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    console.error('Error authorizing plan:', error);
+    res.status(500).json({ error: 'Failed to authorize plan', message: error.message });
+  }
+});
+
+// =========================================================================
+// PLAN LAYER FEATURES
+// =========================================================================
+
+// GET /plans/:id/features - list staged features for plan
+router.get('/:id/features', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).lean();
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const features = await PlanLayerFeature.find({
+      tenantId: req.tenantId,
+      planId: req.params.id
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    res.json({
+      features,
+      summary: plan.stagedFeatureCounts || { total: 0, byType: {}, byStatus: {} }
+    });
+  } catch (error) {
+    console.error('Error fetching plan features:', error);
+    res.status(500).json({ error: 'Failed to fetch plan features', message: error.message });
+  }
+});
+
+// POST /plans/:id/features - create staged feature
+router.post('/:id/features', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const { featureType, geometry, properties, status, metadata } = req.body;
+
+    if (!featureType) {
+      return res.status(400).json({ error: 'featureType is required' });
+    }
+
+    if (!geometry || !geometry.type || geometry.coordinates === undefined) {
+      return res.status(400).json({ error: 'geometry with type and coordinates is required' });
+    }
+
+    const feature = new PlanLayerFeature({
+      tenantId: req.tenantId,
+      planId: req.params.id,
+      featureType,
+      geometry,
+      properties: properties || {},
+      status: status || 'draft',
+      metadata: metadata || {},
+      createdBy: req.user?.email || req.body.createdBy || 'System',
+      createdById: req.user?.uid || req.body.createdById || null,
+      updatedBy: req.user?.email || req.body.createdBy || 'System',
+      updatedById: req.user?.uid || req.body.createdById || null
+    });
+
+    await feature.save();
+
+    const summary = await updatePlanFeatureSummary(req.tenantId, req.params.id);
+
+    res.status(201).json({
+      feature: feature.toObject(),
+      summary
+    });
+  } catch (error) {
+    console.error('Error creating plan feature:', error);
+    res.status(500).json({ error: 'Failed to create feature', message: error.message });
+  }
+});
+
+// PATCH /plans/:id/features/:featureId - update staged feature
+router.patch('/:id/features/:featureId', async (req, res) => {
+  try {
+    const updates = {};
+
+    if (req.body.featureType) {
+      updates.featureType = req.body.featureType;
+    }
+
+    if (req.body.geometry) {
+      const { geometry } = req.body;
+      if (!geometry.type || geometry.coordinates === undefined) {
+        return res.status(400).json({ error: 'geometry must include type and coordinates' });
+      }
+      updates.geometry = geometry;
+    }
+
+    if (req.body.properties !== undefined) {
+      updates.properties = req.body.properties;
+    }
+
+    if (req.body.status) {
+      updates.status = req.body.status;
+    }
+
+    if (req.body.metadata !== undefined) {
+      updates.metadata = req.body.metadata;
+    }
+
+    updates.updatedBy = req.user?.email || req.body.updatedBy || 'System';
+    updates.updatedById = req.user?.uid || req.body.updatedById || null;
+
+    const feature = await PlanLayerFeature.findOneAndUpdate(
+      {
+        _id: req.params.featureId,
+        tenantId: req.tenantId,
+        planId: req.params.id
+      },
+      { $set: updates },
+      { new: true }
+    ).lean();
+
+    if (!feature) {
+      return res.status(404).json({ error: 'Feature not found' });
+    }
+
+    const summary = await updatePlanFeatureSummary(req.tenantId, req.params.id);
+
+    res.json({ feature, summary });
+  } catch (error) {
+    console.error('Error updating plan feature:', error);
+    res.status(500).json({ error: 'Failed to update feature', message: error.message });
+  }
+});
+
+// DELETE /plans/:id/features/:featureId - remove staged feature
+router.delete('/:id/features/:featureId', async (req, res) => {
+  try {
+    const feature = await PlanLayerFeature.findOneAndDelete({
+      _id: req.params.featureId,
+      tenantId: req.tenantId,
+      planId: req.params.id
+    }).lean();
+
+    if (!feature) {
+      return res.status(404).json({ error: 'Feature not found' });
+    }
+
+    const summary = await updatePlanFeatureSummary(req.tenantId, req.params.id);
+
+    res.json({
+      message: 'Feature deleted',
+      summary
+    });
+  } catch (error) {
+    console.error('Error deleting plan feature:', error);
+    res.status(500).json({ error: 'Failed to delete feature', message: error.message });
   }
 });
 
@@ -974,6 +1236,193 @@ function generateAlternatives(requirement) {
   }
   
   return alternatives;
+}
+
+async function updatePlanFeatureSummary(tenantId, planId, session) {
+  try {
+    const summary = await PlanLayerFeature.countByPlan(tenantId, planId);
+    const update = {
+      $set: {
+        stagedFeatureCounts: summary,
+        updatedAt: new Date()
+      }
+    };
+
+    const query = { _id: planId, tenantId };
+
+    if (session) {
+      await PlanProject.updateOne(query, update).session(session);
+    } else {
+      await PlanProject.updateOne(query, update);
+    }
+
+    return summary;
+  } catch (error) {
+    console.error('Error updating plan feature summary:', error);
+    return { total: 0, byType: {}, byStatus: {} };
+  }
+}
+
+async function promotePlanLayerFeatures(plan, tenantId, user, session) {
+  const planId = plan._id.toString();
+  const promotionResults = [];
+  const features = await PlanLayerFeature.find({ tenantId, planId }).session(session);
+
+  for (const feature of features) {
+    try {
+      let promotedDoc = null;
+      switch (feature.featureType) {
+        case 'site':
+          promotedDoc = await createSiteFromFeature(feature, planId, tenantId, user, session);
+          break;
+        case 'equipment':
+          promotedDoc = await createEquipmentFromFeature(feature, planId, tenantId, user, session);
+          break;
+        default:
+          promotionResults.push({
+            featureId: feature._id.toString(),
+            featureType: feature.featureType,
+            status: 'skipped'
+          });
+          continue;
+      }
+
+      if (promotedDoc) {
+        feature.status = 'authorized';
+        feature.promotedResourceId = promotedDoc._id.toString();
+        feature.promotedResourceType = promotedDoc.constructor.modelName;
+        feature.updatedBy = user?.email || feature.updatedBy || 'System';
+        feature.updatedById = user?.uid || feature.updatedById || null;
+        await feature.save({ session });
+
+        promotionResults.push({
+          featureId: feature._id.toString(),
+          featureType: feature.featureType,
+          status: 'promoted',
+          resourceId: promotedDoc._id.toString(),
+          resourceType: promotedDoc.constructor.modelName
+        });
+      }
+    } catch (error) {
+      console.error('Failed to promote plan feature:', {
+        featureId: feature._id.toString(),
+        featureType: feature.featureType,
+        error: error.message
+      });
+      promotionResults.push({
+        featureId: feature._id.toString(),
+        featureType: feature.featureType,
+        status: 'error',
+        message: error.message
+      });
+    }
+  }
+
+  return promotionResults;
+}
+
+async function createSiteFromFeature(feature, planId, tenantId, user, session) {
+  const { latitude, longitude } = extractLatLng(feature);
+  if (latitude === null || longitude === null) {
+    throw new Error('Site feature requires valid latitude/longitude');
+  }
+
+  const properties = feature.properties || {};
+  const site = new UnifiedSite({
+    tenantId,
+    name: properties.name || `Planned Site ${planId.slice(-6)}`,
+    type: properties.type || 'tower',
+    status: properties.status || 'planned',
+    location: {
+      latitude,
+      longitude,
+      address: properties.address || properties.location?.address || ''
+    },
+    contact: properties.contact,
+    towerContact: properties.towerContact,
+    buildingContact: properties.buildingContact,
+    siteContact: properties.siteContact,
+    accessInstructions: properties.accessInstructions,
+    gateCode: properties.gateCode,
+    safetyNotes: properties.safetyNotes,
+    accessHours: properties.accessHours,
+    height: properties.height,
+    structureType: properties.structureType,
+    planId: null,
+    originPlanId: planId,
+    createdBy: user?.email || feature.createdBy || 'System',
+    createdById: user?.uid || feature.createdById || null,
+    updatedBy: user?.email || feature.updatedBy || 'System',
+    updatedById: user?.uid || feature.updatedById || null
+  });
+
+  await site.save({ session });
+  return site;
+}
+
+async function createEquipmentFromFeature(feature, planId, tenantId, user, session) {
+  const { latitude, longitude } = extractLatLng(feature);
+  if (latitude === null || longitude === null) {
+    throw new Error('Equipment feature requires valid latitude/longitude');
+  }
+
+  const properties = feature.properties || {};
+  const equipmentType = properties.type || properties.equipmentType || 'other';
+
+  const equipment = new NetworkEquipment({
+    tenantId,
+    name: properties.name || `Planned Equipment ${planId.slice(-6)}`,
+    type: normalizeEquipmentType(equipmentType),
+    status: properties.status || 'planned',
+    manufacturer: properties.manufacturer,
+    model: properties.model,
+    serialNumber: properties.serialNumber,
+    partNumber: properties.partNumber,
+    location: {
+      latitude,
+      longitude,
+      address: properties.address || properties.location?.address || ''
+    },
+    siteId: properties.siteId || null,
+    inventoryId: properties.inventoryId,
+    notes: properties.notes,
+    planId: null,
+    originPlanId: planId,
+    createdBy: user?.email || feature.createdBy || 'System',
+    createdById: user?.uid || feature.createdById || null,
+    updatedBy: user?.email || feature.updatedBy || 'System',
+    updatedById: user?.uid || feature.updatedById || null
+  });
+
+  await equipment.save({ session });
+  return equipment;
+}
+
+function extractLatLng(feature) {
+  if (feature.geometry?.type === 'Point' && Array.isArray(feature.geometry.coordinates)) {
+    const [lng, lat] = feature.geometry.coordinates;
+    return {
+      latitude: typeof lat === 'number' ? lat : null,
+      longitude: typeof lng === 'number' ? lng : null
+    };
+  }
+
+  const location = feature.properties?.location;
+  if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+    return {
+      latitude: location.latitude,
+      longitude: location.longitude
+    };
+  }
+
+  return { latitude: null, longitude: null };
+}
+
+function normalizeEquipmentType(type) {
+  const allowed = ['router', 'switch', 'power-supply', 'ups', 'generator', 'cable', 'connector', 'mounting-hardware', 'backhaul', 'antenna', 'radio', 'other'];
+  if (!type) return 'other';
+  const normalized = type.toLowerCase();
+  return allowed.includes(normalized) ? normalized : 'other';
 }
 
 module.exports = router;

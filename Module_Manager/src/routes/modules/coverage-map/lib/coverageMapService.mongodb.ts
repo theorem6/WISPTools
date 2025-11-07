@@ -58,8 +58,19 @@ export class CoverageMapService {
     });
   }
   
-  async getTowerSites(tenantId: string): Promise<TowerSite[]> {
-    const sites = await this.apiCall('sites', {}, tenantId);
+  async getTowerSites(
+    tenantId: string,
+    options: { includePlanLayer?: boolean; planIds?: string[] } = {}
+  ): Promise<TowerSite[]> {
+    const params = new URLSearchParams();
+    if (options.includePlanLayer) {
+      params.set('includePlanLayer', 'true');
+      if (options.planIds && options.planIds.length > 0) {
+        params.set('planIds', options.planIds.join(','));
+      }
+    }
+    const endpoint = params.toString() ? `sites?${params.toString()}` : 'sites';
+    const sites = await this.apiCall(endpoint, {}, tenantId);
     return sites.map((s: any) => ({ ...s, id: s._id }));
   }
   
@@ -94,8 +105,19 @@ export class CoverageMapService {
     });
   }
   
-  async getSectors(tenantId: string): Promise<Sector[]> {
-    const sectors = await this.apiCall('sectors', {}, tenantId);
+  async getSectors(
+    tenantId: string,
+    options: { includePlanLayer?: boolean; planIds?: string[] } = {}
+  ): Promise<Sector[]> {
+    const params = new URLSearchParams();
+    if (options.includePlanLayer) {
+      params.set('includePlanLayer', 'true');
+      if (options.planIds && options.planIds.length > 0) {
+        params.set('planIds', options.planIds.join(','));
+      }
+    }
+    const endpoint = params.toString() ? `sectors?${params.toString()}` : 'sectors';
+    const sectors = await this.apiCall(endpoint, {}, tenantId);
     return sectors.map((s: any) => ({ ...s, id: s._id }));
   }
   
@@ -131,8 +153,19 @@ export class CoverageMapService {
     });
   }
   
-  async getCPEDevices(tenantId: string): Promise<CPEDevice[]> {
-    const devices = await this.apiCall('cpe', {}, tenantId);
+  async getCPEDevices(
+    tenantId: string,
+    options: { includePlanLayer?: boolean; planIds?: string[] } = {}
+  ): Promise<CPEDevice[]> {
+    const params = new URLSearchParams();
+    if (options.includePlanLayer) {
+      params.set('includePlanLayer', 'true');
+      if (options.planIds && options.planIds.length > 0) {
+        params.set('planIds', options.planIds.join(','));
+      }
+    }
+    const endpoint = params.toString() ? `cpe?${params.toString()}` : 'cpe';
+    const devices = await this.apiCall(endpoint, {}, tenantId);
     return devices.map((d: any) => ({ ...d, id: d._id }));
   }
   
@@ -158,8 +191,19 @@ export class CoverageMapService {
     });
   }
   
-  async getEquipment(tenantId: string): Promise<NetworkEquipment[]> {
-    const equipment = await this.apiCall('equipment', {}, tenantId);
+  async getEquipment(
+    tenantId: string,
+    options: { includePlanLayer?: boolean; planIds?: string[] } = {}
+  ): Promise<NetworkEquipment[]> {
+    const params = new URLSearchParams();
+    if (options.includePlanLayer) {
+      params.set('includePlanLayer', 'true');
+      if (options.planIds && options.planIds.length > 0) {
+        params.set('planIds', options.planIds.join(','));
+      }
+    }
+    const endpoint = params.toString() ? `equipment?${params.toString()}` : 'equipment';
+    const equipment = await this.apiCall(endpoint, {}, tenantId);
     return equipment.map((e: any) => ({ ...e, id: e._id }));
   }
   

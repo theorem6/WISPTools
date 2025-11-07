@@ -86,7 +86,8 @@
           latitude: formData.latitude,
           longitude: formData.longitude
         },
-        tenantId
+        tenantId,
+        status: planId ? 'planned' : 'active'
       };
       
       // Add planId if in plan mode

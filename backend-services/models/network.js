@@ -102,6 +102,8 @@ const UnifiedSiteSchema = new mongoose.Schema({
   // Integration
   inventoryId: String, // Link to inventory system
   planId: String, // Link to plan project (if created within a plan)
+  originPlanId: String, // Plan that originally created this asset
+  originPlanId: String, // Plan that originally created this asset
   modules: {
     pci: {
       enabled: Boolean,
@@ -183,6 +185,7 @@ const UnifiedSectorSchema = new mongoose.Schema({
   // Integration
   inventoryId: String, // Link to inventory system
   planId: String, // Link to plan project (if created within a plan)
+  originPlanId: String, // Plan that originally created this asset
   modules: {
     pci: {
       enabled: Boolean,
@@ -264,6 +267,7 @@ const UnifiedCPESchema = new mongoose.Schema({
   // Integration
   inventoryId: String, // Link to inventory system
   planId: String, // Link to plan project (if created within a plan)
+  originPlanId: String, // Plan that originally created this asset
   modules: {
     acs: {
       enabled: Boolean,

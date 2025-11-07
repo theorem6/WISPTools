@@ -151,7 +151,7 @@
         manufacturer: formData.equipmentManufacturer || (isWireless ? 'Wireless' : formData.provider || 'Fiber'),
         model: formData.equipmentModel || 'N/A',
         serialNumber: formData.equipmentSerialNumber || `BH-${Date.now()}`,
-        status: formData.status,
+        status: planId ? 'planned' : formData.status,
         location: sites.find(s => s.id === formData.fromSiteId)?.location || { latitude: 0, longitude: 0 },
         installDate: formData.installDate || undefined,
         

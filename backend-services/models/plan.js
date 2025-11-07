@@ -16,7 +16,7 @@ const PlanProjectSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'active', 'ready', 'approved', 'rejected', 'deployed', 'cancelled'],
+    enum: ['draft', 'active', 'ready', 'approved', 'authorized', 'rejected', 'deployed', 'cancelled'],
     default: 'draft'
   },
   // Plan visibility on map
@@ -32,6 +32,19 @@ const PlanProjectSchema = new mongoose.Schema({
     rejectedAt: Date,
     rejectionReason: String,  // e.g., "budget", "technical", "timing", etc.
     approvalNotes: String
+  },
+  authorization: {
+    authorizedBy: String,
+    authorizedAt: Date,
+    notes: String
+  },
+  mapConfig: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => ({})
+  },
+  stagedFeatureCounts: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => ({ total: 0, byType: {}, byStatus: {} })
   },
   
   // Ownership

@@ -76,14 +76,46 @@
   let towerMenuY = 0;
   let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
   
+  // Map mode derived from query parameters (default to coverage view)
+  $: mapMode = (() => {
+    const modeParam = $page.url.searchParams.get('mode');
+    if (modeParam) {
+      return modeParam.toLowerCase();
+    }
+    return $page.url.searchParams.get('planMode') === 'true' ? 'plan' : 'coverage';
+  })();
+
+  $: isPlanMode = mapMode === 'plan';
+  $: isDeployMode = mapMode === 'deploy';
+  $: isMonitorMode = mapMode === 'monitor';
+
   // Module context for permissions
   $: moduleContext = (() => {
     const userRole = $currentTenant?.userRole || 'admin';
-    console.log('[CoverageMap] ModuleContext updated:', { userRole, tenant: $currentTenant?.displayName, hasUserRole: !!$currentTenant?.userRole });
-    return {
+    const context: ModuleContext = {
       module: 'coverage-map',
       userRole
     };
+
+    if (isPlanMode) {
+      context.module = 'plan';
+      if (planId) {
+        context.projectId = planId;
+      }
+    } else if (isDeployMode) {
+      context.module = 'deploy';
+    } else if (isMonitorMode) {
+      context.module = 'monitor';
+    }
+
+    console.log('[CoverageMap] ModuleContext updated:', {
+      userRole,
+      tenant: $currentTenant?.displayName,
+      mode: mapMode,
+      projectId: context.projectId
+    });
+
+    return context;
   })();
   
   // Filters
@@ -110,10 +142,9 @@
   $: tenantName = $currentTenant?.displayName || 'Organization';
   
   // Check if stats should be hidden (for plan module)
-  $: hideStats = $page.url.searchParams.get('hideStats') === 'true';
+  $: hideStats = isPlanMode ? true : $page.url.searchParams.get('hideStats') === 'true';
   // Plan mode - when creating sites within a plan
   $: planId = $page.url.searchParams.get('planId') || null;
-  $: planMode = $page.url.searchParams.get('planMode') === 'true';
   let activePlanName: string | null = null;
   
   onMount(async () => {
@@ -124,7 +155,7 @@
   });
   
   // Watch for tenant changes and plan visibility changes
-  $: if (browser && tenantId) {
+  $: if (browser && tenantId && mapMode) {
     loadAllData();
   }
   
@@ -133,90 +164,108 @@
     loadAllData();
   }
   
+  let currentVisiblePlanIds: Set<string> = new Set();
+
   async function loadAllData() {
+    if (!tenantId) {
+      return;
+    }
+
     isLoading = true;
     error = '';
     
     try {
-      // Import planService dynamically to avoid circular dependencies
       const { planService } = await import('$lib/services/planService');
-      
-      // Use Promise.allSettled to ensure all calls complete even if some fail
-      const [
-        towersResult,
-        sectorsResult,
-        cpeResult,
-        equipmentResult,
-        plansResult
-      ] = await Promise.allSettled([
-        coverageMapService.getTowerSites(tenantId).catch(err => {
-          console.error('Failed to load towers:', err);
-          return [];
-        }),
-        coverageMapService.getSectors(tenantId).catch(err => {
-          console.error('Failed to load sectors:', err);
-          return [];
-        }),
-        coverageMapService.getCPEDevices(tenantId).catch(err => {
-          console.error('Failed to load CPE:', err);
-          return [];
-        }),
-        coverageMapService.getEquipment(tenantId).catch(err => {
-          console.error('Failed to load equipment:', err);
-          return [];
-        }),
-        tenantId ? planService.getPlans(tenantId).catch(() => []) : Promise.resolve([])
-      ]);
-      
-      const loadedTowers = towersResult.status === 'fulfilled' ? towersResult.value : [];
-      const loadedSectors = sectorsResult.status === 'fulfilled' ? sectorsResult.value : [];
-      const loadedCPE = cpeResult.status === 'fulfilled' ? cpeResult.value : [];
-      const loadedEquipment = equipmentResult.status === 'fulfilled' ? equipmentResult.value : [];
-      const plans = plansResult.status === 'fulfilled' ? plansResult.value : [];
-      
-      // Get visible plan IDs
-      const visiblePlanIds = new Set(
-        plans.filter((p: any) => p.showOnMap).map((p: any) => p.id || p._id)
+
+      let plans: any[] = [];
+      try {
+        plans = await planService.getPlans(tenantId);
+      } catch (planErr) {
+        console.error('Failed to load plans:', planErr);
+        plans = [];
+      }
+
+      currentVisiblePlanIds = new Set(
+        plans
+          .filter((p: any) => p.showOnMap)
+          .map((p: any) => String(p.id || p._id))
       );
-      
-      // Load active plan name if in plan mode
-      if (planMode && planId) {
-        const activePlan = plans.find((p: any) => (p.id || p._id) === planId);
+
+      if (isPlanMode && planId) {
+        const activePlan = plans.find((p: any) => String(p.id || p._id) === planId);
         activePlanName = activePlan?.name || null;
       } else {
         activePlanName = null;
       }
-      
-      // Filter sites/equipment based on plan visibility
-      // Show sites if: 
-      // 1. They have no planId (not part of any plan)
-      // 2. They belong to a visible plan (showOnMap === true)
-      // 3. We're in plan mode and they belong to the active plan
+
+      const planIdsForFetch: string[] = [];
+      if (isPlanMode && planId) {
+        planIdsForFetch.push(planId);
+      }
+      if (!isPlanMode && currentVisiblePlanIds.size > 0) {
+        planIdsForFetch.push(...Array.from(currentVisiblePlanIds));
+      }
+
+      const includePlanLayer = planIdsForFetch.length > 0;
+      const fetchOptions = includePlanLayer ? { includePlanLayer: true, planIds: planIdsForFetch } : {};
+
+      const [
+        towersResult,
+        sectorsResult,
+        cpeResult,
+        equipmentResult
+      ] = await Promise.allSettled([
+        coverageMapService.getTowerSites(tenantId, fetchOptions).catch(err => {
+          console.error('Failed to load towers:', err);
+          return [];
+        }),
+        coverageMapService.getSectors(tenantId, fetchOptions).catch(err => {
+          console.error('Failed to load sectors:', err);
+          return [];
+        }),
+        coverageMapService.getCPEDevices(tenantId, fetchOptions).catch(err => {
+          console.error('Failed to load CPE:', err);
+          return [];
+        }),
+        coverageMapService.getEquipment(tenantId, fetchOptions).catch(err => {
+          console.error('Failed to load equipment:', err);
+          return [];
+        })
+      ]);
+
+      const loadedTowers = towersResult.status === 'fulfilled' ? towersResult.value : [];
+      const loadedSectors = sectorsResult.status === 'fulfilled' ? sectorsResult.value : [];
+      const loadedCPE = cpeResult.status === 'fulfilled' ? cpeResult.value : [];
+      const loadedEquipment = equipmentResult.status === 'fulfilled' ? equipmentResult.value : [];
+
+      const visiblePlanIds = new Set(planIdsForFetch);
+      currentVisiblePlanIds.forEach(id => visiblePlanIds.add(id));
+
       towers = loadedTowers.filter((site: any) => {
-        if (!site.planId) return true; // Sites without plans always visible
-        if (planMode && site.planId === planId) return true; // In plan mode, show all sites for this plan
-        return visiblePlanIds.has(site.planId); // Otherwise, only show if plan is visible
+        if (!site.planId) return true;
+        if (isPlanMode && site.planId === planId) return true;
+        return visiblePlanIds.has(site.planId);
       });
-      
+
       sectors = loadedSectors.filter((sector: any) => {
         if (!sector.planId) return true;
-        if (planMode && sector.planId === planId) return true;
+        if (isPlanMode && sector.planId === planId) return true;
         return visiblePlanIds.has(sector.planId);
       });
-      
+
       cpeDevices = loadedCPE.filter((cpe: any) => {
         if (!cpe.planId) return true;
-        if (planMode && cpe.planId === planId) return true;
+        if (isPlanMode && cpe.planId === planId) return true;
         return visiblePlanIds.has(cpe.planId);
       });
-      
+
       equipment = loadedEquipment.filter((eq: any) => {
         if (!eq.planId) return true;
-        if (planMode && eq.planId === planId) return true;
+        if (isPlanMode && eq.planId === planId) return true;
         return visiblePlanIds.has(eq.planId);
       });
-      
-      console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment (filtered by ${visiblePlanIds.size} visible plans)`);
+
+      console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment (mode=${mapMode}, planIds=${Array.from(visiblePlanIds).join(',') || 'none'})`);
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';
@@ -516,7 +565,7 @@
       bind:this={mapComponent}
       {towers}
       {planId}
-      {planMode}
+      {isPlanMode}
       {sectors}
       {cpeDevices}
       {equipment}
@@ -794,7 +843,7 @@
   y={contextMenuY}
   latitude={contextMenuLat}
   longitude={contextMenuLon}
-  planMode={planMode}
+  planMode={isPlanMode}
   planName={activePlanName}
   on:action={handleContextMenuAction}
 />

@@ -5,10 +5,12 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { planService, type PlanProject, type HardwareView } from '$lib/services/planService';
-  import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
+  import { planService, type PlanProject } from '$lib/services/planService';
   import SettingsButton from '$lib/components/SettingsButton.svelte';
-  import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
+  import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
+  import { mapContext } from '$lib/map/mapContext';
+  import SharedMap from '$lib/map/SharedMap.svelte';
+  import type { MapModuleMode } from '$lib/map/MapCapabilities';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -20,13 +22,17 @@
   let showAddRequirementModal = false;
   
   // Data
-  let existingHardware: HardwareView[] = [];
   let projects: PlanProject[] = [];
   let selectedProject: PlanProject | null = null;
   let isLoading = false;
   let error: string = '';
   let successMessage: string = '';
   let loadedTenantId: string | null = null; // Track which tenant's data is loaded
+  let mapState: MapLayerManagerState | undefined;
+  let mapMode: MapModuleMode = 'plan';
+
+  $: mapState = $mapContext as MapLayerManagerState;
+  $: mapMode = (mapState?.mode ?? 'plan');
   
   // New project form
   let newProject = {
@@ -55,8 +61,28 @@
   // Module context for object state management
   let moduleContext: ModuleContext = {
     module: 'plan',
-    userRole: 'admin' // This should be determined from user permissions
+    userRole: 'admin',
+    projectId: undefined
   };
+
+  $: {
+    const tenantRole = $currentTenant?.userRole;
+    const normalizedRole: 'admin' | 'operator' | 'viewer' = tenantRole === 'viewer'
+      ? 'viewer'
+      : tenantRole === 'operator'
+        ? 'operator'
+        : 'admin';
+
+    moduleContext = {
+      module: 'plan',
+      userRole: normalizedRole,
+      projectId: activeProject?.id
+    };
+  }
+
+  $: if (iframeReady) {
+    iframeCommunicationService.updateContext(moduleContext);
+  }
 
   // Equipment categories (matching inventory module)
   const equipmentCategories = {
@@ -198,6 +224,8 @@
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
       if (iframe) {
         iframeCommunicationService.initialize(iframe, moduleContext);
+        iframeReady = true;
+        iframeCommunicationService.updateContext(moduleContext);
         
         // Listen for iframe object actions
         window.addEventListener('iframe-object-action', handleIframeObjectAction);
@@ -229,52 +257,41 @@
 
   async function loadData() {
     if (!currentUser) return;
-    
-    // Wait for tenant to be available
+
     if (!$currentTenant || !$currentTenant.id) {
       console.log('[Plan] Waiting for tenant to be available...');
       return;
     }
-    
-    // Prevent duplicate loads for the same tenant
+
     if (isLoading || loadedTenantId === $currentTenant.id) {
       return;
     }
-    
+
     isLoading = true;
     error = '';
     try {
       const tenantId = $currentTenant.id;
-      
-      // Load existing hardware and projects in parallel
-      const [hardware, plans] = await Promise.all([
-        planService.getAllExistingHardware(tenantId).catch(err => {
-          console.error('Error loading hardware:', err);
-          error = `Failed to load hardware: ${err.message}`;
-          return [];
-        }),
-        planService.getPlans(tenantId).catch(err => {
-          console.error('Error loading projects:', err);
-          error = `Failed to load projects: ${err.message}`;
-          return [];
-        })
-      ]);
-      
-      existingHardware = hardware;
+
+      const plans = await planService.getPlans(tenantId).catch(err => {
+        console.error('Error loading projects:', err);
+        error = `Failed to load projects: ${err.message}`;
+        return [];
+      });
+
       projects = plans;
-      loadedTenantId = tenantId; // Mark this tenant's data as loaded
-      
-      // Initialize visibility set from loaded plans
+      loadedTenantId = tenantId;
       visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
-      
+
       if (error) {
         setTimeout(() => error = '', 5000);
       }
+
+      await mapLayerManager.loadProductionHardware(tenantId);
     } catch (err: any) {
       console.error('Error loading plan data:', err);
       error = err.message || 'Failed to load plan data. Please try again.';
       setTimeout(() => error = '', 8000);
-      loadedTenantId = null; // Reset on error so we can retry
+      loadedTenantId = null;
     } finally {
       isLoading = false;
     }
@@ -357,17 +374,20 @@
     }
   }
 
-  function selectProject(project: PlanProject) {
+  async function selectProject(project: PlanProject) {
     selectedProject = project;
     closeProjectModal();
+    if ($currentTenant?.id) {
+      await mapLayerManager.loadPlan($currentTenant.id, project);
+    }
   }
 
   function getHardwareByModule(module: string) {
-    return existingHardware.filter(h => h.module === module);
+    return mapState?.productionHardware?.filter(h => h.module === module) || [];
   }
 
   function getHardwareByType(type: string) {
-    return existingHardware.filter(h => h.type === type);
+    return mapState?.productionHardware?.filter(h => h.type === type) || [];
   }
 
   function openMissingHardwareModal() {
@@ -470,11 +490,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       await planService.updatePlan(project.id, { status: 'active' });
       await loadData();
       alert(`Project "${project.name}" is now active. All map changes will be saved to this project.`);
-      
-      // Reload iframe to update URL with planId
-      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
-      if (iframe) {
-        iframe.src = `/modules/coverage-map?hideStats=true&planId=${project.id}&planMode=true`;
+
+      if ($currentTenant?.id) {
+        await mapLayerManager.loadPlan($currentTenant.id, project);
       }
     } catch (error) {
       console.error('Error starting project:', error);
@@ -485,6 +503,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   // Toggle plan visibility on map
   async function togglePlanVisibility(project: PlanProject) {
     try {
+      if (project.status === 'authorized') {
+        alert('Authorized projects are already part of the production network and cannot be toggled.');
+        return;
+      }
       const updatedPlan = await planService.togglePlanVisibility(project.id);
       // Update local state
       const index = projects.findIndex(p => p.id === project.id);
@@ -512,13 +534,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   async function finishProject() {
     if (!activeProject) return;
-    
+
     try {
       await planService.updatePlan(activeProject.id, { status: 'ready' });
       await loadData();
       alert(`Project "${activeProject.name}" has been marked as ready for deployment.`);
       activeProject = null;
       showProjectActions = false;
+      mapLayerManager.setMode('plan');
     } catch (error) {
       console.error('Error finishing project:', error);
       alert('Failed to finish project');
@@ -545,6 +568,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       await planService.updatePlan(project.id, { status: 'approved' });
       await loadData();
       alert(`Project "${project.name}" has been approved for deployment.`);
+      if ($currentTenant?.id && activeProject?.id === project.id) {
+        await mapLayerManager.refreshPlan(project.id);
+      }
     } catch (error) {
       console.error('Error approving project:', error);
       alert('Failed to approve project');
@@ -561,17 +587,27 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       alert('Failed to reject project');
     }
   }
+
+  async function authorizeProject(project: PlanProject) {
+    try {
+      await planService.authorizePlan(project.id);
+      await loadData();
+      alert(`Project "${project.name}" has been authorized and promoted to production.`);
+      if ($currentTenant?.id) {
+        await mapLayerManager.loadProductionHardware($currentTenant.id);
+      }
+    } catch (error) {
+      console.error('Error authorizing project:', error);
+      alert('Failed to authorize project');
+    }
+  }
 </script>
 
 <TenantGuard>
   <div class="app">
     <!-- Full Screen Map -->
     <div class="map-fullscreen" bind:this={mapContainer}>
-      <iframe 
-        src={activeProject ? `/modules/coverage-map?hideStats=true&planId=${activeProject.id}&planMode=true` : '/modules/coverage-map?hideStats=true'} 
-        title="Plan"
-        class="coverage-map-iframe"
-      ></iframe>
+      <SharedMap mode={mapMode} />
     </div>
 
     <!-- Enhanced Header Overlay -->
@@ -788,15 +824,27 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   {/if}
                   
                   <button 
-                    class="action-btn {project.showOnMap ? 'visibility-active' : 'visibility-inactive'}" 
+                    class="action-btn {project.showOnMap ? 'visibility-active' : 'visibility-inactive'} {project.status === 'authorized' ? 'disabled' : ''}" 
                     on:click={() => togglePlanVisibility(project)} 
-                    title={project.showOnMap ? "Hide on map" : "Show on map"}
+                    title={project.status === 'authorized' ? "Authorized projects are always visible in production" : project.showOnMap ? "Hide on map" : "Show on map"}
+                    disabled={project.status === 'authorized'}
                   >
                     {project.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
                   </button>
                   
                   {#if project.status === 'approved'}
+                    <button 
+                      class="action-btn authorize-btn" 
+                      on:click={() => authorizeProject(project)} 
+                      title="Authorize Project - Promote this plan to production"
+                    >
+                      🚀 Authorize
+                    </button>
                     <span class="approved-indicator" title="This project has been approved and is ready for deployment">✅ Approved</span>
+                  {/if}
+
+                  {#if project.status === 'authorized'}
+                    <span class="authorized-indicator" title="This project has been authorized and merged into production">🚀 Authorized</span>
                   {/if}
                   
                   {#if project.status === 'rejected'}
@@ -1144,6 +1192,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   <SettingsButton />
 </TenantGuard>
 
+<!-- TODO: integrate MapLayerManager feature CRUD controls for staging (site/equipment) -->
+
 <style>
   /* App Container - Full Screen */
   .app {
@@ -1159,13 +1209,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     position: absolute;
     inset: 0;
     z-index: 0;
-  }
-
-  .coverage-map-iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    display: block;
   }
 
   /* Left Horizontal Menu */
@@ -1587,6 +1630,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     position: relative;
   }
 
+  .action-btn.disabled,
+  .action-btn:disabled {
+    background: rgba(156, 163, 175, 0.2);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
   .action-btn::after {
     content: attr(title);
     position: absolute;
@@ -1627,6 +1678,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     background: #059669;
   }
 
+  .authorize-btn {
+    background: #0ea5e9;
+    color: white;
+  }
+
+  .authorize-btn:hover {
+    background: #0284c7;
+  }
+
   .reject-btn {
     background: #ef4444;
     color: white;
@@ -1656,6 +1716,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .active-indicator,
   .approved-indicator,
+  .authorized-indicator,
   .rejected-indicator,
   .cancelled-indicator {
     padding: 0.5rem 1rem;
@@ -1668,6 +1729,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .active-indicator::after,
   .approved-indicator::after,
+  .authorized-indicator::after,
   .rejected-indicator::after,
   .cancelled-indicator::after {
     content: attr(title);
@@ -1689,6 +1751,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .active-indicator:hover::after,
   .approved-indicator:hover::after,
+  .authorized-indicator:hover::after,
   .rejected-indicator:hover::after,
   .cancelled-indicator:hover::after {
     opacity: 1;
@@ -1702,6 +1765,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   .approved-indicator {
     background: #d1fae5;
     color: #065f46;
+  }
+
+  .authorized-indicator {
+    background: #dbeafe;
+    color: #1d4ed8;
   }
 
   .rejected-indicator {
@@ -1743,6 +1811,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   .status-badge.ready {
     background: rgba(34, 197, 94, 0.1);
     color: #16a34a;
+  }
+
+  .status-badge.authorized {
+    background: rgba(59, 130, 246, 0.1);
+    color: #1d4ed8;
   }
 
   .status-badge.deployed {
