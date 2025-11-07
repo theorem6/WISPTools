@@ -11,7 +11,6 @@ import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerMan
 import { mapContext } from '$lib/map/mapContext';
 import SharedMap from '$lib/map/SharedMap.svelte';
 import type { MapModuleMode } from '$lib/map/MapCapabilities';
-import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -58,34 +57,6 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
   
   // Plan visibility toggle
   let visiblePlans: Set<string> = new Set(); // Plans currently visible on map
-
-  // Module context for object state management
-let moduleContext: ModuleContext = {
-    module: 'plan',
-    userRole: 'admin',
-    projectId: undefined
-  };
-
-let iframeReady = false;
-
-  $: {
-    const tenantRole = $currentTenant?.userRole;
-    const normalizedRole: 'admin' | 'operator' | 'viewer' = tenantRole === 'viewer'
-      ? 'viewer'
-      : tenantRole === 'operator'
-        ? 'operator'
-        : 'admin';
-
-    moduleContext = {
-      module: 'plan',
-      userRole: normalizedRole,
-      projectId: activeProject?.id
-    };
-  }
-
-  $: if (iframeReady) {
-    iframeCommunicationService.updateContext(moduleContext);
-  }
 
   // Equipment categories (matching inventory module)
   const equipmentCategories = {
@@ -223,41 +194,13 @@ let iframeReady = false;
         return;
       }
       
-      // Initialize iframe communication
-      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
-      if (iframe) {
-        iframeCommunicationService.initialize(iframe, moduleContext);
-        iframeReady = true;
-        iframeCommunicationService.updateContext(moduleContext);
-        
-        // Listen for iframe object actions
-        window.addEventListener('iframe-object-action', handleIframeObjectAction);
-      }
-      
+      mapLayerManager.setMode('plan');
       // Don't load data here - wait for tenant store to initialize via reactive statement
     }
     
     return () => {
-      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
-      iframeCommunicationService.destroy();
-      iframeReady = false;
     };
   });
-
-  // Handle iframe object actions
-  function handleIframeObjectAction(event: CustomEvent) {
-    const { objectId, action, allowed, message, state } = event.detail;
-    
-    if (!allowed) {
-      // Show user-friendly error message
-      error = message || `Action '${action}' is not allowed for this object.`;
-      setTimeout(() => error = '', 5000);
-    } else {
-      // Handle allowed actions
-      console.log(`Action '${action}' allowed for object ${objectId}`);
-      // Add specific handling for different actions here
-    }
-  }
 
   async function loadData() {
     if (!currentUser) return;
