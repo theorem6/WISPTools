@@ -7,15 +7,12 @@
   import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
   import { buildArcGISConfig } from '$lib/config';
 
-  const arcgisConfig = buildArcGISConfig();
-  const ARCGIS_API_KEY = import.meta.env.PUBLIC_ARCGIS_API_KEY || arcgisConfig.apiKey || '';
-  const DEFAULT_ASSETS_PATH = 'https://js.arcgis.com/4.33/@arcgis/core/assets/';
-  const ARCGIS_ASSETS_PATH = (() => {
-    const fromEnv = import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH;
-    const fromConfig = arcgisConfig.assetsPath;
-    const resolved = fromEnv || fromConfig || DEFAULT_ASSETS_PATH;
-    return resolved.endsWith('/') ? resolved : `${resolved}/`;
-  })();
+const arcgisConfig = buildArcGISConfig();
+const ARCGIS_API_KEY = import.meta.env.PUBLIC_ARCGIS_API_KEY || arcgisConfig.apiKey || '';
+const ARCGIS_ASSETS_PATH =
+  import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH ||
+  arcgisConfig.assetsPath ||
+  'https://js.arcgis.com/4.33/@arcgis/core/assets/';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -35,7 +32,28 @@
   let mapReady = false;
   const DEFAULT_BASEMAP = 'topo-vector';
   const FALLBACK_BASEMAP = 'gray-vector';
+  const DEFAULT_PUBLIC_BASEMAP = 'osm';
+  const PREMIUM_BASEMAPS = new Set([
+    'topo-vector',
+    'streets-vector',
+    'hybrid',
+    'imagery',
+    'navigation-vector',
+    'streets-night-vector',
+    'streets-relief-vector'
+  ]);
+  const BASMAP_FALLBACKS: Record<string, string[]> = {
+    'topo-vector': ['gray-vector', 'light-gray-vector', DEFAULT_PUBLIC_BASEMAP],
+    'streets-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
+    'hybrid': ['imagery', DEFAULT_PUBLIC_BASEMAP],
+    'imagery': [DEFAULT_PUBLIC_BASEMAP],
+    'navigation-vector': ['streets-vector', DEFAULT_PUBLIC_BASEMAP],
+    'streets-night-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
+    'streets-relief-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
+    'gray-vector': [DEFAULT_PUBLIC_BASEMAP]
+  };
   let currentBasemap = DEFAULT_BASEMAP;
+  let BasemapModule: any = null;
   
   // Extract backhaul links from equipment
   $: backhaulLinks = equipment.filter(eq => {
@@ -94,6 +112,7 @@
         }
         esriConfig.portalUrl = esriConfig.portalUrl || 'https://www.arcgis.com';
         esriConfig.assetsPath = ARCGIS_ASSETS_PATH;
+        console.info('[CoverageMap] ArcGIS assetsPath set to:', esriConfig.assetsPath);
       }
 
       // Create graphics layers
@@ -102,19 +121,10 @@
       planDraftLayer = new GraphicsLayer({ title: 'Plan Drafts', listMode: 'hide' });
 
       // Create map with fallback basemap
-      try {
-        map = new Map({
-          basemap: currentBasemap,
-          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
-        });
-      } catch (basemapError) {
-        console.warn('Failed to load basemap, trying fallback...', basemapError);
-        map = new Map({
-          basemap: FALLBACK_BASEMAP,
-          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
-        });
-        currentBasemap = FALLBACK_BASEMAP;
-      }
+      map = new Map({
+        basemap: FALLBACK_BASEMAP,
+        layers: [backhaulLayer, graphicsLayer, planDraftLayer]
+      });
 
       // Detect mobile device
       const isMobile = window.innerWidth <= 768;
@@ -174,6 +184,8 @@
         })
       }
       });
+
+      await applyBasemap(currentBasemap);
 
       // Wait for view to be ready before adding handlers
       try {
@@ -298,13 +310,69 @@
     }
   }
 
-  // Export function to change basemap from parent component or widget
-  export function changeBasemap(basemapId: string) {
-    if (map) {
-      currentBasemap = basemapId;
-      map.basemap = basemapId;
-      console.log('[CoverageMap] Basemap changed to:', basemapId);
+  async function ensureBasemapModule() {
+    if (!BasemapModule) {
+      const basemapModule = await import('@arcgis/core/Basemap.js');
+      BasemapModule = basemapModule.default;
     }
+    return BasemapModule;
+  }
+
+  function getFallbackChain(basemapId: string): string[] {
+    const fallbacks = BASMAP_FALLBACKS[basemapId] ?? [];
+    if (!fallbacks.includes(DEFAULT_PUBLIC_BASEMAP)) {
+      fallbacks.push(DEFAULT_PUBLIC_BASEMAP);
+    }
+    if (!fallbacks.includes(FALLBACK_BASEMAP)) {
+      fallbacks.push(FALLBACK_BASEMAP);
+    }
+    return fallbacks;
+  }
+
+  async function applyBasemap(basemapId: string, visited = new Set<string>()) {
+    if (!map) return;
+
+    if (visited.has(basemapId)) {
+      return;
+    }
+    visited.add(basemapId);
+
+    if (!ARCGIS_API_KEY && PREMIUM_BASEMAPS.has(basemapId)) {
+      console.warn(`[CoverageMap] Skipping premium basemap "${basemapId}" because no ArcGIS API key is configured.`);
+    } else {
+      try {
+        const Basemap = await ensureBasemapModule();
+        const basemap = await Basemap.fromId(basemapId);
+        if (basemap?.load) {
+          await basemap.load();
+        }
+        map.basemap = basemap;
+        currentBasemap = basemap.id ?? basemapId;
+        console.log('[CoverageMap] Basemap changed to:', currentBasemap);
+        return;
+      } catch (error) {
+        console.error(`[CoverageMap] Failed to load basemap "${basemapId}"`, error);
+      }
+    }
+
+    const fallbacks = getFallbackChain(basemapId);
+    for (const fallback of fallbacks) {
+      if (!visited.has(fallback)) {
+        await applyBasemap(fallback, visited);
+        if (currentBasemap === fallback || map.basemap?.id === fallback) {
+          return;
+        }
+      }
+    }
+
+    console.warn('[CoverageMap] Unable to load requested basemap. Using fallback basemap.');
+    map.basemap = FALLBACK_BASEMAP;
+    currentBasemap = FALLBACK_BASEMAP;
+  }
+
+  // Export function to change basemap from parent component or widget
+  export async function changeBasemap(basemapId: string) {
+    await applyBasemap(basemapId);
   }
 
   // Handle basemap change from widget
