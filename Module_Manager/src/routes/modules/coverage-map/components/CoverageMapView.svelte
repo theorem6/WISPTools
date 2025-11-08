@@ -31,7 +31,7 @@ const ARCGIS_ASSETS_PATH =
   let planDraftLayer: any = null;
   let mapReady = false;
   const DEFAULT_BASEMAP = 'topo-vector';
-  const FALLBACK_BASEMAP = 'gray-vector';
+  const FALLBACK_BASEMAP = 'osm';
   const DEFAULT_PUBLIC_BASEMAP = 'osm';
   const PREMIUM_BASEMAPS = new Set([
     'topo-vector',
@@ -40,17 +40,19 @@ const ARCGIS_ASSETS_PATH =
     'imagery',
     'navigation-vector',
     'streets-night-vector',
-    'streets-relief-vector'
+    'streets-relief-vector',
+    'gray-vector'
   ]);
   const BASMAP_FALLBACKS: Record<string, string[]> = {
-    'topo-vector': ['gray-vector', 'light-gray-vector', DEFAULT_PUBLIC_BASEMAP],
-    'streets-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
+    'topo-vector': [DEFAULT_PUBLIC_BASEMAP],
+    'streets-vector': [DEFAULT_PUBLIC_BASEMAP],
     'hybrid': ['imagery', DEFAULT_PUBLIC_BASEMAP],
     'imagery': [DEFAULT_PUBLIC_BASEMAP],
     'navigation-vector': ['streets-vector', DEFAULT_PUBLIC_BASEMAP],
-    'streets-night-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
-    'streets-relief-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
-    'gray-vector': [DEFAULT_PUBLIC_BASEMAP]
+    'streets-night-vector': [DEFAULT_PUBLIC_BASEMAP],
+    'streets-relief-vector': [DEFAULT_PUBLIC_BASEMAP],
+    'gray-vector': [DEFAULT_PUBLIC_BASEMAP],
+    'light-gray-vector': [DEFAULT_PUBLIC_BASEMAP]
   };
   let currentBasemap = DEFAULT_BASEMAP;
   let BasemapModule: any = null;
@@ -318,6 +320,28 @@ const ARCGIS_ASSETS_PATH =
     return BasemapModule;
   }
 
+  async function createBasemapFromId(basemapId: string) {
+    const Basemap = await ensureBasemapModule();
+    const basemap = await Basemap.fromId(basemapId);
+    const loadTargets = [
+      ...(basemap.baseLayers?.toArray?.() ?? []),
+      ...(basemap.referenceLayers?.toArray?.() ?? [])
+    ].filter(Boolean);
+
+    await Promise.all(
+      loadTargets.map(async (layer: any) => {
+        try {
+          await layer.load?.();
+        } catch (layerError) {
+          console.error(`[CoverageMap] Basemap layer failed "${basemapId}"`, { layer, error: layerError });
+          throw layerError;
+        }
+      })
+    );
+
+    return basemap;
+  }
+
   function getFallbackChain(basemapId: string): string[] {
     const fallbacks = BASMAP_FALLBACKS[basemapId] ?? [];
     if (!fallbacks.includes(DEFAULT_PUBLIC_BASEMAP)) {
@@ -341,11 +365,7 @@ const ARCGIS_ASSETS_PATH =
       console.warn(`[CoverageMap] Skipping premium basemap "${basemapId}" because no ArcGIS API key is configured.`);
     } else {
       try {
-        const Basemap = await ensureBasemapModule();
-        const basemap = await Basemap.fromId(basemapId);
-        if (basemap?.load) {
-          await basemap.load();
-        }
+        const basemap = await createBasemapFromId(basemapId);
         map.basemap = basemap;
         currentBasemap = basemap.id ?? basemapId;
         console.log('[CoverageMap] Basemap changed to:', currentBasemap);
