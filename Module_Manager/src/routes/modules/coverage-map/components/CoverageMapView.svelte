@@ -33,10 +33,9 @@
   let backhaulLayer: any = null;
   let planDraftLayer: any = null;
   let mapReady = false;
-  const DEFAULT_BASEMAP = ARCGIS_API_KEY ? 'topo-vector' : 'osm-standard';
-  const FALLBACK_BASEMAP = 'osm-standard';
+  const DEFAULT_BASEMAP = 'topo-vector';
+  const FALLBACK_BASEMAP = 'gray-vector';
   let currentBasemap = DEFAULT_BASEMAP;
-  let BasemapModule: any = null;
   
   // Extract backhaul links from equipment
   $: backhaulLinks = equipment.filter(eq => {
@@ -68,53 +67,6 @@
     mapReady = false;
     planDraftLayer = null;
   });
-
-  async function ensureBasemapModule() {
-    if (!BasemapModule) {
-      const basemapModule = await import('@arcgis/core/Basemap.js');
-      BasemapModule = basemapModule.default;
-    }
-    return BasemapModule;
-  }
-
-  async function loadBasemapById(basemapId: string) {
-    try {
-      const Basemap = await ensureBasemapModule();
-      if (!ARCGIS_API_KEY && basemapId !== FALLBACK_BASEMAP) {
-        console.warn(`[CoverageMap] Premium basemap "${basemapId}" requires ArcGIS API key. Falling back.`);
-        return null;
-      }
-      const basemap = await Basemap.fromId(basemapId);
-      if (basemap?.load) {
-        await basemap.load();
-      }
-      return basemap;
-    } catch (error) {
-      console.error(`[CoverageMap] Failed to load basemap "${basemapId}"`, error);
-      return null;
-    }
-  }
-
-  async function applyBasemap(basemapId: string) {
-    if (!map) return;
-
-    // Use ArcGIS basemap when available, otherwise fall back to OSM
-    const basemap = await loadBasemapById(basemapId);
-    if (basemap) {
-      map.basemap = basemap;
-      currentBasemap = basemap.id ?? basemapId;
-      console.log('[CoverageMap] Basemap changed to:', currentBasemap);
-      return;
-    }
-
-    if (basemapId !== FALLBACK_BASEMAP) {
-      console.warn(`[CoverageMap] Falling back to "${FALLBACK_BASEMAP}" basemap.`);
-      await applyBasemap(FALLBACK_BASEMAP);
-    } else {
-      map.basemap = FALLBACK_BASEMAP;
-      currentBasemap = FALLBACK_BASEMAP;
-    }
-  }
 
   async function initializeMap() {
     try {
@@ -150,11 +102,19 @@
       planDraftLayer = new GraphicsLayer({ title: 'Plan Drafts', listMode: 'hide' });
 
       // Create map with fallback basemap
-      // Start with fallback basemap to ensure the map renders even if premium layers fail
-      map = new Map({
-        basemap: FALLBACK_BASEMAP,
-        layers: [backhaulLayer, graphicsLayer, planDraftLayer]
-      });
+      try {
+        map = new Map({
+          basemap: currentBasemap,
+          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
+        });
+      } catch (basemapError) {
+        console.warn('Failed to load basemap, trying fallback...', basemapError);
+        map = new Map({
+          basemap: FALLBACK_BASEMAP,
+          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
+        });
+        currentBasemap = FALLBACK_BASEMAP;
+      }
 
       // Detect mobile device
       const isMobile = window.innerWidth <= 768;
@@ -214,9 +174,6 @@
         })
       }
       });
-
-      // Apply preferred basemap after view initialization
-      await applyBasemap(currentBasemap);
 
       // Wait for view to be ready before adding handlers
       try {
@@ -342,9 +299,12 @@
   }
 
   // Export function to change basemap from parent component or widget
-  export async function changeBasemap(basemapId: string) {
-    if (!map) return;
-    await applyBasemap(basemapId);
+  export function changeBasemap(basemapId: string) {
+    if (map) {
+      currentBasemap = basemapId;
+      map.basemap = basemapId;
+      console.log('[CoverageMap] Basemap changed to:', basemapId);
+    }
   }
 
   // Handle basemap change from widget
