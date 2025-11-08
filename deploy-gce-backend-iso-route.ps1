@@ -95,5 +95,8 @@ Write-Host ""
 Write-Host "✅ Deployment complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Test the endpoint:" -ForegroundColor Cyan
-Write-Host "  curl -X POST http://${GCE_SERVER}:3002/api/deploy/generate-epc-iso -H 'Content-Type: application/json' -H 'X-Tenant-ID: test' -d '{`"siteName`":`"Test Site`"}'"
+$testCommand = @"
+  curl -X POST http://$GCE_SERVER:3002/api/deploy/generate-epc-iso -H 'Content-Type: application/json' -H 'X-Tenant-ID: test' -d '{"siteName":"Test Site"}'
+"@
+Write-Host $testCommand
 

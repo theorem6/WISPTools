@@ -5,9 +5,11 @@
   import type { PlanLayerFeature } from '$lib/services/planService';
   import { createLocationIcon } from '$lib/mapIcons';
   import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
+  import { buildArcGISConfig } from '$lib/config';
 
-  const ARCGIS_API_KEY = import.meta.env.PUBLIC_ARCGIS_API_KEY || '';
-  const ARCGIS_ASSETS_PATH = import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH || 'https://js.arcgis.com/4.33/assets';
+  const arcgisConfig = buildArcGISConfig();
+  const ARCGIS_API_KEY = import.meta.env.PUBLIC_ARCGIS_API_KEY || arcgisConfig.apiKey || '';
+  const ARCGIS_ASSETS_PATH = import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH || arcgisConfig.assetsPath || 'https://js.arcgis.com/4.33/assets';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
