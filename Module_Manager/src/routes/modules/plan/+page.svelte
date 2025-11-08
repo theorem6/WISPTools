@@ -624,6 +624,34 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     }
   }
 
+  async function pauseProject() {
+    if (!activeProject) return;
+
+    try {
+      const paused = await planService.updatePlan(activeProject.id, { status: 'draft', showOnMap: false });
+      await loadData(true);
+
+      const updatedVisibility = new Set(visiblePlans);
+      updatedVisibility.delete(activeProject.id);
+      visiblePlans = updatedVisibility;
+
+      const pausedPlan = paused ?? activeProject;
+      selectedProject = pausedPlan;
+      activeProject = null;
+      showProjectActions = false;
+      mapLocked = true;
+      mapLayerManager.setMode('plan');
+      mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
+
+      successMessage = `Plan "${pausedPlan.name}" paused. Resume it from the plan list when you're ready.`;
+      setTimeout(() => successMessage = '', 5000);
+    } catch (err: any) {
+      console.error('Error pausing project:', err);
+      error = err?.message || 'Failed to pause project';
+      setTimeout(() => error = '', 5000);
+    }
+  }
+
   async function approveProject(project: PlanProject) {
     try {
       await planService.updatePlan(project.id, { status: 'approved' });
@@ -664,10 +692,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   }
 
   async function deleteProject(project: PlanProject) {
-    const allowedStatuses = ['draft', 'ready', 'cancelled', 'rejected'];
+    const allowedStatuses = ['draft', 'active', 'ready', 'cancelled', 'rejected'];
 
     if (!allowedStatuses.includes(project.status)) {
-      error = 'Only draft, ready, cancelled, or rejected plans can be deleted.';
+      error = 'Only draft, active, ready, cancelled, or rejected plans can be deleted.';
       setTimeout(() => error = '', 5000);
       return;
     }
@@ -677,6 +705,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     }
 
     try {
+      if (project.status === 'active') {
+        await planService.updatePlan(project.id, { status: 'cancelled', showOnMap: false });
+      }
+
       const deleted = await planService.deletePlan(project.id);
       if (!deleted) {
         throw new Error('Delete request failed');
@@ -841,6 +873,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-icon">✅</span>
             <span class="control-label">Finish</span>
           </button>
+          <button class="control-btn pause-btn" on:click={pauseProject} title="Pause Project">
+            <span class="control-icon">⏸️</span>
+            <span class="control-label">Pause</span>
+          </button>
           <button class="control-btn cancel-btn" on:click={cancelProject} title="Cancel Project">
             <span class="control-icon">❌</span>
             <span class="control-label">Cancel</span>
@@ -853,7 +889,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-icon">{activeProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
             <span class="control-label">{activeProject.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
-          {#if ['draft','ready','cancelled','rejected'].includes(activeProject.status)}
+          {#if ['draft','active','ready','cancelled','rejected'].includes(activeProject.status)}
             <button class="control-btn delete-btn" on:click={() => deleteProject(activeProject)} title="Delete Plan">
               <span class="control-icon">🗑️</span>
               <span class="control-label">Delete</span>
@@ -2000,6 +2036,33 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .cancel-btn:hover {
     background: #dc2626;
+  }
+
+  .pause-btn {
+    background: #f97316;
+    color: white;
+  }
+
+  .pause-btn:hover {
+    background: #ea580c;
+  }
+
+  .resume-btn {
+    background: #10b981;
+    color: white;
+  }
+
+  .resume-btn:hover {
+    background: #059669;
+  }
+
+  .reopen-btn {
+    background: #6366f1;
+    color: white;
+  }
+
+  .reopen-btn:hover {
+    background: #4f46e5;
   }
 
   .active-indicator,

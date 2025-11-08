@@ -160,6 +160,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let externalProductionHardware: HardwareView[] = [];
   let sharedMapStateTimestamp: Date | null = null;
 
+  $: {
+    const activePlanId = planId || sharedActivePlanId;
+    const mapInPlanMode = isPlanMode || sharedMapMode === 'plan' || mapMode === 'plan';
+    const readOnly = sharedCapabilities?.readOnly ?? false;
+    planEditingEnabled = mapInPlanMode ? Boolean(activePlanId) && !readOnly : true;
+  }
+
   onMount(async () => {
     window.addEventListener('message', handleSharedMapMessage);
 
@@ -383,12 +390,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       planId = activePlanIdFromState;
     }
     sharedActivePlanId = activePlanIdFromState;
-  $: {
-    const activePlanId = planId || sharedActivePlanId;
-    const mapInPlanMode = isPlanMode || sharedMapMode === 'plan' || mapMode === 'plan';
-    const readOnly = sharedCapabilities?.readOnly ?? false;
-    planEditingEnabled = mapInPlanMode ? Boolean(activePlanId) && !readOnly : true;
-  }
   }
   
   function handleMapRightClick(event: CustomEvent) {
