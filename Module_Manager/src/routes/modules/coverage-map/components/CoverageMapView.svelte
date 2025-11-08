@@ -33,8 +33,8 @@
   let backhaulLayer: any = null;
   let planDraftLayer: any = null;
   let mapReady = false;
-  const DEFAULT_BASEMAP = ARCGIS_API_KEY ? 'topo-vector' : 'arcgis-imagery';
-  const FALLBACK_BASEMAP = 'arcgis-imagery';
+  const DEFAULT_BASEMAP = ARCGIS_API_KEY ? 'topo-vector' : 'osm-standard';
+  const FALLBACK_BASEMAP = 'osm-standard';
   let currentBasemap = DEFAULT_BASEMAP;
   let BasemapModule: any = null;
   
