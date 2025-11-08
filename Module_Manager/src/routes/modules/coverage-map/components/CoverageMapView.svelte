@@ -13,9 +13,6 @@ const ARCGIS_ASSETS_PATH =
   import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH ||
   arcgisConfig.assetsPath ||
   'https://js.arcgis.com/4.33/@arcgis/core/assets/';
-const ARCGIS_API_KEY_REDACTED = ARCGIS_API_KEY
-  ? `${ARCGIS_API_KEY.slice(0, 6)}...${ARCGIS_API_KEY.slice(-4)}`
-  : 'none';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -37,18 +34,15 @@ const ARCGIS_API_KEY_REDACTED = ARCGIS_API_KEY
   const FALLBACK_BASEMAP = 'osm';
   const DEFAULT_PUBLIC_BASEMAP = 'osm';
   const PREMIUM_BASEMAPS = new Set([
-    'topo-vector',
-    'streets-vector',
     'hybrid',
     'imagery',
     'navigation-vector',
     'streets-night-vector',
-    'streets-relief-vector',
-    'gray-vector'
+    'streets-relief-vector'
   ]);
   const BASMAP_FALLBACKS: Record<string, string[]> = {
-    'topo-vector': [DEFAULT_PUBLIC_BASEMAP],
-    'streets-vector': [DEFAULT_PUBLIC_BASEMAP],
+    'topo-vector': ['streets-vector', 'gray-vector', DEFAULT_PUBLIC_BASEMAP],
+    'streets-vector': ['gray-vector', DEFAULT_PUBLIC_BASEMAP],
     'hybrid': ['imagery', DEFAULT_PUBLIC_BASEMAP],
     'imagery': [DEFAULT_PUBLIC_BASEMAP],
     'navigation-vector': ['streets-vector', DEFAULT_PUBLIC_BASEMAP],
@@ -59,6 +53,7 @@ const ARCGIS_API_KEY_REDACTED = ARCGIS_API_KEY
   };
   let currentBasemap = DEFAULT_BASEMAP;
   let BasemapModule: any = null;
+  let WebTileLayerModule: any = null;
   
   // Extract backhaul links from equipment
   $: backhaulLinks = equipment.filter(eq => {
@@ -118,7 +113,6 @@ const ARCGIS_API_KEY_REDACTED = ARCGIS_API_KEY
         esriConfig.portalUrl = esriConfig.portalUrl || 'https://www.arcgis.com';
         esriConfig.assetsPath = ARCGIS_ASSETS_PATH;
         console.info('[CoverageMap] ArcGIS assetsPath set to:', esriConfig.assetsPath);
-        console.info('[CoverageMap] ArcGIS API key present:', Boolean(ARCGIS_API_KEY), ARCGIS_API_KEY_REDACTED);
       }
 
       // Create graphics layers
@@ -324,7 +318,109 @@ const ARCGIS_API_KEY_REDACTED = ARCGIS_API_KEY
     return BasemapModule;
   }
 
+  async function ensureWebTileLayerModule() {
+    if (!WebTileLayerModule) {
+      const webTileLayerModule = await import('@arcgis/core/layers/WebTileLayer.js');
+      WebTileLayerModule = webTileLayerModule.default;
+    }
+    return WebTileLayerModule;
+  }
+
+  const CUSTOM_BASEMAP_FACTORIES: Record<string, () => Promise<any>> = {
+    'streets-vector': async () => {
+      const [Basemap, WebTileLayer] = await Promise.all([
+        ensureBasemapModule(),
+        ensureWebTileLayerModule()
+      ]);
+      return new Basemap({
+        title: 'OpenStreetMap',
+        id: 'streets-vector',
+        baseLayers: [
+          new WebTileLayer({
+            urlTemplate: 'https://{subDomain}.tile.openstreetmap.org/{level}/{col}/{row}.png',
+            subDomains: ['a', 'b', 'c'],
+            copyright: '© OpenStreetMap contributors'
+          })
+        ]
+      });
+    },
+    'topo-vector': async () => {
+      const [Basemap, WebTileLayer] = await Promise.all([
+        ensureBasemapModule(),
+        ensureWebTileLayerModule()
+      ]);
+      return new Basemap({
+        title: 'OpenTopoMap',
+        id: 'topo-vector',
+        baseLayers: [
+          new WebTileLayer({
+            urlTemplate: 'https://{subDomain}.tile.opentopomap.org/{level}/{col}/{row}.png',
+            subDomains: ['a', 'b', 'c'],
+            copyright:
+              'Map data: © OpenStreetMap contributors, SRTM | Tiles: © OpenTopoMap (CC-BY-SA)'
+          })
+        ]
+      });
+    },
+    'gray-vector': async () => {
+      const [Basemap, WebTileLayer] = await Promise.all([
+        ensureBasemapModule(),
+        ensureWebTileLayerModule()
+      ]);
+      return new Basemap({
+        title: 'Carto Light',
+        id: 'gray-vector',
+        baseLayers: [
+          new WebTileLayer({
+            urlTemplate: 'https://{subDomain}.basemaps.cartocdn.com/light_all/{level}/{col}/{row}.png',
+            subDomains: ['a', 'b', 'c', 'd'],
+            copyright: '© OpenStreetMap contributors © CARTO'
+          })
+        ]
+      });
+    },
+    'light-gray-vector': async () => {
+      const [Basemap, WebTileLayer] = await Promise.all([
+        ensureBasemapModule(),
+        ensureWebTileLayerModule()
+      ]);
+      return new Basemap({
+        title: 'Carto Light',
+        id: 'light-gray-vector',
+        baseLayers: [
+          new WebTileLayer({
+            urlTemplate: 'https://{subDomain}.basemaps.cartocdn.com/light_all/{level}/{col}/{row}.png',
+            subDomains: ['a', 'b', 'c', 'd'],
+            copyright: '© OpenStreetMap contributors © CARTO'
+          })
+        ]
+      });
+    },
+    osm: async () => {
+      const [Basemap, WebTileLayer] = await Promise.all([
+        ensureBasemapModule(),
+        ensureWebTileLayerModule()
+      ]);
+      return new Basemap({
+        title: 'OpenStreetMap',
+        id: 'osm',
+        baseLayers: [
+          new WebTileLayer({
+            urlTemplate: 'https://{subDomain}.tile.openstreetmap.org/{level}/{col}/{row}.png',
+            subDomains: ['a', 'b', 'c'],
+            copyright: '© OpenStreetMap contributors'
+          })
+        ]
+      });
+    }
+  };
+
   async function createBasemapFromId(basemapId: string) {
+    const customFactory = CUSTOM_BASEMAP_FACTORIES[basemapId];
+    if (customFactory) {
+      return customFactory();
+    }
+
     const Basemap = await ensureBasemapModule();
     const basemap = await Basemap.fromId(basemapId);
     const loadTargets = [
