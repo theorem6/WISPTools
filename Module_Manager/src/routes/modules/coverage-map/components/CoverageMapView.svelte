@@ -13,6 +13,9 @@ const ARCGIS_ASSETS_PATH =
   import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH ||
   arcgisConfig.assetsPath ||
   'https://js.arcgis.com/4.33/@arcgis/core/assets/';
+const ARCGIS_API_KEY_REDACTED = ARCGIS_API_KEY
+  ? `${ARCGIS_API_KEY.slice(0, 6)}...${ARCGIS_API_KEY.slice(-4)}`
+  : 'none';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -115,6 +118,7 @@ const ARCGIS_ASSETS_PATH =
         esriConfig.portalUrl = esriConfig.portalUrl || 'https://www.arcgis.com';
         esriConfig.assetsPath = ARCGIS_ASSETS_PATH;
         console.info('[CoverageMap] ArcGIS assetsPath set to:', esriConfig.assetsPath);
+        console.info('[CoverageMap] ArcGIS API key present:', Boolean(ARCGIS_API_KEY), ARCGIS_API_KEY_REDACTED);
       }
 
       // Create graphics layers
