@@ -125,13 +125,15 @@ export class MapLayerManager {
 
   async addFeature(planId: string, payload: Parameters<typeof planService.createPlanFeature>[1]) {
     try {
-      const { feature, summary } = await planService.createPlanFeature(planId, payload);
+      const { feature } = await planService.createPlanFeature(planId, payload);
+      const normalizedFeature = this.normalizeFeature(feature);
       const current = this.getSnapshot();
-      const stagedFeatures = [...current.stagedFeatures, feature];
+      const stagedFeatures = this.mergeStagedFeatures(current.stagedFeatures, normalizedFeature);
+      const summary = this.computeSummaryFromFeatures(stagedFeatures);
       this.saveRemoteSync(planId, stagedFeatures);
       this.updateState({ stagedFeatures, summary });
       setMapData({ stagedFeatures, stagedSummary: summary });
-      return feature;
+      return normalizedFeature;
     } catch (error: any) {
       if (!this.shouldFallbackToLocal(error)) {
         throw error;
@@ -151,13 +153,15 @@ export class MapLayerManager {
 
   async updateFeature(planId: string, featureId: string, updates: Partial<PlanLayerFeature>) {
     try {
-      const { feature, summary } = await planService.updatePlanFeature(planId, featureId, updates);
+      const { feature } = await planService.updatePlanFeature(planId, featureId, updates);
+      const normalizedFeature = this.normalizeFeature(feature);
       const current = this.getSnapshot();
-      const stagedFeatures = current.stagedFeatures.map(f => (f.id === feature.id ? feature : f));
+      const stagedFeatures = current.stagedFeatures.map(f => (f.id === normalizedFeature.id ? normalizedFeature : f));
+      const summary = this.computeSummaryFromFeatures(stagedFeatures);
       this.saveRemoteSync(planId, stagedFeatures);
       this.updateState({ stagedFeatures, summary });
       setMapData({ stagedFeatures, stagedSummary: summary });
-      return feature;
+      return normalizedFeature;
     } catch (error: any) {
       if (!this.shouldFallbackToLocal(error)) {
         throw error;
@@ -180,9 +184,10 @@ export class MapLayerManager {
 
   async deleteFeature(planId: string, featureId: string) {
     try {
-      const summary = await planService.deletePlanFeature(planId, featureId);
+      await planService.deletePlanFeature(planId, featureId);
       const current = this.getSnapshot();
       const stagedFeatures = current.stagedFeatures.filter(f => f.id !== featureId);
+      const summary = this.computeSummaryFromFeatures(stagedFeatures);
       this.removeLocalFeature(planId, featureId);
       this.saveRemoteSync(planId, stagedFeatures);
       this.updateState({ stagedFeatures, summary });
@@ -252,8 +257,9 @@ export class MapLayerManager {
   }
 
   private saveLocalFeature(planId: string, feature: PlanLayerFeature) {
+    const normalized = this.normalizeFeature(feature);
     const existing = this.getLocalFeaturesForPlan(planId);
-    this.localFeatureCache.set(planId, [...existing, feature]);
+    this.localFeatureCache.set(planId, [...existing.filter(f => f.id !== normalized.id), normalized]);
   }
 
   private updateLocalFeature(planId: string, featureId: string, updates: Partial<PlanLayerFeature>): PlanLayerFeature | null {
@@ -270,12 +276,17 @@ export class MapLayerManager {
     };
 
     if ((updates as any)?.geometry) {
-      (updated as any).geometry = this.toEsriGeometry((updates as any).geometry);
+      const planGeometry = this.toPlanGeometry((updates as any).geometry);
+      (updated as any).geometry = this.toEsriGeometry(planGeometry ?? (updates as any).geometry);
+      updated.metadata = {
+        ...(updated.metadata ?? {}),
+        originalGeometry: planGeometry ?? (updated.metadata?.originalGeometry ?? null)
+      };
     }
 
     local[index] = updated;
     this.localFeatureCache.set(planId, [...local]);
-    return updated;
+    return this.normalizeFeature(updated);
   }
 
   private removeLocalFeature(planId: string, featureId: string) {
@@ -298,9 +309,10 @@ export class MapLayerManager {
   }
 
   private mergeWithLocalFeatures(planId: string, remoteFeatures: PlanLayerFeature[]): PlanLayerFeature[] {
-    const remoteIds = new Set(remoteFeatures.map(feature => feature.id));
+    const normalizedRemote = remoteFeatures.map(feature => this.normalizeFeature(feature));
+    const remoteIds = new Set(normalizedRemote.map(feature => feature.id));
     const local = this.getLocalFeaturesForPlan(planId).filter(feature => !remoteIds.has(feature.id));
-    return [...remoteFeatures, ...local];
+    return [...normalizedRemote, ...local];
   }
 
   private computeSummaryFromFeatures(features: PlanLayerFeature[]): PlanFeatureSummary {
@@ -326,7 +338,8 @@ export class MapLayerManager {
     const tenantId = current.activePlan?.tenantId ?? '';
     const now = new Date();
     const id = `local-${planId}-${crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
-    const esriGeometry = this.toEsriGeometry(payload.geometry);
+    const planGeometry = this.toPlanGeometry(payload.geometry) ?? this.toPlanGeometryFromPayload(payload);
+    const esriGeometry = this.toEsriGeometry(planGeometry);
 
     const feature: PlanLayerFeature = {
       id,
@@ -339,23 +352,43 @@ export class MapLayerManager {
       metadata: {
         ...(payload.metadata ?? {}),
         local: true,
-        originalGeometry: payload.geometry ?? null
+        originalGeometry: planGeometry ?? null
       },
       createdAt: now,
       updatedAt: now
     };
 
     (feature as any).type = payload.featureType;
-    return feature;
+    return this.normalizeFeature(feature);
+  }
+
+  private mergeStagedFeatures(existing: PlanLayerFeature[], incoming: PlanLayerFeature): PlanLayerFeature[] {
+    const seen = new Map<string, PlanLayerFeature>();
+    [...existing, incoming].forEach(feature => {
+      seen.set(feature.id, this.normalizeFeature(feature));
+    });
+    return Array.from(seen.values());
   }
 
   private toEsriGeometry(geometry: any): any {
     if (!geometry) return undefined;
 
+    if (typeof geometry.longitude === 'number' && typeof geometry.latitude === 'number') {
+      return {
+        type: 'point',
+        longitude: geometry.longitude,
+        latitude: geometry.latitude,
+        spatialReference: geometry.spatialReference ?? { wkid: 4326 }
+      };
+    }
+
     const type = (geometry.type || '').toLowerCase();
     switch (type) {
       case 'point': {
-        const [longitude, latitude] = geometry.coordinates || [0, 0];
+        const [longitude, latitude] = geometry.coordinates || [
+          geometry.longitude ?? 0,
+          geometry.latitude ?? 0
+        ];
         return {
           type: 'point',
           longitude,
@@ -379,9 +412,103 @@ export class MapLayerManager {
           spatialReference: { wkid: 4326 }
         };
       }
+      case 'polyline': {
+        const paths = geometry.paths || geometry.coordinates || [];
+        return {
+          type: 'polyline',
+          paths: Array.isArray(paths) && !Array.isArray(paths[0]) ? [paths] : paths,
+          spatialReference: { wkid: 4326 }
+        };
+      }
       default:
         return geometry;
     }
+  }
+
+  private toPlanGeometry(geometry: any): any {
+    if (!geometry) return undefined;
+
+    if (typeof geometry.longitude === 'number' && typeof geometry.latitude === 'number') {
+      return {
+        type: 'Point',
+        coordinates: [geometry.longitude, geometry.latitude]
+      };
+    }
+
+    const type = (geometry.type || '').toLowerCase();
+    switch (type) {
+      case 'point':
+        if (Array.isArray(geometry.coordinates)) {
+          return {
+            type: 'Point',
+            coordinates: geometry.coordinates
+          };
+        }
+        return geometry;
+      case 'polyline':
+        if (Array.isArray(geometry.paths)) {
+          return {
+            type: 'LineString',
+            coordinates: geometry.paths[0] ?? []
+          };
+        }
+        return geometry;
+      case 'linestring':
+        return {
+          type: 'LineString',
+          coordinates: geometry.coordinates ?? []
+        };
+      case 'polygon':
+        return {
+          type: 'Polygon',
+          coordinates: geometry.coordinates ?? geometry.rings ?? []
+        };
+      default:
+        return geometry;
+    }
+  }
+
+  private toPlanGeometryFromPayload(payload: Parameters<typeof planService.createPlanFeature>[1]): any {
+    if (payload.geometry) {
+      return this.toPlanGeometry(payload.geometry);
+    }
+
+    const latitude = (payload.properties as any)?.latitude;
+    const longitude = (payload.properties as any)?.longitude;
+
+    if (typeof latitude === 'number' && typeof longitude === 'number') {
+      return {
+        type: 'Point',
+        coordinates: [longitude, latitude]
+      };
+    }
+
+    return {
+      type: 'Point',
+      coordinates: [0, 0]
+    };
+  }
+
+  private normalizeFeature(feature: PlanLayerFeature): PlanLayerFeature {
+    const planGeometry =
+      this.toPlanGeometry(feature.metadata?.originalGeometry) ??
+      this.toPlanGeometry(feature.geometry);
+    const esriGeometry = this.toEsriGeometry(planGeometry ?? feature.geometry);
+    const metadata = {
+      ...(feature.metadata ?? {}),
+      originalGeometry: planGeometry ?? feature.metadata?.originalGeometry ?? null
+    };
+
+    const normalized: PlanLayerFeature = {
+      ...feature,
+      featureType: feature.featureType || (feature as any).type || feature.properties?.featureType || 'plan',
+      geometry: esriGeometry,
+      metadata,
+      updatedAt: feature.updatedAt ? new Date(feature.updatedAt) : new Date()
+    };
+
+    (normalized as any).type = normalized.featureType;
+    return normalized;
   }
 }
 

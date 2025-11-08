@@ -78,6 +78,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let towerMenuX = 0;
   let towerMenuY = 0;
   let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
+  let selectedPlanDraft: PlanLayerFeature | null = null;
+  let showPlanDraftMenu = false;
+  let planDraftMenuX = 0;
+  let planDraftMenuY = 0;
+  let selectedPlanDraftCoords = { latitude: null as number | null, longitude: null as number | null };
   
   // Map mode derived from query parameters (default to coverage view)
   $: mapMode = (() => {
@@ -168,6 +173,42 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
     planEditingEnabled = mapInPlanMode ? (Boolean(activePlanId) || canAddTemporary) && !readOnly : true;
   }
+
+  function getPlanDraftCoordinates(draft: PlanLayerFeature | null): { latitude: number | null; longitude: number | null } {
+    if (!draft) return { latitude: null, longitude: null };
+
+    const original = draft.metadata?.originalGeometry;
+    if (original?.coordinates?.length >= 2) {
+      return { longitude: original.coordinates[0], latitude: original.coordinates[1] };
+    }
+
+    const geometry: any = draft.geometry;
+    if (geometry?.coordinates?.length >= 2) {
+      return { longitude: geometry.coordinates[0], latitude: geometry.coordinates[1] };
+    }
+
+    if (typeof geometry?.longitude === 'number' && typeof geometry?.latitude === 'number') {
+      return { longitude: geometry.longitude, latitude: geometry.latitude };
+    }
+
+    if (typeof geometry?.x === 'number' && typeof geometry?.y === 'number') {
+      return { longitude: geometry.x, latitude: geometry.y };
+    }
+
+    if (typeof draft.properties?.longitude === 'number' && typeof draft.properties?.latitude === 'number') {
+      return { longitude: draft.properties.longitude, latitude: draft.properties.latitude };
+    }
+
+    return { latitude: null, longitude: null };
+  }
+
+  $: selectedPlanDraftCoords = getPlanDraftCoordinates(selectedPlanDraft);
+  $: if (selectedPlanDraft) {
+      const refreshedDraft = externalPlanFeatures.find(feature => feature.id === selectedPlanDraft?.id) ?? null;
+      if (refreshedDraft && refreshedDraft !== selectedPlanDraft) {
+        selectedPlanDraft = refreshedDraft;
+      }
+    }
 
   onMount(async () => {
     window.addEventListener('message', handleSharedMapMessage);
@@ -305,6 +346,35 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       isLoading = false;
     }
   }
+
+  async function removePlanDraft() {
+    if (!selectedPlanDraft) return;
+
+    const activePlanId = planId || selectedPlanDraft.planId || sharedActivePlanId;
+    if (!activePlanId) {
+      error = 'Select a plan to remove staged objects.';
+      setTimeout(() => (error = ''), 4000);
+      return;
+    }
+
+    try {
+      await mapLayerManager.deleteFeature(activePlanId, selectedPlanDraft.id);
+      success = 'Draft removed from plan.';
+      setTimeout(() => (success = ''), 3000);
+    } catch (err: any) {
+      console.error('[CoverageMap] Failed to remove plan draft', err);
+      error = err?.message || 'Failed to remove draft';
+      setTimeout(() => (error = ''), 5000);
+    } finally {
+      showPlanDraftMenu = false;
+      selectedPlanDraft = null;
+    }
+  }
+
+  function closePlanDraftMenu() {
+    showPlanDraftMenu = false;
+    selectedPlanDraft = null;
+  }
   
   function handleFiltersChange(event: CustomEvent<CoverageMapFilters>) {
     filters = event.detail;
@@ -398,6 +468,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     const { latitude, longitude, screenX, screenY } = event.detail;
     console.log('Right-click at:', latitude, longitude);
 
+    showPlanDraftMenu = false;
+    selectedPlanDraft = null;
+
     if ((isPlanMode || sharedMapMode === 'plan') && !planEditingEnabled) {
       showContextMenu = false;
       if (!error) {
@@ -461,15 +534,78 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     showContextMenu = false;
   }
   
+  async function handlePlanFeatureMoved(event: CustomEvent<{
+    featureId: string;
+    planId?: string | null;
+    geometry: { type: string; coordinates: [number, number] };
+    latitude: number;
+    longitude: number;
+  }>) {
+    const { featureId, planId: featurePlanId, geometry, latitude, longitude } = event.detail;
+    const activePlanId = planId || featurePlanId || sharedActivePlanId;
+
+    if (!activePlanId) {
+      error = 'Select a plan to edit staged objects.';
+      setTimeout(() => (error = ''), 4000);
+      return;
+    }
+
+    const draft = externalPlanFeatures.find(feature => feature.id === featureId) ?? null;
+    const propertiesUpdate = draft
+      ? {
+          ...draft.properties,
+          latitude,
+          longitude
+        }
+      : { latitude, longitude };
+
+    try {
+      await mapLayerManager.updateFeature(activePlanId, featureId, {
+        geometry,
+        properties: propertiesUpdate
+      });
+      success = 'Draft location updated.';
+      setTimeout(() => (success = ''), 3000);
+      showPlanDraftMenu = false;
+    } catch (err: any) {
+      console.error('[CoverageMap] Failed to update plan draft location', err);
+      error = err?.message || 'Failed to update draft location';
+      setTimeout(() => (error = ''), 5000);
+    }
+  }
+
   function handleAssetClick(event: CustomEvent) {
     const { type, id, data, screenX, screenY, isRightClick } = event.detail;
     console.log(`Clicked ${type}:`, id, data);
+
+    if (!type?.startsWith('plan-')) {
+      showPlanDraftMenu = false;
+      selectedPlanDraft = null;
+    }
 
     const planningMode = isPlanMode || sharedMapMode === 'plan';
     if (planningMode && !planEditingEnabled && isRightClick) {
       if (!error) {
         error = 'Start a plan to edit or deploy assets.';
         setTimeout(() => error = '', 4000);
+      }
+      return;
+    }
+
+    if (type?.startsWith('plan-')) {
+      const draft = externalPlanFeatures.find(feature => feature.id === id) ?? null;
+      if (!draft) {
+        return;
+      }
+
+      if (isRightClick) {
+        selectedPlanDraft = draft;
+        planDraftMenuX = screenX;
+        planDraftMenuY = screenY;
+        showPlanDraftMenu = true;
+      } else {
+        success = `${draft.featureType?.toUpperCase() ?? 'Draft'} selected`;
+        setTimeout(() => (success = ''), 3000);
       }
       return;
     }
@@ -638,6 +774,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   }
 </script>
 
+<svelte:window on:click={() => showPlanDraftMenu && closePlanDraftMenu()} />
+
 <TenantGuard>
 <div class="fullscreen-map">
   <!-- Full Screen Map -->
@@ -659,7 +797,36 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       externalPlanFeatures={externalPlanFeatures}
       on:map-right-click={handleMapRightClick}
       on:asset-click={handleAssetClick}
+      on:plan-feature-moved={handlePlanFeatureMoved}
     />
+  {/if}
+
+  {#if showPlanDraftMenu && selectedPlanDraft}
+    <div
+      class="plan-draft-menu"
+      style="left: {planDraftMenuX}px; top: {planDraftMenuY}px"
+      on:click|stopPropagation
+      on:contextmenu|preventDefault
+    >
+      <div class="menu-header">
+        <strong>{selectedPlanDraft.properties?.name ?? selectedPlanDraft.featureType ?? 'Draft Object'}</strong>
+        <small>Status: {selectedPlanDraft.status ?? 'draft'}</small>
+      </div>
+      <div class="menu-body">
+        <p>Drag the marker to refine this deployment location.</p>
+        <p class="coords">
+          📍
+          {selectedPlanDraftCoords.latitude !== null ? selectedPlanDraftCoords.latitude.toFixed(5) : '—'},
+          {selectedPlanDraftCoords.longitude !== null ? selectedPlanDraftCoords.longitude.toFixed(5) : '—'}
+        </p>
+      </div>
+      <button class="menu-item danger" on:click={removePlanDraft}>
+        🗑️ Remove From Plan
+      </button>
+      <button class="menu-item" on:click={closePlanDraftMenu}>
+        ✕ Close
+      </button>
+    </div>
   {/if}
 
   <!-- Floating Control Panel -->
@@ -1361,6 +1528,76 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
+  }
+
+  .plan-draft-menu {
+    position: fixed;
+    min-width: 260px;
+    background: var(--card-bg, #0f172a);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.4);
+    z-index: 2200;
+    overflow: hidden;
+    color: var(--text-primary, #e2e8f0);
+  }
+
+  .plan-draft-menu .menu-header {
+    padding: 0.75rem 1rem;
+    background: rgba(59, 130, 246, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .plan-draft-menu .menu-header strong {
+    font-size: 0.95rem;
+  }
+
+  .plan-draft-menu .menu-header small {
+    font-size: 0.75rem;
+    color: rgba(148, 163, 184, 0.85);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .plan-draft-menu .menu-body {
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-secondary, #cbd5f5);
+  }
+
+  .plan-draft-menu .menu-body .coords {
+    margin-top: 0.5rem;
+    font-family: monospace;
+    color: rgba(129, 140, 248, 0.9);
+  }
+
+  .plan-draft-menu .menu-item {
+    width: 100%;
+    background: transparent;
+    border: none;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    color: inherit;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .plan-draft-menu .menu-item:hover {
+    background: rgba(59, 130, 246, 0.18);
+  }
+
+  .plan-draft-menu .menu-item.danger {
+    color: #fca5a5;
+  }
+
+  .plan-draft-menu .menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.18);
   }
 
   .plan-summary-item {

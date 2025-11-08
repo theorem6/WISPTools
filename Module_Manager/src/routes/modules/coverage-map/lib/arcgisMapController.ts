@@ -41,6 +41,15 @@ export class CoverageMapController {
   private graphicsLayer: any = null;
   private backhaulLayer: any = null;
   private planDraftLayer: any = null;
+  private planDraftGraphics: Map<string, any> = new Map();
+  private planDraftDragContext:
+    | {
+        featureId: string;
+        planId: string;
+        graphic: any;
+        startGeometry: any;
+      }
+    | null = null;
 
   private currentBasemap = 'topo-vector';
   private mapReady = false;
@@ -149,7 +158,7 @@ export class CoverageMapController {
   }
 
   public setPlanFeatures(features: PlanLayerFeature[]): void {
-    this.planDraftFeatures = features ?? [];
+    this.planDraftFeatures = (features ?? []).map(feature => this.normalizePlanFeature(feature));
     if (this.mapReady) {
       this.renderPlanDrafts().catch(err => console.error('[CoverageMap] Plan draft render error:', err));
     }
@@ -256,6 +265,7 @@ export class CoverageMapController {
     await this.addMobileUIControls();
     this.addTouchEventHandling();
     this.registerPointerHandlers();
+    this.registerDragHandlers();
 
     console.log('Coverage Map initialized');
   }
@@ -353,6 +363,154 @@ export class CoverageMapController {
         screenY: event.y
       });
     });
+  }
+
+  private registerDragHandlers(): void {
+    if (!this.mapView) return;
+
+    this.mapView.on('drag', async (event: any) => {
+      if (!this.mapView) return;
+
+      if (event.action === 'start') {
+        const hitTest = await this.mapView.hitTest(event);
+        const target = hitTest.results.find(result => {
+          return (
+            result?.graphic?.layer === this.planDraftLayer &&
+            result?.graphic?.attributes?.isPlanDraft &&
+            result?.graphic?.geometry?.type === 'point'
+          );
+        });
+
+        if (!target) {
+          return;
+        }
+
+        if (event.native && event.native.button !== 0 && event.native.buttons !== 1) {
+          return;
+        }
+
+        event.stopPropagation();
+        this.planDraftDragContext = {
+          featureId: target.graphic.attributes.id,
+          planId: target.graphic.attributes.planId,
+          graphic: target.graphic,
+          startGeometry: target.graphic.geometry?.clone ? target.graphic.geometry.clone() : { ...target.graphic.geometry }
+        };
+        this.mapView.cursor = 'grabbing';
+      } else if (event.action === 'update' && this.planDraftDragContext) {
+        event.stopPropagation();
+        const mapPoint = event.mapPoint ?? this.mapView.toMap(event);
+        if (!mapPoint) {
+          return;
+        }
+        this.planDraftDragContext.graphic.geometry = mapPoint;
+      } else if (event.action === 'end' && this.planDraftDragContext) {
+        event.stopPropagation();
+        const mapPoint = event.mapPoint ?? this.mapView.toMap(event);
+        if (mapPoint) {
+          const planGeometry = this.toPlanGeometryFromPoint(mapPoint);
+          this.updatePlanDraftFeatureGeometryInMemory(this.planDraftDragContext.featureId, planGeometry);
+          this.dispatch('plan-feature-moved', {
+            featureId: this.planDraftDragContext.featureId,
+            planId: this.planDraftDragContext.planId,
+            geometry: planGeometry,
+            latitude: mapPoint.latitude,
+            longitude: mapPoint.longitude
+          });
+        }
+        this.mapView.cursor = 'default';
+        this.planDraftDragContext = null;
+      } else if (event.action === 'cancel' && this.planDraftDragContext) {
+        event.stopPropagation();
+        if (this.planDraftDragContext.startGeometry) {
+          this.planDraftDragContext.graphic.geometry = this.planDraftDragContext.startGeometry;
+        }
+        this.mapView.cursor = 'default';
+        this.planDraftDragContext = null;
+      }
+    });
+  }
+
+  private updatePlanDraftFeatureGeometryInMemory(featureId: string, planGeometry: any): void {
+    this.planDraftFeatures = this.planDraftFeatures.map(feature =>
+      feature.id === featureId
+        ? {
+            ...feature,
+            geometry: planGeometry,
+            metadata: {
+              ...(feature.metadata ?? {}),
+              originalGeometry: planGeometry
+            },
+            updatedAt: new Date()
+          }
+        : feature
+    );
+  }
+
+  private toPlanGeometryFromPoint(point: any): any {
+    if (!point) return null;
+    return {
+      type: 'Point',
+      coordinates: [point.longitude, point.latitude]
+    };
+  }
+
+  private toEsriGeometryFromPlan(feature: PlanLayerFeature): any {
+    const planGeometry = normalizePlanGeometry(feature.metadata?.originalGeometry ?? feature.geometry);
+    if (!planGeometry) return null;
+
+    const type = (planGeometry.type || '').toLowerCase();
+    if (typeof planGeometry.longitude === 'number' && typeof planGeometry.latitude === 'number') {
+      return {
+        type: 'point',
+        longitude: planGeometry.longitude,
+        latitude: planGeometry.latitude,
+        spatialReference: { wkid: 4326 }
+      };
+    }
+
+    switch (type) {
+      case 'point': {
+        const [longitude, latitude] = planGeometry.coordinates || [0, 0];
+        return {
+          type: 'point',
+          longitude,
+          latitude,
+          spatialReference: { wkid: 4326 }
+        };
+      }
+      case 'linestring': {
+        const coordinates = planGeometry.coordinates || [];
+        return {
+          type: 'polyline',
+          paths: [coordinates],
+          spatialReference: { wkid: 4326 }
+        };
+      }
+      case 'polygon': {
+        const rings = planGeometry.coordinates || [];
+        return {
+          type: 'polygon',
+          rings,
+          spatialReference: { wkid: 4326 }
+        };
+      }
+      default:
+        return planGeometry;
+    }
+  }
+
+  private normalizePlanFeature(feature: PlanLayerFeature): PlanLayerFeature {
+    const planGeometry = normalizePlanGeometry(feature.metadata?.originalGeometry ?? feature.geometry);
+    return {
+      ...feature,
+      featureType: feature.featureType || (feature as any).type || feature.properties?.featureType || 'plan',
+      geometry: planGeometry,
+      metadata: {
+        ...(feature.metadata ?? {}),
+        originalGeometry: planGeometry ?? feature.metadata?.originalGeometry ?? null
+      }
+    };
   }
 
   private addTouchEventHandling(): void {
@@ -737,65 +895,90 @@ export class CoverageMapController {
     try {
       const [
         { default: Graphic },
+        { default: SimpleMarkerSymbol },
+        { default: PictureMarkerSymbol },
         { default: SimpleFillSymbol },
         { default: SimpleLineSymbol },
         { default: TextSymbol }
       ] = await Promise.all([
         import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/PictureMarkerSymbol.js'),
         import('@arcgis/core/symbols/SimpleFillSymbol.js'),
         import('@arcgis/core/symbols/SimpleLineSymbol.js'),
         import('@arcgis/core/symbols/TextSymbol.js')
       ]);
 
       this.planDraftLayer.removeAll();
+      this.planDraftGraphics.clear();
+
+      const isMobile = window.innerWidth <= 768;
 
       for (const feature of features) {
-        const color = getPlanDraftColor(feature.type || 'plan');
-        const label = feature.label || `Plan Draft (${feature.type || 'plan'})`;
-        const status = feature.status || 'draft';
-        const type = feature.type || 'plan';
+        const normalized = this.normalizePlanFeature(feature);
+        const color = getPlanDraftColor(normalized.featureType || 'plan');
+        const status = normalized.status || 'draft';
+        const label =
+          normalized.properties?.name ||
+          normalized.properties?.siteName ||
+          normalized.label ||
+          `${normalized.featureType || 'plan'} draft`;
 
-        const esriGeometry = feature.geometry;
-        if (!esriGeometry) continue;
+        const esriGeometry = this.toEsriGeometryFromPlan(normalized);
+        if (!esriGeometry) {
+          continue;
+        }
 
         if (esriGeometry.type === 'point') {
-          const symbol = new SimpleMarkerSymbol({
-            color,
-            size: '18px',
-            outline: {
-              color: '#ffffff',
-              width: 2
-            }
-          });
+          const iconConfig = createLocationIcon(normalized.featureType || 'plan', isMobile ? 48 : 36);
+          const symbol = iconConfig
+            ? new PictureMarkerSymbol(iconConfig)
+            : new SimpleMarkerSymbol({
+                style: 'circle',
+                color,
+                size: isMobile ? '24px' : '18px',
+                outline: {
+                  color: '#ffffff',
+                  width: isMobile ? 3 : 2
+                }
+              });
 
-          this.planDraftLayer.add(new Graphic({
+          const graphic = new Graphic({
             geometry: esriGeometry,
             symbol,
             attributes: {
-              id: feature.id,
-              type,
-              status
+              id: normalized.id,
+              planId: normalized.planId,
+              featureType: normalized.featureType,
+              type: `plan-${normalized.featureType}`,
+              status,
+              name: label,
+              isPlanDraft: true
             },
             popupTemplate: {
               title: label,
-              content: `Type: ${type}<br>Status: ${status}`
+              content: `Type: ${normalized.featureType}<br>Status: ${status}`
             }
-          }));
+          });
+
+          this.planDraftLayer!.add(graphic);
+          this.planDraftGraphics.set(normalized.id, graphic);
 
           const textSymbol = new TextSymbol({
             text: label,
             color: '#1f2937',
             haloColor: '#ffffff',
-            haloSize: '2px',
+            haloSize: isMobile ? '3px' : '2px',
             font: {
-              size: 12,
+              size: isMobile ? 14 : 12,
               family: 'Inter, system-ui, sans-serif',
               weight: 'bold'
             },
-            yoffset: 12
+            yoffset: isMobile ? 18 : 12
           });
 
-          this.planDraftLayer.add(new Graphic({ geometry: esriGeometry, symbol: textSymbol }));
+          const labelGraphic = new Graphic({ geometry: esriGeometry, symbol: textSymbol });
+          this.planDraftLayer!.add(labelGraphic);
         } else if (esriGeometry.type === 'polyline') {
           const symbol = new SimpleLineSymbol({
             color,
@@ -803,19 +986,26 @@ export class CoverageMapController {
             style: 'short-dash'
           });
 
-          this.planDraftLayer.add(new Graphic({
+          const graphic = new Graphic({
             geometry: esriGeometry,
             symbol,
             attributes: {
-              id: feature.id,
-              type,
-              status
+              id: normalized.id,
+              planId: normalized.planId,
+              featureType: normalized.featureType,
+              type: `plan-${normalized.featureType}`,
+              status,
+              name: label,
+              isPlanDraft: true
             },
             popupTemplate: {
               title: label,
-              content: `Type: ${type}<br>Status: ${status}`
+              content: `Type: ${normalized.featureType}<br>Status: ${status}`
             }
-          }));
+          });
+
+          this.planDraftLayer!.add(graphic);
+          this.planDraftGraphics.set(normalized.id, graphic);
         } else if (esriGeometry.type === 'polygon') {
           const symbol = new SimpleFillSymbol({
             color: `${color}40`,
@@ -825,19 +1015,26 @@ export class CoverageMapController {
             }
           });
 
-          this.planDraftLayer.add(new Graphic({
+          const graphic = new Graphic({
             geometry: esriGeometry,
             symbol,
             attributes: {
-              id: feature.id,
-              type,
-              status
+              id: normalized.id,
+              planId: normalized.planId,
+              featureType: normalized.featureType,
+              type: `plan-${normalized.featureType}`,
+              status,
+              name: label,
+              isPlanDraft: true
             },
             popupTemplate: {
               title: label,
-              content: `Type: ${type}<br>Status: ${status}`
+              content: `Type: ${normalized.featureType}<br>Status: ${status}`
             }
-          }));
+          });
+
+          this.planDraftLayer!.add(graphic);
+          this.planDraftGraphics.set(normalized.id, graphic);
         }
       }
     } catch (err) {
@@ -933,10 +1130,14 @@ function getBackhaulColor(type: string): string {
 function getPlanDraftColor(type: string): string {
   const colors: Record<string, string> = {
     plan: '#6366f1',
+    site: '#38bdf8',
     tower: '#3b82f6',
     sector: '#8b5cf6',
     cpe: '#10b981',
-    backhaul: '#f97316'
+    backhaul: '#f97316',
+    warehouse: '#f59e0b',
+    noc: '#ef4444',
+    equipment: '#0ea5e9'
   };
   return colors[type] || '#6366f1';
 }
@@ -974,5 +1175,49 @@ function createBackhaulPopupContent(feature: any): string {
       <p><strong>Status:</strong> ${attrs.status}</p>
     </div>
   `;
+}
+
+function normalizePlanGeometry(geometry: any): any {
+  if (!geometry) return undefined;
+
+  const type = (geometry.type || '').toLowerCase();
+
+  if (typeof geometry.longitude === 'number' && typeof geometry.latitude === 'number') {
+    return {
+      type: 'Point',
+      coordinates: [geometry.longitude, geometry.latitude]
+    };
+  }
+
+  switch (type) {
+    case 'point':
+      if (Array.isArray(geometry.coordinates)) {
+        return {
+          type: 'Point',
+          coordinates: geometry.coordinates
+        };
+      }
+      return geometry;
+    case 'linestring':
+      return {
+        type: 'LineString',
+        coordinates: geometry.coordinates ?? []
+      };
+    case 'polyline':
+      if (Array.isArray(geometry.paths)) {
+        return {
+          type: 'LineString',
+          coordinates: geometry.paths[0] ?? []
+        };
+      }
+      return geometry;
+    case 'polygon':
+      return {
+        type: 'Polygon',
+        coordinates: geometry.coordinates ?? geometry.rings ?? []
+      };
+    default:
+      return geometry;
+  }
 }
 
