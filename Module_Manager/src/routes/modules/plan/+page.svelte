@@ -414,14 +414,26 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     }
   }
 
+  const EDITABLE_STATUSES = new Set(['draft', 'ready', 'active', 'paused', 'reopened', 'cancelled', 'rejected']);
+
   async function selectProject(project: PlanProject) {
     selectedProject = project;
     closeProjectModal();
+
     if ($currentTenant?.id) {
       await mapLayerManager.loadPlan($currentTenant.id, project);
     }
-    if (project.status === 'active') {
-      await enterProject(project, { reload: false, message: `Continuing work on "${project.name}".` });
+
+    if (EDITABLE_STATUSES.has(project.status)) {
+      const message =
+        project.status === 'active'
+          ? `Continuing work on "${project.name}".`
+          : `Planning "${project.name}" in ${project.status} status. Map edits will stay staged until you activate the plan.`;
+
+      await enterProject(project, { reload: false, message });
+    } else {
+      successMessage = `Plan "${project.name}" is ${project.status}. View mode only.`;
+      setTimeout(() => (successMessage = ''), 5000);
     }
   }
 
