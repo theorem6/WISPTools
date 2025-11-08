@@ -28,6 +28,7 @@ const createState = (mode: MapModuleMode): MapLayerManagerState => ({
 
 export class MapLayerManager {
   private stateStore: Writable<MapLayerManagerState>;
+  private localFeatureCache: Map<string, PlanLayerFeature[]> = new Map();
 
   constructor(mode: MapModuleMode = 'plan') {
     this.stateStore = writable(createState(mode));
@@ -57,27 +58,47 @@ export class MapLayerManager {
     setMapLoading(true);
     setMapData({ activePlan: plan });
     try {
-      const [{ features, summary }] = await Promise.all([
+      const [{ features }] = await Promise.all([
         planService.getPlanFeatures(plan.id),
         this.ensureProductionLoaded(tenantId)
       ]);
 
+      const combinedFeatures = this.mergeWithLocalFeatures(plan.id, features);
+      const summary = this.computeSummaryFromFeatures(combinedFeatures);
+
       this.updateState({
         activePlan: plan,
-        stagedFeatures: features,
+        stagedFeatures: combinedFeatures,
         summary,
         isLoading: false
       });
 
       setMapData({
         activePlan: plan,
-        stagedFeatures: features,
+        stagedFeatures: combinedFeatures,
         stagedSummary: summary,
         isLoading: false
       });
     } catch (error: any) {
       const message = error?.message || 'Failed to load plan features';
-      this.updateState({ error: message, isLoading: false });
+      const localFeatures = this.getLocalFeaturesForPlan(plan.id);
+      const summary = this.computeSummaryFromFeatures(localFeatures);
+
+      this.updateState({
+        activePlan: plan,
+        stagedFeatures: localFeatures,
+        summary,
+        isLoading: false,
+        error: message
+      });
+
+      setMapData({
+        activePlan: plan,
+        stagedFeatures: localFeatures,
+        stagedSummary: summary,
+        isLoading: false,
+        error: message
+      });
       setMapError(message);
     }
   }
@@ -87,39 +108,100 @@ export class MapLayerManager {
     if (!current.activePlan || current.activePlan.id !== planId) return;
 
     try {
-      const { features, summary } = await planService.getPlanFeatures(planId);
-      this.updateState({ stagedFeatures: features, summary });
-      setMapData({ stagedFeatures: features, stagedSummary: summary });
+      const { features } = await planService.getPlanFeatures(planId);
+      const combinedFeatures = this.mergeWithLocalFeatures(planId, features);
+      const summary = this.computeSummaryFromFeatures(combinedFeatures);
+      this.updateState({ stagedFeatures: combinedFeatures, summary });
+      setMapData({ stagedFeatures: combinedFeatures, stagedSummary: summary });
     } catch (error: any) {
-      setMapError(error?.message || 'Failed to refresh plan');
+      const message = error?.message || 'Failed to refresh plan';
+      const localFeatures = this.getLocalFeaturesForPlan(planId);
+      const summary = this.computeSummaryFromFeatures(localFeatures);
+      this.updateState({ stagedFeatures: localFeatures, summary, error: message });
+      setMapData({ stagedFeatures: localFeatures, stagedSummary: summary, error: message });
+      setMapError(message);
     }
   }
 
   async addFeature(planId: string, payload: Parameters<typeof planService.createPlanFeature>[1]) {
-    const { feature, summary } = await planService.createPlanFeature(planId, payload);
-    const current = this.getSnapshot();
-    const stagedFeatures = [...current.stagedFeatures, feature];
-    this.updateState({ stagedFeatures, summary });
-    setMapData({ stagedFeatures, stagedSummary: summary });
-    return feature;
+    try {
+      const { feature, summary } = await planService.createPlanFeature(planId, payload);
+      const current = this.getSnapshot();
+      const stagedFeatures = [...current.stagedFeatures, feature];
+      this.saveRemoteSync(planId, stagedFeatures);
+      this.updateState({ stagedFeatures, summary });
+      setMapData({ stagedFeatures, stagedSummary: summary });
+      return feature;
+    } catch (error: any) {
+      if (!this.shouldFallbackToLocal(error)) {
+        throw error;
+      }
+
+      console.warn('[MapLayerManager] Falling back to local staged feature cache (create)', error);
+      const current = this.getSnapshot();
+      const feature = this.createLocalFeature(planId, payload);
+      const stagedFeatures = [...current.stagedFeatures, feature];
+      this.saveLocalFeature(planId, feature);
+      const summary = this.computeSummaryFromFeatures(stagedFeatures);
+      this.updateState({ stagedFeatures, summary });
+      setMapData({ stagedFeatures, stagedSummary: summary });
+      return feature;
+    }
   }
 
   async updateFeature(planId: string, featureId: string, updates: Partial<PlanLayerFeature>) {
-    const { feature, summary } = await planService.updatePlanFeature(planId, featureId, updates);
-    const current = this.getSnapshot();
-    const stagedFeatures = current.stagedFeatures.map(f => (f.id === feature.id ? feature : f));
-    this.updateState({ stagedFeatures, summary });
-    setMapData({ stagedFeatures, stagedSummary: summary });
-    return feature;
+    try {
+      const { feature, summary } = await planService.updatePlanFeature(planId, featureId, updates);
+      const current = this.getSnapshot();
+      const stagedFeatures = current.stagedFeatures.map(f => (f.id === feature.id ? feature : f));
+      this.saveRemoteSync(planId, stagedFeatures);
+      this.updateState({ stagedFeatures, summary });
+      setMapData({ stagedFeatures, stagedSummary: summary });
+      return feature;
+    } catch (error: any) {
+      if (!this.shouldFallbackToLocal(error)) {
+        throw error;
+      }
+
+      console.warn('[MapLayerManager] Falling back to local staged feature cache (update)', error);
+      const updated = this.updateLocalFeature(planId, featureId, updates);
+      if (!updated) {
+        throw error;
+      }
+
+      const current = this.getSnapshot();
+      const stagedFeatures = current.stagedFeatures.map(f => (f.id === updated.id ? updated : f));
+      const summary = this.computeSummaryFromFeatures(stagedFeatures);
+      this.updateState({ stagedFeatures, summary });
+      setMapData({ stagedFeatures, stagedSummary: summary });
+      return updated;
+    }
   }
 
   async deleteFeature(planId: string, featureId: string) {
-    const summary = await planService.deletePlanFeature(planId, featureId);
-    const current = this.getSnapshot();
-    const stagedFeatures = current.stagedFeatures.filter(f => f.id !== featureId);
-    this.updateState({ stagedFeatures, summary });
-    setMapData({ stagedFeatures, stagedSummary: summary });
-    return summary;
+    try {
+      const summary = await planService.deletePlanFeature(planId, featureId);
+      const current = this.getSnapshot();
+      const stagedFeatures = current.stagedFeatures.filter(f => f.id !== featureId);
+      this.removeLocalFeature(planId, featureId);
+      this.saveRemoteSync(planId, stagedFeatures);
+      this.updateState({ stagedFeatures, summary });
+      setMapData({ stagedFeatures, stagedSummary: summary });
+      return summary;
+    } catch (error: any) {
+      if (!this.shouldFallbackToLocal(error)) {
+        throw error;
+      }
+
+      console.warn('[MapLayerManager] Falling back to local staged feature cache (delete)', error);
+      this.removeLocalFeature(planId, featureId);
+      const current = this.getSnapshot();
+      const stagedFeatures = current.stagedFeatures.filter(f => f.id !== featureId);
+      const summary = this.computeSummaryFromFeatures(stagedFeatures);
+      this.updateState({ stagedFeatures, summary });
+      setMapData({ stagedFeatures, stagedSummary: summary });
+      return summary;
+    }
   }
 
   setMode(mode: MapModuleMode) {
@@ -158,6 +240,148 @@ export class MapLayerManager {
     });
     unsubscribe();
     return snapshot;
+  }
+
+  private shouldFallbackToLocal(error: any): boolean {
+    const message = (error?.message || '').toLowerCase();
+    return message.includes('404') || message.includes('not found') || message.includes('request failed') || message.includes('failed to fetch');
+  }
+
+  private getLocalFeaturesForPlan(planId: string): PlanLayerFeature[] {
+    return this.localFeatureCache.get(planId) ?? [];
+  }
+
+  private saveLocalFeature(planId: string, feature: PlanLayerFeature) {
+    const existing = this.getLocalFeaturesForPlan(planId);
+    this.localFeatureCache.set(planId, [...existing, feature]);
+  }
+
+  private updateLocalFeature(planId: string, featureId: string, updates: Partial<PlanLayerFeature>): PlanLayerFeature | null {
+    const local = this.getLocalFeaturesForPlan(planId);
+    const index = local.findIndex(feature => feature.id === featureId);
+    if (index === -1) {
+      return null;
+    }
+
+    const updated: PlanLayerFeature = {
+      ...local[index],
+      ...updates,
+      updatedAt: new Date()
+    };
+
+    if ((updates as any)?.geometry) {
+      (updated as any).geometry = this.toEsriGeometry((updates as any).geometry);
+    }
+
+    local[index] = updated;
+    this.localFeatureCache.set(planId, [...local]);
+    return updated;
+  }
+
+  private removeLocalFeature(planId: string, featureId: string) {
+    const local = this.getLocalFeaturesForPlan(planId);
+    if (!local.length) {
+      return;
+    }
+    const filtered = local.filter(feature => feature.id !== featureId);
+    this.localFeatureCache.set(planId, filtered);
+  }
+
+  private saveRemoteSync(planId: string, stagedFeatures: PlanLayerFeature[]) {
+    const remoteIds = new Set(stagedFeatures.map(feature => feature.id));
+    const local = this.getLocalFeaturesForPlan(planId).filter(feature => !remoteIds.has(feature.id));
+    if (local.length) {
+      this.localFeatureCache.set(planId, local);
+    } else if (this.localFeatureCache.has(planId)) {
+      this.localFeatureCache.delete(planId);
+    }
+  }
+
+  private mergeWithLocalFeatures(planId: string, remoteFeatures: PlanLayerFeature[]): PlanLayerFeature[] {
+    const remoteIds = new Set(remoteFeatures.map(feature => feature.id));
+    const local = this.getLocalFeaturesForPlan(planId).filter(feature => !remoteIds.has(feature.id));
+    return [...remoteFeatures, ...local];
+  }
+
+  private computeSummaryFromFeatures(features: PlanLayerFeature[]): PlanFeatureSummary {
+    const summary: PlanFeatureSummary = {
+      total: features.length,
+      byType: {},
+      byStatus: {}
+    };
+
+    for (const feature of features) {
+      const typeKey = feature.featureType || (feature as any).type || 'unknown';
+      const statusKey = feature.status || 'draft';
+
+      summary.byType[typeKey] = (summary.byType[typeKey] ?? 0) + 1;
+      summary.byStatus[statusKey] = (summary.byStatus[statusKey] ?? 0) + 1;
+    }
+
+    return summary;
+  }
+
+  private createLocalFeature(planId: string, payload: Parameters<typeof planService.createPlanFeature>[1]): PlanLayerFeature {
+    const current = this.getSnapshot();
+    const tenantId = current.activePlan?.tenantId ?? '';
+    const now = new Date();
+    const id = `local-${planId}-${crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+    const esriGeometry = this.toEsriGeometry(payload.geometry);
+
+    const feature: PlanLayerFeature = {
+      id,
+      tenantId,
+      planId,
+      featureType: payload.featureType,
+      geometry: esriGeometry,
+      properties: payload.properties ?? {},
+      status: payload.status ?? 'draft',
+      metadata: {
+        ...(payload.metadata ?? {}),
+        local: true,
+        originalGeometry: payload.geometry ?? null
+      },
+      createdAt: now,
+      updatedAt: now
+    };
+
+    (feature as any).type = payload.featureType;
+    return feature;
+  }
+
+  private toEsriGeometry(geometry: any): any {
+    if (!geometry) return undefined;
+
+    const type = (geometry.type || '').toLowerCase();
+    switch (type) {
+      case 'point': {
+        const [longitude, latitude] = geometry.coordinates || [0, 0];
+        return {
+          type: 'point',
+          longitude,
+          latitude,
+          spatialReference: { wkid: 4326 }
+        };
+      }
+      case 'linestring': {
+        const paths = Array.isArray(geometry.coordinates) ? [geometry.coordinates] : [];
+        return {
+          type: 'polyline',
+          paths,
+          spatialReference: { wkid: 4326 }
+        };
+      }
+      case 'polygon': {
+        const rings = geometry.coordinates || [];
+        return {
+          type: 'polygon',
+          rings,
+          spatialReference: { wkid: 4326 }
+        };
+      }
+      default:
+        return geometry;
+    }
   }
 }
 
