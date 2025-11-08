@@ -5,9 +5,9 @@
   import type { PlanLayerFeature } from '$lib/services/planService';
   import { createLocationIcon } from '$lib/mapIcons';
   import BasemapSwitcher from '$lib/components/maps/BasemapSwitcher.svelte';
-  import { buildArcGISConfig } from '$lib/config';
 
-  const arcgisConfig = buildArcGISConfig();
+  const ARCGIS_API_KEY = import.meta.env.PUBLIC_ARCGIS_API_KEY || '';
+  const ARCGIS_ASSETS_PATH = import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH || 'https://js.arcgis.com/4.33/assets';
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
@@ -25,7 +25,10 @@
   let backhaulLayer: any = null;
   let planDraftLayer: any = null;
   let mapReady = false;
-  let currentBasemap = 'topo-vector'; // Use valid ArcGIS basemap ID
+  const DEFAULT_BASEMAP = 'topo-vector';
+  const FALLBACK_BASEMAP = 'osm';
+  let currentBasemap = DEFAULT_BASEMAP;
+  let BasemapModule: any = null;
   
   // Extract backhaul links from equipment
   $: backhaulLinks = equipment.filter(eq => {
@@ -58,6 +61,49 @@
     planDraftLayer = null;
   });
 
+  async function ensureBasemapModule() {
+    if (!BasemapModule) {
+      const basemapModule = await import('@arcgis/core/Basemap.js');
+      BasemapModule = basemapModule.default;
+    }
+    return BasemapModule;
+  }
+
+  async function loadBasemapById(basemapId: string) {
+    try {
+      const Basemap = await ensureBasemapModule();
+      const basemap = await Basemap.fromId(basemapId);
+      if (basemap?.load) {
+        await basemap.load();
+      }
+      return basemap;
+    } catch (error) {
+      console.error(`[CoverageMap] Failed to load basemap "${basemapId}"`, error);
+      return null;
+    }
+  }
+
+  async function applyBasemap(basemapId: string) {
+    if (!map) return;
+
+    // Use ArcGIS basemap when available, otherwise fall back to OSM
+    const basemap = await loadBasemapById(basemapId);
+    if (basemap) {
+      map.basemap = basemap;
+      currentBasemap = basemap.id ?? basemapId;
+      console.log('[CoverageMap] Basemap changed to:', currentBasemap);
+      return;
+    }
+
+    if (basemapId !== FALLBACK_BASEMAP) {
+      console.warn(`[CoverageMap] Falling back to "${FALLBACK_BASEMAP}" basemap.`);
+      await applyBasemap(FALLBACK_BASEMAP);
+    } else {
+      map.basemap = FALLBACK_BASEMAP;
+      currentBasemap = FALLBACK_BASEMAP;
+    }
+  }
+
   async function initializeMap() {
     try {
       console.log('Initializing Coverage Map with ArcGIS...');
@@ -77,14 +123,13 @@
 
       const esriConfig = esriConfigModule?.default;
       if (esriConfig) {
-        if (arcgisConfig.apiKey) {
-          esriConfig.apiKey = arcgisConfig.apiKey;
+        if (ARCGIS_API_KEY) {
+          esriConfig.apiKey = ARCGIS_API_KEY;
         } else {
           console.warn('[CoverageMap] ArcGIS API key is not configured. Basemap access may fail.');
         }
         esriConfig.portalUrl = esriConfig.portalUrl || 'https://www.arcgis.com';
-        esriConfig.request = esriConfig.request || {};
-        esriConfig.assetsPath = esriConfig.assetsPath || 'https://js.arcgis.com/4.33/assets';
+        esriConfig.assetsPath = ARCGIS_ASSETS_PATH;
       }
 
       // Create graphics layers
@@ -93,20 +138,11 @@
       planDraftLayer = new GraphicsLayer({ title: 'Plan Drafts', listMode: 'hide' });
 
       // Create map with fallback basemap
-      try {
-        map = new Map({
-          basemap: currentBasemap,
-          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
-        });
-      } catch (basemapError) {
-        console.warn('Failed to load basemap, trying fallback...', basemapError);
-        // Fallback to a simpler basemap
-        map = new Map({
-          basemap: 'gray-vector',
-          layers: [backhaulLayer, graphicsLayer, planDraftLayer]
-        });
-        currentBasemap = 'gray-vector';
-      }
+      // Start with fallback basemap to ensure the map renders even if premium layers fail
+      map = new Map({
+        basemap: FALLBACK_BASEMAP,
+        layers: [backhaulLayer, graphicsLayer, planDraftLayer]
+      });
 
       // Detect mobile device
       const isMobile = window.innerWidth <= 768;
@@ -166,6 +202,9 @@
         })
       }
       });
+
+      // Apply preferred basemap after view initialization
+      await applyBasemap(currentBasemap);
 
       // Wait for view to be ready before adding handlers
       try {
@@ -291,12 +330,9 @@
   }
 
   // Export function to change basemap from parent component or widget
-  export function changeBasemap(basemapId: string) {
-    if (map) {
-      currentBasemap = basemapId;
-      map.basemap = basemapId;
-      console.log('Basemap changed to:', basemapId);
-    }
+  export async function changeBasemap(basemapId: string) {
+    if (!map) return;
+    await applyBasemap(basemapId);
   }
 
   // Handle basemap change from widget
