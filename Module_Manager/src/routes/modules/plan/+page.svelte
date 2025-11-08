@@ -777,42 +777,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 <TenantGuard>
   <div class="app">
     <!-- Full Screen Map -->
-    <div class="map-fullscreen {mapLocked ? 'locked' : ''}" bind:this={mapContainer}>
+    <div class="map-fullscreen" bind:this={mapContainer}>
       <SharedMap mode={mapMode} />
-
-      {#if mapLocked}
-        <div class="map-lock-overlay">
-          <div class="map-lock-card">
-            <h2>Start Planning</h2>
-            <p>The map is read-only until you start a deployment plan. Create a new plan or resume a draft to begin staging sites and hardware.</p>
-
-            <div class="lock-actions">
-              <button class="btn-primary" on:click={openCreateProject}>
-                ➕ Create Plan
-              </button>
-
-              {#if projects.length > 0}
-                <button class="btn-secondary" on:click={openProjectList}>
-                  📁 View Plans
-                </button>
-              {/if}
-
-              {#if draftPlanSuggestion}
-                <button
-                  class="btn-accent"
-                  on:click={() => {
-                    if (draftPlanSuggestion) {
-                      startProject(draftPlanSuggestion, { autoStart: true });
-                    }
-                  }}
-                >
-                  ▶️ Start "{draftPlanSuggestion.name}"
-                </button>
-              {/if}
-            </div>
-          </div>
-        </div>
-      {/if}
     </div>
 
     <!-- Enhanced Header Overlay -->
@@ -1464,58 +1430,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     position: absolute;
     inset: 0;
     z-index: 0;
-  }
-
-  .map-fullscreen.locked .shared-map,
-  .map-fullscreen.locked .shared-map iframe {
-    pointer-events: none;
-    filter: saturate(0.4) brightness(0.85);
-  }
-
-  .map-lock-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(15, 23, 42, 0.78), rgba(30, 64, 175, 0.55));
-    backdrop-filter: blur(6px);
-    padding: 2rem;
-    z-index: 6;
-  }
-
-  .map-lock-card {
-    max-width: 460px;
-    width: 100%;
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.4);
-    color: #e2e8f0;
-    text-align: center;
-  }
-
-  .map-lock-card h2 {
-    margin: 0 0 0.75rem 0;
-    font-size: 1.6rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-
-  .map-lock-card p {
-    margin: 0;
-    line-height: 1.6;
-    color: rgba(226, 232, 240, 0.75);
-  }
-
-  .lock-actions {
-    margin-top: 1.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    justify-content: center;
   }
 
   /* Left Horizontal Menu */
