@@ -322,12 +322,17 @@ export class CoverageMapController {
 
       const hitTest = await this.mapView!.hitTest(event);
       if (hitTest.results.length > 0) {
-        const graphic = hitTest.results[0].graphic;
-        if (graphic && graphic.attributes) {
+        const interactiveResult = hitTest.results.find(result => {
+          const attrs = result?.graphic?.attributes;
+          return attrs && typeof attrs.type !== 'undefined' && typeof attrs.id !== 'undefined';
+        });
+
+        if (interactiveResult) {
+          const attrs = interactiveResult.graphic.attributes;
           this.dispatch('asset-click', {
-            type: graphic.attributes.type,
-            id: graphic.attributes.id,
-            data: graphic.attributes,
+            type: attrs.type,
+            id: attrs.id,
+            data: attrs,
             screenX: event.x,
             screenY: event.y,
             isRightClick: true
@@ -336,10 +341,14 @@ export class CoverageMapController {
         }
       }
 
-      const point = this.mapView!.toMap(event);
+      const mapPoint = event.mapPoint ?? this.mapView!.toMap({ x: event.x, y: event.y });
+      if (!mapPoint) {
+        return;
+      }
+
       this.dispatch('map-right-click', {
-        latitude: point.latitude,
-        longitude: point.longitude,
+        latitude: mapPoint.latitude,
+        longitude: mapPoint.longitude,
         screenX: event.x,
         screenY: event.y
       });
