@@ -93,7 +93,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   $: isMonitorMode = mapMode === 'monitor';
 
   let sharedCapabilities: MapCapabilities | null = null;
-  let planEditingEnabled = false;
+  let sharedActivePlanId: string | null = null;
+  let planEditingEnabled = true;
 
   // Module context for permissions
   $: moduleContext = (() => {
@@ -381,9 +382,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     if (activePlanIdFromState && activePlanIdFromState !== planId) {
       planId = activePlanIdFromState;
     }
-
-    const mapInPlanMode = sharedMapMode === 'plan' || isPlanMode || mapMode === 'plan';
-    planEditingEnabled = Boolean(mapInPlanMode && activePlanIdFromState && !(sharedCapabilities?.readOnly));
+    sharedActivePlanId = activePlanIdFromState;
+  $: {
+    const activePlanId = planId || sharedActivePlanId;
+    const mapInPlanMode = isPlanMode || sharedMapMode === 'plan' || mapMode === 'plan';
+    const readOnly = sharedCapabilities?.readOnly ?? false;
+    planEditingEnabled = mapInPlanMode ? Boolean(activePlanId) && !readOnly : true;
+  }
   }
   
   function handleMapRightClick(event: CustomEvent) {
