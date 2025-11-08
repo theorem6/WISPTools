@@ -9,7 +9,13 @@
 
   const arcgisConfig = buildArcGISConfig();
   const ARCGIS_API_KEY = import.meta.env.PUBLIC_ARCGIS_API_KEY || arcgisConfig.apiKey || '';
-  const ARCGIS_ASSETS_PATH = import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH || arcgisConfig.assetsPath || 'https://js.arcgis.com/4.33/assets';
+  const DEFAULT_ASSETS_PATH = 'https://js.arcgis.com/4.33/@arcgis/core/assets/';
+  const ARCGIS_ASSETS_PATH = (() => {
+    const fromEnv = import.meta.env.PUBLIC_ARCGIS_ASSETS_PATH;
+    const fromConfig = arcgisConfig.assetsPath;
+    const resolved = fromEnv || fromConfig || DEFAULT_ASSETS_PATH;
+    return resolved.endsWith('/') ? resolved : `${resolved}/`;
+  })();
 
   export let towers: TowerSite[] = [];
   export let sectors: Sector[] = [];
