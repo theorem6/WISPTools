@@ -25,7 +25,7 @@
   let backhaulLayer: any = null;
   let planDraftLayer: any = null;
   let mapReady = false;
-  const DEFAULT_BASEMAP = 'topo-vector';
+  const DEFAULT_BASEMAP = ARCGIS_API_KEY ? 'topo-vector' : 'osm';
   const FALLBACK_BASEMAP = 'osm';
   let currentBasemap = DEFAULT_BASEMAP;
   let BasemapModule: any = null;
@@ -72,6 +72,10 @@
   async function loadBasemapById(basemapId: string) {
     try {
       const Basemap = await ensureBasemapModule();
+      if (!ARCGIS_API_KEY && basemapId !== FALLBACK_BASEMAP) {
+        console.warn(`[CoverageMap] Premium basemap "${basemapId}" requires ArcGIS API key. Falling back.`);
+        return null;
+      }
       const basemap = await Basemap.fromId(basemapId);
       if (basemap?.load) {
         await basemap.load();
