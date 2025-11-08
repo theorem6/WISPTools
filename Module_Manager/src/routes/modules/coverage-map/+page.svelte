@@ -164,7 +164,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     const activePlanId = planId || sharedActivePlanId;
     const mapInPlanMode = isPlanMode || sharedMapMode === 'plan' || mapMode === 'plan';
     const readOnly = sharedCapabilities?.readOnly ?? false;
-    planEditingEnabled = mapInPlanMode ? Boolean(activePlanId) && !readOnly : true;
+    const canAddTemporary = sharedCapabilities?.canAddTemporary ?? false;
+
+    planEditingEnabled = mapInPlanMode ? (Boolean(activePlanId) || canAddTemporary) && !readOnly : true;
   }
 
   onMount(async () => {
