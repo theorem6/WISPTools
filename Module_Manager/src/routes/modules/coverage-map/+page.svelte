@@ -161,6 +161,25 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   let externalPlanFeatures: PlanLayerFeature[] = [];
   let externalPlanSummary: PlanFeatureSummary | null = null;
+  let derivedPlanSummary: PlanFeatureSummary | null = null;
+  let displayPlanSummary: PlanFeatureSummary | null = null;
+  function summarizePlanFeatures(features: PlanLayerFeature[]): PlanFeatureSummary {
+    const summary: PlanFeatureSummary = {
+      total: features.length,
+      byType: {},
+      byStatus: {}
+    };
+
+    for (const feature of features) {
+      const typeKey = feature.featureType || feature.properties?.featureType || 'plan';
+      const statusKey = feature.status || 'draft';
+      summary.byType[typeKey] = (summary.byType[typeKey] ?? 0) + 1;
+      summary.byStatus[statusKey] = (summary.byStatus[statusKey] ?? 0) + 1;
+    }
+
+    return summary;
+  }
+
   let sharedMapMode: MapModuleMode | null = null;
   let externalProductionHardware: HardwareView[] = [];
   let sharedMapStateTimestamp: Date | null = null;
@@ -173,6 +192,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
     planEditingEnabled = mapInPlanMode ? (Boolean(activePlanId) || canAddTemporary) && !readOnly : true;
   }
+
+  $: derivedPlanSummary = summarizePlanFeatures(externalPlanFeatures);
+  $: displayPlanSummary = externalPlanSummary ?? derivedPlanSummary;
 
   function getPlanDraftCoordinates(draft: PlanLayerFeature | null): { latitude: number | null; longitude: number | null } {
     if (!draft) return { latitude: null, longitude: null };
@@ -845,7 +867,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     </button>
   </div>
 
-  {#if externalPlanSummary && (isPlanMode || sharedMapMode === 'plan' || sharedMapMode === 'deploy')}
+  {#if displayPlanSummary && (isPlanMode || sharedMapMode === 'plan' || sharedMapMode === 'deploy')}
     <div class="plan-summary-card">
       <div class="plan-summary-header">
         <span>Plan Drafts</span>
@@ -853,9 +875,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           <small>Updated {sharedMapStateTimestamp.toLocaleTimeString()}</small>
         {/if}
       </div>
-      <div class="plan-summary-total">{externalPlanSummary.total} objects</div>
+      <div class="plan-summary-total">{displayPlanSummary.total} objects</div>
       <div class="plan-summary-grid">
-        {#each Object.entries(externalPlanSummary.byType ?? {}) as [type, count]}
+        {#each Object.entries(displayPlanSummary.byType ?? {}) as [type, count]}
           <div class="plan-summary-item">
             <span class="label">{type}</span>
             <span class="value">{count}</span>

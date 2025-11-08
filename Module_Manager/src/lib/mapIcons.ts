@@ -120,9 +120,91 @@ export const internetAccessIcon = `data:image/svg+xml;base64,${btoa(`
 </svg>
 `)}`;
 
+// Plan Site - Tower icon - Blue
+export const planSiteIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="28" fill="#1d4ed8" stroke="white" stroke-width="3"/>
+  <polygon points="32,12 22,52 26,52 32,28 38,52 42,52" fill="white"/>
+  <line x1="32" y1="18" x2="32" y2="24" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="28" y1="34" x2="36" y2="34" stroke="#1d4ed8" stroke-width="2"/>
+  <line x1="26" y1="42" x2="38" y2="42" stroke="#1d4ed8" stroke-width="2"/>
+</svg>
+`)}`;
+
+// Plan Sector - Sector cone icon - Purple
+export const planSectorIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="28" fill="#6d28d9" stroke="white" stroke-width="3"/>
+  <path d="M32 18 L20 48 L44 48 Z" fill="white" opacity="0.9"/>
+  <path d="M32 18 L24 42 L40 42 Z" fill="#c4b5fd" opacity="0.9"/>
+  <circle cx="32" cy="18" r="4" fill="#6d28d9" stroke="white" stroke-width="2"/>
+</svg>
+`)}`;
+
+// Plan CPE - Home antenna icon - Teal
+export const planCpeIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="28" fill="#0f766e" stroke="white" stroke-width="3"/>
+  <polygon points="32,16 16,30 16,50 48,50 48,30" fill="white"/>
+  <rect x="26" y="34" width="12" height="16" fill="#0f766e"/>
+  <path d="M22 26 Q32 18 42 26" fill="none" stroke="#0f766e" stroke-width="3"/>
+  <path d="M24 24 Q32 20 40 24" fill="none" stroke="#0f766e" stroke-width="2"/>
+</svg>
+`)}`;
+
+// Plan Equipment - Gear icon - Slate
+export const planEquipmentIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="28" fill="#334155" stroke="white" stroke-width="3"/>
+  <g fill="white">
+    <circle cx="32" cy="32" r="10"/>
+    <path d="M32 14 L36 18 L32 22 L28 18 Z"/>
+    <path d="M32 42 L36 46 L32 50 L28 46 Z"/>
+    <path d="M14 32 L18 28 L22 32 L18 36 Z"/>
+    <path d="M42 32 L46 28 L50 32 L46 36 Z"/>
+  </g>
+</svg>
+`)}`;
+
+// Plan Link - Connection icon - Amber
+export const planLinkIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="28" fill="#b45309" stroke="white" stroke-width="3"/>
+  <path d="M22 24 C28 18 36 18 42 24" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <path d="M22 40 C28 46 36 46 42 40" fill="none" stroke="#fcd34d" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="22" cy="32" r="5" fill="white"/>
+  <circle cx="42" cy="32" r="5" fill="white"/>
+</svg>
+`)}`;
+
+// Plan Note - Clipboard icon - Rose
+export const planNoteIcon = `data:image/svg+xml;base64,${btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="28" fill="#be123c" stroke="white" stroke-width="3"/>
+  <rect x="20" y="20" width="24" height="28" rx="3" fill="white"/>
+  <rect x="24" y="14" width="16" height="8" rx="2" fill="#fda4af" stroke="white" stroke-width="2"/>
+  <line x1="24" y1="28" x2="40" y2="28" stroke="#f43f5e" stroke-width="3"/>
+  <line x1="24" y1="34" x2="40" y2="34" stroke="#f43f5e" stroke-width="3"/>
+  <line x1="24" y1="40" x2="36" y2="40" stroke="#f43f5e" stroke-width="3"/>
+</svg>
+`)}`;
+
 // Helper function to create picture marker symbol
 export function createLocationIcon(type: string, size: number = 40): any {
   const iconMap: Record<string, string> = {
+    'site': planSiteIcon,
+    'tower': planSiteIcon,
+    'sector': planSectorIcon,
+    'cpe': planCpeIcon,
+    'equipment': planEquipmentIcon,
+    'link': planLinkIcon,
+    'note': planNoteIcon,
+    'plan-site': planSiteIcon,
+    'plan-sector': planSectorIcon,
+    'plan-cpe': planCpeIcon,
+    'plan-equipment': planEquipmentIcon,
+    'plan-link': planLinkIcon,
+    'plan-note': planNoteIcon,
     'noc': nocIcon,
     'warehouse': warehouseIcon,
     'vehicle': vehicleIcon,

@@ -11,6 +11,7 @@
   let iframeWindow: Window | null = null;
   let iframeLoaded = false;
   let currentUrl = '';
+  let currentNavKey = '';
   let mapState: MapLayerState = get(mapContext);
 
   let unsubscribe: (() => void) | undefined;
@@ -32,13 +33,12 @@
       params.set('planId', planId);
     }
 
-    const versionSeed = state?.lastUpdated
-      ? new Date(state.lastUpdated).getTime()
-      : Date.now();
-    params.set('v', String(versionSeed));
-
     const query = params.toString();
     return query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
+  };
+
+  const buildNavigationKey = (state: MapLayerState = mapState) => {
+    return `${mode}|${state?.activePlan?.id ?? ''}`;
   };
 
   const navigateIframe = (nextUrl: string) => {
@@ -97,14 +97,17 @@
 
     unsubscribe = mapContext.subscribe(state => {
       mapState = state;
+      const navKey = buildNavigationKey(state);
       const nextUrl = buildUrl(state);
-      if (nextUrl !== currentUrl) {
+      if (navKey !== currentNavKey || !currentUrl) {
+        currentNavKey = navKey;
         navigateIframe(nextUrl);
       } else {
         postStateToIframe();
       }
     });
 
+    currentNavKey = buildNavigationKey(mapState);
     navigateIframe(buildUrl(mapState));
   });
 
@@ -115,7 +118,9 @@
 
   $: if (iframeEl) {
     const nextUrl = buildUrl(mapState);
-    if (nextUrl !== currentUrl) {
+    const navKey = buildNavigationKey(mapState);
+    if (navKey !== currentNavKey) {
+      currentNavKey = navKey;
       navigateIframe(nextUrl);
     } else if (iframeLoaded) {
       postStateToIframe();

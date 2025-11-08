@@ -943,18 +943,23 @@ export class CoverageMapController {
                 }
               });
 
+          const attributes = {
+            id: normalized.id,
+            planId: normalized.planId,
+            featureType: normalized.featureType,
+            type: `plan-${normalized.featureType}`,
+            status,
+            name: label,
+            isPlanDraft: true,
+            properties: normalized.properties ?? {},
+            latitude: esriGeometry.latitude ?? esriGeometry.y ?? null,
+            longitude: esriGeometry.longitude ?? esriGeometry.x ?? null
+          };
+
           const graphic = new Graphic({
             geometry: esriGeometry,
             symbol,
-            attributes: {
-              id: normalized.id,
-              planId: normalized.planId,
-              featureType: normalized.featureType,
-              type: `plan-${normalized.featureType}`,
-              status,
-              name: label,
-              isPlanDraft: true
-            },
+            attributes,
             popupTemplate: {
               title: label,
               content: `Type: ${normalized.featureType}<br>Status: ${status}`
@@ -986,18 +991,21 @@ export class CoverageMapController {
             style: 'short-dash'
           });
 
+          const attributes = {
+            id: normalized.id,
+            planId: normalized.planId,
+            featureType: normalized.featureType,
+            type: `plan-${normalized.featureType}`,
+            status,
+            name: label,
+            isPlanDraft: true,
+            properties: normalized.properties ?? {}
+          };
+
           const graphic = new Graphic({
             geometry: esriGeometry,
             symbol,
-            attributes: {
-              id: normalized.id,
-              planId: normalized.planId,
-              featureType: normalized.featureType,
-              type: `plan-${normalized.featureType}`,
-              status,
-              name: label,
-              isPlanDraft: true
-            },
+            attributes,
             popupTemplate: {
               title: label,
               content: `Type: ${normalized.featureType}<br>Status: ${status}`
@@ -1015,18 +1023,21 @@ export class CoverageMapController {
             }
           });
 
+          const attributes = {
+            id: normalized.id,
+            planId: normalized.planId,
+            featureType: normalized.featureType,
+            type: `plan-${normalized.featureType}`,
+            status,
+            name: label,
+            isPlanDraft: true,
+            properties: normalized.properties ?? {}
+          };
+
           const graphic = new Graphic({
             geometry: esriGeometry,
             symbol,
-            attributes: {
-              id: normalized.id,
-              planId: normalized.planId,
-              featureType: normalized.featureType,
-              type: `plan-${normalized.featureType}`,
-              status,
-              name: label,
-              isPlanDraft: true
-            },
+            attributes,
             popupTemplate: {
               title: label,
               content: `Type: ${normalized.featureType}<br>Status: ${status}`
