@@ -41,6 +41,10 @@
   $: controller && controller.setData({ towers, sectors, cpeDevices, equipment });
   $: controller && controller.setFilters(filters);
   $: controller && controller.setPlanFeatures(externalPlanFeatures);
+
+  export function changeBasemap(basemapId: string) {
+    controller?.changeBasemap(basemapId);
+  }
 </script>
 
 <div class="coverage-map-container">
