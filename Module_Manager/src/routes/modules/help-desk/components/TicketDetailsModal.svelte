@@ -6,59 +6,70 @@
   const dispatch = createEventDispatcher();
 </script>
 
-<div class="modal-backdrop" on:click={() => dispatch('close')}>
-  <div class="modal-content" on:click|stopPropagation>
-    <div class="modal-header">
-      <h2>Ticket Details</h2>
-      <button class="close-btn" on:click={() => dispatch('close')}>✕</button>
-    </div>
-    
-    <div class="modal-body">
-      <h3>{ticket.title}</h3>
-      <p>Full ticket details coming soon...</p>
-      <p>Ticket #{ticket.ticketNumber || ticket._id}</p>
-    </div>
-  </div>
+<div
+  class="modal-backdrop"
+  role="presentation"
+  on:click={() => dispatch('close')}
+>
+  <article
+    class="modal-content"
+    data-size="sm"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="ticket-details-heading"
+    on:click|stopPropagation
+  >
+    <header class="modal-header">
+      <div>
+        <p class="modal-eyebrow">Support Ticket</p>
+        <h2 id="ticket-details-heading">Ticket Details</h2>
+      </div>
+      <button
+        class="modal-close-btn"
+        type="button"
+        aria-label="Close ticket details"
+        on:click={() => dispatch('close')}
+      >
+        ✕
+      </button>
+    </header>
+
+    <section class="modal-body">
+      <h3 class="ticket-title">{ticket.title || 'Untitled ticket'}</h3>
+      <p class="ticket-id">Ticket #{ticket.ticketNumber || ticket._id}</p>
+      <p class="ticket-message">Full ticket details coming soon...</p>
+    </section>
+  </article>
 </div>
 
 <style>
-  .modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-  }
-  .modal-content {
-    background: white;
-    border-radius: 0.75rem;
-    width: 90%;
-    max-width: 800px;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  .modal-header h2 {
+  .modal-eyebrow {
     margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
   }
-  .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
+
+  .ticket-title {
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
   }
-  .modal-body {
-    padding: 1.5rem;
+
+  .ticket-id {
+    margin: 0 0 var(--spacing-sm);
+    font-family: 'Fira Mono', 'Roboto Mono', 'SFMono-Regular', ui-monospace, monospace;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+  }
+
+  .ticket-message {
+    margin: 0;
+    color: var(--text-secondary);
   }
 </style>
 

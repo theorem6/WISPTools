@@ -2,6 +2,7 @@
 
 /* Import centralized theme CSS variables */
 @import './lib/config/theme.css';
+@import './lib/styles/modal.css';
 
 :root {
   /* Legacy variable mappings - Backward compatibility */

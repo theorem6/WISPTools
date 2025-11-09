@@ -77,14 +77,35 @@
   }
 </script>
 
-<div class="modal-backdrop" on:click={() => dispatch('close')}>
-  <div class="modal-content" on:click|stopPropagation>
-    <div class="modal-header">
-      <h2>🔍 Customer Lookup</h2>
-      <button class="close-btn" on:click={() => dispatch('close')}>✕</button>
-    </div>
+<div
+  class="modal-backdrop"
+  role="presentation"
+  on:click={() => dispatch('close')}
+>
+  <article
+    class="modal-content"
+    data-size="sm"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="customer-lookup-heading"
+    on:click|stopPropagation
+  >
+    <header class="modal-header">
+      <div>
+        <p class="modal-eyebrow">Customers</p>
+        <h2 id="customer-lookup-heading">Customer Lookup</h2>
+      </div>
+      <button
+        class="modal-close-btn"
+        type="button"
+        aria-label="Close customer lookup"
+        on:click={() => dispatch('close')}
+      >
+        ✕
+      </button>
+    </header>
     
-    <div class="modal-body">
+    <section class="modal-body">
       <div class="search-section">
         <input
           type="text"
@@ -96,51 +117,60 @@
       </div>
       
       {#if error}
-        <div class="error-message">{error}</div>
+        <div class="error-message" role="alert">{error}</div>
       {/if}
       
       {#if loading}
-        <div class="loading">Searching customers...</div>
+        <div class="state-message">Searching customers...</div>
       {:else if customers.length === 0 && searchQuery.trim()}
-        <div class="no-results">
-          <p>No customers found matching "{searchQuery}"</p>
+        <div class="state-message">
+          <p>No customers found matching “{searchQuery}”.</p>
         </div>
       {:else if customers.length === 0}
-        <div class="no-results">
+        <div class="state-message">
           <p>No customers found. Create a customer first.</p>
         </div>
       {:else}
-        <div class="customer-list">
+        <div class="customer-list" role="listbox" aria-label="Customer results">
           {#each customers as customer (customer._id || customer.customerId)}
-            <div class="customer-item" on:click={() => selectCustomer(customer)}>
+            <button
+              class="customer-item"
+              type="button"
+              role="option"
+              on:click={() => selectCustomer(customer)}
+            >
               <div class="customer-header">
                 <div class="customer-name">
                   <strong>{customer.fullName || `${customer.firstName} ${customer.lastName}`}</strong>
-                  <span class="customer-id">{customer.customerId}</span>
+                  {#if customer.customerId}
+                    <span class="customer-id">#{customer.customerId}</span>
+                  {/if}
                 </div>
-                <span class="status-badge status-{customer.serviceStatus}">
-                  {customer.serviceStatus}
-                </span>
+                {#if customer.serviceStatus}
+                  <span class="status-badge status-{customer.serviceStatus}">
+                    {customer.serviceStatus}
+                  </span>
+                {/if}
               </div>
               
               <div class="customer-details">
                 {#if customer.primaryPhone}
                   <div class="detail-item">
-                    <span class="detail-label">📞</span>
+                    <span class="detail-label" aria-hidden="true">📞</span>
                     {formatPhone(customer.primaryPhone)}
                   </div>
                 {/if}
                 
                 {#if customer.email}
                   <div class="detail-item">
-                    <span class="detail-label">📧</span>
+                    <span class="detail-label" aria-hidden="true">📧</span>
                     {customer.email}
                   </div>
                 {/if}
                 
                 {#if customer.serviceAddress?.street}
                   <div class="detail-item">
-                    <span class="detail-label">📍</span>
+                    <span class="detail-label" aria-hidden="true">📍</span>
                     {customer.serviceAddress.street}
                     {#if customer.serviceAddress.city}
                       , {customer.serviceAddress.city}
@@ -150,7 +180,7 @@
                 
                 {#if customer.networkInfo?.imsi}
                   <div class="detail-item">
-                    <span class="detail-label">📡</span>
+                    <span class="detail-label" aria-hidden="true">📡</span>
                     IMSI: {customer.networkInfo.imsi}
                   </div>
                 {/if}
@@ -164,12 +194,12 @@
                   {/if}
                 </div>
               {/if}
-            </div>
+            </button>
           {/each}
         </div>
       {/if}
-    </div>
-  </div>
+    </section>
+  </article>
 </div>
 
 <style>
@@ -336,6 +366,90 @@
     border-top: 1px solid var(--border-color);
     font-size: 0.85rem;
     color: var(--text-secondary);
+  }
+  /* Theme-aware overrides */
+  .modal-content {
+    background: var(--card-bg);
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .modal-header h2 {
+    color: var(--text-primary);
+  }
+
+  .modal-body {
+    display: grid;
+    gap: var(--spacing-lg);
+    background: var(--card-bg);
+  }
+
+  .search-input {
+    background: var(--input-bg);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+  }
+
+  .search-input:focus {
+    border-color: var(--primary-color);
+    outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    outline-offset: 2px;
+  }
+
+  .customer-item {
+    background: var(--color-background-secondary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .customer-item:hover,
+  .customer-item:focus-visible {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .customer-id,
+  .detail-item {
+    color: var(--text-secondary);
+  }
+
+  .status-badge {
+    background: var(--hover-bg);
+    color: var(--text-secondary);
+  }
+
+  .status-active {
+    background: color-mix(in srgb, var(--success) 18%, transparent);
+    color: var(--success);
+  }
+
+  .status-suspended {
+    background: color-mix(in srgb, var(--warning) 22%, transparent);
+    color: var(--warning);
+  }
+
+  .status-disconnected {
+    background: color-mix(in srgb, var(--danger) 24%, transparent);
+    color: var(--danger);
+  }
+
+  .customer-plan {
+    border-top-color: var(--border-light);
+  }
+
+  .error-message {
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+    color: var(--danger);
+  }
+
+  .state-message,
+  .loading,
+  .no-results {
+    border-radius: var(--radius-lg);
+    background: var(--color-background-secondary);
+    border: 1px dashed var(--border-light);
   }
 </style>
 

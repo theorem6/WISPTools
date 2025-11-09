@@ -54,223 +54,256 @@
   }
 </script>
 
-<div class="modal-backdrop" on:click={() => dispatch('close')}>
-  <div class="modal-content" on:click|stopPropagation>
-    <div class="modal-header">
-      <h2>Create Support Ticket</h2>
-      <button class="close-btn" on:click={() => dispatch('close')}>✕</button>
-    </div>
+<div
+  class="modal-backdrop"
+  role="presentation"
+  on:click={() => dispatch('close')}
+>
+  <article
+    class="modal-content"
+    data-size="sm"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="create-ticket-heading"
+    on:click|stopPropagation
+  >
+    <header class="modal-header">
+      <div>
+        <p class="modal-eyebrow">Support Ticket</p>
+        <h2 id="create-ticket-heading">Create Support Ticket</h2>
+      </div>
+      <button
+        class="modal-close-btn"
+        type="button"
+        aria-label="Close create ticket form"
+        on:click={() => dispatch('close')}
+      >
+        ✕
+      </button>
+    </header>
     
     <form on:submit|preventDefault={handleSubmit}>
-      {#if error}
-        <div class="alert alert-error">
-          <span>❌</span>
-          <span>{error}</span>
-        </div>
-      {/if}
-      
-      <div class="form-group">
-        <label for="title">Ticket Title *</label>
-        <input
-          id="title"
-          type="text"
-          bind:value={title}
-          placeholder="Brief description of the issue"
-          required
-        />
-      </div>
-      
-      <div class="form-row">
+      <section class="modal-body">
+        {#if error}
+          <div class="alert alert-error" role="alert">
+            <span>❌</span>
+            <span>{error}</span>
+          </div>
+        {/if}
+        
         <div class="form-group">
-          <label for="type">Type</label>
-          <select id="type" bind:value={type}>
-            <option value="troubleshoot">Troubleshoot</option>
-            <option value="repair">Repair</option>
-            <option value="installation">Installation</option>
-            <option value="other">Other</option>
-          </select>
+          <label for="title">Ticket Title *</label>
+          <input
+            id="title"
+            type="text"
+            bind:value={title}
+            placeholder="Brief description of the issue"
+            required
+          />
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="type">Type</label>
+            <select id="type" bind:value={type}>
+              <option value="troubleshoot">Troubleshoot</option>
+              <option value="repair">Repair</option>
+              <option value="installation">Installation</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="priority">Priority</label>
+            <select id="priority" bind:value={priority}>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
         </div>
         
         <div class="form-group">
-          <label for="priority">Priority</label>
-          <select id="priority" bind:value={priority}>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            bind:value={description}
+            placeholder="Detailed description of the issue"
+            rows="4"
+          ></textarea>
         </div>
-      </div>
+        
+        <div class="form-group">
+          <label for="customer-name">Customer Name</label>
+          <input
+            id="customer-name"
+            type="text"
+            bind:value={customerName}
+            placeholder="Customer or contact name"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label for="customer-phone">Customer Phone</label>
+          <input
+            id="customer-phone"
+            type="tel"
+            bind:value={customerPhone}
+            placeholder="Phone number"
+          />
+        </div>
+      </section>
       
-      <div class="form-group">
-        <label for="description">Description</label>
-        <textarea
-          id="description"
-          bind:value={description}
-          placeholder="Detailed description of the issue"
-          rows="4"
-        ></textarea>
-      </div>
-      
-      <div class="form-group">
-        <label for="customer-name">Customer Name</label>
-        <input
-          id="customer-name"
-          type="text"
-          bind:value={customerName}
-          placeholder="Customer or contact name"
-        />
-      </div>
-      
-      <div class="form-group">
-        <label for="customer-phone">Customer Phone</label>
-        <input
-          id="customer-phone"
-          type="tel"
-          bind:value={customerPhone}
-          placeholder="Phone number"
-        />
-      </div>
-      
-      <div class="modal-actions">
+      <footer class="modal-footer">
         <button type="button" class="btn btn-secondary" on:click={() => dispatch('close')}>
           Cancel
         </button>
         <button type="submit" class="btn btn-primary" disabled={loading}>
           {#if loading}
-            <span class="spinner-sm"></span>
+            <span class="spinner-sm" aria-hidden="true"></span>
             Creating...
           {:else}
             Create Ticket
           {/if}
         </button>
-      </div>
+      </footer>
     </form>
-  </div>
+  </article>
 </div>
 
 <style>
-  .modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-  }
-  
-  .modal-content {
-    background: white;
-    border-radius: 0.75rem;
-    width: 100%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  }
-  
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .modal-header h2 {
+  .modal-eyebrow {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
   }
-  
-  .close-btn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    opacity: 0.5;
-  }
-  
+
   form {
-    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
-  
+
+  .modal-body {
+    display: grid;
+    gap: var(--spacing-lg);
+    padding: 0;
+  }
+
   .form-group {
-    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
   }
   
   .form-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
   }
   
   label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--text-primary);
   }
   
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     width: 100%;
-    padding: 0.75rem;
+    padding: var(--spacing-sm);
     border: 1px solid var(--border-color);
-    border-radius: 0.5rem;
-    font-size: 1rem;
+    border-radius: var(--radius-md);
+    background: var(--input-bg);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
   
-  .modal-actions {
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--primary-color);
+    outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    outline-offset: 2px;
+  }
+  
+  .modal-footer {
     display: flex;
-    gap: 1rem;
     justify-content: flex-end;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
+    gap: var(--spacing-md);
   }
   
   .btn {
     padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
     border: none;
-    border-radius: 0.5rem;
-    font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   
-  .btn-primary { background: var(--primary); color: white; }
-  .btn-secondary { background: #6b7280; color: white; }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--text-inverse);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-primary:not(:disabled):hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn-secondary {
+    background: var(--color-background-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    background: var(--hover-bg);
+  }
   
   .alert {
-    padding: 1rem;
-    border-radius: 0.5rem;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
   }
   
   .alert-error {
-    background: #fee;
-    border: 1px solid #fcc;
-    color: #c00;
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+    color: var(--danger);
   }
   
   .spinner-sm {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: white;
-    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: currentColor;
+    border-radius: 999px;
     animation: spin 0.8s linear infinite;
   }
   
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .modal-content {
+      width: min(100%, 540px);
+    }
   }
 </style>
 
