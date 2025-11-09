@@ -26,7 +26,7 @@
     error = '';
     
     try {
-      await workOrderService.createWorkOrder({
+      const newTicket = await workOrderService.createWorkOrder({
         tenantId: $currentTenant.id,
         title,
         description,
@@ -44,7 +44,8 @@
           phoneNumber: customerPhone || undefined
         }] : undefined
       });
-      
+
+      dispatch('created', newTicket);
       dispatch('close');
     } catch (err: any) {
       error = err.message || 'Failed to create ticket';
