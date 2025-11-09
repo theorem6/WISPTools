@@ -189,7 +189,7 @@ export class PCIOptimizer {
     // SON Algorithm: Sort conflicts by severity and distance
     // Critical conflicts at close range are highest priority
     const sortedConflicts = [...conflicts].sort((a, b) => {
-      const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+      const severityOrder: Record<PCIConflict['severity'], number> = { 'CRITICAL': 5, 'HIGH': 4, 'MEDIUM': 3, 'LOW': 2, 'UNRESOLVABLE': 6 };
       const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
       
       if (severityDiff !== 0) return severityDiff;

@@ -2,13 +2,16 @@
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
+  import type { PlanLayerFeature } from '$lib/services/planService';
+  import type { TowerSite } from '../lib/models';
   
   export let show = false;
   export let initialLatitude: number | null = null;
   export let initialLongitude: number | null = null;
-  export let initialType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
+  export let initialType: TowerSite['type'] | null = null;
   export let tenantId: string;
   export let planId: string | null = null; // Plan ID if creating site within a plan
+  export let existingDraft: PlanLayerFeature | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -20,7 +23,7 @@
   // Form data
   let formData = {
     name: '',
-    type: (initialType || 'tower') as 'tower' | 'noc' | 'warehouse' | 'other',
+    type: (initialType || 'tower') as TowerSite['type'],
     latitude: initialLatitude || 40.7128,
     longitude: initialLongitude || -74.0060,
     address: '',
@@ -44,6 +47,38 @@
   $: if (initialLatitude !== null) formData.latitude = initialLatitude;
   $: if (initialLongitude !== null) formData.longitude = initialLongitude;
   $: if (initialType) formData.type = initialType;
+
+  let lastDraftId: string | null = null;
+  $: if (existingDraft && existingDraft.id !== lastDraftId) {
+    const props = existingDraft.properties ?? {};
+    const coords = extractDraftCoordinates(existingDraft);
+    formData = {
+      ...formData,
+      name: (props.name ?? '') || '',
+      type: (props.siteType ?? formData.type) as typeof formData.type,
+      latitude: coords.latitude ?? formData.latitude,
+      longitude: coords.longitude ?? formData.longitude,
+      address: props.address ?? props.location?.address ?? '',
+      city: props.city ?? props.location?.city ?? '',
+      state: props.state ?? props.location?.state ?? '',
+      zipCode: props.zipCode ?? props.location?.zipCode ?? '',
+      height: props.height ?? formData.height,
+      fccId: props.fccId ?? '',
+      towerOwner: props.towerOwner ?? '',
+      towerContactName: props.towerContact?.name ?? '',
+      towerContactPhone: props.towerContact?.phone ?? '',
+      towerContactEmail: props.towerContact?.email ?? '',
+      siteContactName: props.siteContact?.name ?? '',
+      siteContactPhone: props.siteContact?.phone ?? '',
+      siteContactEmail: props.siteContact?.email ?? '',
+      gateCode: props.gateCode ?? '',
+      accessInstructions: props.accessInstructions ?? '',
+      safetyNotes: props.safetyNotes ?? ''
+    };
+    lastDraftId = existingDraft.id;
+  } else if (!existingDraft && lastDraftId) {
+    lastDraftId = null;
+  }
   
   async function handleSearchAddress() {
     if (!searchAddress.trim()) {
@@ -70,6 +105,31 @@
     }
   }
   
+  function extractDraftCoordinates(draft: PlanLayerFeature): { latitude: number | null; longitude: number | null } {
+    const geometry: any = draft.geometry ?? draft.metadata?.originalGeometry ?? null;
+    if (geometry) {
+      if (typeof geometry.latitude === 'number' && typeof geometry.longitude === 'number') {
+        return { latitude: geometry.latitude, longitude: geometry.longitude };
+      }
+      if (Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+        return { longitude: geometry.coordinates[0], latitude: geometry.coordinates[1] };
+      }
+      if (typeof geometry.y === 'number' && typeof geometry.x === 'number') {
+        return { latitude: geometry.y, longitude: geometry.x };
+      }
+    }
+
+    const props = draft.properties ?? {};
+    if (typeof props.latitude === 'number' && typeof props.longitude === 'number') {
+      return { latitude: props.latitude, longitude: props.longitude };
+    }
+    if (props.location && typeof props.location.latitude === 'number' && typeof props.location.longitude === 'number') {
+      return { latitude: props.location.latitude, longitude: props.location.longitude };
+    }
+
+    return { latitude: null, longitude: null };
+  }
+
   async function handleSave() {
     if (!formData.name.trim()) {
       error = 'Site name is required';
@@ -110,17 +170,28 @@
             : undefined
         };
 
-        await mapLayerManager.addFeature(planId, {
-          featureType: 'site',
-          geometry: {
-            type: 'Point',
-            coordinates: [formData.longitude, formData.latitude]
-          },
-          properties,
-          status: 'draft'
-        });
-
-        dispatch('saved', { message: 'Site staged in plan.' });
+        if (existingDraft) {
+          await mapLayerManager.updateFeature(planId, existingDraft.id, {
+            geometry: {
+              type: 'Point',
+              coordinates: [formData.longitude, formData.latitude]
+            },
+            properties
+          });
+          dispatch('saved', { message: 'Site draft updated.' });
+        } else {
+          await mapLayerManager.addFeature(planId, {
+            featureType: 'site',
+            geometry: {
+              type: 'Point',
+              coordinates: [formData.longitude, formData.latitude]
+            },
+            properties,
+            status: 'draft'
+          });
+  
+          dispatch('saved', { message: 'Site staged in plan.' });
+        }
       } else {
         const siteData: any = {
           name: formData.name,
@@ -175,6 +246,7 @@
     show = false;
     error = '';
     searchAddress = '';
+    dispatch('close');
   }
 </script>
 

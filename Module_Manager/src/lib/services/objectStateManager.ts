@@ -18,7 +18,7 @@ export interface ObjectState {
 export interface ModuleContext {
   module: 'plan' | 'deploy' | 'maintain' | 'monitor' | 'coverage-map' | 'pci' | 'frequency';
   projectId?: string;
-  userRole: 'admin' | 'operator' | 'viewer';
+  userRole?: string | null;
 }
 
 export class ObjectStateManager {
@@ -120,12 +120,32 @@ export class ObjectStateManager {
     
     // Objects in planning stage can be edited
     if (state.status === 'planning' && state.projectId && context.projectId && state.projectId === context.projectId) {
-      state.allowedActions.push('edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment');
+      state.allowedActions.push(
+        'edit',
+        'edit-site',
+        'move',
+        'delete',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'view-inventory'
+      );
       state.isReadOnly = false;
     } else {
       // All other objects are read-only
       state.isReadOnly = true;
-      state.restrictedActions = ['edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment'];
+      state.restrictedActions = [
+        'edit',
+        'edit-site',
+        'move',
+        'delete',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'view-inventory'
+      ];
     }
 
     // ACS objects have special restrictions
@@ -230,16 +250,48 @@ export class ObjectStateManager {
     
     // Admin can do everything - also allow if userRole is undefined or 'owner'
     if (context.userRole === 'admin' || context.userRole === 'owner' || !context.userRole) {
-      state.allowedActions.push('edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment', 'deploy-hardware', 'change-site-type');
+      state.allowedActions.push(
+        'edit',
+        'edit-site',
+        'move',
+        'delete',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'deploy-hardware',
+        'change-site-type',
+        'view-inventory'
+      );
       state.isReadOnly = false;
     } else if (context.userRole === 'operator') {
-      state.allowedActions.push('edit', 'add-sector', 'add-backhaul', 'add-equipment');
-      state.restrictedActions = ['delete'];
+      state.allowedActions.push(
+        'edit',
+        'edit-site',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'view-inventory'
+      );
+      state.restrictedActions = ['delete', 'change-site-type'];
       state.isReadOnly = false;
     } else {
       // Viewer can only view
       state.isReadOnly = true;
-      state.restrictedActions = ['edit', 'move', 'delete', 'add-sector', 'add-backhaul', 'add-equipment'];
+      state.restrictedActions = [
+        'edit',
+        'edit-site',
+        'move',
+        'delete',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'deploy-hardware',
+        'change-site-type',
+        'view-inventory'
+      ];
     }
 
     // ACS objects have special restrictions
@@ -304,14 +356,45 @@ export class ObjectStateManager {
     
     // Allow admin, owner, and undefined userRole to have full permissions
     if (context.userRole === 'admin' || context.userRole === 'owner' || !context.userRole) {
-      state.allowedActions.push('edit', 'delete', 'view-details', 'edit-site', 'add-sector', 'add-backhaul', 'add-equipment', 'view-inventory', 'deploy-hardware', 'change-site-type');
+      state.allowedActions.push(
+        'edit',
+        'delete',
+        'view-details',
+        'edit-site',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'view-inventory',
+        'deploy-hardware',
+        'change-site-type'
+      );
       state.isReadOnly = false;
     } else if (context.userRole === 'operator') {
-      state.allowedActions.push('view-details', 'edit-site', 'add-sector', 'add-backhaul', 'add-equipment');
-      state.restrictedActions = ['delete', 'change-site-type'];
+      state.allowedActions.push(
+        'view-details',
+        'edit-site',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'view-inventory'
+      );
+      state.restrictedActions = ['delete', 'change-site-type', 'deploy-hardware'];
       state.isReadOnly = false;
     } else {
       state.isReadOnly = true;
+      state.restrictedActions = [
+        'edit',
+        'edit-site',
+        'delete',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'deploy-hardware',
+        'change-site-type'
+      ];
     }
   }
 }

@@ -204,7 +204,7 @@ export class EnhancedPCIArcGISMapper {
           });
 
           // Create symbol based on device status
-          const symbol = this.createCPESymbol(device);
+          const symbol = await this.createCPESymbol(device);
 
           // Create graphic
           const graphic = new Graphic({
@@ -317,12 +317,14 @@ export class EnhancedPCIArcGISMapper {
         { default: Graphic },
         { default: SimpleMarkerSymbol },
         { default: SimpleLineSymbol },
+        { default: TextSymbol },
         { default: Color }
       ] = await Promise.all([
         import('@arcgis/core/geometry/Point'),
         import('@arcgis/core/Graphic'),
         import('@arcgis/core/symbols/SimpleMarkerSymbol'),
         import('@arcgis/core/symbols/SimpleLineSymbol'),
+        import('@arcgis/core/symbols/TextSymbol'),
         import('@arcgis/core/Color')
       ]);
 

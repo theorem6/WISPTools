@@ -14,11 +14,20 @@
   const HSS_API = API_CONFIG.PATHS.HSS;
 
   export let show = false;
+  export let tenantId: string = '';
+
+  const dispatch = createEventDispatcher<{ close: void }>();
+  let loading = false;
+  let error = '';
+  let activeTab: 'dashboard' | 'subscribers' | 'groups' | 'plans' | 'epcs' | 'import' | 'connections' = 'dashboard';
+  let stats: any = null;
+  let groups: any[] = [];
+  let bandwidthPlans: any[] = [];
 
   // Reactive statement to load data when modal opens
   $: if (show && tenantId) {
     console.log('[HSSManagement] Modal opened with tenant:', tenantId);
-    loadInitialData();
+    void loadInitialData();
   }
 
   onMount(() => {
@@ -153,8 +162,8 @@
     dispatch('close');
   }
 
-  function refreshData() {
-    loadInitialData();
+  function refreshData(): void {
+    void loadInitialData();
   }
 
 
@@ -270,7 +279,7 @@
                 <p>Overview of HSS system status and statistics</p>
                 
                 {#if stats}
-                  <HSSStats {tenantId} {HSS_API} />
+                  <HSSStats {stats} />
                 {:else}
                   <div class="no-data">
                     <p>No statistics available</p>

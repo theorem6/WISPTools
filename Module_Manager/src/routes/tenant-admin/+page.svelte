@@ -2,10 +2,11 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
-  import { tenantService } from '$lib/services/tenantService';
+import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
-  import type { Tenant, TenantSettings, TenantLimits } from '$lib/models/tenant';
+import type { Tenant, TenantSettings, TenantLimits } from '$lib/models/tenant';
+import { DEFAULT_TENANT_SETTINGS, DEFAULT_TENANT_LIMITS } from '$lib/models/tenant';
 
   let isLoading = true;
   let tenant: Tenant | null = null;
@@ -20,9 +21,15 @@
   // Editable fields
   let displayName = '';
   let contactEmail = '';
-  let contactPhone = '';
-  let settings: TenantSettings | null = null;
-  let limits: TenantLimits | null = null;
+let contactPhone = '';
+let settings: TenantSettings = { ...DEFAULT_TENANT_SETTINGS };
+let limits: TenantLimits = { ...DEFAULT_TENANT_LIMITS };
+
+const orgNameFieldId = 'tenant-org-name';
+const contactEmailFieldId = 'tenant-contact-email';
+const contactPhoneFieldId = 'tenant-contact-phone';
+const informIntervalFieldId = 'tenant-inform-interval';
+const dataRetentionFieldId = 'tenant-data-retention';
 
   onMount(async () => {
     if (!browser) return;
@@ -70,8 +77,8 @@
       displayName = tenant.displayName;
       contactEmail = tenant.contactEmail;
       contactPhone = tenant.contactPhone || '';
-      settings = { ...tenant.settings };
-      limits = { ...tenant.limits };
+      settings = { ...DEFAULT_TENANT_SETTINGS, ...tenant.settings };
+      limits = { ...DEFAULT_TENANT_LIMITS, ...tenant.limits };
     } catch (err: any) {
       error = err.message || 'Failed to load tenant';
     } finally {
@@ -108,8 +115,6 @@
   }
 
   async function saveDeviceSettings() {
-    if (!settings) return;
-    
     error = '';
     success = '';
     isSaving = true;
@@ -131,8 +136,6 @@
   }
 
   async function saveLimits() {
-    if (!limits) return;
-    
     error = '';
     success = '';
     isSaving = true;
@@ -252,27 +255,27 @@
           <h2>General Settings</h2>
           
           <div class="form-group">
-            <label>Organization Name</label>
-            <input type="text" bind:value={displayName} />
+            <label for={orgNameFieldId}>Organization Name</label>
+            <input id={orgNameFieldId} type="text" bind:value={displayName} />
           </div>
 
           <div class="form-group">
-            <label>Contact Email</label>
-            <input type="email" bind:value={contactEmail} />
+            <label for={contactEmailFieldId}>Contact Email</label>
+            <input id={contactEmailFieldId} type="email" bind:value={contactEmail} />
           </div>
 
           <div class="form-group">
-            <label>Contact Phone</label>
-            <input type="tel" bind:value={contactPhone} />
+            <label for={contactPhoneFieldId}>Contact Phone</label>
+            <input id={contactPhoneFieldId} type="tel" bind:value={contactPhone} />
           </div>
 
           <div class="form-group">
-            <label>Status</label>
+            <div class="field-label">Status</div>
             <div class="status-badge status-{tenant.status}">{tenant.status}</div>
           </div>
 
           <div class="form-group">
-            <label>Created</label>
+            <div class="field-label">Created</div>
             <p class="read-only">{new Date(tenant.createdAt).toLocaleString()}</p>
           </div>
 
@@ -287,8 +290,14 @@
           <h2>Device Management Settings</h2>
           
           <div class="form-group">
-            <label>Inform Interval (seconds)</label>
-            <input type="number" bind:value={settings.informInterval} min="60" max="3600" />
+            <label for={informIntervalFieldId}>Inform Interval (seconds)</label>
+            <input
+              id={informIntervalFieldId}
+              type="number"
+              bind:value={settings.informInterval}
+              min="60"
+              max="3600"
+            />
             <p class="help-text">How often devices report to the ACS (60-3600 seconds)</p>
           </div>
 
@@ -317,12 +326,18 @@
           </div>
 
           <div class="form-group">
-            <label>Data Retention (days)</label>
-            <input type="number" bind:value={settings.dataRetentionDays} min="7" max="365" />
+            <label for={dataRetentionFieldId}>Data Retention (days)</label>
+            <input
+              id={dataRetentionFieldId}
+              type="number"
+              bind:value={settings.dataRetentionDays}
+              min="7"
+              max="365"
+            />
             <p class="help-text">How long to keep historical data (7-365 days)</p>
           </div>
 
-          <button class="btn-primary" on:click={saveDeviceSettings} disabled={isSaving}>
+          <button class="btn-primary" type="button" on:click={saveDeviceSettings} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save Device Settings'}
           </button>
         </div>
@@ -336,7 +351,7 @@
             <h3>CWMP Connection URL</h3>
             <div class="url-display">
               <code>{tenant.cwmpUrl}</code>
-              <button class="copy-btn" on:click={() => copyToClipboard(tenant.cwmpUrl)}>
+              <button class="copy-btn" on:click={() => tenant?.cwmpUrl && copyToClipboard(tenant.cwmpUrl)}>
                 📋 Copy
               </button>
             </div>
@@ -611,6 +626,12 @@
     margin-bottom: 1.5rem;
   }
 
+.field-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
   .form-group label {
     display: block;
     margin-bottom: 0.5rem;
@@ -782,12 +803,6 @@
     text-align: center;
     padding: 4rem 2rem;
     color: var(--text-secondary);
-  }
-
-  .coming-soon .icon {
-    font-size: 4rem;
-    display: block;
-    margin-bottom: 1rem;
   }
 
   .dismiss-btn {

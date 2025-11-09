@@ -53,14 +53,14 @@ export class ApiService {
     const token = await this.getAuthToken();
     const tenantId = this.getTenantId();
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+    const headers = new Headers(options.headers || {});
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
 
     // Add auth token
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers.set('Authorization', `Bearer ${token}`);
     }
 
     // Add tenant ID to body or query params

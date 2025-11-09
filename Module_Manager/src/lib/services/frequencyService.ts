@@ -45,24 +45,31 @@ export class FrequencyService {
       console.log(`[FrequencyService] Loaded ${sites.length} sites from coverage map service`);
 
       // Convert sites to tower sectors
-      const sectors: TowerSector[] = sites.map(site => ({
-        id: site.id,
-        name: site.name,
-        latitude: site.latitude,
-        longitude: site.longitude,
-        azimuth: site.azimuth || 0,
-        antennaHeight: site.height || 0,
-        vendor: site.vendor || 'Unknown',
-        frequency: {
-          frequency: site.frequency || 3550, // Default to CBRS
-          bandwidth: site.bandwidth || 20,
-          vendor: site.vendor || 'Unknown',
-          power: site.power || 30
-        },
-        radCenterHeight: (site.height || 0) + 2, // Assume 2m above antenna
-        towerId: site.towerId || site.id,
-        sectorId: site.sectorId || site.id
-      }));
+      const sectors: TowerSector[] = sites.map(site => {
+        const location = site.location;
+        const vendor = (site as any).vendor || 'Unknown';
+        const frequencyValue = (site as any).frequency ?? 3550;
+        const bandwidthValue = (site as any).bandwidth ?? 20;
+        const powerValue = (site as any).power ?? 30;
+        return {
+          id: site.id,
+          name: site.name,
+          latitude: location?.latitude ?? 0,
+          longitude: location?.longitude ?? 0,
+          azimuth: (site as any).azimuth ?? 0,
+          antennaHeight: site.height || 0,
+          vendor,
+          frequency: {
+            frequency: frequencyValue,
+            bandwidth: bandwidthValue,
+            vendor,
+            power: powerValue
+          },
+          radCenterHeight: (site.height || 0) + 2, // Assume 2m above antenna
+          towerId: (site as any).towerId || site.id,
+          sectorId: (site as any).sectorId || site.id
+        };
+      });
 
       console.log(`[FrequencyService] Converted to ${sectors.length} sectors for frequency analysis`);
       

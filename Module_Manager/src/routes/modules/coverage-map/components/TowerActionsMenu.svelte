@@ -25,8 +25,12 @@
     
     // Additional check for tower.id - but safely
     const towerId = tower?.id;
-    // Check if id is missing or empty (but allow falsy values like 0 if they're legitimate)
-    if (!towerId && towerId !== '' && towerId !== 0) {
+    // Check if id is missing or empty (while allowing legitimate falsy values like 0 or '0')
+    const hasValidId =
+      towerId !== null &&
+      towerId !== undefined &&
+      String(towerId).trim() !== '';
+    if (!hasValidId) {
       console.error('Tower object missing id property:', tower);
       return null;
     }

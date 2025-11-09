@@ -26,6 +26,7 @@ export interface WorkOrder {
   assignedTo?: string;
   assignedToName?: string;
   assignedAt?: Date | string;
+  resolvedAt?: Date | string;
   
   title: string;
   description?: string;

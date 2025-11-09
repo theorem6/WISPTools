@@ -2,8 +2,8 @@
   import { createEventDispatcher, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
-  import { authStore, currentUser, isAuthenticated } from '../../stores/authStore';
-  import { authService } from '../../services/authService';
+  import { authStore, currentUser, isAuthenticated } from '$lib/stores/authStore';
+  import { authService } from '$lib/services/authService';
   
   const dispatch = createEventDispatcher();
   
@@ -39,8 +39,8 @@
     showDropdown = false;
   }
   
-  import { networkStore } from '../stores/networkStore';
-  import { resetAllStores } from '../stores/appState';
+  import { networkStore } from '$lib/stores/networkStore';
+  import { resetAllStores } from '$lib/stores/appState';
   
   async function handleSignOut() {
     showDropdown = false;

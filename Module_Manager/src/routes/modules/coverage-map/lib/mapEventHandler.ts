@@ -6,7 +6,7 @@
 import type { TowerSite } from './models';
 
 export interface MapClickEvent {
-  type: 'tower' | 'sector' | 'cpe' | 'cpe-device' | 'equipment' | 'backhaul';
+  type: 'tower' | 'sector' | 'cpe' | 'cpe-device' | 'equipment' | 'backhaul' | 'noc' | 'warehouse';
   id: string;
   data: any;
   screenX: number;
@@ -51,14 +51,20 @@ export function handleAssetClick(
       const tower: TowerSite = {
         id,
         name: data.name || 'Unknown',
-        type: data.type || 'tower',
+        type: (data.type as TowerSite['type']) || 'tower',
         location: {
-          latitude: data.latitude || 0,
-          longitude: data.longitude || 0,
-          address: data.address || ''
+          latitude: data.location?.latitude ?? data.latitude ?? 0,
+          longitude: data.location?.longitude ?? data.longitude ?? 0,
+          address: data.location?.address ?? data.address ?? ''
         },
+        height: data.height,
+        tenantId: data.tenantId || '',
+        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+        updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
         status: data.status || 'active',
-        tenantId: data.tenantId || ''
+        modules: data.modules,
+        inventoryId: data.inventoryId,
+        metadata: data.metadata
       };
       
       callbacks.onShowTowerMenu(tower, screenX, screenY);

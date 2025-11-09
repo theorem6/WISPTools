@@ -3,7 +3,12 @@
   import { browser } from '$app/environment';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
-  import { inventoryService, type InventoryItem, type InventoryFilters } from '$lib/services/inventoryService';
+  import {
+    inventoryService,
+    type InventoryItem,
+    type InventoryFilters,
+    type InventoryStats
+  } from '$lib/services/inventoryService';
   import { barcodeService } from '$lib/services/barcodeService';
   import AssetTagViewer from './components/AssetTagViewer.svelte';
   import { goto } from '$app/navigation';
@@ -45,10 +50,11 @@
   let selectedLocation = '';
   
   // Stats
-  let stats = {
+  let stats: InventoryStats = {
     totalItems: 0,
     byStatus: [],
     byCategory: [],
+    byLocation: [],
     totalValue: 0
   };
   
@@ -259,6 +265,11 @@
     if (!amount) return 'N/A';
     return `$${amount.toLocaleString()}`;
   }
+
+  function getStatusCount(status: string): number {
+    const entry = stats.byStatus.find((item) => item._id === status);
+    return entry?.count ?? 0;
+  }
 </script>
 
 <TenantGuard>
@@ -318,7 +329,7 @@
       <div class="stat-icon">✅</div>
       <div>
         <div class="stat-value">
-          {stats.byStatus.find((s: any) => s._id === 'available')?.count || 0}
+          {getStatusCount('available')}
         </div>
         <div class="stat-label">Available</div>
       </div>
@@ -328,7 +339,7 @@
       <div class="stat-icon">🚀</div>
       <div>
         <div class="stat-value">
-          {stats.byStatus.find((s: any) => s._id === 'deployed')?.count || 0}
+          {getStatusCount('deployed')}
         </div>
         <div class="stat-label">Deployed</div>
       </div>

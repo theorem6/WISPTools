@@ -30,6 +30,10 @@ export interface CellSite {
   latitude: number;        // Cell site GPS coordinates (ONE per site)
   longitude: number;       // Cell site GPS coordinates (ONE per site)
   sectors: Sector[];       // Array of sectors on this cell site
+  tac?: number;
+  mcc?: string;
+  mnc?: string;
+  address?: string;
   metadata?: {
     operator?: string;
     siteType?: string;     // Rooftop, tower, small cell, etc.
@@ -42,11 +46,18 @@ export interface Sector {
   sectorNumber: number;    // Sector number (1, 2, 3, etc.)
   azimuth: number;         // Direction in degrees (0-359) - ONLY sectors have azimuths
   beamwidth: number;       // Horizontal beamwidth in degrees (typically 33, 65, 78, 90, 120)
+  antennaBeamwidth?: number; // Legacy compatibility alias
   heightAGL: number;       // Height above ground level in feet
   rmodId?: number;         // Radio Module ID (1-3) for Nokia configurations
   channels: Channel[];     // Multiple carriers/channels per sector (transmitter)
   rsPower: number;         // Reference signal power (dBm)
-  technology: 'LTE' | 'CBRS' | '5G';
+  technology: 'LTE' | 'CBRS' | 'LTE+CBRS' | '5G';
+  pci?: number;            // Legacy compatibility for primary PCI
+  earfcn?: number;         // Legacy compatibility for primary EARFCN
+  bandwidth?: number;      // Legacy compatibility for primary bandwidth
+  transmitPower?: number;  // Legacy compatibility for UI editors
+  tac?: number;            // Legacy compatibility
+  eNodeBLocalID?: number;  // Legacy compatibility
 }
 
 export interface Channel {
@@ -72,7 +83,7 @@ export interface LegacyCell {
   rsPower: number;
   azimuth?: number;
   towerType?: '3-sector' | '4-sector';
-  technology?: 'LTE' | 'CBRS' | '5G';
+  technology?: 'LTE' | 'CBRS' | '5G' | 'LTE+CBRS';
   earfcn?: number;
   centerFreq?: number;
   channelBandwidth?: number;
@@ -99,7 +110,14 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
         eNodeB: legacyCell.eNodeB,
         latitude: legacyCell.latitude,
         longitude: legacyCell.longitude,
-        sectors: []
+        sectors: [],
+        address: (legacyCell as any).address,
+        tac: (legacyCell as any).tac,
+        mcc: (legacyCell as any).mcc,
+        mnc: (legacyCell as any).mnc,
+        metadata: {
+          ...(legacyCell as any).metadata
+        }
       });
     }
     
@@ -110,23 +128,32 @@ export function convertLegacyToCellSite(legacyCells: LegacyCell[]): CellSite[] {
     
     if (!sector) {
       // Create new sector
-      sector = {
+      const newSector: Sector = {
         id: `${siteId}-SEC${legacyCell.sector}`,
         sectorNumber: legacyCell.sector,
         azimuth: legacyCell.azimuth || 0,
         beamwidth: (legacyCell as any).beamwidth || 65,
+        antennaBeamwidth: (legacyCell as any).beamwidth || 65,
         heightAGL: (legacyCell as any).heightAGL || 100,
         rmodId: ((legacyCell.sector - 1) % 3) + 1,
         channels: [],
         rsPower: legacyCell.rsPower,
-        technology: legacyCell.technology || 'LTE'
+        technology: legacyCell.technology || 'LTE',
+        pci: legacyCell.pci,
+        earfcn: legacyCell.dlEarfcn || legacyCell.earfcn || 0,
+        bandwidth: legacyCell.channelBandwidth || 20,
+        transmitPower: (legacyCell as any).transmitPower,
+        tac: (legacyCell as any).tac,
+        eNodeBLocalID: (legacyCell as any).eNodeBLocalID
       };
-      site.sectors.push(sector);
+      site.sectors.push(newSector);
+      sector = newSector;
     }
     
     // Add carrier/channel to the sector
-    const carrierNumber = sector.channels.length + 1;
-    sector.channels.push({
+    const ensuredSector = sector!;
+    const carrierNumber = ensuredSector.channels.length + 1;
+    ensuredSector.channels.push({
       id: legacyCell.id, // Use original cell ID as carrier ID
       name: `Carrier ${carrierNumber}`,
       dlEarfcn: legacyCell.dlEarfcn || legacyCell.earfcn || 0,

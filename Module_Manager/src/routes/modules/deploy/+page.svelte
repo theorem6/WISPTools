@@ -13,15 +13,18 @@
   import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
   import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
   import SharedMap from '$lib/map/SharedMap.svelte';
-  import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
-  import { mapContext } from '$lib/map/mapContext';
-  import type { MapModuleMode } from '$lib/map/MapCapabilities';
-import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
+  import { mapContext, type MapLayerState } from '$lib/map/mapContext';
+import type { MapModuleMode } from '$lib/map/MapCapabilities';
+import type { ModuleContext } from '$lib/services/objectStateManager';
+import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
-  let mapState: MapLayerManagerState | undefined;
+  let mapState: MapLayerState | undefined;
   let mapMode: MapModuleMode = 'deploy';
+  let isAdmin = false;
+  let buttonsDisabled = false;
   
   // Plan approval workflow
   let showPlanApprovalModal = false;
@@ -63,7 +66,7 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
   $: isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
   $: buttonsDisabled = !isAdmin && !$currentTenant;
 
-  $: mapState = $mapContext as MapLayerManagerState;
+  $: mapState = $mapContext;
   $: mapMode = mapState?.mode ?? 'deploy';
 
   $: {
@@ -85,14 +88,18 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
     iframeCommunicationService.updateContext(moduleContext);
   }
 
-  onMount(async () => {
-    if (browser) {
+  onMount(() => {
+    if (!browser) {
+      return;
+    }
+
+    (async () => {
       currentUser = await authService.getCurrentUser();
       if (!currentUser) {
         goto('/login');
         return;
       }
-      
+
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
         iframeCommunicationService.initialize(iframe, moduleContext);
@@ -103,8 +110,10 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
 
       mapLayerManager.setMode('deploy');
       await loadReadyPlans();
-    }
-    
+    })().catch((err) => {
+      console.error('[Deploy] onMount initialization failed:', err);
+    });
+
     return () => {
       if (iframeListenerAttached) {
         window.removeEventListener('iframe-object-action', handleIframeObjectAction);

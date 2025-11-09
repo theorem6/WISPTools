@@ -111,6 +111,19 @@
     showEditModal = false;
   }
 
+function handleEditBackdropClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
+    closeEditModal();
+  }
+}
+
+function handleEditBackdropKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeEditModal();
+  }
+}
+
   function handleOpenSettings() {
     if (!selectedTenant) return;
     localStorage.setItem('selectedTenantId', selectedTenant.id);
@@ -167,40 +180,55 @@
   async function confirmDelete() {
     if (!tenantToDelete) return;
 
-    // Validate tenant name confirmation
-    const confirmInput = document.getElementById('deleteConfirmInput') as HTMLInputElement;
-    if (!confirmInput || confirmInput.value !== tenantToDelete.displayName) {
-      error = 'Please type the tenant name exactly to confirm deletion';
-      return;
-    }
+  const tenantSnapshot = tenantToDelete;
 
-    isDeleting = true;
-    error = '';
-    success = '';
-
-    try {
-      const result = await tenantService.deleteTenant(tenantToDelete.id);
-
-      if (result.success) {
-        success = `Tenant "${tenantToDelete.displayName}" deleted successfully`;
-        
-        // Remove from local list
-        tenants = tenants.filter(t => t.id !== tenantToDelete.id);
-        
-        // Close modals
-        showDeleteConfirm = false;
-        showEditModal = false;
-        tenantToDelete = null;
-        selectedTenant = null;
-      } else {
-        error = result.error || 'Failed to delete tenant';
-      }
-    } catch (err: any) {
-      error = err.message || 'Failed to delete tenant';
-    } finally {
-      isDeleting = false;
-    }
+  // Validate tenant name confirmation
+  const confirmInput = document.getElementById('deleteConfirmInput') as HTMLInputElement;
+  if (!confirmInput || confirmInput.value !== tenantSnapshot.displayName) {
+    error = 'Please type the tenant name exactly to confirm deletion';
+    return;
   }
+
+  isDeleting = true;
+  error = '';
+  success = '';
+
+  try {
+    const result = await tenantService.deleteTenant(tenantSnapshot.id);
+
+    if (result.success) {
+      success = `Tenant "${tenantSnapshot.displayName}" deleted successfully`;
+
+      // Remove from local list
+      tenants = tenants.filter(t => t.id !== tenantSnapshot.id);
+
+      // Close modals
+      showDeleteConfirm = false;
+      showEditModal = false;
+      tenantToDelete = null;
+      selectedTenant = null;
+    } else {
+      error = result.error || 'Failed to delete tenant';
+    }
+  } catch (err: any) {
+    error = err.message || 'Failed to delete tenant';
+  } finally {
+    isDeleting = false;
+  }
+}
+
+function handleDeleteBackdropClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
+    cancelDelete();
+  }
+}
+
+function handleDeleteBackdropKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelDelete();
+  }
+}
 </script>
 
 <div class="tenant-management-page">
@@ -384,8 +412,16 @@
 
 <!-- Edit Tenant Modal -->
 {#if showEditModal && selectedTenant}
-  <div class="modal-overlay" on:click={closeEditModal} role="dialog" aria-modal="true">
-    <div class="modal-content" on:click|stopPropagation role="document">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    tabindex="0"
+    aria-label="Tenant details dialog"
+    on:click={handleEditBackdropClick}
+    on:keydown={handleEditBackdropKeydown}
+  >
+    <div class="modal-content" role="document">
       <div class="modal-header">
         <h2>Manage Tenant: {selectedTenant.displayName}</h2>
         <button class="close-btn" on:click={closeEditModal}>✕</button>
@@ -464,7 +500,7 @@
           <p class="danger-description">
             Deleting a tenant is permanent and cannot be undone. All associated data will be removed.
           </p>
-          <button class="btn-danger-action" on:click={() => handleDeleteClick(selectedTenant)}>
+          <button class="btn-danger-action" on:click={() => selectedTenant && handleDeleteClick(selectedTenant)}>
             🗑️ Delete Tenant
           </button>
         </div>
@@ -481,8 +517,16 @@
 
 <!-- Delete Confirmation Dialog -->
 {#if showDeleteConfirm && tenantToDelete}
-  <div class="modal-overlay" on:click={cancelDelete} role="dialog" aria-modal="true">
-    <div class="modal-content delete-confirm-modal" on:click|stopPropagation role="document">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    tabindex="0"
+    aria-label="Confirm tenant deletion dialog"
+    on:click={handleDeleteBackdropClick}
+    on:keydown={handleDeleteBackdropKeydown}
+  >
+    <div class="modal-content delete-confirm-modal" role="document">
       <div class="modal-header danger">
         <h2>⚠️ Confirm Deletion</h2>
         <button class="close-btn" on:click={cancelDelete}>✕</button>

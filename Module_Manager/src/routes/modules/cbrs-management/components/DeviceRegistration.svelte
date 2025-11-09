@@ -62,8 +62,8 @@
           <div class="form-group">
             <label for="category">Category</label>
             <select id="category" bind:value={newDevice.cbsdCategory}>
-              <option value="A">Category A (Indoor, < 1W)</option>
-              <option value="B">Category B (Outdoor, > 1W)</option>
+              <option value="A">Category A (Indoor, &lt; 1 W)</option>
+              <option value="B">Category B (Outdoor, &gt; 1 W)</option>
             </select>
           </div>
           

@@ -84,9 +84,10 @@
         const error = await response.text();
         uploadResult = { success: false, error };
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error uploading subscribers:', error);
-      uploadResult = { success: false, error: error.message };
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      uploadResult = { success: false, error: message };
     }
     
     uploading = false;

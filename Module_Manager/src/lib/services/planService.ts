@@ -293,18 +293,19 @@ class PlanService {
       const towers = await coverageMapService.getTowerSites(tenantId);
       if (Array.isArray(towers)) {
         towers.forEach(tower => {
+          const towerLocation = tower.location;
           hardware.push({
             id: tower.id,
             type: 'tower',
             name: tower.name,
             location: {
-              latitude: tower.latitude,
-              longitude: tower.longitude,
-              address: tower.address
+              latitude: towerLocation?.latitude ?? 0,
+              longitude: towerLocation?.longitude ?? 0,
+              address: towerLocation?.address
             },
-            status: tower.status,
+            status: tower.status ?? 'unknown',
             module: 'manual',
-            lastUpdated: new Date(tower.updatedAt),
+            lastUpdated: new Date(tower.updatedAt ?? new Date()),
             isReadOnly: true, // Existing hardware is read-only in plan
             inventoryId: tower.inventoryId
           });
@@ -315,17 +316,21 @@ class PlanService {
       const sectors = await coverageMapService.getSectors(tenantId);
       if (Array.isArray(sectors)) {
         sectors.forEach(sector => {
+          const sectorLocation = sector.location;
+          const sectorName = sector.towerName ? `${sector.towerName} - Sector ${sector.azimuth}°` : sector.name;
+          const modules = sector.modules as Record<string, unknown> | undefined;
           hardware.push({
             id: sector.id,
             type: 'sector',
-            name: `${sector.towerName} - Sector ${sector.azimuth}°`,
+            name: sectorName,
             location: {
-              latitude: sector.latitude,
-              longitude: sector.longitude
+              latitude: sectorLocation?.latitude ?? 0,
+              longitude: sectorLocation?.longitude ?? 0,
+              address: sectorLocation?.address
             },
-            status: sector.status,
-            module: sector.modules?.pci ? 'pci' : 'manual',
-            lastUpdated: new Date(sector.updatedAt),
+            status: sector.status ?? 'unknown',
+            module: modules?.pci ? 'pci' : 'manual',
+            lastUpdated: new Date(sector.updatedAt ?? new Date()),
             isReadOnly: true,
             inventoryId: sector.inventoryId
           });
@@ -336,18 +341,20 @@ class PlanService {
       const cpeDevices = await coverageMapService.getCPEDevices(tenantId);
       if (Array.isArray(cpeDevices)) {
         cpeDevices.forEach(cpe => {
+          const cpeLocation = cpe.location;
+          const modules = cpe.modules as Record<string, unknown> | undefined;
           hardware.push({
             id: cpe.id,
             type: 'cpe',
             name: `${cpe.manufacturer} ${cpe.model} - ${cpe.serialNumber}`,
             location: {
-              latitude: cpe.latitude,
-              longitude: cpe.longitude,
-              address: cpe.address
+              latitude: cpeLocation?.latitude ?? 0,
+              longitude: cpeLocation?.longitude ?? 0,
+              address: cpeLocation?.address
             },
-            status: cpe.status,
-            module: cpe.modules?.acs ? 'acs' : cpe.modules?.hss ? 'hss' : 'manual',
-            lastUpdated: new Date(cpe.updatedAt),
+            status: cpe.status ?? 'unknown',
+            module: modules?.acs ? 'acs' : modules?.hss ? 'hss' : 'manual',
+            lastUpdated: new Date(cpe.updatedAt ?? new Date()),
             isReadOnly: true,
             inventoryId: cpe.inventoryId
           });
@@ -358,18 +365,20 @@ class PlanService {
       const equipment = await coverageMapService.getEquipment(tenantId);
       if (Array.isArray(equipment)) {
         equipment.forEach(item => {
+          const equipmentLocation = item.location;
+          const modules = item.modules as Record<string, unknown> | undefined;
           hardware.push({
             id: item.id,
             type: 'equipment',
             name: `${item.manufacturer} ${item.model} - ${item.serialNumber}`,
             location: {
-              latitude: item.latitude,
-              longitude: item.longitude,
-              address: item.address
+              latitude: equipmentLocation?.latitude ?? 0,
+              longitude: equipmentLocation?.longitude ?? 0,
+              address: equipmentLocation?.address
             },
-            status: item.status,
-            module: 'inventory',
-            lastUpdated: new Date(item.updatedAt),
+            status: item.status ?? 'unknown',
+            module: modules?.acs ? 'acs' : 'inventory',
+            lastUpdated: new Date(item.updatedAt ?? new Date()),
             isReadOnly: true,
             inventoryId: item.inventoryId
           });
@@ -384,18 +393,20 @@ class PlanService {
           // Only include items that aren't already mapped to coverage map
           const alreadyMapped = hardware.some(h => h.inventoryId === item._id);
           if (!alreadyMapped) {
+            const currentLocation = item.currentLocation;
+            const modules = item.modules;
             hardware.push({
               id: item._id || '',
               type: 'equipment',
               name: `${item.manufacturer || 'Unknown'} ${item.model || 'Unknown'} - ${item.serialNumber}`,
               location: {
-                latitude: item.currentLocation?.latitude || 0,
-                longitude: item.currentLocation?.longitude || 0,
-                address: item.currentLocation?.address
+                latitude: currentLocation?.latitude ?? 0,
+                longitude: currentLocation?.longitude ?? 0,
+                address: currentLocation?.address
               },
               status: item.status,
-              module: item.modules?.acs ? 'acs' : item.modules?.hss ? 'hss' : 'inventory',
-              lastUpdated: new Date(item.updatedAt),
+              module: modules?.acs ? 'acs' : modules?.hss ? 'hss' : 'inventory',
+              lastUpdated: item.updatedAt ? new Date(item.updatedAt as string | number | Date) : new Date(),
               isReadOnly: true,
               inventoryId: item._id
             });

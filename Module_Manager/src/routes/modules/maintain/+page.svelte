@@ -466,7 +466,11 @@
               <div class="empty-state">No tickets found</div>
             {:else}
               {#each filteredTickets as ticket}
-                <div class="ticket-card" on:click={() => { selectedTicket = ticket; showTicketDetails = true; }}>
+                <button
+                  type="button"
+                  class="ticket-card"
+                  on:click={() => { selectedTicket = ticket; showTicketDetails = true; }}
+                >
                   <div class="ticket-header">
                     <div class="ticket-id">#{ticket.ticketNumber || ticket._id?.slice(-6)}</div>
                     <span class="priority-badge" style="background: {getPriorityColor(ticket.priority)}">
@@ -484,7 +488,7 @@
                       <span>Assigned: {ticket.assignedToName}</span>
                     {/if}
                   </div>
-                </div>
+                </button>
               {/each}
             {/if}
           </div>
@@ -518,7 +522,11 @@
               <div class="empty-state">No customers found</div>
             {:else}
               {#each filteredCustomers as customer}
-                <div class="customer-card" on:click={() => { selectedCustomer = customer; showEditCustomer = true; }}>
+                <button
+                  type="button"
+                  class="customer-card"
+                  on:click={() => { selectedCustomer = customer; showEditCustomer = true; }}
+                >
                   <div class="customer-header">
                     <div class="customer-name">{customer.fullName}</div>
                     <span class="status-badge" style="background: {getStatusColor(customer.serviceStatus)}">
@@ -537,7 +545,7 @@
                       {customer.serviceAddress.city}, {customer.serviceAddress.state}
                     </div>
                   {/if}
-                </div>
+                </button>
               {/each}
             {/if}
           </div>
@@ -727,18 +735,28 @@
     gap: 1rem;
   }
   
-  .ticket-card, .customer-card {
+  .ticket-card,
+  .customer-card {
+    display: block;
+    width: 100%;
+    text-align: left;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
     cursor: pointer;
     transition: all 0.2s;
+    color: inherit;
+    font: inherit;
   }
   
-  .ticket-card:hover, .customer-card:hover {
+  .ticket-card:hover,
+  .customer-card:hover,
+  .ticket-card:focus-visible,
+  .customer-card:focus-visible {
     border-color: var(--primary);
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    outline: none;
   }
   
   .ticket-header, .customer-header {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import type { PCIConflictAnalysis, PCIConflict } from '../pciMapper';
+  import type { PCIConflictAnalysis, PCIConflict } from '$lib/pciMapper';
   
   export let show = false;
   export let analysis: PCIConflictAnalysis | null = null;

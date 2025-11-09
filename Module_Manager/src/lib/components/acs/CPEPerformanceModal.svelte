@@ -36,8 +36,8 @@
   onMount(async () => {
     // Dynamically import Chart.js
     try {
-      const chartModule = await import('chart.js');
-      Chart = chartModule.default;
+      const chartModule = await import('chart.js/auto');
+      Chart = chartModule.default ?? chartModule.Chart;
     } catch (err) {
       console.error('Failed to load Chart.js:', err);
     }

@@ -75,6 +75,8 @@ export class CoverageMapController {
       showWirelessLicensed: true,
       showWirelessUnlicensed: true,
       bandFilters: [],
+      statusFilter: [],
+      technologyFilter: [],
       locationTypeFilter: []
     };
   }
@@ -226,8 +228,7 @@ export class CoverageMapController {
           enabled: false
         },
         browserTouchPanEnabled: true,
-        momentumEnabled: true,
-        frictionFactor: 0.9
+        momentumEnabled: true
       },
       popup: {
         dockEnabled: true,
@@ -244,6 +245,7 @@ export class CoverageMapController {
           actions: isMobile
             ? [
                 {
+                  type: 'button' as const,
                   title: 'View Details',
                   id: 'view-details',
                   className: 'esri-icon-description'
@@ -332,7 +334,7 @@ export class CoverageMapController {
 
       const hitTest = await this.mapView!.hitTest(event);
       if (hitTest.results.length > 0) {
-        const interactiveResult = hitTest.results.find(result => {
+        const interactiveResult = hitTest.results.find((result: any) => {
           const attrs = result?.graphic?.attributes;
           return attrs && typeof attrs.type !== 'undefined' && typeof attrs.id !== 'undefined';
         });
@@ -373,7 +375,7 @@ export class CoverageMapController {
 
       if (event.action === 'start') {
         const hitTest = await this.mapView.hitTest(event);
-        const target = hitTest.results.find(result => {
+        const target = hitTest.results.find((result: any) => {
           return (
             result?.graphic?.layer === this.planDraftLayer &&
             result?.graphic?.attributes?.isPlanDraft &&
@@ -662,10 +664,10 @@ export class CoverageMapController {
             geometry: point,
             symbol,
             attributes: {
+              ...tower,
               type: 'tower',
               id: tower.id,
-              name: tower.name,
-              ...tower
+              name: tower.name
             }
           });
 
@@ -697,11 +699,19 @@ export class CoverageMapController {
 
           const graphic = new Graphic({
             geometry: sectorPolygon,
-            symbol: fillSymbol,
+            symbol: {
+              type: 'simple-fill',
+              color,
+              style: 'solid',
+              outline: {
+                color: '#ffffff',
+                width: 0.5
+              }
+            },
             attributes: {
+              ...sector,
               type: 'sector',
-              id: sector.id,
-              ...sector
+              id: sector.id
             }
           });
 
@@ -735,9 +745,9 @@ export class CoverageMapController {
             geometry: cpePolygon,
             symbol: fillSymbol,
             attributes: {
+              ...cpe,
               type: 'cpe',
-              id: cpe.id,
-              ...cpe
+              id: cpe.id
             }
           });
 
@@ -775,9 +785,9 @@ export class CoverageMapController {
             geometry: point,
             symbol,
             attributes: {
+              ...eq,
               type: 'equipment',
-              id: eq.id,
-              ...eq
+              id: eq.id
             }
           });
 
@@ -921,7 +931,7 @@ export class CoverageMapController {
         const label =
           normalized.properties?.name ||
           normalized.properties?.siteName ||
-          normalized.label ||
+          normalized.properties?.label ||
           `${normalized.featureType || 'plan'} draft`;
 
         const esriGeometry = this.toEsriGeometryFromPlan(normalized);

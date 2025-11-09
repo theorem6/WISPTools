@@ -13,6 +13,20 @@
   let error = '';
   let sites: any[] = [];
   let sitesLoaded = false;
+  const locationTypeId = 'transfer-location-type';
+  const siteSelectId = 'transfer-site';
+  const warehouseNameId = 'transfer-warehouse-name';
+  const warehouseSectionId = 'transfer-warehouse-section';
+  const warehouseAisleId = 'transfer-warehouse-aisle';
+  const warehouseShelfId = 'transfer-warehouse-shelf';
+  const warehouseBinId = 'transfer-warehouse-bin';
+  const towerRackId = 'transfer-tower-rack';
+  const towerRackUnitId = 'transfer-tower-rack-unit';
+  const towerCabinetId = 'transfer-tower-cabinet';
+  const towerPositionId = 'transfer-tower-position';
+  const transferReasonId = 'transfer-reason';
+  const movedById = 'transfer-moved-by';
+  const transferNotesId = 'transfer-notes';
 
   // Transfer form data
   let transferData = {
@@ -135,11 +149,37 @@
       notes: ''
     };
   }
+
+  function handleOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleClose();
+    }
+  }
+
+  function handleOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      handleClose();
+    }
+  }
 </script>
 
 {#if show && item}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content" on:click|stopPropagation>
+<div
+  class="modal-overlay"
+  role="presentation"
+  aria-hidden="true"
+  tabindex="-1"
+  on:click={handleOverlayClick}
+>
+  <div
+    class="modal-content"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Transfer equipment"
+    tabindex="0"
+    on:keydown={handleOverlayKeydown}
+  >
     <div class="modal-header">
       <h3>📦 Transfer Equipment</h3>
       <button class="close-btn" on:click={handleClose}>✕</button>
@@ -170,8 +210,12 @@
           <h4>📍 New Location</h4>
           
           <div class="form-group">
-            <label>Location Type *</label>
-            <select bind:value={transferData.newLocation.type} on:change={handleLocationTypeChange}>
+            <label for={locationTypeId}>Location Type *</label>
+            <select
+              id={locationTypeId}
+              bind:value={transferData.newLocation.type}
+              on:change={handleLocationTypeChange}
+            >
               <option value="warehouse">Warehouse</option>
               <option value="tower">Tower Site</option>
               <option value="noc">NOC</option>
@@ -185,8 +229,8 @@
 
           {#if transferData.newLocation.type === 'tower'}
             <div class="form-group">
-              <label>Site</label>
-              <select value={transferData.newLocation.siteId} on:change={handleSiteChange}>
+              <label for={siteSelectId}>Site</label>
+              <select id={siteSelectId} value={transferData.newLocation.siteId} on:change={handleSiteChange}>
                 <option value="">Select site...</option>
                 {#each sites as site}
                   <option value={site.id}>{site.name} ({site.type})</option>
@@ -198,24 +242,24 @@
           {#if transferData.newLocation.type === 'warehouse'}
             <div class="form-grid">
               <div class="form-group">
-                <label>Warehouse Name</label>
-                <input type="text" bind:value={transferData.newLocation.warehouse.name} placeholder="Main Warehouse" />
+                <label for={warehouseNameId}>Warehouse Name</label>
+                <input id={warehouseNameId} type="text" bind:value={transferData.newLocation.warehouse.name} placeholder="Main Warehouse" />
               </div>
               <div class="form-group">
-                <label>Section</label>
-                <input type="text" bind:value={transferData.newLocation.warehouse.section} placeholder="A" />
+                <label for={warehouseSectionId}>Section</label>
+                <input id={warehouseSectionId} type="text" bind:value={transferData.newLocation.warehouse.section} placeholder="A" />
               </div>
               <div class="form-group">
-                <label>Aisle</label>
-                <input type="text" bind:value={transferData.newLocation.warehouse.aisle} placeholder="1" />
+                <label for={warehouseAisleId}>Aisle</label>
+                <input id={warehouseAisleId} type="text" bind:value={transferData.newLocation.warehouse.aisle} placeholder="1" />
               </div>
               <div class="form-group">
-                <label>Shelf</label>
-                <input type="text" bind:value={transferData.newLocation.warehouse.shelf} placeholder="B" />
+                <label for={warehouseShelfId}>Shelf</label>
+                <input id={warehouseShelfId} type="text" bind:value={transferData.newLocation.warehouse.shelf} placeholder="B" />
               </div>
               <div class="form-group">
-                <label>Bin</label>
-                <input type="text" bind:value={transferData.newLocation.warehouse.bin} placeholder="1" />
+                <label for={warehouseBinId}>Bin</label>
+                <input id={warehouseBinId} type="text" bind:value={transferData.newLocation.warehouse.bin} placeholder="1" />
               </div>
             </div>
           {/if}
@@ -223,20 +267,20 @@
           {#if transferData.newLocation.type === 'tower'}
             <div class="form-grid">
               <div class="form-group">
-                <label>Rack</label>
-                <input type="text" bind:value={transferData.newLocation.tower.rack} placeholder="Rack-01" />
+                <label for={towerRackId}>Rack</label>
+                <input id={towerRackId} type="text" bind:value={transferData.newLocation.tower.rack} placeholder="Rack-01" />
               </div>
               <div class="form-group">
-                <label>Rack Unit</label>
-                <input type="text" bind:value={transferData.newLocation.tower.rackUnit} placeholder="U10" />
+                <label for={towerRackUnitId}>Rack Unit</label>
+                <input id={towerRackUnitId} type="text" bind:value={transferData.newLocation.tower.rackUnit} placeholder="U10" />
               </div>
               <div class="form-group">
-                <label>Cabinet</label>
-                <input type="text" bind:value={transferData.newLocation.tower.cabinet} placeholder="Cab-01" />
+                <label for={towerCabinetId}>Cabinet</label>
+                <input id={towerCabinetId} type="text" bind:value={transferData.newLocation.tower.cabinet} placeholder="Cab-01" />
               </div>
               <div class="form-group">
-                <label>Position</label>
-                <input type="text" bind:value={transferData.newLocation.tower.position} placeholder="Top" />
+                <label for={towerPositionId}>Position</label>
+                <input id={towerPositionId} type="text" bind:value={transferData.newLocation.tower.position} placeholder="Top" />
               </div>
             </div>
           {/if}
@@ -247,8 +291,8 @@
           <h4>📋 Transfer Details</h4>
           
           <div class="form-group">
-            <label>Reason for Transfer *</label>
-            <select bind:value={transferData.reason}>
+            <label for={transferReasonId}>Reason for Transfer *</label>
+            <select id={transferReasonId} bind:value={transferData.reason}>
               <option value="">Select reason...</option>
               <option value="deployment">Deployment to Site</option>
               <option value="maintenance">Maintenance</option>
@@ -262,13 +306,14 @@
           </div>
 
           <div class="form-group">
-            <label>Moved By</label>
-            <input type="text" bind:value={transferData.movedBy} placeholder="Your name" />
+            <label for={movedById}>Moved By</label>
+            <input id={movedById} type="text" bind:value={transferData.movedBy} placeholder="Your name" />
           </div>
 
           <div class="form-group">
-            <label>Additional Notes</label>
+            <label for={transferNotesId}>Additional Notes</label>
             <textarea 
+              id={transferNotesId}
               bind:value={transferData.notes} 
               placeholder="Any additional notes about this transfer..."
               rows="3"

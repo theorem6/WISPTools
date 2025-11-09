@@ -72,10 +72,15 @@ export interface CBSDDevice {
     hardwareVersion?: string;
     firmwareVersion?: string;
   };
+  airInterface?: {
+    radioTechnology?: string;
+    supportedTechnologies?: string[];
+  };
   
   // Installation
   installationParam: InstallationParams;
   measCapability?: string[];
+  groupingParam?: unknown[];
   
   // State
   state: CBSDState;
@@ -84,6 +89,7 @@ export interface CBSDDevice {
   
   // Grants
   activeGrants?: Grant[];
+  grantStates?: unknown[];
   
   // Tenant
   tenantId: string;

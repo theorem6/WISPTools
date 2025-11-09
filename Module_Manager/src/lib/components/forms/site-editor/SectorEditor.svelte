@@ -7,8 +7,26 @@
   
   const dispatch = createEventDispatcher();
   
+  $: if (sector) {
+    if (sector.antennaBeamwidth == null) {
+      sector.antennaBeamwidth = sector.beamwidth ?? 65;
+    }
+    if (sector.beamwidth == null) {
+      sector.beamwidth = sector.antennaBeamwidth ?? 65;
+    }
+    if (sector.bandwidth == null && sector.channels?.length) {
+      sector.bandwidth = sector.channels[0]?.channelBandwidth;
+    }
+    if (sector.earfcn == null && sector.channels?.length) {
+      sector.earfcn = sector.channels[0]?.dlEarfcn;
+    }
+  }
+
   function handleChange() {
     if (sector) {
+      if (sector.beamwidth != null) {
+        sector.antennaBeamwidth = sector.beamwidth;
+      }
       dispatch('change', { sector, index: sectorIndex });
     }
   }
@@ -57,7 +75,7 @@
         <input
           id="beamwidth"
           type="number"
-          bind:value={sector.antennaBeamwidth}
+          bind:value={sector.beamwidth}
           on:input={handleChange}
           min="1"
           max="180"

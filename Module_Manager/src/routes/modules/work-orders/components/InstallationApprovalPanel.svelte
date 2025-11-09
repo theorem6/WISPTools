@@ -11,6 +11,13 @@
   let rejectionReason = '';
   let showRejectDialog = false;
   let showPaymentDialog = false;
+  const approvedAmountId = 'payment-approved-amount';
+  const invoiceNumberId = 'payment-invoice-number';
+  const invoiceDateId = 'payment-invoice-date';
+  const invoiceUrlId = 'payment-invoice-url';
+  const paymentMethodId = 'payment-method';
+  const paymentNotesId = 'payment-notes';
+
   let paymentData = {
     approvedAmount: documentation?.paymentApproval?.requestedAmount || 0,
     invoiceNumber: '',
@@ -30,21 +37,20 @@
       const token = await authService.getIdToken();
       const tenantId = $currentTenant?.id;
 
-      const response = await fetch(
-        `/api/installation-documentation/${documentation._id}/approve`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            approvalNotes,
-            rejected: false
-          })
-        }
-      );
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(tenantId ? { 'X-Tenant-ID': tenantId } : {})
+      };
+
+      const response = await fetch(`/api/installation-documentation/${documentation._id}/approve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          approvalNotes,
+          rejected: false
+        })
+      });
 
       if (response.ok) {
         const updated = await response.json();
@@ -73,21 +79,20 @@
       const token = await authService.getIdToken();
       const tenantId = $currentTenant?.id;
 
-      const response = await fetch(
-        `/api/installation-documentation/${documentation._id}/approve`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            rejected: true,
-            rejectionReason
-          })
-        }
-      );
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(tenantId ? { 'X-Tenant-ID': tenantId } : {})
+      };
+
+      const response = await fetch(`/api/installation-documentation/${documentation._id}/approve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          rejected: true,
+          rejectionReason
+        })
+      });
 
       if (response.ok) {
         const updated = await response.json();
@@ -117,18 +122,17 @@
       const token = await authService.getIdToken();
       const tenantId = $currentTenant?.id;
 
-      const response = await fetch(
-        `/api/installation-documentation/${documentation._id}/payment-approve`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(paymentData)
-        }
-      );
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(tenantId ? { 'X-Tenant-ID': tenantId } : {})
+      };
+
+      const response = await fetch(`/api/installation-documentation/${documentation._id}/payment-approve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(paymentData)
+      });
 
       if (response.ok) {
         const updated = await response.json();
@@ -268,28 +272,46 @@
         <h4>Approve Payment</h4>
         
         <div class="form-group">
-          <label>Approved Amount ($)</label>
-          <input type="number" bind:value={paymentData.approvedAmount} step="0.01" />
+          <label for={approvedAmountId}>Approved Amount ($)</label>
+          <input
+            id={approvedAmountId}
+            type="number"
+            bind:value={paymentData.approvedAmount}
+            step="0.01"
+          />
         </div>
         
         <div class="form-group">
-          <label>Invoice Number *</label>
-          <input type="text" bind:value={paymentData.invoiceNumber} required />
+          <label for={invoiceNumberId}>Invoice Number *</label>
+          <input
+            id={invoiceNumberId}
+            type="text"
+            bind:value={paymentData.invoiceNumber}
+            required
+          />
         </div>
         
         <div class="form-group">
-          <label>Invoice Date</label>
-          <input type="date" bind:value={paymentData.invoiceDate} />
+          <label for={invoiceDateId}>Invoice Date</label>
+          <input
+            id={invoiceDateId}
+            type="date"
+            bind:value={paymentData.invoiceDate}
+          />
         </div>
         
         <div class="form-group">
-          <label>Invoice URL (optional)</label>
-          <input type="url" bind:value={paymentData.invoiceUrl} />
+          <label for={invoiceUrlId}>Invoice URL (optional)</label>
+          <input
+            id={invoiceUrlId}
+            type="url"
+            bind:value={paymentData.invoiceUrl}
+          />
         </div>
         
         <div class="form-group">
-          <label>Payment Method</label>
-          <select bind:value={paymentData.paymentMethod}>
+          <label for={paymentMethodId}>Payment Method</label>
+          <select id={paymentMethodId} bind:value={paymentData.paymentMethod}>
             <option value="ach">ACH</option>
             <option value="check">Check</option>
             <option value="wire">Wire Transfer</option>
@@ -298,8 +320,8 @@
         </div>
         
         <div class="form-group">
-          <label>Payment Notes</label>
-          <textarea bind:value={paymentData.paymentNotes}></textarea>
+          <label for={paymentNotesId}>Payment Notes</label>
+          <textarea id={paymentNotesId} bind:value={paymentData.paymentNotes}></textarea>
         </div>
         
         <div class="dialog-actions">

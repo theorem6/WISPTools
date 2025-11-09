@@ -1,11 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
-  import type { TowerSite } from '../lib/models';
+  import { mapLayerManager } from '$lib/map/MapLayerManager';
+  import type { TowerSite, NetworkEquipment } from '../lib/models';
   
   export let show = false;
   export let site: TowerSite | null = null;
   export let tenantId: string;
+  export let planId: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -134,12 +136,37 @@
     ipAddress: '',
     macAddress: '',
     managementUrl: '',
-    notes: ''
+    notes: '',
+    quantity: 1
   };
   
   $: availableTypes = equipmentCategories[formData.category as keyof typeof equipmentCategories] || [];
   $: useCustomType = formData.equipmentType === 'Other/Custom';
   
+  function resolveEquipmentType(category: string): NetworkEquipment['type'] {
+    switch (category) {
+      case 'Radio Equipment':
+      case 'Transmission Equipment':
+        return 'radio';
+      case 'Antennas':
+        return 'antenna';
+      case 'Power Systems':
+        return 'power';
+      case 'Networking Equipment':
+        return 'switch';
+      case 'Monitoring & Control':
+        return 'other';
+      case 'Structural & Housing':
+        return 'other';
+      case 'Environmental Control':
+        return 'other';
+      case 'Test Equipment':
+        return 'other';
+      default:
+        return 'other';
+    }
+  }
+
   async function handleSave() {
     const finalEquipmentType = useCustomType ? formData.customType : formData.equipmentType;
     const isPlanMode = Boolean(planId);
@@ -207,17 +234,26 @@
 
         dispatch('saved', { message: 'Hardware staged in plan.' });
       } else {
-        const equipmentData = {
+        const equipmentData: Omit<NetworkEquipment, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'> = {
           siteId: site.id,
           name: `${finalEquipmentType} - ${formData.serialNumber}`,
-          type: 'tower-equipment',
+          type: resolveEquipmentType(formData.category),
           locationType: 'tower',
-          manufacturer: formData.manufacturer,
-          model: formData.model,
+          manufacturer: formData.manufacturer || '',
+          model: formData.model || '',
           serialNumber: formData.serialNumber,
           status: formData.status,
-          location: site.location,
-          installDate: formData.installDate || undefined,
+          quantity: formData.quantity || 1,
+          location: {
+            latitude: site.location.latitude,
+            longitude: site.location.longitude,
+            address: site.location.address,
+            city: site.location.city,
+            state: site.location.state,
+            zipCode: site.location.zipCode
+          },
+          installDate: formData.installDate ? new Date(formData.installDate) : undefined,
+          purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
           notes: JSON.stringify({
             category: formData.category,
             equipmentType: finalEquipmentType,

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import type { OptimizationResult } from '../pciOptimizer';
+  import type { OptimizationResult } from '$lib/pciOptimizer';
   
   export let show = false;
   export let result: OptimizationResult | null = null;

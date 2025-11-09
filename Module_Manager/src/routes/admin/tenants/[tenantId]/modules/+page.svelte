@@ -52,7 +52,12 @@
   ];
   
   onMount(async () => {
-    tenantId = $page.params.tenantId;
+    const paramId = $page.params.tenantId;
+    if (!paramId) {
+      error = 'No tenant specified';
+      return;
+    }
+    tenantId = paramId;
     await loadTenantData();
   });
   
@@ -61,7 +66,7 @@
     error = '';
     
     try {
-      const tenantRef = doc(db, 'tenants', tenantId);
+      const tenantRef = doc(db(), 'tenants', tenantId);
       const tenantSnap = await getDoc(tenantRef);
       
       if (!tenantSnap.exists()) {
@@ -91,7 +96,7 @@
     success = '';
     
     try {
-      const tenantRef = doc(db, 'tenants', tenantId);
+      const tenantRef = doc(db(), 'tenants', tenantId);
       
       await updateDoc(tenantRef, {
         'config.enabledModules': enabledModules,

@@ -20,6 +20,8 @@
   let isOptimizing = false;
   let error = '';
   let success = '';
+  type ConflictSummary = { high: number; medium: number; low: number; total: number } | null;
+  let conflictSummary: ConflictSummary = null;
 
   onMount(async () => {
     if (show && tenantId) {
@@ -32,7 +34,7 @@
   }
 
   // Also watch for tenantId changes from store
-  $: if (show && $currentTenant?.id && (!$tenantId || $tenantId !== $currentTenant.id)) {
+  $: if (show && $currentTenant?.id && (!tenantId || tenantId !== $currentTenant.id)) {
     tenantId = $currentTenant.id;
   }
 
@@ -55,24 +57,35 @@
       const sites = await coverageMapService.getTowerSites(effectiveTenantId);
       console.log(`[FrequencyPlanner] Loaded ${sites.length} sites from coverage map service`);
 
-      sectors = sites.map(site => ({
-        id: site.id,
-        name: site.name,
-        latitude: site.latitude,
-        longitude: site.longitude,
-        azimuth: site.azimuth || 0,
-        antennaHeight: site.height || 0,
-        vendor: site.vendor || 'Unknown',
-        frequency: {
-          frequency: site.frequency || 3550, // Default to CBRS
-          bandwidth: site.bandwidth || 20,
-          vendor: site.vendor || 'Unknown',
-          power: site.power || 30
-        },
-        radCenterHeight: (site.height || 0) + 2, // Assume 2m above antenna
-        towerId: site.towerId || site.id,
-        sectorId: site.sectorId || site.id
-      }));
+      sectors = sites.map((site) => {
+        const siteRecord = site as Record<string, any>;
+        const metadata = siteRecord.metadata ?? {};
+        const stats = siteRecord.stats ?? {};
+        const height = Number(siteRecord.height ?? metadata.height ?? stats.height ?? 0);
+        const vendor = String(siteRecord.vendor ?? metadata.vendor ?? stats.vendor ?? 'Unknown');
+        const frequencyValue = Number(siteRecord.frequency ?? metadata.frequency ?? stats.frequency ?? 3550);
+        const bandwidthValue = Number(siteRecord.bandwidth ?? metadata.bandwidth ?? stats.bandwidth ?? 20);
+        const powerValue = Number(siteRecord.power ?? metadata.power ?? stats.power ?? 30);
+
+        return {
+          id: site.id,
+          name: site.name,
+          latitude: site.location.latitude,
+          longitude: site.location.longitude,
+          azimuth: Number(siteRecord.azimuth ?? metadata.azimuth ?? stats.azimuth ?? 0),
+          antennaHeight: height,
+          vendor,
+          frequency: {
+            frequency: frequencyValue,
+            bandwidth: bandwidthValue,
+            vendor,
+            power: powerValue
+          },
+          radCenterHeight: height + 2,
+          towerId: String(siteRecord.towerId ?? site.id),
+          sectorId: String(siteRecord.sectorId ?? site.id)
+        } as TowerSector;
+      });
 
       console.log(`[FrequencyPlanner] Converted to ${sectors.length} sectors for frequency analysis`);
     } catch (err: any) {
@@ -189,6 +202,8 @@
     
     return { high, medium, low, total: conflicts.length };
   }
+
+  $: conflictSummary = getConflictStats();
 
   function getSeverityColor(severity: 'HIGH' | 'MEDIUM' | 'LOW'): string {
     switch (severity) {
@@ -359,19 +374,18 @@
                   <p>Your frequency plan looks good! No interference issues detected.</p>
                 </div>
               {:else}
-                {#if getConflictStats()}
-                  {@const stats = getConflictStats()}
+                {#if conflictSummary}
                   <div class="conflict-summary">
                     <div class="conflict-stat high">
-                      <span class="count">{stats.high}</span>
+                      <span class="count">{conflictSummary.high}</span>
                       <span class="label">High Severity</span>
                     </div>
                     <div class="conflict-stat medium">
-                      <span class="count">{stats.medium}</span>
+                      <span class="count">{conflictSummary.medium}</span>
                       <span class="label">Medium Severity</span>
                     </div>
                     <div class="conflict-stat low">
-                      <span class="count">{stats.low}</span>
+                      <span class="count">{conflictSummary.low}</span>
                       <span class="label">Low Severity</span>
                     </div>
                   </div>

@@ -250,7 +250,7 @@
               <p class="help-text">Devices must provide valid credentials to connect to ACS</p>
             </div>
 
-            <div class="credentials-section" class:disabled={!settings.requireAuth}>
+            <div class="credentials-section" class:disabled={!settings?.requireAuth}>
               <h3>Connection Credentials</h3>
               <p class="credentials-note">Configure these credentials in your CPE devices</p>
 
@@ -261,7 +261,7 @@
                     id="acs-user"
                     type="text"
                     bind:value={settings.acsUsername}
-                    disabled={!settings.requireAuth}
+                    disabled={!settings?.requireAuth}
                     placeholder="admin"
                   />
                 </div>
@@ -273,13 +273,16 @@
                       id="acs-pass"
                       type="text"
                       bind:value={settings.acsPassword}
-                      disabled={!settings.requireAuth}
+                      disabled={!settings?.requireAuth}
                       placeholder="••••••••"
                     />
                     <button 
                       class="generate-btn"
-                      on:click={() => settings.acsPassword = Math.random().toString(36).slice(-16) + Math.random().toString(36).slice(-16)}
-                      disabled={!settings.requireAuth}
+                      on:click={() => {
+                        if (!settings) return;
+                        settings.acsPassword = Math.random().toString(36).slice(-16) + Math.random().toString(36).slice(-16);
+                      }}
+                      disabled={!settings?.requireAuth}
                       title="Generate random password"
                     >
                       🔄

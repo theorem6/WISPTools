@@ -103,7 +103,7 @@
       tower.carrierCount = tower.sectors.reduce((sum, s) => sum + s.carriers.length, 0);
       
       // Collect unique technologies
-      if (!tower.technologies.includes(cell.technology)) {
+      if (cell.technology && !tower.technologies.includes(cell.technology)) {
         tower.technologies.push(cell.technology);
       }
       

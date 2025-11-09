@@ -7,7 +7,7 @@
   import type { CBSDDevice, CBSDCategory, CBSDState } from './lib/models/cbsdDevice';
   import { CBRS_BAND } from './lib/models/cbsdDevice';
   import { createCBRSService, type CBRSServiceConfig } from './lib/services/cbrsService';
-  import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig, type CBRSConfig, type PlatformCBRSConfig } from './lib/services/configService';
+import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig, type CBRSConfig, type PlatformCBRSConfig } from './lib/services/configService';
   import DeviceList from './components/DeviceList.svelte';
   import GrantStatus from './components/GrantStatus.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
@@ -31,7 +31,8 @@
   // Configuration
   let cbrsConfig: CBRSConfig | null = null;
   let platformConfig: PlatformCBRSConfig | null = null;
-  let configStatus = { status: 'missing' as const, message: '' };
+type ConfigStatus = ReturnType<typeof getConfigStatus>;
+let configStatus: ConfigStatus = getConfigStatus(null);
   
   // Tenant info - use currentTenant store
   $: tenantId = $currentTenant?.id || '';
@@ -84,10 +85,10 @@
           configStatus = getConfigStatus(cbrsConfig);
         } else {
           // No tenant selected - show warning
-          configStatus = { 
-            status: 'missing' as const, 
-            message: 'No tenant selected. Please select a tenant from the dashboard.' 
-          };
+          configStatus = {
+            status: 'missing',
+            message: 'No tenant selected. Please select a tenant from the dashboard.'
+          } as ConfigStatus;
         }
         
         if (cbrsConfig && configStatus.status === 'complete') {
@@ -186,9 +187,13 @@
       view.on('click', async (event) => {
         const response = await view.hitTest(event);
         if (response.results.length > 0) {
-          const graphic = response.results[0].graphic;
-          if (graphic && graphic.attributes && graphic.attributes.device) {
-            handleDeviceSelect(graphic.attributes.device);
+          const interactiveResult = response.results.find((result) => {
+            return typeof (result as any)?.graphic?.attributes === 'object';
+          }) as { graphic?: { attributes?: Record<string, unknown> } } | undefined;
+
+          const attributes = interactiveResult?.graphic?.attributes as { device?: CBSDDevice } | undefined;
+          if (attributes?.device) {
+            handleDeviceSelect(attributes.device);
           }
         }
       });
@@ -568,8 +573,8 @@
         cbsdCategory: (installation.cbsdCategory || 'A') as CBSDCategory,
         userId: installation.userId || currentUserID || 'unknown',
         callSign: installation.callSign || '',
-        cbsdInfo: installation.cbsdInfo || '',
-        airInterface: installation.airInterface || { radioTechnology: 'E_UTRA' },
+        cbsdInfo: installation.cbsdInfo ?? undefined,
+        airInterface: installation.airInterface ?? undefined,
         installationParam: {
           latitude: lat,
           longitude: lon,
@@ -1203,13 +1208,12 @@
 {/if}
 
 <!-- Settings Modal -->
-<SettingsModal 
-  show={showSettingsModal}
-  config={cbrsConfig || {}}
-  tenantId={tenantId}
-  on:close={() => showSettingsModal = false}
-  on:save={handleSaveSettings}
-/>
+  <SettingsModal 
+    show={showSettingsModal}
+    config={cbrsConfig || {}}
+    on:close={() => showSettingsModal = false}
+    on:save={handleSaveSettings}
+  />
 
 <!-- User ID / Network Selector Modal (includes Google login) -->
 <UserIDSelector

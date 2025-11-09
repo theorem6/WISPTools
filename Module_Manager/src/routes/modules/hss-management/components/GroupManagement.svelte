@@ -17,9 +17,9 @@
   };
   
   // Listen for quick actions
-  function handleQuickAction(event: CustomEvent) {
-    if (event.detail.action === 'create') {
-      addGroup();
+  function handleQuickAction(event: CustomEvent<{ action: string }>) {
+    if (event.detail?.action === 'create') {
+      openAddModal();
     }
   }
 
@@ -46,7 +46,7 @@
         // Backend returns { count, groups } format
         groups = data.groups || data || [];
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error loading groups:', error);
     }
     loading = false;
@@ -62,7 +62,7 @@
         // Backend might return array or { count, plans } format
         bandwidthPlans = data.plans || data || [];
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error loading bandwidth plans:', error);
     }
   }
@@ -111,7 +111,7 @@
       } else {
         alert('Error saving group');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving group:', error);
       alert('Error saving group');
     }
@@ -131,7 +131,7 @@
       } else {
         alert('Error deleting group');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error deleting group:', error);
       alert('Error deleting group');
     }

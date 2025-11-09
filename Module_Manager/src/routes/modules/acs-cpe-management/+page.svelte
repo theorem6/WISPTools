@@ -254,9 +254,13 @@
       view.on('click', async (event) => {
         const response = await view.hitTest(event);
         if (response.results.length > 0) {
-          const graphic = response.results[0].graphic;
-          if (graphic && graphic.attributes && graphic.attributes.device) {
-            handleCPEClick(graphic.attributes.device);
+          const graphicHit = response.results.find((result) => {
+            return (result as any)?.graphic?.attributes?.device;
+          });
+          const attributes = (graphicHit as any)?.graphic?.attributes as Record<string, unknown> | undefined;
+          const device = attributes?.device as unknown;
+          if (device) {
+            handleCPEClick(device);
           }
         }
       });

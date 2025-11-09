@@ -1,7 +1,7 @@
 // GenieACS Integration Service
 // Main service for managing TR-069 CPE devices and integrating with PCI Mapper
 
-import { GenieACSNBIClient, type GenieACSConfig, type GenieACSDevice } from '../api/nbiClient';
+import { GenieACSNBIClient, type GenieACSConfig, type GenieACSDevice, type DeviceParameter } from '../api/nbiClient';
 import { type CPEDevice, CPEDeviceUtils, TR069_PARAMETER_PATHS } from '../models/cpeDevice';
 import { TR069ParameterUtils } from '../models/tr069Parameters';
 import type { TR069Parameter } from '../models/cpeDevice';
@@ -207,7 +207,8 @@ export class GenieACSService {
         const existingDevice = this.devices.get(genieDevice._id);
         if (existingDevice) {
           const locationParams = TR069ParameterUtils.getLocationParameters();
-          const locationData = await this.client.getDeviceParametersByPath(genieDevice._id, locationParams);
+          const locationDataRaw = await this.client.getDeviceParametersByPath(genieDevice._id, locationParams);
+          const locationData = this.normalizeDeviceParameters(locationDataRaw);
           
           const newLocation = this.extractLocationFromParameters(locationData);
           if (newLocation && this.hasLocationChanged(existingDevice.location, newLocation)) {
@@ -228,11 +229,17 @@ export class GenieACSService {
    * Convert GenieACS device to CPE device
    */
   private async convertGenieDeviceToCPE(genieDevice: GenieACSDevice): Promise<CPEDevice> {
-    // Extract device ID information
-    const deviceId = genieDevice._deviceId || {};
+    const rawDeviceId = genieDevice._deviceId || {};
+    const normalizedDeviceId = {
+      manufacturer: rawDeviceId.Manufacturer || 'Unknown',
+      oui: rawDeviceId.OUI || '000000',
+      productClass: rawDeviceId.ProductClass || 'Unknown',
+      serialNumber: rawDeviceId.SerialNumber || genieDevice._id
+    };
     
     // Get device parameters
-    const parameters = await this.client.getDeviceParameters(genieDevice._id);
+    const rawParameters = await this.client.getDeviceParameters(genieDevice._id);
+    const parameters = this.normalizeDeviceParameters(rawParameters);
     
     // Extract location information
     const location = this.extractLocationFromParameters(parameters);
@@ -265,18 +272,13 @@ export class GenieACSService {
     }
     
     const cpeDevice: CPEDevice = {
-      id: CPEDeviceUtils.generateDeviceId(deviceId),
-      deviceId: {
-        manufacturer: deviceId.Manufacturer || 'Unknown',
-        oui: deviceId.OUI || '000000',
-        productClass: deviceId.ProductClass || 'Unknown',
-        serialNumber: deviceId.SerialNumber || genieDevice._id
-      },
+      id: CPEDeviceUtils.generateDeviceId(normalizedDeviceId),
+      deviceId: normalizedDeviceId,
       location,
       networkInfo,
       performanceMetrics,
-      lastContact: genieDevice._lastInform || new Date(),
-      status,
+      lastContact: genieDevice._lastInform ? new Date(genieDevice._lastInform) : new Date(),
+      status: this.determineDeviceStatus(genieDevice) === 'online' ? 'online' : 'offline',
       connectionRequestURL: connectionRequestURL as string,
       softwareVersion: softwareVersion as string,
       hardwareVersion: hardwareVersion as string,
@@ -526,7 +528,8 @@ export class GenieACSService {
     
     // Get latest performance parameters
     const performanceParams = TR069ParameterUtils.getPerformanceParameters();
-    const parameters = await this.client.getDeviceParametersByPath(deviceId, performanceParams);
+    const rawParameters = await this.client.getDeviceParametersByPath(deviceId, performanceParams);
+    const parameters = this.normalizeDeviceParameters(rawParameters);
     
     return this.extractPerformanceMetricsFromParameters(parameters);
   }
@@ -556,5 +559,25 @@ export class GenieACSService {
     this.stopAutoDiscovery();
     this.eventListeners.clear();
     this.devices.clear();
+  }
+
+  private normalizeDeviceParameters(parameters: DeviceParameter[]): TR069Parameter[] {
+    return parameters.map((param) => ({
+      name: (param as any).name || param.path,
+      value: param.value,
+      type: this.detectParameterType(param.value),
+      timestamp: param.timestamp ? new Date(param.timestamp) : new Date(),
+      writable: (param as any).writable ?? false,
+      category: (param as any).category ?? 'system'
+    }));
+  }
+
+  private detectParameterType(value: any): TR069Parameter['type'] {
+    if (typeof value === 'boolean') return 'boolean';
+    if (value instanceof Date) return 'dateTime';
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? 'int' : 'string';
+    }
+    return 'string';
   }
 }

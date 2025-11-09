@@ -12,7 +12,8 @@
   let success = '';
   let isUpdating = false;
   
-  $: workOrderId = $page.params.id;
+  let workOrderId: string = '';
+  $: workOrderId = $page.params.id ?? '';
   $: tenantId = $currentTenant?.id || '';
   
   onMount(async () => {
@@ -24,6 +25,9 @@
     error = '';
     
     try {
+      if (!workOrderId) {
+        throw new Error('Missing work order ID');
+      }
       workOrder = await workOrderService.getWorkOrder(workOrderId);
     } catch (err: any) {
       error = err.message || 'Failed to load work order';
@@ -109,6 +113,11 @@
   function formatDateTime(date: Date | string | undefined): string {
     if (!date) return 'N/A';
     return new Date(date).toLocaleString();
+  }
+
+  function gotoEditWorkOrder() {
+    if (!workOrder?._id) return;
+    goto(`/modules/work-orders/${workOrder._id}/edit`);
   }
 </script>
 
@@ -310,7 +319,7 @@
           
           <button 
             class="action-btn secondary-btn"
-            on:click={() => goto(`/modules/work-orders/${workOrder._id}/edit`)}
+            on:click={gotoEditWorkOrder}
           >
             ✏️ Edit Details
           </button>

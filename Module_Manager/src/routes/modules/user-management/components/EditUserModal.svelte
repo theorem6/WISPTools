@@ -97,10 +97,31 @@
       handleClose();
     }
   }
+
+  function handleBackdropKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleClose();
+    }
+  }
 </script>
 
-<div class="modal-backdrop" on:click={handleBackdropClick}>
-  <div class="modal-content">
+<div
+  class="modal-backdrop"
+  role="presentation"
+  aria-hidden="true"
+  tabindex="-1"
+  on:click={handleBackdropClick}
+>
+  <div
+    class="modal-content"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Edit user dialog"
+    tabindex="0"
+    on:keydown={handleBackdropKeydown}
+    on:click|stopPropagation
+  >
     <div class="modal-header">
       <h2>Edit User</h2>
       <button class="close-btn" on:click={handleClose} disabled={loading}>✕</button>

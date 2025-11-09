@@ -35,7 +35,8 @@
       }
     } catch (error) {
       console.error('Reboot error:', error);
-      actionResult = '⚠️ Error: ' + error.message;
+      const message = error instanceof Error ? error.message : String(error);
+      actionResult = `⚠️ Error: ${message}`;
     } finally {
       actionInProgress = false;
     }
@@ -72,7 +73,8 @@
       }
     } catch (error) {
       console.error('Factory reset error:', error);
-      actionResult = '⚠️ Error: ' + error.message;
+      const message = error instanceof Error ? error.message : String(error);
+      actionResult = `⚠️ Error: ${message}`;
     } finally {
       actionInProgress = false;
     }
@@ -99,7 +101,8 @@
       }
     } catch (error) {
       console.error('Refresh error:', error);
-      actionResult = '⚠️ Error: ' + error.message;
+      const message = error instanceof Error ? error.message : String(error);
+      actionResult = `⚠️ Error: ${message}`;
     } finally {
       actionInProgress = false;
     }

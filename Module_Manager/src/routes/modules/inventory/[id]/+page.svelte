@@ -13,7 +13,8 @@
   let showQRCode = false;
   let qrCodeDataURL = '';
 
-  $: itemId = $page.params.id;
+  let itemId: string = '';
+  $: itemId = $page.params.id ?? '';
   $: tenantId = $currentTenant?.id || '';
 
   onMount(async () => {

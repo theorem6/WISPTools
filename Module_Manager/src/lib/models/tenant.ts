@@ -26,6 +26,7 @@ export interface Tenant {
   
   // Limits
   limits: TenantLimits;
+  userCount?: number;
 }
 
 export interface TenantSettings {

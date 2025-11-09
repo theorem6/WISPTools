@@ -11,6 +11,8 @@
   export let equipment: NetworkEquipment[] = [];
   export let filters: CoverageMapFilters;
   export let externalPlanFeatures: PlanLayerFeature[] = [];
+export let planId: string | null = null;
+export let isPlanMode = false;
 
   const dispatch = createEventDispatcher();
 

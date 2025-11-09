@@ -171,24 +171,28 @@
     }
   }
   
+  type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
+  const severityColors: Record<AlertSeverity, string> = {
+    info: '#3b82f6',
+    warning: '#f59e0b',
+    error: '#ef4444',
+    critical: '#dc2626'
+  };
+
   function getSeverityColor(severity: string) {
-    const colors = {
-      'info': '#3b82f6',
-      'warning': '#f59e0b',
-      'error': '#ef4444',
-      'critical': '#dc2626'
-    };
-    return colors[severity] || '#64748b';
+    return severityColors[severity as AlertSeverity] ?? '#64748b';
   }
   
+  type ServiceStatus = 'healthy' | 'degraded' | 'down' | 'unknown';
+  const serviceStatusColors: Record<ServiceStatus, string> = {
+    healthy: '#10b981',
+    degraded: '#f59e0b',
+    down: '#ef4444',
+    unknown: '#64748b'
+  };
+
   function getServiceStatusColor(status: string) {
-    const colors = {
-      'healthy': '#10b981',
-      'degraded': '#f59e0b',
-      'down': '#ef4444',
-      'unknown': '#64748b'
-    };
-    return colors[status] || '#64748b';
+    return serviceStatusColors[status as ServiceStatus] ?? '#64748b';
   }
   
   $: filteredAlerts = activeAlerts.filter(alert => {

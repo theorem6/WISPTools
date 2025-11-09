@@ -38,7 +38,7 @@ export async function loadCoverageMapData(options: LoadOptions): Promise<Coverag
     const cpeDevices = await coverageMapService.getCPEDevices(tenantId);
     
     // Load equipment
-    const equipment = await coverageMapService.getNetworkEquipment(tenantId);
+    const equipment = await coverageMapService.getEquipment(tenantId);
     
     // Apply filters if provided
     let filteredData = {
@@ -69,17 +69,21 @@ function applyFilters(
   return {
     towers: data.towers.filter(tower => {
       if (!filters.showTowers) return false;
-      if (filters.statusFilter.length > 0 && !filters.statusFilter.includes(tower.status)) return false;
+      if (filters.statusFilter.length > 0 && (!tower.status || !filters.statusFilter.includes(tower.status))) return false;
       return true;
     }),
     sectors: data.sectors.filter(sector => {
       if (!filters.showSectors) return false;
-      if (filters.bandFilters.length > 0 && !filters.bandFilters.includes(sector.band)) return false;
+      if (filters.bandFilters.length > 0) {
+        if (!sector.band) return false;
+        const isAllowed = filters.bandFilters.some(filter => filter.enabled && filter.band === sector.band);
+        if (!isAllowed) return false;
+      }
       return true;
     }),
     cpeDevices: data.cpeDevices.filter(cpe => {
       if (!filters.showCPE) return false;
-      if (filters.statusFilter.length > 0 && !filters.statusFilter.includes(cpe.status)) return false;
+      if (filters.statusFilter.length > 0 && (!cpe.status || !filters.statusFilter.includes(cpe.status))) return false;
       return true;
     }),
     equipment: data.equipment.filter(eq => {

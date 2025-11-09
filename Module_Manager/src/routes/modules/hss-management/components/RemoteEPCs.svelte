@@ -134,7 +134,10 @@
   };
   let creatingSite = false;
   
-  function handleSiteSelect() {
+  function handleSiteSelect(siteId?: string) {
+    if (siteId) {
+      selectedSiteId = siteId;
+    }
     if (selectedSiteId === 'create-new') {
       showCreateSiteModal = true;
       return;
@@ -703,13 +706,13 @@ To use:
             {#if loadingSites}
               <p class="loading-text">Loading sites...</p>
             {:else if sites.length === 0}
-              <select bind:value={selectedSiteId} on:change={handleSiteSelect}>
+              <select bind:value={selectedSiteId} on:change={(event) => handleSiteSelect((event.target as HTMLSelectElement).value)}>
                 <option value="create-new">➕ Create New Site...</option>
               </select>
               <small class="form-hint">No sites available. Select "Create New Site" to add one.</small>
             {:else}
               <div style="display: flex; gap: 0.5rem;">
-                <select bind:value={selectedSiteId} on:change={handleSiteSelect} style="flex: 1;">
+                <select bind:value={selectedSiteId} on:change={(event) => handleSiteSelect((event.target as HTMLSelectElement).value)} style="flex: 1;">
                   <option value="">-- Select a site --</option>
                   <option value="create-new">➕ Create New Site...</option>
                   {#each sites as site}

@@ -20,15 +20,14 @@
       const token = await authService.getIdToken();
       const tenantId = $currentTenant?.id;
 
-      const response = await fetch(
-        `/api/installation-documentation?workOrderId=${workOrderId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId
-          }
-        }
-      );
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token}`,
+        ...(tenantId ? { 'X-Tenant-ID': tenantId } : {})
+      };
+
+      const response = await fetch(`/api/installation-documentation?workOrderId=${workOrderId}`, {
+        headers
+      });
 
       if (response.ok) {
         const docs = await response.json();

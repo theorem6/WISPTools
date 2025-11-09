@@ -67,12 +67,13 @@
   }
 
   async function loadSubscribers() {
+    const tenantId = getTenantIdOrThrow();
     const response = await fetch(`${HSS_API}/subscribers`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-          'X-Tenant-ID': $currentTenant.id
+        'X-Tenant-ID': tenantId
       }
     });
 
@@ -84,12 +85,13 @@
   }
 
   async function loadGroups() {
+    const tenantId = getTenantIdOrThrow();
     const response = await fetch(`${HSS_API}/groups`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-          'X-Tenant-ID': $currentTenant.id
+        'X-Tenant-ID': tenantId
       }
     });
 
@@ -101,12 +103,13 @@
   }
 
   async function loadBandwidthPlans() {
+    const tenantId = getTenantIdOrThrow();
     const response = await fetch(`${HSS_API}/bandwidth-plans`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-          'X-Tenant-ID': $currentTenant.id
+        'X-Tenant-ID': tenantId
       }
     });
 
@@ -118,12 +121,13 @@
   }
 
   async function loadEPCs() {
+    const tenantId = getTenantIdOrThrow();
     const response = await fetch(`${HSS_API}/epcs`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${await getAuthToken()}`,
         'Content-Type': 'application/json',
-          'X-Tenant-ID': $currentTenant.id
+        'X-Tenant-ID': tenantId
       }
     });
 
@@ -142,12 +146,33 @@
     return token;
   }
 
+  function getTenantIdOrThrow(): string {
+    const tenantId = $currentTenant?.id?.trim();
+    if (!tenantId) {
+      throw new Error('No tenant selected');
+    }
+    return tenantId;
+  }
+
   function handleClose() {
     error = '';
     success = '';
     importData = null;
     activeTab = 'subscribers';
     dispatch('close');
+  }
+
+  function handleOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      handleClose();
+    }
+  }
+
+  function handleOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleClose();
+    }
   }
 
   function exportToInventory() {
@@ -324,8 +349,16 @@
 </script>
 
 {#if show}
-  <div class="modal-overlay" on:click={handleClose}>
-    <div class="modal-content hss-import-modal" on:click|stopPropagation>
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    tabindex="0"
+    aria-label="HSS data import dialog"
+    on:click={handleOverlayClick}
+    on:keydown={handleOverlayKeydown}
+  >
+    <div class="modal-content hss-import-modal" role="document">
       <div class="modal-header">
         <h2>🏠 HSS Data Import</h2>
         <div class="header-actions">

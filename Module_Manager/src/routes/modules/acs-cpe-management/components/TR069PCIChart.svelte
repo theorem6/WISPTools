@@ -1,6 +1,7 @@
 <script lang="ts">
   import Chart from '$lib/components/data-display/Chart.svelte';
   import type { ChartConfiguration } from '$lib/chartSetup';
+  import type { TooltipItem } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
   export let metrics: TR069CellularMetrics[] = [];
@@ -11,103 +12,104 @@
     return m.pci !== metrics[i - 1].pci;
   });
 
+  const tooltipLabel = (context: TooltipItem<'line'>): string[] => {
+    const value = context.parsed.y;
+    if (typeof value !== 'number') {
+      return ['PCI: N/A'];
+    }
+    const mod3 = value % 3;
+    const mod6 = value % 6;
+    const mod30 = value % 30;
+    return [`PCI: ${value}`, `Mod3: ${mod3}`, `Mod6: ${mod6}`, `Mod30: ${mod30}`];
+  };
+
+  const tooltipTitle = (contexts: TooltipItem<'line'>[]): string => {
+    const context = contexts[0];
+    const index = context.dataIndex;
+    const baseLabel = context.label ?? '';
+    return pciChanges[index] ? `${baseLabel} (Handover)` : baseLabel;
+  };
+
   $: config = {
-    type: 'line',
+    type: 'line' as const,
     data: {
-    labels: metrics.map((m, i) => {
-      const time = new Date(m.timestamp);
-      const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      return pciChanges[i] ? `${label} 🔄` : label;
-    }),
-    datasets: [
-      {
-        label: 'Physical Cell ID (PCI)',
-        data: metrics.map(m => m.pci),
-        borderColor: '#8b5cf6',
-        backgroundColor: pciChanges.map(changed => 
-          changed ? 'rgba(239, 68, 68, 0.3)' : 'rgba(139, 92, 246, 0.1)'
-        ),
-        pointBackgroundColor: pciChanges.map(changed => 
-          changed ? '#ef4444' : '#8b5cf6'
-        ),
-        pointRadius: pciChanges.map(changed => changed ? 6 : 3),
-        pointHoverRadius: 8,
-        stepped: 'before', // Show as step chart since PCI is discrete
-        borderWidth: 2
-      }
-    ]
+      labels: metrics.map((m, i) => {
+        const time = new Date(m.timestamp);
+        const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return pciChanges[i] ? `${label} 🔄` : label;
+      }),
+      datasets: [
+        {
+          label: 'Physical Cell ID (PCI)',
+          data: metrics.map((m) => m.pci),
+          borderColor: '#8b5cf6',
+          backgroundColor: pciChanges.map((changed) =>
+            changed ? 'rgba(239, 68, 68, 0.3)' : 'rgba(139, 92, 246, 0.1)'
+          ),
+          pointBackgroundColor: pciChanges.map((changed) =>
+            changed ? '#ef4444' : '#8b5cf6'
+          ),
+          pointRadius: pciChanges.map((changed) => (changed ? 6 : 3)),
+          pointHoverRadius: 8,
+          stepped: 'before' as const, // step chart since PCI is discrete
+          borderWidth: 2
+        }
+      ]
     },
     options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false
-    },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: 'rgb(156, 163, 175)',
-          usePointStyle: true,
-          padding: 15
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index' as const,
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: 'rgb(156, 163, 175)',
+            usePointStyle: true,
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          callbacks: {
+            label: tooltipLabel,
+            title: tooltipTitle
+          }
         }
       },
-      tooltip: {
-        backgroundColor: 'rgba(17, 24, 39, 0.95)',
-        callbacks: {
-          label: (context) => {
-            const pci = context.parsed.y;
-            const mod3 = pci % 3;
-            const mod6 = pci % 6;
-            const mod30 = pci % 30;
-            return [
-              `PCI: ${pci}`,
-              `Mod3: ${mod3}`,
-              `Mod6: ${mod6}`,
-              `Mod30: ${mod30}`
-            ];
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Physical Cell ID',
+            color: 'rgb(156, 163, 175)'
           },
-          title: (contexts) => {
-            const idx = contexts[0].dataIndex;
-            if (pciChanges[idx]) {
-              return `${contexts[0].label} (Handover)`;
-            }
-            return contexts[0].label;
+          grid: {
+            color: 'rgba(75, 85, 99, 0.2)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)',
+            stepSize: 50
+          },
+          min: 0,
+          max: 503
+        },
+        x: {
+          grid: {
+            color: 'rgba(75, 85, 99, 0.1)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)',
+            maxRotation: 45,
+            minRotation: 45
           }
         }
       }
-    },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: 'Physical Cell ID',
-          color: 'rgb(156, 163, 175)'
-        },
-        grid: {
-          color: 'rgba(75, 85, 99, 0.2)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)',
-          stepSize: 50
-        },
-        min: 0,
-        max: 503
-      },
-      x: {
-        grid: {
-          color: 'rgba(75, 85, 99, 0.1)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)',
-          maxRotation: 45,
-          minRotation: 45
-        }
-      }
     }
-    }
-  };
+  } satisfies ChartConfiguration<'line'>;
 
   $: handoverCount = pciChanges.filter(Boolean).length;
 </script>

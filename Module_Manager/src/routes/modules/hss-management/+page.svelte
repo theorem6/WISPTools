@@ -13,35 +13,46 @@
   import RemoteEPCs from './components/RemoteEPCs.svelte';
   import DeployEPC from './components/DeployEPC.svelte';
   import { API_CONFIG } from '$lib/config/api';
+  import type { Tenant } from '$lib/models/tenant';
+  
+  type HSSManagementTab = 'dashboard' | 'subscribers' | 'groups' | 'plans' | 'mme' | 'import' | 'remote-epcs';
   
   // Use centralized API configuration
   const HSS_API = API_CONFIG.PATHS.HSS;
   
-  let activeTab = 'dashboard';
+  let activeTab: HSSManagementTab = 'dashboard';
+  let loading = true;
+  let error = '';
+  let stats: any = null;
+  let groups: any[] = [];
+  let bandwidthPlans: any[] = [];
+  let tenantId = '';
+  $: tenantId = $currentTenant?.id ?? '';
   
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {
     console.log('[HSS Module] Tenant loaded:', tenantId);
-    loadStats();
-    loadGroups();
-    loadBandwidthPlans();
+    void refreshAll();
   }
   
-  onMount(async () => {
+  async function refreshAll(): Promise<void> {
+    loading = true;
+    error = '';
     try {
-      if (tenantId) {
-        await Promise.all([
-          loadStats(),
-          loadGroups(),
-          loadBandwidthPlans()
-        ]);
+      if (!tenantId) {
+        return;
       }
+      await Promise.all([
+        loadStats(),
+        loadGroups(),
+        loadBandwidthPlans()
+      ]);
     } catch (err: any) {
-      error = err.message;
+      error = err?.message || 'Failed to load HSS data';
     } finally {
       loading = false;
     }
-  });
+  }
   
   async function loadStats() {
     try {
@@ -74,10 +85,12 @@
       });
       
       if (response.ok) {
-        groups = await response.json();
+        const data = await response.json();
+        groups = data.groups || data || [];
       }
     } catch (err) {
       console.error('Failed to load groups:', err);
+      groups = [];
     }
   }
   
@@ -90,18 +103,20 @@
       });
       
       if (response.ok) {
-        bandwidthPlans = await response.json();
+        const data = await response.json();
+        bandwidthPlans = data.plans || data || [];
       }
     } catch (err) {
       console.error('Failed to load bandwidth plans:', err);
+      bandwidthPlans = [];
     }
   }
   
-  function switchTab(tab: string) {
+  function switchTab(tab: HSSManagementTab) {
     activeTab = tab;
   }
   
-  function handleNavigate(event: CustomEvent<{ tab: string; action?: string }>) {
+  function handleNavigate(event: CustomEvent<{ tab: HSSManagementTab; action?: string }>) {
     const { tab, action } = event.detail;
     activeTab = tab;
     

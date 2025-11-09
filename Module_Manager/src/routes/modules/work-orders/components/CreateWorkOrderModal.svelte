@@ -15,6 +15,18 @@
   let sites: any[] = [];
   let showCustomerLookup = false;
   let selectedCustomer: Customer | null = null;
+  const typeFieldId = 'work-order-type';
+  const priorityFieldId = 'work-order-priority';
+  const titleFieldId = 'work-order-title';
+  const descriptionFieldId = 'work-order-description';
+  const issueCategoryFieldId = 'work-order-issue-category';
+  const siteFieldId = 'work-order-site';
+  const customerNameFieldId = 'work-order-customer-name';
+  const customerPhoneFieldId = 'work-order-customer-phone';
+  const scheduledDateFieldId = 'work-order-scheduled-date';
+  const estimatedDurationFieldId = 'work-order-estimated-duration';
+  const slaResponseFieldId = 'work-order-sla-response';
+  const slaResolutionFieldId = 'work-order-sla-resolution';
   
   let formData = {
     type: 'troubleshoot' as WorkOrder['type'],
@@ -211,11 +223,32 @@
       slaResolutionHours: 24
     };
   }
+
+function handleOverlayKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    handleClose();
+  }
+}
+
+function handleOverlayClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
+    handleClose();
+  }
+}
 </script>
 
 {#if show}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content" on:click|stopPropagation>
+<div
+  class="modal-overlay"
+  role="dialog"
+  aria-modal="true"
+  tabindex="0"
+  aria-label="Create work order dialog"
+  on:click={handleOverlayClick}
+  on:keydown={handleOverlayKeydown}
+>
+  <div class="modal-content" role="document">
     <div class="modal-header">
       <h2>➕ Create Work Order</h2>
       <button class="close-btn" on:click={handleClose}>✕</button>
@@ -232,8 +265,8 @@
         
         <div class="form-grid">
           <div class="form-group">
-            <label>Type *</label>
-            <select bind:value={formData.type}>
+            <label for={typeFieldId}>Type *</label>
+            <select id={typeFieldId} bind:value={formData.type}>
               <option value="installation">Installation</option>
               <option value="repair">Repair</option>
               <option value="maintenance">Maintenance</option>
@@ -246,8 +279,8 @@
           </div>
           
           <div class="form-group">
-            <label>Priority *</label>
-            <select bind:value={formData.priority}>
+            <label for={priorityFieldId}>Priority *</label>
+            <select id={priorityFieldId} bind:value={formData.priority}>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -257,13 +290,20 @@
         </div>
         
         <div class="form-group">
-          <label>Title *</label>
-          <input type="text" bind:value={formData.title} placeholder="Brief description of the issue or task" required />
+          <label for={titleFieldId}>Title *</label>
+          <input
+            id={titleFieldId}
+            type="text"
+            bind:value={formData.title}
+            placeholder="Brief description of the issue or task"
+            required
+          />
         </div>
         
         <div class="form-group">
-          <label>Description</label>
+          <label for={descriptionFieldId}>Description</label>
           <textarea 
+            id={descriptionFieldId}
             bind:value={formData.description} 
             placeholder="Detailed description of the work to be performed..."
             rows="4"
@@ -272,8 +312,8 @@
         
         {#if formData.type === 'troubleshoot' || formData.type === 'repair'}
           <div class="form-group">
-            <label>Issue Category</label>
-            <select bind:value={formData.issueCategory}>
+            <label for={issueCategoryFieldId}>Issue Category</label>
+            <select id={issueCategoryFieldId} bind:value={formData.issueCategory}>
               <option value="">Select category...</option>
               <option value="cpe-offline">CPE Offline</option>
               <option value="sector-down">Sector Down</option>
@@ -294,8 +334,8 @@
         <h3>📍 Location</h3>
         
         <div class="form-group">
-          <label>Site</label>
-          <select value={formData.location.siteId} on:change={handleSiteChange}>
+          <label for={siteFieldId}>Site</label>
+          <select id={siteFieldId} value={formData.location.siteId} on:change={handleSiteChange}>
             <option value="">Select site...</option>
             {#each sites as site}
               <option value={site.id}>{site.name} ({site.type})</option>
@@ -344,13 +384,23 @@
               <p class="or-divider">OR</p>
               <div class="form-grid">
                 <div class="form-group">
-                  <label>Customer Name</label>
-                  <input type="text" bind:value={formData.customerName} placeholder="John Smith" />
+                  <label for={customerNameFieldId}>Customer Name</label>
+                  <input
+                    id={customerNameFieldId}
+                    type="text"
+                    bind:value={formData.customerName}
+                    placeholder="John Smith"
+                  />
                 </div>
                 
                 <div class="form-group">
-                  <label>Phone</label>
-                  <input type="tel" bind:value={formData.customerPhone} placeholder="555-1234" />
+                  <label for={customerPhoneFieldId}>Phone</label>
+                  <input
+                    id={customerPhoneFieldId}
+                    type="tel"
+                    bind:value={formData.customerPhone}
+                    placeholder="555-1234"
+                  />
                 </div>
               </div>
             </div>
@@ -364,13 +414,22 @@
         
         <div class="form-grid">
           <div class="form-group">
-            <label>Scheduled Date</label>
-            <input type="datetime-local" bind:value={formData.scheduledDate} />
+            <label for={scheduledDateFieldId}>Scheduled Date</label>
+            <input
+              id={scheduledDateFieldId}
+              type="datetime-local"
+              bind:value={formData.scheduledDate}
+            />
           </div>
           
           <div class="form-group">
-            <label>Estimated Duration (minutes)</label>
-            <input type="number" bind:value={formData.estimatedDuration} placeholder="120" />
+            <label for={estimatedDurationFieldId}>Estimated Duration (minutes)</label>
+            <input
+              id={estimatedDurationFieldId}
+              type="number"
+              bind:value={formData.estimatedDuration}
+              placeholder="120"
+            />
           </div>
         </div>
       </div>
@@ -381,13 +440,23 @@
         
         <div class="form-grid">
           <div class="form-group">
-            <label>Response Time (hours)</label>
-            <input type="number" bind:value={formData.slaResponseHours} placeholder="4" />
+            <label for={slaResponseFieldId}>Response Time (hours)</label>
+            <input
+              id={slaResponseFieldId}
+              type="number"
+              bind:value={formData.slaResponseHours}
+              placeholder="4"
+            />
           </div>
           
           <div class="form-group">
-            <label>Resolution Time (hours)</label>
-            <input type="number" bind:value={formData.slaResolutionHours} placeholder="24" />
+            <label for={slaResolutionFieldId}>Resolution Time (hours)</label>
+            <input
+              id={slaResolutionFieldId}
+              type="number"
+              bind:value={formData.slaResolutionHours}
+              placeholder="24"
+            />
           </div>
         </div>
       </div>

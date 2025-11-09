@@ -4,8 +4,17 @@
   import { authService } from '$lib/services/authService';
   import { tenantStore } from '$lib/stores/tenantStore';
   import { tenantService } from '$lib/services/tenantService';
+  import type { User } from 'firebase/auth';
 
-  let debugInfo = {
+  interface DebugInfo {
+    isAuthenticated: boolean;
+    currentUser: User | null;
+    tenantState: unknown;
+    userTenants: unknown[];
+    error: string | null;
+  }
+
+  let debugInfo: DebugInfo = {
     isAuthenticated: false,
     currentUser: null,
     tenantState: null,
@@ -32,15 +41,15 @@
         try {
           const tenants = await tenantService.getUserTenants(currentUser.uid);
           debugInfo.userTenants = tenants;
-        } catch (err) {
-          debugInfo.error = err.message || String(err);
+        } catch (err: unknown) {
+          debugInfo.error = err instanceof Error ? err.message : String(err);
         }
 
         // Cleanup subscription
         unsubscribe();
       }
-    } catch (err) {
-      debugInfo.error = err.message || String(err);
+    } catch (err: unknown) {
+      debugInfo.error = err instanceof Error ? err.message : String(err);
     }
   });
 </script>

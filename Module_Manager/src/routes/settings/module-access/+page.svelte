@@ -77,7 +77,9 @@
   }
   
   async function handleSave() {
-    if (!$currentTenant || !auth.currentUser) return;
+    const firebaseAuth = auth();
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (!$currentTenant || !currentUserId) return;
     
     saving = true;
     error = '';
@@ -91,7 +93,7 @@
             $currentTenant.id,
             role,
             moduleAccess[role],
-            auth.currentUser.uid
+            currentUserId
           );
         }
       }
@@ -110,10 +112,12 @@
   }
   
   async function handleResetRole(role: UserRole) {
-    if (!$currentTenant || !auth.currentUser) return;
+    const firebaseAuth = auth();
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (!$currentTenant || !currentUserId) return;
     
     try {
-      await resetRoleToDefaults($currentTenant.id, role, auth.currentUser.uid);
+      await resetRoleToDefaults($currentTenant.id, role, currentUserId);
       await loadConfig();
     } catch (err: any) {
       error = err.message || 'Failed to reset role';
@@ -121,13 +125,15 @@
   }
   
   async function handleResetAll() {
-    if (!$currentTenant || !auth.currentUser) return;
+    const firebaseAuth = auth();
+    const currentUserId = firebaseAuth.currentUser?.uid;
+    if (!$currentTenant || !currentUserId) return;
     
     saving = true;
     error = '';
     
     try {
-      await resetAllRolesToDefaults($currentTenant.id, auth.currentUser.uid);
+      await resetAllRolesToDefaults($currentTenant.id, currentUserId);
       await loadConfig();
       showResetConfirm = false;
     } catch (err: any) {
@@ -143,6 +149,19 @@
   
   function isRoleLocked(role: UserRole): boolean {
     return role === 'owner' || role === 'platform_admin';
+  }
+
+  function handleResetBackdropKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      showResetConfirm = false;
+    }
+  }
+
+  function handleResetBackdropClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      showResetConfirm = false;
+    }
   }
 </script>
 
@@ -265,8 +284,22 @@
 </div>
 
 {#if showResetConfirm}
-  <div class="modal-backdrop" on:click={() => showResetConfirm = false}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    aria-hidden="true"
+    tabindex="-1"
+    on:click={handleResetBackdropClick}
+  >
+    <div
+      class="modal-content"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reset module access confirmation dialog"
+      tabindex="0"
+      on:keydown={handleResetBackdropKeydown}
+      on:click|stopPropagation
+    >
       <div class="modal-header">
         <h2>Reset All to Defaults?</h2>
         <button class="close-btn" on:click={() => showResetConfirm = false}>✕</button>

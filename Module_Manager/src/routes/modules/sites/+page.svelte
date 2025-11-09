@@ -15,6 +15,9 @@
   let searchQuery = '';
   let typeFilter: string = 'all';
   let statusFilter: string = 'all';
+
+const typeFilterFieldId = 'sites-type-filter';
+const statusFilterFieldId = 'sites-status-filter';
   
   // Modals
   let showEditModal = false;
@@ -178,8 +181,8 @@
       </div>
       
       <div class="filter-group">
-        <label>Type:</label>
-        <select bind:value={typeFilter}>
+        <label for={typeFilterFieldId}>Type:</label>
+        <select id={typeFilterFieldId} bind:value={typeFilter}>
           <option value="all">All Types</option>
           <option value="tower">📡 Tower</option>
           <option value="building">🏢 Building</option>
@@ -191,8 +194,8 @@
       </div>
       
       <div class="filter-group">
-        <label>Status:</label>
-        <select bind:value={statusFilter}>
+        <label for={statusFilterFieldId}>Status:</label>
+        <select id={statusFilterFieldId} bind:value={statusFilter}>
           <option value="all">All Statuses</option>
           <option value="active">✅ Active</option>
           <option value="inactive">❌ Inactive</option>

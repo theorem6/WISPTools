@@ -2,11 +2,40 @@
   import { onMount } from 'svelte';
   import MainMenu from '../components/MainMenu.svelte';
   
+  type FaultSeverity = 'Critical' | 'Warning' | 'Info' | string;
+  type FaultStatus = 'Open' | 'Resolved' | string;
+  
+  interface Fault {
+    id: string;
+    deviceName: string;
+    message: string;
+    severity: FaultSeverity;
+    status: FaultStatus;
+    createdAt?: string;
+    resolvedAt?: string;
+    resolvedBy?: string;
+    resolution?: string;
+    timestamp?: string;
+    parameters?: Record<string, unknown>;
+    [key: string]: unknown;
+  }
+  
+  interface FaultResponse extends Omit<Fault, 'id'> {
+    _id?: string;
+    id?: string;
+  }
+  
+  interface FaultApiResponse {
+    success: boolean;
+    faults: FaultResponse[];
+    error?: string;
+  }
+  
   // Faults data from database
-  let faults = [];
-
+  let faults: Fault[] = [];
+  
   let isLoading = false;
-  let selectedFault = null;
+  let selectedFault: Fault | null = null;
   let showFaultModal = false;
   let searchTerm = '';
   let severityFilter = 'all';
@@ -17,7 +46,7 @@
     await loadFaults();
   });
 
-  async function loadFaults() {
+  async function loadFaults(): Promise<void> {
     isLoading = true;
     try {
       console.log('Loading faults from MongoDB...');
@@ -31,13 +60,34 @@
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as FaultApiResponse;
         if (data.success) {
           console.log(`Loaded ${data.faults.length} faults from MongoDB`);
-          faults = data.faults.map(f => ({
-            ...f,
-            id: f._id || f.id
-          }));
+          faults = data.faults.map((f) => {
+            const generatedId =
+              f._id ??
+              f.id ??
+              (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? crypto.randomUUID()
+                : `fault-${Math.random().toString(36).slice(2)}`);
+            const timestampValue = typeof f.timestamp === 'string' ? f.timestamp : undefined;
+            const parametersValue = ((): Record<string, unknown> | undefined => {
+              if (typeof f.parameters === 'object' && f.parameters !== null) {
+                return f.parameters as Record<string, unknown>;
+              }
+              return undefined;
+            })();
+            return {
+              ...f,
+              id: String(generatedId),
+              deviceName: typeof f.deviceName === 'string' ? f.deviceName : 'Unknown Device',
+              message: typeof f.message === 'string' ? f.message : '',
+              severity: (f.severity ?? 'Info') as FaultSeverity,
+              status: (f.status ?? 'Open') as FaultStatus,
+              timestamp: timestampValue,
+              parameters: parametersValue
+            };
+          });
         } else {
           console.warn('Failed to load faults:', data.error);
           faults = [];
@@ -54,12 +104,12 @@
     isLoading = false;
   }
 
-  function viewFault(fault) {
+  function viewFault(fault: Fault): void {
     selectedFault = fault;
     showFaultModal = true;
   }
 
-  async function resolveFault(fault) {
+  async function resolveFault(fault: Fault): Promise<void> {
     const resolution = prompt('Enter resolution notes (optional):') || 'Fault resolved manually';
     
     if (resolution !== null) {
@@ -103,7 +153,7 @@
     }
   }
 
-  function getSeverityClass(severity) {
+  function getSeverityClass(severity: FaultSeverity): string {
     switch (severity) {
       case 'Critical': return 'severity-critical';
       case 'Warning': return 'severity-warning';
@@ -112,7 +162,7 @@
     }
   }
 
-  function getStatusClass(status) {
+  function getStatusClass(status: FaultStatus): string {
     switch (status) {
       case 'Open': return 'status-open';
       case 'Resolved': return 'status-resolved';
@@ -120,11 +170,13 @@
     }
   }
 
-  function getFilteredFaults() {
-    return faults.filter(fault => {
-      const matchesSearch = fault.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           fault.deviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           fault.message.toLowerCase().includes(searchTerm.toLowerCase());
+  function getFilteredFaults(): Fault[] {
+    const normalizedSearch = searchTerm.toLowerCase();
+    return faults.filter((fault) => {
+      const matchesSearch =
+        fault.id.toLowerCase().includes(normalizedSearch) ||
+        fault.deviceName.toLowerCase().includes(normalizedSearch) ||
+        fault.message.toLowerCase().includes(normalizedSearch);
       const matchesSeverity = severityFilter === 'all' || fault.severity === severityFilter;
       const matchesStatus = statusFilter === 'all' || fault.status === statusFilter;
       
@@ -132,11 +184,12 @@
     });
   }
 
-  function refreshFaults() {
+  function refreshFaults(): Promise<void> {
     loadFaults();
+    return Promise.resolve();
   }
 
-  async function deleteFault(fault) {
+  async function deleteFault(fault: Fault): Promise<void> {
     if (!confirm(`Delete fault ${fault.id}? This action cannot be undone.`)) {
       return;
     }
@@ -174,7 +227,7 @@
     }
   }
 
-  function getFaultStats() {
+  function getFaultStats(): { total: number; open: number; resolved: number; critical: number } {
     const total = faults.length;
     const open = faults.filter(f => f.status === 'Open').length;
     const resolved = faults.filter(f => f.status === 'Resolved').length;
@@ -324,7 +377,7 @@
               </div>
               <div class="fault-meta">
                 <span class="meta-item">
-                  <strong>Timestamp:</strong> {new Date(fault.timestamp).toLocaleString()}
+                  <strong>Timestamp:</strong> {fault.timestamp ? new Date(fault.timestamp).toLocaleString() : 'N/A'}
                 </span>
                 {#if fault.resolvedAt}
                   <span class="meta-item">
@@ -387,7 +440,7 @@
             </div>
             <div class="detail-item">
               <span class="detail-label">Timestamp:</span>
-              <span class="detail-value">{new Date(selectedFault.timestamp).toLocaleString()}</span>
+              <span class="detail-value">{selectedFault.timestamp ? new Date(selectedFault.timestamp).toLocaleString() : 'N/A'}</span>
             </div>
           </div>
           
@@ -433,7 +486,7 @@
           <div class="detail-section">
             <h3>Device Parameters</h3>
             <div class="parameters-list">
-              {#each Object.entries(selectedFault.parameters) as [path, value]}
+              {#each Object.entries(selectedFault.parameters ?? {}) as [path, value]} 
                 <div class="parameter-item">
                   <span class="parameter-path">{path}</span>
                   <span class="parameter-value">{String(value)}</span>

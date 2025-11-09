@@ -301,7 +301,7 @@ export class GoogleSASClient {
 
       // Get Firebase auth token
       const { auth } = await import('$lib/firebase');
-      const currentUser = auth.currentUser;
+      const currentUser = auth().currentUser;
       
       if (!currentUser) {
         throw new Error('User not authenticated');

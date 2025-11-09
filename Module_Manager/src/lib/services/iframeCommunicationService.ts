@@ -113,16 +113,17 @@ export class IframeCommunicationService {
    * Handle object actions from iframe
    */
   private handleObjectAction(message: IframeMessage): void {
-    if (!message.objectId || !message.action) return;
+    const { objectId, action, data } = message;
+    if (!objectId || !action) return;
     
     // Get object state to check permissions
-    this.requestObjectState(message.objectId).then((state) => {
-      if (objectStateManager.isActionAllowed({ id: message.objectId }, message.action!, this.moduleContext)) {
+    this.requestObjectState(objectId).then((state) => {
+      if (objectStateManager.isActionAllowed({ id: objectId }, action, this.moduleContext)) {
         // Action is allowed, proceed
-        this.onObjectActionAllowed(message.objectId, message.action!, message.data);
+        this.onObjectActionAllowed(objectId, action, data);
       } else {
         // Action is not allowed, show warning
-        this.onObjectActionDenied(message.objectId, message.action!, state);
+        this.onObjectActionDenied(objectId, action, state);
       }
     });
   }

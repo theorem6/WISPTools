@@ -68,10 +68,16 @@ export class AuthService {
         }
         
         this.notifyListeners(user);
-      }, (error) => {
+      }, (error: unknown) => {
         console.error('[AuthService] Auth state change error:', error);
-        console.error('[AuthService] Error code:', error?.code);
-        console.error('[AuthService] Error message:', error?.message);
+        if (error instanceof Error) {
+          console.error('[AuthService] Error message:', error.message);
+          // Some Firebase errors include code property
+          const firebaseError = error as Error & { code?: string };
+          if (firebaseError.code) {
+            console.error('[AuthService] Error code:', firebaseError.code);
+          }
+        }
         // Handle auth errors (expired tokens, etc.)
         this.currentUser = null;
         this.notifyListeners(null);

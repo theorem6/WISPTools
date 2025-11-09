@@ -1,4 +1,6 @@
 <script lang="ts">
+  const DEFAULT_LATITUDE = 40.7128;
+  const DEFAULT_LONGITUDE = -74.0060;
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
@@ -31,7 +33,7 @@ import { mapLayerManager } from '$lib/map/MapLayerManager';
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
     CoverageMapFilters, Location 
   } from './lib/models';
-import type { PlanLayerFeature, PlanFeatureSummary, HardwareView } from '$lib/services/planService';
+import type { PlanLayerFeature, PlanFeatureSummary, HardwareView, PlanFeatureGeometry } from '$lib/services/planService';
 import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   // Data
@@ -67,8 +69,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showSiteEditModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
-  let contextMenuLat = 0;
-  let contextMenuLon = 0;
+  let contextMenuLat = DEFAULT_LATITUDE;
+  let contextMenuLon = DEFAULT_LONGITUDE;
   let selectedSiteForSector: TowerSite | null = null;
   let selectedSiteForBackhaul: TowerSite | null = null;
   let selectedSiteForInventory: TowerSite | null = null;
@@ -77,12 +79,17 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let selectedSiteForEdit: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
-  let initialSiteType: 'tower' | 'noc' | 'warehouse' | 'other' | null = null;
+  let initialSiteType: TowerSite['type'] | null = null;
   let selectedPlanDraft: PlanLayerFeature | null = null;
   let showPlanDraftMenu = false;
   let planDraftMenuX = 0;
   let planDraftMenuY = 0;
   let selectedPlanDraftCoords = { latitude: null as number | null, longitude: null as number | null };
+  let planDraftForSiteEdit: PlanLayerFeature | null = null;
+  let planDraftsForMap: PlanLayerFeature[] = [];
+  let planDraftSitesForActions: TowerSite[] = [];
+  let combinedSites: TowerSite[] = [];
+  let visiblePlanIds: string[] = [];
   
   // Map mode derived from query parameters (default to coverage view)
   $: mapMode = (() => {
@@ -103,7 +110,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   // Module context for permissions
   $: moduleContext = (() => {
-    const userRole = $currentTenant?.userRole || 'admin';
+    const userRole = ($currentTenant?.userRole as string | undefined) || 'admin';
     const context: ModuleContext = {
       module: 'coverage-map',
       userRole
@@ -119,13 +126,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     } else if (isMonitorMode) {
       context.module = 'monitor';
     }
-
-    console.log('[CoverageMap] ModuleContext updated:', {
-      userRole,
-      tenant: $currentTenant?.displayName,
-      mode: mapMode,
-      projectId: context.projectId
-    });
 
     return context;
   })();
@@ -156,8 +156,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   // Check if stats should be hidden (for plan module)
   $: hideStats = isPlanMode ? true : $page.url.searchParams.get('hideStats') === 'true';
   // Plan mode - when creating sites within a plan
+  let planId: string | null = null;
   $: planId = $page.url.searchParams.get('planId') || null;
   let activePlanName: string | null = null;
+  let effectivePlanId: string | null = null;
   
   let externalPlanFeatures: PlanLayerFeature[] = [];
   let externalPlanSummary: PlanFeatureSummary | null = null;
@@ -193,7 +195,32 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     planEditingEnabled = mapInPlanMode ? (Boolean(activePlanId) || canAddTemporary) && !readOnly : true;
   }
 
-  $: derivedPlanSummary = summarizePlanFeatures(externalPlanFeatures);
+  $: effectivePlanId = planId ?? sharedActivePlanId ?? null;
+  $: {
+    const activePlanId = getActivePlanIdForActions();
+    if (activePlanId && !visiblePlanIds.includes(activePlanId)) {
+      visiblePlanIds = Array.from(new Set([...visiblePlanIds, activePlanId]));
+    }
+  }
+  $: planDraftsForMap = (externalPlanFeatures ?? []).filter(feature => {
+      const featurePlanId = getFeaturePlanId(feature);
+      const activePlanId = getActivePlanIdForActions();
+      if (activePlanId) {
+        if (!featurePlanId) {
+          return true;
+        }
+        return featurePlanId === activePlanId;
+      }
+      if (visiblePlanIds.length > 0) {
+        return featurePlanId ? visiblePlanIds.includes(featurePlanId) : false;
+      }
+      return false;
+    });
+  $: planDraftSitesForActions = planDraftsForMap
+      .filter(feature => feature.featureType === 'site')
+      .map(convertPlanDraftToTowerSite);
+  $: combinedSites = [...towers, ...planDraftSitesForActions];
+  $: derivedPlanSummary = summarizePlanFeatures(planDraftsForMap);
   $: displayPlanSummary = externalPlanSummary ?? derivedPlanSummary;
 
   function getPlanDraftCoordinates(draft: PlanLayerFeature | null): { latitude: number | null; longitude: number | null } {
@@ -224,10 +251,120 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     return { latitude: null, longitude: null };
   }
 
+  function getFeaturePlanId(feature: PlanLayerFeature): string | null {
+    return (
+      feature.planId ??
+      feature.properties?.planId ??
+      (feature.metadata as any)?.planId ??
+      (feature.metadata as any)?.originalPlanId ??
+      null
+    );
+  }
+
+  function getActivePlanIdForActions(): string | null {
+    return effectivePlanId;
+  }
+
+  function convertPlanDraftToTowerSite(feature: PlanLayerFeature): TowerSite {
+    const coords = getPlanDraftCoordinates(feature);
+    const props = feature.properties ?? {};
+    const latitude =
+      coords.latitude ??
+      props.latitude ??
+      props.location?.latitude ??
+      0;
+    const longitude =
+      coords.longitude ??
+      props.longitude ??
+      props.location?.longitude ??
+      0;
+
+    return {
+      id: feature.id,
+      name: props.name ?? props.siteName ?? 'Draft Site',
+      type: (props.siteType ?? 'tower') as TowerSite['type'],
+      location: {
+        latitude,
+        longitude,
+        address: props.address ?? props.location?.address,
+        city: props.city ?? props.location?.city,
+        state: props.state ?? props.location?.state,
+        zipCode: props.zipCode ?? props.location?.zipCode
+      },
+      height: props.height,
+      fccId: props.fccId,
+      towerOwner: props.towerOwner,
+      towerContact: props.towerContact,
+      siteContact: props.siteContact,
+      gateCode: props.gateCode,
+      accessInstructions: props.accessInstructions,
+      safetyNotes: props.safetyNotes,
+      tenantId: props.tenantId ?? tenantId ?? '',
+      createdAt: new Date(feature.createdAt ?? Date.now()),
+      updatedAt: new Date(feature.updatedAt ?? Date.now()),
+      planId: getFeaturePlanId(feature),
+      planDraft: true,
+      status: feature.status ?? 'draft',
+      metadata: feature.metadata ?? {}
+    };
+  }
+
+  function handlePlanDraftMenuAction(action: 'edit-site' | 'add-sector' | 'add-backhaul' | 'add-inventory') {
+    if (!selectedPlanDraft) {
+      return;
+    }
+
+    const activePlan = getActivePlanIdForActions();
+    if (!activePlan) {
+      error = 'Select a plan to stage assets.';
+      setTimeout(() => (error = ''), 4000);
+      showPlanDraftMenu = false;
+      return;
+    }
+
+    const draftSite = convertPlanDraftToTowerSite(selectedPlanDraft);
+
+    switch (action) {
+      case 'edit-site': {
+        planDraftForSiteEdit = selectedPlanDraft;
+        initialSiteType = draftSite.type;
+        contextMenuLat = draftSite.location.latitude;
+        contextMenuLon = draftSite.location.longitude;
+        showAddSiteModal = true;
+        break;
+      }
+      case 'add-sector': {
+        selectedSiteForSector = draftSite;
+        showAddSectorModal = true;
+        break;
+      }
+      case 'add-backhaul': {
+        selectedSiteForBackhaul = draftSite;
+        showAddBackhaulModal = true;
+        break;
+      }
+      case 'add-inventory': {
+        selectedSiteForInventory = draftSite;
+        showAddInventoryModal = true;
+        break;
+      }
+    }
+
+    showPlanDraftMenu = false;
+  }
+
+  function handleSiteModalClose() {
+    planDraftForSiteEdit = null;
+    initialSiteType = null;
+  }
+
   $: selectedPlanDraftCoords = getPlanDraftCoordinates(selectedPlanDraft);
   $: if (selectedPlanDraft) {
-      const refreshedDraft = externalPlanFeatures.find(feature => feature.id === selectedPlanDraft?.id) ?? null;
-      if (refreshedDraft && refreshedDraft !== selectedPlanDraft) {
+      const refreshedDraft = planDraftsForMap.find(feature => feature.id === selectedPlanDraft?.id) ?? null;
+      if (!refreshedDraft) {
+        selectedPlanDraft = null;
+        showPlanDraftMenu = false;
+      } else if (refreshedDraft !== selectedPlanDraft) {
         selectedPlanDraft = refreshedDraft;
       }
     }
@@ -285,6 +422,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           .filter((p: any) => p.showOnMap)
           .map((p: any) => String(p.id || p._id))
       );
+      visiblePlanIds = Array.from(currentVisiblePlanIds);
+      if (planId) {
+        visiblePlanIds = Array.from(new Set([...visiblePlanIds, planId]));
+      }
+      if (sharedActivePlanId) {
+        visiblePlanIds = Array.from(new Set([...visiblePlanIds, sharedActivePlanId]));
+      }
 
       if (isPlanMode && planId) {
         const activePlan = plans.find((p: any) => String(p.id || p._id) === planId);
@@ -333,34 +477,34 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       const loadedCPE = cpeResult.status === 'fulfilled' ? cpeResult.value : [];
       const loadedEquipment = equipmentResult.status === 'fulfilled' ? equipmentResult.value : [];
 
-      const visiblePlanIds = new Set(planIdsForFetch);
-      currentVisiblePlanIds.forEach(id => visiblePlanIds.add(id));
+      const visiblePlanIdSet = new Set(planIdsForFetch);
+      currentVisiblePlanIds.forEach(id => visiblePlanIdSet.add(id));
 
       towers = loadedTowers.filter((site: any) => {
         if (!site.planId) return true;
         if (isPlanMode && site.planId === planId) return true;
-        return visiblePlanIds.has(site.planId);
+        return visiblePlanIdSet.has(site.planId);
       });
 
       sectors = loadedSectors.filter((sector: any) => {
         if (!sector.planId) return true;
         if (isPlanMode && sector.planId === planId) return true;
-        return visiblePlanIds.has(sector.planId);
+        return visiblePlanIdSet.has(sector.planId);
       });
 
       cpeDevices = loadedCPE.filter((cpe: any) => {
         if (!cpe.planId) return true;
         if (isPlanMode && cpe.planId === planId) return true;
-        return visiblePlanIds.has(cpe.planId);
+        return visiblePlanIdSet.has(cpe.planId);
       });
 
       equipment = loadedEquipment.filter((eq: any) => {
         if (!eq.planId) return true;
         if (isPlanMode && eq.planId === planId) return true;
-        return visiblePlanIds.has(eq.planId);
+        return visiblePlanIdSet.has(eq.planId);
       });
 
-      console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment (mode=${mapMode}, planIds=${Array.from(visiblePlanIds).join(',') || 'none'})`);
+    // console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment (mode=${mapMode}, planIds=${Array.from(visiblePlanIds).join(',') || 'none'})`);
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';
@@ -372,7 +516,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   async function removePlanDraft() {
     if (!selectedPlanDraft) return;
 
-    const activePlanId = planId || selectedPlanDraft.planId || sharedActivePlanId;
+    const activePlanId = effectivePlanId ?? selectedPlanDraft.planId ?? null;
     if (!activePlanId) {
       error = 'Select a plan to remove staged objects.';
       setTimeout(() => (error = ''), 4000);
@@ -488,7 +632,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   function handleMapRightClick(event: CustomEvent) {
     const { latitude, longitude, screenX, screenY } = event.detail;
-    console.log('Right-click at:', latitude, longitude);
+    // console.log('Right-click at:', latitude, longitude);
 
     showPlanDraftMenu = false;
     selectedPlanDraft = null;
@@ -559,12 +703,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   async function handlePlanFeatureMoved(event: CustomEvent<{
     featureId: string;
     planId?: string | null;
-    geometry: { type: string; coordinates: [number, number] };
+    geometry: PlanFeatureGeometry;
     latitude: number;
     longitude: number;
   }>) {
     const { featureId, planId: featurePlanId, geometry, latitude, longitude } = event.detail;
-    const activePlanId = planId || featurePlanId || sharedActivePlanId;
+    const activePlanId = effectivePlanId ?? featurePlanId ?? null;
 
     if (!activePlanId) {
       error = 'Select a plan to edit staged objects.';
@@ -572,7 +716,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       return;
     }
 
-    const draft = externalPlanFeatures.find(feature => feature.id === featureId) ?? null;
+    const draft = planDraftsForMap.find(feature => feature.id === featureId) ?? null;
     const propertiesUpdate = draft
       ? {
           ...draft.properties,
@@ -581,9 +725,19 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         }
       : { latitude, longitude };
 
+    const coordinates =
+      Array.isArray((geometry as any)?.coordinates) && (geometry as any).coordinates.length >= 2
+        ? (geometry as any).coordinates
+        : [longitude, latitude];
+
+    const geometryUpdate: PlanFeatureGeometry = {
+      type: 'Point',
+      coordinates
+    };
+
     try {
       await mapLayerManager.updateFeature(activePlanId, featureId, {
-        geometry,
+        geometry: geometryUpdate,
         properties: propertiesUpdate
       });
       success = 'Draft location updated.';
@@ -598,7 +752,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   function handleAssetClick(event: CustomEvent) {
     const { type, id, data, screenX, screenY, isRightClick } = event.detail;
-    console.log(`Clicked ${type}:`, id, data);
+    // console.log(`Clicked ${type}:`, id, data);
 
     if (!type?.startsWith('plan-')) {
       showPlanDraftMenu = false;
@@ -615,7 +769,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     }
 
     if (type?.startsWith('plan-')) {
-      const draft = externalPlanFeatures.find(feature => feature.id === id) ?? null;
+      const draft = planDraftsForMap.find(feature => feature.id === id) ?? null;
       if (!draft) {
         return;
       }
@@ -645,7 +799,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       if (type === 'tower' || type === 'noc' || type === 'warehouse') {
         const tower = towers.find(t => t.id === id);
         if (tower && tower.id) {
-          console.log('[CoverageMap] Opening tower actions menu', { tower, id, towerId: tower.id });
+          // console.log('[CoverageMap] Opening tower actions menu', { tower, id, towerId: tower.id });
           selectedTowerForMenu = tower;
           towerMenuX = screenX;
           towerMenuY = screenY;
@@ -681,13 +835,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   function handleTowerAction(event: CustomEvent) {
     const { action, tower } = event.detail;
     
-    console.log('[CoverageMap] handleTowerAction called');
-    console.log('  - action:', action);
-    console.log('  - hasTower:', !!tower);
-    console.log('  - tower type:', typeof tower);
-    console.log('  - tower value:', tower);
-    console.log('  - tower?.id:', tower?.id);
-    console.log('  - tower?.name:', tower?.name);
+    // console.log('[CoverageMap] handleTowerAction called', { action, tower });
     
     // Guard: ensure tower exists
     if (!tower && action !== 'add-site') {
@@ -762,29 +910,35 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   }
   
   function handleAddSite() {
-    contextMenuLat = null;
-    contextMenuLon = null;
+    planDraftForSiteEdit = null;
+    contextMenuLat = DEFAULT_LATITUDE;
+    contextMenuLon = DEFAULT_LONGITUDE;
+    initialSiteType = null;
     showAddSiteModal = true;
   }
   
   function handleAddSector(site: TowerSite | null = null) {
+    planDraftForSiteEdit = null;
     selectedSiteForSector = site;
     showAddSectorModal = true;
   }
   
   function handleAddCPE() {
-    contextMenuLat = null;
-    contextMenuLon = null;
+    planDraftForSiteEdit = null;
+    contextMenuLat = DEFAULT_LATITUDE;
+    contextMenuLon = DEFAULT_LONGITUDE;
     showAddCPEModal = true;
   }
   
   async function handleModalSaved(event?: CustomEvent<{ message?: string }>) {
     success = event?.detail?.message || 'Changes saved to plan.';
     setTimeout(() => success = '', 3000);
+    planDraftForSiteEdit = null;
+    initialSiteType = null;
 
     try {
-      if (planId && (isPlanMode || sharedMapMode === 'plan')) {
-        await mapLayerManager.refreshPlan(planId);
+      if (effectivePlanId && (isPlanMode || sharedMapMode === 'plan')) {
+        await mapLayerManager.refreshPlan(effectivePlanId);
       } else {
         await loadAllData();
       }
@@ -810,13 +964,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <CoverageMapView 
       bind:this={mapComponent}
       {towers}
-      {planId}
-      {isPlanMode}
       {sectors}
       {cpeDevices}
       {equipment}
       {filters}
-      externalPlanFeatures={externalPlanFeatures}
+      externalPlanFeatures={planDraftsForMap}
       on:map-right-click={handleMapRightClick}
       on:asset-click={handleAssetClick}
       on:plan-feature-moved={handlePlanFeatureMoved}
@@ -842,6 +994,18 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           {selectedPlanDraftCoords.longitude !== null ? selectedPlanDraftCoords.longitude.toFixed(5) : '—'}
         </p>
       </div>
+      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('edit-site')}>
+        ✏️ Edit Draft Details
+      </button>
+      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('add-sector')}>
+        📶 Add Sector
+      </button>
+      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('add-backhaul')}>
+        🔗 Add Backhaul Link
+      </button>
+      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('add-inventory')}>
+        📦 Add Equipment
+      </button>
       <button class="menu-item danger" on:click={removePlanDraft}>
         🗑️ Remove From Plan
       </button>
@@ -1060,9 +1224,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   initialType={initialSiteType}
-  planId={planId}
+  planId={effectivePlanId}
   {tenantId}
+  existingDraft={planDraftForSiteEdit}
   on:saved={handleModalSaved}
+  on:close={handleSiteModalClose}
 />
 
 <AddNOCModal 
@@ -1070,7 +1236,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
@@ -1079,7 +1245,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
@@ -1088,7 +1254,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
@@ -1097,35 +1263,35 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
 <AddSectorModal 
   bind:show={showAddSectorModal}
-  sites={towers}
+  sites={combinedSites}
   selectedSite={selectedSiteForSector}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
 <AddCPEModal 
   bind:show={showAddCPEModal}
-  sites={towers}
+  sites={combinedSites}
   initialLatitude={contextMenuLat}
   initialLongitude={contextMenuLon}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
 <AddBackhaulLinkModal 
   bind:show={showAddBackhaulModal}
   fromSite={selectedSiteForBackhaul}
-  sites={towers}
+  sites={combinedSites}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 
@@ -1133,7 +1299,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   bind:show={showAddInventoryModal}
   site={selectedSiteForInventory}
   {tenantId}
-  planId={planId}
+  planId={effectivePlanId}
   on:saved={handleModalSaved}
 />
 

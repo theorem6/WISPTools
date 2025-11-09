@@ -15,6 +15,15 @@
   let success = '';
   let deploymentScript = '';
   let deploymentOption: 'script' | 'iso' = 'script';
+  type TenantContactKey = 'contactName' | 'contactEmail' | 'contactPhone';
+  type TenantContactRecord = Partial<Record<TenantContactKey, string>>;
+
+  function getTenantContactField(field: TenantContactKey): string {
+    const tenant = $currentTenant as unknown as TenantContactRecord | null;
+    const value = tenant?.[field];
+    return typeof value === 'string' ? value : '';
+  }
+
 
   // EPC Configuration
   let epcConfig = {
@@ -68,9 +77,9 @@
         // Initialize with tenant data if available
         console.log(`[EPCDeployment] Initializing for tenant: ${$currentTenant.id}`);
         epcConfig.siteName = $currentTenant.name || '';
-        epcConfig.contact.name = $currentTenant.contactName || '';
-        epcConfig.contact.email = $currentTenant.contactEmail || '';
-        epcConfig.contact.phone = $currentTenant.contactPhone || '';
+        epcConfig.contact.name = getTenantContactField('contactName');
+        epcConfig.contact.email = getTenantContactField('contactEmail');
+        epcConfig.contact.phone = getTenantContactField('contactPhone');
       }
     }
   });
@@ -93,6 +102,11 @@
 
   $: if (show && $currentTenant?.id && $currentTenant.id.trim() !== '') {
     console.log(`[EPCDeployment] Tenant loaded: ${$currentTenant.id}`);
+    if (!siteData) {
+      epcConfig.contact.name = getTenantContactField('contactName');
+      epcConfig.contact.email = getTenantContactField('contactEmail');
+      epcConfig.contact.phone = getTenantContactField('contactPhone');
+    }
   }
 
   function handleClose() {

@@ -1112,8 +1112,9 @@ export class SimplePCIOptimizer {
       const wolframResult = await wolframService.query(validationQuery);
       
       if (wolframResult) {
+        const formattedResult = JSON.stringify(wolframResult).slice(0, 200);
         console.log(`✅ Wolfram Alpha validation:`);
-        console.log(`   ${wolframResult.substring(0, 200)}...`);
+        console.log(`   ${formattedResult}${formattedResult.length === 200 ? '...' : ''}`);
       }
       
       // Query mathematical validation
@@ -1121,8 +1122,9 @@ export class SimplePCIOptimizer {
       const mathResult = await wolframService.query(mathQuery);
       
       if (mathResult) {
+        const formattedMathResult = JSON.stringify(mathResult).slice(0, 200);
         console.log(`📐 Mathematical validation:`);
-        console.log(`   ${mathResult.substring(0, 200)}...`);
+        console.log(`   ${formattedMathResult}${formattedMathResult.length === 200 ? '...' : ''}`);
       }
     } catch (error) {
       console.warn(`⚠️ Wolfram Alpha validation failed (non-critical):`, error);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { authService } from '../services/authService';
-  import { authStore } from '../stores/authStore';
+  import { authService } from '$lib/services/authService';
+  import { authStore } from '$lib/stores/authStore';
   
   export let show = false;
   

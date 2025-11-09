@@ -40,7 +40,7 @@ export interface TenantModuleConfig {
  */
 export async function getTenantModuleConfig(tenantId: string): Promise<TenantModuleConfig | null> {
   try {
-    const configRef = doc(db, 'tenants', tenantId, 'config', 'modules');
+    const configRef = doc(db(), 'tenants', tenantId, 'config', 'modules');
     const configDoc = await getDoc(configRef);
     
     if (!configDoc.exists()) {
@@ -64,7 +64,7 @@ export async function updateRoleModuleAccess(
   userId: string
 ): Promise<void> {
   try {
-    const configRef = doc(db, 'tenants', tenantId, 'config', 'modules');
+    const configRef = doc(db(), 'tenants', tenantId, 'config', 'modules');
     
     // Get existing config or create new one
     const configDoc = await getDoc(configRef);
@@ -97,7 +97,7 @@ export async function updateEnabledModules(
   userId: string
 ): Promise<void> {
   try {
-    const configRef = doc(db, 'tenants', tenantId, 'config', 'modules');
+    const configRef = doc(db(), 'tenants', tenantId, 'config', 'modules');
     
     await setDoc(configRef, {
       enabledModules,
@@ -135,7 +135,7 @@ export async function resetAllRolesToDefaults(
   userId: string
 ): Promise<void> {
   try {
-    const configRef = doc(db, 'tenants', tenantId, 'config', 'modules');
+    const configRef = doc(db(), 'tenants', tenantId, 'config', 'modules');
     
     await setDoc(configRef, {
       roleModuleAccess: DEFAULT_MODULE_ACCESS,

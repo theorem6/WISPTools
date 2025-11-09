@@ -1,5 +1,12 @@
 import { writable, type Writable } from 'svelte/store';
-import type { PlanLayerFeature, PlanFeatureSummary, PlanProject, HardwareView } from '$lib/services/planService';
+import type {
+  PlanLayerFeature,
+  PlanFeatureSummary,
+  PlanProject,
+  HardwareView,
+  PlanFeatureType,
+  PlanFeatureGeometry
+} from '$lib/services/planService';
 import { planService } from '$lib/services/planService';
 import type { MapModuleMode, MapCapabilities } from './MapCapabilities';
 import { getCapabilitiesForMode } from './MapCapabilities';
@@ -63,7 +70,8 @@ export class MapLayerManager {
         this.ensureProductionLoaded(tenantId)
       ]);
 
-      const combinedFeatures = this.mergeWithLocalFeatures(plan.id, features);
+      const syncedLocals = await this.syncLocalPlanFeatures(plan.id);
+      const combinedFeatures = this.mergeWithLocalFeatures(plan.id, [...features, ...syncedLocals]);
       const summary = this.computeSummaryFromFeatures(combinedFeatures);
 
       this.updateState({
@@ -109,7 +117,8 @@ export class MapLayerManager {
 
     try {
       const { features } = await planService.getPlanFeatures(planId);
-      const combinedFeatures = this.mergeWithLocalFeatures(planId, features);
+      const syncedLocals = await this.syncLocalPlanFeatures(planId);
+      const combinedFeatures = this.mergeWithLocalFeatures(planId, [...features, ...syncedLocals]);
       const summary = this.computeSummaryFromFeatures(combinedFeatures);
       this.updateState({ stagedFeatures: combinedFeatures, summary });
       setMapData({ stagedFeatures: combinedFeatures, stagedSummary: summary });
@@ -295,7 +304,11 @@ export class MapLayerManager {
       return;
     }
     const filtered = local.filter(feature => feature.id !== featureId);
-    this.localFeatureCache.set(planId, filtered);
+    if (filtered.length) {
+      this.localFeatureCache.set(planId, filtered);
+    } else {
+      this.localFeatureCache.delete(planId);
+    }
   }
 
   private saveRemoteSync(planId: string, stagedFeatures: PlanLayerFeature[]) {
@@ -313,6 +326,32 @@ export class MapLayerManager {
     const remoteIds = new Set(normalizedRemote.map(feature => feature.id));
     const local = this.getLocalFeaturesForPlan(planId).filter(feature => !remoteIds.has(feature.id));
     return [...normalizedRemote, ...local];
+  }
+
+  private async syncLocalPlanFeatures(planId: string): Promise<PlanLayerFeature[]> {
+    const localFeatures = this.getLocalFeaturesForPlan(planId).filter(
+      feature => feature.metadata?.local
+    );
+
+    if (!localFeatures.length) {
+      return [];
+    }
+
+    const synced: PlanLayerFeature[] = [];
+
+    for (const localFeature of localFeatures) {
+      try {
+        const payload = this.toCreatePayloadFromFeature(localFeature);
+        const { feature } = await planService.createPlanFeature(planId, payload);
+        const normalized = this.normalizeFeature(feature);
+        this.removeLocalFeature(planId, localFeature.id);
+        synced.push(normalized);
+      } catch (error) {
+        console.warn('[MapLayerManager] Failed to sync local plan feature', localFeature.id, error);
+      }
+    }
+
+    return synced;
   }
 
   private computeSummaryFromFeatures(features: PlanLayerFeature[]): PlanFeatureSummary {
@@ -368,6 +407,34 @@ export class MapLayerManager {
       seen.set(feature.id, this.normalizeFeature(feature));
     });
     return Array.from(seen.values());
+  }
+
+  private toCreatePayloadFromFeature(feature: PlanLayerFeature): {
+    featureType: PlanFeatureType;
+    geometry?: PlanFeatureGeometry;
+    properties?: Record<string, any>;
+    status?: PlanLayerFeature['status'];
+    metadata?: Record<string, any>;
+  } {
+    const planGeometry =
+      this.toPlanGeometry(feature.metadata?.originalGeometry ?? feature.geometry) ??
+      this.toPlanGeometryFromPayload({
+        featureType: feature.featureType,
+        geometry: feature.metadata?.originalGeometry ?? feature.geometry,
+        properties: feature.properties
+      } as Parameters<typeof planService.createPlanFeature>[1]);
+    const metadata = { ...(feature.metadata ?? {}) };
+    if (metadata.local) {
+      delete metadata.local;
+    }
+
+    return {
+      featureType: feature.featureType,
+      geometry: planGeometry,
+      properties: feature.properties ?? {},
+      status: feature.status,
+      metadata: Object.keys(metadata).length ? metadata : undefined
+    };
   }
 
   private toEsriGeometry(geometry: any): any {

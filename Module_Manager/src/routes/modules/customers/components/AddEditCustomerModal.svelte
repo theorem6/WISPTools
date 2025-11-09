@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { customerService, type Customer } from '$lib/services/customerService';
+  import { API_CONFIG } from '$lib/config/api';
   
   export let show = false;
   export let customer: Customer | null = null;

@@ -140,8 +140,11 @@
   }
 
   function getCurrentPlan(): SubscriptionPlan | null {
-    if (!currentSubscription) return null;
-    return plans.find(plan => plan.id === currentSubscription.planId) || null;
+    const subscription = currentSubscription;
+    if (!subscription) {
+      return null;
+    }
+    return plans.find((plan) => plan.id === subscription.planId) ?? null;
   }
 </script>
 

@@ -83,10 +83,10 @@
       view.on('click', (event) => {
         view.hitTest(event).then((response) => {
           if (response.results.length > 0) {
-            const graphic = response.results[0].graphic;
-            if (graphic.attributes && graphic.attributes.device) {
-              const device = graphic.attributes.device;
-              // Navigate to monitoring page for this device
+            const graphicHit = response.results.find((result) => (result as any)?.graphic?.attributes?.device);
+            const attributes = (graphicHit as any)?.graphic?.attributes as Record<string, unknown> | undefined;
+            const device = attributes?.device as { id?: string } | undefined;
+            if (device?.id) {
               window.location.href = `/modules/acs-cpe-management/monitoring?deviceId=${device.id}`;
             }
           }

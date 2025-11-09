@@ -6,6 +6,132 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
 
+  type InventoryFormData = Omit<InventoryItem, 'currentLocation' | 'purchaseInfo' | 'warranty' | 'technicalSpecs'> & {
+    currentLocation: InventoryItem['currentLocation'] & {
+      siteId?: string;
+      siteName?: string;
+      warehouse: {
+        name?: string;
+        section?: string;
+        aisle?: string;
+        shelf?: string;
+        bin?: string;
+      };
+      tower: {
+        rack?: string;
+        rackUnit?: string;
+        cabinet?: string;
+        position?: string;
+      };
+    };
+    purchaseInfo: {
+      vendor?: string;
+      purchaseDate?: string;
+      purchasePrice?: number;
+      purchaseOrderNumber?: string;
+    };
+    warranty: {
+      provider?: string;
+      startDate?: string;
+      endDate?: string;
+      type?: string;
+    };
+    technicalSpecs: {
+      powerRequirements?: string;
+      ipAddress?: string;
+      managementUrl?: string;
+    };
+  };
+
+  const EMPTY_WAREHOUSE = { name: '', section: '', aisle: '', shelf: '', bin: '' };
+  const EMPTY_TOWER = { rack: '', rackUnit: '', cabinet: '', position: '' };
+
+  function toDateInput(value?: Date | string): string {
+    if (!value) return '';
+    const date = typeof value === 'string' ? new Date(value) : value;
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().split('T')[0];
+  }
+
+  function buildFormData(source: InventoryItem): InventoryFormData {
+    const { currentLocation, purchaseInfo, warranty, technicalSpecs, ...base } = source;
+
+    return {
+      ...base,
+      currentLocation: {
+        type: currentLocation?.type ?? 'warehouse',
+        siteId: currentLocation?.siteId ?? '',
+        siteName: currentLocation?.siteName ?? '',
+        warehouse: {
+          ...EMPTY_WAREHOUSE,
+          ...(currentLocation?.warehouse ?? {})
+        },
+        tower: {
+          ...EMPTY_TOWER,
+          ...(currentLocation?.tower ?? {})
+        }
+      },
+      purchaseInfo: {
+        vendor: purchaseInfo?.vendor ?? '',
+        purchaseDate: toDateInput(purchaseInfo?.purchaseDate),
+        purchasePrice: purchaseInfo?.purchasePrice ?? 0,
+        purchaseOrderNumber: purchaseInfo?.purchaseOrderNumber ?? ''
+      },
+      warranty: {
+        provider: warranty?.provider ?? '',
+        startDate: toDateInput(warranty?.startDate),
+        endDate: toDateInput(warranty?.endDate),
+        type: warranty?.type ?? ''
+      },
+      technicalSpecs: {
+        powerRequirements: technicalSpecs?.powerRequirements ?? '',
+        ipAddress: technicalSpecs?.ipAddress ?? '',
+        managementUrl: technicalSpecs?.managementUrl ?? ''
+      }
+    };
+  }
+
+  function toUpdatePayload(form: InventoryFormData): Partial<InventoryItem> {
+    return {
+      ...form,
+      currentLocation: {
+        type: form.currentLocation.type,
+        siteId: form.currentLocation.siteId || undefined,
+        siteName: form.currentLocation.siteName || undefined,
+        warehouse: {
+          name: form.currentLocation.warehouse.name || undefined,
+          section: form.currentLocation.warehouse.section || undefined,
+          aisle: form.currentLocation.warehouse.aisle || undefined,
+          shelf: form.currentLocation.warehouse.shelf || undefined,
+          bin: form.currentLocation.warehouse.bin || undefined
+        },
+        tower: {
+          rack: form.currentLocation.tower.rack || undefined,
+          rackUnit: form.currentLocation.tower.rackUnit || undefined,
+          cabinet: form.currentLocation.tower.cabinet || undefined,
+          position: form.currentLocation.tower.position || undefined
+        }
+      },
+      purchaseInfo: {
+        vendor: form.purchaseInfo.vendor || undefined,
+        purchaseDate: form.purchaseInfo.purchaseDate || undefined,
+        purchasePrice: form.purchaseInfo.purchasePrice,
+        purchaseOrderNumber: form.purchaseInfo.purchaseOrderNumber || undefined
+      },
+      warranty: {
+        provider: form.warranty.provider || undefined,
+        startDate: form.warranty.startDate || undefined,
+        endDate: form.warranty.endDate || undefined,
+        type: form.warranty.type || undefined
+      },
+      technicalSpecs: {
+        powerRequirements: form.technicalSpecs.powerRequirements || undefined,
+        ipAddress: form.technicalSpecs.ipAddress || undefined,
+        managementUrl: form.technicalSpecs.managementUrl || undefined
+      }
+    };
+  }
+
   let item: InventoryItem | null = null;
   let isLoading = true;
   let isSaving = false;
@@ -13,9 +139,10 @@
   let success = '';
 
   // Form data
-  let formData: Partial<InventoryItem> = {};
+  let formData: InventoryFormData | null = null;
 
-  $: itemId = $page.params.id;
+  let itemId: string = '';
+  $: itemId = $page.params.id ?? '';
   $: tenantId = $currentTenant?.id || '';
 
   onMount(async () => {
@@ -31,37 +158,7 @@
     try {
       item = await inventoryService.getItem(itemId);
       if (item) {
-        formData = { 
-          ...item,
-          currentLocation: {
-            type: 'warehouse',
-            siteId: '',
-            siteName: '',
-            warehouse: { name: '', section: '', aisle: '', shelf: '', bin: '' },
-            tower: { rack: '', rackUnit: '', cabinet: '', position: '' },
-            ...item.currentLocation
-          },
-          purchaseInfo: {
-            vendor: '',
-            purchaseDate: '',
-            purchasePrice: 0,
-            purchaseOrderNumber: '',
-            ...item.purchaseInfo
-          },
-          warranty: {
-            provider: '',
-            startDate: '',
-            endDate: '',
-            type: '',
-            ...item.warranty
-          },
-          technicalSpecs: {
-            powerRequirements: '',
-            ipAddress: '',
-            managementUrl: '',
-            ...item.technicalSpecs
-          }
-        };
+        formData = buildFormData(item);
       }
     } catch (err: any) {
       error = err.message || 'Failed to load item';
@@ -79,7 +176,8 @@
     success = '';
 
     try {
-      await inventoryService.updateItem(itemId, formData);
+      const payload = toUpdatePayload(formData);
+      await inventoryService.updateItem(itemId, payload);
       success = 'Equipment updated successfully!';
       
       // Reload the item to get updated data

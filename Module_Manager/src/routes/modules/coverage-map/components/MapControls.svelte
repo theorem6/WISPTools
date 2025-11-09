@@ -45,22 +45,39 @@
 <!-- Map Controls -->
 <div class="map-controls">
   <!-- Filter Toggle -->
-  <button class="control-btn" on:click={toggleFilters} class:active={showFilters}>
-    🎛️ {#if showFilters}Hide{else}Show{/if} Filters
+  <button type="button" class="control-btn" on:click={toggleFilters} class:active={showFilters}>
+    <span aria-hidden="true">🎛️</span>
+    {#if showFilters}
+      Hide
+    {:else}
+      Show
+    {/if}
+    Filters
   </button>
   
   <!-- Main Menu Toggle -->
-  <button class="control-btn" on:click={toggleMainMenu} class:active={showMainMenu}>
-    📋 Menu
+  <button type="button" class="control-btn" on:click={toggleMainMenu} class:active={showMainMenu}>
+    <span aria-hidden="true">📋</span>
+    Menu
   </button>
   
   <!-- Stats Toggle -->
-  <button class="control-btn" on:click={toggleStats} class:active={showStats}>
-    📊 {#if showStats}Hide{else}Show{/if} Stats
+  <button type="button" class="control-btn" on:click={toggleStats} class:active={showStats}>
+    <span aria-hidden="true">📊</span>
+    {#if showStats}
+      Hide
+    {:else}
+      Show
+    {/if}
+    Stats
   </button>
   
   <!-- Basemap Selector -->
-  <select class="control-select" on:change={(e) => changeBasemap(e.target.value)} value={currentBasemap}>
+  <select
+    class="control-select"
+    bind:value={currentBasemap}
+    on:change={(event) => changeBasemap((event.currentTarget as HTMLSelectElement).value)}
+  >
     <option value="topo-vector">Topographic</option>
     <option value="satellite">Satellite</option>
     <option value="street-map">Street Map</option>
@@ -68,17 +85,20 @@
   </select>
   
   <!-- Export Buttons -->
-  <button class="control-btn" on:click={exportCSV}>
-    💾 Export CSV
+  <button type="button" class="control-btn" on:click={exportCSV}>
+    <span aria-hidden="true">💾</span>
+    Export CSV
   </button>
   
-  <button class="control-btn" on:click={exportPDF}>
-    📄 Print PDF
+  <button type="button" class="control-btn" on:click={exportPDF}>
+    <span aria-hidden="true">📄</span>
+    Print PDF
   </button>
   
   <!-- Import -->
-  <button class="control-btn" on:click={importFromCBRS}>
-    📥 Import from CBRS
+  <button type="button" class="control-btn" on:click={importFromCBRS}>
+    <span aria-hidden="true">📥</span>
+    Import from CBRS
   </button>
   
   <!-- Settings -->

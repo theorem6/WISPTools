@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { currentNetwork, allNetworks } from '../stores/networkStore';
+  import { currentNetwork, allNetworks } from '$lib/stores/networkStore';
   
   const dispatch = createEventDispatcher();
   

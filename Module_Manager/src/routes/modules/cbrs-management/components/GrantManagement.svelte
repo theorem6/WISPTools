@@ -36,10 +36,10 @@
       </div>
       
       <div class="modal-body">
-        {#if device.grants && device.grants.length > 0}
+        {#if device.activeGrants && device.activeGrants.length > 0}
           <div class="grants-section">
             <h4>Active Grants</h4>
-            {#each device.grants as grant}
+            {#each device.activeGrants as grant}
               <div class="grant-card">
                 <div class="grant-info">
                   <div class="grant-detail">
@@ -49,17 +49,23 @@
                   <div class="grant-detail">
                     <span class="label">Frequency:</span>
                     <span class="value">
-                      {(grant.frequencyRange.lowFrequency / 1000000).toFixed(1)} - 
-                      {(grant.frequencyRange.highFrequency / 1000000).toFixed(1)} MHz
+                      {#if grant.operationParam?.operationFrequencyRange}
+                        {(grant.operationParam.operationFrequencyRange.lowFrequency / 1_000_000).toFixed(1)} -
+                        {(grant.operationParam.operationFrequencyRange.highFrequency / 1_000_000).toFixed(1)} MHz
+                      {:else}
+                        N/A
+                      {/if}
                     </span>
                   </div>
                   <div class="grant-detail">
                     <span class="label">Max EIRP:</span>
-                    <span class="value">{grant.maxEirp} dBm</span>
+                    <span class="value">
+                      {grant.operationParam?.maxEirp ?? 'N/A'}{#if grant.operationParam?.maxEirp !== undefined} dBm{/if}
+                    </span>
                   </div>
                   <div class="grant-detail">
                     <span class="label">State:</span>
-                    <span class="value status-{grant.state}">{grant.state}</span>
+                    <span class="value status-{(grant.grantState || 'unknown').toLowerCase()}">{grant.grantState || 'Unknown'}</span>
                   </div>
                 </div>
                 <button 

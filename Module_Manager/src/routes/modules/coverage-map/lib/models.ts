@@ -36,6 +36,14 @@ export interface TowerSite {
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
+  inventoryId?: string;
+  modules?: Record<string, unknown>;
+  
+  // Planning metadata
+  planId?: string | null;
+  planDraft?: boolean;
+  status?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Sector {
@@ -47,11 +55,12 @@ export interface Sector {
   // RF Configuration
   azimuth: number; // degrees (0-360)
   beamwidth: number; // degrees (typically 65-90 for cell, 30 for CPE)
+  antennaBeamwidth?: number; // Legacy compatibility alias
   tilt?: number; // mechanical tilt in degrees
   
   // Technology
   technology: 'LTE' | 'CBRS' | 'FWA' | '5G' | 'WiFi';
-  band?: string; // "Band 71 (600MHz)", "CBRS (3.5GHz)", "5GHz", etc.
+  band?: string; // "Band 71 (600MHz)", "CBRS (3.5GHz)", etc.
   frequency?: number; // MHz
   bandwidth?: number; // MHz
   
@@ -72,6 +81,14 @@ export interface Sector {
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
+  pci?: number;            // Legacy compatibility for primary PCI
+  earfcn?: number;         // Legacy compatibility for primary EARFCN
+  transmitPower?: number;  // Legacy compatibility for UI editors
+  tac?: number;            // Legacy compatibility
+  eNodeBLocalID?: number;  // Legacy compatibility
+  towerName?: string;
+  inventoryId?: string;
+  modules?: Record<string, unknown>;
 }
 
 export interface CPEDevice {
@@ -110,6 +127,8 @@ export interface CPEDevice {
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
+  modules?: Record<string, unknown>;
+  inventoryId?: string;
 }
 
 export interface BackhaulLink {
@@ -202,7 +221,7 @@ export interface NetworkEquipment {
   partNumber?: string;
   
   // Inventory
-  status: 'deployed' | 'inventory' | 'rma' | 'retired' | 'lost';
+  status: 'deployed' | 'inventory' | 'maintenance' | 'rma' | 'retired' | 'lost';
   quantity?: number; // For inventory items
   purchaseDate?: Date;
   warrantyExpires?: Date;
@@ -216,6 +235,8 @@ export interface NetworkEquipment {
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
+  inventoryId?: string;
+  modules?: Record<string, unknown>;
 }
 
 export interface BandFilter {

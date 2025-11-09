@@ -1,6 +1,7 @@
 <script lang="ts">
   import Chart from '$lib/components/data-display/Chart.svelte';
   import type { ChartConfiguration } from '$lib/chartSetup';
+  import type { TooltipItem } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { formatUptime } from '../lib/tr069MetricsService';
 
@@ -12,92 +13,98 @@
     return m.uptime < metrics[i - 1].uptime;
   });
 
+  const tooltipLabel = (context: TooltipItem<'line'>): string => {
+    const hours = context.parsed.y;
+    const seconds = typeof hours === 'number' ? hours * 3600 : 0;
+    return `Uptime: ${formatUptime(seconds)}`;
+  };
+
+  const tooltipTitle = (contexts: TooltipItem<'line'>[]): string => {
+    const context = contexts[0];
+    const idx = context.dataIndex;
+    const baseLabel = context.label ?? '';
+    return reboots[idx] ? `${baseLabel} (Device Reboot)` : baseLabel;
+  };
+
+  const uptimeTickFormatter = (value: string | number): string => {
+    return `${value}h`;
+  };
+
   $: config = {
-    type: 'line',
+    type: 'line' as const,
     data: {
-    labels: metrics.map((m, i) => {
-      const time = new Date(m.timestamp);
-      const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      return reboots[i] ? `${label} ⚠️` : label;
-    }),
-    datasets: [
-      {
-        label: 'Uptime (hours)',
-        data: metrics.map(m => m.uptime / 3600), // Convert seconds to hours
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-        tension: 0.3,
-        fill: true,
-        pointRadius: reboots.map(r => r ? 6 : 2),
-        pointBackgroundColor: reboots.map(r => r ? '#ef4444' : '#10b981'),
-        pointHoverRadius: 8
-      }
-    ]
+      labels: metrics.map((m, i) => {
+        const time = new Date(m.timestamp);
+        const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return reboots[i] ? `${label} ⚠️` : label;
+      }),
+      datasets: [
+        {
+          label: 'Uptime (hours)',
+          data: metrics.map((m) => m.uptime / 3600),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.2)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: reboots.map((r) => (r ? 6 : 2)),
+          pointBackgroundColor: reboots.map((r) => (r ? '#ef4444' : '#10b981')),
+          pointHoverRadius: 8
+        }
+      ]
     },
     options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false
-    },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: 'rgb(156, 163, 175)',
-          usePointStyle: true,
-          padding: 15
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index' as const,
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: 'rgb(156, 163, 175)',
+            usePointStyle: true,
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          callbacks: {
+            label: tooltipLabel,
+            title: tooltipTitle
+          }
         }
       },
-      tooltip: {
-        backgroundColor: 'rgba(17, 24, 39, 0.95)',
-        callbacks: {
-          label: (context) => {
-            const seconds = context.parsed.y * 3600;
-            return `Uptime: ${formatUptime(seconds)}`;
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Uptime (hours)',
+            color: 'rgb(156, 163, 175)'
           },
-          title: (contexts) => {
-            const idx = contexts[0].dataIndex;
-            if (reboots[idx]) {
-              return `${contexts[0].label} (Device Reboot)`;
-            }
-            return contexts[0].label;
+          grid: {
+            color: 'rgba(75, 85, 99, 0.2)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)',
+            callback: uptimeTickFormatter
+          },
+          beginAtZero: true
+        },
+        x: {
+          grid: {
+            color: 'rgba(75, 85, 99, 0.1)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)',
+            maxRotation: 45,
+            minRotation: 45
           }
         }
       }
-    },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: 'Uptime (hours)',
-          color: 'rgb(156, 163, 175)'
-        },
-        grid: {
-          color: 'rgba(75, 85, 99, 0.2)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)',
-          callback: (value) => {
-            return `${value}h`;
-          }
-        },
-        beginAtZero: true
-      },
-      x: {
-        grid: {
-          color: 'rgba(75, 85, 99, 0.1)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)',
-          maxRotation: 45,
-          minRotation: 45
-        }
-      }
     }
-    }
-  };
+  } satisfies ChartConfiguration<'line'>;
 
   $: rebootCount = reboots.filter(Boolean).length;
   $: currentUptime = metrics.length > 0 ? metrics[metrics.length - 1].uptime : 0;

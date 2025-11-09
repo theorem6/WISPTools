@@ -7,11 +7,12 @@
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject } from '$lib/services/planService';
 import SettingsButton from '$lib/components/SettingsButton.svelte';
-import { mapLayerManager, type MapLayerManagerState } from '$lib/map/MapLayerManager';
-import { mapContext } from '$lib/map/mapContext';
+import { mapLayerManager } from '$lib/map/MapLayerManager';
+import { mapContext, type MapLayerState } from '$lib/map/mapContext';
 import SharedMap from '$lib/map/SharedMap.svelte';
 import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from '$lib/map/MapCapabilities';
-import { iframeCommunicationService, type ModuleContext } from '$lib/services/iframeCommunicationService';
+import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
+import type { ModuleContext } from '$lib/services/objectStateManager';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -29,11 +30,12 @@ import { iframeCommunicationService, type ModuleContext } from '$lib/services/if
   let error: string = '';
   let successMessage: string = '';
   let loadedTenantId: string | null = null; // Track which tenant's data is loaded
-let mapState: MapLayerManagerState | undefined;
+let mapState: MapLayerState | undefined;
 let mapMode: MapModuleMode = 'plan';
 let contextActivePlan: PlanProject | null = null;
+let mapLocked = true;
 
-$: mapState = $mapContext as MapLayerManagerState;
+$: mapState = $mapContext;
 $: mapMode = (mapState?.mode ?? 'plan');
 $: contextActivePlan = mapState?.activePlan ?? null;
 $: {
@@ -97,8 +99,6 @@ const PLANNING_LOCK_CAPABILITIES: MapCapabilities = {
   canMarkProgress: false,
   readOnly: true
 };
-
-let mapLocked = true;
 
 $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
 
@@ -249,38 +249,49 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     loadData();
   }
 
-  onMount(async () => {
-    if (browser) {
+  onMount(() => {
+    if (!browser) {
+      return;
+    }
+
+    let removeListener: () => void = () => {};
+    let iframeInitialized = false;
+
+    (async () => {
       currentUser = await authService.getCurrentUser();
       if (!currentUser) {
         goto('/login');
         return;
       }
-      
-      // Initialize iframe communication
-      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement;
+
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
         iframeCommunicationService.initialize(iframe, moduleContext);
         iframeReady = true;
         iframeCommunicationService.updateContext(moduleContext);
-        
-        // Listen for iframe object actions
-        window.addEventListener('iframe-object-action', handleIframeObjectAction);
+
+        const listener: EventListener = (event: Event) => handleIframeObjectAction(event);
+        window.addEventListener('iframe-object-action', listener);
+        removeListener = () => window.removeEventListener('iframe-object-action', listener);
+        iframeInitialized = true;
       }
-      
-      // Don't load data here - wait for tenant store to initialize via reactive statement
-    }
-    
+    })().catch(err => {
+      console.error('[Plan] Failed to initialize iframe communication:', err);
+    });
+
     return () => {
-      window.removeEventListener('iframe-object-action', handleIframeObjectAction);
-      iframeCommunicationService.destroy();
-      iframeReady = false;
+      if (iframeInitialized) {
+        removeListener();
+        iframeCommunicationService.destroy();
+        iframeReady = false;
+      }
     };
   });
 
   // Handle iframe object actions
-  function handleIframeObjectAction(event: CustomEvent) {
-    const { objectId, action, allowed, message, state } = event.detail;
+  function handleIframeObjectAction(event: Event) {
+    const customEvent = event as CustomEvent<any>;
+    const { objectId, action, allowed, message, state } = customEvent.detail ?? {};
     
     if (!allowed) {
       // Show user-friendly error message
@@ -347,12 +358,38 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     showReportModal = false;
   }
 
+function handleReportOverlayClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
+    closeReportModal();
+  }
+}
+
+function handleReportOverlayKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeReportModal();
+  }
+}
+
   function openHardwareView() {
     showHardwareModal = true;
   }
 
   function closeHardwareModal() {
     showHardwareModal = false;
+  }
+
+  function handleHardwareOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      closeHardwareModal();
+    }
+  }
+
+  function handleHardwareOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeHardwareModal();
+    }
   }
 
   function openProjectList() {
@@ -363,6 +400,19 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     showProjectModal = false;
   }
 
+  function handleProjectOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      closeProjectModal();
+    }
+  }
+
+  function handleProjectOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeProjectModal();
+    }
+  }
+
   function openCreateProject() {
     showCreateProjectModal = true;
     newProject = { name: '', description: '' };
@@ -370,6 +420,19 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
 
   function closeCreateProjectModal() {
     showCreateProjectModal = false;
+  }
+
+  function handleCreateProjectOverlayClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      closeCreateProjectModal();
+    }
+  }
+
+  function handleCreateProjectOverlayKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeCreateProjectModal();
+    }
   }
 
   async function createProject() {
@@ -454,6 +517,19 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     showMissingHardwareModal = false;
   }
 
+function handleMissingHardwareOverlayClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
+    closeMissingHardwareModal();
+  }
+}
+
+function handleMissingHardwareOverlayKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeMissingHardwareModal();
+  }
+}
+
   function openAddRequirementModal() {
     if (!selectedProject) return;
     showAddRequirementModal = true;
@@ -471,6 +547,19 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
   function closeAddRequirementModal() {
     showAddRequirementModal = false;
   }
+
+function handleAddRequirementOverlayClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
+    closeAddRequirementModal();
+  }
+}
+
+function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeAddRequirementModal();
+  }
+}
 
 
   async function addHardwareRequirement() {
@@ -824,25 +913,25 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-label">Needs</span>
           </button>
           <button 
-            class="control-btn {selectedProject.showOnMap ? 'active' : ''}" 
-            on:click={() => togglePlanVisibility(selectedProject)} 
-            title={selectedProject.showOnMap ? "Hide plan on map" : "Show plan on map"}
+            class={`control-btn ${selectedProject?.showOnMap ? 'active' : ''}`} 
+            on:click={() => selectedProject && togglePlanVisibility(selectedProject)} 
+            title={selectedProject?.showOnMap ? "Hide plan on map" : "Show plan on map"}
           >
-            <span class="control-icon">{selectedProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
-            <span class="control-label">{selectedProject.showOnMap ? 'Visible' : 'Hidden'}</span>
+            <span class="control-icon">{selectedProject?.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
+            <span class="control-label">{selectedProject?.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
-+          {#if selectedProject.status === 'active' && (!activeProject || activeProject.id !== selectedProject.id)}
-+            <button class="control-btn resume-btn" on:click={() => enterProject(selectedProject)} title="Resume planning this project">
-+              <span class="control-icon">🔁</span>
-+              <span class="control-label">Resume</span>
-+            </button>
-+          {/if}
-+          {#if ['ready','approved','rejected','cancelled'].includes(selectedProject.status)}
-+            <button class="control-btn reopen-btn" on:click={() => reopenProject(selectedProject)} title="Reopen plan for updates">
-+              <span class="control-icon">♻️</span>
-+              <span class="control-label">Reopen</span>
-+            </button>
-+          {/if}
+          {#if selectedProject?.status === 'active' && (!activeProject || activeProject.id !== selectedProject.id)}
+            <button class="control-btn resume-btn" on:click={() => selectedProject && enterProject(selectedProject)} title="Resume planning this project">
+              <span class="control-icon">🔁</span>
+              <span class="control-label">Resume</span>
+            </button>
+          {/if}
+          {#if selectedProject && ['ready','approved','rejected','cancelled'].includes(selectedProject.status)}
+            <button class="control-btn reopen-btn" on:click={() => selectedProject && reopenProject(selectedProject)} title="Reopen plan for updates">
+              <span class="control-icon">♻️</span>
+              <span class="control-label">Reopen</span>
+            </button>
+          {/if}
         {/if}
         
         <!-- Project Workflow Actions -->
@@ -860,15 +949,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-label">Cancel</span>
           </button>
           <button 
-            class="control-btn {activeProject.showOnMap ? 'active' : ''}" 
-            on:click={() => togglePlanVisibility(activeProject)} 
-            title={activeProject.showOnMap ? "Hide plan on map" : "Show plan on map"}
+            class={`control-btn ${activeProject?.showOnMap ? 'active' : ''}`} 
+            on:click={() => activeProject && togglePlanVisibility(activeProject)} 
+            title={activeProject?.showOnMap ? "Hide plan on map" : "Show plan on map"}
           >
-            <span class="control-icon">{activeProject.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
-            <span class="control-label">{activeProject.showOnMap ? 'Visible' : 'Hidden'}</span>
+            <span class="control-icon">{activeProject?.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
+            <span class="control-label">{activeProject?.showOnMap ? 'Visible' : 'Hidden'}</span>
           </button>
-          {#if ['draft','active','ready','cancelled','rejected'].includes(activeProject.status)}
-            <button class="control-btn delete-btn" on:click={() => deleteProject(activeProject)} title="Delete Plan">
+          {#if activeProject && ['draft','active','ready','cancelled','rejected'].includes(activeProject.status)}
+            <button class="control-btn delete-btn" on:click={() => activeProject && deleteProject(activeProject)} title="Delete Plan">
               <span class="control-icon">🗑️</span>
               <span class="control-label">Delete</span>
             </button>
@@ -879,9 +968,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   </div>
 
   <!-- Hardware View Modal -->
-  {#if showHardwareModal}
-    <div class="modal-overlay" on:click={closeHardwareModal}>
-      <div class="modal-content hardware-modal" on:click|stopPropagation>
+{#if showHardwareModal}
+  <div
+    class="modal-overlay"
+    role="presentation"
+    aria-hidden="true"
+    tabindex="-1"
+    on:click={handleHardwareOverlayClick}
+  >
+    <div
+      class="modal-content hardware-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="All hardware"
+      tabindex="0"
+      on:keydown={handleHardwareOverlayKeydown}
+    >
         <div class="modal-header">
           <h2>🔧 All Existing Hardware</h2>
           <button class="close-btn" on:click={closeHardwareModal}>✕</button>
@@ -994,8 +1096,21 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   <!-- Project List Modal -->
   {#if showProjectModal}
-    <div class="modal-overlay" on:click={closeProjectModal}>
-      <div class="modal-content project-modal" on:click|stopPropagation>
+    <div
+      class="modal-overlay"
+      role="presentation"
+      aria-hidden="true"
+      tabindex="-1"
+      on:click={handleProjectOverlayClick}
+    >
+      <div
+        class="modal-content project-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Deployment projects"
+        tabindex="0"
+        on:keydown={handleProjectOverlayKeydown}
+      >
         <div class="modal-header">
           <h2>📁 Deployment Projects</h2>
           <button class="close-btn" on:click={closeProjectModal}>✕</button>
@@ -1005,7 +1120,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <div class="project-list">
             {#each projects as project}
               <div class="project-item">
-                <div class="project-content" on:click={() => selectProject(project)}>
+                <button type="button" class="project-content" on:click={() => selectProject(project)}>
                   <div class="project-header">
                     <h3>{project.name}</h3>
                     <span class="status-badge {project.status}">{project.status}</span>
@@ -1015,9 +1130,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <span>Created: {new Date(project.createdAt).toLocaleDateString()}</span>
                     <span>Hardware: {project.scope.towers.length + project.scope.sectors.length + project.scope.cpeDevices.length + project.scope.equipment.length} items</span>
                   </div>
-                </div>
-                
-                <div class="project-actions" on:click|stopPropagation>
+                </button>
+
+                <div class="project-actions">
                   {#if project.status === 'draft'}
                     <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
@@ -1111,9 +1226,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {/if}
 
   <!-- Create Project Modal -->
-  {#if showCreateProjectModal}
-    <div class="modal-overlay" on:click={closeCreateProjectModal}>
-      <div class="modal-content create-modal" on:click|stopPropagation>
+{#if showCreateProjectModal}
+    <div
+      class="modal-overlay"
+      role="presentation"
+      aria-hidden="true"
+      tabindex="-1"
+      on:click={handleCreateProjectOverlayClick}
+    >
+      <div
+        class="modal-content create-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Create new project"
+        tabindex="0"
+        on:keydown={handleCreateProjectOverlayKeydown}
+      >
         <div class="modal-header">
           <h2>➕ Create New Project</h2>
           <button class="close-btn" on:click={closeCreateProjectModal}>✕</button>
@@ -1167,9 +1295,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {/if}
 
   <!-- Missing Hardware Modal -->
-  {#if showMissingHardwareModal && selectedProject}
-    <div class="modal-overlay" on:click={closeMissingHardwareModal}>
-      <div class="modal-content missing-hardware-modal" on:click|stopPropagation>
+{#if showMissingHardwareModal && selectedProject}
+    <div
+      class="modal-overlay"
+      role="presentation"
+      aria-hidden="true"
+      tabindex="-1"
+      on:click={handleMissingHardwareOverlayClick}
+    >
+      <div
+        class="modal-content missing-hardware-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Missing hardware analysis for ${selectedProject.name}`}
+        tabindex="0"
+        on:keydown={handleMissingHardwareOverlayKeydown}
+      >
         <div class="modal-header">
           <h2>🛒 Missing Hardware Analysis - {selectedProject.name}</h2>
           <button class="close-btn" on:click={closeMissingHardwareModal}>✕</button>
@@ -1273,9 +1414,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {/if}
 
   <!-- Add Hardware Requirement Modal -->
-  {#if showAddRequirementModal && selectedProject}
-    <div class="modal-overlay" on:click={closeAddRequirementModal}>
-      <div class="modal-content add-requirement-modal" on:click|stopPropagation>
+{#if showAddRequirementModal && selectedProject}
+    <div
+      class="modal-overlay"
+      role="presentation"
+      aria-hidden="true"
+      tabindex="-1"
+      on:click={handleAddRequirementOverlayClick}
+    >
+      <div
+        class="modal-content add-requirement-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Add hardware requirement for ${selectedProject.name}`}
+        tabindex="0"
+        on:keydown={handleAddRequirementOverlayKeydown}
+      >
         <div class="modal-header">
           <h2>📋 Add Hardware Requirement - {selectedProject.name}</h2>
           <button class="close-btn" on:click={closeAddRequirementModal}>✕</button>
@@ -1361,9 +1515,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {/if}
 
   <!-- Planning Report Modal -->
-  {#if showReportModal}
-    <div class="modal-overlay" on:click={closeReportModal}>
-      <div class="modal-content" on:click|stopPropagation>
+{#if showReportModal}
+    <div
+      class="modal-overlay"
+      role="presentation"
+      aria-hidden="true"
+      tabindex="-1"
+      on:click={handleReportOverlayClick}
+    >
+      <div
+        class="modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Planning reports dialog"
+        tabindex="0"
+        on:keydown={handleReportOverlayKeydown}
+      >
         <div class="modal-header">
           <h2>📊 Planning Reports</h2>
           <button class="close-btn" on:click={closeReportModal}>✕</button>
@@ -1854,13 +2021,24 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .project-content {
     flex: 1;
+    background: none;
+    border: none;
     cursor: pointer;
+    text-align: left;
+    padding: 0;
+    font: inherit;
+    color: inherit;
   }
 
   .project-content:hover {
     border-color: var(--brand-primary);
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
+  }
+
+  .project-content:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 2px;
   }
 
   .project-actions {

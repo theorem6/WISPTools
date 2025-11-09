@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import type { Cell } from '../pciMapper';
+  import type { Cell } from '$lib/pciMapper';
   import SiteEditor from './SiteEditor.svelte';
   import type { CellSite } from '$lib/models/cellSite';
   import { convertCellSiteToLegacy } from '$lib/models/cellSite';

@@ -201,7 +201,13 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
  */
 router.post('/invite', requireAdmin, async (req, res) => {
   try {
-    const { email, role, tenantId, customModuleAccess } = req.body;
+    const {
+      email,
+      role: requestedRole,
+      tenantId,
+      customModuleAccess,
+      autoAssign = false
+    } = req.body;
     
     // Validate input
     if (!email) {
@@ -219,10 +225,10 @@ router.post('/invite', requireAdmin, async (req, res) => {
     }
     
     // Auto-assign role based on email if requested
-    let role = requestedRole;
-    if (autoAssign && !role) {
-      role = determineRoleFromEmail(email);
-      if (!role) {
+    let resolvedRole = requestedRole;
+    if (autoAssign && !resolvedRole) {
+      resolvedRole = determineRoleFromEmail(email);
+      if (!resolvedRole) {
         return res.status(400).json({
           error: 'Bad Request',
           message: 'Could not auto-assign role from email pattern. Please specify role manually.'
@@ -230,7 +236,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
       }
     }
     
-    if (!role) {
+    if (!resolvedRole) {
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Role is required (or use autoAssign: true)'
@@ -238,7 +244,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
     }
     
     // Validate role
-    if (!VALID_ROLES.includes(role)) {
+    if (!VALID_ROLES.includes(resolvedRole)) {
       return res.status(400).json({
         error: 'Bad Request',
         message: `Invalid role. Must be one of: ${VALID_ROLES.join(', ')}`
@@ -246,7 +252,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
     }
     
     // Cannot create platform_admin
-    if (role === 'platform_admin') {
+    if (resolvedRole === 'platform_admin') {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Cannot create platform admin users'
@@ -254,10 +260,10 @@ router.post('/invite', requireAdmin, async (req, res) => {
     }
     
     // Check if requester can create this role
-    if (!canManageRole(req.userRole, role)) {
+    if (!canManageRole(req.userRole, resolvedRole)) {
       return res.status(403).json({
         error: 'Forbidden',
-        message: `You cannot create users with role: ${role}. Your role can only create: ${getCreatableRoles(req.userRole).join(', ')}`
+        message: `You cannot create users with role: ${resolvedRole}. Your role can only create: ${getCreatableRoles(req.userRole).join(', ')}`
       });
     }
     
@@ -293,7 +299,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
       const userTenant = new UserTenant({
         userId,
         tenantId,
-        role,
+        role: resolvedRole,
         moduleAccess: customModuleAccess || null,
         status: 'active', // Active immediately since user exists
         invitedBy: req.user.uid,
@@ -312,7 +318,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
         id: invitationId,
         tenantId,
         email,
-        role,
+        role: resolvedRole,
         customModuleAccess: customModuleAccess || null,
         invitedBy: req.user.uid,
         invitedAt: firestore.FieldValue.serverTimestamp(),
@@ -334,7 +340,7 @@ router.post('/invite', requireAdmin, async (req, res) => {
       invitationId,
       userId,
       email,
-      role,
+      role: resolvedRole,
       status: userId ? 'pending_invitation' : 'pending_signup'
     });
   } catch (error) {

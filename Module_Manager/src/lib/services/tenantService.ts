@@ -35,7 +35,7 @@ export class TenantService {
    * Includes retry logic to wait for auth state to be ready
    * Forces token refresh to ensure token is valid for backend
    */
-  private async getAuthHeaders(): Promise<HeadersInit> {
+  private async getAuthHeaders(): Promise<Record<string, string>> {
     // Wait for auth state to be ready (important after login)
     const user = authService.getCurrentUser();
     if (!user) {
@@ -64,7 +64,7 @@ export class TenantService {
       throw new Error('User not authenticated - failed to get valid token');
     }
     
-    const headers = {
+    const headers: Record<string, string> = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
@@ -307,6 +307,58 @@ export class TenantService {
     }
   }
 
+  async createInvitation(
+    tenantId: string,
+    email: string,
+    role: TenantRole,
+    invitedBy: string
+  ): Promise<{ success: boolean; invitation?: TenantInvitation; error?: string }> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}/invitations`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email, role, invitedBy })
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.message || 'Failed to create invitation' };
+      }
+
+      const invitation = await response.json();
+      return { success: true, invitation };
+    } catch (error) {
+      console.error('Error creating tenant invitation:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  async updateUserRole(
+    userId: string,
+    tenantId: string,
+    role: TenantRole
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}/users/${userId}/role`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ role })
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.message || 'Failed to update user role' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
   /**
    * Get user tenants (for regular users)
    */
@@ -374,6 +426,25 @@ export class TenantService {
       console.error('Error getting user tenants:', error);
       return [];
     }
+  }
+
+  async getUserRole(userId: string, tenantId: string): Promise<TenantRole | null> {
+    try {
+      const tenants = await this.getUserTenants(userId);
+      const tenant = tenants.find((t: any) => t.id === tenantId || t.tenantId === tenantId);
+      return tenant?.userRole ?? null;
+    } catch (error) {
+      console.error('Error getting user role:', error);
+      return null;
+    }
+  }
+
+  async updateTenantSettings(tenantId: string, settings: TenantSettings): Promise<{ success: boolean; error?: string }> {
+    return this.updateTenant(tenantId, { settings });
+  }
+
+  async updateTenantLimits(tenantId: string, limits: TenantLimits): Promise<{ success: boolean; error?: string }> {
+    return this.updateTenant(tenantId, { limits });
   }
 
   /**
@@ -459,8 +530,23 @@ export class TenantService {
     userId: string, 
     tenantId: string
   ): Promise<{ success: boolean; error?: string }> {
-    console.warn('removeUserFromTenant is deprecated - use user management API instead');
-    return { success: false, error: 'Use user management API instead' };
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.adminBaseUrl}/tenants/${tenantId}/users/${userId}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.message || 'Failed to remove user from tenant' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error removing user from tenant:', error);
+      return { success: false, error: String(error) };
+    }
   }
 
   /**

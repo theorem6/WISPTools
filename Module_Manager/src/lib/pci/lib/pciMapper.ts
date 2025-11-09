@@ -451,9 +451,12 @@ class PCIMapper {
 
         if (frequencyInfo.type === 'ADJACENT') {
           // Check for adjacent channel PCI conflicts
-          const adjacentConflicts = [
-            { type: 'MOD3' as const, check: (pci1, pci2) => pci1 % 3 === pci2 % 3 },
-            { type: 'MOD6' as const, check: (pci1, pci2) => pci1 % 6 === pci2 % 6 }
+          const adjacentConflicts: Array<{
+            type: 'MOD3' | 'MOD6';
+            check: (pci1: number, pci2: number) => boolean;
+          }> = [
+            { type: 'MOD3', check: (pci1, pci2) => pci1 % 3 === pci2 % 3 },
+            { type: 'MOD6', check: (pci1, pci2) => pci1 % 6 === pci2 % 6 }
           ];
           
           for (const adjConflict of adjacentConflicts) {
@@ -630,7 +633,8 @@ class PCIMapper {
       'CRITICAL': 'HIGH',     // Critical becomes High (still important but not critical)
       'HIGH': 'MEDIUM',       // High becomes Medium
       'MEDIUM': 'LOW',        // Medium becomes Low
-      'LOW': 'LOW'            // Low stays Low (minimal impact)
+      'LOW': 'LOW',            // Low stays Low (minimal impact)
+      'UNRESOLVABLE': 'HIGH'
     };
     
     return severityMap[severity];
@@ -717,7 +721,11 @@ class PCIMapper {
     // Different channels have relaxed rules (interference is lower)
     // Based on industry best practices: MOD3 is critical for TDD (time-synced),
     // less critical for FDD (not time-synced). MOD30 is rarely a real issue.
-    const thresholds = {
+    const thresholds: Partial<Record<PCIConflict['conflictType'], {
+      critical: number;
+      high: number;
+      medium: number;
+    }>> = {
       ADJACENT_CHANNEL: {
         critical: 500,
         high: 1000,
@@ -737,6 +745,21 @@ class PCIMapper {
         critical: 50,   // UL DMRS pattern conflict - "not critical, rarely observed" per industry standards
         high: 200, 
         medium: 500 
+      },
+      CONFUSION: {
+        critical: 800,
+        high: 1500,
+        medium: 3000
+      },
+      FREQUENCY_CONGESTION: {
+        critical: 1000,
+        high: 2500,
+        medium: 5000
+      },
+      CO_CHANNEL: {
+        critical: 500,
+        high: 1500,
+        medium: 4000
       }
     };
     

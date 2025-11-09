@@ -30,6 +30,13 @@ export interface TR069CellularMetrics {
   // Data Usage
   bytesSent: number;
   bytesReceived: number;
+
+  // Performance Metrics
+  throughputDL?: number;     // Mbps
+  throughputUL?: number;     // Mbps
+  ueCount?: number;
+  prbUtilization?: number;   // Percent (0-100)
+  cqi?: number;              // Channel Quality Indicator (0-15)
   
   // Additional Metrics
   currentTechnology: 'LTE' | '5G NR' | 'UMTS' | 'GSM';
@@ -109,6 +116,12 @@ export function generateTR069MetricsHistory(hours: number = 24, deviceId: string
     const currentPCI = handoverEvent ? Math.floor(Math.random() * 504) : 156;
     const currentEARFCN = handoverEvent ? (Math.random() < 0.5 ? 5230 : 66486) : 5230;
     
+    const throughputDL = Math.max(0, (loadFactor * 80) + (Math.random() * 20 - 10));
+    const throughputUL = Math.max(0, throughputDL * 0.3 + (Math.random() * 5 - 2));
+    const ueCount = Math.max(0, Math.round(40 * loadFactor + (Math.random() * 15 - 7)));
+    const prbUtilization = Math.min(100, Math.max(0, 55 * loadFactor + (Math.random() * 20 - 10)));
+    const cqi = Math.max(0, Math.min(15, Math.round(12 + (Math.random() * 4 - 2) - (isPeakHours ? 2 : 0))));
+
     metrics.push({
       timestamp,
       deviceId,
@@ -127,7 +140,12 @@ export function generateTR069MetricsHistory(hours: number = 24, deviceId: string
       bytesSent: Math.floor(Math.random() * 1000000000),
       bytesReceived: Math.floor(Math.random() * 5000000000),
       currentTechnology: currentEARFCN < 10000 ? 'LTE' : '5G NR',
-      connectionMode: currentEARFCN < 10000 ? 'LTE' : '5G NSA'
+      connectionMode: currentEARFCN < 10000 ? 'LTE' : '5G NSA',
+      throughputDL,
+      throughputUL,
+      ueCount,
+      prbUtilization,
+      cqi
     });
   }
   

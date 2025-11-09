@@ -50,10 +50,25 @@
       handleClose();
     }
   }
+
+  function handleBackdropKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      handleClose();
+    }
+  }
 </script>
 
-<div class="modal-backdrop" on:click={handleBackdropClick}>
-  <div class="modal-content">
+<div
+  class="modal-backdrop"
+  role="dialog"
+  aria-modal="true"
+  tabindex="0"
+  aria-label="Invite user dialog"
+  on:click={handleBackdropClick}
+  on:keydown={handleBackdropKeydown}
+>
+  <div class="modal-content" role="document">
     <div class="modal-header">
       <h2>Invite User</h2>
       <button class="close-btn" on:click={handleClose} disabled={loading}>✕</button>

@@ -23,6 +23,13 @@
     sharedMode: true
   };
   
+const googleEndpointFieldId = 'google-api-endpoint';
+const googleApiKeyFieldId = 'google-api-key';
+const googleCertPathFieldId = 'google-cert-path';
+const federatedEndpointFieldId = 'federated-api-endpoint';
+const federatedApiKeyFieldId = 'federated-api-key';
+const federatedCertPathFieldId = 'federated-cert-path';
+
   let testResult = '';
   let showTestResult = false;
   
@@ -188,11 +195,12 @@
       
       <form on:submit|preventDefault={handleSave}>
         <div class="form-group">
-          <label>
+          <label for={googleEndpointFieldId}>
             API Endpoint
             <span class="required">*</span>
           </label>
           <input 
+            id={googleEndpointFieldId}
             type="text" 
             bind:value={formData.googleApiEndpoint}
             placeholder="https://sas.googleapis.com/v1"
@@ -202,11 +210,12 @@
         </div>
         
         <div class="form-group">
-          <label>
+          <label for={googleApiKeyFieldId}>
             Platform API Key
             <span class="required">*</span>
           </label>
           <input 
+            id={googleApiKeyFieldId}
             type="password" 
             bind:value={formData.googleApiKey}
             placeholder="Enter your Google SAS API key"
@@ -219,8 +228,9 @@
         </div>
         
         <div class="form-group">
-          <label>Certificate Path (Optional)</label>
+          <label for={googleCertPathFieldId}>Certificate Path (Optional)</label>
           <input 
+            id={googleCertPathFieldId}
             type="text" 
             bind:value={formData.googleCertificatePath}
             placeholder="/path/to/certificate.pem"
@@ -238,11 +248,12 @@
       
       <form on:submit|preventDefault={handleSave}>
         <div class="form-group">
-          <label>
+          <label for={federatedEndpointFieldId}>
             API Endpoint
             <span class="required">*</span>
           </label>
           <input 
+            id={federatedEndpointFieldId}
             type="text" 
             bind:value={formData.federatedApiEndpoint}
             placeholder="https://sas.federatedwireless.com/api/v1"
@@ -252,11 +263,12 @@
         </div>
         
         <div class="form-group">
-          <label>
+          <label for={federatedApiKeyFieldId}>
             Platform API Key
             <span class="required">*</span>
           </label>
           <input 
+            id={federatedApiKeyFieldId}
             type="password" 
             bind:value={formData.federatedApiKey}
             placeholder="Enter your Federated Wireless API key"
@@ -269,8 +281,9 @@
         </div>
         
         <div class="form-group">
-          <label>Certificate Path (Optional)</label>
+          <label for={federatedCertPathFieldId}>Certificate Path (Optional)</label>
           <input 
+            id={federatedCertPathFieldId}
             type="text" 
             bind:value={formData.federatedCertificatePath}
             placeholder="/path/to/certificate.pem"

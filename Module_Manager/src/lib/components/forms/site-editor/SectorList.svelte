@@ -28,15 +28,22 @@
     }
     
     const newSector: Sector = {
-      sectorId: sectorNumber,
+      id: `temp-sector-${sectorNumber}`,
+      sectorNumber,
       azimuth: suggestedAzimuth,
+      beamwidth: 65,
       antennaBeamwidth: 65,
-      eNodeBLocalID: sectorNumber - 1,
+      heightAGL: 100,
+      rmodId: ((sectorNumber - 1) % 3) + 1,
+      channels: [],
+      rsPower: 46,
+      technology: 'LTE',
       pci: 0,
       earfcn: 2525,
       bandwidth: 10,
       tac: 1,
-      transmitPower: 46
+      transmitPower: 46,
+      eNodeBLocalID: sectorNumber - 1
     };
     
     dispatch('add', newSector);
@@ -89,7 +96,7 @@
             </div>
             <div class="detail">
               <span class="label">Beamwidth:</span>
-              <span class="value">{sector.antennaBeamwidth}°</span>
+              <span class="value">{sector.antennaBeamwidth ?? sector.beamwidth}°</span>
             </div>
             <div class="detail">
               <span class="label">EARFCN:</span>
@@ -97,7 +104,7 @@
             </div>
             <div class="detail">
               <span class="label">BW:</span>
-              <span class="value">{sector.bandwidth} MHz</span>
+              <span class="value">{(sector.bandwidth ?? sector.channels?.[0]?.channelBandwidth) ?? 0} MHz</span>
             </div>
           </div>
           <button 

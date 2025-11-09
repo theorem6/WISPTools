@@ -38,6 +38,8 @@ export interface Customer {
     planName?: string;
     downloadMbps?: number;
     uploadMbps?: number;
+    monthlyFee?: number;
+    currency?: string;
   };
   networkInfo?: {
     imsi?: string;

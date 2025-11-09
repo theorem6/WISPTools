@@ -162,7 +162,7 @@
       if (result) {
         formData.latitude = result.latitude;
         formData.longitude = result.longitude;
-        formData.address = result.address || searchAddress;
+        formData.address = searchAddress;
       } else {
         error = 'Address not found. Try a different search.';
       }
@@ -266,7 +266,8 @@
       } else {
         // Create new site
         const newSite = await coverageMapService.createTowerSite(tenantId, siteData);
-        dispatch('saved', { action: 'created', siteId: newSite._id || newSite.id });
+        const createdSiteId = (newSite as { _id?: string })._id ?? newSite.id;
+        dispatch('saved', { action: 'created', siteId: createdSiteId });
       }
       
       handleClose();

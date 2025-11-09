@@ -23,6 +23,7 @@ import { losService, type LOSResult } from './services/losService';
 
 export interface Cell {
   id: string;                  // Sector ID (inherits from Cell Site)
+  name?: string;
   eNodeB: number;              // Cell Site eNodeB ID
   sector: number;              // Sector number within the Cell Site
   pci: number;                 // Physical Cell ID (belongs to Sector)
@@ -34,12 +35,12 @@ export interface Cell {
   beamwidth?: number;          // Sector beamwidth (33-120 degrees) - SECTOR property
   heightAGL?: number;          // Height above ground level in feet - SECTOR property
   towerType?: '3-sector' | '4-sector'; // Cell Site configuration
-  technology?: 'LTE' | 'CBRS' | 'LTE+CBRS'; // Sector technology
+  technology?: 'LTE' | 'CBRS' | 'LTE+CBRS' | '5G'; // Sector technology
   
   // LTE Frequency Parameters (from Channel)
   earfcn?: number;             // Primary EARFCN for this sector
   centerFreq?: number;         // Center frequency in MHz (derived from EARFCN)
-  channelBandwidth?: 1.4 | 3 | 5 | 10 | 15 | 20; // Channel bandwidth in MHz
+  channelBandwidth?: number; // Channel bandwidth in MHz
   dlEarfcn?: number;           // Downlink EARFCN
   ulEarfcn?: number;           // Uplink EARFCN
 }

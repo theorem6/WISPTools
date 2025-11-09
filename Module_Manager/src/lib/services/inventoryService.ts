@@ -52,6 +52,9 @@ export interface InventoryItem {
       cabinet?: string;
       position?: string;
     };
+    latitude?: number;
+    longitude?: number;
+    address?: string;
   };
   
   // Purchase Info
@@ -90,6 +93,9 @@ export interface InventoryItem {
     };
     coverageMap?: {
       siteId: string;
+      lastSync?: Date | string;
+    };
+    hss?: {
       lastSync?: Date | string;
     };
   };

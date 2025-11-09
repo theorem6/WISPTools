@@ -4,7 +4,7 @@
  */
 
 import { inventoryService } from './inventoryService';
-import type { InventoryItem } from '$lib/types/inventory';
+import type { InventoryItem } from './inventoryService';
 
 export interface CPEDevice {
   _id: string;
@@ -152,6 +152,8 @@ export async function getACSSyncStatus(tenantId: string, acsDeviceId: string): P
       inInventory: !!syncedItem,
       inventoryId: syncedItem?._id,
       lastSync: syncedItem?.modules?.acs?.lastSync
+        ? new Date(syncedItem.modules.acs.lastSync as string | number | Date)
+        : undefined
     };
   } catch (error) {
     console.error('[ACS Sync] Status check failed:', error);

@@ -16,9 +16,9 @@
   };
   
   // Listen for quick actions
-  function handleQuickAction(event: CustomEvent) {
-    if (event.detail.action === 'create') {
-      addPlan();
+  function handleQuickAction(event: CustomEvent<{ action: string }>) {
+    if (event.detail?.action === 'create') {
+      openAddModal();
     }
   }
 
@@ -121,9 +121,10 @@
         alert(errorMsg);
         console.error('Delete error:', errorData);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error deleting plan:', error);
-      alert('Error deleting bandwidth plan: ' + error.message);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      alert('Error deleting bandwidth plan: ' + message);
     }
   }
 </script>

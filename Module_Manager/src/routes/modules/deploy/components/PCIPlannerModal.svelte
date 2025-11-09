@@ -6,7 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   
   export let show = false;
-  export let tenantId: string;
+  export let tenantId: string | null = null;
   
   const dispatch = createEventDispatcher();
   
@@ -42,13 +42,16 @@
   }
 
   // Also watch for tenantId changes from store
-  $: if (show && $currentTenant?.id && (!$tenantId || $tenantId !== $currentTenant.id)) {
+  $: if (show && $currentTenant?.id && (!tenantId || tenantId !== $currentTenant.id)) {
     tenantId = $currentTenant.id;
   }
 
+  type ConflictStats = ReturnType<typeof getConflictStats>;
+  let conflictStats: ConflictStats = null;
+  $: conflictStats = getConflictStats();
+
   async function loadNetworkData() {
-    // Use tenantId prop or fallback to store
-    const effectiveTenantId = tenantId || $currentTenant?.id;
+    const effectiveTenantId = (tenantId && tenantId.trim() !== '') ? tenantId : $currentTenant?.id ?? null;
     
     if (!effectiveTenantId || effectiveTenantId.trim() === '') {
       console.warn('[PCIPlanner] No tenant ID provided');
@@ -61,29 +64,44 @@
     error = '';
     
     try {
-      const effectiveTenantId = tenantId || $currentTenant?.id;
       console.log(`[PCIPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       // Load tower sites and convert to cells
       const sites = await coverageMapService.getTowerSites(effectiveTenantId);
       console.log(`[PCIPlanner] Loaded ${sites.length} sites from coverage map service`);
       
-      cells = sites.map(site => ({
-        id: site.id,
-        name: site.name,
-        latitude: site.latitude,
-        longitude: site.longitude,
-        pci: site.pci || -1, // -1 means auto-assign
-        earfcn: site.earfcn || 0,
-        power: site.power || 0,
-        azimuth: site.azimuth || 0,
-        height: site.height || 0,
-        type: 'tower'
-      }));
+      cells = sites.map((site) => {
+        const metadata = (site as Record<string, any>).metadata ?? {};
+        const stats = (site as Record<string, any>).stats ?? {};
+        const location = site.location ?? { latitude: 0, longitude: 0 };
+
+        return {
+          id: site.id,
+          name: site.name,
+          eNodeB: Number(metadata.eNodeB ?? metadata.enodeb ?? stats.eNodeB ?? 0),
+          sector: Number(metadata.sector ?? metadata.sectorNumber ?? 0),
+          pci: Number(metadata.pci ?? stats.pci ?? -1),
+          latitude: Number(location.latitude ?? 0),
+          longitude: Number(location.longitude ?? 0),
+          frequency: Number(metadata.frequency ?? metadata.centerFreq ?? stats.frequency ?? 0),
+          rsPower: Number(metadata.rsPower ?? metadata.power ?? stats.rsPower ?? 0),
+          azimuth: metadata.azimuth ?? stats.azimuth,
+          beamwidth: metadata.beamwidth ?? stats.beamwidth,
+          heightAGL: metadata.height ?? site.height ?? undefined,
+          towerType: metadata.towerType ?? stats.towerType,
+          technology: metadata.technology ?? stats.technology,
+          earfcn: metadata.earfcn ?? stats.earfcn,
+          centerFreq: metadata.centerFreq ?? stats.centerFreq,
+          channelBandwidth: metadata.bandwidth ?? stats.bandwidth,
+          dlEarfcn: metadata.dlEarfcn ?? stats.dlEarfcn,
+          ulEarfcn: metadata.ulEarfcn ?? stats.ulEarfcn
+        } as Cell;
+      });
       
       console.log(`[PCIPlanner] Converted to ${cells.length} cells for PCI analysis`);
     } catch (err) {
       console.error('[PCIPlanner] Failed to load network data:', err);
-      error = `Failed to load network data: ${err.message || 'Unknown error'}`;
+      const message = err instanceof Error ? err.message : String(err);
+      error = `Failed to load network data: ${message || 'Unknown error'}`;
     } finally {
       isLoading = false;
     }
@@ -111,7 +129,8 @@
       }
     } catch (err) {
       console.error('Analysis error:', err);
-      error = 'Analysis failed';
+      const message = err instanceof Error ? err.message : String(err);
+      error = message || 'Analysis failed';
     } finally {
       isAnalyzing = false;
     }
@@ -142,7 +161,8 @@
       }
     } catch (err) {
       console.error('Optimization error:', err);
-      error = 'Optimization failed';
+      const message = err instanceof Error ? err.message : String(err);
+      error = message || 'Optimization failed';
     } finally {
       isOptimizing = false;
     }
@@ -318,23 +338,22 @@
             </div>
             {:else}
               <div class="conflicts-section">
-                {#if getConflictStats()}
-                  {@const stats = getConflictStats()}
+                {#if conflictStats}
                   <div class="conflict-stats">
                     <div class="stat-item critical">
-                      <span class="stat-number">{stats.critical}</span>
+                      <span class="stat-number">{conflictStats.critical}</span>
                       <span class="stat-label">Critical</span>
                     </div>
                     <div class="stat-item high">
-                      <span class="stat-number">{stats.high}</span>
+                      <span class="stat-number">{conflictStats.high}</span>
                       <span class="stat-label">High</span>
                     </div>
                     <div class="stat-item medium">
-                      <span class="stat-number">{stats.medium}</span>
+                      <span class="stat-number">{conflictStats.medium}</span>
                       <span class="stat-label">Medium</span>
                     </div>
                     <div class="stat-item low">
-                      <span class="stat-number">{stats.low}</span>
+                      <span class="stat-number">{conflictStats.low}</span>
                       <span class="stat-label">Low</span>
                     </div>
                   </div>

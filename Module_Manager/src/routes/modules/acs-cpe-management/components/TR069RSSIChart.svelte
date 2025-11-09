@@ -1,94 +1,98 @@
 <script lang="ts">
   import Chart from '$lib/components/data-display/Chart.svelte';
   import type { ChartConfiguration } from '$lib/chartSetup';
+  import type { TooltipItem } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
   export let metrics: TR069CellularMetrics[] = [];
 
+  const tooltipLabel = (context: TooltipItem<'line'>): string => {
+    const value = context.parsed.y;
+    return `${context.dataset.label ?? ''}: ${typeof value === 'number' ? value.toFixed(1) : 'N/A'} dBm`;
+  };
+
   $: config = {
-    type: 'line',
+    type: 'line' as const,
     data: {
-    labels: metrics.map(m => {
-      const time = new Date(m.timestamp);
-      return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }),
-    datasets: [
-      {
-        label: 'RSSI (dBm)',
-        data: metrics.map(m => m.rssi),
-        borderColor: '#06b6d4',
-        backgroundColor: 'rgba(6, 182, 212, 0.2)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 2,
-        pointHoverRadius: 6
-      },
-      {
-        label: 'RSCP (dBm)',
-        data: metrics.map(m => m.rscp),
-        borderColor: '#14b8a6',
-        backgroundColor: 'rgba(20, 184, 166, 0.1)',
-        tension: 0.4,
-        fill: false,
-        pointRadius: 2,
-        pointHoverRadius: 6
-      }
-    ]
+      labels: metrics.map((m) => {
+        const time = new Date(m.timestamp);
+        return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      }),
+      datasets: [
+        {
+          label: 'RSSI (dBm)',
+          data: metrics.map((m) => m.rssi),
+          borderColor: '#06b6d4',
+          backgroundColor: 'rgba(6, 182, 212, 0.2)',
+          tension: 0.4,
+          fill: true,
+          pointRadius: 2,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'RSCP (dBm)',
+          data: metrics.map((m) => m.rscp),
+          borderColor: '#14b8a6',
+          backgroundColor: 'rgba(20, 184, 166, 0.1)',
+          tension: 0.4,
+          fill: false,
+          pointRadius: 2,
+          pointHoverRadius: 6
+        }
+      ]
     },
     options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false
-    },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: 'rgb(156, 163, 175)',
-          usePointStyle: true,
-          padding: 15
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index' as const,
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: 'rgb(156, 163, 175)',
+            usePointStyle: true,
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          callbacks: {
+            label: tooltipLabel
+          }
         }
       },
-      tooltip: {
-        backgroundColor: 'rgba(17, 24, 39, 0.95)',
-        callbacks: {
-          label: (context) => {
-            return `${context.dataset.label}: ${context.parsed.y.toFixed(1)} dBm`;
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Signal Strength (dBm)',
+            color: 'rgb(156, 163, 175)'
+          },
+          grid: {
+            color: 'rgba(75, 85, 99, 0.2)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)'
+          },
+          min: -110,
+          max: -40
+        },
+        x: {
+          grid: {
+            color: 'rgba(75, 85, 99, 0.1)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)',
+            maxRotation: 45,
+            minRotation: 45
           }
         }
       }
-    },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: 'Signal Strength (dBm)',
-          color: 'rgb(156, 163, 175)'
-        },
-        grid: {
-          color: 'rgba(75, 85, 99, 0.2)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)'
-        },
-        min: -110,
-        max: -40
-      },
-      x: {
-        grid: {
-          color: 'rgba(75, 85, 99, 0.1)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)',
-          maxRotation: 45,
-          minRotation: 45
-        }
-      }
     }
-    }
-  };
+  } satisfies ChartConfiguration<'line'>;
 </script>
 
 <div class="chart-container">

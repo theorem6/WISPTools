@@ -297,8 +297,8 @@
                     {#if epc.latest_metrics.components}
                       <div class="components">
                         {#each Object.entries(epc.latest_metrics.components) as [component, status]}
-                          <span class="component-badge" style="background: {getStatusColor(status)}">
-                            {component}: {status}
+                          <span class="component-badge" style="background: {getStatusColor(String(status))}">
+                            {component}: {String(status)}
                           </span>
                         {/each}
                       </div>

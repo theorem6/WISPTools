@@ -1,6 +1,7 @@
 <script lang="ts">
   import Chart from '$lib/components/data-display/Chart.svelte';
   import type { ChartConfiguration } from '$lib/chartSetup';
+  import type { ScriptableLineSegmentContext, TooltipItem } from 'chart.js';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getSINRQuality } from '../lib/tr069MetricsService';
 
@@ -12,95 +13,97 @@
     return quality.color;
   });
 
+  const tooltipLabel = (context: TooltipItem<'line'>): string[] => {
+    const value = context.parsed.y;
+    const quality = getSINRQuality(typeof value === 'number' ? value : 0);
+    const formatted = typeof value === 'number' ? value.toFixed(1) : 'N/A';
+    return [`SINR: ${formatted} dB`, `Quality: ${quality.label}`];
+  };
+
+  const segmentBorderColor = (ctx: ScriptableLineSegmentContext): string => {
+    const idx = ctx.p0DataIndex ?? ctx.p1DataIndex ?? 0;
+    if (idx >= metrics.length) return '#8b5cf6';
+    const sinr = metrics[idx]?.sinr ?? 0;
+    if (sinr >= 20) return '#10b981';
+    if (sinr >= 13) return '#3b82f6';
+    if (sinr >= 0) return '#f59e0b';
+    return '#ef4444';
+  };
+
   $: config = {
-    type: 'line',
+    type: 'line' as const,
     data: {
-    labels: metrics.map(m => {
-      const time = new Date(m.timestamp);
-      return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }),
-    datasets: [
-      {
-        label: 'SINR (dB)',
-        data: metrics.map(m => m.sinr),
-        borderColor: '#8b5cf6',
-        backgroundColor: 'rgba(139, 92, 246, 0.2)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 3,
-        pointHoverRadius: 8,
-        pointBackgroundColor: segmentColors,
-        segment: {
-          borderColor: (ctx) => {
-            const idx = ctx.p0DataIndex;
-            if (idx >= metrics.length) return '#8b5cf6';
-            const sinr = metrics[idx].sinr;
-            if (sinr >= 20) return '#10b981';
-            if (sinr >= 13) return '#3b82f6';
-            if (sinr >= 0) return '#f59e0b';
-            return '#ef4444';
+      labels: metrics.map((m) => {
+        const time = new Date(m.timestamp);
+        return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      }),
+      datasets: [
+        {
+          label: 'SINR (dB)',
+          data: metrics.map((m) => m.sinr),
+          borderColor: '#8b5cf6',
+          backgroundColor: 'rgba(139, 92, 246, 0.2)',
+          tension: 0.4,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 8,
+          pointBackgroundColor: segmentColors,
+          segment: {
+            borderColor: segmentBorderColor
           }
         }
-      }
-    ]
+      ]
     },
     options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: 'index',
-      intersect: false
-    },
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          color: 'rgb(156, 163, 175)',
-          usePointStyle: true,
-          padding: 15
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index' as const,
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: 'rgb(156, 163, 175)',
+            usePointStyle: true,
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          callbacks: {
+            label: tooltipLabel
+          }
         }
       },
-      tooltip: {
-        backgroundColor: 'rgba(17, 24, 39, 0.95)',
-        callbacks: {
-          label: (context) => {
-            const sinr = context.parsed.y;
-            const quality = getSINRQuality(sinr);
-            return [
-              `SINR: ${sinr.toFixed(1)} dB`,
-              `Quality: ${quality.label}`
-            ];
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'SINR (dB)',
+            color: 'rgb(156, 163, 175)'
+          },
+          grid: {
+            color: 'rgba(75, 85, 99, 0.2)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)'
+          }
+        },
+        x: {
+          grid: {
+            color: 'rgba(75, 85, 99, 0.1)'
+          },
+          ticks: {
+            color: 'rgb(156, 163, 175)',
+            maxRotation: 45,
+            minRotation: 45
           }
         }
       }
-    },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: 'SINR (dB)',
-          color: 'rgb(156, 163, 175)'
-        },
-        grid: {
-          color: 'rgba(75, 85, 99, 0.2)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)'
-        }
-      },
-      x: {
-        grid: {
-          color: 'rgba(75, 85, 99, 0.1)'
-        },
-        ticks: {
-          color: 'rgb(156, 163, 175)',
-          maxRotation: 45,
-          minRotation: 45
-        }
-      }
     }
-    }
-  };
+  } satisfies ChartConfiguration<'line'>;
 
   $: avgSINR = metrics.length > 0 
     ? (metrics.reduce((sum, m) => sum + m.sinr, 0) / metrics.length).toFixed(1)

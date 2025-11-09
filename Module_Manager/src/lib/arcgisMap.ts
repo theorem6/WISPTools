@@ -13,7 +13,7 @@ export interface MapCell {
 
 export class PCIArcGISMapper {
   private map: any;
-  private mapView: any;
+  public mapView: any;
   private cellLayer: any;
   private conflictLayer: any;
   private onCellClickCallback: ((cellId: string) => void) | null = null;
@@ -21,8 +21,8 @@ export class PCIArcGISMapper {
   private isInitialized = false;
   private initPromise: Promise<void>;
   
-  constructor(containerId: string) {
-    this.initPromise = this.initializeMap(containerId);
+  constructor(container: string | HTMLDivElement) {
+    this.initPromise = this.initializeMap(container);
   }
   
   async waitForInit() {
@@ -30,7 +30,7 @@ export class PCIArcGISMapper {
     return this.isInitialized;
   }
   
-  private async initializeMap(containerId: string) {
+  private async initializeMap(container: string | HTMLDivElement) {
     if (!browser) return;
 
     // Dynamically import ArcGIS modules
@@ -59,7 +59,7 @@ export class PCIArcGISMapper {
     
     // Create the map view with mobile-optimized settings
     this.mapView = new MapView({
-      container: containerId,
+      container,
       map: this.map,
       center: [-74.5, 40], // Default to New York area
       zoom: isMobile ? 11 : 10, // Slightly more zoomed on mobile

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import ManualImport from '../forms/ManualImport.svelte';
-  import ConflictReportExport from '../data-display/ConflictReportExport.svelte';
-  import type { Cell, PCIConflict } from '../pciMapper';
+import ConflictReportExport from '../data-display/ConflictReportExport.svelte';
+import type { Cell, PCIConflict } from '$lib/pciMapper';
   
   export let show = false;
   export let cells: Cell[] = [];

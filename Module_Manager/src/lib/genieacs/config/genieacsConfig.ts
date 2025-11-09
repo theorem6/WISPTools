@@ -220,7 +220,9 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
         logging: {
           enableDebugLogs: true,
           logLevel: 'debug',
-          logToConsole: true
+          logToConsole: true,
+          logToServer: false,
+          maxLogEntries: 1000
         }
       };
       
@@ -232,6 +234,7 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
         },
         security: {
           enableAuthentication: true,
+          allowedIPs: [],
           enableHTTPS: true,
           certificateValidation: true
         },
@@ -239,7 +242,8 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
           enableDebugLogs: false,
           logLevel: 'warn',
           logToConsole: false,
-          logToServer: true
+          logToServer: true,
+          maxLogEntries: 5000
         }
       };
       
@@ -252,12 +256,15 @@ export const getEnvironmentConfig = (): Partial<GenieACSIntegrationConfig> => {
         deviceManagement: {
           enableAutoDiscovery: false,
           updateInterval: 1000,
+          locationUpdateInterval: 5000,
           maxDevices: 100
         },
         logging: {
           enableDebugLogs: true,
           logLevel: 'debug',
-          logToConsole: false
+          logToConsole: false,
+          logToServer: false,
+          maxLogEntries: 500
         }
       };
       

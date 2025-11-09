@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const { ObjectId } = require('mongodb');
+const { ObjectId } = mongoose.Types;
 
 console.log('🔗 HSS Management: Using MongoDB Atlas connection via mongoose');
 

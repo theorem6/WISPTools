@@ -208,7 +208,7 @@ class TenantGuardService {
 
       // Load user's tenants
       console.log('[TenantGuardService] Loading user tenants...');
-      const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
+      const tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email ?? undefined);
       
       if (tenants.length === 0) {
         if (createDefaultTenant) {
@@ -222,7 +222,7 @@ class TenantGuardService {
             currentUser.uid,
             undefined,
             true,
-            currentUser.email
+            currentUser.email ?? undefined
           );
 
           if (result.success && result.tenantId) {
@@ -370,5 +370,3 @@ class TenantGuardService {
 // Export singleton instance
 export const tenantGuardService = new TenantGuardService();
 
-// Export types for use in modules
-export type { TenantGuardResult, TenantGuardOptions, TenantStateChangeCallback };

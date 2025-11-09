@@ -4,11 +4,14 @@ import { collection, doc, setDoc, getDoc, getDocs, query, where, deleteDoc, upda
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
 
 export class CoverageMapService {
+  private getFirestore() {
+    return db();
+  }
   
   // ========== Tower Sites ==========
   
   async createTowerSite(tenantId: string, site: Omit<TowerSite, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<TowerSite> {
-    const sitesRef = collection(db, 'tenants', tenantId, 'towerSites');
+    const sitesRef = collection(this.getFirestore(), 'tenants', tenantId, 'towerSites');
     const newSite: Omit<TowerSite, 'id'> = {
       ...site,
       tenantId,
@@ -21,19 +24,19 @@ export class CoverageMapService {
   }
   
   async getTowerSites(tenantId: string): Promise<TowerSite[]> {
-    const sitesRef = collection(db, 'tenants', tenantId, 'towerSites');
+    const sitesRef = collection(this.getFirestore(), 'tenants', tenantId, 'towerSites');
     const snapshot = await getDocs(sitesRef);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TowerSite));
   }
   
   async getTowerSite(tenantId: string, siteId: string): Promise<TowerSite | null> {
-    const siteRef = doc(db, 'tenants', tenantId, 'towerSites', siteId);
+    const siteRef = doc(this.getFirestore(), 'tenants', tenantId, 'towerSites', siteId);
     const snapshot = await getDoc(siteRef);
     return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as TowerSite : null;
   }
   
   async updateTowerSite(tenantId: string, siteId: string, updates: Partial<TowerSite>): Promise<void> {
-    const siteRef = doc(db, 'tenants', tenantId, 'towerSites', siteId);
+    const siteRef = doc(this.getFirestore(), 'tenants', tenantId, 'towerSites', siteId);
     await updateDoc(siteRef, {
       ...updates,
       updatedAt: new Date()
@@ -41,14 +44,14 @@ export class CoverageMapService {
   }
   
   async deleteTowerSite(tenantId: string, siteId: string): Promise<void> {
-    const siteRef = doc(db, 'tenants', tenantId, 'towerSites', siteId);
+    const siteRef = doc(this.getFirestore(), 'tenants', tenantId, 'towerSites', siteId);
     await deleteDoc(siteRef);
   }
   
   // ========== Sectors ==========
   
   async createSector(tenantId: string, sector: Omit<Sector, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<Sector> {
-    const sectorsRef = collection(db, 'tenants', tenantId, 'sectors');
+    const sectorsRef = collection(this.getFirestore(), 'tenants', tenantId, 'sectors');
     const newSector: Omit<Sector, 'id'> = {
       ...sector,
       tenantId,
@@ -61,27 +64,27 @@ export class CoverageMapService {
   }
   
   async getSectors(tenantId: string): Promise<Sector[]> {
-    const sectorsRef = collection(db, 'tenants', tenantId, 'sectors');
+    const sectorsRef = collection(this.getFirestore(), 'tenants', tenantId, 'sectors');
     const snapshot = await getDocs(sectorsRef);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
   }
   
   async getSectorsBySite(tenantId: string, siteId: string): Promise<Sector[]> {
-    const sectorsRef = collection(db, 'tenants', tenantId, 'sectors');
+    const sectorsRef = collection(this.getFirestore(), 'tenants', tenantId, 'sectors');
     const q = query(sectorsRef, where('siteId', '==', siteId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
   }
   
   async getSectorsByBand(tenantId: string, band: string): Promise<Sector[]> {
-    const sectorsRef = collection(db, 'tenants', tenantId, 'sectors');
+    const sectorsRef = collection(this.getFirestore(), 'tenants', tenantId, 'sectors');
     const q = query(sectorsRef, where('band', '==', band));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sector));
   }
   
   async updateSector(tenantId: string, sectorId: string, updates: Partial<Sector>): Promise<void> {
-    const sectorRef = doc(db, 'tenants', tenantId, 'sectors', sectorId);
+    const sectorRef = doc(this.getFirestore(), 'tenants', tenantId, 'sectors', sectorId);
     await updateDoc(sectorRef, {
       ...updates,
       updatedAt: new Date()
@@ -89,14 +92,14 @@ export class CoverageMapService {
   }
   
   async deleteSector(tenantId: string, sectorId: string): Promise<void> {
-    const sectorRef = doc(db, 'tenants', tenantId, 'sectors', sectorId);
+    const sectorRef = doc(this.getFirestore(), 'tenants', tenantId, 'sectors', sectorId);
     await deleteDoc(sectorRef);
   }
   
   // ========== CPE Devices ==========
   
   async createCPE(tenantId: string, cpe: Omit<CPEDevice, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<CPEDevice> {
-    const cpeRef = collection(db, 'tenants', tenantId, 'cpeDevices');
+    const cpeRef = collection(this.getFirestore(), 'tenants', tenantId, 'cpeDevices');
     const newCPE: Omit<CPEDevice, 'id'> = {
       ...cpe,
       tenantId,
@@ -109,13 +112,13 @@ export class CoverageMapService {
   }
   
   async getCPEDevices(tenantId: string): Promise<CPEDevice[]> {
-    const cpeRef = collection(db, 'tenants', tenantId, 'cpeDevices');
+    const cpeRef = collection(this.getFirestore(), 'tenants', tenantId, 'cpeDevices');
     const snapshot = await getDocs(cpeRef);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CPEDevice));
   }
   
   async updateCPE(tenantId: string, cpeId: string, updates: Partial<CPEDevice>): Promise<void> {
-    const cpeRef = doc(db, 'tenants', tenantId, 'cpeDevices', cpeId);
+    const cpeRef = doc(this.getFirestore(), 'tenants', tenantId, 'cpeDevices', cpeId);
     await updateDoc(cpeRef, {
       ...updates,
       updatedAt: new Date()
@@ -123,14 +126,14 @@ export class CoverageMapService {
   }
   
   async deleteCPE(tenantId: string, cpeId: string): Promise<void> {
-    const cpeRef = doc(db, 'tenants', tenantId, 'cpeDevices', cpeId);
+    const cpeRef = doc(this.getFirestore(), 'tenants', tenantId, 'cpeDevices', cpeId);
     await deleteDoc(cpeRef);
   }
   
   // ========== Network Equipment ==========
   
   async createEquipment(tenantId: string, equipment: Omit<NetworkEquipment, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>): Promise<NetworkEquipment> {
-    const equipmentRef = collection(db, 'tenants', tenantId, 'networkEquipment');
+    const equipmentRef = collection(this.getFirestore(), 'tenants', tenantId, 'networkEquipment');
     const newEquipment: Omit<NetworkEquipment, 'id'> = {
       ...equipment,
       tenantId,
@@ -143,20 +146,20 @@ export class CoverageMapService {
   }
   
   async getEquipment(tenantId: string): Promise<NetworkEquipment[]> {
-    const equipmentRef = collection(db, 'tenants', tenantId, 'networkEquipment');
+    const equipmentRef = collection(this.getFirestore(), 'tenants', tenantId, 'networkEquipment');
     const snapshot = await getDocs(equipmentRef);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NetworkEquipment));
   }
   
   async getEquipmentByLocation(tenantId: string, locationType: string): Promise<NetworkEquipment[]> {
-    const equipmentRef = collection(db, 'tenants', tenantId, 'networkEquipment');
+    const equipmentRef = collection(this.getFirestore(), 'tenants', tenantId, 'networkEquipment');
     const q = query(equipmentRef, where('locationType', '==', locationType));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NetworkEquipment));
   }
   
   async updateEquipment(tenantId: string, equipmentId: string, updates: Partial<NetworkEquipment>): Promise<void> {
-    const equipmentRef = doc(db, 'tenants', tenantId, 'networkEquipment', equipmentId);
+    const equipmentRef = doc(this.getFirestore(), 'tenants', tenantId, 'networkEquipment', equipmentId);
     await updateDoc(equipmentRef, {
       ...updates,
       updatedAt: new Date()
@@ -164,7 +167,7 @@ export class CoverageMapService {
   }
   
   async deleteEquipment(tenantId: string, equipmentId: string): Promise<void> {
-    const equipmentRef = doc(db, 'tenants', tenantId, 'networkEquipment', equipmentId);
+    const equipmentRef = doc(this.getFirestore(), 'tenants', tenantId, 'networkEquipment', equipmentId);
     await deleteDoc(equipmentRef);
   }
   
