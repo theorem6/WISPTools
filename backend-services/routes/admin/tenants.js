@@ -9,6 +9,13 @@ const express = require('express');
 const admin = require('firebase-admin');
 const { Tenant } = require('../../models/tenant');
 const { UserTenant } = require('../users/user-schema');
+const { PlanProject } = require('../../models/plan');
+const { PlanLayerFeature } = require('../../models/plan-layer-feature');
+const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../../models/network');
+const { InventoryItem } = require('../../models/inventory');
+const { WorkOrder } = require('../../models/work-order');
+const { Customer } = require('../../models/customer');
+const InstallationDocumentation = require('../../models/installation-documentation');
 const { verifyAuth, isPlatformAdminUser } = require('../users/role-auth-middleware');
 const { PLATFORM_ADMIN_EMAILS } = require('../../utils/platformAdmin');
 
@@ -347,6 +354,33 @@ router.delete('/:tenantId', async (req, res) => {
     console.log(`🗑️ Deleting ${userAssociations.length} user associations...`);
     
     await UserTenant.deleteMany({ tenantId });
+
+    // Cascade delete tenant-scoped data across collections
+    const [
+      planResult,
+      featureResult,
+      siteResult,
+      sectorResult,
+      cpeResult,
+      equipmentResult,
+      deploymentResult,
+      inventoryResult,
+      workOrderResult,
+      customerResult,
+      installationResult
+    ] = await Promise.all([
+      PlanProject.deleteMany({ tenantId }),
+      PlanLayerFeature.deleteMany({ tenantId }),
+      UnifiedSite.deleteMany({ tenantId }),
+      UnifiedSector.deleteMany({ tenantId }),
+      UnifiedCPE.deleteMany({ tenantId }),
+      NetworkEquipment.deleteMany({ tenantId }),
+      HardwareDeployment.deleteMany({ tenantId }),
+      InventoryItem.deleteMany({ tenantId }),
+      WorkOrder.deleteMany({ tenantId }),
+      Customer.deleteMany({ tenantId }),
+      InstallationDocumentation.deleteMany({ tenantId })
+    ]);
     
     // Delete the tenant
     await Tenant.findByIdAndDelete(tenantId);
@@ -356,7 +390,20 @@ router.delete('/:tenantId', async (req, res) => {
     res.json({
       success: true,
       message: `Tenant "${tenant.displayName}" deleted successfully`,
-      deletedAssociations: userAssociations.length
+      deletedAssociations: userAssociations.length,
+      cascade: {
+        plans: planResult.deletedCount || 0,
+        planFeatures: featureResult.deletedCount || 0,
+        sites: siteResult.deletedCount || 0,
+        sectors: sectorResult.deletedCount || 0,
+        cpeDevices: cpeResult.deletedCount || 0,
+        equipment: equipmentResult.deletedCount || 0,
+        hardwareDeployments: deploymentResult.deletedCount || 0,
+        inventoryItems: inventoryResult.deletedCount || 0,
+        workOrders: workOrderResult.deletedCount || 0,
+        customers: customerResult.deletedCount || 0,
+        installationDocs: installationResult.deletedCount || 0
+      }
     });
   } catch (error) {
     console.error('Error deleting tenant:', error);

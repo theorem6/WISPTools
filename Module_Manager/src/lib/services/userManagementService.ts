@@ -57,13 +57,17 @@ async function getAuthHeaders(tenantId: string): Promise<HeadersInit> {
 /**
  * Get all users in a tenant
  */
-export async function getTenantUsers(tenantId: string): Promise<TenantUser[]> {
+export async function getTenantUsers(tenantId: string, scope: 'full' | 'visible' = 'full'): Promise<TenantUser[]> {
   try {
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
     const apiPath = API_BASE_URL || '/api';
-    const response = await fetch(`${apiPath}/users/tenant/${tenantId}`, {
+    const endpoint = scope === 'visible'
+      ? `${apiPath}/users/tenant/${tenantId}/visible`
+      : `${apiPath}/users/tenant/${tenantId}`;
+
+    const response = await fetch(endpoint, {
       method: 'GET',
       headers
     });

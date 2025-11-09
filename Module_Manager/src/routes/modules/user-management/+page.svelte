@@ -17,7 +17,9 @@
   let searchQuery = '';
   let roleFilter: UserRole | 'all' = 'all';
   let statusFilter: 'all' | 'active' | 'suspended' | 'pending_invitation' = 'all';
-  let isAdmin = false;
+let isAdmin = false;
+let tenantRole: UserRole | 'viewer' = 'viewer';
+let canManageUsers = false;
   
   let showInviteModal = false;
   let showEditModal = false;
@@ -39,6 +41,8 @@
         // Admin users see all users across all tenants
         console.log('Loading all users (admin view)');
         users = await getAllUsers();
+        tenantRole = 'platform_admin';
+        canManageUsers = true;
       } else {
         // Regular users see only their tenant's users
         if (!$currentTenant) {
@@ -47,8 +51,12 @@
           console.error('No tenant selected');
           return;
         }
-        console.log('Loading users for tenant:', $currentTenant.id);
-        users = await getTenantUsers($currentTenant.id);
+        tenantRole = ($currentTenant?.userRole as UserRole | undefined) ?? 'viewer';
+        const isTenantManager = tenantRole === 'owner' || tenantRole === 'admin';
+        canManageUsers = isTenantManager;
+        const scope = isTenantManager ? 'full' : 'visible';
+        console.log(`Loading users for tenant: ${$currentTenant.id} (scope: ${scope})`);
+        users = await getTenantUsers($currentTenant.id, scope);
       }
       console.log('Loaded users:', users);
       applyFilters();
@@ -99,6 +107,7 @@
   }
 
   function openInviteModal() {
+    if (!canManageUsers) return;
     showInviteModal = true;
   }
 
@@ -108,6 +117,7 @@
   }
 
   function openEditModal(user: TenantUser) {
+    if (!canManageUsers) return;
     selectedUser = user;
     showEditModal = true;
   }
@@ -190,10 +200,12 @@
       </p>
     </div>
     
-    <button class="btn btn-primary" on:click={openInviteModal}>
-      <span>➕</span>
-      Invite User
-    </button>
+    {#if canManageUsers}
+      <button class="btn btn-primary" on:click={openInviteModal}>
+        <span>➕</span>
+        Invite User
+      </button>
+    {/if}
   </div>
 
   {#if error}
@@ -251,11 +263,13 @@
         <button class="btn btn-secondary" on:click={() => { searchQuery = ''; roleFilter = 'all'; statusFilter = 'all'; applyFilters(); }}>
           Clear Filters
         </button>
-      {:else}
+      {:else if canManageUsers}
         <p>Invite your first user to get started</p>
         <button class="btn btn-primary" on:click={openInviteModal}>
           Invite User
         </button>
+      {:else}
+        <p>No team members available in your view.</p>
       {/if}
     </div>
   {:else}
@@ -268,7 +282,9 @@
             <th>Status</th>
             <th>Last Login</th>
             <th>Added</th>
-            <th>Actions</th>
+            {#if canManageUsers}
+              <th>Actions</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
@@ -305,11 +321,13 @@
               <td class="time-cell">
                 {formatTimeAgo(user.addedAt)}
               </td>
-              <td>
-                <button class="btn btn-sm btn-ghost" on:click={() => openEditModal(user)}>
-                  ✏️ Edit
-                </button>
-              </td>
+              {#if canManageUsers}
+                <td>
+                  <button class="btn btn-sm btn-ghost" on:click={() => openEditModal(user)}>
+                    ✏️ Edit
+                  </button>
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>

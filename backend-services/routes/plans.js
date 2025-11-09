@@ -796,7 +796,25 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Plan not found' });
     }
     
-    res.json({ message: 'Plan deleted successfully', plan });
+    const [featureResult, towerResult, sectorResult, cpeResult, equipmentResult] = await Promise.all([
+      PlanLayerFeature.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
+      UnifiedSite.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
+      UnifiedSector.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
+      UnifiedCPE.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
+      NetworkEquipment.deleteMany({ tenantId: req.tenantId, planId: req.params.id })
+    ]);
+
+    res.json({
+      message: 'Plan deleted successfully',
+      plan,
+      removed: {
+        features: featureResult.deletedCount || 0,
+        sites: towerResult.deletedCount || 0,
+        sectors: sectorResult.deletedCount || 0,
+        cpe: cpeResult.deletedCount || 0,
+        equipment: equipmentResult.deletedCount || 0
+      }
+    });
   } catch (error) {
     console.error('Error deleting plan:', error);
     res.status(500).json({ error: 'Failed to delete plan', message: error.message });
@@ -1272,6 +1290,7 @@ async function updatePlanFeatureSummary(tenantId, planId, session) {
 async function promotePlanLayerFeatures(plan, tenantId, user, session) {
   const planId = plan._id.toString();
   const promotionResults = [];
+  const promotedFeatureIds = [];
   const features = await PlanLayerFeature.find({ tenantId, planId }).session(session);
 
   for (const feature of features) {
@@ -1308,6 +1327,7 @@ async function promotePlanLayerFeatures(plan, tenantId, user, session) {
           resourceId: promotedDoc._id.toString(),
           resourceType: promotedDoc.constructor.modelName
         });
+        promotedFeatureIds.push(feature._id);
       }
     } catch (error) {
       console.error('Failed to promote plan feature:', {
@@ -1322,6 +1342,16 @@ async function promotePlanLayerFeatures(plan, tenantId, user, session) {
         message: error.message
       });
     }
+  }
+
+  if (promotedFeatureIds.length > 0) {
+    await PlanLayerFeature.deleteMany({
+      _id: { $in: promotedFeatureIds },
+      tenantId,
+      planId
+    }).session(session);
+
+    await updatePlanFeatureSummary(tenantId, planId, session);
   }
 
   return promotionResults;

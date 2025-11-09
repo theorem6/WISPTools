@@ -18,7 +18,8 @@ const {
   verifyAuth, 
   extractTenantId, 
   requireRole,
-  VALID_ROLES 
+  VALID_ROLES,
+  getUserTenantRole
 } = require('../../middleware/auth');
 const { getCreatableRoles, canManageRole, determineRoleFromEmail } = require('../../config/user-hierarchy');
 const { isPlatformAdminEmail } = require('../../utils/platformAdmin');
@@ -95,6 +96,95 @@ router.get('/', async (req, res) => {
     res.json(users);
   } catch (error) {
     console.error('Error listing all users:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message || 'Failed to list users'
+    });
+  }
+});
+
+/**
+ * GET /api/users/tenant/:tenantId/visible
+ * List users visible to the current user based on role hierarchy
+ */
+router.get('/tenant/:tenantId/visible', async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    if (!req.user?.isPlatformAdmin && req.tenantId !== tenantId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Cannot view users for another tenant'
+      });
+    }
+
+    let currentUserRole = 'platform_admin';
+    if (!req.user?.isPlatformAdmin) {
+      currentUserRole = await getUserTenantRole(req.user.uid, tenantId);
+      if (!currentUserRole) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Not a member of this tenant'
+        });
+      }
+    }
+
+    const isManagerRole = req.user?.isPlatformAdmin || ['owner', 'admin'].includes(currentUserRole);
+    const allowedRoles = new Set();
+
+    if (!isManagerRole) {
+      allowedRoles.add(currentUserRole);
+      const manageableRoles = getCreatableRoles(currentUserRole) || [];
+      manageableRoles.forEach(role => allowedRoles.add(role));
+    }
+
+    const query = { tenantId };
+    if (!isManagerRole) {
+      query.role = { $in: Array.from(allowedRoles) };
+    }
+
+    let userTenants = await UserTenant.find(query).lean();
+
+    // Ensure the requesting user always sees themselves
+    if (!isManagerRole) {
+      const hasSelf = userTenants.some(ut => ut.userId === req.user.uid);
+      if (!hasSelf) {
+        const selfRecord = await UserTenant.findOne({ userId: req.user.uid, tenantId }).lean();
+        if (selfRecord) {
+          userTenants.push(selfRecord);
+        }
+      }
+    }
+
+    const users = [];
+    for (const userTenant of userTenants) {
+      try {
+        const userRecord = await auth.getUser(userTenant.userId);
+        users.push({
+          uid: userTenant.userId,
+          email: userRecord.email || '',
+          displayName: userRecord.displayName || '',
+          photoURL: userRecord.photoURL || '',
+          phoneNumber: userRecord.phoneNumber || '',
+          role: userTenant.role,
+          status: userTenant.status,
+          invitedBy: userTenant.invitedBy || '',
+          invitedAt: userTenant.invitedAt || null,
+          acceptedAt: userTenant.acceptedAt || null,
+          addedAt: userTenant.addedAt,
+          lastAccessAt: userTenant.lastAccessAt || null,
+          lastLoginAt: userRecord.metadata?.lastSignInTime || null,
+          moduleAccess: userTenant.moduleAccess || null,
+          workOrderPermissions: userTenant.workOrderPermissions || null
+        });
+      } catch (authError) {
+        console.error(`User ${userTenant.userId} not found in Firebase Auth:`, authError.message);
+      }
+    }
+
+    res.json(users);
+  } catch (error) {
+    console.error('Error listing visible tenant users:', error);
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message || 'Failed to list users'
