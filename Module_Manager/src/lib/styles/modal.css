@@ -55,7 +55,7 @@
   justify-content: space-between;
   gap: var(--spacing-md);
   border-bottom: 1px solid var(--border-light);
-  background: var(--color-background-secondary);
+  background: color-mix(in srgb, var(--modal-surface-background) 94%, var(--color-background-secondary) 6%);
 }
 
 :global(.modal-header h1),
@@ -69,7 +69,7 @@
 :global(.modal-body) {
   padding: var(--spacing-lg);
   overflow-y: auto;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   background: var(--modal-surface-background);
 }
 
@@ -80,7 +80,7 @@
   justify-content: flex-end;
   gap: var(--spacing-md);
   border-top: 1px solid var(--border-light);
-  background: var(--color-background-secondary);
+  background: color-mix(in srgb, var(--modal-surface-background) 94%, var(--color-background-secondary) 6%);
 }
 
 :global(.modal-close-btn) {
