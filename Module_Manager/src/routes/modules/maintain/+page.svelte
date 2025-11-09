@@ -92,6 +92,12 @@
   
   $: applyTicketFilters();
   $: applyCustomerFilters();
+$: if (showCreateTicket) {
+  console.info('[Maintain] showCreateTicket set to true');
+}
+$: if (showTicketDetails) {
+  console.info('[Maintain] showTicketDetails set to true', selectedTicket);
+}
   
   // ========== API Calls ==========
   async function loadDashboardStats() {

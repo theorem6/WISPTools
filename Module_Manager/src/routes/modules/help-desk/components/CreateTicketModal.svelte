@@ -1,9 +1,13 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { workOrderService } from '$lib/services/workOrderService';
   
   const dispatch = createEventDispatcher();
+  onMount(() => {
+    console.info('[CreateTicketModal] Mounted');
+    return () => console.info('[CreateTicketModal] Destroyed');
+  });
   
   let title = '';
   let description = '';
