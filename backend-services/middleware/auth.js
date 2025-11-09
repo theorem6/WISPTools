@@ -18,6 +18,7 @@ const {
   getRoleDisplayName,
   getRoleDescription
 } = require('../config/user-hierarchy');
+const { isPlatformAdminEmail } = require('../utils/platformAdmin');
 
 // ============================================================================
 // ROLE DEFINITIONS (must match frontend TypeScript)
@@ -319,7 +320,7 @@ async function getUserTenantRole(userId, tenantId) {
  * @returns {boolean}
  */
 function isPlatformAdmin(email) {
-  return email === 'david@david.com';
+  return isPlatformAdminEmail(email);
 }
 
 /**

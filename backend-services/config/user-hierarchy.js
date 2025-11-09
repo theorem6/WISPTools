@@ -13,14 +13,12 @@
  * 8. Read-only/Viewer - View-only access for audits/compliance
  */
 
+const { PLATFORM_ADMIN_EMAILS } = require('../utils/platformAdmin');
+
 // Email domain/pattern mappings for auto-role assignment
 const EMAIL_ROLE_MAPPINGS = {
   // Platform admin - specific emails
-  platform_admin: [
-    'david@david.com',
-    'admin@wisptools.io',
-    'platform-admin@wisptools.io'
-  ],
+  platform_admin: PLATFORM_ADMIN_EMAILS,
   
   // Owner patterns - C-level executives
   owner: [

@@ -21,6 +21,7 @@ const {
   VALID_ROLES 
 } = require('../../middleware/auth');
 const { getCreatableRoles, canManageRole, determineRoleFromEmail } = require('../../config/user-hierarchy');
+const { isPlatformAdminEmail } = require('../../utils/platformAdmin');
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ router.get('/', async (req, res) => {
   try {
     // Check if user is platform admin
     const userEmail = req.user?.email;
-    if (userEmail !== 'david@david.com') {
+    if (!isPlatformAdminEmail(userEmail)) {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Platform admin access required'

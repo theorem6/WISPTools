@@ -11,6 +11,7 @@ const { admin } = require('../config/firebase');
 const { verifyAuth } = require('./users/role-auth-middleware');
 const { Tenant } = require('../models/tenant');
 const { UserTenant } = require('./users/user-schema');
+const { PLATFORM_ADMIN_EMAILS } = require('../utils/platformAdmin');
 
 /**
  * POST /api/tenants
@@ -120,47 +121,34 @@ router.post('/', verifyAuth, async (req, res) => {
     
     await userTenant.save();
     
-    // ALWAYS add david@david.com as platform admin for every tenant
-    try {
-      const platformAdminEmail = 'david@david.com';
-      const platformAdminUid = '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1'; // Known UID for david@david.com
-      
-      let platformAdminUserId;
+    for (const platformAdminEmail of PLATFORM_ADMIN_EMAILS) {
       try {
-        // Try to get user by email first
         const platformAdminUser = await admin.auth().getUserByEmail(platformAdminEmail);
-        platformAdminUserId = platformAdminUser.uid;
-      } catch (emailError) {
-        // If email lookup fails, use the known UID
-        console.warn(`Could not find user by email ${platformAdminEmail}, using known UID:`, emailError.message);
-        platformAdminUserId = platformAdminUid;
-      }
-      
-      // Check if platform admin already has a record for this tenant
-      const existingPlatformAdmin = await UserTenant.findOne({
-        userId: platformAdminUserId,
-        tenantId: tenant._id.toString()
-      });
-      
-      if (!existingPlatformAdmin) {
-        const platformAdminTenant = new UserTenant({
+        const platformAdminUserId = platformAdminUser.uid;
+        
+        const existingPlatformAdmin = await UserTenant.findOne({
           userId: platformAdminUserId,
-          tenantId: tenant._id.toString(),
-          role: 'admin', // Platform admin gets admin role in all tenants
-          status: 'active',
-          invitedBy: userId,
-          invitedAt: new Date(),
-          acceptedAt: new Date(),
-          addedAt: new Date()
+          tenantId: tenant._id.toString()
         });
         
-        await platformAdminTenant.save();
-        console.log(`✅ Added platform admin ${platformAdminEmail} (${platformAdminUserId}) as admin to tenant "${displayName}"`);
+        if (!existingPlatformAdmin) {
+          const platformAdminTenant = new UserTenant({
+            userId: platformAdminUserId,
+            tenantId: tenant._id.toString(),
+            role: 'admin',
+            status: 'active',
+            invitedBy: userId,
+            invitedAt: new Date(),
+            acceptedAt: new Date(),
+            addedAt: new Date()
+          });
+          
+          await platformAdminTenant.save();
+          console.log(`✅ Added platform admin ${platformAdminEmail} (${platformAdminUserId}) as admin to tenant "${displayName}"`);
+        }
+      } catch (error) {
+        console.error(`⚠️ Failed to add platform admin ${platformAdminEmail} to tenant:`, error.message);
       }
-    } catch (error) {
-      console.error(`⚠️ Failed to add platform admin to tenant:`, error.message);
-      console.error(`⚠️ Error stack:`, error.stack);
-      // Don't fail tenant creation if platform admin addition fails
     }
     
     console.log(`✅ User ${userEmail} created their tenant "${displayName}" (${tenant._id})`);

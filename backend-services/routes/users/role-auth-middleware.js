@@ -1,4 +1,5 @@
 const { admin, auth, firestore } = require('../../config/firebase');
+const { isPlatformAdminEmail } = require('../../utils/platformAdmin');
 
 const verifyAuth = async (req, res, next) => {
   try {
@@ -100,17 +101,20 @@ const requireRole = (requiredRole) => {
 const VALID_ROLES = ['admin', 'user', 'tenant_admin'];
 
 // Check if user is platform admin (by UID - preferred)
+const PLATFORM_ADMIN_UIDS = (process.env.PLATFORM_ADMIN_UIDS || '')
+  .split(',')
+  .map((uid) => uid.trim())
+  .filter(Boolean);
+
 const isPlatformAdminByUid = (uid) => {
-  const PLATFORM_ADMIN_UIDS = [
-    '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1', // david@david.com (expected UID)
-    'RXxGyzxnIngJ3TWKyWmAgSimfwG2'  // david@david.com (actual UID)
-  ];
-  return uid && PLATFORM_ADMIN_UIDS.includes(uid);
+  if (!uid) return false;
+  if (PLATFORM_ADMIN_UIDS.length === 0) return false;
+  return PLATFORM_ADMIN_UIDS.includes(uid);
 };
 
 // Check if user is platform admin (by email - legacy fallback)
 const isPlatformAdmin = (email) => {
-  return email === 'david@david.com' || email === 'david@4gengineer.com';
+  return isPlatformAdminEmail(email);
 };
 
 // Check if user is platform admin (checks both UID and email)

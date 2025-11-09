@@ -323,6 +323,15 @@
         }
         
         console.log('[Login Page] Google auth state ready');
+
+        const emailLower = (user.email || '').toLowerCase();
+        if (!emailLower.endsWith('@wisptools.io')) {
+          console.warn('[Login Page] Google login blocked for non-domain email:', user.email);
+          error = 'Only Google accounts under the wisptools.io domain are allowed.';
+          await authService.signOut();
+          isLoading = false;
+          return;
+        }
         
         // Store user info in localStorage for compatibility
         localStorage.setItem('isAuthenticated', 'true');
@@ -437,6 +446,24 @@
             : 'Already have an account? Sign in'}
         </button>
       </div>
+
+      <div class="login-divider">
+        <span></span>
+        <p>or</p>
+        <span></span>
+      </div>
+
+      <button type="button" class="btn-google" on:click={handleGoogleSignIn} disabled={isLoading}>
+        <svg aria-hidden="true" viewBox="0 0 533.5 544.3">
+          <path fill="#4285f4" d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.2H272v95h147.5c-6.4 34-25 62.8-53.4 82v68h86.1c50.4-46.5 80.3-115.1 80.3-194.8z"/>
+          <path fill="#34a853" d="M272 544.3c72.2 0 132.8-23.9 177-64.7l-86.1-68c-23.9 16.1-54.5 25.7-90.9 25.7-69.9 0-129.2-47.2-150.4-110.5h-90.7v69.8c44 87.4 134.5 148.7 241.1 148.7z"/>
+          <path fill="#fbbc04" d="M121.6 326.8c-10.2-30-10.2-62.5 0-92.5v-69.8h-90.7c-37.3 74.6-37.3 158.4 0 233z"/>
+          <path fill="#ea4335" d="M272 107.7c39.2-.6 76.4 13.8 105 39.9l78.2-78.2C404.5 25.5 344 0 272 0 165.4 0 74.9 61.3 30.9 148.7l90.7 69.8C142.7 175 202.1 107.7 272 107.7z"/>
+        </svg>
+        <span>Sign in with Google</span>
+      </button>
+
+      <p class="domain-note">Use your <strong>@wisptools.io</strong> Google account to sign in.</p>
 
       <div class="demo-notice">
         <p><strong>Firebase Authentication:</strong> Use your Firebase account to access your saved networks and data.</p>
@@ -656,6 +683,68 @@
 
   .link-btn:hover {
     color: #00f2fe;
+  }
+
+  .login-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0 1.5rem;
+    color: #6bb7ca;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .login-divider span {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.4), transparent);
+  }
+
+  .login-divider p {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .btn-google {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-radius: 0.6rem;
+    background: #ffffff;
+    color: #1a2332;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-google svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .btn-google:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(0, 217, 255, 0.25);
+  }
+
+  .btn-google:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .domain-note {
+    margin-top: 0.75rem;
+    text-align: center;
+    color: #8dcde0;
+    font-size: 0.85rem;
   }
 
   .demo-notice {

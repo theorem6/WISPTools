@@ -2,7 +2,7 @@
  * Unified Tenant Management API
  * 
  * Complete CRUD operations for tenants using MongoDB
- * Only accessible by platform admin (david@david.com)
+ * Only accessible by platform admin (admin@wisptools.io by default)
  */
 
 const express = require('express');
@@ -10,6 +10,7 @@ const admin = require('firebase-admin');
 const { Tenant } = require('../../models/tenant');
 const { UserTenant } = require('../users/user-schema');
 const { verifyAuth, isPlatformAdminUser } = require('../users/role-auth-middleware');
+const { PLATFORM_ADMIN_EMAILS } = require('../../utils/platformAdmin');
 
 const router = express.Router();
 
@@ -210,47 +211,35 @@ router.post('/', async (req, res) => {
       }
     }
     
-    // ALWAYS add david@david.com as platform admin for every tenant
-    try {
-      const platformAdminEmail = 'david@david.com';
-      const platformAdminUid = '1tf7J4Df4jMuZlEfrRQZ3Kmj1Gy1'; // Known UID for david@david.com
-      
-      let platformAdminUserId;
+    // ALWAYS add platform administrators to every tenant
+    for (const platformAdminEmail of PLATFORM_ADMIN_EMAILS) {
       try {
-        // Try to get user by email first
         const platformAdminUser = await admin.auth().getUserByEmail(platformAdminEmail);
-        platformAdminUserId = platformAdminUser.uid;
-      } catch (emailError) {
-        // If email lookup fails, use the known UID
-        console.warn(`Could not find user by email ${platformAdminEmail}, using known UID:`, emailError.message);
-        platformAdminUserId = platformAdminUid;
-      }
-      
-      // Check if platform admin already has a record for this tenant
-      const existingPlatformAdmin = await UserTenant.findOne({
-        userId: platformAdminUserId,
-        tenantId: tenant._id.toString()
-      });
-      
-      if (!existingPlatformAdmin) {
-        const platformAdminTenant = new UserTenant({
+        const platformAdminUserId = platformAdminUser.uid;
+        
+        const existingPlatformAdmin = await UserTenant.findOne({
           userId: platformAdminUserId,
-          tenantId: tenant._id.toString(),
-          role: 'admin', // Platform admin gets admin role in all tenants
-          status: 'active',
-          invitedBy: req.user.uid,
-          invitedAt: new Date(),
-          acceptedAt: new Date(),
-          addedAt: new Date()
+          tenantId: tenant._id.toString()
         });
         
-        await platformAdminTenant.save();
-        console.log(`✅ Added platform admin ${platformAdminEmail} (${platformAdminUserId}) as admin to tenant "${displayName}"`);
+        if (!existingPlatformAdmin) {
+          const platformAdminTenant = new UserTenant({
+            userId: platformAdminUserId,
+            tenantId: tenant._id.toString(),
+            role: 'admin',
+            status: 'active',
+            invitedBy: req.user.uid,
+            invitedAt: new Date(),
+            acceptedAt: new Date(),
+            addedAt: new Date()
+          });
+          
+          await platformAdminTenant.save();
+          console.log(`✅ Added platform admin ${platformAdminEmail} (${platformAdminUserId}) as admin to tenant "${displayName}"`);
+        }
+      } catch (error) {
+        console.error(`⚠️ Failed to add platform admin ${platformAdminEmail} to tenant:`, error.message);
       }
-    } catch (error) {
-      console.error(`⚠️ Failed to add platform admin to tenant:`, error.message);
-      console.error(`⚠️ Error stack:`, error.stack);
-      // Don't fail tenant creation if platform admin addition fails
     }
     
     res.status(201).json({

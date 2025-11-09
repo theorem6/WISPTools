@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { verifyAuth } = require('./role-auth-middleware');
+const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
 const { UserTenant } = require('./user-schema');
 
 /**
@@ -18,7 +18,7 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     const { userId } = req.params;
     
     // Security: Users can only query their own tenants (unless platform admin)
-    const isPlatformAdmin = req.user.email === 'david@david.com';
+    const isPlatformAdmin = isPlatformAdminUser(req.user);
     if (!isPlatformAdmin && req.user.uid !== userId) {
       return res.status(403).json({ error: 'Forbidden: Cannot query other users tenants' });
     }
