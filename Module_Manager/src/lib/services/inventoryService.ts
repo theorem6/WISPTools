@@ -2,6 +2,7 @@
 // Communicates with backend inventory API
 
 import { authService } from './authService';
+import { isPlatformAdmin } from './adminService';
 import { getApiUrl } from '$lib/config/api';
 
 // API Configuration - Use centralized config
@@ -151,7 +152,7 @@ class InventoryService {
     
     // Check if user is admin - if so, tenant is optional
     const currentUser = await this.getCurrentUser();
-    const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+    const isAdmin = isPlatformAdmin(currentUser?.email ?? null);
     
     if (!resolvedTenantId && !isAdmin) {
       throw new Error('No tenant selected');

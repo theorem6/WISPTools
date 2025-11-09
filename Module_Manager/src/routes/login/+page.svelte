@@ -7,6 +7,7 @@
   import { tenantService } from '$lib/services/tenantService';
   import { tenantStore } from '$lib/stores/tenantStore';
   import type { User } from 'firebase/auth';
+  import { isPlatformAdmin } from '$lib/services/adminService';
 
   let email = '';
   let password = '';
@@ -184,8 +185,8 @@
       // If no current tenant set yet, try auto-selection
       if (!currentTenant && tenants.length > 0) {
         // Auto-select single tenant for non-admin users
-        const isPlatformAdmin = email === 'david@david.com';
-        if (tenants.length === 1 && !isPlatformAdmin) {
+        const userIsPlatformAdmin = isPlatformAdmin(email);
+        if (tenants.length === 1 && !userIsPlatformAdmin) {
           console.log('[Login Page] Auto-selecting single tenant:', tenants[0].displayName);
           currentTenant = tenants[0];
           tenantStore.setCurrentTenant(currentTenant);

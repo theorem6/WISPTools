@@ -130,7 +130,8 @@ export class ObjectStateManager {
         'add-equipment',
         'add-inventory',
         'view-inventory',
-        'deploy-hardware'
+        'deploy-hardware',
+        'change-site-type'
       );
       state.isReadOnly = false;
     } else {
@@ -146,7 +147,8 @@ export class ObjectStateManager {
         'add-equipment',
         'add-inventory',
         'view-inventory',
-        'deploy-hardware'
+        'deploy-hardware',
+        'change-site-type'
       ];
     }
 

@@ -3,6 +3,7 @@
 
 import { browser } from '$app/environment';
 import { authService } from './authService';
+import { isPlatformAdmin } from './adminService';
 import { API_CONFIG } from '$lib/config/api';
 import type {
   Tenant,
@@ -99,11 +100,11 @@ export class TenantService {
       
       // Get current user to check if they're platform admin
       const user = authService.getCurrentUser();
-      const isPlatformAdmin = user?.email === 'david@david.com' || user?.email === 'david@4gengineer.com';
+      const userIsPlatformAdmin = isPlatformAdmin(user?.email ?? null);
       
       // For regular users, use /api/tenants (enforces one tenant per user)
       // For platform admins, use /admin/tenants (unlimited tenants)
-      const endpoint = isPlatformAdmin 
+      const endpoint = userIsPlatformAdmin 
         ? `${this.adminBaseUrl}/tenants`
         : `${this.apiBaseUrl}/tenants`;
       

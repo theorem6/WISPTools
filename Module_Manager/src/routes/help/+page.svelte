@@ -290,7 +290,7 @@
             
             <div class="role-detail">
               <h4>🏢 Platform Admin</h4>
-              <p><strong>Who:</strong> System administrator (david@david.com)</p>
+              <p><strong>Who:</strong> System administrator (admin@wisptools.io)</p>
               <p><strong>Access:</strong> ALL tenants, ALL modules, ALL permissions</p>
               <p><strong>Can:</strong> Manage all tenants, create owners, override any permission</p>
             </div>

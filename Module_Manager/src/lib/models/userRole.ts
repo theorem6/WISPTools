@@ -15,7 +15,7 @@ import type { Timestamp } from 'firebase/firestore';
  * User role types in the system
  */
 export type UserRole = 
-  | 'platform_admin'  // Super admin (david@david.com only)
+  | 'platform_admin'  // Super admin (admin@wisptools.io only)
   | 'owner'           // Tenant creator, full access
   | 'admin'           // Full management, configurable modules
   | 'engineer'        // Network engineer - technical modules

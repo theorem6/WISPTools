@@ -167,7 +167,7 @@
             console.log('[TenantGuard] Tenant validated:', tenantState.currentTenant.displayName);
           }
         } else {
-          // Platform admin (david@david.com) has master tenant rights
+          // Platform admin (admin@wisptools.io) has master tenant rights
           // Can add, change, or delete tenant admins
           console.log('[TenantGuard] Platform admin - has master tenant rights');
           if (!tenantState.currentTenant && currentUser) {

@@ -5,9 +5,10 @@
   import ServiceStatus from './components/ServiceStatus.svelte';
   import SystemResources from './components/SystemResources.svelte';
   import QuickActions from './components/QuickActions.svelte';
+  import { isPlatformAdmin } from '$lib/services/adminService';
   
   // Platform admin check
-  let isPlatformAdmin = false;
+  let hasPlatformAdminAccess = false;
   let isLoading = true;
   let user: any = null;
   
@@ -20,10 +21,10 @@
     
     user = currentUser;
     
-    // Check if user is platform admin (david@david.com)
-    isPlatformAdmin = currentUser.email === 'david@david.com';
+    // Check if user is platform admin
+    hasPlatformAdminAccess = isPlatformAdmin(currentUser.email ?? null);
     
-    if (!isPlatformAdmin) {
+    if (!hasPlatformAdminAccess) {
       alert('⛔ Access Denied: Platform Admin only');
       goto('/dashboard');
       return;
@@ -42,7 +43,7 @@
     <div class="spinner"></div>
     <p>Verifying admin access...</p>
   </div>
-{:else if isPlatformAdmin}
+{:else if hasPlatformAdminAccess}
   <div class="backend-management">
     <!-- Admin Banner -->
     <div class="admin-banner">

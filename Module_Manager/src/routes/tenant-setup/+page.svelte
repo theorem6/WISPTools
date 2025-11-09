@@ -5,6 +5,7 @@
   import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
   import { tenantStore } from '$lib/stores/tenantStore';
+  import { isPlatformAdmin } from '$lib/services/adminService';
 
   let isLoading = false;
   let error = '';
@@ -38,19 +39,19 @@
       const existingTenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
       console.log('[Tenant Setup] User has', existingTenants.length, 'existing tenants');
       
-      const isPlatformAdmin = currentUser.email === 'david@david.com' || currentUser.email === 'david@4gengineer.com';
+      const userIsPlatformAdmin = isPlatformAdmin(currentUser.email || null);
       
       // Only allow if:
       // 1. Platform admin (always allowed)
       // 2. First-time user with no tenants (allowed to create their first tenant)
-      if (!isPlatformAdmin && existingTenants.length > 0) {
+      if (!userIsPlatformAdmin && existingTenants.length > 0) {
         console.log('[Tenant Setup] ACCESS DENIED - User already has a tenant');
         error = 'You already have an organization. Each user can only create one tenant.';
         await goto('/tenant-selector', { replaceState: true });
         return;
       }
       
-      console.log('[Tenant Setup] Access granted -', isPlatformAdmin ? 'platform admin' : 'first-time user');
+      console.log('[Tenant Setup] Access granted -', userIsPlatformAdmin ? 'platform admin' : 'first-time user');
     } catch (err: any) {
       console.error('[Tenant Setup] Error checking existing tenants:', err);
       // If we can't check (e.g., 401 error), allow first-time setup
@@ -91,7 +92,7 @@
 
     try {
       // Check if this is platform admin or first-time user
-      const isPlatformAdmin = currentUser.email === 'david@david.com' || currentUser.email === 'david@4gengineer.com';
+      const userIsPlatformAdmin = isPlatformAdmin(currentUser.email || null);
       
       // Platform admin creating tenant should NOT be added as owner
       // First-time users creating their own tenant SHOULD be added as owner
@@ -101,8 +102,8 @@
         contactEmail,
         currentUser.uid,
         subdomain,
-        !isPlatformAdmin,  // Create owner association for first-time users, not for platform admin
-        isPlatformAdmin ? undefined : currentUser.email  // Owner email for first-time users
+        !userIsPlatformAdmin,  // Create owner association for first-time users, not for platform admin
+        userIsPlatformAdmin ? undefined : currentUser.email  // Owner email for first-time users
       );
 
       if (result.success && result.tenantId) {

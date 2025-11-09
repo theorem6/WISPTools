@@ -5,6 +5,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { Tenant } from '../models/tenant';
+import { isPlatformAdmin } from '../services/adminService';
 
 export interface TenantState {
   // Current tenant
@@ -202,18 +203,18 @@ function createTenantStore() {
         console.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
         
         // Auto-select tenant for non-admin users to ensure data isolation
-        // Platform admin (david@david.com) has master tenant rights and doesn't need auto-selection
-        const isPlatformAdmin = userEmail === 'david@david.com';
+        // Platform admin (admin@wisptools.io) has master tenant rights and doesn't need auto-selection
+        const userIsPlatformAdmin = isPlatformAdmin(userEmail ?? null);
         const currentState = get({ subscribe });
         
         console.log('[TenantStore] Auto-selection check:', { 
           tenantCount: tenants.length, 
-          isPlatformAdmin,
+          isPlatformAdmin: userIsPlatformAdmin,
           hasCurrentTenant: !!currentState.currentTenant,
           userEmail 
         });
         
-        if (tenants.length === 1 && !isPlatformAdmin && !currentState.currentTenant) {
+        if (tenants.length === 1 && !userIsPlatformAdmin && !currentState.currentTenant) {
           // Regular user with one tenant - auto-select it (enforces data isolation)
           const tenant = tenants[0];
           console.log('[TenantStore] Auto-selecting single tenant:', tenant.displayName);

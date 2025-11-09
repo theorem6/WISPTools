@@ -18,6 +18,7 @@
 import type { MapModuleMode } from '$lib/map/MapCapabilities';
 import type { ModuleContext } from '$lib/services/objectStateManager';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
+import { isPlatformAdmin } from '$lib/services/adminService';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -63,7 +64,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
 
   // Reactive tenant tracking
   $: console.log('[Deploy] Tenant state changed:', $currentTenant);
-  $: isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+  $: isAdmin = isPlatformAdmin(currentUser?.email ?? null);
   $: buttonsDisabled = !isAdmin && !$currentTenant;
 
   $: mapState = $mapContext;
@@ -278,7 +279,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
     console.log('[Deploy] Tenant ID:', $currentTenant?.id);
     
     // Check if user is admin - if so, allow opening without tenant
-    const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+    const isAdmin = isPlatformAdmin(currentUser?.email ?? null);
     
     if (!isAdmin && !$currentTenant?.id) {
       console.error('[Deploy] No tenant available and user is not admin - cannot open PCI Planner');
@@ -301,7 +302,7 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
     console.log('[Deploy] Tenant ID:', $currentTenant?.id);
     
     // Check if user is admin - if so, allow opening without tenant
-    const isAdmin = currentUser?.email === 'david@david.com' || currentUser?.email?.includes('admin');
+    const isAdmin = isPlatformAdmin(currentUser?.email ?? null);
     
     if (!isAdmin && !$currentTenant?.id) {
       console.error('[Deploy] No tenant available and user is not admin - cannot open Frequency Planner');
