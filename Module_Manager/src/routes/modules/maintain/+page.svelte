@@ -169,8 +169,10 @@
     
     loadingTickets = true;
     try {
+      console.info('[Maintain] Loading tickets for tenant', tenantId);
       // Services use localStorage for tenantId
       tickets = await workOrderService.getWorkOrders();
+      console.info('[Maintain] Loaded tickets', tickets);
       applyTicketFilters();
     } catch (error: any) {
       console.error('Error loading tickets:', error);
@@ -300,6 +302,7 @@
   }
   
   function handleTicketCreated() {
+    console.info('[Maintain] Ticket created event received');
     showCreateTicket = false;
     loadTickets();
     loadDashboardStats();
@@ -324,7 +327,10 @@
         <h1>🔧 Maintain Module</h1>
         <div class="header-actions">
           {#if activeTab === 'tickets'}
-            <button class="btn btn-primary" on:click={() => showCreateTicket = true}>
+            <button class="btn btn-primary" on:click={() => {
+              console.info('[Maintain] Opening create ticket modal');
+              showCreateTicket = true;
+            }}>
               + Create Ticket
             </button>
           {:else if activeTab === 'customers'}
@@ -469,7 +475,11 @@
                 <button
                   type="button"
                   class="ticket-card"
-                  on:click={() => { selectedTicket = ticket; showTicketDetails = true; }}
+                  on:click={() => {
+                    console.info('[Maintain] Opening ticket details', ticket);
+                    selectedTicket = ticket;
+                    showTicketDetails = true;
+                  }}
                 >
                   <div class="ticket-header">
                     <div class="ticket-id">#{ticket.ticketNumber || ticket._id?.slice(-6)}</div>
