@@ -129,7 +129,8 @@ export class ObjectStateManager {
         'add-backhaul',
         'add-equipment',
         'add-inventory',
-        'view-inventory'
+        'view-inventory',
+        'deploy-hardware'
       );
       state.isReadOnly = false;
     } else {
@@ -144,7 +145,8 @@ export class ObjectStateManager {
         'add-backhaul',
         'add-equipment',
         'add-inventory',
-        'view-inventory'
+        'view-inventory',
+        'deploy-hardware'
       ];
     }
 
