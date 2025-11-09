@@ -26,6 +26,12 @@
     error = '';
     
     try {
+      console.info('[CreateTicketModal] Submitting ticket', {
+        tenant: $currentTenant.id,
+        title,
+        priority,
+        type
+      });
       const newTicket = await workOrderService.createWorkOrder({
         tenantId: $currentTenant.id,
         title,
@@ -45,9 +51,11 @@
         }] : undefined
       });
 
+      console.info('[CreateTicketModal] Ticket created', newTicket);
       dispatch('created', newTicket);
       dispatch('close');
     } catch (err: any) {
+      console.error('[CreateTicketModal] Failed to create ticket', err);
       error = err.message || 'Failed to create ticket';
     } finally {
       loading = false;
