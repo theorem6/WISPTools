@@ -16,16 +16,6 @@
 
   let unsubscribe: (() => void) | undefined;
 
-  const DEFAULT_MAP_HOST = 'https://wisptools-production.web.app';
-
-  const COVERAGE_MAP_HOST =
-    import.meta.env.VITE_COVERAGE_MAP_HOST ??
-    (typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? window.location.origin
-      : DEFAULT_MAP_HOST);
-
-  const normalizedHost = COVERAGE_MAP_HOST.replace(/\/+$/, '');
-
   const buildUrl = (state: MapLayerState = mapState) => {
     const params = new URLSearchParams();
 
@@ -44,8 +34,7 @@
     }
 
     const query = params.toString();
-    const path = query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
-    return `${normalizedHost}${path}`;
+    return query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
   };
 
   const buildNavigationKey = (state: MapLayerState = mapState) => {
