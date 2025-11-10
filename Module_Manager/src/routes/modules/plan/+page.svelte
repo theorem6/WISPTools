@@ -1442,11 +1442,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeProjectModal}>Close</button>
-          <button class="btn-primary" on:click={openMarketingToolsFromModal} disabled={!projects.length}>
+          <button class="btn-secondary" type="button" on:click={closeProjectModal}>Close</button>
+          <button class="btn-primary" type="button" on:click={openMarketingToolsFromModal} disabled={!projects.length}>
             🔍 Find Addresses
           </button>
-          <button class="btn-primary" on:click={openCreateProject}>Create New Project</button>
+          <button class="btn-primary" type="button" on:click={openCreateProject}>Create New Project</button>
         </div>
       </div>
     </div>
