@@ -1371,7 +1371,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     on:click={() => openMarketingToolsForProject(project)}
                     title="Discover serviceable addresses for marketing outreach"
                   >
-                    📣 Marketing
+                    🔍 Find Addresses
                   </button>
                   
                   {#if ['ready','approved','rejected','cancelled'].includes(project.status)}
