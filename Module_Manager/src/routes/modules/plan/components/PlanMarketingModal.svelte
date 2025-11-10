@@ -191,7 +191,7 @@
 </script>
 
 <div
-  class="modal-backdrop marketing-modal-backdrop"
+  class="modal-overlay"
   role="presentation"
   aria-hidden="true"
   tabindex="-1"
