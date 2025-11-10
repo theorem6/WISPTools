@@ -5,7 +5,9 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { planService, type PlanProject } from '$lib/services/planService';
+  import { planService, type PlanProject, type PlanProjectLocation, type PlanProjectMarketing } from '$lib/services/planService';
+  import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
+  import PlanMarketingModal from './components/PlanMarketingModal.svelte';
 import SettingsButton from '$lib/components/SettingsButton.svelte';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
 import { mapContext, type MapLayerState } from '$lib/map/mapContext';
@@ -22,6 +24,7 @@ import type { ModuleContext } from '$lib/services/objectStateManager';
   let showCreateProjectModal = false;
   let showMissingHardwareModal = false;
   let showAddRequirementModal = false;
+  let showMarketingModal = false;
   
   // Data
   let projects: PlanProject[] = [];
@@ -56,11 +59,44 @@ $: mapLocked = !(activeProject || contextActivePlan);
 
   $: applyPlanningCapabilities(mapLocked);
   
-  // New project form
-  let newProject = {
-    name: '',
-    description: ''
+  type NewProjectForm = {
+    name: string;
+    description: string;
+    location: {
+      addressLine1: string;
+      addressLine2: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      country: string;
+      latitude: string;
+      longitude: string;
+    };
+    marketing: {
+      targetRadiusMiles: number;
+    };
   };
+
+  const createDefaultProject = (): NewProjectForm => ({
+    name: '',
+    description: '',
+    location: {
+      addressLine1: '',
+      addressLine2: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'US',
+      latitude: '',
+      longitude: ''
+    },
+    marketing: {
+      targetRadiusMiles: 5
+    }
+  });
+
+  // New project form
+  let newProject: NewProjectForm = createDefaultProject();
   
   // New hardware requirement form
   let newRequirement = {
@@ -72,6 +108,96 @@ $: mapLocked = !(activeProject || contextActivePlan);
     priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
     specifications: {}
   };
+
+  function resetNewProjectForm() {
+    newProject = createDefaultProject();
+  }
+
+  function buildAddressString(location: NewProjectForm['location']): string | null {
+    const parts = [
+      location.addressLine1,
+      location.addressLine2,
+      location.city && location.state ? `${location.city}, ${location.state}` : location.city,
+      !location.city && location.state ? location.state : undefined,
+      location.postalCode,
+      location.country
+    ]
+      .map(part => (typeof part === 'string' ? part.trim() : ''))
+      .filter(part => part && part.length > 0);
+
+    if (parts.length === 0) {
+      return null;
+    }
+    return parts.join(', ');
+  }
+
+  function buildPlanLocationPayload(): PlanProjectLocation | undefined {
+    const location = newProject.location;
+    const normalized: PlanProjectLocation = {
+      addressLine1: location.addressLine1.trim() || undefined,
+      addressLine2: location.addressLine2.trim() || undefined,
+      city: location.city.trim() || undefined,
+      state: location.state.trim() || undefined,
+      postalCode: location.postalCode.trim() || undefined,
+      country: location.country.trim() || undefined
+    };
+
+    const latitude = parseFloat(location.latitude);
+    const longitude = parseFloat(location.longitude);
+    if (Number.isFinite(latitude)) {
+      normalized.latitude = latitude;
+    }
+    if (Number.isFinite(longitude)) {
+      normalized.longitude = longitude;
+    }
+
+    const hasValue = Object.values(normalized).some(value => value !== undefined);
+    return hasValue ? normalized : undefined;
+  }
+
+  function buildPlanMarketingPayload(): PlanProjectMarketing | undefined {
+    const radius = Number(newProject.marketing.targetRadiusMiles);
+    if (Number.isFinite(radius) && radius > 0) {
+      return { targetRadiusMiles: radius };
+    }
+    return undefined;
+  }
+
+  async function geocodeNewProjectLocation() {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) {
+      error = 'Select a tenant before geocoding a project location.';
+      setTimeout(() => (error = ''), 5000);
+      return;
+    }
+
+    const address = buildAddressString(newProject.location);
+    if (!address) {
+      error = 'Enter address details (street, city, state) before geocoding.';
+      setTimeout(() => (error = ''), 5000);
+      return;
+    }
+
+    try {
+      isLoading = true;
+      const result = await coverageMapService.geocodeAddress(address);
+      if (result && typeof result.latitude === 'number' && typeof result.longitude === 'number') {
+        newProject.location.latitude = result.latitude.toFixed(6);
+        newProject.location.longitude = result.longitude.toFixed(6);
+        successMessage = `Coordinates located at ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`;
+        setTimeout(() => (successMessage = ''), 5000);
+      } else {
+        error = 'Unable to resolve geolocation for the provided address.';
+        setTimeout(() => (error = ''), 5000);
+      }
+    } catch (err: any) {
+      console.error('Error geocoding project address:', err);
+      error = err?.message || 'Failed to geocode address.';
+      setTimeout(() => (error = ''), 5000);
+    } finally {
+      isLoading = false;
+    }
+  }
 
   // Project workflow states
   let activeProject: PlanProject | null = null;
@@ -415,7 +541,7 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
 
   function openCreateProject() {
     showCreateProjectModal = true;
-    newProject = { name: '', description: '' };
+    resetNewProjectForm();
   }
 
   function closeCreateProjectModal() {
@@ -441,6 +567,23 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
       setTimeout(() => error = '', 5000);
       return;
     }
+
+    const requiredLocation: Array<{ field: keyof NewProjectForm['location']; label: string }> = [
+      { field: 'addressLine1', label: 'street address' },
+      { field: 'city', label: 'city' },
+      { field: 'state', label: 'state' },
+      { field: 'postalCode', label: 'postal code' }
+    ];
+
+    const missingLocationFields = requiredLocation
+      .filter(item => !newProject.location[item.field].trim())
+      .map(item => item.label);
+
+    if (missingLocationFields.length > 0) {
+      error = `Please provide ${missingLocationFields.join(', ')} for the project location.`;
+      setTimeout(() => (error = ''), 6000);
+      return;
+    }
     
     isLoading = true;
     error = '';
@@ -450,11 +593,39 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
       if (!tenantId) {
         throw new Error('No tenant selected');
       }
+
+      const createdByEmail = currentUser?.email || 'System';
+
+      let locationPayload = buildPlanLocationPayload();
+
+      if (locationPayload && (locationPayload.latitude === undefined || locationPayload.longitude === undefined)) {
+        const searchAddress = buildAddressString(newProject.location);
+        if (searchAddress) {
+          try {
+            const geocodeResult = await coverageMapService.geocodeAddress(searchAddress);
+            if (geocodeResult && typeof geocodeResult.latitude === 'number' && typeof geocodeResult.longitude === 'number') {
+              locationPayload = {
+                ...locationPayload,
+                latitude: geocodeResult.latitude,
+                longitude: geocodeResult.longitude
+              };
+              newProject.location.latitude = geocodeResult.latitude.toFixed(6);
+              newProject.location.longitude = geocodeResult.longitude.toFixed(6);
+            }
+          } catch (geocodeError) {
+            console.warn('Automatic geocode for project creation failed:', geocodeError);
+          }
+        }
+      }
+
+      const marketingPayload = buildPlanMarketingPayload();
       
       const project = await planService.createPlan(tenantId, {
         name: newProject.name,
         description: newProject.description,
-        createdBy: currentUser.email
+        createdBy: createdByEmail,
+        location: locationPayload,
+        marketing: marketingPayload
       });
       
       closeCreateProjectModal();
@@ -560,6 +731,30 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     closeAddRequirementModal();
   }
 }
+
+  function openMarketingTools() {
+    if (!selectedProject) return;
+    showMarketingModal = true;
+  }
+
+  function closeMarketingTools() {
+    showMarketingModal = false;
+  }
+
+  function openMarketingToolsForProject(project: PlanProject) {
+    selectedProject = project;
+    showMarketingModal = true;
+  }
+
+  function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
+    const updatedPlan = event.detail;
+    if (!updatedPlan) return;
+    selectedProject = updatedPlan;
+    const idx = projects.findIndex(p => p.id === updatedPlan.id);
+    if (idx !== -1) {
+      projects[idx] = updatedPlan;
+    }
+  }
 
 
   async function addHardwareRequirement() {
@@ -1169,6 +1364,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   >
                     {project.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
                   </button>
+
+                  <button
+                    class="action-btn marketing-btn"
+                    type="button"
+                    on:click={() => openMarketingToolsForProject(project)}
+                    title="Discover serviceable addresses for marketing outreach"
+                  >
+                    📣 Marketing
+                  </button>
                   
                   {#if ['ready','approved','rejected','cancelled'].includes(project.status)}
                     <button 
@@ -1280,6 +1484,122 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 rows="3"
                 disabled={isLoading}
               ></textarea>
+            </div>
+
+            <div class="form-section">
+              <h3>Project Location</h3>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="projectAddress1">Street Address *</label>
+                  <input
+                    id="projectAddress1"
+                    type="text"
+                    bind:value={newProject.location.addressLine1}
+                    placeholder="123 Main St"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="projectAddress2">Suite / Unit</label>
+                  <input
+                    id="projectAddress2"
+                    type="text"
+                    bind:value={newProject.location.addressLine2}
+                    placeholder="Suite 200"
+                    disabled={isLoading}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="projectCity">City *</label>
+                  <input
+                    id="projectCity"
+                    type="text"
+                    bind:value={newProject.location.city}
+                    placeholder="City"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="projectState">State / Region *</label>
+                  <input
+                    id="projectState"
+                    type="text"
+                    bind:value={newProject.location.state}
+                    placeholder="State"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="projectPostalCode">Postal Code *</label>
+                  <input
+                    id="projectPostalCode"
+                    type="text"
+                    bind:value={newProject.location.postalCode}
+                    placeholder="ZIP / Postal Code"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="projectCountry">Country</label>
+                  <input
+                    id="projectCountry"
+                    type="text"
+                    bind:value={newProject.location.country}
+                    placeholder="Country"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+              <div class="coordinate-row">
+                <div class="form-group">
+                  <label for="projectLatitude">Latitude</label>
+                  <input
+                    id="projectLatitude"
+                    type="text"
+                    bind:value={newProject.location.latitude}
+                    placeholder="Auto populated after geocoding"
+                    disabled={isLoading}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="projectLongitude">Longitude</label>
+                  <input
+                    id="projectLongitude"
+                    type="text"
+                    bind:value={newProject.location.longitude}
+                    placeholder="Auto populated after geocoding"
+                    disabled={isLoading}
+                  />
+                </div>
+                <button
+                  class="btn-secondary geocode-btn"
+                  type="button"
+                  on:click={geocodeNewProjectLocation}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Geocoding...' : 'Geocode Address'}
+                </button>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Marketing Coverage</h3>
+              <div class="form-group">
+                <label for="projectRadius">Target Radius (miles)</label>
+                <input
+                  id="projectRadius"
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  bind:value={newProject.marketing.targetRadiusMiles}
+                  disabled={isLoading}
+                />
+                <small>This radius is used when discovering serviceable addresses for outreach.</small>
+              </div>
             </div>
           </form>
         </div>
@@ -1411,6 +1731,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
       </div>
     </div>
+  {/if}
+
+  <!-- Marketing Modal -->
+  {#if showMarketingModal && selectedProject}
+    <PlanMarketingModal
+      plan={selectedProject}
+      on:close={closeMarketingTools}
+      on:updated={handleMarketingUpdated}
+    />
   {/if}
 
   <!-- Add Hardware Requirement Modal -->
@@ -2097,6 +2426,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     background: #059669;
   }
 
+  .marketing-btn {
+    background: #fbbf24;
+    color: #1f2937;
+  }
+
+  .marketing-btn:hover {
+    background: #d97706;
+    color: #111827;
+  }
+
   .approve-btn {
     background: #10b981;
     color: white;
@@ -2319,6 +2658,62 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   /* Create Project Modal Styles */
   .create-modal {
     max-width: 500px;
+  }
+
+  .form-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .form-section:last-of-type {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .form-section h3 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .coordinate-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-top: 1rem;
+  }
+
+  .coordinate-row .form-group {
+    flex: 1 1 220px;
+    margin-bottom: 0;
+  }
+
+  .geocode-btn {
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--border-radius-sm);
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .geocode-btn:hover {
+    background: #0369a1;
+  }
+
+  .geocode-btn:disabled {
+    background: rgba(14, 165, 233, 0.4);
+    cursor: not-allowed;
   }
 
   .form-group {

@@ -3,6 +3,7 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
+const fetch = require('node-fetch');
 const router = express.Router();
 const { PlanProject } = require('../models/plan');
 const { InventoryItem } = require('../models/inventory');
@@ -28,6 +29,188 @@ const requireTenant = (req, res, next) => {
 
 router.use(verifyAuth);
 router.use(requireTenant);
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+const trimString = (value) => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseLocation = (input) => {
+  if (input === null) return null;
+  if (!input || typeof input !== 'object') return undefined;
+
+  const latitude = toNumber(input.latitude ?? input.lat);
+  const longitude = toNumber(input.longitude ?? input.lon);
+
+  const location = {
+    addressLine1: trimString(input.addressLine1 ?? input.address),
+    addressLine2: trimString(input.addressLine2 ?? input.unit),
+    city: trimString(input.city),
+    state: trimString(input.state ?? input.region),
+    postalCode: trimString(input.postalCode ?? input.zip ?? input.postcode),
+    country: trimString(input.country) ?? 'US'
+  };
+
+  if (latitude !== undefined) location.latitude = latitude;
+  if (longitude !== undefined) location.longitude = longitude;
+
+  const hasData = Object.values(location).some((value) => value !== undefined);
+  return hasData ? location : undefined;
+};
+
+const parseBoundingBox = (input) => {
+  if (!input || typeof input !== 'object') return undefined;
+  const west = toNumber(input.west);
+  const south = toNumber(input.south);
+  const east = toNumber(input.east);
+  const north = toNumber(input.north);
+  if ([west, south, east, north].some((value) => value === undefined)) {
+    return undefined;
+  }
+  return { west, south, east, north };
+};
+
+const parseCenter = (input) => {
+  if (!input || typeof input !== 'object') return undefined;
+  const lat = toNumber(input.lat ?? input.latitude);
+  const lon = toNumber(input.lon ?? input.longitude);
+  if (lat === undefined || lon === undefined) return undefined;
+  return { lat, lon };
+};
+
+const parseMarketing = (input) => {
+  if (input === null) return null;
+  if (!input || typeof input !== 'object') return undefined;
+
+  const marketing = {};
+
+  const radius = toNumber(input.targetRadiusMiles ?? input.radiusMiles ?? input.radius);
+  if (radius !== undefined) marketing.targetRadiusMiles = radius;
+
+  const lastRunAt = input.lastRunAt ? new Date(input.lastRunAt) : undefined;
+  if (lastRunAt && !Number.isNaN(lastRunAt.valueOf())) {
+    marketing.lastRunAt = lastRunAt;
+  }
+
+  const lastResultCount = toNumber(input.lastResultCount);
+  if (lastResultCount !== undefined) marketing.lastResultCount = lastResultCount;
+
+  const boundingBox = parseBoundingBox(input.lastBoundingBox ?? input.boundingBox);
+  if (boundingBox) marketing.lastBoundingBox = boundingBox;
+
+  const center = parseCenter(input.lastCenter ?? input.center);
+  if (center) marketing.lastCenter = center;
+
+  if (Array.isArray(input.addresses)) {
+    marketing.addresses = input.addresses
+      .map((addr) => {
+        const latitude = toNumber(addr.latitude ?? addr.lat);
+        const longitude = toNumber(addr.longitude ?? addr.lon);
+        const addressLine1 = trimString(addr.addressLine1 ?? addr.address);
+        const addressLine2 = trimString(addr.addressLine2 ?? addr.unit);
+        const city = trimString(addr.city);
+        const state = trimString(addr.state);
+        const postalCode = trimString(addr.postalCode ?? addr.zip ?? addr.postcode);
+        const country = trimString(addr.country);
+        const source = trimString(addr.source);
+
+        if (
+          addressLine1 ||
+          addressLine2 ||
+          city ||
+          state ||
+          postalCode ||
+          country ||
+          (latitude !== undefined && longitude !== undefined)
+        ) {
+          const result = {
+            addressLine1,
+            addressLine2,
+            city,
+            state,
+            postalCode,
+            country,
+            source
+          };
+          if (latitude !== undefined) result.latitude = latitude;
+          if (longitude !== undefined) result.longitude = longitude;
+          return result;
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  const hasData = Object.keys(marketing).length > 0;
+  return hasData ? marketing : undefined;
+};
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const MAX_BUILDING_RESULTS = 150;
+const MAX_REVERSE_GEOCODE = 15;
+const NOMINATIM_DELAY_MS = 1200;
+const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
+const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+
+const buildOverpassQuery = (bbox) => `
+[out:json][timeout:60];
+(
+  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["landuse"~"^(residential|village_green)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["landuse"~"^(residential|village_green)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+);
+out center meta;
+`;
+
+const reverseGeocodeCoordinate = async (lat, lon) => {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': NOMINATIM_USER_AGENT,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Reverse geocoding failed: ${response.status} ${response.statusText} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const address = data.address || {};
+
+  const line1 =
+    address.house_number && address.road
+      ? `${address.house_number} ${address.road}`
+      : data.display_name?.split(',')?.slice(0, 1)?.[0] || undefined;
+
+  return {
+    addressLine1: line1 ? line1.trim() : undefined,
+    addressLine2: undefined,
+    city: address.city || address.town || address.village || address.hamlet || undefined,
+    state: address.state || address.region || undefined,
+    postalCode: address.postcode || undefined,
+    country: address.country || address.country_code?.toUpperCase() || undefined,
+    latitude: lat,
+    longitude: lon,
+    source: 'nominatim'
+  };
+};
 
 // ============================================================================
 // PLAN MANAGEMENT
@@ -101,6 +284,9 @@ router.post('/', async (req, res) => {
       name: req.body.name
     }));
     
+    const location = parseLocation(req.body.location);
+    const marketing = parseMarketing(req.body.marketing);
+
     // Build planData WITHOUT spreading req.body first (to avoid overwriting createdBy)
     const planData = {
       name: req.body.name || 'New Plan',
@@ -128,6 +314,21 @@ router.post('/', async (req, res) => {
       },
       deployment: req.body.deployment || {}
     };
+
+    if (location === null) {
+      planData.location = null;
+    } else if (location !== undefined) {
+      planData.location = location;
+    }
+
+    if (marketing === null) {
+      planData.marketing = null;
+    } else if (marketing !== undefined) {
+      planData.marketing = {
+        targetRadiusMiles: marketing.targetRadiusMiles ?? 5,
+        ...marketing
+      };
+    }
     
     // Verify createdBy is set before validation
     if (!planData.createdBy || planData.createdBy.trim() === '') {
@@ -175,6 +376,30 @@ router.put('/:id', async (req, res) => {
       });
     }
      
+    const parsedLocation = req.body.location !== undefined ? parseLocation(req.body.location) : undefined;
+    const parsedMarketing = req.body.marketing !== undefined ? parseMarketing(req.body.marketing) : undefined;
+
+    const locationUpdate =
+      req.body.location !== undefined
+        ? (parsedLocation === undefined ? existingPlan.location : parsedLocation)
+        : existingPlan.location;
+
+    const marketingUpdateRaw =
+      req.body.marketing !== undefined
+        ? (parsedMarketing === undefined ? existingPlan.marketing : parsedMarketing)
+        : existingPlan.marketing;
+
+    const marketingUpdate =
+      marketingUpdateRaw && marketingUpdateRaw !== null
+        ? {
+            targetRadiusMiles:
+              marketingUpdateRaw.targetRadiusMiles ??
+              existingPlan.marketing?.targetRadiusMiles ??
+              5,
+            ...marketingUpdateRaw
+          }
+        : marketingUpdateRaw;
+
     const plan = await PlanProject.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
       { 
@@ -186,6 +411,8 @@ router.put('/:id', async (req, res) => {
         hardwareRequirements: req.body.hardwareRequirements !== undefined ? req.body.hardwareRequirements : existingPlan.hardwareRequirements,
         purchasePlan: req.body.purchasePlan !== undefined ? req.body.purchasePlan : existingPlan.purchasePlan,
         deployment: req.body.deployment !== undefined ? req.body.deployment : existingPlan.deployment,
+        location: locationUpdate,
+        marketing: marketingUpdate,
         updatedAt: new Date(),
         updatedBy: userEmail || 'System',
         updatedById: req.user?.uid || req.body.uid || null,
@@ -198,6 +425,154 @@ router.put('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error updating plan:', error);
     res.status(500).json({ error: 'Failed to update plan', message: error.message });
+  }
+});
+
+// POST /plans/:id/marketing/discover - Find marketing addresses within area
+router.post('/:id/marketing/discover', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const boundingBox = parseBoundingBox(req.body.boundingBox);
+    if (!boundingBox) {
+      return res.status(400).json({
+        error: 'Invalid bounding box',
+        message: 'Provide boundingBox with numeric west, south, east, north values'
+      });
+    }
+
+    const radiusMiles =
+      toNumber(req.body.radiusMiles ?? req.body.radius ?? plan.marketing?.targetRadiusMiles) ?? 5;
+
+    const explicitCenter = parseCenter(req.body.center);
+    const computedCenter = explicitCenter || (plan.location?.latitude !== undefined && plan.location?.longitude !== undefined
+      ? { lat: plan.location.latitude, lon: plan.location.longitude }
+      : {
+          lat: (boundingBox.north + boundingBox.south) / 2,
+          lon: (boundingBox.east + boundingBox.west) / 2
+        });
+
+    const overpassQuery = buildOverpassQuery(boundingBox);
+    const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `data=${encodeURIComponent(overpassQuery)}`
+    });
+
+    if (!overpassResponse.ok) {
+      const details = await overpassResponse.text().catch(() => '');
+      return res.status(502).json({
+        error: 'Failed to query building data',
+        message: `Overpass API returned ${overpassResponse.status}`,
+        details
+      });
+    }
+
+    const overpassData = await overpassResponse.json();
+    const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
+
+    const seen = new Set();
+    const candidates = [];
+
+    for (const element of elements) {
+      const latitude =
+        toNumber(element.lat) ??
+        toNumber(element.center?.lat) ??
+        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
+      const longitude =
+        toNumber(element.lon) ??
+        toNumber(element.center?.lon) ??
+        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
+
+      if (latitude === undefined || longitude === undefined) continue;
+
+      const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      candidates.push({
+        lat: latitude,
+        lon: longitude,
+        source: element.type === 'node' ? 'osm_node' : 'osm_way'
+      });
+
+      if (candidates.length >= MAX_BUILDING_RESULTS) break;
+    }
+
+    const addresses = [];
+    let geocodedCount = 0;
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      if (geocodedCount < MAX_REVERSE_GEOCODE) {
+        try {
+          if (geocodedCount > 0) {
+            await delay(NOMINATIM_DELAY_MS);
+          }
+          const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+          addresses.push(details);
+          geocodedCount += 1;
+          continue;
+        } catch (error) {
+          console.warn('Reverse geocode fallback:', error.message);
+        }
+      }
+
+      addresses.push({
+        addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+        latitude: candidate.lat,
+        longitude: candidate.lon,
+        country: 'US',
+        source: geocodedCount >= MAX_REVERSE_GEOCODE ? 'coordinate-only' : 'coordinate-fallback'
+      });
+    }
+
+    const marketingUpdate = {
+      targetRadiusMiles: radiusMiles,
+      lastRunAt: new Date(),
+      lastResultCount: addresses.length,
+      lastBoundingBox: boundingBox,
+      lastCenter: computedCenter,
+      addresses
+    };
+
+    await PlanProject.updateOne(
+      { _id: plan._id, tenantId: req.tenantId },
+      {
+        $set: {
+          marketing: marketingUpdate,
+          updatedAt: new Date(),
+          updatedBy: req.user?.email || plan.updatedBy || 'System',
+          updatedById: req.user?.uid || plan.updatedById || null
+        }
+      }
+    );
+
+    res.json({
+      summary: {
+        totalCandidates: candidates.length,
+        geocodedCount,
+        radiusMiles,
+        boundingBox,
+        center: computedCenter
+      },
+      addresses
+    });
+  } catch (error) {
+    console.error('Error discovering marketing addresses:', error);
+    res.status(500).json({
+      error: 'Failed to discover marketing addresses',
+      message: error.message
+    });
   }
 });
 

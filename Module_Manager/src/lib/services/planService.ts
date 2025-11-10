@@ -15,6 +15,46 @@ import { getApiUrl } from '$lib/config/api';
 // API Configuration - Use centralized config
 const API_URL = getApiUrl('PLANS');
 
+export interface PlanProjectLocation {
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface PlanMarketingAddress {
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  source?: string;
+}
+
+export interface PlanProjectMarketing {
+  targetRadiusMiles?: number;
+  lastRunAt?: Date;
+  lastResultCount?: number;
+  lastBoundingBox?: {
+    west: number;
+    south: number;
+    east: number;
+    north: number;
+  };
+  lastCenter?: {
+    lat: number;
+    lon: number;
+  };
+  addresses?: PlanMarketingAddress[];
+}
+
 export interface PlanProject {
   id: string;
   name: string;
@@ -24,6 +64,8 @@ export interface PlanProject {
   updatedAt: Date;
   createdBy: string;
   tenantId: string;
+  location?: PlanProjectLocation | null;
+  marketing?: PlanProjectMarketing | null;
   
   // Project Scope
   scope: {
@@ -433,6 +475,15 @@ class PlanService {
         status: 'draft',
         createdBy: planData.createdBy || '',
         showOnMap: false,
+        location: planData.location ?? undefined,
+        marketing: planData.marketing
+          ? {
+              ...planData.marketing,
+              lastRunAt: planData.marketing.lastRunAt
+                ? new Date(planData.marketing.lastRunAt).toISOString()
+                : undefined
+            }
+          : undefined,
         scope: {
           towers: [],
           sectors: [],
@@ -627,6 +678,44 @@ class PlanService {
       createdBy: plan.createdBy,
       tenantId: plan.tenantId,
       showOnMap: plan.showOnMap || false,
+      location: plan.location
+        ? {
+            addressLine1: plan.location.addressLine1 ?? plan.location.address ?? undefined,
+            addressLine2: plan.location.addressLine2 ?? plan.location.unit ?? undefined,
+            city: plan.location.city ?? undefined,
+            state: plan.location.state ?? undefined,
+            postalCode: plan.location.postalCode ?? plan.location.zip ?? plan.location.postcode ?? undefined,
+            country: plan.location.country ?? undefined,
+            latitude: typeof plan.location.latitude === 'number' ? plan.location.latitude : undefined,
+            longitude: typeof plan.location.longitude === 'number' ? plan.location.longitude : undefined
+          }
+        : plan.location === null
+          ? null
+          : undefined,
+      marketing: plan.marketing
+        ? {
+            targetRadiusMiles: plan.marketing.targetRadiusMiles ?? undefined,
+            lastRunAt: plan.marketing.lastRunAt ? new Date(plan.marketing.lastRunAt) : undefined,
+            lastResultCount: plan.marketing.lastResultCount ?? undefined,
+            lastBoundingBox: plan.marketing.lastBoundingBox ?? undefined,
+            lastCenter: plan.marketing.lastCenter ?? undefined,
+            addresses: Array.isArray(plan.marketing.addresses)
+              ? plan.marketing.addresses.map((addr: any) => ({
+                  addressLine1: addr.addressLine1 ?? addr.address ?? undefined,
+                  addressLine2: addr.addressLine2 ?? addr.unit ?? undefined,
+                  city: addr.city ?? undefined,
+                  state: addr.state ?? undefined,
+                  postalCode: addr.postalCode ?? addr.zip ?? addr.postcode ?? undefined,
+                  country: addr.country ?? undefined,
+                  latitude: typeof addr.latitude === 'number' ? addr.latitude : undefined,
+                  longitude: typeof addr.longitude === 'number' ? addr.longitude : undefined,
+                  source: addr.source ?? undefined
+                }))
+              : undefined
+          }
+        : plan.marketing === null
+          ? null
+          : undefined,
       scope: plan.scope || {
         towers: [],
         sectors: [],
@@ -646,6 +735,65 @@ class PlanService {
       approval: plan.approval || {},
       authorization: plan.authorization || undefined,
       deployment: plan.deployment || {}
+    };
+  }
+
+  async discoverMarketingAddresses(
+    planId: string,
+    payload: {
+      boundingBox: { west: number; south: number; east: number; north: number };
+      radiusMiles: number;
+      center?: { lat: number; lon: number };
+    }
+  ): Promise<{
+    summary: {
+      totalCandidates: number;
+      geocodedCount: number;
+      radiusMiles: number;
+      boundingBox: { west: number; south: number; east: number; north: number };
+      center?: { lat: number; lon: number };
+    };
+    addresses: PlanMarketingAddress[];
+  }> {
+    const response = await this.apiCall(`/${planId}/marketing/discover`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    const summary = response.summary || {};
+    const addresses: PlanMarketingAddress[] = Array.isArray(response.addresses)
+      ? response.addresses.map((addr: any) => ({
+          addressLine1: addr.addressLine1 ?? addr.address ?? undefined,
+          addressLine2: addr.addressLine2 ?? addr.unit ?? undefined,
+          city: addr.city ?? undefined,
+          state: addr.state ?? undefined,
+          postalCode: addr.postalCode ?? addr.zip ?? addr.postcode ?? undefined,
+          country: addr.country ?? undefined,
+          latitude:
+            typeof addr.latitude === 'number'
+              ? addr.latitude
+              : addr.latitude !== undefined
+                ? Number(addr.latitude)
+                : undefined,
+          longitude:
+            typeof addr.longitude === 'number'
+              ? addr.longitude
+              : addr.longitude !== undefined
+                ? Number(addr.longitude)
+                : undefined,
+          source: addr.source ?? undefined
+        }))
+      : [];
+
+    return {
+      summary: {
+        totalCandidates: summary.totalCandidates ?? addresses.length,
+        geocodedCount: summary.geocodedCount ?? 0,
+        radiusMiles: summary.radiusMiles ?? payload.radiusMiles,
+        boundingBox: summary.boundingBox ?? payload.boundingBox,
+        center: summary.center ?? payload.center
+      },
+      addresses
     };
   }
 

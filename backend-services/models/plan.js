@@ -19,6 +19,42 @@ const PlanProjectSchema = new mongoose.Schema({
     enum: ['draft', 'active', 'ready', 'approved', 'authorized', 'rejected', 'deployed', 'cancelled'],
     default: 'draft'
   },
+  location: {
+    addressLine1: { type: String, trim: true },
+    addressLine2: { type: String, trim: true },
+    city: { type: String, trim: true },
+    state: { type: String, trim: true },
+    postalCode: { type: String, trim: true },
+    country: { type: String, trim: true, default: 'US' },
+    latitude: { type: Number },
+    longitude: { type: Number }
+  },
+  marketing: {
+    targetRadiusMiles: { type: Number, default: 5 },
+    lastRunAt: { type: Date },
+    lastResultCount: { type: Number },
+    lastBoundingBox: {
+      west: Number,
+      south: Number,
+      east: Number,
+      north: Number
+    },
+    lastCenter: {
+      lat: Number,
+      lon: Number
+    },
+    addresses: [{
+      addressLine1: String,
+      addressLine2: String,
+      city: String,
+      state: String,
+      postalCode: String,
+      country: String,
+      latitude: Number,
+      longitude: Number,
+      source: String
+    }]
+  },
   // Plan visibility on map
   showOnMap: {
     type: Boolean,
