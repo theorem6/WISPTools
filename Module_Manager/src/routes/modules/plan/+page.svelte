@@ -25,6 +25,7 @@ import type { ModuleContext } from '$lib/services/objectStateManager';
   let showMissingHardwareModal = false;
   let showAddRequirementModal = false;
   let showMarketingModal = false;
+  let marketingAvailable = false;
   
   // Data
   let projects: PlanProject[] = [];
@@ -48,6 +49,9 @@ $: {
   }
 }
 $: mapLocked = !(activeProject || contextActivePlan);
+$: marketingAvailable = Boolean(
+  selectedProject ?? activeProject ?? contextActivePlan ?? (projects?.length ?? 0)
+);
 
   function applyPlanningCapabilities(lock: boolean) {
     if (lock) {
@@ -750,15 +754,14 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     showMarketingModal = false;
   }
 
-  function openMarketingToolsForProject(project: PlanProject) {
-    selectedProject = project;
-    showMarketingModal = true;
-  }
+  function openMarketingTools(project?: PlanProject, options: { closeProjectModal?: boolean } = {}) {
+    const { closeProjectModal: shouldCloseProjectModal = false } = options;
 
-  function openMarketingToolsFromModal() {
     const targetPlan =
-      contextActivePlan ??
+      project ??
+      selectedProject ??
       activeProject ??
+      contextActivePlan ??
       projects.find((plan) => plan.status === 'active') ??
       projects[0];
 
@@ -767,8 +770,12 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
       return;
     }
 
-    closeProjectModal();
-    openMarketingToolsForProject(targetPlan);
+    if (shouldCloseProjectModal) {
+      closeProjectModal();
+    }
+
+    selectedProject = targetPlan;
+    showMarketingModal = true;
   }
 
   function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
@@ -1127,6 +1134,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-icon">➕</span>
           <span class="control-label">New Plan</span>
         </button>
+        <button
+          class="control-btn marketing-btn"
+          type="button"
+          on:click={() => openMarketingTools()}
+          title="Discover serviceable addresses for marketing outreach"
+          disabled={!marketingAvailable}
+        >
+          <span class="control-icon">🔍</span>
+          <span class="control-label">Find Addresses</span>
+        </button>
         {#if selectedProject}
           <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
             <span class="control-icon">🛒</span>
@@ -1357,6 +1374,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 </button>
 
                 <div class="project-actions">
+                  <button
+                    class="action-btn marketing-btn"
+                    type="button"
+                    on:click={() => openMarketingTools(project, { closeProjectModal: true })}
+                    title="Discover serviceable addresses for marketing outreach"
+                  >
+                    🔍 Find Addresses
+                  </button>
                   {#if project.status === 'draft'}
                     <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
@@ -1443,9 +1468,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         
         <div class="modal-footer">
           <button class="btn-secondary" type="button" on:click={closeProjectModal}>Close</button>
-          <button class="btn-primary" type="button" on:click={openMarketingToolsFromModal} disabled={!projects.length}>
-            🔍 Find Addresses
-          </button>
           <button class="btn-primary" type="button" on:click={openCreateProject}>Create New Project</button>
         </div>
       </div>
