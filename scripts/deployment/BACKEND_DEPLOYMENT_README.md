@@ -123,6 +123,18 @@ After deployment, verify:
    curl http://localhost:3002/health
    ```
 
+3. **Firebase credentials configured:**
+   - Export the production Firebase service account credentials once:
+     ```bash
+     sudo tee /etc/profile.d/firebase-service-account.sh <<'EOF'
+     export FIREBASE_SERVICE_ACCOUNT_BASE64='<BASE64_ENCODED_SERVICE_ACCOUNT_JSON>'
+     export FIREBASE_PROJECT_ID='wisptools-production'
+     EOF
+     source /etc/profile.d/firebase-service-account.sh
+     ```
+   - Replace `<BASE64_ENCODED_SERVICE_ACCOUNT_JSON>` with the base64 string of the `wisptools-production` service account JSON.
+   - Restart the backend after updating the credentials so every API (main-api, epc-api, etc.) shares the same configuration.
+
 3. **ISO generation works:**
    - Test from frontend wizard
    - Check logs: `pm2 logs epc-api --lines 50`

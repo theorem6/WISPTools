@@ -7,42 +7,81 @@ const admin = require('firebase-admin');
 const path = require('path');
 const fs = require('fs');
 
+const loadServiceAccountFromEnv = () => {
+  const jsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (jsonString && jsonString.trim().length > 0) {
+    console.log('✅ Firebase Admin: Using FIREBASE_SERVICE_ACCOUNT_JSON environment variable');
+    return JSON.parse(jsonString);
+  }
+
+  const base64String = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  if (base64String && base64String.trim().length > 0) {
+    console.log('✅ Firebase Admin: Using FIREBASE_SERVICE_ACCOUNT_BASE64 environment variable');
+    const decoded = Buffer.from(base64String, 'base64').toString('utf8');
+    return JSON.parse(decoded);
+  }
+
+  return null;
+};
+
+const resolveServiceAccount = () => {
+  // Highest priority: JSON/BASE64 env variables
+  const envAccount = loadServiceAccountFromEnv();
+  if (envAccount) {
+    return { source: 'env', account: envAccount };
+  }
+
+  // Next: explicit path env variables
+  const explicitPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (explicitPath && fs.existsSync(explicitPath)) {
+    console.log('✅ Firebase Admin: Using service account file from environment path:', explicitPath);
+    return { source: 'file', account: require(explicitPath) };
+  }
+
+  // Finally: default location inside repo
+  const defaultPath = path.join(__dirname, '..', 'wisptools-production-firebase-adminsdk.json');
+  if (fs.existsSync(defaultPath)) {
+    console.log('✅ Firebase Admin: Using default service account file:', defaultPath);
+    return { source: 'file', account: require(defaultPath) };
+  }
+
+  console.warn('⚠️ Firebase Admin: No service account credentials found. Falling back to application default credentials (ADC).');
+  return { source: 'adc', account: null };
+};
+
 // Initialize Firebase Admin only once
 if (!admin.apps.length) {
   try {
-    // Try to load service account key file
-    // First check for environment variable, then look for key file in project
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || 
-                                process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-                                path.join(__dirname, '..', 'wisptools-production-firebase-adminsdk.json');
-    
+    const { source, account } = resolveServiceAccount();
+
     let credential;
-    
-    if (serviceAccountPath && fs.existsSync(serviceAccountPath)) {
-      // Use service account file if provided
-      const serviceAccount = require(serviceAccountPath);
-      credential = admin.credential.cert(serviceAccount);
-      console.log('✅ Firebase Admin initialized with service account file:', serviceAccountPath);
+    let resolvedProjectId = process.env.FIREBASE_PROJECT_ID;
+
+    if (source === 'env' || source === 'file') {
+      credential = admin.credential.cert(account);
+      resolvedProjectId = resolvedProjectId || account.project_id;
     } else {
-      // Fall back to application default credentials (for GCE/Cloud Run)
       credential = admin.credential.applicationDefault();
-      console.log('✅ Firebase Admin initialized with application default credentials');
     }
-    
+
+    if (!resolvedProjectId) {
+      resolvedProjectId = 'wisptools-production';
+      console.warn('⚠️ Firebase Admin: FIREBASE_PROJECT_ID not set. Defaulting to wisptools-production.');
+    }
+
     admin.initializeApp({
-      credential: credential,
-      projectId: process.env.FIREBASE_PROJECT_ID || 'wisptools-production'
+      credential,
+      projectId: resolvedProjectId
     });
-    
+
     console.log('✅ Firebase Admin initialized successfully');
     console.log('✅ Firebase Admin project:', admin.app().options.projectId);
   } catch (error) {
     console.error('❌ Firebase Admin initialization failed:', error);
-    // Don't exit process, let individual modules handle the error
+    throw error;
   }
 }
 
-// Export Firebase services
 module.exports = {
   admin,
   auth: admin.auth(),
