@@ -457,6 +457,20 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
       loadedTenantId = tenantId;
       visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
 
+      const preferredPlan =
+        projects.find(p => p.status === 'active') ??
+        projects.find(p => p.status === 'draft') ??
+        projects[0];
+
+      if (preferredPlan) {
+        if (!selectedProject || selectedProject.id !== preferredPlan.id) {
+          selectedProject = preferredPlan;
+        }
+        if (!activeProject || activeProject.id !== preferredPlan.id) {
+          await enterProject(preferredPlan, { reload: true, message: '' });
+        }
+      }
+
       if (error) {
         setTimeout(() => error = '', 5000);
       }
@@ -1058,8 +1072,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
       mapLocked = false;
 
-      successMessage = message ?? `Now planning "${project.name}".`;
-      setTimeout(() => successMessage = '', 5000);
+      const finalMessage = message ?? `Now planning "${project.name}".`;
+      if (finalMessage) {
+        successMessage = finalMessage;
+        setTimeout(() => (successMessage = ''), 5000);
+      }
     } catch (err: any) {
       console.error('Error entering project:', err);
       error = err?.message || 'Failed to load plan. Please try again';
