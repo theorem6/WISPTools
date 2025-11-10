@@ -732,11 +732,6 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
   }
 }
 
-  function openMarketingTools() {
-    if (!selectedProject) return;
-    showMarketingModal = true;
-  }
-
   function closeMarketingTools() {
     showMarketingModal = false;
   }
@@ -744,6 +739,22 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
   function openMarketingToolsForProject(project: PlanProject) {
     selectedProject = project;
     showMarketingModal = true;
+  }
+
+  function openMarketingToolsFromModal() {
+    const targetPlan =
+      contextActivePlan ??
+      activeProject ??
+      projects.find((plan) => plan.status === 'active') ??
+      projects[0];
+
+    if (!targetPlan) {
+      console.warn('[Plan] No project available for address discovery');
+      return;
+    }
+
+    closeProjectModal();
+    openMarketingToolsForProject(targetPlan);
   }
 
   function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
@@ -1365,15 +1376,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     {project.showOnMap ? "👁️ Visible" : "👁️‍🗨️ Hidden"}
                   </button>
 
-                  <button
-                    class="action-btn marketing-btn"
-                    type="button"
-                    on:click={() => openMarketingToolsForProject(project)}
-                    title="Discover serviceable addresses for marketing outreach"
-                  >
-                    🔍 Find Addresses
-                  </button>
-                  
                   {#if ['ready','approved','rejected','cancelled'].includes(project.status)}
                     <button 
                       class="action-btn reopen-btn" 
@@ -1423,6 +1425,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         
         <div class="modal-footer">
           <button class="btn-secondary" on:click={closeProjectModal}>Close</button>
+          <button class="btn-primary" on:click={openMarketingToolsFromModal} disabled={!projects.length}>
+            🔍 Find Addresses
+          </button>
           <button class="btn-primary" on:click={openCreateProject}>Create New Project</button>
         </div>
       </div>
