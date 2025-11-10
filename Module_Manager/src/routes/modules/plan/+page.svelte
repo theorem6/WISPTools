@@ -1061,16 +1061,17 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     const { reload = true, message } = options;
 
     try {
-      if ($currentTenant?.id && reload) {
-        await mapLayerManager.loadPlan($currentTenant.id, project);
-      }
-
+      // Set UI state immediately so the map unlocks even if loading fails
       activeProject = project;
       selectedProject = project;
       showProjectActions = true;
       mapLayerManager.setMode('plan');
       mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
       mapLocked = false;
+
+      if ($currentTenant?.id && reload) {
+        await mapLayerManager.loadPlan($currentTenant.id, project);
+      }
 
       const finalMessage = message ?? `Now planning "${project.name}".`;
       if (finalMessage) {
@@ -1080,7 +1081,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     } catch (err: any) {
       console.error('Error entering project:', err);
       error = err?.message || 'Failed to load plan. Please try again';
-      setTimeout(() => error = '', 6000);
+      setTimeout(() => (error = ''), 6000);
     }
   }
 
