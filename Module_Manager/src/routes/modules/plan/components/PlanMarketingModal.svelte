@@ -18,8 +18,11 @@
 
   export let mapExtent: MapExtentData | null = null;
 
-  const extentAtOpen = cloneMapExtent(mapExtent);
-  const extentSpanMiles = computeSpanMiles(extentAtOpen);
+const extentAtOpen = cloneMapExtent(mapExtent);
+
+let latestExtent: MapExtentData | null = extentAtOpen;
+$: latestExtent = mapExtent ? cloneMapExtent(mapExtent) : extentAtOpen;
+$: extentSpanMiles = computeSpanMiles(latestExtent);
 
   type Summary = {
     totalCandidates: number;
@@ -47,16 +50,16 @@
   const derivedCenterLat =
     plan.marketing?.lastCenter?.lat ??
     plan.location?.latitude ??
-    extentAtOpen?.center?.lat;
+    latestExtent?.center?.lat;
   const derivedCenterLon =
     plan.marketing?.lastCenter?.lon ??
     plan.location?.longitude ??
-    extentAtOpen?.center?.lon;
+    latestExtent?.center?.lon;
 
   let latitudeInput = formatNumericInput(derivedCenterLat, 6);
   let longitudeInput = formatNumericInput(derivedCenterLon, 6);
 
-  const derivedRadius = deriveRadiusFromExtent(extentAtOpen);
+  const derivedRadius = deriveRadiusFromExtent(latestExtent);
   let radiusMiles = normalizeRadius(
     plan.marketing?.targetRadiusMiles,
     derivedRadius ?? 5
@@ -76,13 +79,13 @@
         },
         center: plan.marketing.lastCenter
       }
-    : extentAtOpen?.boundingBox
+      : latestExtent?.boundingBox
       ? {
           totalCandidates: 0,
           geocodedCount: 0,
           radiusMiles,
-          boundingBox: extentAtOpen.boundingBox,
-          center: extentAtOpen.center
+          boundingBox: latestExtent.boundingBox,
+          center: latestExtent.center
         }
       : null;
 
@@ -238,10 +241,11 @@
   }
 
   function useExtentCenter() {
-    if (!extentAtOpen?.center) return;
-    latitudeInput = formatNumericInput(extentAtOpen.center.lat, 6);
-    longitudeInput = formatNumericInput(extentAtOpen.center.lon, 6);
-    info = 'Using map view center coordinates.';
+    const extent = latestExtent ?? extentAtOpen;
+    if (!extent?.center) return;
+    latitudeInput = formatNumericInput(extent.center.lat, 6);
+    longitudeInput = formatNumericInput(extent.center.lon, 6);
+    info = 'Using current map view center coordinates.';
     error = null;
   }
 
@@ -322,7 +326,7 @@
       return;
     }
 
-    const extentForRun = extentAtOpen ?? mapExtent;
+    const extentForRun = latestExtent ?? extentAtOpen;
     radiusMiles = normalizeRadius(radiusMiles, deriveRadiusFromExtent(extentForRun) ?? 5);
 
     isLoading = true;
@@ -511,7 +515,7 @@
             </div>
           </div>
           <div class="support-actions">
-        {#if extentAtOpen?.center}
+        {#if latestExtent?.center}
           <button type="button" class="btn-tertiary" on:click={useExtentCenter} disabled={isLoading}>
             Use map center
           </button>
@@ -528,11 +532,11 @@
               Resolve coordinates from address
             </button>
           </div>
-      {#if extentAtOpen?.boundingBox}
+      {#if latestExtent?.boundingBox}
         <div class="extent-summary">
           <span>
-            Map bounds: lat {formatCoord(extentAtOpen.boundingBox.south, 4)} → {formatCoord(extentAtOpen.boundingBox.north, 4)},
-            lon {formatCoord(extentAtOpen.boundingBox.west, 4)} → {formatCoord(extentAtOpen.boundingBox.east, 4)}
+            Map bounds: lat {formatCoord(latestExtent.boundingBox.south, 4)} → {formatCoord(latestExtent.boundingBox.north, 4)},
+            lon {formatCoord(latestExtent.boundingBox.west, 4)} → {formatCoord(latestExtent.boundingBox.east, 4)}
           </span>
           {#if extentSpanMiles}
             <span>Approx. span: {extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} mi</span>
