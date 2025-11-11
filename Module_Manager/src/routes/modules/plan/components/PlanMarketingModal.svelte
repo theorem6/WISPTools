@@ -65,7 +65,7 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
     derivedRadius ?? 5
   );
 
-  let results: PlanMarketingAddress[] = plan.marketing?.addresses ?? [];
+let results: PlanMarketingAddress[] = [];
   let summary: Summary = plan.marketing
     ? {
         totalCandidates: plan.marketing.addresses?.length ?? 0,
@@ -110,6 +110,7 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
   onMount(() => {
     console.log('[PlanMarketingModal] Wizard opened', { planId: plan?.id, planName: plan?.name });
     currentStep = results.length ? 2 : 0;
+    results = [];
   });
 
   function closeModal() {
@@ -359,9 +360,12 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
       results = response.addresses;
       summary = response.summary;
       const runtimeSpan = computeSpanMiles(extentForRun ?? { center: resolved, boundingBox });
-      info = runtimeSpan
-        ? `Mapped ${results.length} address candidates across approximately ${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles.`
-        : `Mapped ${results.length} address candidates for the current view.`;
+    const leadCount = results.length;
+    if (runtimeSpan) {
+      info = `Saved ${leadCount} marketing leads across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles. View them on the map under Marketing Leads.`;
+    } else {
+      info = `Saved ${leadCount} marketing leads for the current map view. View them on the map under Marketing Leads.`;
+    }
 
       await fetchUpdatedPlan();
     } catch (err: any) {
@@ -374,9 +378,17 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
   }
 
   function downloadCsv() {
-    if (!results.length) return;
+    const exportRows =
+      results.length > 0
+        ? results
+        : Array.isArray(plan.marketing?.addresses)
+        ? plan.marketing?.addresses ?? []
+        : [];
+
+    if (!exportRows.length) return;
+
     const headers = ['Address', 'City', 'State', 'PostalCode', 'Country', 'Latitude', 'Longitude', 'Source'];
-    const rows = results.map(entry => [
+    const rows = exportRows.map(entry => [
       entry.addressLine1 ?? '',
       entry.city ?? '',
       entry.state ?? '',
@@ -707,38 +719,19 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
           {/if}
 
           <div class="results">
-            {#if results.length === 0}
-              <p class="placeholder">
-                No marketing addresses discovered yet. Run a search to populate this list.
+            <div class="results-note">
+              <p>
+                Addresses discovered in this run are saved with the plan and rendered on the coverage map as
+                marketing leads. Review them from the map or export the CSV once the run completes.
               </p>
-            {:else}
-              <table>
-                <thead>
-                  <tr>
-                    <th>Address</th>
-                    <th>City</th>
-                    <th>State</th>
-                    <th>Postal</th>
-                    <th>Latitude</th>
-                    <th>Longitude</th>
-                    <th>Source</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each results as result, index (result.latitude ?? index)}
-                    <tr>
-                      <td>{result.addressLine1 || '—'}</td>
-                      <td>{result.city || '—'}</td>
-                      <td>{result.state || '—'}</td>
-                      <td>{result.postalCode || '—'}</td>
-                      <td>{formatCoord(result.latitude)}</td>
-                      <td>{formatCoord(result.longitude)}</td>
-                      <td>{result.source || '—'}</td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            {/if}
+              <ul>
+                <li><strong>Leads saved:</strong> {summary?.totalCandidates ?? 0}</li>
+                <li><strong>Geocoded:</strong> {summary?.geocodedCount ?? 0}</li>
+                {#if plan.marketing?.lastRunAt}
+                  <li><strong>Last run:</strong> {new Date(plan.marketing.lastRunAt).toLocaleString()}</li>
+                {/if}
+              </ul>
+            </div>
           </div>
         </section>
       {/if}
@@ -764,7 +757,15 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
           <button class="btn-primary" type="button" on:click={discoverAddresses} disabled={!canRun || isLoading}>
             {isLoading ? 'Discovering…' : results.length ? 'Re-run Discovery' : 'Run Discovery'}
           </button>
-          <button class="btn-secondary" type="button" on:click={downloadCsv} disabled={!results.length || isLoading}>
+          <button
+            class="btn-secondary"
+            type="button"
+            on:click={downloadCsv}
+            disabled={
+              isLoading ||
+              (!results.length && !(plan.marketing?.addresses && plan.marketing.addresses.length > 0))
+            }
+          >
             ⬇️ Download CSV
           </button>
         </div>
@@ -1022,24 +1023,29 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
     color: var(--text-primary);
   }
 
-  .results table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--bg-secondary);
+  .results {
+    margin-top: 1rem;
+  }
+
+  .results-note {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-sm);
-    overflow: hidden;
+    padding: 1rem 1.25rem;
+    background: rgba(15, 23, 42, 0.35);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
 
-  .results th,
-  .results td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color);
+  .results-note ul {
+    margin: 0.75rem 0 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.35rem;
   }
 
-  .results tbody tr:nth-child(odd) {
-    background: rgba(148, 163, 184, 0.08);
+  .results-note li {
+    list-style: disc;
   }
 
   .placeholder {

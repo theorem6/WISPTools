@@ -1017,8 +1017,8 @@ export class CoverageMapController {
       ]);
 
       const isMobile = window.innerWidth <= 768;
-      const markerSize = isMobile ? '22px' : '16px';
-      const outlineWidth = isMobile ? 3 : 2;
+      const markerSize = isMobile ? '18px' : '12px';
+      const outlineWidth = isMobile ? 2 : 1.5;
 
       const seen = new Set<string>();
 
@@ -1041,7 +1041,7 @@ export class CoverageMapController {
         });
 
         const symbol = new SimpleMarkerSymbol({
-          style: 'circle',
+          style: 'diamond',
           color: '#f97316',
           size: markerSize,
           outline: {
