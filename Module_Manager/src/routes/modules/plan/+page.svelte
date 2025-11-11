@@ -1100,49 +1100,49 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
       if ($currentTenant?.id && reload) {
         await mapLayerManager.loadPlan($currentTenant.id, project);
-        
-        // Center map on plan location or features
-        setTimeout(() => {
-          // Access the iframe through the SharedMap component
-          const iframe = document.querySelector('iframe.coverage-map-iframe') as HTMLIFrameElement;
-          if (!iframe?.contentWindow) {
-            console.warn('[Plan] Iframe not ready for centering');
-            return;
-          }
-
-          // Get plan features from mapLayerManager state
-          let featuresToCenter: any[] = [];
-          const unsubscribe = mapLayerManager.subscribe(state => {
-            featuresToCenter = state.stagedFeatures ?? [];
-          });
-          unsubscribe();
-
-          // Try to center on features first, then fall back to plan location
-          if (featuresToCenter.length > 0) {
-            iframe.contentWindow.postMessage(
-              {
-                source: 'shared-map',
-                type: 'center-map',
-                payload: { features: featuresToCenter }
-              },
-              '*'
-            );
-          } else if (project.location?.latitude && project.location?.longitude) {
-            iframe.contentWindow.postMessage(
-              {
-                source: 'shared-map',
-                type: 'center-map',
-                payload: {
-                  lat: project.location.latitude,
-                  lon: project.location.longitude,
-                  zoom: 12
-                }
-              },
-              '*'
-            );
-          }
-        }, 1000); // Delay to ensure iframe and map are ready
       }
+      
+      // Always center map on plan location or features (even if reload is false)
+      setTimeout(() => {
+        // Access the iframe through the SharedMap component
+        const iframe = document.querySelector('iframe.coverage-map-iframe') as HTMLIFrameElement;
+        if (!iframe?.contentWindow) {
+          console.warn('[Plan] Iframe not ready for centering');
+          return;
+        }
+
+        // Get plan features from mapLayerManager state
+        let featuresToCenter: any[] = [];
+        const unsubscribe = mapLayerManager.subscribe(state => {
+          featuresToCenter = state.stagedFeatures ?? [];
+        });
+        unsubscribe();
+
+        // Try to center on features first, then fall back to plan location
+        if (featuresToCenter.length > 0) {
+          iframe.contentWindow.postMessage(
+            {
+              source: 'shared-map',
+              type: 'center-map',
+              payload: { features: featuresToCenter }
+            },
+            '*'
+          );
+        } else if (project.location?.latitude && project.location?.longitude) {
+          iframe.contentWindow.postMessage(
+            {
+              source: 'shared-map',
+              type: 'center-map',
+              payload: {
+                lat: project.location.latitude,
+                lon: project.location.longitude,
+                zoom: 12
+              }
+            },
+            '*'
+          );
+        }
+      }, reload ? 1000 : 500); // Shorter delay if reload is false since plan is already loaded
 
       const finalMessage = message ?? `Now planning "${project.name}".`;
       if (finalMessage) {
