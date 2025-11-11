@@ -430,13 +430,18 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
   };
 
   try {
+    console.log('[MarketingDiscovery] Starting OSM building discovery', { boundingBox });
     const overpassQuery = buildOverpassQuery(boundingBox);
     
     // Add timeout to prevent hanging
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+    const timeoutId = setTimeout(() => {
+      console.warn('[MarketingDiscovery] OSM Overpass API timeout triggered');
+      controller.abort();
+    }, 45000); // 45 second timeout
     
     try {
+      console.log('[MarketingDiscovery] Fetching from Overpass API...');
       const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -447,6 +452,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       });
       
       clearTimeout(timeoutId);
+      console.log('[MarketingDiscovery] Overpass API response received', { status: overpassResponse.status });
 
       if (!overpassResponse.ok) {
         const details = await overpassResponse.text().catch(() => '');
@@ -454,6 +460,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       }
 
       const overpassData = await overpassResponse.json();
+      console.log('[MarketingDiscovery] Overpass data parsed', { elementCount: overpassData.elements?.length || 0 });
       const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
 
       const seen = new Set();
@@ -524,6 +531,11 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       result.addresses = addresses;
       result.stats.rawCandidates = candidates.length;
       result.stats.geocoded = geocodedCount;
+      console.log('[MarketingDiscovery] OSM discovery completed', { 
+        candidates: candidates.length, 
+        geocoded: geocodedCount,
+        addresses: addresses.length 
+      });
       return result;
     } catch (fetchError) {
       clearTimeout(timeoutId);
@@ -908,6 +920,24 @@ router.put('/:id', async (req, res) => {
 
 // POST /plans/:id/marketing/discover - Find marketing addresses within area
 router.post('/:id/marketing/discover', async (req, res) => {
+  const requestStartTime = Date.now();
+  console.log('[MarketingDiscovery] Request received', { 
+    planId: req.params.id, 
+    tenantId: req.tenantId,
+    boundingBox: req.body.boundingBox 
+  });
+  
+  // Set a timeout for the entire request (60 seconds)
+  const requestTimeout = setTimeout(() => {
+    if (!res.headersSent) {
+      console.error('[MarketingDiscovery] Request timeout after 60 seconds');
+      res.status(504).json({ 
+        error: 'Request timeout', 
+        message: 'Marketing discovery request took too long to complete' 
+      });
+    }
+  }, 60000);
+  
   try {
     const plan = await PlanProject.findOne({
       _id: req.params.id,
@@ -915,11 +945,13 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
 
     if (!plan) {
+      clearTimeout(requestTimeout);
       return res.status(404).json({ error: 'Plan not found' });
     }
 
     const boundingBox = parseBoundingBox(req.body.boundingBox);
     if (!boundingBox) {
+      clearTimeout(requestTimeout);
       return res.status(400).json({
         error: 'Invalid bounding box',
         message: 'Provide boundingBox with numeric west, south, east, north values'
@@ -991,11 +1023,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     if (algorithms.includes('osm_buildings')) {
       try {
+        console.log('[MarketingDiscovery] Running OSM building discovery algorithm');
         const osmResult = await runOsmBuildingDiscovery({
           boundingBox,
           radiusMiles,
           center: computedCenter,
           advancedOptions
+        });
+        console.log('[MarketingDiscovery] OSM algorithm completed', { 
+          addresses: osmResult.addresses?.length || 0,
+          error: osmResult.error 
         });
 
         let produced = 0;
@@ -1099,6 +1136,14 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     );
 
+    clearTimeout(requestTimeout);
+    const requestDuration = Date.now() - requestStartTime;
+    console.log('[MarketingDiscovery] Request completed successfully', { 
+      duration: `${requestDuration}ms`,
+      totalAddresses: combinedAddresses.length,
+      geocodedCount 
+    });
+    
     res.json({
       summary: {
         totalCandidates: combinedAddresses.length,
@@ -1112,13 +1157,19 @@ router.post('/:id/marketing/discover', async (req, res) => {
       addresses: combinedAddresses
     });
   } catch (error) {
-    console.error('Error discovering marketing addresses:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      error: 'Failed to discover marketing addresses',
-      message: error.message || 'Unknown error occurred',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    clearTimeout(requestTimeout);
+    const requestDuration = Date.now() - requestStartTime;
+    console.error('[MarketingDiscovery] Error discovering marketing addresses:', error);
+    console.error('[MarketingDiscovery] Error stack:', error.stack);
+    console.error('[MarketingDiscovery] Request failed after', { duration: `${requestDuration}ms` });
+    
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Failed to discover marketing addresses',
+        message: error.message || 'Unknown error occurred',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
 });
 
