@@ -141,6 +141,11 @@
     });
   }
 
+  function clearCoordinates() {
+    latitudeInput = '';
+    longitudeInput = '';
+  }
+
   async function geocodeFromAddress() {
     if (!addressSearch) return;
     try {
@@ -293,9 +298,9 @@
     normalizeNumber(latitudeInput) !== null && normalizeNumber(longitudeInput) !== null;
   $: canAdvance =
     currentStep === 0
-      ? Boolean(radiusMiles && radiusMiles > 0 && coordinatesReady)
+      ? Boolean(radiusMiles && radiusMiles > 0)
       : true;
-  $: canRun = currentStep === steps.length - 1 && coordinatesReady && radiusMiles > 0;
+  $: canRun = currentStep === steps.length - 1 && radiusMiles > 0 && coordinatesReady;
 
   function formatCoord(value: number | string | undefined, fractionDigits = 5): string {
     if (value === undefined || value === null) return '—';
@@ -304,26 +309,24 @@
   }
 </script>
 
-<div
-  class="modal-overlay"
-  role="presentation"
-  aria-hidden="true"
-  tabindex="-1"
-  on:click={closeModal}
->
-  <div
-    class="modal-content marketing-modal"
+<div class="marketing-backdrop" role="presentation" aria-hidden="false">
+  <section
+    class="marketing-panel"
     role="dialog"
-    aria-modal="true"
+    aria-modal="false"
     aria-label={`Marketing discovery for ${plan.name}`}
     tabindex="0"
-    on:click|stopPropagation
   >
     <div class="modal-header">
       <h2>📣 Find Addresses - {plan.name}</h2>
-      <button class="close-btn" type="button" on:click={closeModal} aria-label="Close marketing modal">
-        ✕
-      </button>
+      <div class="header-actions">
+        <button class="btn-tertiary mini" type="button" on:click={usePlanLocation} disabled={isLoading}>
+          Use plan location
+        </button>
+        <button class="close-btn" type="button" on:click={closeModal} aria-label="Close marketing wizard">
+          ✕
+        </button>
+      </div>
     </div>
 
     <div class="modal-body">
@@ -396,8 +399,8 @@
             </div>
           </div>
           <div class="support-actions">
-            <button type="button" class="btn-tertiary" on:click={usePlanLocation} disabled={isLoading}>
-              Use plan location
+            <button type="button" class="btn-tertiary" on:click={clearCoordinates} disabled={isLoading}>
+              Clear coordinates
             </button>
             <button
               type="button"
@@ -540,6 +543,12 @@
             </div>
           {/if}
 
+          {#if !coordinatesReady}
+            <div class="alert alert-warning">
+              Provide latitude and longitude or resolve them from an address before running discovery.
+            </div>
+          {/if}
+
           {#if summary}
             <div class="summary-grid">
               <div class="summary-card">
@@ -629,23 +638,78 @@
         </div>
       {/if}
     </div>
-  </div>
+  </section>
 </div>
 
 <style>
-  .marketing-modal {
-    width: min(1024px, 100%);
+  .marketing-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 1.5rem;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .marketing-panel {
+    pointer-events: auto;
+    width: min(480px, 95vw);
     max-height: 90vh;
+    background: var(--modal-surface-background, var(--bg-secondary));
+    border: 1px solid var(--modal-surface-border, var(--border-color));
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--modal-surface-shadow, 0 28px 60px rgba(15, 23, 42, 0.45));
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: linear-gradient(
+      135deg,
+      rgba(14, 165, 233, 0.12),
+      rgba(14, 165, 233, 0)
+    );
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .modal-body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    padding: 1.5rem;
     overflow-y: auto;
-    padding-right: 0.25rem;
+  }
+
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
   }
 
   .wizard-steps {
@@ -755,6 +819,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    background: rgba(148, 163, 184, 0.06);
   }
 
   fieldset label {
@@ -833,17 +898,11 @@
   }
 
   .results tbody tr:nth-child(odd) {
-    background: rgba(148, 163, 184, 0.1);
+    background: rgba(148, 163, 184, 0.08);
   }
 
   .placeholder {
     color: var(--text-secondary);
-  }
-
-  .modal-footer {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
   }
 
   .run-actions {
@@ -856,6 +915,68 @@
     background: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
+    transition: all 0.2s ease;
+  }
+
+  .btn-tertiary:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+
+  .btn-tertiary.mini {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 6px;
+  }
+
+  .close-btn:hover {
+    background: rgba(148, 163, 184, 0.16);
+  }
+
+  .alert-warning {
+    background: rgba(234, 179, 8, 0.12);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem 1rem;
+  }
+
+  @media (max-width: 900px) {
+    .marketing-backdrop {
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .marketing-panel {
+      width: min(520px, 100%);
+      max-height: 88vh;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+      padding: 1rem;
+    }
+
+    .header-actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .wizard-steps {
+      justify-content: center;
+    }
   }
 </style>
 
