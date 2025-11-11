@@ -420,100 +420,115 @@ const distanceInMeters = (lat1, lon1, lat2, lon2) => {
 };
 
 async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions }) {
-  const overpassQuery = buildOverpassQuery(boundingBox);
-  const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: `data=${encodeURIComponent(overpassQuery)}`
-  });
-
-  if (!overpassResponse.ok) {
-    const details = await overpassResponse.text().catch(() => '');
-    throw new Error(`Overpass API returned ${overpassResponse.status}: ${details}`);
-  }
-
-  const overpassData = await overpassResponse.json();
-  const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
-
-  const seen = new Set();
-  const candidates = [];
-
-  for (const element of elements) {
-    const latitude =
-      toNumber(element.lat) ??
-      toNumber(element.center?.lat) ??
-      (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
-    const longitude =
-      toNumber(element.lon) ??
-      toNumber(element.center?.lon) ??
-      (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
-
-    if (latitude === undefined || longitude === undefined) continue;
-
-    const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    candidates.push({
-      lat: latitude,
-      lon: longitude
-    });
-
-    if (candidates.length >= MAX_BUILDING_RESULTS) break;
-  }
-
-  const maxReverseGeocode =
-    toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
-  const reverseDelay =
-    toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
-
-  const addresses = [];
-  let geocodedCount = 0;
-
-  for (let index = 0; index < candidates.length; index += 1) {
-    const candidate = candidates[index];
-    if (geocodedCount < maxReverseGeocode) {
-      try {
-        if (geocodedCount > 0) {
-          await delay(reverseDelay);
-        }
-        const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
-        if (details) {
-          addresses.push({
-            ...details,
-            source: 'osm_buildings'
-          });
-          geocodedCount += 1;
-          continue;
-        }
-      } catch (error) {
-        console.warn('Reverse geocode fallback:', error.message);
-      }
-    }
-
-    addresses.push({
-      addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
-      latitude: candidate.lat,
-      longitude: candidate.lon,
-      country: 'US',
-      source: 'osm_buildings'
-    });
-  }
-
-  return {
-    addresses,
+  const result = {
+    addresses: [],
     stats: {
-      rawCandidates: candidates.length,
-      geocoded: geocodedCount
-    }
+      rawCandidates: 0,
+      geocoded: 0
+    },
+    error: null
   };
+
+  try {
+    const overpassQuery = buildOverpassQuery(boundingBox);
+    const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `data=${encodeURIComponent(overpassQuery)}`
+    });
+
+    if (!overpassResponse.ok) {
+      const details = await overpassResponse.text().catch(() => '');
+      throw new Error(`Overpass API returned ${overpassResponse.status}: ${details}`);
+    }
+
+    const overpassData = await overpassResponse.json();
+    const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
+
+    const seen = new Set();
+    const candidates = [];
+
+    for (const element of elements) {
+      const latitude =
+        toNumber(element.lat) ??
+        toNumber(element.center?.lat) ??
+        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
+      const longitude =
+        toNumber(element.lon) ??
+        toNumber(element.center?.lon) ??
+        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
+
+      if (latitude === undefined || longitude === undefined) continue;
+
+      const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      candidates.push({
+        lat: latitude,
+        lon: longitude
+      });
+
+      if (candidates.length >= MAX_BUILDING_RESULTS) break;
+    }
+
+    const maxReverseGeocode =
+      toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
+    const reverseDelay =
+      toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
+
+    const addresses = [];
+    let geocodedCount = 0;
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      if (geocodedCount < maxReverseGeocode) {
+        try {
+          if (geocodedCount > 0) {
+            await delay(reverseDelay);
+          }
+          const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+          if (details) {
+            addresses.push({
+              ...details,
+              source: 'osm_buildings'
+            });
+            geocodedCount += 1;
+            continue;
+          }
+        } catch (error) {
+          console.warn('[MarketingDiscovery] Reverse geocode fallback failed:', error?.message || error);
+        }
+      }
+
+      addresses.push({
+        addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+        latitude: candidate.lat,
+        longitude: candidate.lon,
+        country: 'US',
+        source: 'osm_buildings'
+      });
+    }
+
+    result.addresses = addresses;
+    result.stats.rawCandidates = candidates.length;
+    result.stats.geocoded = geocodedCount;
+    return result;
+  } catch (error) {
+    const message =
+      error?.message ||
+      (typeof error === 'string' ? error : 'Unexpected error during OSM building discovery');
+    console.warn('[MarketingDiscovery] OSM building discovery error:', message);
+    result.error = message;
+    return result;
+  }
 }
 
 async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
   if (!ARC_GIS_API_KEY) {
-    return [];
+    return { addresses: [], error: 'ArcGIS API key not configured' };
   }
 
   try {
@@ -549,7 +564,7 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     const payload = await response.json();
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
 
-    return candidates
+    const addresses = candidates
       .map((candidate) => {
         const location = candidate?.location;
         const attributes = candidate?.attributes || {};
@@ -574,15 +589,18 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
         };
       })
       .filter(Boolean);
+
+    return { addresses };
   } catch (error) {
-    console.warn('[MarketingDiscovery] ArcGIS address points error', error);
-    return [];
+    const message = error?.message || (typeof error === 'string' ? error : 'Unknown ArcGIS address points error');
+    console.warn('[MarketingDiscovery] ArcGIS address points error', message);
+    return { addresses: [], error: message };
   }
 }
 
 async function runArcgisPlacesDiscovery({ boundingBox, center }) {
   if (!ARC_GIS_API_KEY) {
-    return [];
+    return { addresses: [], error: 'ArcGIS API key not configured' };
   }
 
   try {
@@ -618,7 +636,7 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
     const payload = await response.json();
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
 
-    return candidates
+    const addresses = candidates
       .map((candidate) => {
         const location = candidate?.location;
         const attributes = candidate?.attributes || {};
@@ -647,9 +665,12 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
         };
       })
       .filter(Boolean);
+
+    return { addresses };
   } catch (error) {
-    console.warn('[MarketingDiscovery] ArcGIS places error', error);
-    return [];
+    const message = error?.message || (typeof error === 'string' ? error : 'Unknown ArcGIS places error');
+    console.warn('[MarketingDiscovery] ArcGIS places error', message);
+    return { addresses: [], error: message };
   }
 }
 
@@ -942,11 +963,14 @@ router.post('/:id/marketing/discover', async (req, res) => {
       return true;
     };
 
-    const recordAlgorithmStats = (algorithmId, produced, geocoded) => {
+    const recordAlgorithmStats = (algorithmId, produced, geocoded, errorMessage) => {
       algorithmStats[algorithmId] = {
         produced: (algorithmStats[algorithmId]?.produced || 0) + produced,
         geocoded: (algorithmStats[algorithmId]?.geocoded || 0) + geocoded
       };
+      if (errorMessage) {
+        algorithmStats[algorithmId].error = errorMessage;
+      }
     };
 
     if (algorithms.includes('osm_buildings')) {
@@ -960,19 +984,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
       let produced = 0;
       let geocoded = 0;
 
-      for (const address of osmResult.addresses) {
-        produced += 1;
-        if (address.addressLine1) {
-          geocoded += 1;
+      if (Array.isArray(osmResult.addresses)) {
+        for (const address of osmResult.addresses) {
+          produced += 1;
+          if (address.addressLine1) {
+            geocoded += 1;
+          }
+          addAddressToCombined(address, 'osm_buildings');
         }
-        addAddressToCombined(address, 'osm_buildings');
       }
 
-      recordAlgorithmStats('osm_buildings', produced, geocoded);
+      recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
     }
 
     if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
-      const arcgisAddresses = await runArcgisAddressPointsDiscovery({
+      const arcgisResult = await runArcgisAddressPointsDiscovery({
         boundingBox,
         center: computedCenter,
         radiusMiles
@@ -981,19 +1007,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
       let produced = 0;
       let geocoded = 0;
 
-      for (const address of arcgisAddresses) {
-        produced += 1;
-        if (address.addressLine1) {
-          geocoded += 1;
+      if (Array.isArray(arcgisResult.addresses)) {
+        for (const address of arcgisResult.addresses) {
+          produced += 1;
+          if (address.addressLine1) {
+            geocoded += 1;
+          }
+          addAddressToCombined(address, 'arcgis_address_points');
         }
-        addAddressToCombined(address, 'arcgis_address_points');
       }
 
-      recordAlgorithmStats('arcgis_address_points', produced, geocoded);
+      recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
     }
 
     if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
-      const arcgisPlaces = await runArcgisPlacesDiscovery({
+      const arcgisPlacesResult = await runArcgisPlacesDiscovery({
         boundingBox,
         center: computedCenter,
         radiusMiles
@@ -1002,15 +1030,17 @@ router.post('/:id/marketing/discover', async (req, res) => {
       let produced = 0;
       let geocoded = 0;
 
-      for (const address of arcgisPlaces) {
-        produced += 1;
-        if (address.addressLine1) {
-          geocoded += 1;
+      if (Array.isArray(arcgisPlacesResult.addresses)) {
+        for (const address of arcgisPlacesResult.addresses) {
+          produced += 1;
+          if (address.addressLine1) {
+            geocoded += 1;
+          }
+          addAddressToCombined(address, 'arcgis_places');
         }
-        addAddressToCombined(address, 'arcgis_places');
       }
 
-      recordAlgorithmStats('arcgis_places', produced, geocoded);
+      recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
     }
 
     const geocodedCount = combinedAddresses.filter((addr) => !!addr.addressLine1).length;
