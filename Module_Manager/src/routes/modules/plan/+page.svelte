@@ -1111,6 +1111,18 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           return;
         }
 
+        // Ensure we have location coordinates
+        const planLat = project.location?.latitude;
+        const planLon = project.location?.longitude;
+        
+        console.log('[Plan] Attempting to center map on plan', {
+          planId: project.id,
+          planName: project.name,
+          hasLocation: !!project.location,
+          latitude: planLat,
+          longitude: planLon
+        });
+
         // Get plan features from mapLayerManager state
         let featuresToCenter: any[] = [];
         const unsubscribe = mapLayerManager.subscribe(state => {
@@ -1120,6 +1132,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
         // Try to center on features first, then fall back to plan location
         if (featuresToCenter.length > 0) {
+          console.log('[Plan] Centering on plan features:', featuresToCenter.length);
           iframe.contentWindow.postMessage(
             {
               source: 'shared-map',
@@ -1128,19 +1141,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             },
             '*'
           );
-        } else if (project.location?.latitude && project.location?.longitude) {
+        } else if (planLat !== undefined && planLon !== undefined && Number.isFinite(planLat) && Number.isFinite(planLon)) {
+          console.log('[Plan] Centering on plan location:', planLat, planLon);
           iframe.contentWindow.postMessage(
             {
               source: 'shared-map',
               type: 'center-map',
               payload: {
-                lat: project.location.latitude,
-                lon: project.location.longitude,
+                lat: planLat,
+                lon: planLon,
                 zoom: 12
               }
             },
             '*'
           );
+        } else {
+          console.warn('[Plan] Plan has no location coordinates or features to center on', project);
         }
       }, reload ? 1000 : 500); // Shorter delay if reload is false since plan is already loaded
 

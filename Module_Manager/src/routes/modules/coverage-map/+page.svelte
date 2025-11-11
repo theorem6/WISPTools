@@ -644,16 +644,18 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       // Handle center-map message from parent
       const { lat, lon, zoom, features } = payload || {};
       
-      if (controller && controller.isReady()) {
+      if (mapComponent) {
         if (features && Array.isArray(features) && features.length > 0) {
-          controller.centerMapOnFeatures(features).catch(err => {
+          mapComponent.centerMapOnFeatures(features).catch(err => {
             console.warn('[CoverageMap] Failed to center on features:', err);
           });
         } else if (typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon)) {
-          controller.centerMapOnLocation(lat, lon, zoom).catch(err => {
+          mapComponent.centerMapOnLocation(lat, lon, zoom).catch(err => {
             console.warn('[CoverageMap] Failed to center on location:', err);
           });
         }
+      } else {
+        console.warn('[CoverageMap] Map component not ready for centering');
       }
     }
   }

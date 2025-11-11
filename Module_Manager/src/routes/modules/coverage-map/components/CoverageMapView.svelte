@@ -50,6 +50,18 @@ export let isPlanMode = false;
   export function changeBasemap(basemapId: string) {
     controller?.changeBasemap(basemapId);
   }
+
+  export async function centerMapOnLocation(lat: number, lon: number, zoom?: number): Promise<void> {
+    if (controller && controller.isReady()) {
+      await controller.centerMapOnLocation(lat, lon, zoom);
+    }
+  }
+
+  export async function centerMapOnFeatures(features: PlanLayerFeature[]): Promise<void> {
+    if (controller && controller.isReady()) {
+      await controller.centerMapOnFeatures(features);
+    }
+  }
 </script>
 
 <div class="coverage-map-container">
