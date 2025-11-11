@@ -58,6 +58,7 @@ export class CoverageMapController {
   private extentWatchHandle: any = null;
   private extentPostTimer: number | null = null;
   private webMercatorUtils: any = null;
+  private reactiveUtils: any = null;
 
   private filters: CoverageMapFilters;
   private data: CoverageMapData = {
@@ -119,8 +120,12 @@ export class CoverageMapController {
       window.clearTimeout(this.extentPostTimer);
       this.extentPostTimer = null;
     }
-    if (this.extentWatchHandle?.remove) {
-      this.extentWatchHandle.remove();
+    if (this.extentWatchHandle) {
+      if (typeof this.extentWatchHandle.remove === 'function') {
+        this.extentWatchHandle.remove();
+      } else if (typeof this.extentWatchHandle === 'function') {
+        this.extentWatchHandle();
+      }
     }
     this.extentWatchHandle = null;
 
@@ -218,18 +223,23 @@ export class CoverageMapController {
       { default: Map },
       { default: MapView },
       { default: GraphicsLayer },
-      webMercatorUtilsModule
+      webMercatorUtilsModule,
+      reactiveUtilsModule
     ] = await Promise.all([
       import('@arcgis/core/Map.js'),
       import('@arcgis/core/views/MapView.js'),
       import('@arcgis/core/layers/GraphicsLayer.js'),
-      import('@arcgis/core/geometry/support/webMercatorUtils.js')
+      import('@arcgis/core/geometry/support/webMercatorUtils.js'),
+      import('@arcgis/core/core/reactiveUtils.js')
     ]);
 
     this.webMercatorUtils =
       (webMercatorUtilsModule && 'default' in webMercatorUtilsModule
         ? webMercatorUtilsModule.default
         : webMercatorUtilsModule) ?? null;
+    this.reactiveUtils =
+      reactiveUtilsModule?.reactiveUtils ??
+      (reactiveUtilsModule && 'default' in reactiveUtilsModule ? reactiveUtilsModule.default : null);
 
     this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
     this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
@@ -497,9 +507,19 @@ export class CoverageMapController {
       broadcast(this.mapView.extent);
     }
 
-    this.extentWatchHandle = this.mapView.watch('extent', (extent: any) => {
-      broadcast(extent);
-    });
+    if (this.reactiveUtils?.watch) {
+      this.extentWatchHandle = this.reactiveUtils.watch(
+        () => this.mapView?.extent,
+        (extent: any) => {
+          broadcast(extent);
+        },
+        { initial: false }
+      );
+    } else if (typeof this.mapView.watch === 'function') {
+      this.extentWatchHandle = this.mapView.watch('extent', (extent: any) => {
+        broadcast(extent);
+      });
+    }
   }
 
   private broadcastViewExtent(extent: any): void {

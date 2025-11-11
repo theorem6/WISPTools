@@ -516,62 +516,68 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     return [];
   }
 
-  const params = new URLSearchParams({
-    f: 'json',
-    outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
-    maxLocations: '150',
-    searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
-    category: 'Point Address',
-    forStorage: 'false'
-  });
+  try {
+    const params = new URLSearchParams({
+      f: 'json',
+      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
+      maxLocations: '150',
+      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+      category: 'Point Address',
+      forStorage: 'false'
+    });
 
-  if (center?.lon !== undefined && center?.lat !== undefined) {
-    params.set('location', `${center.lon},${center.lat}`);
+    if (center?.lon !== undefined && center?.lat !== undefined) {
+      params.set('location', `${center.lon},${center.lat}`);
+    }
+
+    params.set('token', ARC_GIS_API_KEY);
+
+    const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      console.warn('[MarketingDiscovery] ArcGIS address points request failed', response.status, details);
+      return [];
+    }
+
+    const payload = await response.json();
+    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+
+    return candidates
+      .map((candidate) => {
+        const location = candidate?.location;
+        const attributes = candidate?.attributes || {};
+        const latitude = toNumber(location?.y);
+        const longitude = toNumber(location?.x);
+        if (latitude === undefined || longitude === undefined) {
+          return null;
+        }
+
+        const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
+
+        return {
+          addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+          addressLine2: undefined,
+          city: attributes.City || undefined,
+          state: attributes.Region || undefined,
+          postalCode: attributes.Postal || undefined,
+          country: 'US',
+          latitude,
+          longitude,
+          source: 'arcgis_address_points'
+        };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.warn('[MarketingDiscovery] ArcGIS address points error', error);
+    return [];
   }
-
-  params.set('token', ARC_GIS_API_KEY);
-
-  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: params.toString()
-  });
-
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`ArcGIS Address Points failed with ${response.status}: ${details}`);
-  }
-
-  const payload = await response.json();
-  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-
-  return candidates
-    .map((candidate) => {
-      const location = candidate?.location;
-      const attributes = candidate?.attributes || {};
-      const latitude = toNumber(location?.y);
-      const longitude = toNumber(location?.x);
-      if (latitude === undefined || longitude === undefined) {
-        return null;
-      }
-
-      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
-
-      return {
-        addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-        addressLine2: undefined,
-        city: attributes.City || undefined,
-        state: attributes.Region || undefined,
-        postalCode: attributes.Postal || undefined,
-        country: 'US',
-        latitude,
-        longitude,
-        source: 'arcgis_address_points'
-      };
-    })
-    .filter(Boolean);
 }
 
 async function runArcgisPlacesDiscovery({ boundingBox, center }) {
@@ -579,66 +585,72 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
     return [];
   }
 
-  const params = new URLSearchParams({
-    f: 'json',
-    outFields: 'Match_addr,PlaceName,Type,Address,City,Region,Postal',
-    maxLocations: '120',
-    searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
-    category: 'POI',
-    forStorage: 'false'
-  });
+  try {
+    const params = new URLSearchParams({
+      f: 'json',
+      outFields: 'Match_addr,PlaceName,Type,Address,City,Region,Postal',
+      maxLocations: '120',
+      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+      category: 'POI',
+      forStorage: 'false'
+    });
 
-  if (center?.lon !== undefined && center?.lat !== undefined) {
-    params.set('location', `${center.lon},${center.lat}`);
+    if (center?.lon !== undefined && center?.lat !== undefined) {
+      params.set('location', `${center.lon},${center.lat}`);
+    }
+
+    params.set('token', ARC_GIS_API_KEY);
+
+    const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      console.warn('[MarketingDiscovery] ArcGIS places request failed', response.status, details);
+      return [];
+    }
+
+    const payload = await response.json();
+    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+
+    return candidates
+      .map((candidate) => {
+        const location = candidate?.location;
+        const attributes = candidate?.attributes || {};
+        const latitude = toNumber(location?.y);
+        const longitude = toNumber(location?.x);
+        if (latitude === undefined || longitude === undefined) {
+          return null;
+        }
+
+        const addressLine1 =
+          attributes.PlaceName ||
+          attributes.Address ||
+          candidate.address ||
+          `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+        return {
+          addressLine1,
+          addressLine2: undefined,
+          city: attributes.City || undefined,
+          state: attributes.Region || undefined,
+          postalCode: attributes.Postal || undefined,
+          country: 'US',
+          latitude,
+          longitude,
+          source: 'arcgis_places'
+        };
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.warn('[MarketingDiscovery] ArcGIS places error', error);
+    return [];
   }
-
-  params.set('token', ARC_GIS_API_KEY);
-
-  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: params.toString()
-  });
-
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`ArcGIS Places failed with ${response.status}: ${details}`);
-  }
-
-  const payload = await response.json();
-  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-
-  return candidates
-    .map((candidate) => {
-      const location = candidate?.location;
-      const attributes = candidate?.attributes || {};
-      const latitude = toNumber(location?.y);
-      const longitude = toNumber(location?.x);
-      if (latitude === undefined || longitude === undefined) {
-        return null;
-      }
-
-      const addressLine1 =
-        attributes.PlaceName ||
-        attributes.Address ||
-        candidate.address ||
-        `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-
-      return {
-        addressLine1,
-        addressLine2: undefined,
-        city: attributes.City || undefined,
-        state: attributes.Region || undefined,
-        postalCode: attributes.Postal || undefined,
-        country: 'US',
-        latitude,
-        longitude,
-        source: 'arcgis_places'
-      };
-    })
-    .filter(Boolean);
 }
 
 // ============================================================================

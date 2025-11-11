@@ -5,6 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
+const appConfig = require('../config/app');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -412,63 +413,188 @@ router.delete('/equipment/:id', async (req, res) => {
 
 // ========== GEOCODING ==========
 
+const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Geocoder/1.0 (support@wisptools.io)';
+
 router.post('/geocode', async (req, res) => {
-  try {
-    const { address } = req.body;
-    if (!address) return res.status(400).json({ error: 'Address is required' });
-    
-    const appConfig = require('../../config/app');
-    const url = appConfig.externalServices.arcgis.geocodeUrl;
+  const { address } = req.body || {};
+  if (!address) {
+    return res.status(400).json({ error: 'Address is required' });
+  }
+
+  const arcgisConfig = appConfig?.externalServices?.arcgis || {};
+  const geocodeUrl = arcgisConfig.geocodeUrl;
+  const apiKey = arcgisConfig.apiKey;
+
+  const tryArcgisGeocode = async () => {
+    if (!geocodeUrl) return null;
+
     const params = new URLSearchParams({
       f: 'json',
       singleLine: address,
       outFields: 'Match_addr,Addr_type'
     });
-    
-    const response = await fetch(`${url}?${params.toString()}`);
-    const data = await response.json();
-    
-    if (data.candidates && data.candidates.length > 0) {
-      const best = data.candidates[0];
-      res.json({
-        latitude: best.location.y,
-        longitude: best.location.x,
-        address: best.address
-      });
-    } else {
-      res.status(404).json({ error: 'Address not found' });
+
+    if (apiKey) {
+      params.set('token', apiKey);
     }
+
+    const response = await fetch(`${geocodeUrl}?${params.toString()}`);
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      console.warn('[NetworkRoutes] ArcGIS geocode failed', response.status, details);
+      return null;
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data?.candidates) && data.candidates.length > 0) {
+      const best = data.candidates[0];
+      return {
+        latitude: best?.location?.y,
+        longitude: best?.location?.x,
+        address: best?.address || best?.attributes?.Match_addr
+      };
+    }
+
+    return null;
+  };
+
+  const tryNominatimGeocode = async () => {
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+      format: 'jsonv2',
+      q: address,
+      addressdetails: '1',
+      limit: '1'
+    }).toString()}`;
+
+    const response = await fetch(nominatimUrl, {
+      headers: {
+        'User-Agent': NOMINATIM_USER_AGENT,
+        Accept: 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      console.warn('[NetworkRoutes] Nominatim geocode failed', response.status, details);
+      return null;
+    }
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) {
+      return null;
+    }
+
+    const best = results[0];
+    const displayName = best.display_name || address;
+    return {
+      latitude: best.lat ? Number(best.lat) : undefined,
+      longitude: best.lon ? Number(best.lon) : undefined,
+      address: displayName
+    };
+  };
+
+  try {
+    let result = await tryArcgisGeocode();
+    if (!result || !Number.isFinite(result.latitude) || !Number.isFinite(result.longitude)) {
+      result = await tryNominatimGeocode();
+    }
+
+    if (result && Number.isFinite(result.latitude) && Number.isFinite(result.longitude)) {
+      return res.json(result);
+    }
+
+    return res.status(404).json({ error: 'Address not found' });
   } catch (error) {
-    res.status(500).json({ error: 'Geocoding failed' });
+    console.error('[NetworkRoutes] Geocoding failed', error);
+    return res.status(500).json({ error: 'Geocoding failed' });
   }
 });
 
 router.post('/reverse-geocode', async (req, res) => {
-  try {
-    const { latitude, longitude } = req.body;
-    if (!latitude || !longitude) {
-      return res.status(400).json({ error: 'Latitude and longitude are required' });
-    }
-    
-    const appConfig = require('../../config/app');
-    const url = appConfig.externalServices.arcgis.reverseGeocodeUrl;
+  const { latitude, longitude } = req.body || {};
+  if (!latitude || !longitude) {
+    return res.status(400).json({ error: 'Latitude and longitude are required' });
+  }
+
+  const arcgisConfig = appConfig?.externalServices?.arcgis || {};
+  const reverseUrl = arcgisConfig.reverseGeocodeUrl;
+  const apiKey = arcgisConfig.apiKey;
+
+  const tryArcgisReverse = async () => {
+    if (!reverseUrl) return null;
+
     const params = new URLSearchParams({
       f: 'json',
       location: `${longitude},${latitude}`,
       outSR: '4326'
     });
-    
-    const response = await fetch(`${url}?${params.toString()}`);
-    const data = await response.json();
-    
-    if (data.address) {
-      const addr = data.address;
-      res.json({ address: `${addr.Address}, ${addr.City}, ${addr.Region} ${addr.Postal}` });
-    } else {
-      res.status(404).json({ error: 'Address not found' });
+
+    if (apiKey) {
+      params.set('token', apiKey);
     }
+
+    const response = await fetch(`${reverseUrl}?${params.toString()}`);
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      console.warn('[NetworkRoutes] ArcGIS reverse geocode failed', response.status, details);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data?.address) {
+      const addr = data.address;
+      return { address: `${addr.Address ?? ''}, ${addr.City ?? ''}, ${addr.Region ?? ''} ${addr.Postal ?? ''}`.trim() };
+    }
+
+    return null;
+  };
+
+  const tryNominatimReverse = async () => {
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      lat: String(latitude),
+      lon: String(longitude),
+      zoom: '18',
+      addressdetails: '1'
+    });
+    const url = `https://nominatim.openstreetmap.org/reverse?${params.toString()}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': NOMINATIM_USER_AGENT,
+        Accept: 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      console.warn('[NetworkRoutes] Nominatim reverse geocode failed', response.status, details);
+      return null;
+    }
+
+    const data = await response.json();
+    const displayName = data?.display_name;
+    if (displayName) {
+      return { address: displayName };
+    }
+
+    return null;
+  };
+
+  try {
+    let result = await tryArcgisReverse();
+    if (!result?.address) {
+      result = await tryNominatimReverse();
+    }
+
+    if (result?.address) {
+      return res.json(result);
+    }
+
+    return res.status(404).json({ error: 'Address not found' });
   } catch (error) {
-    res.status(500).json({ error: 'Reverse geocoding failed' });
+    console.error('[NetworkRoutes] Reverse geocoding failed', error);
+    return res.status(500).json({ error: 'Reverse geocoding failed' });
   }
 });
 
