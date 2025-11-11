@@ -774,6 +774,12 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
       closeProjectModal();
     }
 
+    console.log('[Plan] Opening find addresses wizard', {
+      planId: targetPlan.id,
+      planName: targetPlan.name,
+      source: project ? 'project-row' : 'map-control'
+    });
+
     selectedProject = targetPlan;
     showMarketingModal = true;
   }

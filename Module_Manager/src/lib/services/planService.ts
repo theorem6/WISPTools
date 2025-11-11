@@ -744,6 +744,7 @@ class PlanService {
       boundingBox: { west: number; south: number; east: number; north: number };
       radiusMiles: number;
       center?: { lat: number; lon: number };
+      options?: Record<string, unknown>;
     }
   ): Promise<{
     summary: {
