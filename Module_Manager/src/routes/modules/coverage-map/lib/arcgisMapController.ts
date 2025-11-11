@@ -489,9 +489,14 @@ export class CoverageMapController {
   private watchViewExtent(): void {
     if (!this.mapView) return;
 
-    if (this.extentWatchHandle?.remove) {
-      this.extentWatchHandle.remove();
+    if (this.extentWatchHandle) {
+      if (typeof this.extentWatchHandle.remove === 'function') {
+        this.extentWatchHandle.remove();
+      } else if (typeof this.extentWatchHandle === 'function') {
+        this.extentWatchHandle();
+      }
     }
+    this.extentWatchHandle = null;
 
     const broadcast = (extent: any) => {
       if (!extent) return;
