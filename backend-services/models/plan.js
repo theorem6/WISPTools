@@ -53,7 +53,9 @@ const PlanProjectSchema = new mongoose.Schema({
       latitude: Number,
       longitude: Number,
       source: String
-    }]
+    }],
+    algorithms: [String],
+    algorithmStats: mongoose.Schema.Types.Mixed
   },
   // Plan visibility on map
   showOnMap: {

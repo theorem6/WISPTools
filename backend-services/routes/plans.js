@@ -13,6 +13,7 @@ const { createProjectApprovalNotification } = require('./notifications');
 const { PlanLayerFeature } = require('../models/plan-layer-feature');
 const { verifyAuth } = require('./users/role-auth-middleware');
 const { Customer } = require('../models/customer');
+const appConfig = require('../config/app');
 
 // ============================================================================
 // MIDDLEWARE
@@ -90,6 +91,22 @@ const parseCenter = (input) => {
   return { lat, lon };
 };
 
+const AVAILABLE_MARKETING_ALGORITHMS = {
+  osm_buildings: 'OpenStreetMap Building Footprints',
+  arcgis_address_points: 'ArcGIS Address Points',
+  arcgis_places: 'ArcGIS Places & Amenities'
+};
+
+const parseMarketingAlgorithms = (input) => {
+  if (!Array.isArray(input)) return undefined;
+  const normalized = input
+    .map((value) => (typeof value === 'string' ? value.trim().toLowerCase() : null))
+    .filter(Boolean)
+    .filter((value, index, self) => self.indexOf(value) === index)
+    .filter((value) => Object.prototype.hasOwnProperty.call(AVAILABLE_MARKETING_ALGORITHMS, value));
+  return normalized.length ? normalized : undefined;
+};
+
 const parseMarketing = (input) => {
   if (input === null) return null;
   if (!input || typeof input !== 'object') return undefined;
@@ -151,6 +168,14 @@ const parseMarketing = (input) => {
         return null;
       })
       .filter(Boolean);
+  }
+
+  const algorithms = parseMarketingAlgorithms(input.algorithms);
+  if (algorithms) {
+    marketing.algorithms = algorithms;
+  }
+  if (input.algorithmStats && typeof input.algorithmStats === 'object') {
+    marketing.algorithmStats = input.algorithmStats;
   }
 
   const hasData = Object.keys(marketing).length > 0;
@@ -321,6 +346,8 @@ const MAX_REVERSE_GEOCODE = 15;
 const NOMINATIM_DELAY_MS = 1200;
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
+const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 
 const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
@@ -369,6 +396,250 @@ const reverseGeocodeCoordinate = async (lat, lon) => {
     source: 'nominatim'
   };
 };
+
+const toRadians = (degrees) => degrees * (Math.PI / 180);
+
+const distanceInMeters = (lat1, lon1, lat2, lon2) => {
+  if (
+    lat1 === undefined ||
+    lon1 === undefined ||
+    lat2 === undefined ||
+    lon2 === undefined
+  ) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const R = 6371000;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions }) {
+  const overpassQuery = buildOverpassQuery(boundingBox);
+  const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: `data=${encodeURIComponent(overpassQuery)}`
+  });
+
+  if (!overpassResponse.ok) {
+    const details = await overpassResponse.text().catch(() => '');
+    throw new Error(`Overpass API returned ${overpassResponse.status}: ${details}`);
+  }
+
+  const overpassData = await overpassResponse.json();
+  const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
+
+  const seen = new Set();
+  const candidates = [];
+
+  for (const element of elements) {
+    const latitude =
+      toNumber(element.lat) ??
+      toNumber(element.center?.lat) ??
+      (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
+    const longitude =
+      toNumber(element.lon) ??
+      toNumber(element.center?.lon) ??
+      (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
+
+    if (latitude === undefined || longitude === undefined) continue;
+
+    const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    candidates.push({
+      lat: latitude,
+      lon: longitude
+    });
+
+    if (candidates.length >= MAX_BUILDING_RESULTS) break;
+  }
+
+  const maxReverseGeocode =
+    toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
+  const reverseDelay =
+    toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
+
+  const addresses = [];
+  let geocodedCount = 0;
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (geocodedCount < maxReverseGeocode) {
+      try {
+        if (geocodedCount > 0) {
+          await delay(reverseDelay);
+        }
+        const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+        if (details) {
+          addresses.push({
+            ...details,
+            source: 'osm_buildings'
+          });
+          geocodedCount += 1;
+          continue;
+        }
+      } catch (error) {
+        console.warn('Reverse geocode fallback:', error.message);
+      }
+    }
+
+    addresses.push({
+      addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+      latitude: candidate.lat,
+      longitude: candidate.lon,
+      country: 'US',
+      source: 'osm_buildings'
+    });
+  }
+
+  return {
+    addresses,
+    stats: {
+      rawCandidates: candidates.length,
+      geocoded: geocodedCount
+    }
+  };
+}
+
+async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
+  if (!ARC_GIS_API_KEY) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    f: 'json',
+    outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
+    maxLocations: '150',
+    searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+    category: 'Point Address',
+    forStorage: 'false'
+  });
+
+  if (center?.lon !== undefined && center?.lat !== undefined) {
+    params.set('location', `${center.lon},${center.lat}`);
+  }
+
+  params.set('token', ARC_GIS_API_KEY);
+
+  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: params.toString()
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => '');
+    throw new Error(`ArcGIS Address Points failed with ${response.status}: ${details}`);
+  }
+
+  const payload = await response.json();
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+
+  return candidates
+    .map((candidate) => {
+      const location = candidate?.location;
+      const attributes = candidate?.attributes || {};
+      const latitude = toNumber(location?.y);
+      const longitude = toNumber(location?.x);
+      if (latitude === undefined || longitude === undefined) {
+        return null;
+      }
+
+      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
+
+      return {
+        addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+        addressLine2: undefined,
+        city: attributes.City || undefined,
+        state: attributes.Region || undefined,
+        postalCode: attributes.Postal || undefined,
+        country: 'US',
+        latitude,
+        longitude,
+        source: 'arcgis_address_points'
+      };
+    })
+    .filter(Boolean);
+}
+
+async function runArcgisPlacesDiscovery({ boundingBox, center }) {
+  if (!ARC_GIS_API_KEY) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    f: 'json',
+    outFields: 'Match_addr,PlaceName,Type,Address,City,Region,Postal',
+    maxLocations: '120',
+    searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+    category: 'POI',
+    forStorage: 'false'
+  });
+
+  if (center?.lon !== undefined && center?.lat !== undefined) {
+    params.set('location', `${center.lon},${center.lat}`);
+  }
+
+  params.set('token', ARC_GIS_API_KEY);
+
+  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: params.toString()
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => '');
+    throw new Error(`ArcGIS Places failed with ${response.status}: ${details}`);
+  }
+
+  const payload = await response.json();
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+
+  return candidates
+    .map((candidate) => {
+      const location = candidate?.location;
+      const attributes = candidate?.attributes || {};
+      const latitude = toNumber(location?.y);
+      const longitude = toNumber(location?.x);
+      if (latitude === undefined || longitude === undefined) {
+        return null;
+      }
+
+      const addressLine1 =
+        attributes.PlaceName ||
+        attributes.Address ||
+        candidate.address ||
+        `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+      return {
+        addressLine1,
+        addressLine2: undefined,
+        city: attributes.City || undefined,
+        state: attributes.Region || undefined,
+        postalCode: attributes.Postal || undefined,
+        country: 'US',
+        latitude,
+        longitude,
+        source: 'arcgis_places'
+      };
+    })
+    .filter(Boolean);
+}
 
 // ============================================================================
 // PLAN MANAGEMENT
@@ -617,90 +888,130 @@ router.post('/:id/marketing/discover', async (req, res) => {
           lon: (boundingBox.east + boundingBox.west) / 2
         });
 
-    const overpassQuery = buildOverpassQuery(boundingBox);
-    const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `data=${encodeURIComponent(overpassQuery)}`
-    });
+    const advancedOptions = req.body?.options?.advancedOptions || {};
+    const userAlgorithms = parseMarketingAlgorithms(req.body?.options?.algorithms);
+    let algorithms = (userAlgorithms && userAlgorithms.length ? userAlgorithms : ['osm_buildings', 'arcgis_address_points']).filter(Boolean);
 
-    if (!overpassResponse.ok) {
-      const details = await overpassResponse.text().catch(() => '');
-      return res.status(502).json({
-        error: 'Failed to query building data',
-        message: `Overpass API returned ${overpassResponse.status}`,
-        details
-      });
+    if (!ARC_GIS_API_KEY) {
+      const filtered = algorithms.filter((id) => id === 'osm_buildings');
+      if (algorithms.length !== filtered.length) {
+        console.warn('[MarketingDiscovery] ArcGIS API key missing. Skipping ArcGIS-based algorithms.');
+      }
+      algorithms = filtered;
     }
 
-    const overpassData = await overpassResponse.json();
-    const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
-
-    const seen = new Set();
-    const candidates = [];
-
-    for (const element of elements) {
-      const latitude =
-        toNumber(element.lat) ??
-        toNumber(element.center?.lat) ??
-        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
-      const longitude =
-        toNumber(element.lon) ??
-        toNumber(element.center?.lon) ??
-        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
-
-      if (latitude === undefined || longitude === undefined) continue;
-
-      const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      candidates.push({
-        lat: latitude,
-        lon: longitude,
-        source: element.type === 'node' ? 'osm_node' : 'osm_way'
-      });
-
-      if (candidates.length >= MAX_BUILDING_RESULTS) break;
+    if (!algorithms.length) {
+      algorithms = ['osm_buildings'];
     }
 
-    const addresses = [];
-    let geocodedCount = 0;
+    const dedupDistanceMeters =
+      toNumber(advancedOptions?.dedup?.clientDedupDistanceMeters) ?? 10;
 
-    for (let index = 0; index < candidates.length; index += 1) {
-      const candidate = candidates[index];
-      if (geocodedCount < MAX_REVERSE_GEOCODE) {
-        try {
-          if (geocodedCount > 0) {
-            await delay(NOMINATIM_DELAY_MS);
-          }
-          const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
-          addresses.push(details);
-          geocodedCount += 1;
-          continue;
-        } catch (error) {
-          console.warn('Reverse geocode fallback:', error.message);
+    const algorithmStats = {};
+    const combinedAddresses = [];
+
+    const addAddressToCombined = (address, algorithmId) => {
+      const latitude = toNumber(address.latitude);
+      const longitude = toNumber(address.longitude);
+      if (latitude === undefined || longitude === undefined) return false;
+
+      for (const existing of combinedAddresses) {
+        if (distanceInMeters(latitude, longitude, existing.latitude, existing.longitude) <= dedupDistanceMeters) {
+          return false;
         }
       }
 
-      addresses.push({
-        addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
-        latitude: candidate.lat,
-        longitude: candidate.lon,
-        country: 'US',
-        source: geocodedCount >= MAX_REVERSE_GEOCODE ? 'coordinate-only' : 'coordinate-fallback'
+      combinedAddresses.push({
+        ...address,
+        latitude,
+        longitude,
+        source: address.source || algorithmId
       });
+      return true;
+    };
+
+    const recordAlgorithmStats = (algorithmId, produced, geocoded) => {
+      algorithmStats[algorithmId] = {
+        produced: (algorithmStats[algorithmId]?.produced || 0) + produced,
+        geocoded: (algorithmStats[algorithmId]?.geocoded || 0) + geocoded
+      };
+    };
+
+    if (algorithms.includes('osm_buildings')) {
+      const osmResult = await runOsmBuildingDiscovery({
+        boundingBox,
+        radiusMiles,
+        center: computedCenter,
+        advancedOptions
+      });
+
+      let produced = 0;
+      let geocoded = 0;
+
+      for (const address of osmResult.addresses) {
+        produced += 1;
+        if (address.addressLine1) {
+          geocoded += 1;
+        }
+        addAddressToCombined(address, 'osm_buildings');
+      }
+
+      recordAlgorithmStats('osm_buildings', produced, geocoded);
     }
+
+    if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
+      const arcgisAddresses = await runArcgisAddressPointsDiscovery({
+        boundingBox,
+        center: computedCenter,
+        radiusMiles
+      });
+
+      let produced = 0;
+      let geocoded = 0;
+
+      for (const address of arcgisAddresses) {
+        produced += 1;
+        if (address.addressLine1) {
+          geocoded += 1;
+        }
+        addAddressToCombined(address, 'arcgis_address_points');
+      }
+
+      recordAlgorithmStats('arcgis_address_points', produced, geocoded);
+    }
+
+    if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
+      const arcgisPlaces = await runArcgisPlacesDiscovery({
+        boundingBox,
+        center: computedCenter,
+        radiusMiles
+      });
+
+      let produced = 0;
+      let geocoded = 0;
+
+      for (const address of arcgisPlaces) {
+        produced += 1;
+        if (address.addressLine1) {
+          geocoded += 1;
+        }
+        addAddressToCombined(address, 'arcgis_places');
+      }
+
+      recordAlgorithmStats('arcgis_places', produced, geocoded);
+    }
+
+    const geocodedCount = combinedAddresses.filter((addr) => !!addr.addressLine1).length;
 
     const marketingUpdate = {
       targetRadiusMiles: radiusMiles,
       lastRunAt: new Date(),
-      lastResultCount: addresses.length,
+      lastResultCount: combinedAddresses.length,
       lastBoundingBox: boundingBox,
       lastCenter: computedCenter,
-      addresses
+      algorithms,
+      algorithmStats,
+      addresses: combinedAddresses
     };
 
     await PlanProject.updateOne(
@@ -717,13 +1028,15 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     res.json({
       summary: {
-        totalCandidates: candidates.length,
+        totalCandidates: combinedAddresses.length,
         geocodedCount,
         radiusMiles,
         boundingBox,
-        center: computedCenter
+        center: computedCenter,
+        algorithmsUsed: algorithms,
+        algorithmStats
       },
-      addresses
+      addresses: combinedAddresses
     });
   } catch (error) {
     console.error('Error discovering marketing addresses:', error);

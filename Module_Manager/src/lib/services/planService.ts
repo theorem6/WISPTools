@@ -53,6 +53,8 @@ export interface PlanProjectMarketing {
     lon: number;
   };
   addresses?: PlanMarketingAddress[];
+  algorithms?: string[];
+  algorithmStats?: Record<string, { produced?: number; geocoded?: number }>;
 }
 
 export interface PlanProject {
@@ -699,6 +701,8 @@ class PlanService {
             lastResultCount: plan.marketing.lastResultCount ?? undefined,
             lastBoundingBox: plan.marketing.lastBoundingBox ?? undefined,
             lastCenter: plan.marketing.lastCenter ?? undefined,
+            algorithms: Array.isArray(plan.marketing.algorithms) ? plan.marketing.algorithms : undefined,
+            algorithmStats: plan.marketing.algorithmStats ?? undefined,
             addresses: Array.isArray(plan.marketing.addresses)
               ? plan.marketing.addresses.map((addr: any) => ({
                   addressLine1: addr.addressLine1 ?? addr.address ?? undefined,
@@ -744,7 +748,12 @@ class PlanService {
       boundingBox: { west: number; south: number; east: number; north: number };
       radiusMiles: number;
       center?: { lat: number; lon: number };
-      options?: Record<string, unknown>;
+      options?: {
+        advancedOptions?: Record<string, unknown>;
+        viewExtent?: Record<string, unknown>;
+        algorithms?: string[];
+        [key: string]: unknown;
+      };
     }
   ): Promise<{
     summary: {
@@ -753,6 +762,8 @@ class PlanService {
       radiusMiles: number;
       boundingBox: { west: number; south: number; east: number; north: number };
       center?: { lat: number; lon: number };
+      algorithmsUsed?: string[];
+      algorithmStats?: Record<string, { produced?: number; geocoded?: number }>;
     };
     addresses: PlanMarketingAddress[];
   }> {
@@ -792,7 +803,9 @@ class PlanService {
         geocodedCount: summary.geocodedCount ?? 0,
         radiusMiles: summary.radiusMiles ?? payload.radiusMiles,
         boundingBox: summary.boundingBox ?? payload.boundingBox,
-        center: summary.center ?? payload.center
+        center: summary.center ?? payload.center,
+        algorithmsUsed: Array.isArray(summary.algorithmsUsed) ? summary.algorithmsUsed : undefined,
+        algorithmStats: summary.algorithmStats ?? undefined
       },
       addresses
     };

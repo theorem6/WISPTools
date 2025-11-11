@@ -30,9 +30,33 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
     radiusMiles: number;
     boundingBox: { west: number; south: number; east: number; north: number };
     center?: { lat: number; lon: number };
+    algorithmsUsed?: string[];
+    rawCandidateCount?: number;
+    dedupedCount?: number;
+    algorithmStats?: Record<string, unknown>;
   } | null;
 
   const steps = ['Define Service Area', 'Advanced Options', 'Review & Run'];
+
+const ALGORITHM_OPTIONS = [
+    {
+      id: 'osm_buildings',
+      label: 'OpenStreetMap Building Footprints',
+      description: 'Pulls building centroids from OpenStreetMap and reverse-geocodes the top matches.'
+    },
+    {
+      id: 'arcgis_address_points',
+      label: 'ArcGIS Address Points',
+      description: 'Uses Esri World Geocoding service to return residential and parcel address points.'
+    },
+    {
+      id: 'arcgis_places',
+      label: 'ArcGIS Places & Amenities',
+      description: 'Targets nearby places of interest (schools, businesses, amenities) for marketing outreach.'
+    }
+  ] as const;
+
+  const DEFAULT_ALGORITHMS = ['osm_buildings', 'arcgis_address_points'];
 
   let isLoading = false;
   let error: string | null = null;
@@ -77,7 +101,9 @@ let results: PlanMarketingAddress[] = [];
           south: plan.location?.latitude ?? 0,
           north: plan.location?.latitude ?? 0
         },
-        center: plan.marketing.lastCenter
+        center: plan.marketing.lastCenter,
+        algorithmsUsed: Array.isArray(plan.marketing.algorithms) ? [...plan.marketing.algorithms] : undefined,
+        algorithmStats: plan.marketing.algorithmStats ?? undefined
       }
       : latestExtent?.boundingBox
       ? {
@@ -85,9 +111,15 @@ let results: PlanMarketingAddress[] = [];
           geocodedCount: 0,
           radiusMiles,
           boundingBox: latestExtent.boundingBox,
-          center: latestExtent.center
+          center: latestExtent.center,
+          algorithmsUsed: undefined,
+          algorithmStats: undefined
         }
       : null;
+
+  let selectedAlgorithms: string[] = [];
+  let initializedAlgorithms = false;
+  let selectedAlgorithmLabels: string[] = [];
 
   let advancedOptions = {
     forceReverse: false,
@@ -111,7 +143,36 @@ let results: PlanMarketingAddress[] = [];
     console.log('[PlanMarketingModal] Wizard opened', { planId: plan?.id, planName: plan?.name });
     currentStep = results.length ? 2 : 0;
     results = [];
+    initializeAlgorithms();
   });
+
+  function initializeAlgorithms() {
+    if (initializedAlgorithms) return;
+    const existing = Array.isArray(plan.marketing?.algorithms)
+      ? plan.marketing.algorithms.filter((id) => ALGORITHM_OPTIONS.some(option => option.id === id))
+      : [];
+    selectedAlgorithms = existing.length ? existing : [...DEFAULT_ALGORITHMS];
+    initializedAlgorithms = true;
+  }
+
+  function toggleAlgorithm(id: string) {
+    if (selectedAlgorithms.includes(id)) {
+      selectedAlgorithms = selectedAlgorithms.filter((alg) => alg !== id);
+    } else {
+      selectedAlgorithms = [...selectedAlgorithms, id];
+    }
+  }
+
+  function algorithmLabel(id: string): string {
+    const match = ALGORITHM_OPTIONS.find(option => option.id === id);
+    return match ? match.label : id;
+  }
+
+  $: if (!initializedAlgorithms && plan) {
+    initializeAlgorithms();
+  }
+
+  $: selectedAlgorithmLabels = selectedAlgorithms.map((id) => algorithmLabel(id));
 
   function closeModal() {
     dispatch('close');
@@ -353,7 +414,8 @@ let results: PlanMarketingAddress[] = [];
         center: resolved,
         options: {
           advancedOptions,
-          viewExtent: extentForRun ?? { center: resolved, boundingBox }
+          viewExtent: extentForRun ?? { center: resolved, boundingBox },
+          algorithms: selectedAlgorithms
         }
       });
 
@@ -422,8 +484,11 @@ let results: PlanMarketingAddress[] = [];
   $: canAdvance =
     currentStep === 0
       ? Boolean(radiusMiles && radiusMiles > 0)
-      : true;
-  $: canRun = currentStep === steps.length - 1 && radiusMiles > 0 && coordinatesReady;
+      : currentStep === 1
+        ? selectedAlgorithms.length > 0
+        : true;
+  $: canRun =
+    currentStep === steps.length - 1 && radiusMiles > 0 && coordinatesReady && selectedAlgorithms.length > 0;
 
   function formatCoord(value: number | string | undefined, fractionDigits = 5): string {
     if (value === undefined || value === null) return '—';
@@ -565,6 +630,28 @@ let results: PlanMarketingAddress[] = [];
             <p>Tune geocoding, grouping, and deduplication behaviour. These settings mirror the FTTH wizard.</p>
           </header>
           <div class="options-grid">
+            <fieldset class="algorithm-fieldset">
+              <legend>Discovery Algorithms</legend>
+              <p class="section-help">
+                Select one or more address discovery strategies. The wizard will combine results and remove duplicates automatically.
+              </p>
+              {#each ALGORITHM_OPTIONS as option}
+                <label class="algorithm-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedAlgorithms.includes(option.id)}
+                    on:change={() => toggleAlgorithm(option.id)}
+                  />
+                  <span class="option-body">
+                    <span class="option-label">{option.label}</span>
+                    <span class="option-description">{option.description}</span>
+                  </span>
+                </label>
+              {/each}
+              {#if selectedAlgorithms.length === 0}
+                <p class="algorithm-warning">Select at least one algorithm before continuing.</p>
+              {/if}
+            </fieldset>
             <fieldset>
               <legend>Reverse Geocoding</legend>
               <label>
@@ -703,7 +790,7 @@ let results: PlanMarketingAddress[] = [];
                 <span class="label">Geocoded</span>
                 <span class="value">{summary.geocodedCount}</span>
               </div>
-              <div class="summary-card">
+            <div class="summary-card">
                 <span class="label">Radius</span>
                 <span class="value">{summary.radiusMiles} mi</span>
               </div>
@@ -715,6 +802,16 @@ let results: PlanMarketingAddress[] = [];
                   </span>
                 </div>
               {/if}
+            {#if summary.algorithmsUsed?.length}
+              <div class="summary-card full-width">
+                <span class="label">Algorithms Used</span>
+                <ul class="algorithm-list">
+                  {#each summary.algorithmsUsed as algId}
+                    <li>{algorithmLabel(algId)}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
             </div>
           {/if}
 
@@ -727,6 +824,14 @@ let results: PlanMarketingAddress[] = [];
               <ul>
                 <li><strong>Leads saved:</strong> {summary?.totalCandidates ?? 0}</li>
                 <li><strong>Geocoded:</strong> {summary?.geocodedCount ?? 0}</li>
+                {#if summary?.algorithmStats}
+                  {#each Object.entries(summary.algorithmStats) as [algId, stats]}
+                    <li>
+                      <strong>{algorithmLabel(algId)}:</strong>
+                      {stats?.produced ?? 0} candidates ({stats?.geocoded ?? 0} geocoded)
+                    </li>
+                  {/each}
+                {/if}
                 {#if plan.marketing?.lastRunAt}
                   <li><strong>Last run:</strong> {new Date(plan.marketing.lastRunAt).toLocaleString()}</li>
                 {/if}
@@ -976,6 +1081,47 @@ let results: PlanMarketingAddress[] = [];
     padding: 0 0.25rem;
   }
 
+  .section-help {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    margin: -0.35rem 0 0;
+  }
+
+  .algorithm-fieldset {
+    grid-column: 1 / -1;
+  }
+
+  .algorithm-option {
+    align-items: flex-start;
+  }
+
+  .algorithm-option input[type='checkbox'] {
+    margin-top: 0.2rem;
+  }
+
+  .algorithm-option .option-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .algorithm-option .option-label {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .algorithm-option .option-description {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .algorithm-warning {
+    font-size: 0.8rem;
+    color: #f97316;
+    margin: -0.35rem 0 0;
+  }
+
   .review-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1022,6 +1168,19 @@ let results: PlanMarketingAddress[] = [];
     font-weight: 600;
     color: var(--text-primary);
   }
+
+.summary-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.algorithm-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
 
   .results {
     margin-top: 1rem;
