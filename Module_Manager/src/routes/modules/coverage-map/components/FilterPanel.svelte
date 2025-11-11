@@ -40,6 +40,9 @@
       case 'cpe':
         filters.showCPE = !filters.showCPE;
         break;
+      case 'marketing':
+        filters.showMarketing = !filters.showMarketing;
+        break;
       case 'equipment':
         filters.showEquipment = !filters.showEquipment;
         break;
@@ -138,6 +141,16 @@
         />
         <span class="filter-icon">📱</span>
         <span>CPE Devices</span>
+      </label>
+      
+      <label class="filter-checkbox">
+        <input 
+          type="checkbox" 
+          checked={filters.showMarketing}
+          on:change={() => toggleAssetType('marketing')}
+        />
+        <span class="filter-icon">📍</span>
+        <span>Marketing Leads</span>
       </label>
       
       <label class="filter-checkbox">

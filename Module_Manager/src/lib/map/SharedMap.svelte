@@ -72,6 +72,28 @@
     if (!targetWindow) return;
 
     try {
+      const activePlan = mapState.activePlan;
+      const activePlanSummary = activePlan
+        ? {
+            id: activePlan.id ?? activePlan._id ?? null,
+            name: activePlan.name ?? null,
+            status: activePlan.status ?? null,
+            tenantId: activePlan.tenantId ?? null
+          }
+        : null;
+
+      const marketing = activePlan?.marketing;
+      const activePlanMarketing = marketing
+        ? {
+            targetRadiusMiles: marketing.targetRadiusMiles ?? null,
+            lastRunAt: marketing.lastRunAt ? new Date(marketing.lastRunAt).toISOString() : null,
+            lastResultCount: marketing.lastResultCount ?? null,
+            lastBoundingBox: marketing.lastBoundingBox ?? null,
+            lastCenter: marketing.lastCenter ?? null,
+            addresses: Array.isArray(marketing.addresses) ? marketing.addresses : []
+          }
+        : null;
+
       targetWindow.postMessage(
         {
           source: 'shared-map',
@@ -81,6 +103,8 @@
             state: {
               mode: mapState.mode,
               activePlanId: mapState.activePlan?.id ?? null,
+              activePlan: activePlanSummary,
+              activePlanMarketing,
               stagedSummary: mapState.stagedSummary,
               stagedFeatures: mapState.stagedFeatures,
               productionHardware: mapState.productionHardware,

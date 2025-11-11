@@ -9,13 +9,15 @@ module.exports = {
     {
       name: 'main-api',
       script: './server.js',
-      cwd: '/opt/gce-backend',
+      cwd: '/opt/lte-pci-mapper/backend-services',
       instances: 1,
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
         PORT: 3001,
-        HOST: '0.0.0.0'
+        HOST: '0.0.0.0',
+        FIREBASE_PROJECT_ID: 'wisptools-production',
+        FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json'
       },
       error_file: '/home/david/.pm2/logs/main-api-error.log',
       out_file: '/home/david/.pm2/logs/main-api-out.log',
@@ -31,13 +33,15 @@ module.exports = {
     {
       name: 'epc-api',
       script: './min-epc-server.js',
-      cwd: '/opt/gce-backend',
+      cwd: '/opt/lte-pci-mapper/backend-services',
       instances: 1,
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
         PORT: 3002,
-        HOST: '0.0.0.0'
+        HOST: '0.0.0.0',
+        FIREBASE_PROJECT_ID: 'wisptools-production',
+        FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json'
       },
       error_file: '/home/david/.pm2/logs/epc-api-error.log',
       out_file: '/home/david/.pm2/logs/epc-api-out.log',

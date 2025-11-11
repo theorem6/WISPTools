@@ -12,6 +12,7 @@ const UnifiedTower = UnifiedSite; // Backwards compatibility alias
 const { createProjectApprovalNotification } = require('./notifications');
 const { PlanLayerFeature } = require('../models/plan-layer-feature');
 const { verifyAuth } = require('./users/role-auth-middleware');
+const { Customer } = require('../models/customer');
 
 // ============================================================================
 // MIDDLEWARE
@@ -154,6 +155,163 @@ const parseMarketing = (input) => {
 
   const hasData = Object.keys(marketing).length > 0;
   return hasData ? marketing : undefined;
+};
+
+const generateLeadCustomerId = async (tenantId) => {
+  const year = new Date().getFullYear();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const candidate = `LEAD-${year}-${suffix}`;
+    const exists = await Customer.exists({ tenantId, customerId: candidate });
+    if (!exists) {
+      return candidate;
+    }
+  }
+  return `LEAD-${Date.now()}`;
+};
+
+const buildLeadHash = (latitude, longitude, addressLine1, postalCode) => {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+  const streetKey = (addressLine1 || '').toLowerCase();
+  const postalKey = (postalCode || '').toLowerCase();
+  return `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${streetKey}|${postalKey}`;
+};
+
+const normalizePlanNameForLead = (planName) => {
+  if (!planName) return 'Lead';
+  const str = String(planName).trim();
+  return str.length > 0 ? str.substring(0, 40) : 'Lead';
+};
+
+const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
+  const marketing = plan?.marketing;
+  if (!marketing || !Array.isArray(marketing.addresses) || marketing.addresses.length === 0) {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  const planIdString =
+    (typeof plan._id === 'object' && plan._id !== null && plan._id.toString) ? plan._id.toString() :
+    (typeof plan.id === 'string' ? plan.id : null);
+
+  const radiusMiles = toNumber(marketing.targetRadiusMiles) ?? null;
+  const marketingRunAt = marketing.lastRunAt ? new Date(marketing.lastRunAt).toISOString() : new Date().toISOString();
+  const boundingBox = marketing.lastBoundingBox ?? null;
+  const center = marketing.lastCenter ?? null;
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const address of marketing.addresses) {
+    const latitude = toNumber(address.latitude);
+    const longitude = toNumber(address.longitude);
+    if (latitude === undefined || longitude === undefined) {
+      skipped += 1;
+      continue;
+    }
+
+    const leadHash = buildLeadHash(latitude, longitude, address.addressLine1, address.postalCode);
+    if (!leadHash) {
+      skipped += 1;
+      continue;
+    }
+
+    const street = address.addressLine1 ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    const now = new Date();
+    const metadata = {
+      planId: planIdString,
+      planName: plan.name ?? null,
+      marketingRunAt,
+      radiusMiles,
+      boundingBox,
+      center,
+      source: address.source ?? 'marketing',
+      addressLine2: address.addressLine2 ?? null
+    };
+
+    const setPayload = {
+      isLead: true,
+      leadSource: 'plan-marketing',
+      associatedPlanId: planIdString,
+      leadMetadata: metadata,
+      leadHash,
+      updatedAt: now,
+      updatedBy: userEmail || 'system',
+      'serviceAddress.street': street,
+      'serviceAddress.latitude': latitude,
+      'serviceAddress.longitude': longitude
+    };
+
+    if (address.city) {
+      setPayload['serviceAddress.city'] = address.city;
+    }
+    if (address.state) {
+      setPayload['serviceAddress.state'] = address.state;
+    }
+    if (address.postalCode) {
+      setPayload['serviceAddress.zipCode'] = address.postalCode;
+    }
+    setPayload['serviceAddress.country'] = address.country || 'USA';
+    if (address.email) {
+      setPayload.email = address.email;
+    }
+
+    const setOnInsertPayload = {
+      tenantId,
+      customerId: await generateLeadCustomerId(tenantId),
+      firstName: 'Prospect',
+      lastName: normalizePlanNameForLead(plan.name),
+      primaryPhone: '000-000-0000',
+      serviceStatus: 'pending',
+      accountStatus: 'good-standing',
+      isActive: true,
+      createdAt: now,
+      createdBy: userEmail || 'system',
+      notes: 'Auto-generated marketing lead',
+      leadStatus: 'new',
+      fullName: `Prospect (${street})`
+    };
+
+    if (address.email) {
+      setOnInsertPayload.email = address.email;
+    }
+
+    const updateDoc = {
+      $setOnInsert: setOnInsertPayload,
+      $set: setPayload,
+      $addToSet: {
+        tags: { $each: ['marketing', 'lead'] }
+      }
+    };
+
+    try {
+      const result = await Customer.updateOne(
+        { tenantId, leadHash },
+        updateDoc,
+        { upsert: true }
+      );
+
+      if (result.upsertedCount && result.upsertedCount > 0) {
+        created += 1;
+      } else if (result.matchedCount && result.matchedCount > 0) {
+        updated += 1;
+      } else {
+        skipped += 1;
+      }
+    } catch (err) {
+      console.error('Failed to sync marketing lead:', {
+        tenantId,
+        planId: planIdString,
+        address: street,
+        error: err.message
+      });
+      skipped += 1;
+    }
+  }
+
+  return { created, updated, skipped };
 };
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -627,6 +785,21 @@ router.post('/:id/approve', async (req, res) => {
     };
     plan.updatedAt = new Date();
     await plan.save();
+
+    let marketingLeadSummary = { created: 0, updated: 0, skipped: 0 };
+    try {
+      marketingLeadSummary = await createMarketingLeadsForPlan(
+        plan,
+        req.tenantId,
+        req.user?.email || req.user?.name || 'System'
+      );
+      console.log('Marketing leads synced for plan approval:', {
+        planId: plan._id?.toString?.() ?? plan.id,
+        ...marketingLeadSummary
+      });
+    } catch (leadError) {
+      console.error('Failed to sync marketing leads during plan approval:', leadError);
+    }
     
     // Create notifications for field techs
     try {
@@ -641,7 +814,7 @@ router.post('/:id/approve', async (req, res) => {
       // Don't fail the approval if notifications fail
     }
     
-    res.json({ plan, message: 'Plan approved for deployment' });
+    res.json({ plan, message: 'Plan approved for deployment', marketingLeads: marketingLeadSummary });
   } catch (error) {
     console.error('Error approving plan:', error);
     res.status(500).json({ error: 'Failed to approve plan', message: error.message });

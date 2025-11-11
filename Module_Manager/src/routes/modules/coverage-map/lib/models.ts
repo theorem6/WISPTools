@@ -259,6 +259,7 @@ export interface CoverageMapFilters {
   showSectors: boolean;
   showCPE: boolean;
   showEquipment: boolean;
+  showMarketing: boolean;
   showBackhaul: boolean;
   
   // Backhaul type filtering

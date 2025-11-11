@@ -15,14 +15,40 @@ const CustomerSchema = new mongoose.Schema({
   
   // Identification
   customerId: { type: String, required: true, unique: true }, // CUST-2025-001
+  isLead: { type: Boolean, default: false, index: true },
+  leadSource: { type: String },
+  associatedPlanId: { type: String, index: true },
+  leadStatus: {
+    type: String,
+    enum: ['new', 'contacted', 'qualified', 'converted', 'disqualified'],
+    default: 'new'
+  },
+  leadMetadata: mongoose.Schema.Types.Mixed,
+  leadHash: { type: String, index: true },
   
   // Personal Information
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  firstName: { 
+    type: String, 
+    required: function() {
+      return !this.isLead;
+    } 
+  },
+  lastName: { 
+    type: String, 
+    required: function() {
+      return !this.isLead;
+    } 
+  },
   fullName: { type: String }, // Auto-generated from first + last
   
   // Contact Information
-  primaryPhone: { type: String, required: true, index: true },
+  primaryPhone: { 
+    type: String, 
+    required: function() {
+      return !this.isLead;
+    }, 
+    index: true 
+  },
   alternatePhone: String,
   email: { type: String, index: true },
   
@@ -167,12 +193,25 @@ CustomerSchema.index({ tenantId: 1, email: 1 });
 CustomerSchema.index({ tenantId: 1, serviceStatus: 1 });
 CustomerSchema.index({ 'serviceAddress.latitude': 1, 'serviceAddress.longitude': 1 });
 CustomerSchema.index({ 'networkInfo.imsi': 1 });
+CustomerSchema.index({ tenantId: 1, leadHash: 1 }, { unique: true, sparse: true });
 
 // Pre-save middleware - generate fullName
 CustomerSchema.pre('save', function(next) {
-  if (this.firstName && this.lastName) {
-    this.fullName = `${this.firstName} ${this.lastName}`;
+  if (this.isLead) {
+    if (!this.firstName) {
+      this.firstName = 'Prospect';
+    }
+    if (!this.lastName) {
+      this.lastName = 'Lead';
+    }
   }
+
+  if (this.firstName && this.lastName) {
+    this.fullName = `${this.firstName} ${this.lastName}`.trim();
+  } else if (!this.fullName && this.firstName) {
+    this.fullName = this.firstName;
+  }
+
   this.updatedAt = new Date();
   next();
 });

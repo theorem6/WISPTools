@@ -33,7 +33,7 @@ import { mapLayerManager } from '$lib/map/MapLayerManager';
     TowerSite, Sector, CPEDevice, NetworkEquipment, 
     CoverageMapFilters, Location 
   } from './lib/models';
-import type { PlanLayerFeature, PlanFeatureSummary, HardwareView, PlanFeatureGeometry } from '$lib/services/planService';
+import type { PlanLayerFeature, PlanFeatureSummary, HardwareView, PlanFeatureGeometry, PlanMarketingAddress } from '$lib/services/planService';
 import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   // Data
@@ -90,6 +90,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let planDraftSitesForActions: TowerSite[] = [];
   let combinedSites: TowerSite[] = [];
   let visiblePlanIds: string[] = [];
+  let marketingLeads: PlanMarketingAddress[] = [];
   
   // Map mode derived from query parameters (default to coverage view)
   $: mapMode = (() => {
@@ -136,6 +137,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     showSectors: true,
     showCPE: true,
     showEquipment: false,
+    showMarketing: true,
     showBackhaul: true,
     showFiber: true,
     showWirelessLicensed: true,
@@ -433,8 +435,15 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       if (isPlanMode && planId) {
         const activePlan = plans.find((p: any) => String(p.id || p._id) === planId);
         activePlanName = activePlan?.name || null;
+        if (!sharedActivePlanId) {
+          const addresses = activePlan?.marketing?.addresses;
+          marketingLeads = Array.isArray(addresses) ? addresses : [];
+        }
       } else {
         activePlanName = null;
+        if (!sharedActivePlanId) {
+          marketingLeads = [];
+        }
       }
 
       const planIdsForFetch: string[] = [];
@@ -628,6 +637,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       planId = activePlanIdFromState;
     }
     sharedActivePlanId = activePlanIdFromState;
+
+    const inboundMarketing = state.activePlanMarketing?.addresses ?? [];
+    marketingLeads = Array.isArray(inboundMarketing) ? inboundMarketing : [];
   }
   
   function handleMapRightClick(event: CustomEvent) {
@@ -969,6 +981,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       {equipment}
       {filters}
       externalPlanFeatures={planDraftsForMap}
+      {marketingLeads}
       on:map-right-click={handleMapRightClick}
       on:asset-click={handleAssetClick}
       on:plan-feature-moved={handlePlanFeatureMoved}

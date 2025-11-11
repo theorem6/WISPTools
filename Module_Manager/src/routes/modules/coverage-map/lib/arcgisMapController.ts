@@ -5,7 +5,7 @@ import type {
   NetworkEquipment,
   CoverageMapFilters
 } from './models';
-import type { PlanLayerFeature } from '$lib/services/planService';
+import type { PlanLayerFeature, PlanMarketingAddress } from '$lib/services/planService';
 import { createLocationIcon } from '$lib/mapIcons';
 
 type DispatchFn = (event: string, detail?: any) => void;
@@ -18,6 +18,7 @@ export interface CoverageMapInitOptions {
   cpeDevices: CPEDevice[];
   equipment: NetworkEquipment[];
   externalPlanFeatures?: PlanLayerFeature[];
+  marketingLeads?: PlanMarketingAddress[];
 }
 
 interface CoverageMapData {
@@ -40,6 +41,7 @@ export class CoverageMapController {
   private mapView: any = null;
   private graphicsLayer: any = null;
   private backhaulLayer: any = null;
+  private marketingLayer: any = null;
   private planDraftLayer: any = null;
   private planDraftGraphics: Map<string, any> = new Map();
   private planDraftDragContext:
@@ -65,6 +67,8 @@ export class CoverageMapController {
     equipment: []
   };
   private planDraftFeatures: PlanLayerFeature[] = [];
+  private marketingLeads: PlanMarketingAddress[] = [];
+  private hasPerformedInitialFit = false;
 
   constructor(dispatch: DispatchFn) {
     this.dispatch = dispatch;
@@ -94,10 +98,13 @@ export class CoverageMapController {
       equipment: options.equipment
     });
     this.setPlanFeatures(options.externalPlanFeatures ?? []);
+    this.marketingLeads = options.marketingLeads ?? [];
 
     await this.initializeMap();
     await this.renderAllAssets();
     await this.renderPlanDrafts();
+    await this.renderMarketingLeads();
+    await this.fitMapToVisibleGraphics(true);
 
     this.mapReady = true;
 
@@ -127,6 +134,7 @@ export class CoverageMapController {
     }
     this.graphicsLayer = null;
     this.backhaulLayer = null;
+    this.marketingLayer = null;
     this.planDraftLayer = null;
     this.container = null;
     this.mapReady = false;
@@ -168,13 +176,27 @@ export class CoverageMapController {
     this.filters = filters;
     if (this.mapReady) {
       this.renderAllAssets().catch(err => console.error('[CoverageMap] Asset render error:', err));
+      this.renderMarketingLeads().catch(err => console.error('[CoverageMap] Marketing render error:', err));
     }
   }
 
   public setPlanFeatures(features: PlanLayerFeature[]): void {
     this.planDraftFeatures = (features ?? []).map(feature => this.normalizePlanFeature(feature));
+    this.hasPerformedInitialFit = false;
     if (this.mapReady) {
-      this.renderPlanDrafts().catch(err => console.error('[CoverageMap] Plan draft render error:', err));
+      this.renderPlanDrafts()
+        .then(() => this.fitMapToVisibleGraphics())
+        .catch(err => console.error('[CoverageMap] Plan draft render error:', err));
+    }
+  }
+
+  public setMarketingLeads(leads: PlanMarketingAddress[]): void {
+    this.marketingLeads = Array.isArray(leads) ? [...leads] : [];
+    this.hasPerformedInitialFit = false;
+    if (this.mapReady) {
+      this.renderMarketingLeads()
+        .then(() => this.fitMapToVisibleGraphics())
+        .catch(err => console.error('[CoverageMap] Marketing render error:', err));
     }
   }
 
@@ -211,18 +233,19 @@ export class CoverageMapController {
 
     this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
     this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
+    this.marketingLayer = new GraphicsLayer({ title: 'Marketing Leads', listMode: 'hide' });
     this.planDraftLayer = new GraphicsLayer({ title: 'Plan Drafts', listMode: 'hide' });
 
     try {
       this.map = new Map({
         basemap: this.currentBasemap,
-        layers: [this.backhaulLayer, this.graphicsLayer, this.planDraftLayer]
+        layers: [this.backhaulLayer, this.graphicsLayer, this.marketingLayer, this.planDraftLayer]
       });
     } catch (basemapError) {
       console.warn('Failed to load basemap, trying fallback...', basemapError);
       this.map = new Map({
         basemap: 'gray-vector',
-        layers: [this.backhaulLayer, this.graphicsLayer, this.planDraftLayer]
+        layers: [this.backhaulLayer, this.graphicsLayer, this.marketingLayer, this.planDraftLayer]
       });
       this.currentBasemap = 'gray-vector';
     }
@@ -967,29 +990,134 @@ export class CoverageMapController {
         });
       }
 
-      if (this.graphicsLayer.graphics.length > 0) {
-        try {
-          await this.mapView.when();
-          await this.mapView.goTo({
-            target: this.graphicsLayer.graphics,
-            padding: 50
-          }).catch((err: unknown) => {
-            console.warn('Could not fit map to graphics:', err);
-            if (this.graphicsLayer!.graphics.length > 0) {
-              const firstGraphic = this.graphicsLayer!.graphics.getItemAt(0);
-              if (firstGraphic && firstGraphic.geometry) {
-                this.mapView!.center = firstGraphic.geometry;
-              }
-            }
-          });
-        } catch (err) {
-          console.warn('Map animation error:', err);
-        }
-      }
-
       console.log(`Rendered ${this.graphicsLayer.graphics.length} assets on map`);
     } catch (err) {
       console.error('Failed to render assets:', err);
+    }
+  }
+
+  private async renderMarketingLeads(): Promise<void> {
+    if (!this.marketingLayer || !this.mapView) return;
+
+    this.marketingLayer.removeAll();
+
+    if (!this.filters.showMarketing || !Array.isArray(this.marketingLeads) || this.marketingLeads.length === 0) {
+      return;
+    }
+
+    try {
+      const [
+        { default: Graphic },
+        { default: Point },
+        { default: SimpleMarkerSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/Graphic.js'),
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js')
+      ]);
+
+      const isMobile = window.innerWidth <= 768;
+      const markerSize = isMobile ? '22px' : '16px';
+      const outlineWidth = isMobile ? 3 : 2;
+
+      const seen = new Set<string>();
+
+      this.marketingLeads.forEach((lead, index) => {
+        const latitude = this.toNumeric(lead.latitude);
+        const longitude = this.toNumeric(lead.longitude);
+        if (latitude === null || longitude === null) {
+          return;
+        }
+
+        const hash = `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
+        if (seen.has(hash)) {
+          return;
+        }
+        seen.add(hash);
+
+        const point = new Point({
+          latitude,
+          longitude
+        });
+
+        const symbol = new SimpleMarkerSymbol({
+          style: 'circle',
+          color: '#f97316',
+          size: markerSize,
+          outline: {
+            color: '#ffffff',
+            width: outlineWidth
+          }
+        });
+
+        const title = lead.addressLine1 ?? 'Potential Customer';
+        const popupContent = this.buildMarketingPopupContent(lead, latitude, longitude);
+
+        const graphic = new Graphic({
+          geometry: point,
+          symbol,
+          attributes: {
+            type: 'marketing-lead',
+            id: `marketing-${index}-${hash}`,
+            latitude,
+            longitude,
+            city: lead.city,
+            state: lead.state,
+            postalCode: lead.postalCode,
+            country: lead.country,
+            source: lead.source ?? 'marketing',
+            addressLine1: lead.addressLine1,
+            addressLine2: lead.addressLine2
+          },
+          popupTemplate: {
+            title,
+            content: popupContent
+          }
+        });
+
+        this.marketingLayer!.add(graphic);
+      });
+
+      console.log(`[CoverageMap] Rendered ${this.marketingLayer.graphics?.length ?? 0} marketing leads`);
+    } catch (err) {
+      console.error('[CoverageMap] Failed to render marketing leads:', err);
+    }
+  }
+
+  private async fitMapToVisibleGraphics(force = false): Promise<void> {
+    if (!this.mapView) return;
+    if (this.hasPerformedInitialFit && !force) return;
+
+    const graphics: any[] = [];
+
+    if (this.graphicsLayer?.graphics?.length) {
+      this.graphicsLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+    }
+
+    if (this.filters.showMarketing && this.marketingLayer?.graphics?.length) {
+      this.marketingLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+    }
+
+    if (this.planDraftLayer?.graphics?.length) {
+      this.planDraftLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+    }
+
+    if (!graphics.length) {
+      return;
+    }
+
+    try {
+      await this.mapView.when();
+      await this.mapView.goTo(graphics, {
+        padding: 50
+      });
+      this.hasPerformedInitialFit = true;
+    } catch (err) {
+      console.warn('Map fit error:', err);
+      const first = graphics[0];
+      if (first?.geometry) {
+        this.mapView.center = first.geometry;
+      }
     }
   }
 
@@ -1233,6 +1361,38 @@ export class CoverageMapController {
     } catch (err) {
       console.error('[CoverageMap] Failed to render plan drafts:', err);
     }
+  }
+
+  private toNumeric(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private buildMarketingPopupContent(lead: PlanMarketingAddress, latitude: number, longitude: number): string {
+    const rows: string[] = [];
+
+    if (lead.addressLine1) {
+      rows.push(`<strong>Address:</strong> ${lead.addressLine1}`);
+    }
+    if (lead.addressLine2) {
+      rows.push(`<strong>Unit:</strong> ${lead.addressLine2}`);
+    }
+    const localityParts = [lead.city, lead.state, lead.postalCode].filter(Boolean).join(', ');
+    if (localityParts) {
+      rows.push(`<strong>Location:</strong> ${localityParts}`);
+    }
+    if (lead.country) {
+      rows.push(`<strong>Country:</strong> ${lead.country}`);
+    }
+    rows.push(`<strong>Coordinates:</strong> ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+    if (lead.source) {
+      rows.push(`<strong>Source:</strong> ${lead.source}`);
+    }
+
+    return `<div class="marketing-lead-popup">${rows.join('<br/>')}</div>`;
   }
 
   private filterSectorsByBand(allSectors: Sector[]): Sector[] {

@@ -83,23 +83,31 @@ router.post('/', async (req, res) => {
       bodyKeys: Object.keys(req.body || {})
     });
     
-    // Validate required fields
-    if (!req.body.firstName || !req.body.lastName) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        message: 'firstName and lastName are required',
-        received: {
-          firstName: req.body.firstName,
-          lastName: req.body.lastName
-        }
-      });
-    }
+    const isLead = Boolean(req.body.isLead);
     
-    if (!req.body.primaryPhone) {
-      return res.status(400).json({ 
-        error: 'Missing required field',
-        message: 'primaryPhone is required'
-      });
+    // Validate required fields for non-leads
+    if (!isLead) {
+      if (!req.body.firstName || !req.body.lastName) {
+        return res.status(400).json({ 
+          error: 'Missing required fields',
+          message: 'firstName and lastName are required',
+          received: {
+            firstName: req.body.firstName,
+            lastName: req.body.lastName
+          }
+        });
+      }
+      
+      if (!req.body.primaryPhone) {
+        return res.status(400).json({ 
+          error: 'Missing required field',
+          message: 'primaryPhone is required'
+        });
+      }
+    } else {
+      req.body.firstName = req.body.firstName || 'Prospect';
+      req.body.lastName = req.body.lastName || 'Lead';
+      req.body.primaryPhone = req.body.primaryPhone || '000-000-0000';
     }
     
     // Generate customer ID
@@ -115,7 +123,8 @@ router.post('/', async (req, res) => {
       });
     }
     
-    const customerId = `CUST-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const idPrefix = isLead ? 'LEAD' : 'CUST';
+    const customerId = `${idPrefix}-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
     
     // Generate fullName if not provided
     const fullName = req.body.fullName || `${req.body.firstName || ''} ${req.body.lastName || ''}`.trim();

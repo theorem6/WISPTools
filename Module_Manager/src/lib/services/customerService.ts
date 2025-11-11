@@ -58,6 +58,11 @@ export interface Customer {
   notes?: string;
   tags?: string[];
   isActive?: boolean;
+  isLead?: boolean;
+  leadSource?: string;
+  associatedPlanId?: string | null;
+  leadStatus?: 'new' | 'contacted' | 'qualified' | 'converted' | 'disqualified';
+  leadMetadata?: Record<string, unknown>;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }

@@ -805,6 +805,9 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     if (idx !== -1) {
       projects[idx] = updatedPlan;
     }
+    if ($currentTenant?.id) {
+      void mapLayerManager.loadPlan($currentTenant.id, updatedPlan);
+    }
   }
 
 

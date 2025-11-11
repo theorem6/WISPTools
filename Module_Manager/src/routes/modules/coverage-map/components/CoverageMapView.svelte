@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import type { TowerSite, Sector, CPEDevice, NetworkEquipment, CoverageMapFilters } from '../lib/models';
-  import type { PlanLayerFeature } from '$lib/services/planService';
+  import type { PlanLayerFeature, PlanMarketingAddress } from '$lib/services/planService';
   import { CoverageMapController } from '../lib/arcgisMapController';
 
   export let towers: TowerSite[] = [];
@@ -11,6 +11,7 @@
   export let equipment: NetworkEquipment[] = [];
   export let filters: CoverageMapFilters;
   export let externalPlanFeatures: PlanLayerFeature[] = [];
+  export let marketingLeads: PlanMarketingAddress[] = [];
 export let planId: string | null = null;
 export let isPlanMode = false;
 
@@ -29,7 +30,8 @@ export let isPlanMode = false;
       sectors,
       cpeDevices,
       equipment,
-      externalPlanFeatures
+      externalPlanFeatures,
+      marketingLeads
     });
     mapView = view;
   });
@@ -43,6 +45,7 @@ export let isPlanMode = false;
   $: controller && controller.setData({ towers, sectors, cpeDevices, equipment });
   $: controller && controller.setFilters(filters);
   $: controller && controller.setPlanFeatures(externalPlanFeatures);
+  $: controller && controller.setMarketingLeads(marketingLeads);
 
   export function changeBasemap(basemapId: string) {
     controller?.changeBasemap(basemapId);
