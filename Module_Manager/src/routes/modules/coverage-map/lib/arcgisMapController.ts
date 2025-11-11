@@ -53,6 +53,9 @@ export class CoverageMapController {
 
   private currentBasemap = 'topo-vector';
   private mapReady = false;
+  private extentWatchHandle: any = null;
+  private extentPostTimer: number | null = null;
+  private webMercatorUtils: any = null;
 
   private filters: CoverageMapFilters;
   private data: CoverageMapData = {
@@ -105,6 +108,15 @@ export class CoverageMapController {
   }
 
   public destroy(): void {
+    if (this.extentPostTimer) {
+      window.clearTimeout(this.extentPostTimer);
+      this.extentPostTimer = null;
+    }
+    if (this.extentWatchHandle?.remove) {
+      this.extentWatchHandle.remove();
+    }
+    this.extentWatchHandle = null;
+
     if (this.mapView) {
       this.mapView.destroy();
       this.mapView = null;
@@ -183,12 +195,16 @@ export class CoverageMapController {
     const [
       { default: Map },
       { default: MapView },
-      { default: GraphicsLayer }
+      { default: GraphicsLayer },
+      webMercatorUtilsModule
     ] = await Promise.all([
       import('@arcgis/core/Map.js'),
       import('@arcgis/core/views/MapView.js'),
-      import('@arcgis/core/layers/GraphicsLayer.js')
+      import('@arcgis/core/layers/GraphicsLayer.js'),
+      import('@arcgis/core/geometry/support/webMercatorUtils.js')
     ]);
+
+    this.webMercatorUtils = webMercatorUtilsModule;
 
     this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
     this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
@@ -268,6 +284,7 @@ export class CoverageMapController {
     this.addTouchEventHandling();
     this.registerPointerHandlers();
     this.registerDragHandlers();
+    this.watchViewExtent();
 
     console.log('Coverage Map initialized');
   }
@@ -431,6 +448,158 @@ export class CoverageMapController {
         this.planDraftDragContext = null;
       }
     });
+  }
+
+  private watchViewExtent(): void {
+    if (!this.mapView) return;
+
+    if (this.extentWatchHandle?.remove) {
+      this.extentWatchHandle.remove();
+    }
+
+    const broadcast = (extent: any) => {
+      if (!extent) return;
+      if (this.extentPostTimer) {
+        window.clearTimeout(this.extentPostTimer);
+      }
+      this.extentPostTimer = window.setTimeout(() => {
+        this.broadcastViewExtent(extent);
+      }, 200);
+    };
+
+    if (this.mapView.extent) {
+      broadcast(this.mapView.extent);
+    }
+
+    this.extentWatchHandle = this.mapView.watch('extent', (extent: any) => {
+      broadcast(extent);
+    });
+  }
+
+  private broadcastViewExtent(extent: any): void {
+    const payload = this.buildExtentPayload(extent);
+    if (!payload) return;
+
+    try {
+      window.parent?.postMessage(
+        {
+          source: 'coverage-map',
+          type: 'view-extent',
+          payload
+        },
+        '*'
+      );
+    } catch (err) {
+      console.warn('[CoverageMap] Failed to post view extent', err);
+    }
+  }
+
+  private buildExtentPayload(extent: any): any {
+    const center = this.extractLatLon(extent?.center ?? this.mapView?.center);
+    const boundingBox = this.extractBoundingBox(extent);
+    if (!center || !boundingBox) {
+      return null;
+    }
+
+    const spans = {
+      latSpan: Math.abs(boundingBox.north - boundingBox.south),
+      lonSpan: Math.abs(boundingBox.east - boundingBox.west)
+    };
+
+    return {
+      center,
+      boundingBox,
+      spans,
+      scale: this.mapView?.scale ?? null,
+      zoom: this.mapView?.zoom ?? null
+    };
+  }
+
+  private extractBoundingBox(extent: any): { west: number; south: number; east: number; north: number } | null {
+    if (!extent) return null;
+    const spatialReference = extent.spatialReference ?? this.mapView?.spatialReference;
+
+    const southWest = this.projectXYToLatLon(extent.xmin, extent.ymin, spatialReference);
+    const northEast = this.projectXYToLatLon(extent.xmax, extent.ymax, spatialReference);
+
+    if (southWest && northEast) {
+      return {
+        west: Math.min(southWest.lon, northEast.lon),
+        south: Math.min(southWest.lat, northEast.lat),
+        east: Math.max(southWest.lon, northEast.lon),
+        north: Math.max(southWest.lat, northEast.lat)
+      };
+    }
+
+    if (
+      typeof extent.xmin === 'number' &&
+      typeof extent.ymin === 'number' &&
+      typeof extent.xmax === 'number' &&
+      typeof extent.ymax === 'number'
+    ) {
+      return {
+        west: extent.xmin,
+        south: extent.ymin,
+        east: extent.xmax,
+        north: extent.ymax
+      };
+    }
+
+    return null;
+  }
+
+  private extractLatLon(point: any): { lat: number; lon: number } | null {
+    if (!point) return null;
+
+    const lat = typeof point.latitude === 'number' ? point.latitude : undefined;
+    const lon = typeof point.longitude === 'number' ? point.longitude : undefined;
+    if (lat !== undefined && lon !== undefined && Number.isFinite(lat) && Number.isFinite(lon)) {
+      return { lat, lon };
+    }
+
+    if (typeof point.y === 'number' && typeof point.x === 'number') {
+      return this.projectXYToLatLon(point.x, point.y, point.spatialReference);
+    }
+
+    return null;
+  }
+
+  private projectXYToLatLon(x: number, y: number, spatialReference?: any): { lat: number; lon: number } | null {
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      return null;
+    }
+
+    if (spatialReference?.isGeographic || spatialReference?.wkid === 4326) {
+      return { lat: y, lon: x };
+    }
+
+    if (
+      (spatialReference?.isWebMercator || spatialReference?.wkid === 3857 || spatialReference?.wkid === 102100) &&
+      this.webMercatorUtils?.xyToLngLat
+    ) {
+      try {
+        const [lon, lat] = this.webMercatorUtils.xyToLngLat(x, y);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          return { lat, lon };
+        }
+      } catch (err) {
+        console.warn('[CoverageMap] Failed to convert WebMercator point', err);
+      }
+      return null;
+    }
+
+    if (this.webMercatorUtils?.xyToLngLat) {
+      try {
+        const [lon, lat] = this.webMercatorUtils.xyToLngLat(x, y);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          return { lat, lon };
+        }
+      } catch {
+        // ignore conversion error
+      }
+    }
+
+    return null;
   }
 
   private updatePlanDraftFeatureGeometryInMemory(featureId: string, planGeometry: any): void {

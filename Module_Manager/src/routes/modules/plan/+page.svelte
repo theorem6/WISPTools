@@ -16,8 +16,17 @@ import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
 import type { ModuleContext } from '$lib/services/objectStateManager';
 
+interface MapViewExtentPayload {
+  center?: { lat: number; lon: number };
+  boundingBox?: { west: number; south: number; east: number; north: number };
+  spans?: { latSpan: number; lonSpan: number };
+  scale?: number | null;
+  zoom?: number | null;
+}
+
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
+  let latestMapExtent: MapViewExtentPayload | null = null;
   let showReportModal = false;
   let showHardwareModal = false;
   let showProjectModal = false;
@@ -201,6 +210,10 @@ $: marketingAvailable = Boolean(
     } finally {
       isLoading = false;
     }
+  }
+
+  function handleMapExtent(event: CustomEvent<MapViewExtentPayload>) {
+    latestMapExtent = event.detail;
   }
 
   // Project workflow states
@@ -1116,7 +1129,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   <div class="app">
     <!-- Full Screen Map -->
     <div class="map-fullscreen" bind:this={mapContainer}>
-      <SharedMap mode={mapMode} />
+      <SharedMap mode={mapMode} on:viewExtent={handleMapExtent} />
     </div>
 
     <!-- Enhanced Header Overlay -->
@@ -1788,6 +1801,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {#if showMarketingModal && selectedProject}
     <PlanMarketingModal
       plan={selectedProject}
+      mapExtent={latestMapExtent}
       on:close={closeMarketingTools}
       on:updated={handleMarketingUpdated}
     />

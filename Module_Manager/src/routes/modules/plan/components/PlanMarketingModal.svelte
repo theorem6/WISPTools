@@ -8,6 +8,19 @@
 
   export let plan: PlanProject;
 
+  interface MapExtentData {
+    center?: { lat: number; lon: number };
+    boundingBox?: { west: number; south: number; east: number; north: number };
+    spans?: { latSpan: number; lonSpan: number };
+    scale?: number | null;
+    zoom?: number | null;
+  }
+
+  export let mapExtent: MapExtentData | null = null;
+
+  const extentAtOpen = cloneMapExtent(mapExtent);
+  const extentSpanMiles = computeSpanMiles(extentAtOpen);
+
   type Summary = {
     totalCandidates: number;
     geocodedCount: number;
@@ -30,15 +43,24 @@
     plan.location?.addressLine1 && plan.location?.city && plan.location?.state
       ? `${plan.location.addressLine1}, ${plan.location.city}, ${plan.location.state}`
       : plan.location?.addressLine1 ?? '';
-  let latitudeInput =
-    plan.marketing?.lastCenter?.lat?.toString() ??
-    plan.location?.latitude?.toString() ??
-    '';
-  let longitudeInput =
-    plan.marketing?.lastCenter?.lon?.toString() ??
-    plan.location?.longitude?.toString() ??
-    '';
-  let radiusMiles = plan.marketing?.targetRadiusMiles ?? 5;
+
+  const derivedCenterLat =
+    plan.marketing?.lastCenter?.lat ??
+    plan.location?.latitude ??
+    extentAtOpen?.center?.lat;
+  const derivedCenterLon =
+    plan.marketing?.lastCenter?.lon ??
+    plan.location?.longitude ??
+    extentAtOpen?.center?.lon;
+
+  let latitudeInput = formatNumericInput(derivedCenterLat, 6);
+  let longitudeInput = formatNumericInput(derivedCenterLon, 6);
+
+  const derivedRadius = deriveRadiusFromExtent(extentAtOpen);
+  let radiusMiles = normalizeRadius(
+    plan.marketing?.targetRadiusMiles,
+    derivedRadius ?? 5
+  );
 
   let results: PlanMarketingAddress[] = plan.marketing?.addresses ?? [];
   let summary: Summary = plan.marketing
@@ -54,7 +76,15 @@
         },
         center: plan.marketing.lastCenter
       }
-    : null;
+    : extentAtOpen?.boundingBox
+      ? {
+          totalCandidates: 0,
+          geocodedCount: 0,
+          radiusMiles,
+          boundingBox: extentAtOpen.boundingBox,
+          center: extentAtOpen.center
+        }
+      : null;
 
   let advancedOptions = {
     forceReverse: false,
@@ -103,6 +133,61 @@
     };
   }
 
+  function cloneMapExtent(extent: MapExtentData | null): MapExtentData | null {
+    if (!extent) return null;
+    return {
+      center: extent.center ? { ...extent.center } : undefined,
+      boundingBox: extent.boundingBox ? { ...extent.boundingBox } : undefined,
+      spans: extent.spans ? { ...extent.spans } : undefined,
+      scale: extent.scale ?? null,
+      zoom: extent.zoom ?? null
+    };
+  }
+
+  function computeSpanMiles(extent: MapExtentData | null): { width: number; height: number } | null {
+    if (!extent?.boundingBox) return null;
+    const { north, south, east, west } = extent.boundingBox;
+    const centerLat = extent.center?.lat ?? (north + south) / 2;
+    const milesPerLat = 69.0;
+    const milesPerLon = Math.cos((centerLat * Math.PI) / 180) * 69.172 || 69.172;
+    const height = Math.abs(north - south) * milesPerLat;
+    const width = Math.abs(east - west) * Math.abs(milesPerLon);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+    return {
+      width,
+      height
+    };
+  }
+
+  function deriveRadiusFromExtent(extent: MapExtentData | null): number | null {
+    if (!extent?.boundingBox) return null;
+    const { north, south, east, west } = extent.boundingBox;
+    const centerLat = extent.center?.lat ?? (north + south) / 2;
+    const milesPerLat = 69.0;
+    const milesPerLon = Math.cos((centerLat * Math.PI) / 180) * 69.172 || 69.172;
+    const latRadius = (Math.abs(north - south) * milesPerLat) / 2;
+    const lonRadius = (Math.abs(east - west) * Math.abs(milesPerLon)) / 2;
+    const candidate = Math.max(latRadius, lonRadius);
+    return Number.isFinite(candidate) && candidate > 0 ? candidate : null;
+  }
+
+  function normalizeRadius(value: unknown, fallback: number): number {
+    const numeric = Number(value);
+    const base = Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+    const clamped = Math.max(base, 0.25);
+    return Number(clamped.toFixed(2));
+  }
+
+  function formatNumericInput(value: unknown, fractionDigits = 6): string {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return '';
+    }
+    return numeric.toFixed(fractionDigits);
+  }
+
   function goToStep(target: number) {
     if (target < 0 || target >= steps.length) return;
     if (target > currentStep && !canAdvance) return;
@@ -133,8 +218,12 @@
     if (parts.length) {
       addressSearch = parts.join(', ');
     }
-    latitudeInput = plan.location.latitude?.toString() ?? latitudeInput;
-    longitudeInput = plan.location.longitude?.toString() ?? longitudeInput;
+    const latValue = formatNumericInput(plan.location.latitude, 6);
+    const lonValue = formatNumericInput(plan.location.longitude, 6);
+    latitudeInput = latValue || latitudeInput;
+    longitudeInput = lonValue || longitudeInput;
+    info = 'Using project location coordinates.';
+    error = null;
     console.log('[PlanMarketingModal] Using plan location', {
       latitudeInput,
       longitudeInput
@@ -144,6 +233,16 @@
   function clearCoordinates() {
     latitudeInput = '';
     longitudeInput = '';
+    info = null;
+    error = null;
+  }
+
+  function useExtentCenter() {
+    if (!extentAtOpen?.center) return;
+    latitudeInput = formatNumericInput(extentAtOpen.center.lat, 6);
+    longitudeInput = formatNumericInput(extentAtOpen.center.lon, 6);
+    info = 'Using map view center coordinates.';
+    error = null;
   }
 
   async function geocodeFromAddress() {
@@ -223,10 +322,8 @@
       return;
     }
 
-    if (!radiusMiles || radiusMiles <= 0) {
-      error = 'Enter a valid radius in miles.';
-      return;
-    }
+    const extentForRun = extentAtOpen ?? mapExtent;
+    radiusMiles = normalizeRadius(radiusMiles, deriveRadiusFromExtent(extentForRun) ?? 5);
 
     isLoading = true;
     info = 'Discovering candidate addresses...';
@@ -237,20 +334,30 @@
         throw new Error('Provide latitude & longitude or a searchable address.');
       }
 
-      const boundingBox = computeBoundingBox(resolved.lat, resolved.lon, radiusMiles);
+      let boundingBox =
+        extentForRun?.boundingBox ??
+        computeBoundingBox(resolved.lat, resolved.lon, radiusMiles);
+
+      if (!boundingBox) {
+        throw new Error('Unable to determine map bounds. Zoom the map or enter coordinates.');
+      }
 
       const response = await planService.discoverMarketingAddresses(plan.id, {
         boundingBox,
         radiusMiles,
         center: resolved,
         options: {
-          advancedOptions
+          advancedOptions,
+          viewExtent: extentForRun ?? { center: resolved, boundingBox }
         }
       });
 
       results = response.addresses;
       summary = response.summary;
-      info = `Mapped ${results.length} address candidates.`;
+      const runtimeSpan = computeSpanMiles(extentForRun ?? { center: resolved, boundingBox });
+      info = runtimeSpan
+        ? `Mapped ${results.length} address candidates across approximately ${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles.`
+        : `Mapped ${results.length} address candidates for the current view.`;
 
       await fetchUpdatedPlan();
     } catch (err: any) {
@@ -320,7 +427,12 @@
     <div class="modal-header">
       <h2>📣 Find Addresses - {plan.name}</h2>
       <div class="header-actions">
-        <button class="btn-tertiary mini" type="button" on:click={usePlanLocation} disabled={isLoading}>
+        <button
+          class="btn-tertiary mini"
+          type="button"
+          on:click={usePlanLocation}
+          disabled={isLoading || !plan.location}
+        >
           Use plan location
         </button>
         <button class="close-btn" type="button" on:click={closeModal} aria-label="Close marketing wizard">
@@ -399,6 +511,11 @@
             </div>
           </div>
           <div class="support-actions">
+        {#if extentAtOpen?.center}
+          <button type="button" class="btn-tertiary" on:click={useExtentCenter} disabled={isLoading}>
+            Use map center
+          </button>
+        {/if}
             <button type="button" class="btn-tertiary" on:click={clearCoordinates} disabled={isLoading}>
               Clear coordinates
             </button>
@@ -411,6 +528,17 @@
               Resolve coordinates from address
             </button>
           </div>
+      {#if extentAtOpen?.boundingBox}
+        <div class="extent-summary">
+          <span>
+            Map bounds: lat {formatCoord(extentAtOpen.boundingBox.south, 4)} → {formatCoord(extentAtOpen.boundingBox.north, 4)},
+            lon {formatCoord(extentAtOpen.boundingBox.west, 4)} → {formatCoord(extentAtOpen.boundingBox.east, 4)}
+          </span>
+          {#if extentSpanMiles}
+            <span>Approx. span: {extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} mi</span>
+          {/if}
+        </div>
+      {/if}
         </section>
       {/if}
 
@@ -804,6 +932,15 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
+  }
+
+  .extent-summary {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .options-grid {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { get } from 'svelte/store';
   import { mapContext } from './mapContext';
   import type { MapModuleMode } from './MapCapabilities';
@@ -15,6 +15,7 @@
   let mapState: MapLayerState = get(mapContext);
 
   let unsubscribe: (() => void) | undefined;
+  const dispatch = createEventDispatcher();
 
   const buildUrl = (state: MapLayerState = mapState) => {
     const params = new URLSearchParams();
@@ -89,6 +90,8 @@
     if (type === 'request-state') {
       const replyTarget = (event.source as Window) || iframeWindow;
       postStateToIframe(replyTarget);
+    } else if (type === 'view-extent' && event.data?.payload) {
+      dispatch('viewExtent', event.data.payload);
     }
   };
 
