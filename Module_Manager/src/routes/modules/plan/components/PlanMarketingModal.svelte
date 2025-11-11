@@ -18,10 +18,18 @@
 
   export let mapExtent: MapExtentData | null = null;
 
-const extentAtOpen = cloneMapExtent(mapExtent);
+let extentAtOpen: MapExtentData | null = null;
 
-let latestExtent: MapExtentData | null = extentAtOpen;
-$: latestExtent = mapExtent ? cloneMapExtent(mapExtent) : extentAtOpen;
+let latestExtent: MapExtentData | null = null;
+$: {
+  // Always use current mapExtent when available, otherwise keep existing extentAtOpen
+  if (mapExtent) {
+    extentAtOpen = cloneMapExtent(mapExtent);
+    latestExtent = cloneMapExtent(mapExtent);
+  } else if (extentAtOpen) {
+    latestExtent = extentAtOpen;
+  }
+}
 $: extentSpanMiles = computeSpanMiles(latestExtent);
 
   type Summary = {
@@ -141,8 +149,32 @@ let results: PlanMarketingAddress[] = [];
 
   onMount(() => {
     console.log('[PlanMarketingModal] Wizard opened', { planId: plan?.id, planName: plan?.name });
-    currentStep = results.length ? 2 : 0;
+    // Reset wizard state
+    currentStep = 0;
     results = [];
+    summary = null;
+    error = null;
+    info = null;
+    isLoading = false;
+    // Reset extent to current map extent
+    if (mapExtent) {
+      extentAtOpen = cloneMapExtent(mapExtent);
+      latestExtent = cloneMapExtent(mapExtent);
+    }
+    // Reset coordinates to use current map extent or plan location
+    const extent = latestExtent ?? extentAtOpen;
+    if (extent?.center) {
+      latitudeInput = formatNumericInput(extent.center.lat, 6);
+      longitudeInput = formatNumericInput(extent.center.lon, 6);
+    } else if (plan.location?.latitude && plan.location?.longitude) {
+      latitudeInput = formatNumericInput(plan.location.latitude, 6);
+      longitudeInput = formatNumericInput(plan.location.longitude, 6);
+    }
+    // Reset radius to derived value from extent
+    const derivedRadius = deriveRadiusFromExtent(extent);
+    if (derivedRadius !== null) {
+      radiusMiles = normalizeRadius(derivedRadius, 5);
+    }
     initializeAlgorithms();
   });
 

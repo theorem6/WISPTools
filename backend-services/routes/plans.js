@@ -1699,12 +1699,30 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Plan not found' });
     }
     
-    const [featureResult, towerResult, sectorResult, cpeResult, equipmentResult] = await Promise.all([
-      PlanLayerFeature.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
-      UnifiedSite.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
-      UnifiedSector.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
-      UnifiedCPE.deleteMany({ tenantId: req.tenantId, planId: req.params.id }),
-      NetworkEquipment.deleteMany({ tenantId: req.tenantId, planId: req.params.id })
+    const planIdString = req.params.id;
+    
+    const [featureResult, towerResult, sectorResult, cpeResult, equipmentResult, customerResult] = await Promise.all([
+      PlanLayerFeature.deleteMany({ tenantId: req.tenantId, planId: planIdString }),
+      UnifiedSite.deleteMany({ tenantId: req.tenantId, planId: planIdString }),
+      UnifiedSector.deleteMany({ tenantId: req.tenantId, planId: planIdString }),
+      UnifiedCPE.deleteMany({ tenantId: req.tenantId, planId: planIdString }),
+      NetworkEquipment.deleteMany({ tenantId: req.tenantId, planId: planIdString }),
+      // Delete customer prospects created from this plan's marketing leads
+      (async () => {
+        try {
+          const Customer = require('../models/customer');
+          const result = await Customer.deleteMany({
+            tenantId: req.tenantId,
+            associatedPlanId: planIdString,
+            leadSource: 'plan-marketing',
+            serviceStatus: 'prospect'
+          });
+          return result;
+        } catch (err) {
+          console.error('Error deleting customer prospects:', err);
+          return { deletedCount: 0 };
+        }
+      })()
     ]);
 
     res.json({
@@ -1715,7 +1733,8 @@ router.delete('/:id', async (req, res) => {
         sites: towerResult.deletedCount || 0,
         sectors: sectorResult.deletedCount || 0,
         cpe: cpeResult.deletedCount || 0,
-        equipment: equipmentResult.deletedCount || 0
+        equipment: equipmentResult.deletedCount || 0,
+        customers: customerResult.deletedCount || 0
       }
     });
   } catch (error) {

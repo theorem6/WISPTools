@@ -205,6 +205,125 @@ export class CoverageMapController {
     }
   }
 
+  public async centerMapOnLocation(lat: number, lon: number, zoom?: number): Promise<void> {
+    if (!this.mapView || !this.mapReady) {
+      console.warn('[CoverageMap] Map not ready for centering');
+      return;
+    }
+
+    try {
+      await this.mapView.when();
+      const targetZoom = zoom ?? this.mapView.zoom ?? 12;
+      
+      await this.mapView.goTo(
+        {
+          center: [lon, lat],
+          zoom: targetZoom
+        },
+        {
+          animate: true,
+          duration: 1000
+        }
+      );
+      console.log('[CoverageMap] Map centered on location:', lat, lon);
+    } catch (error: any) {
+      if (error?.name === 'view:goto-interrupted') {
+        console.log('[CoverageMap] Map centering interrupted by new data load (expected)');
+        return;
+      }
+      console.warn('[CoverageMap] Map centering failed:', error);
+    }
+  }
+
+  public async centerMapOnFeatures(features: PlanLayerFeature[]): Promise<void> {
+    if (!this.mapView || !this.mapReady || !features || features.length === 0) {
+      return;
+    }
+
+    try {
+      await this.mapView.when();
+      
+      const coordinates: Array<{ lat: number; lon: number }> = [];
+      
+      for (const feature of features) {
+        if (feature.geometry?.type === 'Point' && feature.geometry.coordinates) {
+          const [lon, lat] = feature.geometry.coordinates;
+          if (typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon)) {
+            coordinates.push({ lat, lon });
+          }
+        } else if (feature.geometry?.type === 'Polygon' && feature.geometry.coordinates) {
+          // Get center of polygon
+          const rings = feature.geometry.coordinates;
+          if (rings && rings.length > 0 && rings[0].length > 0) {
+            let sumLat = 0;
+            let sumLon = 0;
+            let count = 0;
+            for (const ring of rings) {
+              for (const coord of ring) {
+                const [lon, lat] = coord;
+                if (typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon)) {
+                  sumLat += lat;
+                  sumLon += lon;
+                  count++;
+                }
+              }
+            }
+            if (count > 0) {
+              coordinates.push({ lat: sumLat / count, lon: sumLon / count });
+            }
+          }
+        }
+      }
+
+      if (coordinates.length === 0) {
+        return;
+      }
+
+      // Calculate bounding box
+      const lats = coordinates.map(c => c.lat);
+      const lons = coordinates.map(c => c.lon);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLon = Math.min(...lons);
+      const maxLon = Math.max(...lons);
+
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLon = (minLon + maxLon) / 2;
+
+      // Calculate zoom level based on bounding box
+      const latSpan = maxLat - minLat;
+      const lonSpan = maxLon - minLon;
+      const maxSpan = Math.max(latSpan, lonSpan);
+      
+      let targetZoom = 12;
+      if (maxSpan > 1) targetZoom = 8;
+      else if (maxSpan > 0.5) targetZoom = 9;
+      else if (maxSpan > 0.25) targetZoom = 10;
+      else if (maxSpan > 0.1) targetZoom = 11;
+      else if (maxSpan > 0.05) targetZoom = 12;
+      else if (maxSpan > 0.01) targetZoom = 13;
+      else targetZoom = 14;
+
+      await this.mapView.goTo(
+        {
+          center: [centerLon, centerLat],
+          zoom: targetZoom
+        },
+        {
+          animate: true,
+          duration: 1000
+        }
+      );
+      console.log('[CoverageMap] Map centered on features:', coordinates.length, 'features');
+    } catch (error: any) {
+      if (error?.name === 'view:goto-interrupted') {
+        console.log('[CoverageMap] Map centering interrupted by new data load (expected)');
+        return;
+      }
+      console.warn('[CoverageMap] Map centering on features failed:', error);
+    }
+  }
+
   public async renderPlanDrafts(features?: PlanLayerFeature[]): Promise<void> {
     if (!this.planDraftLayer || !this.mapView) return;
 

@@ -621,25 +621,41 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   function handleSharedMapMessage(event: MessageEvent) {
     const { source, type, payload } = event.data || {};
-    if (source !== 'shared-map' || type !== 'state-update') return;
+    
+    if (source === 'shared-map' && type === 'state-update') {
+      const state = payload?.state ?? {};
 
-    const state = payload?.state ?? {};
+      sharedMapMode = payload?.mode ?? state.mode ?? null;
+      sharedCapabilities = state.capabilities ?? sharedCapabilities;
+      externalPlanFeatures = state.stagedFeatures ?? [];
+      externalPlanSummary = state.stagedSummary ?? null;
+      externalProductionHardware = state.productionHardware ?? [];
+      sharedMapStateTimestamp = state.lastUpdated ? new Date(state.lastUpdated) : null;
 
-    sharedMapMode = payload?.mode ?? state.mode ?? null;
-    sharedCapabilities = state.capabilities ?? sharedCapabilities;
-    externalPlanFeatures = state.stagedFeatures ?? [];
-    externalPlanSummary = state.stagedSummary ?? null;
-    externalProductionHardware = state.productionHardware ?? [];
-    sharedMapStateTimestamp = state.lastUpdated ? new Date(state.lastUpdated) : null;
+      const activePlanIdFromState = state.activePlanId ?? null;
+      if (activePlanIdFromState && activePlanIdFromState !== planId) {
+        planId = activePlanIdFromState;
+      }
+      sharedActivePlanId = activePlanIdFromState;
 
-    const activePlanIdFromState = state.activePlanId ?? null;
-    if (activePlanIdFromState && activePlanIdFromState !== planId) {
-      planId = activePlanIdFromState;
+      const inboundMarketing = state.activePlanMarketing?.addresses ?? [];
+      marketingLeads = Array.isArray(inboundMarketing) ? inboundMarketing : [];
+    } else if (source === 'shared-map' && type === 'center-map') {
+      // Handle center-map message from parent
+      const { lat, lon, zoom, features } = payload || {};
+      
+      if (controller && controller.isReady()) {
+        if (features && Array.isArray(features) && features.length > 0) {
+          controller.centerMapOnFeatures(features).catch(err => {
+            console.warn('[CoverageMap] Failed to center on features:', err);
+          });
+        } else if (typeof lat === 'number' && typeof lon === 'number' && Number.isFinite(lat) && Number.isFinite(lon)) {
+          controller.centerMapOnLocation(lat, lon, zoom).catch(err => {
+            console.warn('[CoverageMap] Failed to center on location:', err);
+          });
+        }
+      }
     }
-    sharedActivePlanId = activePlanIdFromState;
-
-    const inboundMarketing = state.activePlanMarketing?.addresses ?? [];
-    marketingLeads = Array.isArray(inboundMarketing) ? inboundMarketing : [];
   }
   
   function handleMapRightClick(event: CustomEvent) {
