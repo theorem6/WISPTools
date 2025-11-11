@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+  import { browser } from '$app/environment';
   import { get } from 'svelte/store';
   import { mapContext } from './mapContext';
   import type { MapModuleMode } from './MapCapabilities';
@@ -16,6 +17,22 @@
 
   let unsubscribe: (() => void) | undefined;
   const dispatch = createEventDispatcher();
+
+  const coverageMapHost = (() => {
+    if (!browser) return '';
+
+    const envHost = import.meta.env.VITE_COVERAGE_MAP_HOST;
+    if (envHost && typeof envHost === 'string') {
+      return envHost.replace(/\/$/, '');
+    }
+
+    const origin = window.location.origin;
+    if (origin.includes('wisptools.io')) {
+      return 'https://wisptools-production.web.app';
+    }
+
+    return origin;
+  })();
 
   const buildUrl = (state: MapLayerState = mapState) => {
     const params = new URLSearchParams();
@@ -35,7 +52,8 @@
     }
 
     const query = params.toString();
-    return query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
+    const path = query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
+    return coverageMapHost ? `${coverageMapHost}${path}` : path;
   };
 
   const buildNavigationKey = (state: MapLayerState = mapState) => {
