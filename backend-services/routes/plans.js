@@ -431,91 +431,107 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 
   try {
     const overpassQuery = buildOverpassQuery(boundingBox);
-    const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `data=${encodeURIComponent(overpassQuery)}`
-    });
-
-    if (!overpassResponse.ok) {
-      const details = await overpassResponse.text().catch(() => '');
-      throw new Error(`Overpass API returned ${overpassResponse.status}: ${details}`);
-    }
-
-    const overpassData = await overpassResponse.json();
-    const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
-
-    const seen = new Set();
-    const candidates = [];
-
-    for (const element of elements) {
-      const latitude =
-        toNumber(element.lat) ??
-        toNumber(element.center?.lat) ??
-        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
-      const longitude =
-        toNumber(element.lon) ??
-        toNumber(element.center?.lon) ??
-        (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
-
-      if (latitude === undefined || longitude === undefined) continue;
-
-      const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      candidates.push({
-        lat: latitude,
-        lon: longitude
+    
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+    
+    try {
+      const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `data=${encodeURIComponent(overpassQuery)}`,
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
-      if (candidates.length >= MAX_BUILDING_RESULTS) break;
-    }
-
-    const maxReverseGeocode =
-      toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
-    const reverseDelay =
-      toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
-
-    const addresses = [];
-    let geocodedCount = 0;
-
-    for (let index = 0; index < candidates.length; index += 1) {
-      const candidate = candidates[index];
-      if (geocodedCount < maxReverseGeocode) {
-        try {
-          if (geocodedCount > 0) {
-            await delay(reverseDelay);
-          }
-          const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
-          if (details) {
-            addresses.push({
-              ...details,
-              source: 'osm_buildings'
-            });
-            geocodedCount += 1;
-            continue;
-          }
-        } catch (error) {
-          console.warn('[MarketingDiscovery] Reverse geocode fallback failed:', error?.message || error);
-        }
+      if (!overpassResponse.ok) {
+        const details = await overpassResponse.text().catch(() => '');
+        throw new Error(`Overpass API returned ${overpassResponse.status}: ${details}`);
       }
 
-      addresses.push({
-        addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
-        latitude: candidate.lat,
-        longitude: candidate.lon,
-        country: 'US',
-        source: 'osm_buildings'
-      });
-    }
+      const overpassData = await overpassResponse.json();
+      const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
 
-    result.addresses = addresses;
-    result.stats.rawCandidates = candidates.length;
-    result.stats.geocoded = geocodedCount;
-    return result;
+      const seen = new Set();
+      const candidates = [];
+
+      for (const element of elements) {
+        const latitude =
+          toNumber(element.lat) ??
+          toNumber(element.center?.lat) ??
+          (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
+        const longitude =
+          toNumber(element.lon) ??
+          toNumber(element.center?.lon) ??
+          (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
+
+        if (latitude === undefined || longitude === undefined) continue;
+
+        const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        candidates.push({
+          lat: latitude,
+          lon: longitude
+        });
+
+        if (candidates.length >= MAX_BUILDING_RESULTS) break;
+      }
+
+      const maxReverseGeocode =
+        toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
+      const reverseDelay =
+        toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
+
+      const addresses = [];
+      let geocodedCount = 0;
+
+      for (let index = 0; index < candidates.length; index += 1) {
+        const candidate = candidates[index];
+        if (geocodedCount < maxReverseGeocode) {
+          try {
+            if (geocodedCount > 0) {
+              await delay(reverseDelay);
+            }
+            const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+            if (details) {
+              addresses.push({
+                ...details,
+                source: 'osm_buildings'
+              });
+              geocodedCount += 1;
+              continue;
+            }
+          } catch (error) {
+            console.warn('[MarketingDiscovery] Reverse geocode fallback failed:', error?.message || error);
+          }
+        }
+
+        addresses.push({
+          addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+          latitude: candidate.lat,
+          longitude: candidate.lon,
+          country: 'US',
+          source: 'osm_buildings'
+        });
+      }
+
+      result.addresses = addresses;
+      result.stats.rawCandidates = candidates.length;
+      result.stats.geocoded = geocodedCount;
+      return result;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Overpass API request timed out after 45 seconds');
+      }
+      throw fetchError;
+    }
   } catch (error) {
     const message =
       error?.message ||
@@ -558,7 +574,7 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     if (!response.ok) {
       const details = await response.text().catch(() => '');
       console.warn('[MarketingDiscovery] ArcGIS address points request failed', response.status, details);
-      return [];
+      return { addresses: [], error: `ArcGIS API returned ${response.status}` };
     }
 
     const payload = await response.json();
@@ -630,7 +646,7 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
     if (!response.ok) {
       const details = await response.text().catch(() => '');
       console.warn('[MarketingDiscovery] ArcGIS places request failed', response.status, details);
-      return [];
+      return { addresses: [], error: `ArcGIS API returned ${response.status}` };
     }
 
     const payload = await response.json();
@@ -1082,9 +1098,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
   } catch (error) {
     console.error('Error discovering marketing addresses:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       error: 'Failed to discover marketing addresses',
-      message: error.message
+      message: error.message || 'Unknown error occurred',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -1710,7 +1728,6 @@ router.delete('/:id', async (req, res) => {
       // Delete customer prospects created from this plan's marketing leads
       (async () => {
         try {
-          const Customer = require('../models/customer');
           const result = await Customer.deleteMany({
             tenantId: req.tenantId,
             associatedPlanId: planIdString,
