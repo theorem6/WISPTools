@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-  import { browser } from '$app/environment';
+  import { browser, version as appVersion } from '$app/environment';
   import { get } from 'svelte/store';
   import { mapContext } from './mapContext';
   import type { MapModuleMode } from './MapCapabilities';
@@ -51,6 +51,7 @@
       params.set('planId', planId);
     }
 
+    params.set('appVersion', appVersion ?? 'dev');
     const query = params.toString();
     const path = query ? `/modules/coverage-map?${query}` : '/modules/coverage-map';
     return coverageMapHost ? `${coverageMapHost}${path}` : path;
