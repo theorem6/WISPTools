@@ -990,73 +990,88 @@ router.post('/:id/marketing/discover', async (req, res) => {
     };
 
     if (algorithms.includes('osm_buildings')) {
-      const osmResult = await runOsmBuildingDiscovery({
-        boundingBox,
-        radiusMiles,
-        center: computedCenter,
-        advancedOptions
-      });
+      try {
+        const osmResult = await runOsmBuildingDiscovery({
+          boundingBox,
+          radiusMiles,
+          center: computedCenter,
+          advancedOptions
+        });
 
-      let produced = 0;
-      let geocoded = 0;
+        let produced = 0;
+        let geocoded = 0;
 
-      if (Array.isArray(osmResult.addresses)) {
-        for (const address of osmResult.addresses) {
-          produced += 1;
-          if (address.addressLine1) {
-            geocoded += 1;
+        if (Array.isArray(osmResult.addresses)) {
+          for (const address of osmResult.addresses) {
+            produced += 1;
+            if (address.addressLine1) {
+              geocoded += 1;
+            }
+            addAddressToCombined(address, 'osm_buildings');
           }
-          addAddressToCombined(address, 'osm_buildings');
         }
-      }
 
-      recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
+        recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
+      } catch (err) {
+        console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
+        recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
+      }
     }
 
     if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
-      const arcgisResult = await runArcgisAddressPointsDiscovery({
-        boundingBox,
-        center: computedCenter,
-        radiusMiles
-      });
+      try {
+        const arcgisResult = await runArcgisAddressPointsDiscovery({
+          boundingBox,
+          center: computedCenter,
+          radiusMiles
+        });
 
-      let produced = 0;
-      let geocoded = 0;
+        let produced = 0;
+        let geocoded = 0;
 
-      if (Array.isArray(arcgisResult.addresses)) {
-        for (const address of arcgisResult.addresses) {
-          produced += 1;
-          if (address.addressLine1) {
-            geocoded += 1;
+        if (Array.isArray(arcgisResult.addresses)) {
+          for (const address of arcgisResult.addresses) {
+            produced += 1;
+            if (address.addressLine1) {
+              geocoded += 1;
+            }
+            addAddressToCombined(address, 'arcgis_address_points');
           }
-          addAddressToCombined(address, 'arcgis_address_points');
         }
-      }
 
-      recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
+        recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
+      } catch (err) {
+        console.error('[MarketingDiscovery] ArcGIS Address Points Discovery failed:', err);
+        recordAlgorithmStats('arcgis_address_points', 0, 0, err.message || 'Unknown error');
+      }
     }
 
     if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
-      const arcgisPlacesResult = await runArcgisPlacesDiscovery({
-        boundingBox,
-        center: computedCenter,
-        radiusMiles
-      });
+      try {
+        const arcgisPlacesResult = await runArcgisPlacesDiscovery({
+          boundingBox,
+          center: computedCenter,
+          radiusMiles
+        });
 
-      let produced = 0;
-      let geocoded = 0;
+        let produced = 0;
+        let geocoded = 0;
 
-      if (Array.isArray(arcgisPlacesResult.addresses)) {
-        for (const address of arcgisPlacesResult.addresses) {
-          produced += 1;
-          if (address.addressLine1) {
-            geocoded += 1;
+        if (Array.isArray(arcgisPlacesResult.addresses)) {
+          for (const address of arcgisPlacesResult.addresses) {
+            produced += 1;
+            if (address.addressLine1) {
+              geocoded += 1;
+            }
+            addAddressToCombined(address, 'arcgis_places');
           }
-          addAddressToCombined(address, 'arcgis_places');
         }
-      }
 
-      recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
+        recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
+      } catch (err) {
+        console.error('[MarketingDiscovery] ArcGIS Places Discovery failed:', err);
+        recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
+      }
     }
 
     const geocodedCount = combinedAddresses.filter((addr) => !!addr.addressLine1).length;
