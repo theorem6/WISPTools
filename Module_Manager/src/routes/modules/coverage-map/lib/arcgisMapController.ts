@@ -204,7 +204,10 @@ export class CoverageMapController {
       import('@arcgis/core/geometry/support/webMercatorUtils.js')
     ]);
 
-    this.webMercatorUtils = webMercatorUtilsModule;
+    this.webMercatorUtils =
+      (webMercatorUtilsModule && 'default' in webMercatorUtilsModule
+        ? webMercatorUtilsModule.default
+        : webMercatorUtilsModule) ?? null;
 
     this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
     this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
