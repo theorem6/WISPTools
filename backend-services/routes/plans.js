@@ -342,8 +342,8 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const MAX_BUILDING_RESULTS = 150;
-const MAX_REVERSE_GEOCODE = 5; // Reduced from 15 to speed up requests
-const NOMINATIM_DELAY_MS = 1000; // Reduced from 1200ms to 1000ms
+const MAX_REVERSE_GEOCODE = 20; // Increased since ArcGIS is faster
+const NOMINATIM_DELAY_MS = 500; // Reduced delay since ArcGIS doesn't need rate limiting
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
@@ -362,7 +362,54 @@ const buildOverpassQuery = (bbox) => `
 out center meta;
 `;
 
+const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
+  if (!ARC_GIS_API_KEY) {
+    return null; // Fall back to Nominatim if no API key
+  }
+
+  try {
+    const params = new URLSearchParams({
+      f: 'json',
+      location: `${lon},${lat}`,
+      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal'
+    });
+
+    params.set('token', ARC_GIS_API_KEY);
+
+    const response = await fetch(`${ARCGIS_GEOCODER_URL}/reverseGeocode?${params.toString()}`);
+    
+    if (!response.ok) {
+      return null; // Fall back to Nominatim
+    }
+
+    const data = await response.json();
+    const address = data.address || {};
+
+    return {
+      addressLine1: address.Match_addr || address.Address || undefined,
+      addressLine2: undefined,
+      city: address.City || undefined,
+      state: address.Region || undefined,
+      postalCode: address.Postal || undefined,
+      country: address.CountryCode || 'US',
+      latitude: lat,
+      longitude: lon,
+      source: 'arcgis'
+    };
+  } catch (error) {
+    console.warn('[MarketingDiscovery] ArcGIS reverse geocode failed:', error?.message);
+    return null; // Fall back to Nominatim
+  }
+};
+
 const reverseGeocodeCoordinate = async (lat, lon) => {
+  // Try ArcGIS first (faster and better)
+  const arcgisResult = await reverseGeocodeCoordinateArcgis(lat, lon);
+  if (arcgisResult) {
+    return arcgisResult;
+  }
+
+  // Fall back to Nominatim if ArcGIS fails or isn't available
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
   const response = await fetch(url, {
     headers: {
@@ -513,7 +560,9 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         const candidate = candidates[index];
         if (geocodedCount < maxReverseGeocode) {
           try {
-            if (geocodedCount > 0) {
+            // ArcGIS is faster, so we can reduce delay or remove it entirely
+            if (geocodedCount > 0 && !ARC_GIS_API_KEY) {
+              // Only delay for Nominatim (OSM fallback)
               await delay(reverseDelay);
             }
             
@@ -527,7 +576,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
             if (details) {
               addresses.push({
                 ...details,
-                source: 'osm_buildings'
+                source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
               });
               geocodedCount += 1;
               continue;
@@ -943,10 +992,41 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// In-memory progress store (keyed by requestId)
+const progressStore = new Map();
+
+// GET /plans/:id/marketing/progress/:requestId - Get progress for a discovery request
+router.get('/:id/marketing/progress/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  const progress = progressStore.get(requestId);
+  
+  if (!progress) {
+    return res.status(404).json({ error: 'Progress not found' });
+  }
+  
+  res.json(progress);
+});
+
 // POST /plans/:id/marketing/discover - Find marketing addresses within area
 router.post('/:id/marketing/discover', async (req, res) => {
   const requestStartTime = Date.now();
   const requestId = `${req.params.id}-${Date.now()}`;
+  
+  // Initialize progress
+  progressStore.set(requestId, {
+    requestId,
+    planId: req.params.id,
+    progress: 0,
+    step: 'Initializing',
+    startedAt: new Date().toISOString(),
+    details: {}
+  });
+  
+  // Clean up progress after 5 minutes
+  setTimeout(() => {
+    progressStore.delete(requestId);
+  }, 5 * 60 * 1000);
+  
   console.log('[MarketingDiscovery] Request received', { 
     requestId,
     planId: req.params.id, 
@@ -1013,7 +1093,22 @@ router.post('/:id/marketing/discover', async (req, res) => {
       currentStep = step;
       totalProgress = progress;
       const elapsed = Date.now() - requestStartTime;
-      console.log(`[MarketingDiscovery] Progress [${progress}%] ${step}`, { 
+      
+      // Update progress store
+      progressStore.set(requestId, {
+        requestId,
+        planId: req.params.id,
+        progress: Math.round(progress),
+        step,
+        startedAt: new Date(requestStartTime).toISOString(),
+        elapsed: elapsed,
+        details: {
+          ...details,
+          elapsedMs: elapsed
+        }
+      });
+      
+      console.log(`[MarketingDiscovery] Progress [${Math.round(progress)}%] ${step}`, { 
         requestId,
         elapsed: `${elapsed}ms`,
         ...details 
@@ -1197,6 +1292,19 @@ router.post('/:id/marketing/discover', async (req, res) => {
       geocodedCount 
     });
     
+    // Mark progress as complete
+    progressStore.set(requestId, {
+      ...progressStore.get(requestId),
+      progress: 100,
+      step: 'Completed',
+      completed: true,
+      completedAt: new Date().toISOString(),
+      result: {
+        totalAddresses: combinedAddresses.length,
+        geocodedCount
+      }
+    });
+    
     if (!res.headersSent) {
       res.json({
         summary: {
@@ -1208,7 +1316,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
           algorithmsUsed: algorithms,
           algorithmStats
         },
-        addresses: combinedAddresses
+        addresses: combinedAddresses,
+        requestId // Include requestId in response
       });
     } else {
       console.warn('[MarketingDiscovery] Response already sent, skipping duplicate response');
@@ -1216,6 +1325,18 @@ router.post('/:id/marketing/discover', async (req, res) => {
   } catch (error) {
     const requestDuration = Date.now() - requestStartTime;
     updateProgress('Request failed', 0, { error: error.message });
+    
+    // Mark progress as failed
+    progressStore.set(requestId, {
+      ...progressStore.get(requestId),
+      progress: 0,
+      step: 'Failed',
+      completed: true,
+      failed: true,
+      error: error.message,
+      completedAt: new Date().toISOString()
+    });
+    
     console.error('[MarketingDiscovery] Error discovering marketing addresses:', error);
     console.error('[MarketingDiscovery] Error stack:', error.stack);
     console.error('[MarketingDiscovery] Request failed after', { 
@@ -1227,7 +1348,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
       res.status(500).json({
         error: 'Failed to discover marketing addresses',
         message: error.message || 'Unknown error occurred',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        requestId
       });
     } else {
       console.warn('[MarketingDiscovery] Response already sent, skipping error response');
