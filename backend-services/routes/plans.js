@@ -465,7 +465,7 @@ async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
   }
 }
 
-function extractBuildingCandidates(elements, { precision = 20000, sourceLabel = 'osm_primary' }) {
+function extractBuildingCandidates(elements, { precision = 100000, sourceLabel = 'osm_primary' }) {
   const seen = new Map();
   const candidates = [];
 
@@ -540,7 +540,7 @@ function extractBuildingCandidates(elements, { precision = 20000, sourceLabel = 
   return candidates;
 }
 
-function mergeCandidateSets(primary, secondary, precision = 20000) {
+function mergeCandidateSets(primary, secondary, precision = 100000) {
   const merged = new Map();
   const addCandidate = (candidate) => {
     const roundedLat = Math.round(candidate.lat * precision) / precision;
