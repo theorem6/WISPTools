@@ -677,6 +677,10 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
       return null;
     }
 
+    const location = data.location || {};
+    const resolvedLat = toNumber(location?.y);
+    const resolvedLon = toNumber(location?.x);
+
     return {
       addressLine1: addressLine1,
       addressLine2: undefined,
@@ -684,8 +688,8 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
       state: address.Region || address.State || undefined,
       postalCode: address.Postal || undefined,
       country: address.CountryCode || 'US',
-      latitude: lat,
-      longitude: lon,
+      latitude: resolvedLat ?? lat,
+      longitude: resolvedLon ?? lon,
       source: 'arcgis'
     };
   } catch (error) {
