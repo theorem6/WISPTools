@@ -1307,9 +1307,10 @@ export class CoverageMapController {
     }
 
     if (!graphics.length) {
-      // No graphics to fit - only center on US if we have no plan features
-      // If we have plan features (even if not visible), preserve the current view
-      if (this.planDraftFeatures.length === 0) {
+      // No graphics to fit - only center on US if we have no plan features AND no marketing leads
+      // If we have plan features or marketing leads (even if not visible), preserve the current view
+      const hasMarketingLeads = this.marketingLeads.length > 0;
+      if (this.planDraftFeatures.length === 0 && !hasMarketingLeads) {
         await this.centerOnUSOrLastDeployedPlan();
       }
       // Otherwise, preserve current map view (don't recenter)
