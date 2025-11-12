@@ -17,7 +17,8 @@ module.exports = {
         PORT: 3001,
         HOST: '0.0.0.0',
         FIREBASE_PROJECT_ID: 'wisptools-production',
-        FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json'
+        FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json',
+        ARCGIS_API_KEY: 'Aezlf1N3Z568EwL9'
       },
       error_file: '/home/david/.pm2/logs/main-api-error.log',
       out_file: '/home/david/.pm2/logs/main-api-out.log',
@@ -41,7 +42,8 @@ module.exports = {
         PORT: 3002,
         HOST: '0.0.0.0',
         FIREBASE_PROJECT_ID: 'wisptools-production',
-        FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json'
+        FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json',
+        ARCGIS_API_KEY: 'Aezlf1N3Z568EwL9'
       },
       error_file: '/home/david/.pm2/logs/epc-api-error.log',
       out_file: '/home/david/.pm2/logs/epc-api-out.log',

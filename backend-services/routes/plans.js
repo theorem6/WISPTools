@@ -545,9 +545,9 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       const reverseGeocodeStartTime = Date.now();
       const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
       const maxReverseGeocode =
-        toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
+        toNumber(advancedOptions?.reverse?.batchSize) ?? (ARC_GIS_API_KEY ? MAX_REVERSE_GEOCODE : 5); // Reduce to 5 if using Nominatim
       const reverseDelay =
-        toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
+        toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? (ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS); // No delay for ArcGIS
 
       for (let index = 0; index < candidates.length; index += 1) {
         if (progressCallback && geocodedCount < maxReverseGeocode) {
@@ -560,16 +560,16 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         const candidate = candidates[index];
         if (geocodedCount < maxReverseGeocode) {
           try {
-            // ArcGIS is faster, so we can reduce delay or remove it entirely
+            // Only delay for Nominatim (OSM fallback) - ArcGIS doesn't need delays
             if (geocodedCount > 0 && !ARC_GIS_API_KEY) {
-              // Only delay for Nominatim (OSM fallback)
               await delay(reverseDelay);
             }
             
-            // Add timeout to individual reverse geocode calls
+            // Add timeout to individual reverse geocode calls (shorter for Nominatim)
+            const timeoutMs = ARC_GIS_API_KEY ? REVERSE_GEOCODE_TIMEOUT : 5000; // 5s for Nominatim, 10s for ArcGIS
             const geocodePromise = reverseGeocodeCoordinate(candidate.lat, candidate.lon);
             const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Reverse geocode timeout')), REVERSE_GEOCODE_TIMEOUT)
+              setTimeout(() => reject(new Error('Reverse geocode timeout')), timeoutMs)
             );
             
             const details = await Promise.race([geocodePromise, timeoutPromise]);
@@ -583,6 +583,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
             }
           } catch (error) {
             console.warn('[MarketingDiscovery] Reverse geocode failed:', error?.message || error);
+            // Continue to next candidate instead of breaking
           }
         }
 
