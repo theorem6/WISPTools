@@ -24,8 +24,8 @@
   let formData = {
     name: '',
     type: (initialType || 'tower') as TowerSite['type'],
-    latitude: initialLatitude || 40.7128,
-    longitude: initialLongitude || -74.0060,
+    latitude: initialLatitude || 0,
+    longitude: initialLongitude || 0,
     address: '',
     city: '',
     state: '',

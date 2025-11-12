@@ -79,8 +79,8 @@
     formData.name = site.name || '';
     formData.type = site.type || 'tower';
     formData.status = site.status || 'active';
-    formData.latitude = site.location?.latitude || 40.7128;
-    formData.longitude = site.location?.longitude || -74.0060;
+    formData.latitude = site.location?.latitude || 0;
+    formData.longitude = site.location?.longitude || 0;
     formData.address = site.location?.address || '';
     formData.city = site.location?.city || '';
     formData.state = site.location?.state || '';
@@ -126,8 +126,8 @@
       name: '',
       type: 'tower',
       status: 'active',
-      latitude: 40.7128,
-      longitude: -74.0060,
+      latitude: 0,
+      longitude: 0,
       address: '',
       city: '',
       state: '',

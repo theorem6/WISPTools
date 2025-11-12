@@ -99,8 +99,8 @@ export class EnhancedPCIArcGISMapper {
       this.mapView = new MapView({
         container: containerId,
         map: this.map,
-        center: [-74.5, 40], // Default to New York area
-        zoom: 10,
+        center: [-98.5795, 39.8283], // Geographic center of contiguous US
+        zoom: 5,
         ui: {
           components: [] // Remove default UI components
         }

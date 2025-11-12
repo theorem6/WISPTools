@@ -15,8 +15,8 @@ export let planId: string | null = null;
   
   let formData = {
     name: '',
-    latitude: initialLatitude || 40.7128,
-    longitude: initialLongitude || -74.0060,
+    latitude: initialLatitude || 0,
+    longitude: initialLongitude || 0,
     address: '',
     city: '',
     state: '',

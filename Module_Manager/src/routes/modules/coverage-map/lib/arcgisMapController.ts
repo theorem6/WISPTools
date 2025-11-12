@@ -235,6 +235,23 @@ export class CoverageMapController {
     }
   }
 
+  private async centerOnUSOrLastDeployedPlan(): Promise<void> {
+    // Center on contiguous US by default
+    try {
+      await this.mapView.when();
+      await this.mapView.goTo({
+        center: [-98.5795, 39.8283], // Geographic center of contiguous US
+        zoom: 5
+      }, {
+        animate: false
+      });
+      this.hasPerformedInitialFit = true;
+      console.log('[CoverageMap] Centered on US (no objects to display)');
+    } catch (err) {
+      console.warn('[CoverageMap] Failed to center on US:', err);
+    }
+  }
+
   public async centerMapOnFeatures(features: PlanLayerFeature[]): Promise<void> {
     if (!this.mapView || !this.mapReady || !features || features.length === 0) {
       return;
@@ -1259,6 +1276,8 @@ export class CoverageMapController {
     }
 
     if (!graphics.length) {
+      // No graphics to fit - center on US or last deployed plan
+      await this.centerOnUSOrLastDeployedPlan();
       return;
     }
 

@@ -61,8 +61,8 @@ export class PCIArcGISMapper {
     this.mapView = new MapView({
       container,
       map: this.map,
-      center: [-74.5, 40], // Default to New York area
-      zoom: isMobile ? 11 : 10, // Slightly more zoomed on mobile
+      center: [-98.5795, 39.8283], // Geographic center of contiguous US
+      zoom: isMobile ? 6 : 5, // Show most of US
       ui: {
         components: [] // Remove default UI components, we'll add custom ones
       },

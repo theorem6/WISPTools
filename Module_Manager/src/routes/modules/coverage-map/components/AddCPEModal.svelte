@@ -22,8 +22,8 @@
   let formData = {
     siteId: '',
     name: '',
-    latitude: initialLatitude || 40.7128,
-    longitude: initialLongitude || -74.0060,
+    latitude: initialLatitude || 0,
+    longitude: initialLongitude || 0,
     address: '',
     azimuth: 0,
     beamwidth: 30,

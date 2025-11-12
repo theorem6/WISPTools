@@ -267,7 +267,9 @@ let results: PlanMarketingAddress[] = [];
     const latRadius = (Math.abs(north - south) * milesPerLat) / 2;
     const lonRadius = (Math.abs(east - west) * Math.abs(milesPerLon)) / 2;
     const candidate = Math.max(latRadius, lonRadius);
-    return Number.isFinite(candidate) && candidate > 0 ? candidate : null;
+    // Enforce 50 mile maximum radius
+    const clamped = Math.min(candidate, 50);
+    return Number.isFinite(clamped) && clamped > 0 ? clamped : null;
   }
 
   function normalizeRadius(value: unknown, fallback: number): number {
@@ -421,7 +423,9 @@ let results: PlanMarketingAddress[] = [];
     }
 
     const extentForRun = latestExtent ?? extentAtOpen;
-    radiusMiles = normalizeRadius(radiusMiles, deriveRadiusFromExtent(extentForRun) ?? 5);
+    // Use bounding box from map extent - enforce 50 mile max
+    const derivedRadius = deriveRadiusFromExtent(extentForRun) ?? 5;
+    radiusMiles = Math.min(normalizeRadius(radiusMiles, derivedRadius), 50);
 
     isLoading = true;
     info = 'Discovering candidate addresses...';
@@ -432,12 +436,28 @@ let results: PlanMarketingAddress[] = [];
         throw new Error('Provide latitude & longitude or a searchable address.');
       }
 
-      let boundingBox =
-        extentForRun?.boundingBox ??
-        computeBoundingBox(resolved.lat, resolved.lon, radiusMiles);
-
+      // ALWAYS use bounding box from map extent, not computed radius
+      let boundingBox = extentForRun?.boundingBox;
+      
       if (!boundingBox) {
-        throw new Error('Unable to determine map bounds. Zoom the map or enter coordinates.');
+        // Fallback: compute bounding box but enforce 50 mile max
+        const maxRadius = Math.min(radiusMiles, 50);
+        boundingBox = computeBoundingBox(resolved.lat, resolved.lon, maxRadius);
+      }
+      
+      if (!boundingBox) {
+        throw new Error('Unable to determine map bounds. Please zoom the map to define the search area.');
+      }
+      
+      // Verify the bounding box doesn't exceed 50 miles from center
+      const boxSpan = computeSpanMiles({ center: resolved, boundingBox });
+      if (boxSpan) {
+        const maxSpan = Math.max(boxSpan.width, boxSpan.height);
+        if (maxSpan / 2 > 50) {
+          error = 'Search area too large. Please zoom in so the map shows an area within 50 miles from center.';
+          isLoading = false;
+          return;
+        }
       }
 
       const response = await planService.discoverMarketingAddresses(plan.id, {

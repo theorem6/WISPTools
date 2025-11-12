@@ -1,6 +1,5 @@
 <script lang="ts">
-  const DEFAULT_LATITUDE = 40.7128;
-  const DEFAULT_LONGITUDE = -74.0060;
+  // No default coordinates - map will center on US or last deployed plan
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
@@ -69,8 +68,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showSiteEditModal = false;
   let contextMenuX = 0;
   let contextMenuY = 0;
-  let contextMenuLat = DEFAULT_LATITUDE;
-  let contextMenuLon = DEFAULT_LONGITUDE;
+  let contextMenuLat: number | null = null;
+  let contextMenuLon: number | null = null;
   let selectedSiteForSector: TowerSite | null = null;
   let selectedSiteForBackhaul: TowerSite | null = null;
   let selectedSiteForInventory: TowerSite | null = null;
@@ -941,8 +940,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   function handleAddSite() {
     planDraftForSiteEdit = null;
-    contextMenuLat = DEFAULT_LATITUDE;
-    contextMenuLon = DEFAULT_LONGITUDE;
+    // Use map center if available, otherwise null
+    contextMenuLat = mapComponent?.mapView?.center?.latitude ?? null;
+    contextMenuLon = mapComponent?.mapView?.center?.longitude ?? null;
     initialSiteType = null;
     showAddSiteModal = true;
   }
@@ -955,8 +955,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   function handleAddCPE() {
     planDraftForSiteEdit = null;
-    contextMenuLat = DEFAULT_LATITUDE;
-    contextMenuLon = DEFAULT_LONGITUDE;
+    // Use map center if available, otherwise null
+    contextMenuLat = mapComponent?.mapView?.center?.latitude ?? null;
+    contextMenuLon = mapComponent?.mapView?.center?.longitude ?? null;
     showAddCPEModal = true;
   }
   
