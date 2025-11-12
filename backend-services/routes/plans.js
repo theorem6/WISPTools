@@ -379,10 +379,19 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
     const response = await fetch(`${ARCGIS_GEOCODER_URL}/reverseGeocode?${params.toString()}`);
     
     if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', response.status, errorText.substring(0, 200));
       return null; // Fall back to Nominatim
     }
 
     const data = await response.json();
+    
+    // Check for ArcGIS API errors
+    if (data.error) {
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode API error:', data.error.code, data.error.message);
+      return null; // Fall back to Nominatim
+    }
+    
     const address = data.address || {};
 
     return {
