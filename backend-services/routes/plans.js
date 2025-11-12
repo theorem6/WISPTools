@@ -390,10 +390,12 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
   }
 
   try {
+    // FTTH approach: Request specific fields for residential street addresses
     const params = new URLSearchParams({
       f: 'json',
       location: `${lon},${lat}`,
-      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal'
+      outFields: 'Address,City,Postal,Region,State,CountryCode',
+      maxLocations: '1'
     });
 
     params.set('token', ARC_GIS_API_KEY);
@@ -414,13 +416,26 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
       return null; // Fall back to Nominatim
     }
     
-    const address = data.address || {};
+    if (!data.address) {
+      console.warn('[MarketingDiscovery] ArcGIS returned no address data for', lat, lon);
+      return null;
+    }
+    
+    const address = data.address;
+
+    // FTTH approach: Use Address field (street address), not Match_addr (which can include business names)
+    const addressLine1 = address.Address || address.Match_addr;
+    
+    // Skip if we only got business name or place name (no actual street address)
+    if (!addressLine1 || addressLine1.length < 3) {
+      return null;
+    }
 
     return {
-      addressLine1: address.Match_addr || address.Address || undefined,
+      addressLine1: addressLine1,
       addressLine2: undefined,
       city: address.City || undefined,
-      state: address.Region || undefined,
+      state: address.Region || address.State || undefined,
       postalCode: address.Postal || undefined,
       country: address.CountryCode || 'US',
       latitude: lat,
