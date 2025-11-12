@@ -620,7 +620,9 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         centroidsFound,
         nodesFound,
         skippedNoCoords,
-        candidatesAfterFiltering: candidates.length
+        candidatesAfterFiltering: candidates.length,
+        boundingBox,
+        sampleTags: elements.slice(0, 3).map(e => ({type: e.type, tags: e.tags}))
       });
 
       if (progressCallback) progressCallback('Parsing Overpass results', 20);
@@ -706,6 +708,8 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         geocoded: geocodedCount,
         failed: failedCount,
         total: candidates.length,
+        addressesWithLine1: addresses.filter(a => a.addressLine1).length,
+        sampleAddresses: addresses.slice(0, 5).map(a => a.addressLine1),
         successRate: `${((geocodedCount / candidates.length) * 100).toFixed(1)}%`
       });
 
@@ -1397,6 +1401,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     updateProgress('Deduplicating addresses', 85);
     const geocodedCount = combinedAddresses.filter((addr) => !!addr.addressLine1).length;
+    
+    console.log('[MarketingDiscovery] Final combined addresses', {
+      totalAddresses: combinedAddresses.length,
+      withAddressLine1: geocodedCount,
+      sampleAddresses: combinedAddresses.slice(0, 5).map(a => ({ 
+        addressLine1: a.addressLine1, 
+        source: a.source 
+      })),
+      algorithmStats
+    });
 
     updateProgress('Saving results to database', 90);
 
