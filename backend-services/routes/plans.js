@@ -350,9 +350,9 @@ const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/Wor
 const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 
 const RURAL_AREA_THRESHOLD_KM2 = 1.0;
-const RURAL_MIN_PRIMARY_RESULTS = 25;
-const RURAL_MIN_AFTER_FALLBACK = 50;
-const RURAL_FALLBACK_MAX_RESULTS = 300;
+const RURAL_MIN_PRIMARY_RESULTS = 150;
+const RURAL_MIN_AFTER_FALLBACK = 150;
+const RURAL_FALLBACK_MAX_RESULTS = 600;
 
 const buildPrimaryOverpassQuery = (bbox) => `
 [out:json][timeout:90][maxsize:100000000];
