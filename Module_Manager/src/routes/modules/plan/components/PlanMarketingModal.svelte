@@ -44,7 +44,7 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
     algorithmStats?: Record<string, unknown>;
   } | null;
 
-  const steps = ['Define Service Area', 'Advanced Options', 'Review & Run'];
+  const steps = ['Select Algorithms', 'Review & Run'];
 
 const ALGORITHM_OPTIONS = [
     {
@@ -408,15 +408,11 @@ let results: PlanMarketingAddress[] = [];
   }
 
   async function discoverAddresses() {
-    console.log('[PlanMarketingModal] Discover addresses clicked', {
+    console.log('[PlanMarketingModal] Discover addresses clicked (map-centric mode)', {
       planId: plan?.id,
-      radiusMiles,
       advancedOptions,
-      coordinatesReady,
-      hasAddressOrCoordinates,
-      addressSearch,
-      latitudeInput,
-      longitudeInput
+      hasMapExtent,
+      mapExtent: latestExtent
     });
 
     error = null;
@@ -428,41 +424,24 @@ let results: PlanMarketingAddress[] = [];
       return;
     }
 
-    if (!hasAddressOrCoordinates) {
-      error = 'Provide latitude & longitude or enter an address to resolve coordinates.';
+    const extentForRun = latestExtent ?? extentAtOpen;
+    
+    if (!extentForRun?.boundingBox || !extentForRun?.center) {
+      error = 'Unable to determine map bounds. Please zoom the map to define the search area.';
       isLoading = false;
       return;
     }
 
-    const extentForRun = latestExtent ?? extentAtOpen;
-    // Use bounding box from map extent - enforce 50 mile max
-    const derivedRadius = deriveRadiusFromExtent(extentForRun) ?? 5;
-    radiusMiles = Math.min(normalizeRadius(radiusMiles, derivedRadius), 50);
-
     isLoading = true;
-    info = 'Discovering candidate addresses...';
+    info = 'Discovering addresses from map view...';
 
     try {
-      const resolved = await resolveCoordinates();
-      if (!resolved) {
-        throw new Error('Provide latitude & longitude or a searchable address.');
-      }
-
-      // ALWAYS use bounding box from map extent, not computed radius
-      let boundingBox = extentForRun?.boundingBox;
-      
-      if (!boundingBox) {
-        // Fallback: compute bounding box but enforce 50 mile max
-        const maxRadius = Math.min(radiusMiles, 50);
-        boundingBox = computeBoundingBox(resolved.lat, resolved.lon, maxRadius);
-      }
-      
-      if (!boundingBox) {
-        throw new Error('Unable to determine map bounds. Please zoom the map to define the search area.');
-      }
+      // Use map extent directly
+      let boundingBox = extentForRun.boundingBox;
+      const center = extentForRun.center;
       
       // Auto-constrain bounding box to 50x50 miles maximum centered on map view
-      const boxSpan = computeSpanMiles({ center: resolved, boundingBox });
+      const boxSpan = computeSpanMiles({ center, boundingBox });
       if (boxSpan) {
         const maxSpan = Math.max(boxSpan.width, boxSpan.height);
         if (maxSpan / 2 > 50) {
@@ -472,28 +451,32 @@ let results: PlanMarketingAddress[] = [];
             maxSpan
           });
           
-          // Recompute bounding box centered on resolved coordinates with 50 mile radius
-          boundingBox = computeBoundingBox(resolved.lat, resolved.lon, 50);
+          // Recompute bounding box centered on map center with 50 mile radius
+          boundingBox = computeBoundingBox(center.lat, center.lon, 50);
           
-          info = 'Map view was too large. Auto-constrained search area to 50×50 miles centered on your location.';
+          info = 'Map view was too large. Auto-constrained search area to 50×50 miles centered on map view.';
         }
       }
+      
+      // Calculate radius from bounding box for API
+      const derivedRadius = deriveRadiusFromExtent({ center, boundingBox }) ?? 25;
+      radiusMiles = Math.min(derivedRadius, 50);
 
       console.log('[PlanMarketingModal] Calling discoverMarketingAddresses API', {
         planId: plan.id,
         boundingBox,
         radiusMiles,
-        center: resolved,
+        center,
         algorithms: selectedAlgorithms
       });
 
       const response = await planService.discoverMarketingAddresses(plan.id, {
         boundingBox,
         radiusMiles,
-        center: resolved,
+        center,
         options: {
           advancedOptions,
-          viewExtent: extentForRun ?? { center: resolved, boundingBox },
+          viewExtent: extentForRun,
           algorithms: selectedAlgorithms
         }
       });
@@ -515,7 +498,7 @@ let results: PlanMarketingAddress[] = [];
 
       results = response.addresses;
       summary = response.summary;
-      const runtimeSpan = computeSpanMiles(extentForRun ?? { center: resolved, boundingBox });
+      const runtimeSpan = computeSpanMiles({ center, boundingBox });
       const leadCount = results.length;
       
       console.log('[PlanMarketingModal] Discovery completed successfully', {
@@ -525,7 +508,7 @@ let results: PlanMarketingAddress[] = [];
       });
       
       if (leadCount === 0) {
-        info = 'No addresses found in the specified area. Try adjusting the search radius or location.';
+        info = 'No addresses found in current map view. Try zooming in or moving to a different area.';
       } else if (runtimeSpan) {
         info = `Saved ${leadCount} marketing leads across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles. View them on the map under Marketing Leads.`;
       } else {
@@ -542,7 +525,7 @@ let results: PlanMarketingAddress[] = [];
           lastRunAt: new Date().toISOString(),
           lastResultCount: leadCount,
           lastBoundingBox: boundingBox,
-          lastCenter: resolved,
+          lastCenter: center,
           algorithms: selectedAlgorithms,
           algorithmStats: summary?.algorithmStats
         }
@@ -605,17 +588,13 @@ let results: PlanMarketingAddress[] = [];
     URL.revokeObjectURL(url);
   }
 
-  $: coordinatesReady =
-    normalizeNumber(latitudeInput) !== null && normalizeNumber(longitudeInput) !== null;
-  $: hasAddressOrCoordinates = coordinatesReady || (addressSearch && addressSearch.trim().length > 0);
+  $: hasMapExtent = Boolean(latestExtent?.boundingBox && latestExtent?.center);
   $: canAdvance =
     currentStep === 0
-      ? Boolean(radiusMiles && radiusMiles > 0)
-      : currentStep === 1
-        ? selectedAlgorithms.length > 0
-        : true;
+      ? selectedAlgorithms.length > 0 && hasMapExtent
+      : true;
   $: canRun =
-    currentStep === steps.length - 1 && radiusMiles > 0 && hasAddressOrCoordinates && selectedAlgorithms.length > 0;
+    currentStep === steps.length - 1 && hasMapExtent && selectedAlgorithms.length > 0;
 
   function formatCoord(value: number | string | undefined, fractionDigits = 5): string {
     if (value === undefined || value === null) return '—';
@@ -633,16 +612,8 @@ let results: PlanMarketingAddress[] = [];
     tabindex="0"
   >
     <div class="modal-header">
-      <h2>📣 Find Addresses - {plan.name}</h2>
+      <h2>📍 Find Addresses - {plan.name}</h2>
       <div class="header-actions">
-        <button
-          class="btn-tertiary mini"
-          type="button"
-          on:click={usePlanLocation}
-          disabled={isLoading || !plan.location}
-        >
-          Use plan location
-        </button>
         <button class="close-btn" type="button" on:click={closeModal} aria-label="Close marketing wizard">
           ✕
         </button>
@@ -670,97 +641,37 @@ let results: PlanMarketingAddress[] = [];
       {#if currentStep === 0}
         <section class="wizard-panel">
           <header>
-            <h3>Define Service Area</h3>
-            <p>Start by centering the search area and choosing a marketing radius around the location.</p>
+            <h3>Select Algorithms & Search Area</h3>
+            <p>Choose discovery methods and verify the map area. The search uses the visible map extent as the boundary.</p>
           </header>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="marketing-address">Search Address (optional)</label>
-              <input
-                id="marketing-address"
-                type="text"
-                bind:value={addressSearch}
-                placeholder="Use address to resolve coordinates"
-                disabled={isLoading}
-              />
+          
+          {#if !hasMapExtent}
+            <div class="alert alert-warning">
+              <strong>⚠️ Map extent not available.</strong> Please zoom the map to define the search area before continuing.
             </div>
-            <div class="coordinate-row">
-              <div class="form-group">
-                <label for="marketing-latitude">Latitude</label>
-                <input
-                  id="marketing-latitude"
-                  type="text"
-                  bind:value={latitudeInput}
-                  placeholder="e.g., 34.12345"
-                  disabled={isLoading}
-                />
-              </div>
-              <div class="form-group">
-                <label for="marketing-longitude">Longitude</label>
-                <input
-                  id="marketing-longitude"
-                  type="text"
-                  bind:value={longitudeInput}
-                  placeholder="-118.12345"
-                  disabled={isLoading}
-                />
-              </div>
-              <div class="form-group radius-field">
-                <label for="marketing-radius">Radius (miles)</label>
-                <input
-                  id="marketing-radius"
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  bind:value={radiusMiles}
-                  disabled={isLoading}
-                />
+          {:else if latestExtent?.boundingBox}
+            <div class="extent-summary-prominent">
+              <h4>📍 Search Area (from map view)</h4>
+              <div class="extent-details">
+                <span>
+                  <strong>Bounds:</strong> lat {formatCoord(latestExtent.boundingBox.south, 4)} → {formatCoord(latestExtent.boundingBox.north, 4)},
+                  lon {formatCoord(latestExtent.boundingBox.west, 4)} → {formatCoord(latestExtent.boundingBox.east, 4)}
+                </span>
+                {#if extentSpanMiles}
+                  <span><strong>Span:</strong> {extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} miles</span>
+                  {#if Math.max(extentSpanMiles.width, extentSpanMiles.height) > 100}
+                    <span class="extent-warning">⚠️ Large area - will be auto-constrained to 50×50 miles max</span>
+                  {/if}
+                {/if}
               </div>
             </div>
-          </div>
-          <div class="support-actions">
-        {#if latestExtent?.center}
-          <button type="button" class="btn-tertiary" on:click={useExtentCenter} disabled={isLoading}>
-            Use map center
-          </button>
-        {/if}
-            <button type="button" class="btn-tertiary" on:click={clearCoordinates} disabled={isLoading}>
-              Clear coordinates
-            </button>
-            <button
-              type="button"
-              class="btn-secondary"
-              on:click={geocodeFromAddress}
-              disabled={isLoading || !addressSearch}
-            >
-              Resolve coordinates from address
-            </button>
-          </div>
-      {#if latestExtent?.boundingBox}
-        <div class="extent-summary">
-          <span>
-            Map bounds: lat {formatCoord(latestExtent.boundingBox.south, 4)} → {formatCoord(latestExtent.boundingBox.north, 4)},
-            lon {formatCoord(latestExtent.boundingBox.west, 4)} → {formatCoord(latestExtent.boundingBox.east, 4)}
-          </span>
-          {#if extentSpanMiles}
-            <span>Approx. span: {extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} mi</span>
           {/if}
-        </div>
-      {/if}
-        </section>
-      {/if}
-
-      {#if currentStep === 1}
-        <section class="wizard-panel">
-          <header>
-            <h3>Advanced Options</h3>
-            <p>Tune geocoding, grouping, and deduplication behaviour. These settings mirror the FTTH wizard.</p>
-          </header>
+          
           <div class="options-grid">
             <fieldset class="algorithm-fieldset">
               <legend>Discovery Algorithms</legend>
               <p class="section-help">
-                Select one or more address discovery strategies. The wizard will combine results and remove duplicates automatically.
+                Select one or more address discovery strategies. Results are automatically deduplicated.
               </p>
               {#each ALGORITHM_OPTIONS as option}
                 <label class="algorithm-option">
@@ -776,115 +687,81 @@ let results: PlanMarketingAddress[] = [];
                 </label>
               {/each}
               {#if selectedAlgorithms.length === 0}
-                <p class="algorithm-warning">Select at least one algorithm before continuing.</p>
+                <p class="algorithm-warning">⚠️ Select at least one algorithm before continuing.</p>
               {/if}
             </fieldset>
-            <fieldset>
-              <legend>Reverse Geocoding</legend>
-              <label>
-                <span>Force server reverse geocoding</span>
-                <input type="checkbox" bind:checked={advancedOptions.forceReverse} />
-              </label>
-              <label>
-                <span>Server batch size</span>
-                <input
-                  type="number"
-                  min="5"
-                  max="50"
-                  step="5"
-                  bind:value={advancedOptions.reverse.batchSize}
-                />
-              </label>
-              <label>
-                <span>Per-request timeout (ms)</span>
-                <input
-                  type="number"
-                  min="2000"
-                  max="15000"
-                  step="500"
-                  bind:value={advancedOptions.reverse.perRequestTimeoutMs}
-                />
-              </label>
-              <label>
-                <span>Overall timeout (ms)</span>
-                <input
-                  type="number"
-                  min="10000"
-                  max="60000"
-                  step="1000"
-                  bind:value={advancedOptions.reverse.overallTimeoutMs}
-                />
-              </label>
-            </fieldset>
-            <fieldset>
-              <legend>Grouping</legend>
-              <label>
-                <input type="checkbox" bind:checked={advancedOptions.grouping.useOsmId} />
-                <span>Prefer OSM ids for grouping</span>
-              </label>
-              <label>
-                <input type="checkbox" bind:checked={advancedOptions.grouping.highPrecision} />
-                <span>High-precision coordinate grouping</span>
-              </label>
-            </fieldset>
-            <fieldset>
-              <legend>Deduplication</legend>
-              <label>
-                <span>Client dedup distance (m)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="30"
-                  step="1"
-                  bind:value={advancedOptions.dedup.clientDedupDistanceMeters}
-                />
-              </label>
-              <label>
-                <input type="checkbox" bind:checked={advancedOptions.dedup.mergeHalfAddresses} />
-                <span>Merge half-addresses (e.g. "½")</span>
-              </label>
-              <label>
-                <span>Half-address penalty</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="1"
-                  bind:value={advancedOptions.dedup.halfPenalty}
-                />
-              </label>
-            </fieldset>
+            
+            <details class="advanced-options-toggle">
+              <summary>Advanced Options (optional)</summary>
+              <div class="advanced-options-content">
+                <fieldset>
+                  <legend>Reverse Geocoding</legend>
+                  <label>
+                    <span>Force server reverse geocoding</span>
+                    <input type="checkbox" bind:checked={advancedOptions.forceReverse} />
+                  </label>
+                  <label>
+                    <span>Server batch size</span>
+                    <input
+                      type="number"
+                      min="5"
+                      max="50"
+                      step="5"
+                      bind:value={advancedOptions.reverse.batchSize}
+                    />
+                  </label>
+                </fieldset>
+                <fieldset>
+                  <legend>Deduplication</legend>
+                  <label>
+                    <span>Client dedup distance (m)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      step="1"
+                      bind:value={advancedOptions.dedup.clientDedupDistanceMeters}
+                    />
+                  </label>
+                  <label>
+                    <input type="checkbox" bind:checked={advancedOptions.dedup.mergeHalfAddresses} />
+                    <span>Merge half-addresses (e.g. "½")</span>
+                  </label>
+                </fieldset>
+              </div>
+            </details>
           </div>
         </section>
       {/if}
 
-      {#if currentStep === 2}
+      {#if currentStep === 1}
         <section class="wizard-panel">
           <header>
-            <h3>Review & Run</h3>
-            <p>Confirm the run parameters, then launch discovery. Results will populate below the wizard.</p>
+            <h3>Review & Run Discovery</h3>
+            <p>The system will: (1) Find OSM building centroids in map view → (2) Reverse geocode with ArcGIS → (3) Deduplicate → (4) Place markers</p>
           </header>
+          
           <div class="review-grid">
+            {#if latestExtent?.center}
+              <div>
+                <span class="label">Map Center</span>
+                <span class="value">
+                  {formatCoord(latestExtent.center.lat)}, {formatCoord(latestExtent.center.lon)}
+                </span>
+              </div>
+            {/if}
+            {#if extentSpanMiles}
+              <div>
+                <span class="label">Search Area</span>
+                <span class="value">{extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} mi</span>
+              </div>
+            {/if}
             <div>
-              <span class="label">Center Coordinates</span>
-              <span class="value">
-                {#if coordinatesReady}
-                  {formatCoord(latitudeInput)}, {formatCoord(longitudeInput)}
-                {:else}
-                  —
-                {/if}
-              </span>
+              <span class="label">Algorithms</span>
+              <span class="value">{selectedAlgorithms.length} selected</span>
             </div>
             <div>
-              <span class="label">Radius</span>
-              <span class="value">{radiusMiles} mi</span>
-            </div>
-            <div>
-              <span class="label">Server batch size</span>
-              <span class="value">{advancedOptions.reverse.batchSize}</span>
-            </div>
-            <div>
-              <span class="label">Dedup distance</span>
+              <span class="label">Dedup Distance</span>
               <span class="value">{advancedOptions.dedup.clientDedupDistanceMeters} m</span>
             </div>
           </div>
@@ -901,9 +778,9 @@ let results: PlanMarketingAddress[] = [];
             </div>
           {/if}
 
-          {#if !hasAddressOrCoordinates}
+          {#if !hasMapExtent}
             <div class="alert alert-warning">
-              Provide latitude and longitude or enter an address to resolve coordinates before running discovery.
+              <strong>⚠️ Map extent not available.</strong> Please zoom the map to define the search area before running discovery.
             </div>
           {/if}
 
@@ -1178,6 +1055,70 @@ let results: PlanMarketingAddress[] = [];
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .extent-summary-prominent {
+    background: rgba(14, 165, 233, 0.08);
+    border: 1px solid rgba(14, 165, 233, 0.25);
+    border-radius: var(--border-radius-sm);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .extent-summary-prominent h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .extent-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .extent-warning {
+    color: #f97316;
+    font-weight: 600;
+  }
+
+  .advanced-options-toggle {
+    grid-column: 1 / -1;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem 1rem;
+    background: rgba(148, 163, 184, 0.06);
+  }
+
+  .advanced-options-toggle summary {
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+    list-style: none;
+  }
+
+  .advanced-options-toggle summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advanced-options-toggle summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 0.5rem;
+    transition: transform 0.2s;
+  }
+
+  .advanced-options-toggle[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .advanced-options-content {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
   }
 
   .options-grid {
