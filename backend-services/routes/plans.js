@@ -384,9 +384,8 @@ const buildOverpassQuery = (bbox) => `
   // Strategy 9: Building entrance nodes (often represent small structures)
   node["entrance"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
-// Output: For ways output centroids, for nodes output their coordinates directly
-out center meta;
-out meta;
+// Output: center for ways (building centroids), regular coordinates for nodes
+out center;
 `;
 
 const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
