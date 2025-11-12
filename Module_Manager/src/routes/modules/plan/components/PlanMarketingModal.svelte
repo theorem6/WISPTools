@@ -493,24 +493,62 @@ let results: PlanMarketingAddress[] = [];
 
       console.log('[PlanMarketingModal] Discovery API response received', {
         addressCount: response.addresses?.length || 0,
-        summary: response.summary
+        summary: response.summary,
+        fullResponse: response
       });
 
-      if (!response || !response.addresses) {
-        throw new Error('Invalid response from discovery API');
+      if (!response) {
+        throw new Error('No response from discovery API');
+      }
+
+      if (!Array.isArray(response.addresses)) {
+        console.error('[PlanMarketingModal] Invalid addresses in response:', response);
+        throw new Error('Invalid response format: addresses is not an array');
       }
 
       results = response.addresses;
       summary = response.summary;
       const runtimeSpan = computeSpanMiles(extentForRun ?? { center: resolved, boundingBox });
-    const leadCount = results.length;
-    if (runtimeSpan) {
-      info = `Saved ${leadCount} marketing leads across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles. View them on the map under Marketing Leads.`;
-    } else {
-      info = `Saved ${leadCount} marketing leads for the current map view. View them on the map under Marketing Leads.`;
-    }
+      const leadCount = results.length;
+      
+      console.log('[PlanMarketingModal] Discovery completed successfully', {
+        leadCount,
+        hasSummary: !!summary,
+        runtimeSpan
+      });
+      
+      if (leadCount === 0) {
+        info = 'No addresses found in the specified area. Try adjusting the search radius or location.';
+      } else if (runtimeSpan) {
+        info = `Saved ${leadCount} marketing leads across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles. View them on the map under Marketing Leads.`;
+      } else {
+        info = `Saved ${leadCount} marketing leads for the current map view. View them on the map under Marketing Leads.`;
+      }
 
-      await fetchUpdatedPlan();
+      // Update the plan object locally to reflect the new marketing data
+      // This will sync to the map via SharedMap without reloading everything
+      plan = {
+        ...plan,
+        marketing: {
+          ...plan.marketing,
+          addresses: results,
+          lastRunAt: new Date().toISOString(),
+          lastResultCount: leadCount,
+          lastBoundingBox: boundingBox,
+          lastCenter: resolved,
+          algorithms: selectedAlgorithms,
+          algorithmStats: summary?.algorithmStats
+        }
+      };
+      
+      // Dispatch update event so parent can sync to map
+      dispatch('updated', plan);
+      
+      // Also fetch the updated plan from backend to ensure consistency
+      // But do it in the background without blocking
+      fetchUpdatedPlan().catch(err => {
+        console.warn('[PlanMarketingModal] Background plan refresh failed:', err);
+      });
     } catch (err: any) {
       console.error('Marketing discovery failed:', err);
       error = err?.message || 'Failed to discover addresses.';
