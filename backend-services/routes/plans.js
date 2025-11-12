@@ -352,13 +352,20 @@ const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
 (
+  // Prioritize residential buildings with addresses (highest priority)
+  way["building"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Residential building types (house, apartments, etc.)
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // All buildings (fallback - will filter by residential landuse if possible)
   way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["landuse"~"^(residential|village_green)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["landuse"~"^(residential|village_green)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Nodes with building tags and addresses
+  node["building"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"~"^(residential|house|apartments)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
+// Output centroids for ways, coordinates for nodes
 out center meta;
 `;
 
@@ -525,28 +532,57 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       const candidates = [];
 
       for (const element of elements) {
-        const latitude =
-          toNumber(element.lat) ??
-          toNumber(element.center?.lat) ??
-          (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lat) : undefined);
-        const longitude =
-          toNumber(element.lon) ??
-          toNumber(element.center?.lon) ??
-          (Array.isArray(element.geometry) ? toNumber(element.geometry[0]?.lon) : undefined);
+        // Extract centroid/coordinates - prioritize center for ways (building footprints)
+        let latitude, longitude;
+        
+        if (element.type === 'way' && element.center) {
+          // Way with computed center (building footprint centroid)
+          latitude = toNumber(element.center.lat);
+          longitude = toNumber(element.center.lon);
+        } else if (element.type === 'node') {
+          // Node coordinates
+          latitude = toNumber(element.lat);
+          longitude = toNumber(element.lon);
+        } else if (element.lat !== undefined && element.lon !== undefined) {
+          // Direct coordinates
+          latitude = toNumber(element.lat);
+          longitude = toNumber(element.lon);
+        } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
+          // Geometry array - use first point
+          latitude = toNumber(element.geometry[0]?.lat);
+          longitude = toNumber(element.geometry[0]?.lon);
+        }
 
-        if (latitude === undefined || longitude === undefined) continue;
+        if (latitude === undefined || longitude === undefined || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          continue;
+        }
 
+        // Filter for residential buildings - check tags
+        const buildingType = element.tags?.building;
+        const hasAddress = element.tags?.['addr:housenumber'];
+        const isResidential = buildingType && /^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex)$/i.test(buildingType);
+        
+        // Prioritize buildings with addresses or residential types, but include all buildings
+        const priority = hasAddress ? 1 : (isResidential ? 2 : 3);
+        
         const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
         if (seen.has(key)) continue;
         seen.add(key);
 
         candidates.push({
           lat: latitude,
-          lon: longitude
+          lon: longitude,
+          priority,
+          hasAddress: !!hasAddress,
+          buildingType: buildingType || 'unknown',
+          tags: element.tags || {}
         });
 
         if (candidates.length >= MAX_BUILDING_RESULTS) break;
       }
+      
+      // Sort by priority (addresses first, then residential types, then others)
+      candidates.sort((a, b) => a.priority - b.priority);
 
       if (progressCallback) progressCallback('Parsing Overpass results', 20);
       const addresses = [];
