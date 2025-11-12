@@ -36,6 +36,7 @@ export interface PlanMarketingAddress {
   latitude?: number;
   longitude?: number;
   source?: string;
+  discoveredAt?: string;
 }
 
 export interface PlanProjectMarketing {
@@ -55,6 +56,25 @@ export interface PlanProjectMarketing {
   addresses?: PlanMarketingAddress[];
   algorithms?: string[];
   algorithmStats?: Record<string, { produced?: number; geocoded?: number }>;
+  totalUniqueAddresses?: number;
+  totalRuns?: number;
+  lastRunNewAddresses?: number;
+  runHistory?: Array<{
+    runAt: string;
+    boundingBox?: {
+      west: number;
+      south: number;
+      east: number;
+      north: number;
+    };
+    center?: {
+      lat: number;
+      lon: number;
+    };
+    newAddresses?: number;
+    totalAddresses?: number;
+    algorithms?: string[];
+  }>;
 }
 
 export interface PlanProject {
@@ -713,7 +733,31 @@ class PlanService {
                   country: addr.country ?? undefined,
                   latitude: typeof addr.latitude === 'number' ? addr.latitude : undefined,
                   longitude: typeof addr.longitude === 'number' ? addr.longitude : undefined,
-                  source: addr.source ?? undefined
+                  source: addr.source ?? undefined,
+                  discoveredAt: addr.discoveredAt
+                    ? (() => {
+                        const parsed = new Date(addr.discoveredAt);
+                        return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
+                      })()
+                    : undefined
+                }))
+              : undefined,
+            totalUniqueAddresses: plan.marketing.totalUniqueAddresses ?? undefined,
+            totalRuns: plan.marketing.totalRuns ?? undefined,
+            lastRunNewAddresses: plan.marketing.lastRunNewAddresses ?? undefined,
+            runHistory: Array.isArray(plan.marketing.runHistory)
+              ? plan.marketing.runHistory.map((entry: any) => ({
+                  runAt: entry.runAt
+                    ? (() => {
+                        const parsed = new Date(entry.runAt);
+                        return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
+                      })()
+                    : undefined,
+                  boundingBox: entry.boundingBox ?? undefined,
+                  center: entry.center ?? undefined,
+                  newAddresses: entry.newAddresses ?? undefined,
+                  totalAddresses: entry.totalAddresses ?? undefined,
+                  algorithms: Array.isArray(entry.algorithms) ? entry.algorithms : undefined
                 }))
               : undefined
           }
@@ -764,8 +808,19 @@ class PlanService {
       center?: { lat: number; lon: number };
       algorithmsUsed?: string[];
       algorithmStats?: Record<string, { produced?: number; geocoded?: number }>;
+      newlyAdded?: number;
+      previousCount?: number;
+      totalUniqueAddresses?: number;
+      totalRuns?: number;
     };
     addresses: PlanMarketingAddress[];
+    metadata?: {
+      totalUniqueAddresses?: number;
+      newlyAdded?: number;
+      previousCount?: number;
+      totalRuns?: number;
+      runTimestamp?: string;
+    };
   }> {
     const response = await this.apiCall(`/${planId}/marketing/discover`, {
       method: 'POST',
@@ -773,6 +828,12 @@ class PlanService {
     });
 
     const summary = response.summary || {};
+    const metadata = response.metadata || {};
+    const normalizeIsoString = (value: unknown): string | undefined => {
+      if (!value) return undefined;
+      const parsed = new Date(value as any);
+      return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
+    };
     const addresses: PlanMarketingAddress[] = Array.isArray(response.addresses)
       ? response.addresses.map((addr: any) => ({
           addressLine1: addr.addressLine1 ?? addr.address ?? undefined,
@@ -793,7 +854,8 @@ class PlanService {
               : addr.longitude !== undefined
                 ? Number(addr.longitude)
                 : undefined,
-          source: addr.source ?? undefined
+          source: addr.source ?? undefined,
+          discoveredAt: normalizeIsoString(addr.discoveredAt ?? addr.discovered_at ?? addr.runTimestamp)
         }))
       : [];
 
@@ -805,9 +867,22 @@ class PlanService {
         boundingBox: summary.boundingBox ?? payload.boundingBox,
         center: summary.center ?? payload.center,
         algorithmsUsed: Array.isArray(summary.algorithmsUsed) ? summary.algorithmsUsed : undefined,
-        algorithmStats: summary.algorithmStats ?? undefined
+        algorithmStats: summary.algorithmStats ?? undefined,
+        newlyAdded: summary.newlyAdded ?? metadata.newlyAdded ?? undefined,
+        previousCount: summary.previousCount ?? metadata.previousCount ?? undefined,
+        totalUniqueAddresses:
+          summary.totalUniqueAddresses ?? metadata.totalUniqueAddresses ?? summary.totalCandidates ?? addresses.length,
+        totalRuns: summary.totalRuns ?? metadata.totalRuns ?? undefined
       },
-      addresses
+      addresses,
+      metadata: {
+        totalUniqueAddresses:
+          metadata.totalUniqueAddresses ?? summary.totalUniqueAddresses ?? summary.totalCandidates ?? addresses.length,
+        newlyAdded: metadata.newlyAdded ?? summary.newlyAdded ?? 0,
+        previousCount: metadata.previousCount ?? summary.previousCount ?? 0,
+        totalRuns: metadata.totalRuns ?? summary.totalRuns ?? undefined,
+        runTimestamp: normalizeIsoString(metadata.runTimestamp)
+      }
     };
   }
 

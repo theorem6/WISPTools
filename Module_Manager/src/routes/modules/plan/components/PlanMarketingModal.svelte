@@ -42,6 +42,10 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
     rawCandidateCount?: number;
     dedupedCount?: number;
     algorithmStats?: Record<string, unknown>;
+    newlyAdded?: number;
+    totalUniqueAddresses?: number;
+    previousCount?: number;
+    totalRuns?: number;
   } | null;
 
   const steps = ['Select Algorithms', 'Review & Run'];
@@ -70,6 +74,13 @@ const ALGORITHM_OPTIONS = [
   let error: string | null = null;
   let info: string | null = null;
   let currentStep = 0;
+
+  $: currentExtentKey = latestExtent?.boundingBox ? boundingBoxKey(latestExtent.boundingBox) : null;
+  $: pendingExtentChange =
+    !isLoading &&
+    lastRunExtentKey !== null &&
+    currentExtentKey !== null &&
+    currentExtentKey !== lastRunExtentKey;
 
   let tenantId: string | undefined;
   $: tenantId = $currentTenant?.id;
@@ -100,7 +111,7 @@ const ALGORITHM_OPTIONS = [
 let results: PlanMarketingAddress[] = [];
   let summary: Summary = plan.marketing
     ? {
-        totalCandidates: plan.marketing.addresses?.length ?? 0,
+        totalCandidates: plan.marketing.totalUniqueAddresses ?? plan.marketing.addresses?.length ?? 0,
         geocodedCount: plan.marketing.addresses?.length ?? 0,
         radiusMiles: plan.marketing.targetRadiusMiles ?? radiusMiles,
         boundingBox: plan.marketing.lastBoundingBox ?? {
@@ -111,7 +122,14 @@ let results: PlanMarketingAddress[] = [];
         },
         center: plan.marketing.lastCenter,
         algorithmsUsed: Array.isArray(plan.marketing.algorithms) ? [...plan.marketing.algorithms] : undefined,
-        algorithmStats: plan.marketing.algorithmStats ?? undefined
+        algorithmStats: plan.marketing.algorithmStats ?? undefined,
+        newlyAdded: plan.marketing.lastRunNewAddresses ?? undefined,
+        totalUniqueAddresses: plan.marketing.totalUniqueAddresses ?? plan.marketing.addresses?.length ?? 0,
+        previousCount:
+          plan.marketing.totalUniqueAddresses !== undefined && plan.marketing.lastRunNewAddresses !== undefined
+            ? Math.max(plan.marketing.totalUniqueAddresses - plan.marketing.lastRunNewAddresses, 0)
+            : undefined,
+        totalRuns: plan.marketing.totalRuns ?? undefined
       }
       : latestExtent?.boundingBox
       ? {
@@ -124,6 +142,10 @@ let results: PlanMarketingAddress[] = [];
           algorithmStats: undefined
         }
       : null;
+
+  let lastRunExtentKey = plan.marketing?.lastBoundingBox ? boundingBoxKey(plan.marketing.lastBoundingBox) : null;
+  let pendingExtentChange = false;
+  let currentExtentKey: string | null = latestExtent?.boundingBox ? boundingBoxKey(latestExtent.boundingBox) : null;
 
   let selectedAlgorithms: string[] = [];
   let initializedAlgorithms = false;
@@ -223,6 +245,15 @@ let results: PlanMarketingAddress[] = [];
       south: lat - latRange,
       north: lat + latRange
     };
+  }
+
+  function boundingBoxKey(box?: { west: number; south: number; east: number; north: number } | null): string | null {
+    if (!box) return null;
+    const values = [box.west, box.south, box.east, box.north];
+    if (values.some(value => typeof value !== 'number' || !Number.isFinite(value))) {
+      return null;
+    }
+    return values.map(value => Number(value).toFixed(5)).join('|');
   }
 
   function cloneMapExtent(extent: MapExtentData | null): MapExtentData | null {
@@ -430,6 +461,10 @@ let results: PlanMarketingAddress[] = [];
     isLoading = true;
     info = 'Discovering addresses from map view...';
 
+    const previousSavedCount =
+      plan.marketing?.totalUniqueAddresses ?? plan.marketing?.addresses?.length ?? 0;
+    const previousTotalRuns = plan.marketing?.totalRuns ?? 0;
+
     try {
       // Use map extent directly (clone so we don't mutate shared reference)
       let boundingBox = { ...extentForRun.boundingBox };
@@ -515,22 +550,32 @@ let results: PlanMarketingAddress[] = [];
       results = response.addresses;
       summary = response.summary;
       const runtimeSpan = computeSpanMiles({ center, boundingBox });
-      const leadCount = results.length;
+      const totalSaved = summary?.totalUniqueAddresses ?? results.length;
+      const newlyAdded = summary?.newlyAdded ?? Math.max(totalSaved - previousSavedCount, 0);
+      const totalRuns = summary?.totalRuns ?? previousTotalRuns + 1;
+
+      lastRunExtentKey = boundingBoxKey(boundingBox);
+      pendingExtentChange = false;
       
       console.log('[PlanMarketingModal] Discovery completed successfully', {
-        leadCount,
+        totalSaved,
+        newlyAdded,
+        previousSavedCount,
+        totalRuns,
         hasSummary: !!summary,
         runtimeSpan,
         sampleResults: results.slice(0, 3),
         planMarketingAddressesLength: plan.marketing?.addresses?.length
       });
       
-      if (leadCount === 0) {
+      if (totalSaved === 0) {
         info = 'No addresses found in current map view. Try zooming in or moving to a different area.';
+      } else if (newlyAdded === 0) {
+        info = `No new addresses detected in this view. ${totalSaved} saved leads remain available.`;
       } else if (runtimeSpan) {
-        info = `Saved ${leadCount} marketing leads across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles. View them on the map under Marketing Leads.`;
+        info = `Added ${newlyAdded} new addresses (${totalSaved} total saved) across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles.`;
       } else {
-        info = `Saved ${leadCount} marketing leads for the current map view. View them on the map under Marketing Leads.`;
+        info = `Added ${newlyAdded} new addresses (${totalSaved} total saved) for the current map view.`;
       }
 
       // Update the plan object locally to reflect the new marketing data
@@ -541,11 +586,14 @@ let results: PlanMarketingAddress[] = [];
           ...plan.marketing,
           addresses: results,
           lastRunAt: new Date().toISOString(),
-          lastResultCount: leadCount,
+          lastResultCount: totalSaved,
           lastBoundingBox: boundingBox,
           lastCenter: center,
           algorithms: selectedAlgorithms,
-          algorithmStats: summary?.algorithmStats
+          algorithmStats: summary?.algorithmStats,
+          totalUniqueAddresses: totalSaved,
+          totalRuns,
+          lastRunNewAddresses: newlyAdded
         }
       };
       
@@ -566,18 +614,47 @@ let results: PlanMarketingAddress[] = [];
     }
   }
 
-  function downloadCsv() {
-    const exportRows =
-      results.length > 0
-        ? results
-        : Array.isArray(plan.marketing?.addresses)
-        ? plan.marketing?.addresses ?? []
-        : [];
+  function getTotalSavedAddresses(): number {
+    if (summary?.totalUniqueAddresses !== undefined) return summary.totalUniqueAddresses;
+    if (plan.marketing?.totalUniqueAddresses !== undefined) return plan.marketing.totalUniqueAddresses;
+    if (Array.isArray(plan.marketing?.addresses)) return plan.marketing.addresses.length;
+    return results.length;
+  }
 
-    if (!exportRows.length) return;
+  function getNewlyAddedThisRun(): number {
+    if (summary?.newlyAdded !== undefined) return summary.newlyAdded;
+    if (plan.marketing?.lastRunNewAddresses !== undefined) return plan.marketing.lastRunNewAddresses;
+    return 0;
+  }
 
-    const headers = ['Address', 'City', 'State', 'PostalCode', 'Country', 'Latitude', 'Longitude', 'Source'];
-    const rows = exportRows.map(entry => [
+  function getTotalRunCount(): number {
+    if (summary?.totalRuns !== undefined) return summary.totalRuns;
+    if (plan.marketing?.totalRuns !== undefined) return plan.marketing.totalRuns;
+    return plan.marketing?.lastRunAt ? 1 : 0;
+  }
+
+  function getAllSavedAddresses(): PlanMarketingAddress[] {
+    if (Array.isArray(plan.marketing?.addresses) && plan.marketing.addresses.length > 0) {
+      return plan.marketing.addresses;
+    }
+    return results;
+  }
+
+  function exportAddresses(addresses: PlanMarketingAddress[], filenameSuffix: string) {
+    if (!addresses.length) return;
+
+    const headers = [
+      'Address',
+      'City',
+      'State',
+      'PostalCode',
+      'Country',
+      'Latitude',
+      'Longitude',
+      'Source',
+      'DiscoveredAt'
+    ];
+    const rows = addresses.map(entry => [
       entry.addressLine1 ?? '',
       entry.city ?? '',
       entry.state ?? '',
@@ -585,7 +662,13 @@ let results: PlanMarketingAddress[] = [];
       entry.country ?? '',
       entry.latitude ?? '',
       entry.longitude ?? '',
-      entry.source ?? ''
+      entry.source ?? '',
+      entry.discoveredAt
+        ? (() => {
+            const parsed = new Date(entry.discoveredAt);
+            return Number.isNaN(parsed.valueOf()) ? entry.discoveredAt : parsed.toISOString();
+          })()
+        : ''
     ]);
     const csv = [headers, ...rows]
       .map(columns =>
@@ -598,12 +681,25 @@ let results: PlanMarketingAddress[] = [];
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const safePlanName = plan.name ? plan.name.replace(/\s+/g, '_') : 'marketing-addresses';
     link.href = url;
-    link.setAttribute('download', `${plan.name.replace(/\s+/g, '_')}-marketing-addresses.csv`);
+    link.setAttribute('download', `${safePlanName}-${filenameSuffix}-${timestamp}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  function downloadLatestCsv() {
+    if (!results.length) return;
+    exportAddresses(results, 'latest-run');
+  }
+
+  function downloadAllCsv() {
+    const addresses = getAllSavedAddresses();
+    if (!addresses.length) return;
+    exportAddresses(addresses, 'all-addresses');
   }
 
   $: hasMapExtent = Boolean(latestExtent?.boundingBox && latestExtent?.center);
@@ -775,6 +871,12 @@ let results: PlanMarketingAddress[] = [];
             </div>
           {/if}
 
+          {#if pendingExtentChange}
+            <div class="alert alert-reminder">
+              Map view changed since the last run. Move the map to your next target area and run discovery again to capture it.
+            </div>
+          {/if}
+
           {#if !hasMapExtent}
             <div class="alert alert-warning">
               <strong>⚠️ Map extent not available.</strong> Please zoom the map to define the search area before running discovery.
@@ -791,6 +893,20 @@ let results: PlanMarketingAddress[] = [];
                 <span class="label">Geocoded</span>
                 <span class="value">{summary.geocodedCount}</span>
               </div>
+              <div class="summary-card">
+                <span class="label">New This Run</span>
+                <span class="value">{summary.newlyAdded ?? 0}</span>
+              </div>
+              <div class="summary-card">
+                <span class="label">Saved Total</span>
+                <span class="value">{summary.totalUniqueAddresses ?? getTotalSavedAddresses()}</span>
+              </div>
+              {#if getTotalRunCount()}
+                <div class="summary-card">
+                  <span class="label">Runs Completed</span>
+                  <span class="value">{getTotalRunCount()}</span>
+                </div>
+              {/if}
             <div class="summary-card">
                 <span class="label">Radius</span>
                 <span class="value">{summary.radiusMiles} mi</span>
@@ -823,8 +939,12 @@ let results: PlanMarketingAddress[] = [];
                 marketing leads. Review them from the map or export the CSV once the run completes.
               </p>
               <ul>
-                <li><strong>Leads saved:</strong> {summary?.totalCandidates ?? 0}</li>
-                <li><strong>Geocoded:</strong> {summary?.geocodedCount ?? 0}</li>
+                <li><strong>New this run:</strong> {getNewlyAddedThisRun()}</li>
+                <li><strong>Total saved (all runs):</strong> {getTotalSavedAddresses()}</li>
+                <li><strong>Geocoded this run:</strong> {summary?.geocodedCount ?? 0}</li>
+                {#if getTotalRunCount()}
+                  <li><strong>Runs completed:</strong> {getTotalRunCount()}</li>
+                {/if}
                 {#if summary?.algorithmStats}
                   {#each Object.entries(summary.algorithmStats) as [algId, stats]}
                     <li>
@@ -866,13 +986,18 @@ let results: PlanMarketingAddress[] = [];
           <button
             class="btn-secondary"
             type="button"
-            on:click={downloadCsv}
-            disabled={
-              isLoading ||
-              (!results.length && !(plan.marketing?.addresses && plan.marketing.addresses.length > 0))
-            }
+            on:click={downloadLatestCsv}
+            disabled={isLoading || results.length === 0}
           >
-            ⬇️ Download CSV
+            ⬇️ Download This Run
+          </button>
+          <button
+            class="btn-secondary"
+            type="button"
+            on:click={downloadAllCsv}
+            disabled={isLoading || getAllSavedAddresses().length === 0}
+          >
+            ⬇️ Download All Addresses
           </button>
         </div>
       {/if}
@@ -1316,6 +1441,30 @@ let results: PlanMarketingAddress[] = [];
   .alert-warning {
     background: rgba(234, 179, 8, 0.12);
     border: 1px solid rgba(234, 179, 8, 0.35);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem 1rem;
+  }
+
+  .alert-info {
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem 1rem;
+  }
+
+  .alert-error {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem 1rem;
+  }
+
+  .alert-reminder {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
     color: var(--text-primary);
     border-radius: var(--border-radius-sm);
     padding: 0.75rem 1rem;

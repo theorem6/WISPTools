@@ -52,7 +52,27 @@ const PlanProjectSchema = new mongoose.Schema({
       country: String,
       latitude: Number,
       longitude: Number,
-      source: String
+      source: String,
+      discoveredAt: { type: Date }
+    }],
+    totalUniqueAddresses: { type: Number, default: 0 },
+    totalRuns: { type: Number, default: 0 },
+    lastRunNewAddresses: { type: Number, default: 0 },
+    runHistory: [{
+      runAt: { type: Date },
+      boundingBox: {
+        west: Number,
+        south: Number,
+        east: Number,
+        north: Number
+      },
+      center: {
+        lat: Number,
+        lon: Number
+      },
+      newAddresses: Number,
+      totalAddresses: Number,
+      algorithms: [String]
     }],
     algorithms: [String],
     algorithmStats: mongoose.Schema.Types.Mixed

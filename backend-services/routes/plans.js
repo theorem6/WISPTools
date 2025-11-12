@@ -1633,6 +1633,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
     const combinedAddresses = [];
     const coordinateHashes = new Set();
     const addressHashes = new Set();
+    const existingAddresses = Array.isArray(plan.marketing?.addresses)
+      ? plan.marketing.addresses
+      : [];
+    const previousAddressCount = existingAddresses.length;
+    const runTimestampIso = new Date().toISOString();
+    const lastRunAtIso = plan.marketing?.lastRunAt ? new Date(plan.marketing.lastRunAt).toISOString() : null;
+    const priorTotalRuns = Number.isFinite(Number(plan.marketing?.totalRuns))
+      ? Number(plan.marketing.totalRuns)
+      : 0;
+    let newAddressesAdded = 0;
     let totalProgress = 0;
     let currentStep = '';
 
@@ -1671,7 +1681,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
       // Filter out addresses that only have street name (no house number)
       // BUT allow empty addressLine1 (we'll use coordinates as fallback)
-      const addressLine1 = address.addressLine1 || '';
+      const workingAddress = { ...address };
+      const addressLine1 = workingAddress.addressLine1 || '';
       if (addressLine1 && addressLine1.length > 0) {
         // Check if address starts with a number (valid house number)
         const startsWithNumber = /^\d/.test(addressLine1.trim());
@@ -1686,10 +1697,10 @@ router.post('/:id/marketing/discover', async (req, res) => {
         }
       } else {
         // No address line, use coordinates as identifier
-        address.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        workingAddress.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
       }
 
-      const normalizedAddressKey = buildAddressHash(address);
+      const normalizedAddressKey = buildAddressHash(workingAddress);
       if (normalizedAddressKey && addressHashes.has(normalizedAddressKey)) {
         return false;
       }
@@ -1706,17 +1717,92 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
 
       combinedAddresses.push({
-        ...address,
+        ...workingAddress,
         latitude,
         longitude,
-        source: address.source || algorithmId
+        source: workingAddress.source || algorithmId,
+        discoveredAt:
+          workingAddress.discoveredAt && !Number.isNaN(new Date(workingAddress.discoveredAt).valueOf())
+            ? new Date(workingAddress.discoveredAt).toISOString()
+            : runTimestampIso
       });
       coordinateHashes.add(coordinateKey);
       if (normalizedAddressKey) {
         addressHashes.add(normalizedAddressKey);
       }
+      newAddressesAdded += 1;
       return true;
     };
+
+    const seedExistingAddresses = (addresses = []) => {
+      for (const existing of addresses) {
+        const latitude = toNumber(existing.latitude);
+        const longitude = toNumber(existing.longitude);
+        if (latitude === undefined || longitude === undefined) {
+          continue;
+        }
+
+        const workingAddress = { ...existing };
+        if (!workingAddress.addressLine1) {
+          workingAddress.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        }
+
+        const normalizedAddressKey = buildAddressHash(workingAddress);
+        if (normalizedAddressKey && addressHashes.has(normalizedAddressKey)) {
+          continue;
+        }
+
+        const coordinateKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+        if (coordinateHashes.has(coordinateKey)) {
+          continue;
+        }
+
+        let duplicateWithinRadius = false;
+        for (const saved of combinedAddresses) {
+          if (distanceInMeters(latitude, longitude, saved.latitude, saved.longitude) <= dedupDistanceMeters) {
+            duplicateWithinRadius = true;
+            break;
+          }
+        }
+        if (duplicateWithinRadius) {
+          continue;
+        }
+
+        const discoveredAtSource =
+          workingAddress.discoveredAt ||
+          workingAddress.createdAt ||
+          workingAddress.updatedAt ||
+          lastRunAtIso;
+        let discoveredAtIso = runTimestampIso;
+        if (discoveredAtSource) {
+          const parsed = new Date(discoveredAtSource);
+          if (!Number.isNaN(parsed.valueOf())) {
+            discoveredAtIso = parsed.toISOString();
+          }
+        }
+
+        combinedAddresses.push({
+          ...workingAddress,
+          latitude,
+          longitude,
+          source: workingAddress.source || 'existing',
+          discoveredAt: discoveredAtIso
+        });
+        coordinateHashes.add(coordinateKey);
+        if (normalizedAddressKey) {
+          addressHashes.add(normalizedAddressKey);
+        }
+      }
+    };
+
+    seedExistingAddresses(existingAddresses);
+
+    if (previousAddressCount > 0) {
+      console.log('[MarketingDiscovery] Seeded existing marketing addresses', {
+        previousAddressCount,
+        dedupedSeedCount: combinedAddresses.length
+      });
+    }
 
     const recordAlgorithmStats = (algorithmId, produced, geocoded, errorMessage) => {
       algorithmStats[algorithmId] = {
@@ -1838,12 +1924,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     }
 
-    updateProgress('Deduplicating addresses', 85);
+    const totalUniqueAddresses = combinedAddresses.length;
+    const totalRuns = priorTotalRuns + 1;
+    updateProgress('Deduplicating addresses', 85, {
+      totalAddresses: totalUniqueAddresses,
+      newlyAdded: newAddressesAdded,
+      previousCount: previousAddressCount
+    });
     const geocodedCount = combinedAddresses.filter((addr) => !!addr.addressLine1).length;
     
     console.log('[MarketingDiscovery] Final combined addresses', {
-      totalAddresses: combinedAddresses.length,
+      totalAddresses: totalUniqueAddresses,
       withAddressLine1: geocodedCount,
+      newlyAdded: newAddressesAdded,
+      previousAddressCount,
+      totalRuns,
       sampleAddresses: combinedAddresses.slice(0, 5).map(a => ({ 
         addressLine1: a.addressLine1, 
         source: a.source 
@@ -1851,17 +1946,40 @@ router.post('/:id/marketing/discover', async (req, res) => {
       algorithmStats
     });
 
-    updateProgress('Saving results to database', 90);
+    updateProgress('Saving results to database', 90, {
+      totalAddresses: totalUniqueAddresses,
+      newlyAdded: newAddressesAdded
+    });
+
+    const previousMarketing =
+      plan.marketing && typeof plan.marketing.toObject === 'function'
+        ? plan.marketing.toObject()
+        : plan.marketing || {};
+    const existingHistory = Array.isArray(previousMarketing.runHistory) ? previousMarketing.runHistory : [];
+    const runHistoryEntry = {
+      runAt: new Date(runTimestampIso),
+      boundingBox,
+      center: computedCenter,
+      newAddresses: newAddressesAdded,
+      totalAddresses: totalUniqueAddresses,
+      algorithms
+    };
+    const runHistory = [runHistoryEntry, ...existingHistory].slice(0, 20);
 
     const marketingUpdate = {
+      ...previousMarketing,
       targetRadiusMiles: radiusMiles,
-      lastRunAt: new Date(),
-      lastResultCount: combinedAddresses.length,
+      lastRunAt: new Date(runTimestampIso),
+      lastResultCount: totalUniqueAddresses,
       lastBoundingBox: boundingBox,
       lastCenter: computedCenter,
       algorithms,
       algorithmStats,
-      addresses: combinedAddresses
+      addresses: combinedAddresses,
+      totalUniqueAddresses,
+      totalRuns,
+      lastRunNewAddresses: newAddressesAdded,
+      runHistory
     };
 
     const updateResult = await PlanProject.updateOne(
@@ -1880,19 +1998,24 @@ router.post('/:id/marketing/discover', async (req, res) => {
       planId: plan._id.toString(),
       matched: updateResult.matchedCount,
       modified: updateResult.modifiedCount,
-      addressesSaved: combinedAddresses.length
+      addressesSaved: totalUniqueAddresses,
+      newlyAdded: newAddressesAdded,
+      totalRuns
     });
 
     const requestDuration = Date.now() - requestStartTime;
     updateProgress('Request completed', 100, { 
-      totalAddresses: combinedAddresses.length,
-      geocodedCount 
+      totalAddresses: totalUniqueAddresses,
+      geocodedCount,
+      newlyAdded: newAddressesAdded
     });
     console.log('[MarketingDiscovery] Request completed successfully', { 
       requestId,
       duration: `${requestDuration}ms`,
-      totalAddresses: combinedAddresses.length,
-      geocodedCount 
+      totalAddresses: totalUniqueAddresses,
+      geocodedCount,
+      newlyAdded: newAddressesAdded,
+      totalRuns
     });
     
     // Mark progress as complete
@@ -1903,23 +2026,35 @@ router.post('/:id/marketing/discover', async (req, res) => {
       completed: true,
       completedAt: new Date().toISOString(),
       result: {
-        totalAddresses: combinedAddresses.length,
-        geocodedCount
+        totalAddresses: totalUniqueAddresses,
+        geocodedCount,
+        newlyAdded: newAddressesAdded
       }
     });
     
     if (!res.headersSent) {
       res.json({
         summary: {
-          totalCandidates: combinedAddresses.length,
+          totalCandidates: totalUniqueAddresses,
           geocodedCount,
           radiusMiles,
           boundingBox,
           center: computedCenter,
           algorithmsUsed: algorithms,
-          algorithmStats
+          algorithmStats,
+          newlyAdded: newAddressesAdded,
+          previousCount: previousAddressCount,
+          totalUniqueAddresses,
+          totalRuns
         },
         addresses: combinedAddresses,
+        metadata: {
+          totalUniqueAddresses,
+          newlyAdded: newAddressesAdded,
+          previousCount: previousAddressCount,
+          totalRuns,
+          runTimestamp: runTimestampIso
+        },
         requestId // Include requestId in response
       });
     } else {
