@@ -22,12 +22,23 @@ async function cleanupTestData() {
     await mongoose.connect(appConfig.mongodb.uri, appConfig.mongodb.options);
     console.log('✓ Connected to MongoDB');
 
-    // Get all tenants (we'll clean up for all tenants)
-    const plans = await PlanProject.find({}).select('tenantId').lean();
-    const tenantIds = [...new Set(plans.map(p => p.tenantId))];
+    // Get all tenants - check all network objects, not just plans
+    const allPlans = await PlanProject.find({}).select('tenantId').lean();
+    const allSites = await UnifiedSite.find({}).select('tenantId').distinct('tenantId').lean();
+    const allSectors = await UnifiedSector.find({}).select('tenantId').distinct('tenantId').lean();
+    const allCPE = await UnifiedCPE.find({}).select('tenantId').distinct('tenantId').lean();
+    const allCustomers = await Customer.find({ serviceStatus: 'prospect' }).select('tenantId').distinct('tenantId').lean();
     
-    console.log(`\nFound ${tenantIds.length} tenant(s) with plan data`);
-    console.log(`Found ${plans.length} plan(s) total`);
+    const tenantIds = [...new Set([
+      ...allPlans.map(p => p.tenantId),
+      ...allSites,
+      ...allSectors,
+      ...allCPE,
+      ...allCustomers
+    ].filter(Boolean))];
+    
+    console.log(`\nFound ${tenantIds.length} tenant(s) with data`);
+    console.log(`Found ${allPlans.length} plan(s) total`);
 
     let totalDeleted = {
       plans: 0,
@@ -56,31 +67,45 @@ async function cleanupTestData() {
       totalDeleted.planFeatures += featuresResult.deletedCount;
       console.log(`  ✓ Deleted ${featuresResult.deletedCount} plan features`);
 
-      // 3. Delete network objects with planId
-      const sitesResult = await UnifiedSite.deleteMany({ tenantId, planId: { $exists: true, $ne: null } });
+      // 3. Delete ALL network objects (test environment - remove everything)
+      // First try with planId, then delete all if no planId found
+      const sitesWithPlanId = await UnifiedSite.countDocuments({ tenantId, planId: { $exists: true, $ne: null } });
+      const sitesResult = sitesWithPlanId > 0 
+        ? await UnifiedSite.deleteMany({ tenantId, planId: { $exists: true, $ne: null } })
+        : await UnifiedSite.deleteMany({ tenantId }); // Delete all if no planId
       totalDeleted.sites += sitesResult.deletedCount;
-      console.log(`  ✓ Deleted ${sitesResult.deletedCount} sites with planId`);
+      console.log(`  ✓ Deleted ${sitesResult.deletedCount} sites`);
 
-      const sectorsResult = await UnifiedSector.deleteMany({ tenantId, planId: { $exists: true, $ne: null } });
+      const sectorsWithPlanId = await UnifiedSector.countDocuments({ tenantId, planId: { $exists: true, $ne: null } });
+      const sectorsResult = sectorsWithPlanId > 0
+        ? await UnifiedSector.deleteMany({ tenantId, planId: { $exists: true, $ne: null } })
+        : await UnifiedSector.deleteMany({ tenantId }); // Delete all if no planId
       totalDeleted.sectors += sectorsResult.deletedCount;
-      console.log(`  ✓ Deleted ${sectorsResult.deletedCount} sectors with planId`);
+      console.log(`  ✓ Deleted ${sectorsResult.deletedCount} sectors`);
 
-      const cpeResult = await UnifiedCPE.deleteMany({ tenantId, planId: { $exists: true, $ne: null } });
+      const cpeWithPlanId = await UnifiedCPE.countDocuments({ tenantId, planId: { $exists: true, $ne: null } });
+      const cpeResult = cpeWithPlanId > 0
+        ? await UnifiedCPE.deleteMany({ tenantId, planId: { $exists: true, $ne: null } })
+        : await UnifiedCPE.deleteMany({ tenantId }); // Delete all if no planId
       totalDeleted.cpe += cpeResult.deletedCount;
-      console.log(`  ✓ Deleted ${cpeResult.deletedCount} CPE devices with planId`);
+      console.log(`  ✓ Deleted ${cpeResult.deletedCount} CPE devices`);
 
-      const equipmentResult = await NetworkEquipment.deleteMany({ tenantId, planId: { $exists: true, $ne: null } });
+      const equipmentWithPlanId = await NetworkEquipment.countDocuments({ tenantId, planId: { $exists: true, $ne: null } });
+      const equipmentResult = equipmentWithPlanId > 0
+        ? await NetworkEquipment.deleteMany({ tenantId, planId: { $exists: true, $ne: null } })
+        : await NetworkEquipment.deleteMany({ tenantId }); // Delete all if no planId
       totalDeleted.equipment += equipmentResult.deletedCount;
-      console.log(`  ✓ Deleted ${equipmentResult.deletedCount} equipment with planId`);
+      console.log(`  ✓ Deleted ${equipmentResult.deletedCount} equipment`);
 
       // 4. Delete customer prospects created from marketing leads
+      // Delete all prospects, or those with marketing lead sources
       const customersResult = await Customer.deleteMany({
         tenantId,
         $or: [
           { serviceStatus: 'prospect' },
           { leadSource: 'plan-marketing' },
           { leadSource: 'marketing-lead' },
-          { associatedPlanId: { $in: planIds } }
+          ...(planIds.length > 0 ? [{ associatedPlanId: { $in: planIds } }] : [])
         ]
       });
       totalDeleted.customers += customersResult.deletedCount;
