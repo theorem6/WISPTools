@@ -436,31 +436,51 @@ let results: PlanMarketingAddress[] = [];
     info = 'Discovering addresses from map view...';
 
     try {
-      // Use map extent directly
-      let boundingBox = extentForRun.boundingBox;
+      // Use map extent directly (clone so we don't mutate shared reference)
+      let boundingBox = { ...extentForRun.boundingBox };
       const center = extentForRun.center;
       
-      // Auto-constrain bounding box to 50x50 miles maximum centered on map view
+      // Auto-constrain bounding box to balanced square footprint (max 50 mile radius)
       const boxSpan = computeSpanMiles({ center, boundingBox });
       if (boxSpan) {
         const maxSpan = Math.max(boxSpan.width, boxSpan.height);
+        const minSpan = Math.min(boxSpan.width, boxSpan.height);
+        let targetRadius = Math.min(maxSpan / 2, 50);
+        const adjustments: string[] = [];
+
         if (maxSpan / 2 > 50) {
-          // Constrain to 50 miles from center instead of blocking
           console.log('[PlanMarketingModal] Bounding box too large, auto-constraining to 50x50 miles', {
             originalSpan: boxSpan,
             maxSpan
           });
-          
-          // Recompute bounding box centered on map center with 50 mile radius
-          boundingBox = computeBoundingBox(center.lat, center.lon, 50);
-          
-          info = 'Map view was too large. Auto-constrained search area to 50×50 miles centered on map view.';
+          adjustments.push('Map view was too large; constrained search area to 50×50 miles centered on the map.');
         }
+
+        // Normalize rectangle to a square so sampling covers full area evenly
+        const differenceMiles = Math.abs(boxSpan.width - boxSpan.height);
+        if (differenceMiles > 0.5) {
+          console.log('[PlanMarketingModal] Normalizing search area to square footprint', {
+            originalSpan: boxSpan,
+            targetRadius
+          });
+          adjustments.push('Search area normalized to a square so sampling is even in all directions.');
+        }
+
+        if (adjustments.length > 0) {
+          boundingBox = computeBoundingBox(center.lat, center.lon, targetRadius);
+          info = adjustments.join(' ');
+        }
+
+        // Calculate radius from adjusted bounding box
+        const adjustedSpan = computeSpanMiles({ center, boundingBox });
+        const adjustedMaxSpan = adjustedSpan ? Math.max(adjustedSpan.width, adjustedSpan.height) : maxSpan;
+        targetRadius = Math.min(adjustedMaxSpan / 2, 50);
+        radiusMiles = targetRadius;
+      } else {
+        // Fallback radius calculation if span could not be derived
+        const derivedRadius = deriveRadiusFromExtent({ center, boundingBox }) ?? 25;
+        radiusMiles = Math.min(derivedRadius, 50);
       }
-      
-      // Calculate radius from bounding box for API
-      const derivedRadius = deriveRadiusFromExtent({ center, boundingBox }) ?? 25;
-      radiusMiles = Math.min(derivedRadius, 50);
 
       console.log('[PlanMarketingModal] Calling discoverMarketingAddresses API', {
         planId: plan.id,
