@@ -764,11 +764,49 @@ const distanceInMeters = (lat1, lon1, lat2, lon2) => {
 
 const normalizeAddressComponent = (value) => {
   if (!value || typeof value !== 'string') return '';
-  return value
+
+  const directionMap = {
+    northeast: 'ne',
+    northwest: 'nw',
+    southeast: 'se',
+    southwest: 'sw',
+    north: 'n',
+    south: 's',
+    east: 'e',
+    west: 'w'
+  };
+
+  const streetTypeMap = {
+    street: 'st',
+    avenue: 'ave',
+    boulevard: 'blvd',
+    court: 'ct',
+    drive: 'dr',
+    lane: 'ln',
+    place: 'pl',
+    road: 'rd',
+    terrace: 'ter',
+    trail: 'trl',
+    highway: 'hwy',
+    parkway: 'pkwy',
+    circle: 'cir'
+  };
+
+  let normalized = value
     .toLowerCase()
-    .replace(/\s+/g, ' ')
     .replace(/[.,#]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
+
+  Object.entries(directionMap).forEach(([full, abbr]) => {
+    normalized = normalized.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
+  });
+
+  Object.entries(streetTypeMap).forEach(([full, abbr]) => {
+    normalized = normalized.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
+  });
+
+  return normalized;
 };
 
 const buildAddressHash = (address = {}) => {
@@ -1588,7 +1626,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
       algorithms = ['osm_buildings'];
     }
 
-    const dedupDistanceMeters = 10; // Always deduplicate within 10 meters
+    // Always deduplicate addresses within 25 meters (≈82 feet)
+    const dedupDistanceMeters = 25;
 
     const algorithmStats = {};
     const combinedAddresses = [];
