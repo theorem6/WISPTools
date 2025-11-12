@@ -419,7 +419,7 @@ const distanceInMeters = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
-async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions }) {
+async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions, progressCallback }) {
   const result = {
     addresses: [],
     stats: {
@@ -431,6 +431,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 
   try {
     console.log('[MarketingDiscovery] Starting OSM building discovery', { boundingBox });
+    if (progressCallback) progressCallback('Building Overpass query', 5);
     const overpassQuery = buildOverpassQuery(boundingBox);
     
     // Add timeout to prevent hanging
@@ -441,6 +442,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
     }, 45000); // 45 second timeout
     
     try {
+      if (progressCallback) progressCallback('Fetching from Overpass API', 10);
       console.log('[MarketingDiscovery] Fetching from Overpass API...');
       const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
         method: 'POST',
@@ -490,17 +492,24 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         if (candidates.length >= MAX_BUILDING_RESULTS) break;
       }
 
+      if (progressCallback) progressCallback('Parsing Overpass results', 20);
+      const addresses = [];
+      let geocodedCount = 0;
+      const reverseGeocodeStartTime = Date.now();
+      const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
       const maxReverseGeocode =
         toNumber(advancedOptions?.reverse?.batchSize) ?? MAX_REVERSE_GEOCODE;
       const reverseDelay =
         toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? NOMINATIM_DELAY_MS;
 
-      const addresses = [];
-      let geocodedCount = 0;
-      const reverseGeocodeStartTime = Date.now();
-      const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
-
       for (let index = 0; index < candidates.length; index += 1) {
+        if (progressCallback && geocodedCount < maxReverseGeocode) {
+          const geocodeProgress = 20 + ((geocodedCount / maxReverseGeocode) * 60);
+          progressCallback(`Reverse geocoding ${geocodedCount + 1}/${maxReverseGeocode}`, geocodeProgress, {
+            current: geocodedCount + 1,
+            total: maxReverseGeocode
+          });
+        }
         const candidate = candidates[index];
         if (geocodedCount < maxReverseGeocode) {
           try {
@@ -937,22 +946,15 @@ router.put('/:id', async (req, res) => {
 // POST /plans/:id/marketing/discover - Find marketing addresses within area
 router.post('/:id/marketing/discover', async (req, res) => {
   const requestStartTime = Date.now();
+  const requestId = `${req.params.id}-${Date.now()}`;
   console.log('[MarketingDiscovery] Request received', { 
+    requestId,
     planId: req.params.id, 
     tenantId: req.tenantId,
     boundingBox: req.body.boundingBox 
   });
   
-  // Set a timeout for the entire request (120 seconds to allow for reverse geocoding)
-  const requestTimeout = setTimeout(() => {
-    if (!res.headersSent) {
-      console.error('[MarketingDiscovery] Request timeout after 120 seconds');
-      res.status(504).json({ 
-        error: 'Request timeout', 
-        message: 'Marketing discovery request took too long to complete' 
-      });
-    }
-  }, 120000);
+  // Removed timeout temporarily - will add progress feedback instead
   
   try {
     const plan = await PlanProject.findOne({
@@ -961,13 +963,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
 
     if (!plan) {
-      clearTimeout(requestTimeout);
       return res.status(404).json({ error: 'Plan not found' });
     }
 
     const boundingBox = parseBoundingBox(req.body.boundingBox);
     if (!boundingBox) {
-      clearTimeout(requestTimeout);
       return res.status(400).json({
         error: 'Invalid bounding box',
         message: 'Provide boundingBox with numeric west, south, east, north values'
@@ -1006,6 +1006,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     const algorithmStats = {};
     const combinedAddresses = [];
+    let totalProgress = 0;
+    let currentStep = '';
+
+    const updateProgress = (step, progress, details = {}) => {
+      currentStep = step;
+      totalProgress = progress;
+      const elapsed = Date.now() - requestStartTime;
+      console.log(`[MarketingDiscovery] Progress [${progress}%] ${step}`, { 
+        requestId,
+        elapsed: `${elapsed}ms`,
+        ...details 
+      });
+    };
+
+    updateProgress('Initializing', 0);
 
     const addAddressToCombined = (address, algorithmId) => {
       const latitude = toNumber(address.latitude);
@@ -1039,12 +1054,20 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     if (algorithms.includes('osm_buildings')) {
       try {
+        updateProgress('Running OSM building discovery', 10);
         console.log('[MarketingDiscovery] Running OSM building discovery algorithm');
         const osmResult = await runOsmBuildingDiscovery({
           boundingBox,
           radiusMiles,
           center: computedCenter,
-          advancedOptions
+          advancedOptions,
+          progressCallback: (step, progress, details) => {
+            updateProgress(`OSM: ${step}`, 10 + (progress * 0.4), details); // 10-50%
+          }
+        });
+        updateProgress('OSM discovery completed', 50, { 
+          addresses: osmResult.addresses?.length || 0,
+          error: osmResult.error 
         });
         console.log('[MarketingDiscovery] OSM algorithm completed', { 
           addresses: osmResult.addresses?.length || 0,
@@ -1066,6 +1089,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
         recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
       } catch (err) {
+        updateProgress('OSM discovery failed', 50, { error: err.message });
         console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
         recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
       }
@@ -1073,11 +1097,13 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
       try {
+        updateProgress('Running ArcGIS address points discovery', 50);
         const arcgisResult = await runArcgisAddressPointsDiscovery({
           boundingBox,
           center: computedCenter,
           radiusMiles
         });
+        updateProgress('ArcGIS address points completed', 70);
 
         let produced = 0;
         let geocoded = 0;
@@ -1094,6 +1120,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
         recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
       } catch (err) {
+        updateProgress('ArcGIS address points failed', 70, { error: err.message });
         console.error('[MarketingDiscovery] ArcGIS Address Points Discovery failed:', err);
         recordAlgorithmStats('arcgis_address_points', 0, 0, err.message || 'Unknown error');
       }
@@ -1101,11 +1128,13 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
       try {
+        updateProgress('Running ArcGIS places discovery', 70);
         const arcgisPlacesResult = await runArcgisPlacesDiscovery({
           boundingBox,
           center: computedCenter,
           radiusMiles
         });
+        updateProgress('ArcGIS places completed', 85);
 
         let produced = 0;
         let geocoded = 0;
@@ -1122,12 +1151,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
         recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
       } catch (err) {
+        updateProgress('ArcGIS places failed', 85, { error: err.message });
         console.error('[MarketingDiscovery] ArcGIS Places Discovery failed:', err);
         recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
       }
     }
 
+    updateProgress('Deduplicating addresses', 85);
     const geocodedCount = combinedAddresses.filter((addr) => !!addr.addressLine1).length;
+
+    updateProgress('Saving results to database', 90);
 
     const marketingUpdate = {
       targetRadiusMiles: radiusMiles,
@@ -1152,9 +1185,13 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     );
 
-    clearTimeout(requestTimeout);
     const requestDuration = Date.now() - requestStartTime;
+    updateProgress('Request completed', 100, { 
+      totalAddresses: combinedAddresses.length,
+      geocodedCount 
+    });
     console.log('[MarketingDiscovery] Request completed successfully', { 
+      requestId,
       duration: `${requestDuration}ms`,
       totalAddresses: combinedAddresses.length,
       geocodedCount 
@@ -1177,11 +1214,14 @@ router.post('/:id/marketing/discover', async (req, res) => {
       console.warn('[MarketingDiscovery] Response already sent, skipping duplicate response');
     }
   } catch (error) {
-    clearTimeout(requestTimeout);
     const requestDuration = Date.now() - requestStartTime;
+    updateProgress('Request failed', 0, { error: error.message });
     console.error('[MarketingDiscovery] Error discovering marketing addresses:', error);
     console.error('[MarketingDiscovery] Error stack:', error.stack);
-    console.error('[MarketingDiscovery] Request failed after', { duration: `${requestDuration}ms` });
+    console.error('[MarketingDiscovery] Request failed after', { 
+      requestId,
+      duration: `${requestDuration}ms` 
+    });
     
     if (!res.headersSent) {
       res.status(500).json({
