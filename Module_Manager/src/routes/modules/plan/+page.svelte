@@ -805,8 +805,11 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     if (idx !== -1) {
       projects[idx] = updatedPlan;
     }
-    if ($currentTenant?.id) {
-      void mapLayerManager.loadPlan($currentTenant.id, updatedPlan);
+    // Don't reload the plan - just update the active plan in the map state
+    // This preserves the map center and only updates marketing leads
+    if ($currentTenant?.id && mapLayerManager) {
+      // Update the active plan in map state without reloading everything
+      mapLayerManager.updateState({ activePlan: updatedPlan });
     }
   }
 
