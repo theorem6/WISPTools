@@ -353,18 +353,16 @@ const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
 (
   // PRIMARY: Residential buildings with addresses (highest priority)
-  way["building"]["addr:housenumber"](!["building"~"^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|warehouse|factory|garage)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
   // SECONDARY: Specific residential building types
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building)$"](!["amenity"])(!["shop"])(!["office"])(!["craft"])(!["leisure"])(!["tourism"])(!["healthcare"])(!["education"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // TERTIARY: Buildings in residential landuse areas (exclude commercial areas)
-  way["building"]["landuse"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"](is_in(${bbox.south},${bbox.west},${bbox.north},${bbox.east}) && t["landuse"="residential"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // TERTIARY: Generic buildings (we'll filter commercial/business in post-processing)
+  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Nodes with residential building tags and addresses (exclude businesses)
-  node["building"]["addr:housenumber"](!["amenity"])(!["shop"])(!["office"])(!["craft"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"~"^(residential|house|apartments)$"](!["amenity"])(!["shop"])(!["office"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Nodes with building tags
+  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output centroids for ways, coordinates for nodes
 out center meta;
@@ -526,11 +524,17 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       }
 
       const overpassData = await overpassResponse.json();
-      console.log('[MarketingDiscovery] Overpass data parsed', { elementCount: overpassData.elements?.length || 0 });
+      console.log('[MarketingDiscovery] Overpass data parsed', { 
+        elementCount: overpassData.elements?.length || 0,
+        sampleElement: overpassData.elements?.[0] 
+      });
       const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
 
       const seen = new Set();
       const candidates = [];
+      let centroidsFound = 0;
+      let nodesFound = 0;
+      let skippedNoCoords = 0;
 
       for (const element of elements) {
         // Extract centroid/coordinates - prioritize center for ways (building footprints)
@@ -540,10 +544,12 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           // Way with computed center (building footprint centroid)
           latitude = toNumber(element.center.lat);
           longitude = toNumber(element.center.lon);
+          centroidsFound++;
         } else if (element.type === 'node') {
           // Node coordinates
           latitude = toNumber(element.lat);
           longitude = toNumber(element.lon);
+          nodesFound++;
         } else if (element.lat !== undefined && element.lon !== undefined) {
           // Direct coordinates
           latitude = toNumber(element.lat);
@@ -555,6 +561,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         }
 
         if (latitude === undefined || longitude === undefined || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          skippedNoCoords++;
           continue;
         }
 
@@ -593,6 +600,14 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       
       // Sort by priority (addresses first, then residential types, then others)
       candidates.sort((a, b) => a.priority - b.priority);
+
+      console.log('[MarketingDiscovery] OSM building extraction stats', {
+        totalElements: elements.length,
+        centroidsFound,
+        nodesFound,
+        skippedNoCoords,
+        candidatesAfterFiltering: candidates.length
+      });
 
       if (progressCallback) progressCallback('Parsing Overpass results', 20);
       const addresses = [];
