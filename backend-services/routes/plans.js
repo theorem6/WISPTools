@@ -593,6 +593,43 @@ function generateInterpolatedCandidates(elements) {
   return interpolated;
 }
 
+const RESIDENTIAL_BUILDING_TYPES = new Set([
+  'house',
+  'residential',
+  'apartments',
+  'detached',
+  'semidetached_house',
+  'semi_detached_house',
+  'terrace',
+  'bungalow',
+  'cabin',
+  'farm',
+  'static_caravan',
+  'stilt_house',
+  'yes'
+]);
+
+function candidateHasResidentialSignal(tags = {}) {
+  if (!tags || typeof tags !== 'object') return false;
+  if (tags['addr:housenumber']) return true;
+  if (tags['addr:unit']) return true;
+  const building = tags.building;
+  if (building && RESIDENTIAL_BUILDING_TYPES.has(building)) return true;
+  if (building && building !== 'commercial') return true;
+  const place = tags.place;
+  if (place && ['household', 'house', 'hamlet', 'village'].includes(place)) return true;
+  if (tags.amenity && ['dwelling', 'house'].includes(tags.amenity)) return true;
+  return false;
+}
+
+function candidateLooksLikeRoad(tags = {}) {
+  if (!tags) return false;
+  if (tags.highway) return true;
+  if (tags.railway) return true;
+  if (tags.route) return true;
+  return false;
+}
+
 const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
   if (!ARC_GIS_API_KEY) {
     return null; // Fall back to Nominatim if no API key
@@ -759,10 +796,13 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       isRuralArea
     });
 
-    if (isRuralArea && candidates.length < RURAL_MIN_PRIMARY_RESULTS) {
-      console.log('[MarketingDiscovery] Rural area with sparse results, executing fallback query', {
-        currentCandidates: candidates.length,
-        threshold: RURAL_MIN_PRIMARY_RESULTS
+    if (isRuralArea) {
+      const shouldRunFallback = candidates.length < RURAL_MIN_PRIMARY_RESULTS;
+
+      console.log('[MarketingDiscovery] Rural fallback policy', {
+        primaryCandidates: candidates.length,
+        threshold: RURAL_MIN_PRIMARY_RESULTS,
+        executingFallback: shouldRunFallback ? true : 'forced'
       });
 
       if (progressCallback) progressCallback('Running rural fallback query', 18);
@@ -808,6 +848,28 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
     }
 
     candidates = candidates.slice(0, MAX_BUILDING_RESULTS);
+
+    const beforeFilterCount = candidates.length;
+    const filteredCandidates = candidates.filter((candidate) => {
+      if (!candidate || !candidate.tags) return false;
+      if (candidateLooksLikeRoad(candidate.tags)) return false;
+      return candidateHasResidentialSignal(candidate.tags);
+    });
+
+    if (filteredCandidates.length === 0 && beforeFilterCount > 0) {
+      console.log('[MarketingDiscovery] Residential filter removed all candidates, falling back to original set', {
+        beforeFilterCount
+      });
+    } else {
+      console.log('[MarketingDiscovery] Residential filter applied', {
+        beforeFilterCount,
+        afterFilterCount: filteredCandidates.length,
+        removed: beforeFilterCount - filteredCandidates.length
+      });
+      if (filteredCandidates.length > 0) {
+        candidates = filteredCandidates;
+      }
+    }
 
     console.log('[MarketingDiscovery] Final OSM candidate summary', {
       totalCandidates: candidates.length,
