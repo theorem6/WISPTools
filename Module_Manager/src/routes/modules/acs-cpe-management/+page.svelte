@@ -154,55 +154,8 @@
     }
   }
 
-  function loadFallbackSampleData() {
-    // Sample CPE devices for demonstration (fallback)
-    cpeDevices = [
-      {
-        id: 'nokia-lte-router-001',
-        manufacturer: 'Nokia',
-        status: 'Online',
-        location: {
-          latitude: 40.7128,
-          longitude: -74.0060
-        },
-        lastContact: new Date(),
-        parameters: {
-          SoftwareVersion: '1.2.3',
-          HardwareVersion: 'HW-2.1'
-        },
-        tenantId: tenantId
-      },
-      {
-        id: 'huawei-lte-cpe-002',
-        manufacturer: 'Huawei',
-        status: 'Online',
-        location: {
-          latitude: 40.7589,
-          longitude: -73.9851
-        },
-        lastContact: new Date(),
-        parameters: {
-          SoftwareVersion: '2.1.0',
-          HardwareVersion: 'HW-3.0'
-        }
-      },
-      {
-        id: 'zte-lte-modem-003',
-        manufacturer: 'ZTE',
-        status: 'Offline',
-        location: {
-          latitude: 40.6892,
-          longitude: -74.0445
-        },
-        lastContact: new Date(Date.now() - 300000), // 5 minutes ago
-        parameters: {
-          SoftwareVersion: '1.8.2',
-          HardwareVersion: 'HW-1.5'
-        }
-      }
-    ];
-    console.log(`Loaded ${cpeDevices.length} sample CPE devices (fallback)`);
-  }
+  // Removed loadFallbackSampleData() - no hardcoded test data
+  // All CPE devices should come from GenieACS or MongoDB
 
   async function initializeMap() {
     if (!mapContainer) return;
