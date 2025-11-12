@@ -341,7 +341,7 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const MAX_BUILDING_RESULTS = 500; // Allow more OSM buildings (FTTH approach)
+const MAX_BUILDING_RESULTS = 2000; // Increase limit to capture more buildings
 const MAX_REVERSE_GEOCODE = 500; // No artificial limit - geocode all (FTTH approach)
 const NOMINATIM_DELAY_MS = 500; // Reduced delay since ArcGIS doesn't need rate limiting
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
@@ -350,41 +350,15 @@ const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/Wor
 const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 
 const buildOverpassQuery = (bbox) => `
-[out:json][timeout:60];
+[out:json][timeout:60][maxsize:100000000];
 (
-  // Strategy 1: All buildings with any building tag (includes small buildings)
+  // Primary: ALL buildings in area (most comprehensive)
   way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 2: Explicit residential buildings (small houses, cabins, sheds)
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|cabin|bungalow|hut)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|cabin|bungalow|hut)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 3: Small structures often used for residences
-  way["building"~"^(shed|garage|outbuilding)$"]["residential"="yes"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 4: ANY address node (critical - these often represent small houses without building polygons)
+  // Secondary: Address nodes (points without building polygons - critical for rural/small buildings)
   node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 5: Address ways (buildings with addresses)
-  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 6: Structures with names (often rural properties)
-  way["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 7: Place=household (rural single-family homes)
-  way["place"~"^(household|house|plot|isolated_dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["place"~"^(household|house|plot|isolated_dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 8: Residential landuse with address nodes (finds small houses in subdivisions)
-  node["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Strategy 9: Building entrance nodes (often represent small structures)
-  node["entrance"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
-// Output: center for ways (building centroids), regular coordinates for nodes
+// Output: center for ways (building centroids), coordinates for nodes
 out center;
 `;
 
@@ -530,6 +504,12 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
     console.log('[MarketingDiscovery] Starting OSM building discovery', { boundingBox });
     if (progressCallback) progressCallback('Building Overpass query', 5);
     const overpassQuery = buildOverpassQuery(boundingBox);
+    
+    console.log('[MarketingDiscovery] Overpass Query:', {
+      boundingBox,
+      query: overpassQuery,
+      queryLength: overpassQuery.length
+    });
     
     // Add timeout to prevent hanging
     const controller = new AbortController();
@@ -1253,9 +1233,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
       if (latitude === undefined || longitude === undefined) return false;
 
       // Filter out addresses that only have street name (no house number)
-      // These are duplicates or invalid entries
+      // BUT allow empty addressLine1 (we'll use coordinates as fallback)
       const addressLine1 = address.addressLine1 || '';
-      if (addressLine1) {
+      if (addressLine1 && addressLine1.length > 0) {
         // Check if address starts with a number (valid house number)
         const startsWithNumber = /^\d/.test(addressLine1.trim());
         
@@ -1264,9 +1244,12 @@ router.post('/:id/marketing/discover', async (req, res) => {
         const looksLikeCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+/.test(addressLine1.trim());
         
         if (!startsWithNumber && !looksLikeCoordinates) {
-          console.log('[MarketingDiscovery] Skipping street-only address (no house number):', addressLine1);
+          console.log('[MarketingDiscovery] Filtered street-only (no house number):', addressLine1);
           return false;
         }
+      } else {
+        // No address line, use coordinates as identifier
+        address.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
       }
 
       for (const existing of combinedAddresses) {
