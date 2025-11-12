@@ -190,7 +190,13 @@ export class CoverageMapController {
     this.hasPerformedInitialFit = false;
     if (this.mapReady) {
       this.renderPlanDrafts()
-        .then(() => this.fitMapToVisibleGraphics())
+        .then(() => {
+          // Always fit to plan features if they exist, otherwise check for other graphics
+          if (this.planDraftFeatures.length > 0) {
+            return this.fitMapToVisibleGraphics(true);
+          }
+          return this.fitMapToVisibleGraphics();
+        })
         .catch(err => console.error('[CoverageMap] Plan draft render error:', err));
     }
   }
@@ -1263,20 +1269,24 @@ export class CoverageMapController {
 
     const graphics: any[] = [];
 
-    if (this.graphicsLayer?.graphics?.length) {
-      this.graphicsLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
-    }
-
-    if (this.filters.showMarketing && this.marketingLayer?.graphics?.length) {
-      this.marketingLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
-    }
-
+    // Prioritize plan features - if they exist, center on them
     if (this.planDraftLayer?.graphics?.length) {
       this.planDraftLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
     }
 
+    // Add other graphics if no plan features
+    if (graphics.length === 0) {
+      if (this.graphicsLayer?.graphics?.length) {
+        this.graphicsLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+      }
+
+      if (this.filters.showMarketing && this.marketingLayer?.graphics?.length) {
+        this.marketingLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+      }
+    }
+
     if (!graphics.length) {
-      // No graphics to fit - center on US or last deployed plan
+      // No graphics to fit - center on US (only when no plan is loaded)
       await this.centerOnUSOrLastDeployedPlan();
       return;
     }

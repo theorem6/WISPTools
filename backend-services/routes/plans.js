@@ -352,18 +352,19 @@ const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
 (
-  // Prioritize residential buildings with addresses (highest priority)
-  way["building"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // PRIMARY: Residential buildings with addresses (highest priority)
+  way["building"]["addr:housenumber"](!["building"~"^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|warehouse|factory|garage)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Residential building types (house, apartments, etc.)
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // SECONDARY: Specific residential building types
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building)$"](!["amenity"])(!["shop"])(!["office"])(!["craft"])(!["leisure"])(!["tourism"])(!["healthcare"])(!["education"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // All buildings (fallback - will filter by residential landuse if possible)
-  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // TERTIARY: Buildings in residential landuse areas (exclude commercial areas)
+  way["building"]["landuse"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"](is_in(${bbox.south},${bbox.west},${bbox.north},${bbox.east}) && t["landuse"="residential"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Nodes with building tags and addresses
-  node["building"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"~"^(residential|house|apartments)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Nodes with residential building tags and addresses (exclude businesses)
+  node["building"]["addr:housenumber"](!["amenity"])(!["shop"])(!["office"])(!["craft"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"~"^(residential|house|apartments)$"](!["amenity"])(!["shop"])(!["office"])(${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output centroids for ways, coordinates for nodes
 out center meta;
@@ -557,12 +558,21 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           continue;
         }
 
-        // Filter for residential buildings - check tags
+        // Filter for residential buildings - check tags and exclude businesses
         const buildingType = element.tags?.building;
         const hasAddress = element.tags?.['addr:housenumber'];
-        const isResidential = buildingType && /^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex)$/i.test(buildingType);
+        const isResidential = buildingType && /^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building)$/i.test(buildingType);
         
-        // Prioritize buildings with addresses or residential types, but include all buildings
+        // Exclude commercial/retail/industrial buildings
+        const isCommercial = buildingType && /^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage)$/i.test(buildingType);
+        const hasBusinessTags = element.tags?.amenity || element.tags?.shop || element.tags?.office || element.tags?.craft || element.tags?.leisure || element.tags?.tourism || element.tags?.healthcare || element.tags?.education;
+        
+        // Skip non-residential buildings
+        if (isCommercial || hasBusinessTags) {
+          continue;
+        }
+        
+        // Prioritize buildings with addresses or residential types
         const priority = hasAddress ? 1 : (isResidential ? 2 : 3);
         
         const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
@@ -712,6 +722,7 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     const payload = await response.json();
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
 
+    // Filter for residential addresses - exclude businesses
     const addresses = candidates
       .map((candidate) => {
         const location = candidate?.location;
@@ -719,6 +730,21 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
         const latitude = toNumber(location?.y);
         const longitude = toNumber(location?.x);
         if (latitude === undefined || longitude === undefined) {
+          return null;
+        }
+
+        // Check Addr_type - filter out businesses
+        const addrType = attributes.Addr_type || '';
+        const placeName = attributes.PlaceName || candidate.address || '';
+        
+        // Exclude commercial/business addresses
+        if (addrType && (addrType.includes('Commercial') || addrType.includes('Business') || addrType.includes('POI'))) {
+          return null;
+        }
+        
+        // Exclude if PlaceName suggests a business (common business keywords)
+        const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
+        if (businessKeywords.test(placeName)) {
           return null;
         }
 
