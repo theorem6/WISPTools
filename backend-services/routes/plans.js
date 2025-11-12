@@ -349,52 +349,249 @@ const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
 const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 
-const buildOverpassQuery = (bbox) => `
+const RURAL_AREA_THRESHOLD_KM2 = 1.0;
+const RURAL_MIN_PRIMARY_RESULTS = 25;
+const RURAL_MIN_AFTER_FALLBACK = 50;
+const RURAL_FALLBACK_MAX_RESULTS = 300;
+
+const buildPrimaryOverpassQuery = (bbox) => `
 [out:json][timeout:90][maxsize:100000000];
 (
-  // Primary: ALL buildings in area (most comprehensive)
+  // Strategy 1: All buildings with any building tag (most comprehensive)
   way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Specific residential building types
-  way["building"="house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="apartments"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="detached"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="semidetached_house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="semi_detached_house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="terrace"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="bungalow"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="cabin"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="farm"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="static_caravan"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["building"="stilt_house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Residential land use areas (catch-all for large residential zones)
-  way["landuse"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Address nodes (points without building polygons - critical for rural/small buildings)
+
+  // Strategy 2: Explicit residential buildings
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|semi_detached_house|terrace|bungalow|cabin|farm|static_caravan|stilt_house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"~"^(residential|house|apartments|detached|semidetached_house|semi_detached_house|terrace|bungalow|cabin|farm|static_caravan|stilt_house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+
+  // Strategy 3: Amenities tagged as dwellings
+  way["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+
+  // Strategy 4: Small structures & outbuildings
+  way["building"~"^(garage|shed|barn|outbuilding|storage|warehouse|hangar)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"~"^(garage|shed|barn|outbuilding|storage|warehouse|hangar)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+
+  // Strategy 5: Any structure with address information
+  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+
+  // Strategy 6: Named structures
+  way["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+
+  // Strategy 7: Rural tagging patterns
+  way["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+
+  // Strategy 8: Residential landuse polygons with addresses
+  way["landuse"~"^(residential|village_green)$"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["landuse"~"^(residential|village_green)$"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
-// Output: center for ways (building centroids), coordinates for nodes
 out center;
 `;
 
-// Generate a grid of sample points for reverse geocoding (backup when OSM is incomplete)
-const generateGridPoints = (bbox, gridSpacingMeters = 50) => {
-  const points = [];
-  const latStep = gridSpacingMeters / 111000; // ~111km per degree latitude
-  const lonStep = gridSpacingMeters / (111000 * Math.cos((bbox.north + bbox.south) / 2 * Math.PI / 180));
-  
-  for (let lat = bbox.south; lat <= bbox.north; lat += latStep) {
-    for (let lon = bbox.west; lon <= bbox.east; lon += lonStep) {
-      points.push({ lat, lon });
+const buildFallbackOverpassQuery = (bbox) => `
+[out:json][timeout:90][maxsize:100000000];
+(
+  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["amenity"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["amenity"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["shop"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["shop"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["office"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["office"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:city"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:city"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:postcode"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:postcode"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["power"~"^(pole|tower)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["power"~"^(pole|tower)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["name"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["name"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+);
+out center;
+`;
+
+const buildInterpolationOverpassQuery = (bbox) => `
+[out:json][timeout:90][maxsize:100000000];
+(
+  way["highway"~"^(primary|secondary|tertiary|residential|unclassified|track)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:interpolation"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["boundary"~"^(administrative|parcel)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["landuse"~"^(residential|village_green)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+);
+out geom;
+`;
+
+const computeBoundingBoxAreaKm2 = (bbox) => {
+  const width = Math.abs(bbox.east - bbox.west);
+  const height = Math.abs(bbox.north - bbox.south);
+  return width * height * 111 * 111;
+};
+
+async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    console.log(`[MarketingDiscovery] Overpass request (${label}) starting`);
+    const response = await fetch(OVERPASS_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      throw new Error(`Overpass API returned ${response.status}: ${details}`);
+    }
+
+    const payload = await response.json();
+    if (payload?.remark) {
+      console.log(`[MarketingDiscovery] Overpass remark (${label}):`, payload.remark);
+    }
+
+    return Array.isArray(payload?.elements) ? payload.elements : [];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function extractBuildingCandidates(elements, { precision = 20000, sourceLabel = 'osm_primary' }) {
+  const seen = new Map();
+  const candidates = [];
+
+  for (const element of elements) {
+    let latitude;
+    let longitude;
+
+    if (element.type === 'way' && element.center) {
+      latitude = toNumber(element.center.lat);
+      longitude = toNumber(element.center.lon);
+    } else if (element.type === 'node') {
+      latitude = toNumber(element.lat);
+      longitude = toNumber(element.lon);
+    } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
+      latitude = toNumber(element.geometry[0]?.lat);
+      longitude = toNumber(element.geometry[0]?.lon);
+    }
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      continue;
+    }
+
+    const roundedLat = Math.round(latitude * precision) / precision;
+    const roundedLon = Math.round(longitude * precision) / precision;
+    const key = `${roundedLat},${roundedLon}`;
+
+    if (!seen.has(key)) {
+      const candidate = {
+        lat: latitude,
+        lon: longitude,
+        tags: element.tags || {},
+        source: sourceLabel
+      };
+      seen.set(key, candidate);
+      candidates.push(candidate);
+    } else {
+      const existing = seen.get(key);
+
+      const existingHasAddress =
+        existing.tags?.['addr:housenumber'] ||
+        existing.tags?.['addr:street'] ||
+        existing.tags?.name;
+      const incomingHasAddress =
+        element.tags?.['addr:housenumber'] ||
+        element.tags?.['addr:street'] ||
+        element.tags?.name;
+
+      if (!existingHasAddress && incomingHasAddress) {
+        const updated = {
+          lat: latitude,
+          lon: longitude,
+          tags: element.tags || {},
+          source: sourceLabel
+        };
+        seen.set(key, updated);
+        const index = candidates.findIndex(
+          (candidate) =>
+            Math.abs(candidate.lat - existing.lat) < 0.00001 &&
+            Math.abs(candidate.lon - existing.lon) < 0.00001
+        );
+        if (index >= 0) {
+          candidates[index] = updated;
+        }
+      }
+    }
+
+    if (candidates.length >= MAX_BUILDING_RESULTS) {
+      break;
     }
   }
-  
-  return points;
-};
+
+  return candidates;
+}
+
+function mergeCandidateSets(primary, secondary, precision = 20000) {
+  const merged = new Map();
+  const addCandidate = (candidate) => {
+    const roundedLat = Math.round(candidate.lat * precision) / precision;
+    const roundedLon = Math.round(candidate.lon * precision) / precision;
+    const key = `${roundedLat},${roundedLon}`;
+    if (!merged.has(key)) {
+      merged.set(key, candidate);
+    }
+  };
+
+  primary.forEach(addCandidate);
+  secondary.forEach(addCandidate);
+
+  return Array.from(merged.values()).slice(0, MAX_BUILDING_RESULTS);
+}
+
+function generateInterpolatedCandidates(elements) {
+  const interpolated = [];
+
+  for (const element of elements) {
+    if (element.type === 'way' && Array.isArray(element.geometry)) {
+      for (let i = 0; i < element.geometry.length; i += 2) {
+        const point = element.geometry[i];
+        if (!point) continue;
+        const lat = toNumber(point.lat);
+        const lon = toNumber(point.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
+        const offsetLat = lat + (Math.random() - 0.5) * 0.0005; // ~30m offset
+        const offsetLon = lon + (Math.random() - 0.5) * 0.0005;
+
+        interpolated.push({
+          lat: offsetLat,
+          lon: offsetLon,
+          tags: {
+            building: 'residential',
+            source: 'osm_interpolated',
+            note: 'Potential rural house location'
+          },
+          source: 'osm_interpolated'
+        });
+
+        if (interpolated.length >= 20) {
+          return interpolated;
+        }
+      }
+    }
+  }
+
+  return interpolated;
+}
 
 const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
   if (!ARC_GIS_API_KEY) {
@@ -537,123 +734,108 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
   try {
     console.log('[MarketingDiscovery] Starting OSM building discovery', { boundingBox });
     if (progressCallback) progressCallback('Building Overpass query', 5);
-    const overpassQuery = buildOverpassQuery(boundingBox);
-    
-    console.log('[MarketingDiscovery] Overpass Query:', {
-      boundingBox,
-      query: overpassQuery,
-      queryLength: overpassQuery.length
+
+    const areaKm2 = computeBoundingBoxAreaKm2(boundingBox);
+    const isRuralArea = areaKm2 > RURAL_AREA_THRESHOLD_KM2;
+    console.log('[MarketingDiscovery] OSM area analysis', {
+      areaKm2: areaKm2.toFixed(2),
+      isRuralArea
     });
-    
-    // Add timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      console.warn('[MarketingDiscovery] OSM Overpass API timeout triggered');
-      controller.abort();
-    }, 45000); // 45 second timeout
-    
-    try {
-      if (progressCallback) progressCallback('Fetching from Overpass API', 10);
-      console.log('[MarketingDiscovery] Fetching from Overpass API...');
-      const overpassResponse = await fetch(OVERPASS_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `data=${encodeURIComponent(overpassQuery)}`,
-        signal: controller.signal
+
+    if (progressCallback) progressCallback('Fetching primary OSM dataset', 10);
+    const primaryElements = await executeOverpassQuery({
+      query: buildPrimaryOverpassQuery(boundingBox),
+      label: 'primary'
+    });
+
+    let candidates = extractBuildingCandidates(primaryElements, {
+      precision: isRuralArea ? 10000 : 20000,
+      sourceLabel: 'osm_primary'
+    });
+
+    console.log('[MarketingDiscovery] OSM primary extraction stats', {
+      totalElements: primaryElements.length,
+      candidates: candidates.length,
+      isRuralArea
+    });
+
+    if (isRuralArea && candidates.length < RURAL_MIN_PRIMARY_RESULTS) {
+      console.log('[MarketingDiscovery] Rural area with sparse results, executing fallback query', {
+        currentCandidates: candidates.length,
+        threshold: RURAL_MIN_PRIMARY_RESULTS
       });
-      
-      clearTimeout(timeoutId);
-      console.log('[MarketingDiscovery] Overpass API response received', { status: overpassResponse.status });
 
-      if (!overpassResponse.ok) {
-        const details = await overpassResponse.text().catch(() => '');
-        throw new Error(`Overpass API returned ${overpassResponse.status}: ${details}`);
-      }
-
-      const overpassData = await overpassResponse.json();
-      console.log('[MarketingDiscovery] Overpass data parsed', { 
-        elementCount: overpassData.elements?.length || 0,
-        sampleElement: overpassData.elements?.[0] 
+      if (progressCallback) progressCallback('Running rural fallback query', 18);
+      const fallbackElements = await executeOverpassQuery({
+        query: buildFallbackOverpassQuery(boundingBox),
+        label: 'fallback'
       });
-      const elements = Array.isArray(overpassData.elements) ? overpassData.elements : [];
 
-      const seen = new Set();
-      const candidates = [];
-      let centroidsFound = 0;
-      let nodesFound = 0;
-      let skippedNoCoords = 0;
+      const fallbackCandidates = extractBuildingCandidates(fallbackElements, {
+        precision: 10000,
+        sourceLabel: 'osm_fallback'
+      }).slice(0, RURAL_FALLBACK_MAX_RESULTS);
 
-      for (const element of elements) {
-        // Extract centroid/coordinates - prioritize center for ways (building footprints)
-        let latitude, longitude;
-        
-        if (element.type === 'way' && element.center) {
-          // Way with computed center (building footprint centroid)
-          latitude = toNumber(element.center.lat);
-          longitude = toNumber(element.center.lon);
-          centroidsFound++;
-        } else if (element.type === 'node') {
-          // Node coordinates
-          latitude = toNumber(element.lat);
-          longitude = toNumber(element.lon);
-          nodesFound++;
-        } else if (element.lat !== undefined && element.lon !== undefined) {
-          // Direct coordinates
-          latitude = toNumber(element.lat);
-          longitude = toNumber(element.lon);
-        } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
-          // Geometry array - use first point
-          latitude = toNumber(element.geometry[0]?.lat);
-          longitude = toNumber(element.geometry[0]?.lon);
-        }
+      console.log('[MarketingDiscovery] Fallback extraction stats', {
+        fallbackElements: fallbackElements.length,
+        fallbackCandidates: fallbackCandidates.length
+      });
 
-        if (latitude === undefined || longitude === undefined || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-          skippedNoCoords++;
-          continue;
-        }
+      candidates = mergeCandidateSets(candidates, fallbackCandidates, 10000);
+      console.log('[MarketingDiscovery] Candidate count after fallback merge', {
+        mergedCandidates: candidates.length
+      });
 
-        // Simple deduplication by coordinates only (5 decimal places = ~1.1m precision)
-        const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        candidates.push({
-          lat: latitude,
-          lon: longitude,
-          buildingType: element.tags?.building || 'unknown',
-          tags: element.tags || {}
+      if (candidates.length < RURAL_MIN_AFTER_FALLBACK) {
+        console.log('[MarketingDiscovery] Results still sparse, generating interpolation candidates', {
+          currentCandidates: candidates.length
         });
 
-        if (candidates.length >= MAX_BUILDING_RESULTS) break;
+        if (progressCallback) progressCallback('Interpolating rural houses', 22);
+        const interpolationElements = await executeOverpassQuery({
+          query: buildInterpolationOverpassQuery(boundingBox),
+          label: 'interpolation'
+        });
+
+        const interpolated = generateInterpolatedCandidates(interpolationElements);
+        console.log('[MarketingDiscovery] Interpolation generated candidates', {
+          interpolationElements: interpolationElements.length,
+          interpolated: interpolated.length
+        });
+
+        candidates = mergeCandidateSets(candidates, interpolated, 10000);
       }
+    }
 
-      console.log('[MarketingDiscovery] OSM building extraction stats', {
-        totalElements: elements.length,
-        centroidsFound,
-        nodesFound,
-        skippedNoCoords,
-        candidatesAfterFiltering: candidates.length,
-        boundingBox,
-        sampleTags: elements.slice(0, 3).map(e => ({type: e.type, tags: e.tags}))
-      });
+    candidates = candidates.slice(0, MAX_BUILDING_RESULTS);
 
-      if (progressCallback) progressCallback('Parsing Overpass results', 20);
-      const addresses = [];
-      let geocodedCount = 0;
-      let failedCount = 0;
-      const reverseGeocodeStartTime = Date.now();
-      const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
-      const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS
+    console.log('[MarketingDiscovery] Final OSM candidate summary', {
+      totalCandidates: candidates.length,
+      sample: candidates.slice(0, 5).map((c) => ({
+        lat: c.lat,
+        lon: c.lon,
+        source: c.source,
+        hasAddress: Boolean(
+          c.tags?.['addr:housenumber'] || c.tags?.['addr:street'] || c.tags?.name
+        )
+      }))
+    });
 
-      // Reverse geocode ALL candidates (ArcGIS is fast and accurate)
-      console.log('[MarketingDiscovery] Starting reverse geocoding for all candidates', { 
-        totalCandidates: candidates.length,
-        usingArcGIS: !!ARC_GIS_API_KEY 
-      });
+    if (progressCallback) progressCallback('Parsing Overpass results', 25);
 
-      for (let index = 0; index < candidates.length; index += 1) {
+    const addresses = [];
+    let geocodedCount = 0;
+    let failedCount = 0;
+    const reverseGeocodeStartTime = Date.now();
+    const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
+    const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS
+
+    console.log('[MarketingDiscovery] Starting reverse geocoding for OSM candidates', {
+      totalCandidates: candidates.length,
+      usingArcGIS: !!ARC_GIS_API_KEY
+    });
+
+    for (let index = 0; index < candidates.length; index += 1) {
         const candidate = candidates[index];
         
         if (progressCallback && index % 10 === 0) {
@@ -715,37 +897,33 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         }
       }
       
-      const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
-      console.log('[MarketingDiscovery] Reverse geocoding completed', { 
-        duration: `${reverseGeocodeDuration}ms`,
-        durationPerAddress: `${(reverseGeocodeDuration / candidates.length).toFixed(0)}ms`,
-        geocoded: geocodedCount,
-        failed: failedCount,
-        total: candidates.length,
-        addressesWithLine1: addresses.filter(a => a.addressLine1).length,
-        sampleAddresses: addresses.slice(0, 5).map(a => a.addressLine1),
-        successRate: `${((geocodedCount / candidates.length) * 100).toFixed(1)}%`
-      });
+    const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
+    console.log('[MarketingDiscovery] Reverse geocoding completed', { 
+      duration: `${reverseGeocodeDuration}ms`,
+      durationPerAddress: candidates.length ? `${(reverseGeocodeDuration / candidates.length).toFixed(0)}ms` : '0ms',
+      geocoded: geocodedCount,
+      failed: failedCount,
+      total: candidates.length,
+      addressesWithLine1: addresses.filter(a => a.addressLine1).length,
+      sampleAddresses: addresses.slice(0, 5).map(a => a.addressLine1),
+      successRate: candidates.length ? `${((geocodedCount / candidates.length) * 100).toFixed(1)}%` : '0%'
+    });
 
-      result.addresses = addresses;
-      result.stats.rawCandidates = candidates.length;
-      result.stats.geocoded = geocodedCount;
-      console.log('[MarketingDiscovery] OSM discovery completed', { 
-        osmCentroidsFound: centroidsFound,
-        candidatesAfterFiltering: candidates.length, 
-        successfullyGeocoded: geocodedCount,
-        failedGeocoding: failedCount,
-        totalAddresses: addresses.length,
-        accuracyRate: `${((geocodedCount / addresses.length) * 100).toFixed(1)}%`
-      });
-      return result;
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        throw new Error('Overpass API request timed out after 45 seconds');
-      }
-      throw fetchError;
-    }
+    result.addresses = addresses;
+    result.stats.rawCandidates = candidates.length;
+    result.stats.geocoded = geocodedCount;
+    console.log('[MarketingDiscovery] OSM discovery completed', { 
+      totalCandidates: candidates.length,
+      successfullyGeocoded: geocodedCount,
+      failedGeocoding: failedCount,
+      totalAddresses: addresses.length,
+      accuracyRate: addresses.length ? `${((geocodedCount / addresses.length) * 100).toFixed(1)}%` : '0%',
+      sampleAddresses: addresses.slice(0, 5).map((address) => ({
+        addressLine1: address.addressLine1,
+        source: address.source
+      }))
+    });
+    return result;
   } catch (error) {
     const message =
       error?.message ||
@@ -2861,3 +3039,4 @@ function normalizeEquipmentType(type) {
 }
 
 module.exports = router;
+
