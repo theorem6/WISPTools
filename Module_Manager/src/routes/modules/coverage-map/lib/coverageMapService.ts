@@ -183,6 +183,12 @@ export class CoverageMapService {
         outFields: 'Match_addr,Addr_type'
       });
       
+      // Add API key if available
+      const arcgisApiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      if (arcgisApiKey) {
+        params.set('token', arcgisApiKey);
+      }
+      
       const response = await fetch(`${url}?${params.toString()}`);
       const data = await response.json();
       
@@ -210,6 +216,12 @@ export class CoverageMapService {
         location: `${longitude},${latitude}`,
         outSR: '4326'
       });
+      
+      // Add API key if available
+      const arcgisApiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      if (arcgisApiKey) {
+        params.set('token', arcgisApiKey);
+      }
       
       const response = await fetch(`${url}?${params.toString()}`);
       const data = await response.json();

@@ -40,7 +40,8 @@
       ]);
 
       // Set up ArcGIS API key (if you have one)
-      esriConfig.default.apiKey = '';
+      const arcgisApiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY || '';
+      esriConfig.default.apiKey = arcgisApiKey;
 
       // Create graphics layer for CPE markers
       const graphicsLayer = new GraphicsLayer();

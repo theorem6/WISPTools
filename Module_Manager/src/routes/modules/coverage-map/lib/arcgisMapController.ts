@@ -338,6 +338,18 @@ export class CoverageMapController {
 
     console.log('Initializing Coverage Map with ArcGIS...');
 
+    // Set ArcGIS API key if available
+    try {
+      const { default: esriConfig } = await import('@arcgis/core/config.js');
+      const arcgisApiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      if (arcgisApiKey) {
+        esriConfig.apiKey = arcgisApiKey;
+        console.log('[CoverageMap] ArcGIS API key configured');
+      }
+    } catch (configError) {
+      console.warn('[CoverageMap] Failed to configure ArcGIS API key:', configError);
+    }
+
     const [
       { default: Map },
       { default: MapView },
