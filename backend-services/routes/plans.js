@@ -341,8 +341,8 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const MAX_BUILDING_RESULTS = 150;
-const MAX_REVERSE_GEOCODE = 20; // Increased since ArcGIS is faster
+const MAX_BUILDING_RESULTS = 500; // Allow more OSM buildings (FTTH approach)
+const MAX_REVERSE_GEOCODE = 500; // No artificial limit - geocode all (FTTH approach)
 const NOMINATIM_DELAY_MS = 500; // Reduced delay since ArcGIS doesn't need rate limiting
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
@@ -352,17 +352,33 @@ const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
 (
-  // PRIMARY: Residential buildings with addresses (highest priority)
-  way["building"]["addr:housenumber"]["building"!~"^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage|store|barn)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 1: All buildings with any building tag (most comprehensive)
+  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // SECONDARY: Specific residential building types
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building|cabin)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 2: Explicit residential buildings
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"~"^(residential|house|apartments|detached|semidetached_house|terrace)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // TERTIARY: Generic "yes" or "building" tags (common for residential), excluding commercial tags
-  way["building"="yes"]["building"!~"^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage|store|barn)$"][!"shop"][!"office"][!"amenity"]["tourism"!~"."](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 3: Structures tagged as amenities that might be houses
+  way["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Nodes with residential building tags
-  node["building"~"^(residential|house|apartments|detached|cabin)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 4: ANY structure with address information (critical for rural houses)
+  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Strategy 5: Structures with names (often rural properties)
+  way["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Strategy 6: Structures with place=household (rural tagging pattern)
+  way["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Strategy 7: Any structure with residential address components
+  way["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output centroids for ways, coordinates for nodes
 out center meta;
@@ -565,31 +581,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           continue;
         }
 
-        // Filter for residential buildings - check tags and exclude businesses
-        const buildingType = element.tags?.building;
-        const hasAddress = element.tags?.['addr:housenumber'];
-        const isResidential = buildingType && /^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building|cabin)$/i.test(buildingType);
-        
-        // Exclude clear commercial/retail/industrial buildings
-        const isCommercial = buildingType && /^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage|store|barn)$/i.test(buildingType);
-        
-        // Check for explicit business tags that indicate non-residential use
-        const hasBusinessTags = 
-          element.tags?.shop || 
-          element.tags?.office || 
-          element.tags?.craft || 
-          element.tags?.tourism || 
-          element.tags?.healthcare || 
-          element.tags?.['amenity'] && /^(school|hospital|clinic|pharmacy|fuel|bank|post_office|restaurant|cafe|bar|pub|fast_food|place_of_worship|parking)$/i.test(element.tags.amenity);
-        
-        // Skip clearly non-residential buildings
-        if (isCommercial || hasBusinessTags) {
-          continue;
-        }
-        
-        // Prioritize buildings with addresses or residential types
-        const priority = hasAddress ? 1 : (isResidential ? 2 : 3);
-        
+        // Simple deduplication by coordinates only (5 decimal places = ~1.1m precision)
         const key = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -597,17 +589,12 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         candidates.push({
           lat: latitude,
           lon: longitude,
-          priority,
-          hasAddress: !!hasAddress,
-          buildingType: buildingType || 'unknown',
+          buildingType: element.tags?.building || 'unknown',
           tags: element.tags || {}
         });
 
         if (candidates.length >= MAX_BUILDING_RESULTS) break;
       }
-      
-      // Sort by priority (addresses first, then residential types, then others)
-      candidates.sort((a, b) => a.priority - b.priority);
 
       console.log('[MarketingDiscovery] OSM building extraction stats', {
         totalElements: elements.length,
