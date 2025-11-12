@@ -612,74 +612,99 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       if (progressCallback) progressCallback('Parsing Overpass results', 20);
       const addresses = [];
       let geocodedCount = 0;
+      let failedCount = 0;
       const reverseGeocodeStartTime = Date.now();
       const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
-      const maxReverseGeocode =
-        toNumber(advancedOptions?.reverse?.batchSize) ?? (ARC_GIS_API_KEY ? MAX_REVERSE_GEOCODE : 5); // Reduce to 5 if using Nominatim
-      const reverseDelay =
-        toNumber(advancedOptions?.reverse?.perRequestTimeoutMs) ?? (ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS); // No delay for ArcGIS
+      const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS
+
+      // Reverse geocode ALL candidates (ArcGIS is fast and accurate)
+      console.log('[MarketingDiscovery] Starting reverse geocoding for all candidates', { 
+        totalCandidates: candidates.length,
+        usingArcGIS: !!ARC_GIS_API_KEY 
+      });
 
       for (let index = 0; index < candidates.length; index += 1) {
-        if (progressCallback && geocodedCount < maxReverseGeocode) {
-          const geocodeProgress = 20 + ((geocodedCount / maxReverseGeocode) * 60);
-          progressCallback(`Reverse geocoding ${geocodedCount + 1}/${maxReverseGeocode}`, geocodeProgress, {
-            current: geocodedCount + 1,
-            total: maxReverseGeocode
+        const candidate = candidates[index];
+        
+        if (progressCallback && index % 10 === 0) {
+          const geocodeProgress = 20 + ((index / candidates.length) * 60);
+          progressCallback(`Reverse geocoding ${index + 1}/${candidates.length}`, geocodeProgress, {
+            current: index + 1,
+            total: candidates.length,
+            geocoded: geocodedCount,
+            failed: failedCount
           });
         }
-        const candidate = candidates[index];
-        if (geocodedCount < maxReverseGeocode) {
-          try {
-            // Only delay for Nominatim (OSM fallback) - ArcGIS doesn't need delays
-            if (geocodedCount > 0 && !ARC_GIS_API_KEY) {
-              await delay(reverseDelay);
-            }
-            
-            // Add timeout to individual reverse geocode calls (shorter for Nominatim)
-            const timeoutMs = ARC_GIS_API_KEY ? REVERSE_GEOCODE_TIMEOUT : 5000; // 5s for Nominatim, 10s for ArcGIS
-            const geocodePromise = reverseGeocodeCoordinate(candidate.lat, candidate.lon);
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Reverse geocode timeout')), timeoutMs)
-            );
-            
-            const details = await Promise.race([geocodePromise, timeoutPromise]);
-            if (details) {
-              addresses.push({
-                ...details,
-                source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
-              });
-              geocodedCount += 1;
-              continue;
-            }
-          } catch (error) {
-            console.warn('[MarketingDiscovery] Reverse geocode failed:', error?.message || error);
-            // Continue to next candidate instead of breaking
-          }
-        }
 
-        addresses.push({
-          addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
-          latitude: candidate.lat,
-          longitude: candidate.lon,
-          country: 'US',
-          source: 'osm_buildings'
-        });
+        try {
+          // Only delay for Nominatim (OSM fallback) - ArcGIS doesn't need delays
+          if (index > 0 && !ARC_GIS_API_KEY) {
+            await delay(reverseDelay);
+          }
+          
+          // Add timeout to individual reverse geocode calls
+          const timeoutMs = ARC_GIS_API_KEY ? REVERSE_GEOCODE_TIMEOUT : 5000;
+          const geocodePromise = reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Reverse geocode timeout')), timeoutMs)
+          );
+          
+          const details = await Promise.race([geocodePromise, timeoutPromise]);
+          if (details && details.addressLine1) {
+            addresses.push({
+              ...details,
+              source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
+            });
+            geocodedCount += 1;
+          } else {
+            // No address returned, use coordinates
+            failedCount += 1;
+            addresses.push({
+              addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+              latitude: candidate.lat,
+              longitude: candidate.lon,
+              country: 'US',
+              source: 'osm_buildings'
+            });
+          }
+        } catch (error) {
+          console.warn('[MarketingDiscovery] Reverse geocode failed for centroid:', {
+            lat: candidate.lat,
+            lon: candidate.lon,
+            error: error?.message || error
+          });
+          failedCount += 1;
+          // Fallback to coordinates
+          addresses.push({
+            addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+            latitude: candidate.lat,
+            longitude: candidate.lon,
+            country: 'US',
+            source: 'osm_buildings'
+          });
+        }
       }
       
       const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
       console.log('[MarketingDiscovery] Reverse geocoding completed', { 
         duration: `${reverseGeocodeDuration}ms`,
+        durationPerAddress: `${(reverseGeocodeDuration / candidates.length).toFixed(0)}ms`,
         geocoded: geocodedCount,
-        total: candidates.length 
+        failed: failedCount,
+        total: candidates.length,
+        successRate: `${((geocodedCount / candidates.length) * 100).toFixed(1)}%`
       });
 
       result.addresses = addresses;
       result.stats.rawCandidates = candidates.length;
       result.stats.geocoded = geocodedCount;
       console.log('[MarketingDiscovery] OSM discovery completed', { 
-        candidates: candidates.length, 
-        geocoded: geocodedCount,
-        addresses: addresses.length 
+        osmCentroidsFound: centroidsFound,
+        candidatesAfterFiltering: candidates.length, 
+        successfullyGeocoded: geocodedCount,
+        failedGeocoding: failedCount,
+        totalAddresses: addresses.length,
+        accuracyRate: `${((geocodedCount / addresses.length) * 100).toFixed(1)}%`
       });
       return result;
     } catch (fetchError) {
