@@ -354,11 +354,27 @@ const buildOverpassQuery = (bbox) => `
 (
   // Primary: ALL buildings in area (most comprehensive)
   way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Secondary: Address nodes (points without building polygons - critical for rural/small buildings)
+  // Specific residential building types
+  way["building"="house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="apartments"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="detached"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="semidetached_house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="semi_detached_house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="terrace"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="bungalow"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="cabin"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="farm"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="static_caravan"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"="stilt_house"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Residential land use areas (catch-all for large residential zones)
+  way["landuse"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Address nodes (points without building polygons - critical for rural/small buildings)
   node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // Tertiary: Any node with address tags (captures more residential addresses)
   node["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output: center for ways (building centroids), coordinates for nodes
