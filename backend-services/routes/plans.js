@@ -350,17 +350,35 @@ const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/Wor
 const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 
 const buildOverpassQuery = (bbox) => `
-[out:json][timeout:60][maxsize:100000000];
+[out:json][timeout:90][maxsize:100000000];
 (
   // Primary: ALL buildings in area (most comprehensive)
   way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
   // Secondary: Address nodes (points without building polygons - critical for rural/small buildings)
   node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Tertiary: Any node with address tags (captures more residential addresses)
+  node["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output: center for ways (building centroids), coordinates for nodes
 out center;
 `;
+
+// Generate a grid of sample points for reverse geocoding (backup when OSM is incomplete)
+const generateGridPoints = (bbox, gridSpacingMeters = 50) => {
+  const points = [];
+  const latStep = gridSpacingMeters / 111000; // ~111km per degree latitude
+  const lonStep = gridSpacingMeters / (111000 * Math.cos((bbox.north + bbox.south) / 2 * Math.PI / 180));
+  
+  for (let lat = bbox.south; lat <= bbox.north; lat += latStep) {
+    for (let lon = bbox.west; lon <= bbox.east; lon += lonStep) {
+      points.push({ lat, lon });
+    }
+  }
+  
+  return points;
+};
 
 const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
   if (!ARC_GIS_API_KEY) {
@@ -723,7 +741,13 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 }
 
 async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
+  console.log('[MarketingDiscovery] ArcGIS Address Points Discovery called', {
+    hasApiKey: !!ARC_GIS_API_KEY,
+    boundingBox
+  });
+  
   if (!ARC_GIS_API_KEY) {
+    console.warn('[MarketingDiscovery] ArcGIS API key not configured, skipping address points');
     return { addresses: [], error: 'ArcGIS API key not configured' };
   }
 
@@ -731,10 +755,16 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     const params = new URLSearchParams({
       f: 'json',
       outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
-      maxLocations: '150',
+      maxLocations: '500',  // Increased from 150
       searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
       category: 'Point Address',
       forStorage: 'false'
+    });
+    
+    console.log('[MarketingDiscovery] ArcGIS Address Points query params', {
+      maxLocations: 500,
+      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+      category: 'Point Address'
     });
 
     if (center?.lon !== undefined && center?.lat !== undefined) {
@@ -759,6 +789,11 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
 
     const payload = await response.json();
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+    
+    console.log('[MarketingDiscovery] ArcGIS Address Points raw response', {
+      candidatesFound: candidates.length,
+      sampleCandidate: candidates[0]
+    });
 
     // Filter for residential addresses - exclude businesses
     const addresses = candidates
@@ -801,6 +836,13 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
         };
       })
       .filter(Boolean);
+    
+    console.log('[MarketingDiscovery] ArcGIS Address Points filtered results', {
+      totalCandidates: candidates.length,
+      afterFiltering: addresses.length,
+      filteredOut: candidates.length - addresses.length,
+      sampleAddress: addresses[0]
+    });
 
     return { addresses };
   } catch (error) {
@@ -1322,6 +1364,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
       try {
+        console.log('[MarketingDiscovery] Starting ArcGIS address points discovery', {
+          boundingBox,
+          center: computedCenter,
+          hasApiKey: !!ARC_GIS_API_KEY
+        });
         updateProgress('Running ArcGIS address points discovery', 50);
         const arcgisResult = await runArcgisAddressPointsDiscovery({
           boundingBox,
