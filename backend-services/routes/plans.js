@@ -342,8 +342,8 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const MAX_BUILDING_RESULTS = 150;
-const MAX_REVERSE_GEOCODE = 15;
-const NOMINATIM_DELAY_MS = 1200;
+const MAX_REVERSE_GEOCODE = 5; // Reduced from 15 to speed up requests
+const NOMINATIM_DELAY_MS = 1000; // Reduced from 1200ms to 1000ms
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
@@ -497,6 +497,8 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 
       const addresses = [];
       let geocodedCount = 0;
+      const reverseGeocodeStartTime = Date.now();
+      const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
 
       for (let index = 0; index < candidates.length; index += 1) {
         const candidate = candidates[index];
@@ -505,7 +507,14 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
             if (geocodedCount > 0) {
               await delay(reverseDelay);
             }
-            const details = await reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+            
+            // Add timeout to individual reverse geocode calls
+            const geocodePromise = reverseGeocodeCoordinate(candidate.lat, candidate.lon);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Reverse geocode timeout')), REVERSE_GEOCODE_TIMEOUT)
+            );
+            
+            const details = await Promise.race([geocodePromise, timeoutPromise]);
             if (details) {
               addresses.push({
                 ...details,
@@ -515,7 +524,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
               continue;
             }
           } catch (error) {
-            console.warn('[MarketingDiscovery] Reverse geocode fallback failed:', error?.message || error);
+            console.warn('[MarketingDiscovery] Reverse geocode failed:', error?.message || error);
           }
         }
 
@@ -527,6 +536,13 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           source: 'osm_buildings'
         });
       }
+      
+      const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
+      console.log('[MarketingDiscovery] Reverse geocoding completed', { 
+        duration: `${reverseGeocodeDuration}ms`,
+        geocoded: geocodedCount,
+        total: candidates.length 
+      });
 
       result.addresses = addresses;
       result.stats.rawCandidates = candidates.length;
@@ -927,16 +943,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
     boundingBox: req.body.boundingBox 
   });
   
-  // Set a timeout for the entire request (60 seconds)
+  // Set a timeout for the entire request (120 seconds to allow for reverse geocoding)
   const requestTimeout = setTimeout(() => {
     if (!res.headersSent) {
-      console.error('[MarketingDiscovery] Request timeout after 60 seconds');
+      console.error('[MarketingDiscovery] Request timeout after 120 seconds');
       res.status(504).json({ 
         error: 'Request timeout', 
         message: 'Marketing discovery request took too long to complete' 
       });
     }
-  }, 60000);
+  }, 120000);
   
   try {
     const plan = await PlanProject.findOne({
@@ -1144,18 +1160,22 @@ router.post('/:id/marketing/discover', async (req, res) => {
       geocodedCount 
     });
     
-    res.json({
-      summary: {
-        totalCandidates: combinedAddresses.length,
-        geocodedCount,
-        radiusMiles,
-        boundingBox,
-        center: computedCenter,
-        algorithmsUsed: algorithms,
-        algorithmStats
-      },
-      addresses: combinedAddresses
-    });
+    if (!res.headersSent) {
+      res.json({
+        summary: {
+          totalCandidates: combinedAddresses.length,
+          geocodedCount,
+          radiusMiles,
+          boundingBox,
+          center: computedCenter,
+          algorithmsUsed: algorithms,
+          algorithmStats
+        },
+        addresses: combinedAddresses
+      });
+    } else {
+      console.warn('[MarketingDiscovery] Response already sent, skipping duplicate response');
+    }
   } catch (error) {
     clearTimeout(requestTimeout);
     const requestDuration = Date.now() - requestStartTime;
@@ -1169,6 +1189,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
         message: error.message || 'Unknown error occurred',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
+    } else {
+      console.warn('[MarketingDiscovery] Response already sent, skipping error response');
     }
   }
 });
