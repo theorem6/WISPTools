@@ -353,16 +353,16 @@ const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
 (
   // PRIMARY: Residential buildings with addresses (highest priority)
-  way["building"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"]["addr:housenumber"]["building"!~"^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage|store|barn)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
   // SECONDARY: Specific residential building types
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building|cabin)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // TERTIARY: Generic buildings (we'll filter commercial/business in post-processing)
-  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // TERTIARY: Generic "yes" or "building" tags (common for residential), excluding commercial tags
+  way["building"="yes"]["building"!~"^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage|store|barn)$"][!"shop"][!"office"][!"amenity"]["tourism"!~"."](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Nodes with building tags
-  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Nodes with residential building tags
+  node["building"~"^(residential|house|apartments|detached|cabin)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output centroids for ways, coordinates for nodes
 out center meta;
@@ -568,13 +568,21 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         // Filter for residential buildings - check tags and exclude businesses
         const buildingType = element.tags?.building;
         const hasAddress = element.tags?.['addr:housenumber'];
-        const isResidential = buildingType && /^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building)$/i.test(buildingType);
+        const isResidential = buildingType && /^(residential|house|apartments|detached|semidetached_house|terrace|bungalow|villa|duplex|residential_building|cabin)$/i.test(buildingType);
         
-        // Exclude commercial/retail/industrial buildings
-        const isCommercial = buildingType && /^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage)$/i.test(buildingType);
-        const hasBusinessTags = element.tags?.amenity || element.tags?.shop || element.tags?.office || element.tags?.craft || element.tags?.leisure || element.tags?.tourism || element.tags?.healthcare || element.tags?.education;
+        // Exclude clear commercial/retail/industrial buildings
+        const isCommercial = buildingType && /^(commercial|retail|industrial|warehouse|office|shop|mall|supermarket|restaurant|hotel|hospital|school|university|church|factory|garage|store|barn)$/i.test(buildingType);
         
-        // Skip non-residential buildings
+        // Check for explicit business tags that indicate non-residential use
+        const hasBusinessTags = 
+          element.tags?.shop || 
+          element.tags?.office || 
+          element.tags?.craft || 
+          element.tags?.tourism || 
+          element.tags?.healthcare || 
+          element.tags?.['amenity'] && /^(school|hospital|clinic|pharmacy|fuel|bank|post_office|restaurant|cafe|bar|pub|fast_food|place_of_worship|parking)$/i.test(element.tags.amenity);
+        
+        // Skip clearly non-residential buildings
         if (isCommercial || hasBusinessTags) {
           continue;
         }
