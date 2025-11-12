@@ -621,35 +621,6 @@ function candidateHasResidentialSignal(tags = {}) {
   return false;
 }
 
-const RESIDENTIAL_BUILDING_TYPES = new Set([
-  'house',
-  'residential',
-  'apartments',
-  'detached',
-  'semidetached_house',
-  'semi_detached_house',
-  'terrace',
-  'bungalow',
-  'cabin',
-  'farm',
-  'static_caravan',
-  'stilt_house',
-  'yes'
-]);
-
-function candidateHasResidentialSignal(tags = {}) {
-  if (!tags || typeof tags !== 'object') return false;
-  if (tags['addr:housenumber']) return true;
-  if (tags['addr:unit']) return true;
-  const building = tags.building;
-  if (building && RESIDENTIAL_BUILDING_TYPES.has(building)) return true;
-  if (building && building !== 'commercial') return true;
-  const place = tags.place;
-  if (place && ['household', 'house', 'hamlet', 'village'].includes(place)) return true;
-  if (tags.amenity && ['dwelling', 'house'].includes(tags.amenity)) return true;
-  return false;
-}
-
 function candidateLooksLikeRoad(tags = {}) {
   if (!tags) return false;
   if (tags.highway) return true;
