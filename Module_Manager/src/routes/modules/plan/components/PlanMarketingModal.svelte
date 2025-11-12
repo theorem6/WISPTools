@@ -472,6 +472,14 @@ let results: PlanMarketingAddress[] = [];
         }
       }
 
+      console.log('[PlanMarketingModal] Calling discoverMarketingAddresses API', {
+        planId: plan.id,
+        boundingBox,
+        radiusMiles,
+        center: resolved,
+        algorithms: selectedAlgorithms
+      });
+
       const response = await planService.discoverMarketingAddresses(plan.id, {
         boundingBox,
         radiusMiles,
@@ -482,6 +490,15 @@ let results: PlanMarketingAddress[] = [];
           algorithms: selectedAlgorithms
         }
       });
+
+      console.log('[PlanMarketingModal] Discovery API response received', {
+        addressCount: response.addresses?.length || 0,
+        summary: response.summary
+      });
+
+      if (!response || !response.addresses) {
+        throw new Error('Invalid response from discovery API');
+      }
 
       results = response.addresses;
       summary = response.summary;

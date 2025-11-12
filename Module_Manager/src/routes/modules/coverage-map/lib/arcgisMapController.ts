@@ -202,11 +202,32 @@ export class CoverageMapController {
   }
 
   public setMarketingLeads(leads: PlanMarketingAddress[]): void {
+    const previousCount = this.marketingLeads.length;
     this.marketingLeads = Array.isArray(leads) ? [...leads] : [];
-    this.hasPerformedInitialFit = false;
+    
+    // Don't reset hasPerformedInitialFit - preserve current map view
     if (this.mapReady) {
       this.renderMarketingLeads()
-        .then(() => this.fitMapToVisibleGraphics())
+        .then(() => {
+          // Only fit to graphics if we have plan features or other graphics
+          // Don't recenter on US if we have plan features (preserve plan center)
+          const hasPlanFeatures = this.planDraftLayer?.graphics?.length > 0;
+          const hasOtherGraphics = this.graphicsLayer?.graphics?.length > 0;
+          const hasMarketingGraphics = this.filters.showMarketing && this.marketingLayer?.graphics?.length > 0;
+          
+          // If we have plan features, preserve the current view (don't recenter)
+          if (hasPlanFeatures) {
+            // Don't change the view - plan is already centered
+            return;
+          }
+          
+          // If we have other graphics or marketing leads, fit to them
+          if (hasOtherGraphics || hasMarketingGraphics) {
+            return this.fitMapToVisibleGraphics(true);
+          }
+          
+          // Otherwise, preserve current map view (don't recenter on US)
+        })
         .catch(err => console.error('[CoverageMap] Marketing render error:', err));
     }
   }
@@ -1286,8 +1307,12 @@ export class CoverageMapController {
     }
 
     if (!graphics.length) {
-      // No graphics to fit - center on US (only when no plan is loaded)
-      await this.centerOnUSOrLastDeployedPlan();
+      // No graphics to fit - only center on US if we have no plan features
+      // If we have plan features (even if not visible), preserve the current view
+      if (this.planDraftFeatures.length === 0) {
+        await this.centerOnUSOrLastDeployedPlan();
+      }
+      // Otherwise, preserve current map view (don't recenter)
       return;
     }
 
