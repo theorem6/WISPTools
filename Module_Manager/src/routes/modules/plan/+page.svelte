@@ -10,7 +10,7 @@
   import PlanMarketingModal from './components/PlanMarketingModal.svelte';
 import SettingsButton from '$lib/components/SettingsButton.svelte';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
-import { mapContext, type MapLayerState } from '$lib/map/mapContext';
+import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
 import SharedMap from '$lib/map/SharedMap.svelte';
 import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from '$lib/map/MapCapabilities';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
@@ -805,12 +805,11 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     if (idx !== -1) {
       projects[idx] = updatedPlan;
     }
-    // Don't reload the plan - just update the active plan in the map state
+    // Update the active plan in the map data store without reloading everything
     // This preserves the map center and only updates marketing leads
-    if ($currentTenant?.id && mapLayerManager) {
-      // Update the active plan in map state without reloading everything
-      mapLayerManager.updateState({ activePlan: updatedPlan });
-    }
+    // The SharedMap component will pick up the updated plan via reactive state
+    // and pass the marketing leads to the iframe without resetting the map
+    setMapData({ activePlan: updatedPlan });
   }
 
 
