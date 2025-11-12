@@ -411,7 +411,12 @@ let results: PlanMarketingAddress[] = [];
     console.log('[PlanMarketingModal] Discover addresses clicked', {
       planId: plan?.id,
       radiusMiles,
-      advancedOptions
+      advancedOptions,
+      coordinatesReady,
+      hasAddressOrCoordinates,
+      addressSearch,
+      latitudeInput,
+      longitudeInput
     });
 
     error = null;
@@ -419,6 +424,13 @@ let results: PlanMarketingAddress[] = [];
 
     if (!tenantId) {
       error = 'Select a tenant before running marketing discovery.';
+      isLoading = false;
+      return;
+    }
+
+    if (!hasAddressOrCoordinates) {
+      error = 'Provide latitude & longitude or enter an address to resolve coordinates.';
+      isLoading = false;
       return;
     }
 
@@ -533,6 +545,7 @@ let results: PlanMarketingAddress[] = [];
 
   $: coordinatesReady =
     normalizeNumber(latitudeInput) !== null && normalizeNumber(longitudeInput) !== null;
+  $: hasAddressOrCoordinates = coordinatesReady || (addressSearch && addressSearch.trim().length > 0);
   $: canAdvance =
     currentStep === 0
       ? Boolean(radiusMiles && radiusMiles > 0)
@@ -540,7 +553,7 @@ let results: PlanMarketingAddress[] = [];
         ? selectedAlgorithms.length > 0
         : true;
   $: canRun =
-    currentStep === steps.length - 1 && radiusMiles > 0 && coordinatesReady && selectedAlgorithms.length > 0;
+    currentStep === steps.length - 1 && radiusMiles > 0 && hasAddressOrCoordinates && selectedAlgorithms.length > 0;
 
   function formatCoord(value: number | string | undefined, fractionDigits = 5): string {
     if (value === undefined || value === null) return '—';
@@ -826,9 +839,9 @@ let results: PlanMarketingAddress[] = [];
             </div>
           {/if}
 
-          {#if !coordinatesReady}
+          {#if !hasAddressOrCoordinates}
             <div class="alert alert-warning">
-              Provide latitude and longitude or resolve them from an address before running discovery.
+              Provide latitude and longitude or enter an address to resolve coordinates before running discovery.
             </div>
           {/if}
 
