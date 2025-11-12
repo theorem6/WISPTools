@@ -762,6 +762,29 @@ const distanceInMeters = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+const normalizeAddressComponent = (value) => {
+  if (!value || typeof value !== 'string') return '';
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[.,#]/g, '')
+    .trim();
+};
+
+const buildAddressHash = (address = {}) => {
+  const line1 = normalizeAddressComponent(address.addressLine1);
+  const line2 = normalizeAddressComponent(address.addressLine2);
+  const city = normalizeAddressComponent(address.city);
+  const state = normalizeAddressComponent(address.state);
+  const postal = normalizeAddressComponent(address.postalCode || address.zip);
+
+  if (!line1 && !city && !postal) {
+    return null;
+  }
+
+  return [line1, line2, city, state, postal].filter(Boolean).join('|');
+};
+
 function generateGridSamplePoints({ boundingBox, spacingMeters, maxPoints = 1000 }) {
   const points = [];
   const latStep = spacingMeters / 111000;
@@ -1565,11 +1588,12 @@ router.post('/:id/marketing/discover', async (req, res) => {
       algorithms = ['osm_buildings'];
     }
 
-    const dedupDistanceMeters =
-      toNumber(advancedOptions?.dedup?.clientDedupDistanceMeters) ?? 10;
+    const dedupDistanceMeters = 10; // Always deduplicate within 10 meters
 
     const algorithmStats = {};
     const combinedAddresses = [];
+    const coordinateHashes = new Set();
+    const addressHashes = new Set();
     let totalProgress = 0;
     let currentStep = '';
 
@@ -1626,6 +1650,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
         address.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
       }
 
+      const normalizedAddressKey = buildAddressHash(address);
+      if (normalizedAddressKey && addressHashes.has(normalizedAddressKey)) {
+        return false;
+      }
+
+      const coordinateKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+      if (coordinateHashes.has(coordinateKey)) {
+        return false;
+      }
+
       for (const existing of combinedAddresses) {
         if (distanceInMeters(latitude, longitude, existing.latitude, existing.longitude) <= dedupDistanceMeters) {
           return false;
@@ -1638,6 +1672,10 @@ router.post('/:id/marketing/discover', async (req, res) => {
         longitude,
         source: address.source || algorithmId
       });
+      coordinateHashes.add(coordinateKey);
+      if (normalizedAddressKey) {
+        addressHashes.add(normalizedAddressKey);
+      }
       return true;
     };
 

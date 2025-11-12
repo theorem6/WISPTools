@@ -139,11 +139,6 @@ let results: PlanMarketingAddress[] = [];
     grouping: {
       useOsmId: true,
       highPrecision: false
-    },
-    dedup: {
-      mergeHalfAddresses: true,
-      halfPenalty: 3,
-      clientDedupDistanceMeters: 10
     }
   };
 
@@ -734,23 +729,6 @@ let results: PlanMarketingAddress[] = [];
                     />
                   </label>
                 </fieldset>
-                <fieldset>
-                  <legend>Deduplication</legend>
-                  <label>
-                    <span>Client dedup distance (m)</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="30"
-                      step="1"
-                      bind:value={advancedOptions.dedup.clientDedupDistanceMeters}
-                    />
-                  </label>
-                  <label>
-                    <input type="checkbox" bind:checked={advancedOptions.dedup.mergeHalfAddresses} />
-                    <span>Merge half-addresses (e.g. "½")</span>
-                  </label>
-                </fieldset>
               </div>
             </details>
           </div>
@@ -782,10 +760,6 @@ let results: PlanMarketingAddress[] = [];
             <div>
               <span class="label">Algorithms</span>
               <span class="value">{selectedAlgorithms.length} selected</span>
-            </div>
-            <div>
-              <span class="label">Dedup Distance</span>
-              <span class="value">{advancedOptions.dedup.clientDedupDistanceMeters} m</span>
             </div>
           </div>
 
