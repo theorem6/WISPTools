@@ -611,6 +611,34 @@ const RESIDENTIAL_BUILDING_TYPES = new Set([
 
 function candidateHasResidentialSignal(tags = {}) {
   if (!tags || typeof tags !== 'object') return false;
+  if (tags['addr:housenumber'] || tags['addr:unit']) return true;
+  const building = tags.building;
+  if (building && RESIDENTIAL_BUILDING_TYPES.has(building)) return true;
+  if (building && building !== 'commercial') return true;
+  const place = tags.place;
+  if (place && ['household', 'house', 'hamlet', 'village'].includes(place)) return true;
+  if (tags.amenity && ['dwelling', 'house'].includes(tags.amenity)) return true;
+  return false;
+}
+
+const RESIDENTIAL_BUILDING_TYPES = new Set([
+  'house',
+  'residential',
+  'apartments',
+  'detached',
+  'semidetached_house',
+  'semi_detached_house',
+  'terrace',
+  'bungalow',
+  'cabin',
+  'farm',
+  'static_caravan',
+  'stilt_house',
+  'yes'
+]);
+
+function candidateHasResidentialSignal(tags = {}) {
+  if (!tags || typeof tags !== 'object') return false;
   if (tags['addr:housenumber']) return true;
   if (tags['addr:unit']) return true;
   const building = tags.building;
@@ -627,6 +655,7 @@ function candidateLooksLikeRoad(tags = {}) {
   if (tags.highway) return true;
   if (tags.railway) return true;
   if (tags.route) return true;
+  if (tags.waterway) return true;
   return false;
 }
 
@@ -758,6 +787,68 @@ const distanceInMeters = (lat1, lon1, lat2, lon2) => {
   return R * c;
 };
 
+function generateGridSamplePoints({ boundingBox, spacingMeters, maxPoints = 1000 }) {
+  const points = [];
+  const latStep = spacingMeters / 111000;
+  const centerLatRad = ((boundingBox.north + boundingBox.south) / 2) * (Math.PI / 180);
+  const lonStep = spacingMeters / (111000 * Math.cos(centerLatRad || 0.00001));
+
+  for (let lat = boundingBox.south; lat <= boundingBox.north; lat += latStep) {
+    for (let lon = boundingBox.west; lon <= boundingBox.east; lon += lonStep) {
+      points.push({ lat, lon });
+      if (points.length >= maxPoints) {
+        return points;
+      }
+    }
+  }
+
+  return points;
+}
+
+async function runArcgisGridSampler({ boundingBox, spacingMeters = 40 }) {
+  const start = Date.now();
+  const samplePoints = generateGridSamplePoints({ boundingBox, spacingMeters, maxPoints: 750 });
+  console.log('[MarketingDiscovery] ArcGIS grid sampler', {
+    spacingMeters,
+    samplePoints: samplePoints.length
+  });
+
+  const addresses = [];
+  let geocoded = 0;
+  let failed = 0;
+
+  for (const point of samplePoints) {
+    try {
+      const result = await reverseGeocodeCoordinateArcgis(point.lat, point.lon);
+      if (result && result.addressLine1) {
+        addresses.push({
+          ...result,
+          source: 'arcgis_grid'
+        });
+        geocoded += 1;
+      } else {
+        failed += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      console.warn('[MarketingDiscovery] Grid sampler reverse geocode failed', {
+        lat: point.lat,
+        lon: point.lon,
+        error: error?.message || error
+      });
+    }
+  }
+
+  console.log('[MarketingDiscovery] ArcGIS grid sampler completed', {
+    durationMs: Date.now() - start,
+    totalSamples: samplePoints.length,
+    geocoded,
+    failed
+  });
+
+  return { addresses, geocoded, failed };
+}
+
 async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions, progressCallback }) {
   const result = {
     addresses: [],
@@ -860,6 +951,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       console.log('[MarketingDiscovery] Residential filter removed all candidates, falling back to original set', {
         beforeFilterCount
       });
+      candidates = candidates.slice(0, Math.min(beforeFilterCount, RURAL_FALLBACK_MAX_RESULTS));
     } else {
       console.log('[MarketingDiscovery] Residential filter applied', {
         beforeFilterCount,
@@ -1099,6 +1191,15 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       filteredOut: candidates.length - addresses.length,
       sampleAddress: addresses[0]
     });
+
+    if (addresses.length === 0) {
+      console.log('[MarketingDiscovery] ArcGIS address points returned zero candidates, falling back to grid sampler');
+      const gridResult = await runArcgisGridSampler({
+        boundingBox,
+        spacingMeters: 40
+      });
+      return { addresses: gridResult.addresses };
+    }
 
     return { addresses };
   } catch (error) {
