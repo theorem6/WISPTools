@@ -352,33 +352,37 @@ const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
 const buildOverpassQuery = (bbox) => `
 [out:json][timeout:60];
 (
-  // Strategy 1: All buildings with any building tag (most comprehensive)
+  // Strategy 1: All buildings with any building tag (includes small buildings)
   way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 2: Explicit residential buildings
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"~"^(residential|house|apartments|detached|semidetached_house|terrace)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 2: Explicit residential buildings (small houses, cabins, sheds)
+  way["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|cabin|bungalow|hut)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["building"~"^(residential|house|apartments|detached|semidetached_house|terrace|cabin|bungalow|hut)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 3: Structures tagged as amenities that might be houses
-  way["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 3: Small structures often used for residences
+  way["building"~"^(shed|garage|outbuilding)$"]["residential"="yes"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 4: ANY structure with address information (critical for rural houses)
-  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 4: ANY address node (critical - these often represent small houses without building polygons)
   node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 5: Structures with names (often rural properties)
+  // Strategy 5: Address ways (buildings with addresses)
+  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Strategy 6: Structures with names (often rural properties)
   way["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   node["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 6: Structures with place=household (rural tagging pattern)
-  way["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 7: Place=household (rural single-family homes)
+  way["place"~"^(household|house|plot|isolated_dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  node["place"~"^(household|house|plot|isolated_dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   
-  // Strategy 7: Any structure with residential address components
-  way["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  // Strategy 8: Residential landuse with address nodes (finds small houses in subdivisions)
   node["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:street"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // Strategy 9: Building entrance nodes (often represent small structures)
+  node["entrance"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 // Output centroids for ways, coordinates for nodes
 out center meta;
@@ -1243,6 +1247,23 @@ router.post('/:id/marketing/discover', async (req, res) => {
       const latitude = toNumber(address.latitude);
       const longitude = toNumber(address.longitude);
       if (latitude === undefined || longitude === undefined) return false;
+
+      // Filter out addresses that only have street name (no house number)
+      // These are duplicates or invalid entries
+      const addressLine1 = address.addressLine1 || '';
+      if (addressLine1) {
+        // Check if address starts with a number (valid house number)
+        const startsWithNumber = /^\d/.test(addressLine1.trim());
+        
+        // If it doesn't start with a number and doesn't look like coordinates, skip it
+        // Coordinates format: "lat, lon" like "40.1234, -74.5678"
+        const looksLikeCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+/.test(addressLine1.trim());
+        
+        if (!startsWithNumber && !looksLikeCoordinates) {
+          console.log('[MarketingDiscovery] Skipping street-only address (no house number):', addressLine1);
+          return false;
+        }
+      }
 
       for (const existing of combinedAddresses) {
         if (distanceInMeters(latitude, longitude, existing.latitude, existing.longitude) <= dedupDistanceMeters) {
