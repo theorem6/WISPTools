@@ -1408,7 +1408,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
       addresses: combinedAddresses
     };
 
-    await PlanProject.updateOne(
+    const updateResult = await PlanProject.updateOne(
       { _id: plan._id, tenantId: req.tenantId },
       {
         $set: {
@@ -1419,6 +1419,13 @@ router.post('/:id/marketing/discover', async (req, res) => {
         }
       }
     );
+    
+    console.log('[MarketingDiscovery] Database update result', {
+      planId: plan._id.toString(),
+      matched: updateResult.matchedCount,
+      modified: updateResult.modifiedCount,
+      addressesSaved: combinedAddresses.length
+    });
 
     const requestDuration = Date.now() - requestStartTime;
     updateProgress('Request completed', 100, { 

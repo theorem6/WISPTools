@@ -483,8 +483,9 @@ let results: PlanMarketingAddress[] = [];
 
       console.log('[PlanMarketingModal] Discovery API response received', {
         addressCount: response.addresses?.length || 0,
+        sampleAddresses: response.addresses?.slice(0, 3),
         summary: response.summary,
-        fullResponse: response
+        responseKeys: Object.keys(response || {})
       });
 
       if (!response) {
@@ -504,7 +505,9 @@ let results: PlanMarketingAddress[] = [];
       console.log('[PlanMarketingModal] Discovery completed successfully', {
         leadCount,
         hasSummary: !!summary,
-        runtimeSpan
+        runtimeSpan,
+        sampleResults: results.slice(0, 3),
+        planMarketingAddressesLength: plan.marketing?.addresses?.length
       });
       
       if (leadCount === 0) {
