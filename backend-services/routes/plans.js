@@ -1398,6 +1398,10 @@ const filterArcgisCandidates = (candidates = []) => {
   // Commercial indicators - exclude "st" and "ste" as they're common in street names
   const COMMERCIAL_INDICATORS = /\b(suite\s+\w+|unit\s+\w+|building\s+\w+|floor\s+\w+|room\s+\w+|office\s+\w+|warehouse|plaza|center|complex|parking\s+lot|drive[\s-]thru|drive[\s-]through|bldg\s+\w+|blg\s+\w+)\b/i;
   const HOUSE_NUMBER_REGEX = /^\d+[A-Za-z]?\s+/; // Must start with a number (residential indicator)
+  // Major road/highway indicators - exclude addresses on highways, routes, etc.
+  // Matches: Highway 20, Route 250, I-75, US-20, State Route 4, SR-4, etc.
+  // Note: Excludes boulevard/blvd as many residential areas use these
+  const MAJOR_ROAD_REGEX = /\b(highway|route|interstate|i-?\s*\d+|us-?\s*\d+|state\s+route|sr-?\s*\d+|freeway|turnpike|parkway|bypass|expressway|toll\s+road|service\s+area|rest\s+area|rest\s+stop|truck\s+stop|travel\s+plaza|hwy\s*\d+|rte\s*\d+|rt\s*\d+[^\w])\b/i;
 
   let filtered = 0;
 
@@ -1431,6 +1435,12 @@ const filterArcgisCandidates = (candidates = []) => {
 
       // Filter out addresses with commercial indicators (Suite, Unit, Building, etc.)
       if (COMMERCIAL_INDICATORS.test(fullAddress)) {
+        filtered++;
+        return null;
+      }
+
+      // Filter out addresses on major roads/highways
+      if (MAJOR_ROAD_REGEX.test(fullAddress)) {
         filtered++;
         return null;
       }
