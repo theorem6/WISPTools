@@ -444,7 +444,8 @@ let results: PlanMarketingAddress[] = [];
       planId: plan?.id,
       advancedOptions,
       hasMapExtent,
-      mapExtent: latestExtent
+      mapExtent: mapExtent,
+      latestExtent: latestExtent
     });
 
     error = null;
@@ -456,7 +457,8 @@ let results: PlanMarketingAddress[] = [];
       return;
     }
 
-    const extentForRun = latestExtent ?? extentAtOpen;
+    // Always use the current mapExtent at click time, not a stale cached value
+    const extentForRun = mapExtent ? cloneMapExtent(mapExtent) : (latestExtent ?? extentAtOpen);
     
     if (!extentForRun?.boundingBox || !extentForRun?.center) {
       error = 'Unable to determine map bounds. Please zoom the map to define the search area.';

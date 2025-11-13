@@ -149,6 +149,13 @@ export class CoverageMapController {
     return this.mapView;
   }
 
+  public getCurrentExtent(): any {
+    if (!this.mapView) return null;
+    const extent = this.mapView.extent;
+    if (!extent) return null;
+    return this.buildExtentPayload(extent);
+  }
+
   public isReady(): boolean {
     return this.mapReady;
   }
