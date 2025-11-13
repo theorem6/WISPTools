@@ -264,7 +264,8 @@ const buildLeadHash = (latitude, longitude, addressLine1, postalCode) => {
   }
   const streetKey = (addressLine1 || '').toLowerCase();
   const postalKey = (postalCode || '').toLowerCase();
-  return `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${streetKey}|${postalKey}`;
+  // Use 7 decimal places for better precision (~1cm vs ~1m with 5 places)
+  return `${latitude.toFixed(7)}|${longitude.toFixed(7)}|${streetKey}|${postalKey}`;
 };
 
 const normalizePlanNameForLead = (planName) => {
@@ -306,7 +307,7 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
       continue;
     }
 
-    const street = address.addressLine1 ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+    const street = address.addressLine1 ?? `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
     const now = new Date();
     const metadata = {
       planId: planIdString,
@@ -532,14 +533,26 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
   const seen = new Map();
   const candidates = [];
 
-  for (const element of elements) {
+  // Sort elements to prioritize ways (which have centroids) over nodes (which are just points)
+  const sortedElements = [...elements].sort((a, b) => {
+    // Ways with centroids come first (these are building polygons with calculated centroids)
+    if (a.type === 'way' && a.center && b.type !== 'way') return -1;
+    if (b.type === 'way' && b.center && a.type !== 'way') return 1;
+    return 0;
+  });
+
+  for (const element of sortedElements) {
     let latitude;
     let longitude;
 
+    // Always prefer way centroids (building polygon centers) over node coordinates (point locations)
     if (element.type === 'way' && element.center) {
+      // Use the calculated centroid for building polygons - this is the actual building center
       latitude = toNumber(element.center.lat);
       longitude = toNumber(element.center.lon);
     } else if (element.type === 'node') {
+      // Nodes are just points - use their coordinates directly
+      // Note: These may not be true building centroids if the building is represented as a point
       latitude = toNumber(element.lat);
       longitude = toNumber(element.lon);
     } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
@@ -879,7 +892,8 @@ const normalizeArcgisAddressKey = (address = {}) => {
   const postal = normalizeAddressComponent(address.postalCode || address.zip);
 
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-    return `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${line1}|${postal}`;
+    // Use 7 decimal places for better precision
+    return `${latitude.toFixed(7)}|${longitude.toFixed(7)}|${line1}|${postal}`;
   }
 
   if (line1) {
@@ -1168,7 +1182,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
             // No address returned, use coordinates
             failedCount += 1;
             addresses.push({
-              addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+              addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
               latitude: candidate.lat,
               longitude: candidate.lon,
               country: 'US',
@@ -1184,7 +1198,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           failedCount += 1;
           // Fallback to coordinates
           addresses.push({
-            addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
+            addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
             latitude: candidate.lat,
             longitude: candidate.lon,
             country: 'US',
@@ -1257,7 +1271,7 @@ const filterArcgisCandidates = (candidates = []) => {
       const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
 
       return {
-        addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+        addressLine1: addressLine1 || `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,
         addressLine2: undefined,
         city: attributes.City || undefined,
         state: attributes.Region || undefined,
@@ -1455,7 +1469,7 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
           attributes.PlaceName ||
           attributes.Address ||
           candidate.address ||
-          `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+          `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
 
         return {
           addressLine1,
@@ -1863,8 +1877,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
           return false;
         }
       } else {
-        // No address line, use coordinates as identifier
-        workingAddress.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        // No address line, use coordinates as identifier (7 decimal places = ~1cm precision)
+        workingAddress.addressLine1 = `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
       }
 
       const normalizedAddressKey = buildAddressHash(workingAddress);
@@ -1872,7 +1886,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
         return false;
       }
 
-      const coordinateKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+      // Use 7 decimal places for coordinate keys (~1cm precision, good for building centroids)
+      const coordinateKey = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
       if (coordinateHashes.has(coordinateKey)) {
         return false;
       }
@@ -1911,7 +1926,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
         const workingAddress = { ...existing };
         if (!workingAddress.addressLine1) {
-          workingAddress.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+          workingAddress.addressLine1 = `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
         }
 
         // Always include existing addresses, regardless of current bounding box
@@ -1922,7 +1937,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
           continue;
         }
 
-        const coordinateKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+        // Use 7 decimal places for coordinate keys in seed function too
+        const coordinateKey = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
         if (coordinateHashes.has(coordinateKey)) {
           continue;
         }
@@ -2094,18 +2110,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     }
 
-    const filteredWithinBounds = combinedAddresses.filter((addr) =>
-      isWithinBoundingBox(addr.latitude, addr.longitude, boundingBox)
-    );
-    if (filteredWithinBounds.length !== combinedAddresses.length) {
-      console.log('[MarketingDiscovery] Removed addresses outside requested bounds', {
-        requested: boundingBox,
-        totalBefore: combinedAddresses.length,
-        totalAfter: filteredWithinBounds.length
-      });
-    }
-    combinedAddresses.length = 0;
-    combinedAddresses.push(...filteredWithinBounds);
+    // Don't filter existing addresses - only new addresses were already filtered in addAddressToCombined
+    // This allows re-discover to merge addresses from multiple areas scanned
+    // New addresses are already checked against bounding box at line 1840 in addAddressToCombined
 
     const totalUniqueAddresses = combinedAddresses.length;
     const totalRuns = priorTotalRuns + 1;

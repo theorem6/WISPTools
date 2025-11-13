@@ -774,10 +774,13 @@ export class CoverageMapController {
     if (!extent) return null;
     const spatialReference = extent.spatialReference ?? this.mapView?.spatialReference;
 
+    // Project Web Mercator or other coordinate systems to WGS84 lat/lon with full precision
     const southWest = this.projectXYToLatLon(extent.xmin, extent.ymin, spatialReference);
     const northEast = this.projectXYToLatLon(extent.xmax, extent.ymax, spatialReference);
 
     if (southWest && northEast) {
+      // Return bounding box with full precision (JavaScript numbers preserve ~15-17 significant digits)
+      // No rounding - use exact coordinates from map viewport
       return {
         west: Math.min(southWest.lon, northEast.lon),
         south: Math.min(southWest.lat, northEast.lat),
@@ -786,12 +789,14 @@ export class CoverageMapController {
       };
     }
 
+    // Fallback for geographic coordinates (WGS84) - already in lat/lon format
     if (
       typeof extent.xmin === 'number' &&
       typeof extent.ymin === 'number' &&
       typeof extent.xmax === 'number' &&
       typeof extent.ymax === 'number'
     ) {
+      // Use full precision - no rounding
       return {
         west: extent.xmin,
         south: extent.ymin,
