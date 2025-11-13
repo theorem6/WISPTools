@@ -1851,14 +1851,10 @@ router.post('/:id/marketing/discover', async (req, res) => {
       const longitude = toNumber(address.longitude);
       if (latitude === undefined || longitude === undefined) return false;
 
-      if (!isWithinBoundingBox(latitude, longitude, boundingBox)) {
-        console.log('[MarketingDiscovery] Skipped address outside requested bounds', {
-          latitude,
-          longitude,
-          algorithmId
-        });
-        return false;
-      }
+      // Don't filter by bounding box - save ALL addresses found by the search services
+      // The search services (OSM/ArcGIS) already filter by bounding box in their queries
+      // Any addresses returned are valid and should be saved to the database
+      // This allows all addresses to be saved for later management (save to system or delete)
 
       // Filter out addresses that only have street name (no house number)
       // BUT allow empty addressLine1 (we'll use coordinates as fallback)
@@ -2131,9 +2127,17 @@ router.post('/:id/marketing/discover', async (req, res) => {
       totalRuns,
       sampleAddresses: combinedAddresses.slice(0, 5).map(a => ({ 
         addressLine1: a.addressLine1, 
-        source: a.source 
+        source: a.source,
+        lat: a.latitude,
+        lon: a.longitude
       })),
-      algorithmStats
+      algorithmStats,
+      // Log address count by source for debugging
+      addressCountBySource: combinedAddresses.reduce((acc, addr) => {
+        const source = addr.source || 'unknown';
+        acc[source] = (acc[source] || 0) + 1;
+        return acc;
+      }, {})
     });
 
     updateProgress('Saving results to database', 90, {
@@ -2189,9 +2193,33 @@ router.post('/:id/marketing/discover', async (req, res) => {
       matched: updateResult.matchedCount,
       modified: updateResult.modifiedCount,
       addressesSaved: totalUniqueAddresses,
+      addressesInUpdate: combinedAddresses.length,
       newlyAdded: newAddressesAdded,
-      totalRuns
+      previousAddressCount,
+      totalRuns,
+      // Verify all addresses are in the update object
+      addressesCountCheck: marketingUpdate.addresses?.length === combinedAddresses.length
     });
+    
+    // Verify addresses were saved correctly
+    if (updateResult.modifiedCount > 0) {
+      const savedPlan = await PlanProject.findById(plan._id).select('marketing.addresses').lean();
+      const savedAddressCount = savedPlan?.marketing?.addresses?.length || 0;
+      console.log('[MarketingDiscovery] Verification - addresses in database after save', {
+        planId: plan._id.toString(),
+        savedAddressCount,
+        expectedCount: totalUniqueAddresses,
+        match: savedAddressCount === totalUniqueAddresses
+      });
+      
+      if (savedAddressCount !== totalUniqueAddresses) {
+        console.error('[MarketingDiscovery] WARNING: Address count mismatch!', {
+          expected: totalUniqueAddresses,
+          actual: savedAddressCount,
+          difference: totalUniqueAddresses - savedAddressCount
+        });
+      }
+    }
 
     const requestDuration = Date.now() - requestStartTime;
     updateProgress('Request completed', 100, { 
