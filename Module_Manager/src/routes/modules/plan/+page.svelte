@@ -220,8 +220,8 @@ $: marketingAvailable = Boolean(
   let activeProject: PlanProject | null = null;
   let showProjectActions = false;
   
-  // Plan visibility toggle
-  let visiblePlans: Set<string> = new Set(); // Plans currently visible on map
+  // Project visibility toggle
+  let visiblePlans: Set<string> = new Set(); // Projects currently visible on map
 
   // Module context for object state management
 let moduleContext: ModuleContext = {
@@ -495,7 +495,7 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
       await mapLayerManager.loadProductionHardware(tenantId);
     } catch (err: any) {
       console.error('Error loading plan data:', err);
-      error = err.message || 'Failed to load plan data. Please try again.';
+      error = err.message || 'Failed to load project data. Please try again.';
       setTimeout(() => error = '', 8000);
       loadedTenantId = null;
     } finally {
@@ -693,11 +693,11 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
       const message =
         project.status === 'active'
           ? `Continuing work on "${project.name}".`
-          : `Planning "${project.name}" in ${project.status} status. Map edits will stay staged until you activate the plan.`;
+          : `Planning "${project.name}" in ${project.status} status. Map edits will stay staged until you activate the project.`;
 
       await enterProject(project, { reload: false, message });
     } else {
-      successMessage = `Plan "${project.name}" is ${project.status}. View mode only.`;
+      successMessage = `Project "${project.name}" is ${project.status}. View mode only.`;
       setTimeout(() => (successMessage = ''), 5000);
     }
   }
@@ -903,8 +903,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       await enterProject(active, {
         reload: false,
         message: autoStart
-          ? `Plan "${active.name}" started. You can now stage sites and hardware on the map.`
-          : `Plan "${active.name}" is now active. All map edits will be saved to this plan.`
+          ? `Project "${active.name}" started. You can now stage sites and hardware on the map.`
+          : `Project "${active.name}" is now active. All map edits will be saved to this project.`
       });
     } catch (err: any) {
       console.error('Error starting project:', err);
@@ -913,7 +913,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     }
   }
   
-  // Toggle plan visibility on map
+  // Toggle project visibility on map
   async function togglePlanVisibility(project: PlanProject) {
     try {
       if (project.status === 'authorized') {
@@ -940,8 +940,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       // Reload map to reflect visibility changes
       await loadData();
     } catch (error) {
-      console.error('Error toggling plan visibility:', error);
-      alert('Failed to toggle plan visibility');
+      console.error('Error toggling project visibility:', error);
+      alert('Failed to toggle project visibility');
     }
   }
 
@@ -995,7 +995,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       mapLayerManager.setMode('plan');
       mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
 
-      successMessage = `Plan "${pausedPlan.name}" paused. Resume it from the plan list when you're ready.`;
+      successMessage = `Project "${pausedPlan.name}" paused. Resume it from the project list when you're ready.`;
       setTimeout(() => successMessage = '', 5000);
     } catch (err: any) {
       console.error('Error pausing project:', err);
@@ -1047,12 +1047,12 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     const allowedStatuses = ['draft', 'active', 'ready', 'cancelled', 'rejected'];
 
     if (!allowedStatuses.includes(project.status)) {
-      error = 'Only draft, active, ready, cancelled, or rejected plans can be deleted.';
+      error = 'Only draft, active, ready, cancelled, or rejected projects can be deleted.';
       setTimeout(() => error = '', 5000);
       return;
     }
 
-    if (!confirm(`Delete plan "${project.name}"? This cannot be undone.`)) {
+    if (!confirm(`Delete project "${project.name}"? This cannot be undone.`)) {
       return;
     }
 
@@ -1066,24 +1066,30 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         throw new Error('Delete request failed');
       }
 
-      projects = projects.filter(p => p.id !== project.id);
-      const updatedVisibility = new Set(visiblePlans);
-      updatedVisibility.delete(project.id);
-      visiblePlans = updatedVisibility;
-
-      if (activeProject?.id === project.id) {
+      // Clear active project if it's the one being deleted
+      if (activeProject?.id === project.id || selectedProject?.id === project.id) {
         activeProject = null;
         selectedProject = null;
         showProjectActions = false;
+        showProjectModal = false;
+        // Return to simpler toolbar - no project in focus
         mapLayerManager.setMode('plan');
-        mapLayerManager.setCapabilities(getCapabilitiesForMode('plan'));
+        mapLayerManager.setCapabilities(PLANNING_LOCK_CAPABILITIES);
+        mapLocked = true;
+        // Clear map layers for deleted project - just reload map with no active plan
+        if ($currentTenant?.id) {
+          await mapLayerManager.loadProductionHardware($currentTenant.id);
+        }
       }
 
-      successMessage = `Plan "${project.name}" deleted.`;
+      // Refresh the screen - reload all data
+      await loadData(true);
+
+      successMessage = `Project "${project.name}" deleted.`;
       setTimeout(() => successMessage = '', 5000);
     } catch (err: any) {
       console.error('Error deleting project:', err);
-      error = err?.message || 'Failed to delete plan';
+      error = err?.message || 'Failed to delete project';
       setTimeout(() => error = '', 5000);
     }
   }
@@ -1169,7 +1175,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       }
     } catch (err: any) {
       console.error('Error entering project:', err);
-      error = err?.message || 'Failed to load plan. Please try again';
+      error = err?.message || 'Failed to load project. Please try again';
       setTimeout(() => (error = ''), 6000);
     }
   }
@@ -1179,10 +1185,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       const updatedPlan = await planService.updatePlan(project.id, { status: 'active' });
       await loadData(true);
       const refreshed = projects.find(p => p.id === project.id) || updatedPlan || project;
-      await enterProject(refreshed, { reload: true, message: `Plan "${refreshed.name}" reopened for editing.` });
+      await enterProject(refreshed, { reload: true, message: `Project "${refreshed.name}" reopened for editing.` });
     } catch (err: any) {
       console.error('Error reopening project:', err);
-      error = err?.message || 'Failed to reopen plan';
+      error = err?.message || 'Failed to reopen project';
       setTimeout(() => error = '', 6000);
     }
   }
@@ -1210,11 +1216,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </button>
         <button class="control-btn" on:click={openProjectList} title="Project List">
           <span class="control-icon">📁</span>
-          <span class="control-label">Plans</span>
+          <span class="control-label">Projects</span>
         </button>
         <button class="control-btn" on:click={openCreateProject} title="Create New Project">
           <span class="control-icon">➕</span>
-          <span class="control-label">New Plan</span>
+          <span class="control-label">New Project</span>
         </button>
         <button
           class="control-btn marketing-btn"
@@ -1235,14 +1241,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-icon">📋</span>
             <span class="control-label">Needs</span>
           </button>
-          <button 
-            class={`control-btn ${selectedProject?.showOnMap ? 'active' : ''}`} 
-            on:click={() => selectedProject && togglePlanVisibility(selectedProject)} 
-            title={selectedProject?.showOnMap ? "Hide plan on map" : "Show plan on map"}
-          >
-            <span class="control-icon">{selectedProject?.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
-            <span class="control-label">{selectedProject?.showOnMap ? 'Visible' : 'Hidden'}</span>
-          </button>
           {#if selectedProject?.status === 'active' && (!activeProject || activeProject.id !== selectedProject.id)}
             <button class="control-btn resume-btn" on:click={() => selectedProject && enterProject(selectedProject)} title="Resume planning this project">
               <span class="control-icon">🔁</span>
@@ -1250,7 +1248,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             </button>
           {/if}
           {#if selectedProject && ['ready','approved','rejected','cancelled'].includes(selectedProject.status)}
-            <button class="control-btn reopen-btn" on:click={() => selectedProject && reopenProject(selectedProject)} title="Reopen plan for updates">
+            <button class="control-btn reopen-btn" on:click={() => selectedProject && reopenProject(selectedProject)} title="Reopen project for updates">
               <span class="control-icon">♻️</span>
               <span class="control-label">Reopen</span>
             </button>
@@ -1271,16 +1269,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
             <span class="control-icon">❌</span>
             <span class="control-label">Cancel</span>
           </button>
-          <button 
-            class={`control-btn ${activeProject?.showOnMap ? 'active' : ''}`} 
-            on:click={() => activeProject && togglePlanVisibility(activeProject)} 
-            title={activeProject?.showOnMap ? "Hide plan on map" : "Show plan on map"}
-          >
-            <span class="control-icon">{activeProject?.showOnMap ? '👁️' : '👁️‍🗨️'}</span>
-            <span class="control-label">{activeProject?.showOnMap ? 'Visible' : 'Hidden'}</span>
-          </button>
           {#if activeProject && ['draft','active','ready','cancelled','rejected'].includes(activeProject.status)}
-            <button class="control-btn delete-btn" on:click={() => activeProject && deleteProject(activeProject)} title="Delete Plan">
+            <button class="control-btn delete-btn" on:click={() => activeProject && deleteProject(activeProject)} title="Delete Project">
               <span class="control-icon">🗑️</span>
               <span class="control-label">Delete</span>
             </button>
@@ -1468,7 +1458,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
                     </button>
-                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Plan">
+                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Project">
                       🗑️ Delete
                     </button>
                   {/if}
@@ -1480,7 +1470,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project - Send back for revision">
                       ❌ Reject
                     </button>
-                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Plan">
+                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Project">
                       🗑️ Delete
                     </button>
                   {/if}
@@ -1505,7 +1495,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <button 
                       class="action-btn reopen-btn" 
                       on:click={() => reopenProject(project)} 
-                      title="Reopen this plan for additional planning work"
+                      title="Reopen this project for additional planning work"
                     >
                       ♻️ Reopen
                     </button>
@@ -1515,7 +1505,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <button 
                       class="action-btn authorize-btn" 
                       on:click={() => authorizeProject(project)} 
-                      title="Authorize Project - Promote this plan to production"
+                      title="Authorize Project - Promote this project to production"
                     >
                       🚀 Authorize
                     </button>
