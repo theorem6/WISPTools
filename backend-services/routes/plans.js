@@ -784,6 +784,8 @@ const RESIDENTIAL_BUILDING_TYPES = new Set([
   'yes'
 ]);
 
+const BUSINESS_NAME_REGEX = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
+
 function candidateHasResidentialSignal(tags = {}) {
   if (!tags || typeof tags !== 'object') return false;
   if (tags['addr:housenumber'] || tags['addr:unit']) return true;
@@ -1393,8 +1395,6 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 }
 
 const filterArcgisCandidates = (candidates = []) => {
-  const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
-
   return candidates
     .map((candidate) => {
       const location = candidate?.location;
@@ -1412,7 +1412,7 @@ const filterArcgisCandidates = (candidates = []) => {
         return null;
       }
 
-      if (businessKeywords.test(placeName)) {
+      if (BUSINESS_NAME_REGEX.test(placeName)) {
         return null;
       }
 
@@ -2108,16 +2108,20 @@ router.post('/:id/marketing/discover', async (req, res) => {
       const workingAddress = { ...address };
       const addressLine1 = workingAddress.addressLine1 || '';
       if (addressLine1 && addressLine1.length > 0) {
-        // Check if address starts with a number (valid house number)
-        const startsWithNumber = /^\d/.test(addressLine1.trim());
-        
-        // If it doesn't start with a number and doesn't look like coordinates, skip it
-        // Coordinates format: "lat, lon" like "40.1234, -74.5678"
-        const looksLikeCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+/.test(addressLine1.trim());
-        
-        if (!startsWithNumber && !looksLikeCoordinates) {
-          console.log('[MarketingDiscovery] Filtered street-only (no house number):', addressLine1);
-          return false;
+        const trimmed = addressLine1.trim();
+        const looksLikeCoordinates = /^-?\d+\.\d+,\s*-?\d+\.\d+/.test(trimmed);
+
+        if (!looksLikeCoordinates) {
+          const containsNumber = /\d/.test(trimmed);
+          if (!containsNumber) {
+            console.log('[MarketingDiscovery] Filtered non-numeric address:', addressLine1);
+            return false;
+          }
+
+          if (BUSINESS_NAME_REGEX.test(trimmed)) {
+            console.log('[MarketingDiscovery] Filtered business-like address:', addressLine1);
+            return false;
+          }
         }
       } else {
         // No address line, use coordinates as identifier
