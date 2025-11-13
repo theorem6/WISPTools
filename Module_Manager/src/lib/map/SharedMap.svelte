@@ -126,6 +126,21 @@
     postStateToIframe();
   };
 
+  const requestCurrentExtent = () => {
+    if (!iframeWindow) return;
+    try {
+      iframeWindow.postMessage(
+        {
+          source: 'shared-map',
+          type: 'request-extent'
+        },
+        '*'
+      );
+    } catch (err) {
+      console.error('[SharedMap] Failed to request extent from iframe:', err);
+    }
+  };
+
   const handleMessage = (event: MessageEvent) => {
     const { source, type } = event.data || {};
     if (source !== 'coverage-map') return;
@@ -138,8 +153,13 @@
     }
   };
 
+  const handleRequestExtentEvent = () => {
+    requestCurrentExtent();
+  };
+
   onMount(() => {
     window.addEventListener('message', handleMessage);
+    window.addEventListener('request-map-extent', handleRequestExtentEvent);
 
     unsubscribe = mapContext.subscribe(state => {
       mapState = state;
@@ -159,6 +179,7 @@
 
   onDestroy(() => {
     window.removeEventListener('message', handleMessage);
+    window.removeEventListener('request-map-extent', handleRequestExtentEvent);
     unsubscribe?.();
   });
 

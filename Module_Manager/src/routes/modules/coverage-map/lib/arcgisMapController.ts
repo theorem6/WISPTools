@@ -506,6 +506,7 @@ export class CoverageMapController {
     this.registerPointerHandlers();
     this.registerDragHandlers();
     this.watchViewExtent();
+    this.setupMessageListener();
 
     console.log('Coverage Map initialized');
   }
@@ -727,6 +728,24 @@ export class CoverageMapController {
       );
     } catch (err) {
       console.warn('[CoverageMap] Failed to post view extent', err);
+    }
+  }
+
+  private handleMessage(event: MessageEvent): void {
+    const { source, type } = event.data || {};
+    if (source !== 'shared-map') return;
+
+    if (type === 'request-extent') {
+      const currentExtent = this.mapView?.extent;
+      if (currentExtent) {
+        this.broadcastViewExtent(currentExtent);
+      }
+    }
+  }
+
+  private setupMessageListener(): void {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('message', this.handleMessage.bind(this));
     }
   }
 

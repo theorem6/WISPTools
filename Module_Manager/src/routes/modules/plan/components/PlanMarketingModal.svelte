@@ -457,7 +457,13 @@ let results: PlanMarketingAddress[] = [];
       return;
     }
 
-    // Always use the current mapExtent at click time, not a stale cached value
+    // Request current extent from map when button is clicked
+    window.dispatchEvent(new CustomEvent('request-map-extent'));
+    
+    // Wait briefly for the extent update to propagate
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    // Use the most recent extent (either just updated mapExtent or fallback to latestExtent)
     const extentForRun = mapExtent ? cloneMapExtent(mapExtent) : (latestExtent ?? extentAtOpen);
     
     if (!extentForRun?.boundingBox || !extentForRun?.center) {

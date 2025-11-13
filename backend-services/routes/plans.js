@@ -1914,9 +1914,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
           workingAddress.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
         }
 
-        if (!isWithinBoundingBox(latitude, longitude, boundingBox)) {
-          continue;
-        }
+        // Always include existing addresses, regardless of current bounding box
+        // This allows re-discover to merge addresses from multiple areas scanned
 
         const normalizedAddressKey = buildAddressHash(workingAddress);
         if (normalizedAddressKey && addressHashes.has(normalizedAddressKey)) {
