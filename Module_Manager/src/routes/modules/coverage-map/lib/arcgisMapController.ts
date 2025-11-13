@@ -203,30 +203,33 @@ export class CoverageMapController {
 
   public setMarketingLeads(leads: PlanMarketingAddress[]): void {
     const previousCount = this.marketingLeads.length;
-    this.marketingLeads = Array.isArray(leads) ? [...leads] : [];
+    const incomingLeads = Array.isArray(leads) ? [...leads] : [];
+    this.marketingLeads = incomingLeads;
+
+    const shouldAutoFit =
+      previousCount === 0 &&
+      this.marketingLeads.length > 0 &&
+      !this.hasPerformedInitialFit;
     
-    // Don't reset hasPerformedInitialFit - preserve current map view
     if (this.mapReady) {
       this.renderMarketingLeads()
         .then(() => {
-          // Only fit to graphics if we have plan features or other graphics
-          // Don't recenter on US if we have plan features (preserve plan center)
-          const hasPlanFeatures = this.planDraftLayer?.graphics?.length > 0;
-          const hasOtherGraphics = this.graphicsLayer?.graphics?.length > 0;
-          const hasMarketingGraphics = this.filters.showMarketing && this.marketingLayer?.graphics?.length > 0;
-          
-          // If we have plan features, preserve the current view (don't recenter)
-          if (hasPlanFeatures) {
-            // Don't change the view - plan is already centered
+          if (!shouldAutoFit) {
             return;
           }
-          
-          // If we have other graphics or marketing leads, fit to them
+
+          const hasPlanFeatures = this.planDraftLayer?.graphics?.length > 0;
+          if (hasPlanFeatures) {
+            return;
+          }
+
+          const hasOtherGraphics = this.graphicsLayer?.graphics?.length > 0;
+          const hasMarketingGraphics =
+            this.filters.showMarketing && this.marketingLayer?.graphics?.length > 0;
+
           if (hasOtherGraphics || hasMarketingGraphics) {
             return this.fitMapToVisibleGraphics(true);
           }
-          
-          // Otherwise, preserve current map view (don't recenter on US)
         })
         .catch(err => console.error('[CoverageMap] Marketing render error:', err));
     }

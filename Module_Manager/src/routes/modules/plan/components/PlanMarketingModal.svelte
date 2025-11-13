@@ -74,6 +74,7 @@ const ALGORITHM_OPTIONS = [
   let error: string | null = null;
   let info: string | null = null;
   let currentStep = 0;
+  let lastSearchSpan: { widthMiles: number; heightMiles: number } | null = null;
 
   $: currentExtentKey = latestExtent?.boundingBox ? boundingBoxKey(latestExtent.boundingBox) : null;
   $: pendingExtentChange =
@@ -305,6 +306,11 @@ let results: PlanMarketingAddress[] = [];
     return Number(clamped.toFixed(2));
   }
 
+  function describeSpan(span: { widthMiles: number; heightMiles: number } | null): string | null {
+    if (!span) return null;
+    return `${span.widthMiles.toFixed(2)} × ${span.heightMiles.toFixed(2)} miles`;
+  }
+
   function formatNumericInput(value: unknown, fractionDigits = 6): string {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
@@ -472,9 +478,11 @@ let results: PlanMarketingAddress[] = [];
 
       const spanMiles = computeSpanMiles({ center, boundingBox });
       if (spanMiles) {
+        lastSearchSpan = { widthMiles: spanMiles.width, heightMiles: spanMiles.height };
         const maxSpan = Math.max(spanMiles.width, spanMiles.height);
         radiusMiles = Math.min(Math.max(maxSpan / 2, 0.25), 50);
       } else {
+        lastSearchSpan = null;
         const derivedRadius = deriveRadiusFromExtent({ center, boundingBox }) ?? 25;
         radiusMiles = Math.min(derivedRadius, 50);
       }
@@ -535,14 +543,17 @@ let results: PlanMarketingAddress[] = [];
         planMarketingAddressesLength: plan.marketing?.addresses?.length
       });
       
+      const fallbackSpanDescription = describeSpan(lastSearchSpan);
+      const defaultAreaSuffix = fallbackSpanDescription ? ` Search area ≈ ${fallbackSpanDescription}.` : '';
+
       if (totalSaved === 0) {
-        info = 'No addresses found in current map view. Try zooming in or moving to a different area.';
+        info = `No addresses found in current map view. Try zooming in or moving to a different area.${defaultAreaSuffix}`.trim();
       } else if (newlyAdded === 0) {
-        info = `No new addresses detected in this view. ${totalSaved} saved leads remain available.`;
+        info = `No new addresses detected in this view. ${totalSaved} saved leads remain available.${defaultAreaSuffix}`.trim();
       } else if (runtimeSpan) {
-        info = `Added ${newlyAdded} new addresses (${totalSaved} total saved) across ~${runtimeSpan.width.toFixed(1)} × ${runtimeSpan.height.toFixed(1)} miles.`;
+        info = `Added ${newlyAdded} new addresses (${totalSaved} total saved) across ~${runtimeSpan.width.toFixed(2)} × ${runtimeSpan.height.toFixed(2)} miles.`;
       } else {
-        info = `Added ${newlyAdded} new addresses (${totalSaved} total saved) for the current map view.`;
+        info = `Added ${newlyAdded} new addresses (${totalSaved} total saved) for the current map view.${defaultAreaSuffix}`.trim();
       }
 
       // Update the plan object locally to reflect the new marketing data
