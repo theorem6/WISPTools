@@ -699,45 +699,8 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
 };
 
 const reverseGeocodeCoordinate = async (lat, lon) => {
-  // Try ArcGIS first (faster and better)
-  const arcgisResult = await reverseGeocodeCoordinateArcgis(lat, lon);
-  if (arcgisResult) {
-    return arcgisResult;
-  }
-
-  // Fall back to Nominatim if ArcGIS fails or isn't available
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': NOMINATIM_USER_AGENT,
-      Accept: 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`Reverse geocoding failed: ${response.status} ${response.statusText} ${errorText}`);
-  }
-
-  const data = await response.json();
-  const address = data.address || {};
-
-  const line1 =
-    address.house_number && address.road
-      ? `${address.house_number} ${address.road}`
-      : data.display_name?.split(',')?.slice(0, 1)?.[0] || undefined;
-
-  return {
-    addressLine1: line1 ? line1.trim() : undefined,
-    addressLine2: undefined,
-    city: address.city || address.town || address.village || address.hamlet || undefined,
-    state: address.state || address.region || undefined,
-    postalCode: address.postcode || undefined,
-    country: address.country || address.country_code?.toUpperCase() || undefined,
-    latitude: lat,
-    longitude: lon,
-    source: 'nominatim'
-  };
+  // Per policy, only accept ArcGIS reverse geocoding results
+  return await reverseGeocodeCoordinateArcgis(lat, lon);
 };
 
 const toRadians = (degrees) => degrees * (Math.PI / 180);
@@ -1055,19 +1018,12 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           if (details && details.addressLine1) {
             addresses.push({
               ...details,
-              source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
+              source: 'osm_buildings+arcgis'
             });
             geocodedCount += 1;
           } else {
-            // No address returned, use coordinates
             failedCount += 1;
-            addresses.push({
-              addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
-              latitude: candidate.lat,
-              longitude: candidate.lon,
-              country: 'US',
-              source: 'osm_buildings'
-            });
+            continue;
           }
         } catch (error) {
           console.warn('[MarketingDiscovery] Reverse geocode failed for centroid:', {
@@ -1076,14 +1032,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
             error: error?.message || error
           });
           failedCount += 1;
-          // Fallback to coordinates
-          addresses.push({
-            addressLine1: `${candidate.lat.toFixed(5)}, ${candidate.lon.toFixed(5)}`,
-            latitude: candidate.lat,
-            longitude: candidate.lon,
-            country: 'US',
-            source: 'osm_buildings'
-          });
+          continue;
         }
       }
       
@@ -1229,12 +1178,8 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     });
 
     if (addresses.length === 0) {
-      console.log('[MarketingDiscovery] ArcGIS address points returned zero candidates, falling back to grid sampler');
-      const gridResult = await runArcgisGridSampler({
-        boundingBox,
-        spacingMeters: 40
-      });
-      return { addresses: gridResult.addresses };
+      console.log('[MarketingDiscovery] ArcGIS address points returned zero candidates (no grid fallback, per policy)');
+      return { addresses: [], error: 'ArcGIS address points returned zero candidates' };
     }
 
     return { addresses };
