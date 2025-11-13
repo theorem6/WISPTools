@@ -126,6 +126,8 @@ const isWithinBoundingBox = (lat, lon, bbox, toleranceMeters = 40) => {
   );
 };
 
+const OVERPASS_RATE_LIMIT_REGEX = /429|rate_limited/i;
+
 const subdivideBoundingBox = (bbox) => {
   const midLat = (bbox.north + bbox.south) / 2;
   const midLon = (bbox.east + bbox.west) / 2;
@@ -1519,7 +1521,7 @@ const shouldSubdivideArcgisExtent = ({ spanMiles, depth, candidateCount, exceede
   return false;
 };
 
-async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
+async function runArcgisAddressPointsDiscovery({ boundingBox, center, isAborted }) {
   console.log('[MarketingDiscovery] ArcGIS Address Points Discovery called', {
     hasApiKey: !!ARC_GIS_API_KEY,
     boundingBox
@@ -1535,6 +1537,11 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     return { addresses: [], error: 'Invalid bounding box' };
   }
 
+  if (isAborted?.()) {
+    console.warn('[MarketingDiscovery] ArcGIS discovery aborted before start');
+    return { addresses: [], error: 'Request aborted' };
+  }
+
   try {
     const initialTiles = generateArcgisTileGrid(boundingBox);
     const queue = (initialTiles.length ? initialTiles : [boundingBox]).map((tile) => ({
@@ -1543,11 +1550,17 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     }));
     const uniqueAddresses = [];
     const seenKeys = new Set();
+    let overpassRateLimited = false;
 
     while (queue.length > 0) {
       const { bbox: currentBBox, depth } = queue.shift();
       if (!isValidBoundingBox(currentBBox)) {
         continue;
+      }
+
+      if (isAborted?.()) {
+        console.warn('[MarketingDiscovery] ArcGIS discovery aborted mid-queue, stopping');
+        break;
       }
 
       const requestCenter = center ?? computeBoundingBoxCenter(currentBBox);
@@ -1561,22 +1574,31 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       const newlyAdded = mergeArcgisAddresses(uniqueAddresses, result.addresses, seenKeys, boundingBox);
       let fallbackAdded = 0;
 
-      if (newlyAdded < ARC_GIS_TILE_SPARSE_THRESHOLD) {
-        const fallback = await runOsmTileFallback({ boundingBox: currentBBox });
-        if (Array.isArray(fallback.addresses) && fallback.addresses.length > 0) {
-          fallbackAdded = mergeArcgisAddresses(
-            uniqueAddresses,
-            fallback.addresses,
-            seenKeys,
-            boundingBox
-          );
+      if (!isAborted?.() && newlyAdded < ARC_GIS_TILE_SPARSE_THRESHOLD) {
+        if (overpassRateLimited) {
+          console.log('[MarketingDiscovery] Skipping tile fallback due to prior Overpass rate limit', {
+            bbox: currentBBox
+          });
+        } else {
+          const fallback = await runOsmTileFallback({ boundingBox: currentBBox });
+          if (Array.isArray(fallback.addresses) && fallback.addresses.length > 0) {
+            fallbackAdded = mergeArcgisAddresses(
+              uniqueAddresses,
+              fallback.addresses,
+              seenKeys,
+              boundingBox
+            );
+          }
+          if (fallback?.error && OVERPASS_RATE_LIMIT_REGEX.test(fallback.error)) {
+            overpassRateLimited = true;
+          }
+          console.log('[MarketingDiscovery] Tile fallback evaluation', {
+            newlyAdded,
+            fallbackAttempted: fallback?.attempted ?? 0,
+            fallbackAdded,
+            fallbackError: fallback?.error
+          });
         }
-        console.log('[MarketingDiscovery] Tile fallback evaluation', {
-          newlyAdded,
-          fallbackAttempted: fallback?.attempted ?? 0,
-          fallbackAdded,
-          fallbackError: fallback?.error
-        });
       }
 
       console.log('[MarketingDiscovery] ArcGIS address extent processed', {
@@ -1590,6 +1612,7 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       });
 
       if (
+        isAborted?.() ||
         shouldSubdivideArcgisExtent({
           spanMiles,
           depth,
@@ -1597,6 +1620,10 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
           exceededLimit: result.exceededLimit
         })
       ) {
+        if (isAborted?.()) {
+          console.warn('[MarketingDiscovery] Aborted before subdividing tiles, stopping');
+          break;
+        }
         const subdivisions = subdivideBoundingBox(currentBBox);
         subdivisions.forEach((subBBox) => queue.push({ bbox: subBBox, depth: depth + 1 }));
       }
@@ -1930,6 +1957,12 @@ router.get('/:id/marketing/progress/:requestId', (req, res) => {
 router.post('/:id/marketing/discover', async (req, res) => {
   const requestStartTime = Date.now();
   const requestId = `${req.params.id}-${Date.now()}`;
+  let aborted = false;
+
+  req.on('aborted', () => {
+    aborted = true;
+    console.warn('[MarketingDiscovery] Client aborted request, cancelling processing', { requestId });
+  });
   
   // Initialize progress
   progressStore.set(requestId, {
@@ -1960,6 +1993,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
       _id: req.params.id,
       tenantId: req.tenantId
     });
+
+    if (aborted) {
+      console.warn('[MarketingDiscovery] Request aborted before plan lookup finished', { requestId });
+      return;
+    }
 
     if (!plan) {
       return res.status(404).json({ error: 'Plan not found' });
@@ -2021,6 +2059,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
     let currentStep = '';
 
     const updateProgress = (step, progress, details = {}) => {
+      if (aborted) {
+        return;
+      }
       currentStep = step;
       totalProgress = progress;
       const elapsed = Date.now() - requestStartTime;
@@ -2255,7 +2296,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
         const arcgisResult = await runArcgisAddressPointsDiscovery({
           boundingBox,
           center: computedCenter,
-          radiusMiles
+          radiusMiles,
+          isAborted: () => aborted
         });
         updateProgress('ArcGIS address points completed', 70);
 
@@ -2432,6 +2474,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     });
     
+    if (aborted) {
+      console.warn('[MarketingDiscovery] Request aborted after processing completed, skipping response', { requestId });
+      return;
+    }
+
     if (!res.headersSent) {
       res.json({
         summary: {
@@ -2482,6 +2529,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
       duration: `${requestDuration}ms` 
     });
     
+    if (aborted) {
+      console.warn('[MarketingDiscovery] Request aborted during error handling, skipping response', { requestId });
+      return;
+    }
+
     if (!res.headersSent) {
       res.status(500).json({
         error: 'Failed to discover marketing addresses',
@@ -2491,6 +2543,10 @@ router.post('/:id/marketing/discover', async (req, res) => {
       });
     } else {
       console.warn('[MarketingDiscovery] Response already sent, skipping error response');
+    }
+  } finally {
+    if (aborted) {
+      console.warn('[MarketingDiscovery] Cleanup after aborted request complete', { requestId });
     }
   }
 });
