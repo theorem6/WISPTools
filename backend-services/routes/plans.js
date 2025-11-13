@@ -83,6 +83,47 @@ const parseBoundingBox = (input) => {
   return { west, south, east, north };
 };
 
+const isValidBoundingBox = (bbox) => {
+  if (!bbox) return false;
+  const required = ['west', 'south', 'east', 'north'];
+  if (required.some((key) => !Number.isFinite(bbox[key]))) return false;
+  if (bbox.east <= bbox.west) return false;
+  if (bbox.north <= bbox.south) return false;
+  return true;
+};
+
+const computeBoundingBoxCenter = (bbox) => ({
+  lat: (bbox.north + bbox.south) / 2,
+  lon: (bbox.east + bbox.west) / 2
+});
+
+const computeBoundingBoxSpanMiles = (bbox) => {
+  const latSpan = Math.abs(bbox.north - bbox.south);
+  const lonSpan = Math.abs(bbox.east - bbox.west);
+  const centerLat = (bbox.north + bbox.south) / 2;
+  const milesPerLat = 69.0;
+  const milesPerLon = Math.cos((centerLat * Math.PI) / 180) * 69.172 || 69.172;
+  return {
+    widthMiles: lonSpan * Math.abs(milesPerLon),
+    heightMiles: latSpan * milesPerLat
+  };
+};
+
+const subdivideBoundingBox = (bbox) => {
+  const midLat = (bbox.north + bbox.south) / 2;
+  const midLon = (bbox.east + bbox.west) / 2;
+  if (!Number.isFinite(midLat) || !Number.isFinite(midLon)) {
+    return [];
+  }
+  const subBoxes = [
+    { west: bbox.west, south: midLat, east: midLon, north: bbox.north }, // NW
+    { west: midLon, south: midLat, east: bbox.east, north: bbox.north }, // NE
+    { west: bbox.west, south: bbox.south, east: midLon, north: midLat }, // SW
+    { west: midLon, south: bbox.south, east: bbox.east, north: midLat } // SE
+  ];
+  return subBoxes.filter((box) => isValidBoundingBox(box));
+};
+
 const parseCenter = (input) => {
   if (!input || typeof input !== 'object') return undefined;
   const lat = toNumber(input.lat ?? input.latitude);
@@ -96,6 +137,11 @@ const AVAILABLE_MARKETING_ALGORITHMS = {
   arcgis_address_points: 'ArcGIS Address Points',
   arcgis_places: 'ArcGIS Places & Amenities'
 };
+
+const ARC_GIS_MAX_CANDIDATES_PER_REQUEST = 500;
+const ARC_GIS_SUBDIVIDE_TRIGGER_COUNT = Math.round(ARC_GIS_MAX_CANDIDATES_PER_REQUEST * 0.9);
+const ARC_GIS_MIN_SUBDIVIDE_SPAN_MILES = 1.5;
+const ARC_GIS_MAX_SUBDIVISION_DEPTH = 3;
 
 const parseMarketingAlgorithms = (input) => {
   if (!Array.isArray(input)) return undefined;
@@ -809,6 +855,40 @@ const normalizeAddressComponent = (value) => {
   return normalized;
 };
 
+const normalizeArcgisAddressKey = (address = {}) => {
+  const latitude = toNumber(address.latitude);
+  const longitude = toNumber(address.longitude);
+  const line1 = normalizeAddressComponent(address.addressLine1);
+  const postal = normalizeAddressComponent(address.postalCode || address.zip);
+
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${line1}|${postal}`;
+  }
+
+  if (line1) {
+    return `${line1}|${postal}`;
+  }
+
+  return null;
+};
+
+const mergeArcgisAddresses = (target, candidates, seen) => {
+  let added = 0;
+  if (!Array.isArray(candidates) || !candidates.length) {
+    return added;
+  }
+
+  for (const candidate of candidates) {
+    const key = normalizeArcgisAddressKey(candidate);
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    target.push(candidate);
+    added += 1;
+  }
+  return added;
+};
+
 const buildAddressHash = (address = {}) => {
   const line1 = normalizeAddressComponent(address.addressLine1);
   const line2 = normalizeAddressComponent(address.addressLine2);
@@ -1124,6 +1204,103 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
   }
 }
 
+const filterArcgisCandidates = (candidates = []) => {
+  const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
+
+  return candidates
+    .map((candidate) => {
+      const location = candidate?.location;
+      const attributes = candidate?.attributes || {};
+      const latitude = toNumber(location?.y);
+      const longitude = toNumber(location?.x);
+      if (latitude === undefined || longitude === undefined) {
+        return null;
+      }
+
+      const addrType = attributes.Addr_type || '';
+      const placeName = attributes.PlaceName || candidate.address || '';
+
+      if (addrType && (addrType.includes('Commercial') || addrType.includes('Business') || addrType.includes('POI'))) {
+        return null;
+      }
+
+      if (businessKeywords.test(placeName)) {
+        return null;
+      }
+
+      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
+
+      return {
+        addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+        addressLine2: undefined,
+        city: attributes.City || undefined,
+        state: attributes.Region || undefined,
+        postalCode: attributes.Postal || undefined,
+        country: 'US',
+        latitude,
+        longitude,
+        source: 'arcgis_address_points'
+      };
+    })
+    .filter(Boolean);
+};
+
+const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
+  const params = new URLSearchParams({
+    f: 'json',
+    outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
+    maxLocations: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
+    searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+    category: 'Point Address',
+    forStorage: 'false'
+  });
+
+  if (centerOverride?.lon !== undefined && centerOverride?.lat !== undefined) {
+    params.set('location', `${centerOverride.lon},${centerOverride.lat}`);
+  }
+
+  params.set('token', ARC_GIS_API_KEY);
+
+  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: params.toString()
+  });
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => '');
+    throw new Error(`ArcGIS API returned ${response.status}: ${details}`);
+  }
+
+  const payload = await response.json();
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+  const addresses = filterArcgisCandidates(candidates);
+  const exceededLimit = Boolean(payload?.exceededTransferLimit) || candidates.length >= ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
+
+  return {
+    addresses,
+    candidateCount: candidates.length,
+    exceededLimit,
+    rawCandidates: candidates
+  };
+};
+
+const shouldSubdivideArcgisExtent = ({ spanMiles, depth, candidateCount, exceededLimit }) => {
+  if (depth >= ARC_GIS_MAX_SUBDIVISION_DEPTH) return false;
+
+  const largeExtent =
+    spanMiles.widthMiles > ARC_GIS_MIN_SUBDIVIDE_SPAN_MILES || spanMiles.heightMiles > ARC_GIS_MIN_SUBDIVIDE_SPAN_MILES;
+
+  if (exceededLimit) return true;
+  if (candidateCount >= ARC_GIS_SUBDIVIDE_TRIGGER_COUNT) return true;
+  if (largeExtent && candidateCount === 0) return true;
+  if (largeExtent && candidateCount > ARC_GIS_SUBDIVIDE_TRIGGER_COUNT / 2) return true;
+
+  return false;
+};
+
 async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
   console.log('[MarketingDiscovery] ArcGIS Address Points Discovery called', {
     hasApiKey: !!ARC_GIS_API_KEY,
@@ -1135,109 +1312,64 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
     return { addresses: [], error: 'ArcGIS API key not configured' };
   }
 
+  if (!isValidBoundingBox(boundingBox)) {
+    console.warn('[MarketingDiscovery] Invalid bounding box provided to ArcGIS discovery', boundingBox);
+    return { addresses: [], error: 'Invalid bounding box' };
+  }
+
   try {
-    const params = new URLSearchParams({
-      f: 'json',
-      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
-      maxLocations: '500',  // Increased from 150
-      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
-      category: 'Point Address',
-      forStorage: 'false'
-    });
-    
-    console.log('[MarketingDiscovery] ArcGIS Address Points query params', {
-      maxLocations: 500,
-      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
-      category: 'Point Address'
-    });
+    const queue = [{ bbox: boundingBox, depth: 0 }];
+    const uniqueAddresses = [];
+    const seenKeys = new Set();
 
-    if (center?.lon !== undefined && center?.lat !== undefined) {
-      params.set('location', `${center.lon},${center.lat}`);
+    while (queue.length > 0) {
+      const { bbox: currentBBox, depth } = queue.shift();
+      if (!isValidBoundingBox(currentBBox)) {
+        continue;
+      }
+
+      const requestCenter = center ?? computeBoundingBoxCenter(currentBBox);
+      const spanMiles = computeBoundingBoxSpanMiles(currentBBox);
+
+      const result = await fetchArcgisCandidatesForExtent({
+        boundingBox: currentBBox,
+        centerOverride: requestCenter
+      });
+
+      const newlyAdded = mergeArcgisAddresses(uniqueAddresses, result.addresses, seenKeys);
+
+      console.log('[MarketingDiscovery] ArcGIS address extent processed', {
+        depth,
+        spanMiles,
+        candidateCount: result.candidateCount,
+        addressesAdded: newlyAdded,
+        exceededLimit: result.exceededLimit,
+        bbox: currentBBox
+      });
+
+      if (
+        shouldSubdivideArcgisExtent({
+          spanMiles,
+          depth,
+          candidateCount: result.candidateCount,
+          exceededLimit: result.exceededLimit
+        })
+      ) {
+        const subdivisions = subdivideBoundingBox(currentBBox);
+        subdivisions.forEach((subBBox) => queue.push({ bbox: subBBox, depth: depth + 1 }));
+      }
     }
 
-    params.set('token', ARC_GIS_API_KEY);
-
-    const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString()
-    });
-
-    if (!response.ok) {
-      const details = await response.text().catch(() => '');
-      console.warn('[MarketingDiscovery] ArcGIS address points request failed', response.status, details);
-      return { addresses: [], error: `ArcGIS API returned ${response.status}` };
-    }
-
-    const payload = await response.json();
-    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-    
-    console.log('[MarketingDiscovery] ArcGIS Address Points raw response', {
-      candidatesFound: candidates.length,
-      sampleCandidate: candidates[0]
-    });
-
-    // Filter for residential addresses - exclude businesses
-    const addresses = candidates
-      .map((candidate) => {
-        const location = candidate?.location;
-        const attributes = candidate?.attributes || {};
-        const latitude = toNumber(location?.y);
-        const longitude = toNumber(location?.x);
-        if (latitude === undefined || longitude === undefined) {
-          return null;
-        }
-
-        // Check Addr_type - filter out businesses
-        const addrType = attributes.Addr_type || '';
-        const placeName = attributes.PlaceName || candidate.address || '';
-        
-        // Exclude commercial/business addresses
-        if (addrType && (addrType.includes('Commercial') || addrType.includes('Business') || addrType.includes('POI'))) {
-          return null;
-        }
-        
-        // Exclude if PlaceName suggests a business (common business keywords)
-        const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
-        if (businessKeywords.test(placeName)) {
-          return null;
-        }
-
-        const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
-
-        return {
-          addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
-          addressLine2: undefined,
-          city: attributes.City || undefined,
-          state: attributes.Region || undefined,
-          postalCode: attributes.Postal || undefined,
-          country: 'US',
-          latitude,
-          longitude,
-          source: 'arcgis_address_points'
-        };
-      })
-      .filter(Boolean);
-    
-    console.log('[MarketingDiscovery] ArcGIS Address Points filtered results', {
-      totalCandidates: candidates.length,
-      afterFiltering: addresses.length,
-      filteredOut: candidates.length - addresses.length,
-      sampleAddress: addresses[0]
-    });
-
-    if (addresses.length === 0) {
-      console.log('[MarketingDiscovery] ArcGIS address points returned zero candidates, falling back to grid sampler');
+    if (uniqueAddresses.length === 0) {
+      console.log('[MarketingDiscovery] ArcGIS address points subdivisions yielded no results, falling back to grid sampler');
       const gridResult = await runArcgisGridSampler({
         boundingBox,
         spacingMeters: 40
       });
-      return { addresses: gridResult.addresses };
+      mergeArcgisAddresses(uniqueAddresses, gridResult.addresses, seenKeys);
     }
 
-    return { addresses };
+    return { addresses: uniqueAddresses };
   } catch (error) {
     const message = error?.message || (typeof error === 'string' ? error : 'Unknown ArcGIS address points error');
     console.warn('[MarketingDiscovery] ArcGIS address points error', message);
