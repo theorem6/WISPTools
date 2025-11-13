@@ -109,6 +109,23 @@ const computeBoundingBoxSpanMiles = (bbox) => {
   };
 };
 
+const isWithinBoundingBox = (lat, lon, bbox, toleranceMeters = 40) => {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !isValidBoundingBox(bbox)) {
+    return false;
+  }
+  const centerLat = (bbox.north + bbox.south) / 2;
+  const latTolerance = toleranceMeters / 111000;
+  const lonDenominator = Math.cos((centerLat * Math.PI) / 180) * 111000;
+  const lonTolerance = lonDenominator ? toleranceMeters / lonDenominator : toleranceMeters / 111000;
+
+  return (
+    lat >= bbox.south - latTolerance &&
+    lat <= bbox.north + latTolerance &&
+    lon >= bbox.west - lonTolerance &&
+    lon <= bbox.east + lonTolerance
+  );
+};
+
 const subdivideBoundingBox = (bbox) => {
   const midLat = (bbox.north + bbox.south) / 2;
   const midLon = (bbox.east + bbox.west) / 2;
@@ -872,7 +889,7 @@ const normalizeArcgisAddressKey = (address = {}) => {
   return null;
 };
 
-const mergeArcgisAddresses = (target, candidates, seen) => {
+const mergeArcgisAddresses = (target, candidates, seen, boundingBox) => {
   let added = 0;
   if (!Array.isArray(candidates) || !candidates.length) {
     return added;
@@ -882,6 +899,15 @@ const mergeArcgisAddresses = (target, candidates, seen) => {
     const key = normalizeArcgisAddressKey(candidate);
     if (!key) continue;
     if (seen.has(key)) continue;
+
+    if (boundingBox) {
+      const latitude = toNumber(candidate.latitude);
+      const longitude = toNumber(candidate.longitude);
+      if (!isWithinBoundingBox(latitude, longitude, boundingBox)) {
+        continue;
+      }
+    }
+
     seen.add(key);
     target.push(candidate);
     added += 1;
@@ -1336,7 +1362,7 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
         centerOverride: requestCenter
       });
 
-      const newlyAdded = mergeArcgisAddresses(uniqueAddresses, result.addresses, seenKeys);
+      const newlyAdded = mergeArcgisAddresses(uniqueAddresses, result.addresses, seenKeys, boundingBox);
 
       console.log('[MarketingDiscovery] ArcGIS address extent processed', {
         depth,
@@ -1366,7 +1392,7 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
         boundingBox,
         spacingMeters: 40
       });
-      mergeArcgisAddresses(uniqueAddresses, gridResult.addresses, seenKeys);
+      mergeArcgisAddresses(uniqueAddresses, gridResult.addresses, seenKeys, boundingBox);
     }
 
     return { addresses: uniqueAddresses };
@@ -1811,6 +1837,15 @@ router.post('/:id/marketing/discover', async (req, res) => {
       const longitude = toNumber(address.longitude);
       if (latitude === undefined || longitude === undefined) return false;
 
+      if (!isWithinBoundingBox(latitude, longitude, boundingBox)) {
+        console.log('[MarketingDiscovery] Skipped address outside requested bounds', {
+          latitude,
+          longitude,
+          algorithmId
+        });
+        return false;
+      }
+
       // Filter out addresses that only have street name (no house number)
       // BUT allow empty addressLine1 (we'll use coordinates as fallback)
       const workingAddress = { ...address };
@@ -1877,6 +1912,10 @@ router.post('/:id/marketing/discover', async (req, res) => {
         const workingAddress = { ...existing };
         if (!workingAddress.addressLine1) {
           workingAddress.addressLine1 = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        }
+
+        if (!isWithinBoundingBox(latitude, longitude, boundingBox)) {
+          continue;
         }
 
         const normalizedAddressKey = buildAddressHash(workingAddress);
@@ -2055,6 +2094,19 @@ router.post('/:id/marketing/discover', async (req, res) => {
         recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
       }
     }
+
+    const filteredWithinBounds = combinedAddresses.filter((addr) =>
+      isWithinBoundingBox(addr.latitude, addr.longitude, boundingBox)
+    );
+    if (filteredWithinBounds.length !== combinedAddresses.length) {
+      console.log('[MarketingDiscovery] Removed addresses outside requested bounds', {
+        requested: boundingBox,
+        totalBefore: combinedAddresses.length,
+        totalAfter: filteredWithinBounds.length
+      });
+    }
+    combinedAddresses.length = 0;
+    combinedAddresses.push(...filteredWithinBounds);
 
     const totalUniqueAddresses = combinedAddresses.length;
     const totalRuns = priorTotalRuns + 1;
