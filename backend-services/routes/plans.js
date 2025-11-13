@@ -1395,66 +1395,30 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 }
 
 const filterArcgisCandidates = (candidates = []) => {
-  // Commercial indicators - exclude "st" and "ste" as they're common in street names
-  const COMMERCIAL_INDICATORS = /\b(suite\s+\w+|unit\s+\w+|building\s+\w+|floor\s+\w+|room\s+\w+|office\s+\w+|warehouse|plaza|center|complex|parking\s+lot|drive[\s-]thru|drive[\s-]through|bldg\s+\w+|blg\s+\w+)\b/i;
-  const HOUSE_NUMBER_REGEX = /^\d+[A-Za-z]?\s+/; // Must start with a number (residential indicator)
-  // Major road/highway indicators - exclude addresses on highways, routes, etc.
-  // Matches: Highway 20, Route 250, I-75, US-20, State Route 4, SR-4, etc.
-  // Note: Excludes boulevard/blvd as many residential areas use these
-  const MAJOR_ROAD_REGEX = /\b(highway|route|interstate|i-?\s*\d+|us-?\s*\d+|state\s+route|sr-?\s*\d+|freeway|turnpike|parkway|bypass|expressway|toll\s+road|service\s+area|rest\s+area|rest\s+stop|truck\s+stop|travel\s+plaza|hwy\s*\d+|rte\s*\d+|rt\s*\d+[^\w])\b/i;
+  const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
 
-  let filtered = 0;
-
-  const result = candidates
+  return candidates
     .map((candidate) => {
       const location = candidate?.location;
       const attributes = candidate?.attributes || {};
       const latitude = toNumber(location?.y);
       const longitude = toNumber(location?.x);
       if (latitude === undefined || longitude === undefined) {
-        filtered++;
         return null;
       }
 
-      const addrType = (attributes.Addr_type || '').toLowerCase();
-      const placeName = (attributes.PlaceName || candidate.address || '').toLowerCase();
-      const matchAddr = (attributes.Match_addr || candidate.address || '').toLowerCase();
-      const fullAddress = `${matchAddr} ${placeName}`.toLowerCase();
+      const addrType = attributes.Addr_type || '';
+      const placeName = attributes.PlaceName || candidate.address || '';
 
-      // Strict Addr_type filtering - exclude commercial, business, POI
-      if (addrType && (addrType.includes('commercial') || addrType.includes('business') || addrType.includes('poi') || addrType.includes('retail') || addrType.includes('industrial'))) {
-        filtered++;
+      if (addrType && (addrType.includes('Commercial') || addrType.includes('Business') || addrType.includes('POI'))) {
         return null;
       }
 
-      // Filter by business name keywords
-      if (BUSINESS_NAME_REGEX.test(placeName) || BUSINESS_NAME_REGEX.test(matchAddr)) {
-        filtered++;
+      if (businessKeywords.test(placeName)) {
         return null;
       }
 
-      // Filter out addresses with commercial indicators (Suite, Unit, Building, etc.)
-      if (COMMERCIAL_INDICATORS.test(fullAddress)) {
-        filtered++;
-        return null;
-      }
-
-      // Filter out addresses on major roads/highways
-      if (MAJOR_ROAD_REGEX.test(fullAddress)) {
-        filtered++;
-        return null;
-      }
-
-      // Prefer addresses with house numbers (strong residential indicator)
-      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || '';
-      if (addressLine1 && !HOUSE_NUMBER_REGEX.test(addressLine1)) {
-        // If it doesn't start with a number, it's likely a business or POI
-        // Only exclude if Addr_type suggests non-residential
-        if (addrType && !addrType.includes('residential') && !addrType.includes('address')) {
-          filtered++;
-          return null;
-        }
-      }
+      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
 
       return {
         addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
@@ -1469,15 +1433,6 @@ const filterArcgisCandidates = (candidates = []) => {
       };
     })
     .filter(Boolean);
-
-  console.log('[MarketingDiscovery] ArcGIS filtering summary', {
-    totalCandidates: candidates.length,
-    filtered,
-    kept: result.length,
-    filterRate: `${((filtered / candidates.length) * 100).toFixed(1)}%`
-  });
-
-  return result;
 };
 
 const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
