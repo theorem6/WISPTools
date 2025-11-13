@@ -1220,9 +1220,41 @@ export class CoverageMapController {
       const markerSize = isMobile ? '18px' : '12px';
       const outlineWidth = isMobile ? 2 : 1.5;
 
+      // Deduplicate by normalized "house number + street" before rendering
+      const deduplicatedLeads: PlanMarketingAddress[] = [];
+      const streetKeyIndex = new Map<string, number>();
+      const fallbackKeys = new Set<string>();
+
+      this.marketingLeads.forEach((lead) => {
+        const streetKey = this.normalizeStreetKey(lead.addressLine1);
+        if (streetKey) {
+          const existingIndex = streetKeyIndex.get(streetKey);
+          if (existingIndex === undefined) {
+            streetKeyIndex.set(streetKey, deduplicatedLeads.length);
+            deduplicatedLeads.push(lead);
+          } else {
+            const existingLead = deduplicatedLeads[existingIndex];
+            if (this.getLeadSourcePriority(lead) > this.getLeadSourcePriority(existingLead)) {
+              deduplicatedLeads[existingIndex] = lead;
+            }
+          }
+          return;
+        }
+
+        const fallbackKey = this.buildCoordinateKey(lead);
+        if (!fallbackKey) {
+          deduplicatedLeads.push(lead);
+          return;
+        }
+        if (!fallbackKeys.has(fallbackKey)) {
+          fallbackKeys.add(fallbackKey);
+          deduplicatedLeads.push(lead);
+        }
+      });
+
       const seen = new Set<string>();
 
-      this.marketingLeads.forEach((lead, index) => {
+      deduplicatedLeads.forEach((lead, index) => {
         const latitude = this.toNumeric(lead.latitude);
         const longitude = this.toNumeric(lead.longitude);
         if (latitude === null || longitude === null) {
@@ -1580,6 +1612,79 @@ export class CoverageMapController {
     }
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private normalizeStreetKey(addressLine1?: string | null): string | null {
+    if (!addressLine1) return null;
+
+    const trimmed = addressLine1.trim();
+    if (!trimmed) return null;
+
+    const match = trimmed.match(/^(\d+[a-z0-9-]*)\s+(.*)$/i);
+    if (!match) return null;
+
+    const directionMap: Record<string, string> = {
+      northeast: 'ne',
+      northwest: 'nw',
+      southeast: 'se',
+      southwest: 'sw',
+      north: 'n',
+      south: 's',
+      east: 'e',
+      west: 'w'
+    };
+
+    const streetTypeMap: Record<string, string> = {
+      street: 'st',
+      avenue: 'ave',
+      boulevard: 'blvd',
+      court: 'ct',
+      drive: 'dr',
+      lane: 'ln',
+      place: 'pl',
+      road: 'rd',
+      terrace: 'ter',
+      trail: 'trl',
+      highway: 'hwy',
+      parkway: 'pkwy',
+      circle: 'cir'
+    };
+
+    const numberPart = match[1].toLowerCase();
+    let streetPart = match[2]
+      .toLowerCase()
+      .replace(/[.,#]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    Object.entries(directionMap).forEach(([full, abbr]) => {
+      streetPart = streetPart.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
+    });
+
+    Object.entries(streetTypeMap).forEach(([full, abbr]) => {
+      streetPart = streetPart.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
+    });
+
+    if (!streetPart) return null;
+    return `${numberPart}|${streetPart}`;
+  }
+
+  private getLeadSourcePriority(lead: PlanMarketingAddress): number {
+    const source = (lead.source ?? '').toLowerCase();
+    if (source.includes('arcgis')) return 3;
+    if (source.includes('osm')) return 2;
+    if (source.includes('nominatim')) return 1;
+    return 0;
+  }
+
+  private buildCoordinateKey(lead: PlanMarketingAddress): string | null {
+    const latitude = this.toNumeric(lead.latitude);
+    const longitude = this.toNumeric(lead.longitude);
+    if (latitude === null || longitude === null) {
+      return null;
+    }
+    const address = (lead.addressLine1 ?? '').toLowerCase();
+    return `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${address}`;
   }
 
   private buildMarketingPopupContent(lead: PlanMarketingAddress, latitude: number, longitude: number): string {
