@@ -784,7 +784,7 @@ const RESIDENTIAL_BUILDING_TYPES = new Set([
   'yes'
 ]);
 
-const BUSINESS_NAME_REGEX = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
+const BUSINESS_NAME_REGEX = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company|business|commercial|retail|service|center|mfg|manufacturing|distributor|supply|wholesale|outlet|showroom|salon|barber|spa|gym|fitness|studio|theater|cinema|mall|supermarket|grocery|deli|bakery|bistro|cafe|coffee|pizza|bar|pub|tavern|inn|lodge|motel|resort|conference|event|hall|venue|truck|trailer|rv|campground|rv|park)\b/i;
 
 function candidateHasResidentialSignal(tags = {}) {
   if (!tags || typeof tags !== 'object') return false;
@@ -1395,28 +1395,56 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 }
 
 const filterArcgisCandidates = (candidates = []) => {
-  return candidates
+  // Commercial indicators - exclude "st" and "ste" as they're common in street names
+  const COMMERCIAL_INDICATORS = /\b(suite\s+\w+|unit\s+\w+|building\s+\w+|floor\s+\w+|room\s+\w+|office\s+\w+|warehouse|plaza|center|complex|parking\s+lot|drive[\s-]thru|drive[\s-]through|bldg\s+\w+|blg\s+\w+)\b/i;
+  const HOUSE_NUMBER_REGEX = /^\d+[A-Za-z]?\s+/; // Must start with a number (residential indicator)
+
+  let filtered = 0;
+
+  const result = candidates
     .map((candidate) => {
       const location = candidate?.location;
       const attributes = candidate?.attributes || {};
       const latitude = toNumber(location?.y);
       const longitude = toNumber(location?.x);
       if (latitude === undefined || longitude === undefined) {
+        filtered++;
         return null;
       }
 
-      const addrType = attributes.Addr_type || '';
-      const placeName = attributes.PlaceName || candidate.address || '';
+      const addrType = (attributes.Addr_type || '').toLowerCase();
+      const placeName = (attributes.PlaceName || candidate.address || '').toLowerCase();
+      const matchAddr = (attributes.Match_addr || candidate.address || '').toLowerCase();
+      const fullAddress = `${matchAddr} ${placeName}`.toLowerCase();
 
-      if (addrType && (addrType.includes('Commercial') || addrType.includes('Business') || addrType.includes('POI'))) {
+      // Strict Addr_type filtering - exclude commercial, business, POI
+      if (addrType && (addrType.includes('commercial') || addrType.includes('business') || addrType.includes('poi') || addrType.includes('retail') || addrType.includes('industrial'))) {
+        filtered++;
         return null;
       }
 
-      if (BUSINESS_NAME_REGEX.test(placeName)) {
+      // Filter by business name keywords
+      if (BUSINESS_NAME_REGEX.test(placeName) || BUSINESS_NAME_REGEX.test(matchAddr)) {
+        filtered++;
         return null;
       }
 
-      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
+      // Filter out addresses with commercial indicators (Suite, Unit, Building, etc.)
+      if (COMMERCIAL_INDICATORS.test(fullAddress)) {
+        filtered++;
+        return null;
+      }
+
+      // Prefer addresses with house numbers (strong residential indicator)
+      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || '';
+      if (addressLine1 && !HOUSE_NUMBER_REGEX.test(addressLine1)) {
+        // If it doesn't start with a number, it's likely a business or POI
+        // Only exclude if Addr_type suggests non-residential
+        if (addrType && !addrType.includes('residential') && !addrType.includes('address')) {
+          filtered++;
+          return null;
+        }
+      }
 
       return {
         addressLine1: addressLine1 || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
@@ -1431,6 +1459,15 @@ const filterArcgisCandidates = (candidates = []) => {
       };
     })
     .filter(Boolean);
+
+  console.log('[MarketingDiscovery] ArcGIS filtering summary', {
+    totalCandidates: candidates.length,
+    filtered,
+    kept: result.length,
+    filterRate: `${((filtered / candidates.length) * 100).toFixed(1)}%`
+  });
+
+  return result;
 };
 
 const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
