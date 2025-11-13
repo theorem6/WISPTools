@@ -141,6 +141,99 @@ const subdivideBoundingBox = (bbox) => {
   return subBoxes.filter((box) => isValidBoundingBox(box));
 };
 
+const generateArcgisTileGrid = (bbox) => {
+  if (!isValidBoundingBox(bbox)) {
+    return [];
+  }
+
+  const spanMiles = computeBoundingBoxSpanMiles(bbox);
+  if (
+    spanMiles.widthMiles <= ARC_GIS_BASE_TILE_SPAN_MILES &&
+    spanMiles.heightMiles <= ARC_GIS_BASE_TILE_SPAN_MILES
+  ) {
+    return [{ ...bbox }];
+  }
+
+  const centerLat = (bbox.north + bbox.south) / 2;
+  const milesPerLat = 69.0;
+  const milesPerLon = Math.cos((centerLat * Math.PI) / 180) * 69.172 || 69.172;
+  const fullLatSpanDeg = Math.max(bbox.north - bbox.south, 0);
+  const fullLonSpanDeg = Math.max(bbox.east - bbox.west, 0);
+  const desiredLatSpanDeg = Math.min(ARC_GIS_BASE_TILE_SPAN_MILES / milesPerLat, fullLatSpanDeg);
+  const desiredLonSpanDeg = Math.min(
+    ARC_GIS_BASE_TILE_SPAN_MILES / Math.abs(milesPerLon || 1),
+    fullLonSpanDeg
+  );
+
+  if (desiredLatSpanDeg <= 0 || desiredLonSpanDeg <= 0) {
+    return [{ ...bbox }];
+  }
+
+  const latStepDeg = Math.max(
+    desiredLatSpanDeg * (1 - ARC_GIS_TILE_OVERLAP_RATIO),
+    desiredLatSpanDeg * 0.4
+  );
+  const lonStepDeg = Math.max(
+    desiredLonSpanDeg * (1 - ARC_GIS_TILE_OVERLAP_RATIO),
+    desiredLonSpanDeg * 0.4
+  );
+
+  const computeStarts = (min, max, span, step) => {
+    if (span <= 0 || max <= min) {
+      return [min];
+    }
+    const starts = [];
+    let current = min;
+    const epsilon = 1e-9;
+    while (current < max - epsilon) {
+      let end = current + span;
+      if (end >= max - epsilon) {
+        current = Math.max(min, max - span);
+        starts.push(current);
+        break;
+      }
+      starts.push(current);
+      current += step;
+      if (current > max) {
+        current = Math.max(min, max - span);
+        starts.push(current);
+        break;
+      }
+    }
+    if (!starts.length) {
+      starts.push(min);
+    }
+    const unique = Array.from(new Set(starts.map((value) => Number(value.toFixed(8)))));
+    return unique.sort((a, b) => a - b);
+  };
+
+  const latStarts = computeStarts(bbox.south, bbox.north, desiredLatSpanDeg, latStepDeg);
+  const lonStarts = computeStarts(bbox.west, bbox.east, desiredLonSpanDeg, lonStepDeg);
+
+  const tiles = [];
+  for (const latStart of latStarts) {
+    const latEnd = Math.min(latStart + desiredLatSpanDeg, bbox.north);
+    for (const lonStart of lonStarts) {
+      const lonEnd = Math.min(lonStart + desiredLonSpanDeg, bbox.east);
+      const tile = {
+        south: Math.max(latStart, bbox.south),
+        west: Math.max(lonStart, bbox.west),
+        north: latEnd,
+        east: lonEnd
+      };
+      if (isValidBoundingBox(tile)) {
+        tiles.push(tile);
+      }
+    }
+  }
+
+  if (!tiles.length) {
+    return [{ ...bbox }];
+  }
+
+  return tiles;
+};
+
 const parseCenter = (input) => {
   if (!input || typeof input !== 'object') return undefined;
   const lat = toNumber(input.lat ?? input.latitude);
@@ -156,9 +249,14 @@ const AVAILABLE_MARKETING_ALGORITHMS = {
 };
 
 const ARC_GIS_MAX_CANDIDATES_PER_REQUEST = 500;
+const ARC_GIS_MAX_TILE_PAGES = 4;
 const ARC_GIS_SUBDIVIDE_TRIGGER_COUNT = Math.round(ARC_GIS_MAX_CANDIDATES_PER_REQUEST * 0.9);
-const ARC_GIS_MIN_SUBDIVIDE_SPAN_MILES = 1.5;
+const ARC_GIS_MIN_SUBDIVIDE_SPAN_MILES = 0.8;
 const ARC_GIS_MAX_SUBDIVISION_DEPTH = 3;
+const ARC_GIS_BASE_TILE_SPAN_MILES = 0.6;
+const ARC_GIS_TILE_OVERLAP_RATIO = 0.3;
+const ARC_GIS_TILE_SPARSE_THRESHOLD = 10;
+const ARC_GIS_TILE_OSM_MAX_CANDIDATES = 40;
 
 const parseMarketingAlgorithms = (input) => {
   if (!Array.isArray(input)) return undefined;
@@ -491,6 +589,18 @@ const buildInterpolationOverpassQuery = (bbox) => `
   way["landuse"~"^(residential|village_green)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
 );
 out geom;
+`;
+
+const buildTileFallbackOverpassQuery = (bbox) => `
+[out:json][timeout:60][maxsize:25000000];
+(
+  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  relation["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"]["residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  way["building"~"^(house|detached|semidetached_house|semi_detached_house|terrace|bungalow|cabin|farm|static_caravan|stilt_house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+);
+out center;
 `;
 
 const computeBoundingBoxAreaKm2 = (bbox) => {
@@ -991,6 +1101,56 @@ async function runArcgisGridSampler({ boundingBox, spacingMeters = 40 }) {
   return { addresses, geocoded, failed };
 }
 
+async function runOsmTileFallback({ boundingBox }) {
+  try {
+    console.log('[MarketingDiscovery] Tile OSM fallback triggered', { boundingBox });
+    const elements = await executeOverpassQuery({
+      query: buildTileFallbackOverpassQuery(boundingBox),
+      label: 'tile_fallback',
+      timeoutMs: 40000
+    });
+
+    let candidates = extractBuildingCandidates(elements, {
+      precision: 1000000,
+      sourceLabel: 'osm_tile'
+    });
+
+    candidates = candidates
+      .filter((candidate) => candidateHasResidentialSignal(candidate.tags))
+      .filter((candidate) => !candidateLooksLikeRoad(candidate.tags))
+      .slice(0, ARC_GIS_TILE_OSM_MAX_CANDIDATES);
+
+    const addresses = [];
+    let geocoded = 0;
+    let skipped = 0;
+
+    for (const candidate of candidates) {
+      const result = await reverseGeocodeCoordinateArcgis(candidate.lat, candidate.lon);
+      if (result?.addressLine1) {
+        addresses.push({
+          ...result,
+          source: 'arcgis_osm_tile'
+        });
+        geocoded += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+
+    console.log('[MarketingDiscovery] Tile OSM fallback completed', {
+      requested: candidates.length,
+      geocoded,
+      skipped
+    });
+
+    return { addresses, attempted: candidates.length };
+  } catch (error) {
+    const message = error?.message || (typeof error === 'string' ? error : 'Tile fallback failed');
+    console.warn('[MarketingDiscovery] Tile OSM fallback error', message);
+    return { addresses: [], error: message };
+  }
+}
+
 async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions, progressCallback }) {
   const result = {
     addresses: [],
@@ -1272,44 +1432,76 @@ const filterArcgisCandidates = (candidates = []) => {
 };
 
 const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
-  const params = new URLSearchParams({
+  const baseParams = {
     f: 'json',
     outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
     maxLocations: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
+    resultRecordCount: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
     searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
     category: 'Point Address',
     forStorage: 'false'
-  });
+  };
 
-  if (centerOverride?.lon !== undefined && centerOverride?.lat !== undefined) {
-    params.set('location', `${centerOverride.lon},${centerOverride.lat}`);
+  const allCandidates = [];
+  let exceededLimit = false;
+  let totalCount = 0;
+  let offset = 0;
+
+  for (let page = 0; page < ARC_GIS_MAX_TILE_PAGES; page += 1) {
+    const params = new URLSearchParams(baseParams);
+    params.set('resultOffset', String(offset));
+
+    if (centerOverride?.lon !== undefined && centerOverride?.lat !== undefined) {
+      params.set('location', `${centerOverride.lon},${centerOverride.lat}`);
+    }
+
+    params.set('token', ARC_GIS_API_KEY);
+
+    const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
+    });
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => '');
+      throw new Error(`ArcGIS API returned ${response.status}: ${details}`);
+    }
+
+    const payload = await response.json();
+    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+    allCandidates.push(...candidates);
+    totalCount += candidates.length;
+    exceededLimit = Boolean(payload?.exceededTransferLimit);
+
+    console.log('[MarketingDiscovery] ArcGIS tile page fetched', {
+      page,
+      offset,
+      returned: candidates.length,
+      totalCount,
+      exceededLimit
+    });
+
+    if (!exceededLimit && candidates.length < ARC_GIS_MAX_CANDIDATES_PER_REQUEST) {
+      break;
+    }
+
+    if (candidates.length === 0) {
+      break;
+    }
+
+    offset += ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
   }
 
-  params.set('token', ARC_GIS_API_KEY);
-
-  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: params.toString()
-  });
-
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`ArcGIS API returned ${response.status}: ${details}`);
-  }
-
-  const payload = await response.json();
-  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-  const addresses = filterArcgisCandidates(candidates);
-  const exceededLimit = Boolean(payload?.exceededTransferLimit) || candidates.length >= ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
+  const addresses = filterArcgisCandidates(allCandidates);
 
   return {
     addresses,
-    candidateCount: candidates.length,
+    candidateCount: totalCount,
     exceededLimit,
-    rawCandidates: candidates
+    rawCandidates: allCandidates
   };
 };
 
@@ -1344,7 +1536,11 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
   }
 
   try {
-    const queue = [{ bbox: boundingBox, depth: 0 }];
+    const initialTiles = generateArcgisTileGrid(boundingBox);
+    const queue = (initialTiles.length ? initialTiles : [boundingBox]).map((tile) => ({
+      bbox: tile,
+      depth: 0
+    }));
     const uniqueAddresses = [];
     const seenKeys = new Set();
 
@@ -1363,12 +1559,32 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       });
 
       const newlyAdded = mergeArcgisAddresses(uniqueAddresses, result.addresses, seenKeys, boundingBox);
+      let fallbackAdded = 0;
+
+      if (newlyAdded < ARC_GIS_TILE_SPARSE_THRESHOLD) {
+        const fallback = await runOsmTileFallback({ boundingBox: currentBBox });
+        if (Array.isArray(fallback.addresses) && fallback.addresses.length > 0) {
+          fallbackAdded = mergeArcgisAddresses(
+            uniqueAddresses,
+            fallback.addresses,
+            seenKeys,
+            boundingBox
+          );
+        }
+        console.log('[MarketingDiscovery] Tile fallback evaluation', {
+          newlyAdded,
+          fallbackAttempted: fallback?.attempted ?? 0,
+          fallbackAdded,
+          fallbackError: fallback?.error
+        });
+      }
 
       console.log('[MarketingDiscovery] ArcGIS address extent processed', {
         depth,
         spanMiles,
         candidateCount: result.candidateCount,
         addressesAdded: newlyAdded,
+        fallbackAdded,
         exceededLimit: result.exceededLimit,
         bbox: currentBBox
       });
