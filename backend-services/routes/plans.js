@@ -860,14 +860,18 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
         console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinates.length} coordinates.`);
         // Add remaining coordinates as coordinate-only addresses
         for (let i = batchStart; i < coordinates.length; i += 1) {
-          addresses.push({
-            addressLine1: `${coordinates[i].latitude.toFixed(7)}, ${coordinates[i].longitude.toFixed(7)}`,
-            latitude: coordinates[i].latitude,
-            longitude: coordinates[i].longitude,
-            country: 'US',
-            source: coordinates[i].source || 'unknown'
-          });
-          failedCount += 1;
+          const lat = toNumber(coordinates[i]?.latitude);
+          const lon = toNumber(coordinates[i]?.longitude);
+          if (lat !== undefined && lon !== undefined) {
+            addresses.push({
+              addressLine1: `${lat.toFixed(7)}, ${lon.toFixed(7)}`,
+              latitude: lat,
+              longitude: lon,
+              country: 'US',
+              source: coordinates[i]?.source || 'unknown'
+            });
+            failedCount += 1;
+          }
         }
         break;
       }
@@ -919,23 +923,35 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
             };
           }
         } catch (error) {
+          const lat = toNumber(coord?.latitude);
+          const lon = toNumber(coord?.longitude);
+          const coordSource = coord?.source || 'unknown';
+          
           console.warn('[MarketingDiscovery] Reverse geocode failed for coordinate:', {
-            lat: coord.latitude,
-            lon: coord.longitude,
-            source: coord.source,
+            lat,
+            lon,
+            source: coordSource,
             error: error?.message || error
           });
-          // Fallback to coordinates
-          return {
-            success: false,
-            address: {
-              addressLine1: `${coord.latitude.toFixed(7)}, ${coord.longitude.toFixed(7)}`,
-              latitude: coord.latitude,
-              longitude: coord.longitude,
-              country: 'US',
-              source: coord.source || 'unknown'
-            }
-          };
+          
+          // Fallback to coordinates if valid
+          if (lat !== undefined && lon !== undefined) {
+            return {
+              success: false,
+              address: {
+                addressLine1: `${lat.toFixed(7)}, ${lon.toFixed(7)}`,
+                latitude: lat,
+                longitude: lon,
+                country: 'US',
+                source: coordSource
+              }
+            };
+          } else {
+            return {
+              success: false,
+              address: null
+            };
+          }
         }
       });
 
@@ -944,10 +960,15 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       
       // Process batch results
       for (const result of batchResults) {
-        addresses.push(result.address);
-        if (result.success) {
-          geocodedCount += 1;
+        if (result.address) {
+          addresses.push(result.address);
+          if (result.success) {
+            geocodedCount += 1;
+          } else {
+            failedCount += 1;
+          }
         } else {
+          // Skip invalid coordinates
           failedCount += 1;
         }
       }
@@ -2191,10 +2212,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
         
         if (Array.isArray(osmResult.coordinates)) {
           for (const coord of osmResult.coordinates) {
-            const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+            const latitude = toNumber(coord?.latitude);
+            const longitude = toNumber(coord?.longitude);
+            if (latitude === undefined || longitude === undefined) {
+              console.warn('[MarketingDiscovery] Skipping invalid OSM coordinate:', coord);
+              continue;
+            }
+            const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
             if (!coordinateKeys.has(key)) {
               coordinateKeys.add(key);
-              allCoordinates.push(coord);
+              allCoordinates.push({
+                latitude,
+                longitude,
+                source: coord.source || 'osm_buildings',
+                tags: coord.tags || {}
+              });
             }
           }
         }
@@ -2235,10 +2267,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
         
         if (Array.isArray(arcgisResult.coordinates)) {
           for (const coord of arcgisResult.coordinates) {
-            const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+            const latitude = toNumber(coord?.latitude);
+            const longitude = toNumber(coord?.longitude);
+            if (latitude === undefined || longitude === undefined) {
+              console.warn('[MarketingDiscovery] Skipping invalid ArcGIS address point coordinate:', coord);
+              continue;
+            }
+            const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
             if (!coordinateKeys.has(key)) {
               coordinateKeys.add(key);
-              allCoordinates.push(coord);
+              allCoordinates.push({
+                latitude,
+                longitude,
+                source: coord.source || 'arcgis_address_points',
+                attributes: coord.attributes || {}
+              });
             }
           }
         }
@@ -2273,10 +2316,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
         
         if (Array.isArray(arcgisPlacesResult.coordinates)) {
           for (const coord of arcgisPlacesResult.coordinates) {
-            const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+            const latitude = toNumber(coord?.latitude);
+            const longitude = toNumber(coord?.longitude);
+            if (latitude === undefined || longitude === undefined) {
+              console.warn('[MarketingDiscovery] Skipping invalid ArcGIS places coordinate:', coord);
+              continue;
+            }
+            const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
             if (!coordinateKeys.has(key)) {
               coordinateKeys.add(key);
-              allCoordinates.push(coord);
+              allCoordinates.push({
+                latitude,
+                longitude,
+                source: coord.source || 'arcgis_places',
+                attributes: coord.attributes || {}
+              });
             }
           }
         }
