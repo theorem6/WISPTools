@@ -76,13 +76,6 @@ const ALGORITHM_OPTIONS = [
   let currentStep = 0;
   let lastSearchSpan: { widthMiles: number; heightMiles: number } | null = null;
 
-  $: currentExtentKey = latestExtent?.boundingBox ? boundingBoxKey(latestExtent.boundingBox) : null;
-  $: pendingExtentChange =
-    !isLoading &&
-    lastRunExtentKey !== null &&
-    currentExtentKey !== null &&
-    currentExtentKey !== lastRunExtentKey;
-
   let tenantId: string | undefined;
   $: tenantId = $currentTenant?.id;
 
@@ -149,9 +142,41 @@ let results: PlanMarketingAddress[] = [];
         }
       : null;
 
-  let lastRunExtentKey = plan.marketing?.lastBoundingBox ? boundingBoxKey(plan.marketing.lastBoundingBox) : null;
-  let pendingExtentChange = false;
-  let currentExtentKey: string | null = latestExtent?.boundingBox ? boundingBoxKey(latestExtent.boundingBox) : null;
+  // Track the extent key from the last successful run
+  // Make it reactive to plan updates so it stays in sync
+  let lastRunExtentKey: string | null = null;
+  $: {
+    const planLastBbox = plan.marketing?.lastBoundingBox;
+    if (planLastBbox) {
+      const key = boundingBoxKey(planLastBbox);
+      if (key) {
+        lastRunExtentKey = key;
+      }
+    }
+  }
+
+  // Only show pending change warning if extent changed significantly (more than 0.01 degrees)
+  function boundingBoxChangedSignificantly(
+    box1: { west: number; south: number; east: number; north: number } | null | undefined,
+    box2: { west: number; south: number; east: number; north: number } | null | undefined
+  ): boolean {
+    if (!box1 || !box2) return box1 !== box2;
+    const threshold = 0.01; // ~1.1 km
+    return (
+      Math.abs(box1.west - box2.west) > threshold ||
+      Math.abs(box1.east - box2.east) > threshold ||
+      Math.abs(box1.south - box2.south) > threshold ||
+      Math.abs(box1.north - box2.north) > threshold
+    );
+  }
+
+  $: currentExtentKey = latestExtent?.boundingBox ? boundingBoxKey(latestExtent.boundingBox) : null;
+  $: pendingExtentChange =
+    !isLoading &&
+    lastRunExtentKey !== null &&
+    latestExtent?.boundingBox &&
+    plan.marketing?.lastBoundingBox &&
+    boundingBoxChangedSignificantly(latestExtent.boundingBox, plan.marketing.lastBoundingBox);
 
   let selectedAlgorithms: string[] = [];
   let initializedAlgorithms = false;
@@ -551,8 +576,8 @@ let results: PlanMarketingAddress[] = [];
       const newlyAdded = summary?.newlyAdded ?? Math.max(totalSaved - previousSavedCount, 0);
       const totalRuns = summary?.totalRuns ?? previousTotalRuns + 1;
 
-      lastRunExtentKey = boundingBoxKey(boundingBox);
-      pendingExtentChange = false;
+      // Update lastRunExtentKey - but don't set it directly, let the reactive statement handle it
+      // This ensures it stays in sync with the plan's marketing data
       
       console.log('[PlanMarketingModal] Discovery completed successfully', {
         totalSaved,
@@ -602,15 +627,35 @@ let results: PlanMarketingAddress[] = [];
       
       // Also fetch the updated plan from backend to ensure consistency
       // But do it in the background without blocking
-      fetchUpdatedPlan().catch(err => {
-        console.warn('[PlanMarketingModal] Background plan refresh failed:', err);
-      });
+      try {
+        const refreshed = await planService.getPlan(plan.id);
+        if (refreshed) {
+          plan = refreshed;
+          dispatch('updated', refreshed);
+          // Update lastRunExtentKey after plan refresh - the reactive statement will handle it
+          console.log('[PlanMarketingModal] Plan refreshed, lastBoundingBox:', refreshed.marketing?.lastBoundingBox);
+        }
+      } catch (refreshErr) {
+        console.warn('[PlanMarketingModal] Background plan refresh failed (non-critical):', refreshErr);
+        // Don't fail the whole operation if refresh fails - the local update is enough
+      }
     } catch (err: any) {
-      console.error('Marketing discovery failed:', err);
-      error = err?.message || 'Failed to discover addresses.';
-      info = null;
-    } finally {
+      console.error('[PlanMarketingModal] Marketing discovery failed:', err);
       isLoading = false;
+      error = err?.message || 'Failed to discover addresses. Please try again.';
+      info = null;
+      results = [];
+      summary = null;
+      // Reset state to prevent wizard from being in broken state
+      try {
+        // Try to refresh plan to get back to known good state
+        const refreshed = await planService.getPlan(plan.id).catch(() => null);
+        if (refreshed) {
+          plan = refreshed;
+        }
+      } catch (recoveryErr) {
+        console.warn('[PlanMarketingModal] Failed to recover plan state:', recoveryErr);
+      }
     }
   }
 
