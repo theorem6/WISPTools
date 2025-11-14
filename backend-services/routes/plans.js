@@ -775,13 +775,24 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
 };
 
 const reverseGeocodeCoordinate = async (lat, lon) => {
-  // Try ArcGIS first (faster and better)
-  const arcgisResult = await reverseGeocodeCoordinateArcgis(lat, lon);
-  if (arcgisResult) {
-    return arcgisResult;
+  // Always use ArcGIS if available - it's much faster and more accurate
+  if (ARC_GIS_API_KEY) {
+    const arcgisResult = await reverseGeocodeCoordinateArcgis(lat, lon);
+    if (arcgisResult) {
+      return arcgisResult;
+    }
+    // If ArcGIS fails, return coordinates instead of slow Nominatim
+    // This speeds up the process significantly
+    return {
+      addressLine1: `${lat.toFixed(7)}, ${lon.toFixed(7)}`,
+      latitude: lat,
+      longitude: lon,
+      country: 'US',
+      source: 'arcgis_failed'
+    };
   }
 
-  // Fall back to Nominatim if ArcGIS fails or isn't available
+  // Only use Nominatim if ArcGIS API key is not available (shouldn't happen in production)
   const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
   const response = await fetch(url, {
     headers: {
@@ -1138,9 +1149,9 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
     let failedCount = 0;
     const reverseGeocodeStartTime = Date.now();
     const REVERSE_GEOCODE_TIMEOUT = 8000; // 8 seconds per geocode (reduced from 10)
-    const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS
-    const MAX_PARALLEL_GEOCODES = 5; // Process up to 5 geocodes in parallel
-    const MAX_REVERSE_GEOCODE_TIME = 5 * 60 * 1000; // 5 minutes max for reverse geocoding
+    const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS (it's much faster)
+    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS is faster, can handle more parallel requests
+    const MAX_REVERSE_GEOCODE_TIME = ARC_GIS_API_KEY ? 10 * 60 * 1000 : 5 * 60 * 1000; // 10 min for ArcGIS, 5 min for Nominatim
     const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
 
     console.log('[MarketingDiscovery] Starting reverse geocoding for OSM candidates', {
@@ -1184,10 +1195,11 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       // Process batch in parallel
       const batchPromises = batch.map(async (candidate, batchIndex) => {
         try {
-          // Only delay for Nominatim (OSM fallback) - ArcGIS doesn't need delays
+          // No delays needed for ArcGIS - it's fast and can handle high throughput
+          // Only delay for Nominatim (OSM fallback) which has strict rate limits
           const globalIndex = batchStart + batchIndex;
           if (globalIndex > 0 && !ARC_GIS_API_KEY) {
-            await delay(reverseDelay * batchIndex); // Stagger delays within batch
+            await delay(reverseDelay * batchIndex); // Stagger delays within batch for Nominatim
           }
           
           // Add timeout to individual reverse geocode calls
@@ -1252,9 +1264,10 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         }
       }
 
-      // Small delay between batches to avoid overwhelming the API
-      if (batchEnd < candidates.length && ARC_GIS_API_KEY) {
-        await delay(100); // 100ms delay between batches for ArcGIS
+      // No delay needed for ArcGIS - it's designed for high throughput
+      // Only delay for Nominatim to respect rate limits
+      if (batchEnd < candidates.length && !ARC_GIS_API_KEY) {
+        await delay(1000); // 1 second delay between batches for Nominatim rate limiting
       }
     }
       
