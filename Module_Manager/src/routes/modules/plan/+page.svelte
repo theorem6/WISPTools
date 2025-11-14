@@ -192,6 +192,8 @@ $: marketingAvailable = Boolean(
     projectLocationLookupError = null;
 
     try {
+      console.log('[CreateProject] Starting location lookup for:', input);
+      
       // Try to parse as coordinates first (format: lat, lng)
       const coordMatch = input.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
       let lat: number | null = null;
@@ -203,6 +205,7 @@ $: marketingAvailable = Boolean(
         
         if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
           // Valid coordinates - center map
+          console.log('[CreateProject] Parsed coordinates:', lat, lon);
           await centerMapOnProjectLocation(lat, lon);
           projectLocationLookup = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
           isLookingUpProjectLocation = false;
@@ -215,18 +218,27 @@ $: marketingAvailable = Boolean(
       }
 
       // Use ArcGIS geocoding service for addresses/cities/states/zip
-      const response = await fetch(
-        `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?` +
+      const geocodeUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?` +
         `singleLine=${encodeURIComponent(input)}` +
         `&f=json` +
-        `&maxLocations=5`
-      );
+        `&maxLocations=5`;
+      
+      console.log('[CreateProject] Geocoding URL:', geocodeUrl);
+      
+      const response = await fetch(geocodeUrl);
 
       if (!response.ok) {
-        throw new Error('Geocoding service unavailable');
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[CreateProject] Geocoding response error:', response.status, errorText);
+        throw new Error(`Geocoding service unavailable (${response.status})`);
       }
 
       const data = await response.json();
+      console.log('[CreateProject] Geocoding response:', data);
+
+      if (data.error) {
+        throw new Error(data.error.message || 'Geocoding failed');
+      }
 
       if (data.candidates && data.candidates.length > 0) {
         // Use the first candidate (best match)
@@ -234,6 +246,8 @@ $: marketingAvailable = Boolean(
         lat = candidate.location.y;
         lon = candidate.location.x;
         const address = candidate.address || input;
+        
+        console.log('[CreateProject] Found location:', address, 'at', lat, lon);
         
         // Center map on the location
         await centerMapOnProjectLocation(lat, lon);
@@ -257,6 +271,7 @@ $: marketingAvailable = Boolean(
           }
         }
       } else {
+        console.warn('[CreateProject] No candidates found for:', input);
         projectLocationLookupError = 'Location not found. Try: "New York, NY", "10001", or coordinates like "40.7128, -74.0060"';
       }
     } catch (err: any) {
@@ -268,10 +283,30 @@ $: marketingAvailable = Boolean(
   }
 
   async function centerMapOnProjectLocation(lat: number, lon: number) {
+    console.log('[CreateProject] Centering map on location:', lat, lon);
+    
     // Send message to map to center on location
     window.dispatchEvent(new CustomEvent('center-map-on-location', {
       detail: { lat, lon, zoom: 14 }
     }));
+    
+    console.log('[CreateProject] Dispatched center-map-on-location event');
+    
+    // Also try direct iframe message in case event listener isn't working
+    const mapIframe = document.querySelector('iframe[src*="coverage-map"]') as HTMLIFrameElement;
+    if (mapIframe?.contentWindow) {
+      mapIframe.contentWindow.postMessage(
+        {
+          source: 'shared-map',
+          type: 'center-map-on-location',
+          payload: { lat, lon, zoom: 14 }
+        },
+        '*'
+      );
+      console.log('[CreateProject] Sent direct message to map iframe');
+    } else {
+      console.warn('[CreateProject] Map iframe not found');
+    }
     
     // Wait a bit for map to center, then request new extent
     await new Promise(resolve => setTimeout(resolve, 1000));
