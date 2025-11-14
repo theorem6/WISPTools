@@ -1727,42 +1727,52 @@ router.get('/:id/marketing/progress/:requestId', (req, res) => {
 // POST /plans/:id/marketing/discover - Find marketing addresses within area
 router.post('/:id/marketing/discover', async (req, res) => {
   const requestStartTime = Date.now();
-  const requestId = `${req.params.id}-${Date.now()}`;
-  
-  // Initialize progress
-  progressStore.set(requestId, {
-    requestId,
-    planId: req.params.id,
-    progress: 0,
-    step: 'Initializing',
-    startedAt: new Date().toISOString(),
-    details: {}
-  });
-  
-  // Clean up progress after 5 minutes (safety net)
-  const timeoutCleanup = setTimeout(() => {
-    progressStore.delete(requestId);
-    console.log('[MarketingDiscovery] Timeout cleanup for progress entry:', requestId);
-  }, 5 * 60 * 1000);
-  
-  // Handle client abort
-  req.on('close', () => {
-    clearTimeout(timeoutCleanup);
-    progressStore.delete(requestId);
-    console.log('[MarketingDiscovery] Client disconnected, cleaned up progress entry:', requestId);
-  });
-  
-  console.log('[MarketingDiscovery] Request received', { 
-    requestId,
-    planId: req.params.id, 
-    tenantId: req.tenantId,
-    boundingBox: req.body.boundingBox,
-    progressStoreSize: progressStore.size
-  });
-  
-  // Removed timeout temporarily - will add progress feedback instead
+  const requestId = `${req.params?.id || 'unknown'}-${Date.now()}`;
+  let timeoutCleanup = null;
   
   try {
+    // Validate request parameters
+    if (!req.params?.id) {
+      return res.status(400).json({ error: 'Plan ID is required' });
+    }
+    
+    if (!req.tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    // Initialize progress
+    progressStore.set(requestId, {
+      requestId,
+      planId: req.params.id,
+      progress: 0,
+      step: 'Initializing',
+      startedAt: new Date().toISOString(),
+      details: {}
+    });
+    
+    // Clean up progress after 5 minutes (safety net)
+    timeoutCleanup = setTimeout(() => {
+      progressStore.delete(requestId);
+      console.log('[MarketingDiscovery] Timeout cleanup for progress entry:', requestId);
+    }, 5 * 60 * 1000);
+    
+    // Handle client abort
+    req.on('close', () => {
+      if (timeoutCleanup) clearTimeout(timeoutCleanup);
+      progressStore.delete(requestId);
+      console.log('[MarketingDiscovery] Client disconnected, cleaned up progress entry:', requestId);
+    });
+    
+    console.log('[MarketingDiscovery] Request received', { 
+      requestId,
+      planId: req.params.id, 
+      tenantId: req.tenantId,
+      boundingBox: req.body?.boundingBox,
+      progressStoreSize: progressStore.size
+    });
+    
+    // Removed timeout temporarily - will add progress feedback instead
+  
     const plan = await PlanProject.findOne({
       _id: req.params.id,
       tenantId: req.tenantId
