@@ -855,102 +855,102 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
 
     // Process coordinates in batches for parallel geocoding
     for (let batchStart = 0; batchStart < coordinates.length; batchStart += MAX_PARALLEL_GEOCODES) {
-    // Check overall timeout
-    if (Date.now() > overallTimeout) {
-      console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinates.length} coordinates.`);
-      // Add remaining coordinates as coordinate-only addresses
-      for (let i = batchStart; i < coordinates.length; i += 1) {
-        addresses.push({
-          addressLine1: `${coordinates[i].latitude.toFixed(7)}, ${coordinates[i].longitude.toFixed(7)}`,
-          latitude: coordinates[i].latitude,
-          longitude: coordinates[i].longitude,
-          country: 'US',
-          source: coordinates[i].source || 'unknown'
-        });
-        failedCount += 1;
+      // Check overall timeout
+      if (Date.now() > overallTimeout) {
+        console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinates.length} coordinates.`);
+        // Add remaining coordinates as coordinate-only addresses
+        for (let i = batchStart; i < coordinates.length; i += 1) {
+          addresses.push({
+            addressLine1: `${coordinates[i].latitude.toFixed(7)}, ${coordinates[i].longitude.toFixed(7)}`,
+            latitude: coordinates[i].latitude,
+            longitude: coordinates[i].longitude,
+            country: 'US',
+            source: coordinates[i].source || 'unknown'
+          });
+          failedCount += 1;
+        }
+        break;
       }
-      break;
-    }
 
-    const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, coordinates.length);
-    const batch = coordinates.slice(batchStart, batchEnd);
-    
-    if (progressCallback && batchStart % 20 === 0) {
-      const geocodeProgress = (batchStart / coordinates.length) * 100;
-      progressCallback(`Reverse geocoding ${batchStart + 1}/${coordinates.length}`, geocodeProgress, {
-        current: batchStart + 1,
-        total: coordinates.length,
-        geocoded: geocodedCount,
-        failed: failedCount
-      });
-    }
+      const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, coordinates.length);
+      const batch = coordinates.slice(batchStart, batchEnd);
+      
+      if (progressCallback && batchStart % 20 === 0) {
+        const geocodeProgress = (batchStart / coordinates.length) * 100;
+        progressCallback(`Reverse geocoding ${batchStart + 1}/${coordinates.length}`, geocodeProgress, {
+          current: batchStart + 1,
+          total: coordinates.length,
+          geocoded: geocodedCount,
+          failed: failedCount
+        });
+      }
 
-    // Process batch in parallel
-    const batchPromises = batch.map(async (coord, batchIndex) => {
-      try {
-        const { latitude, longitude, source } = coord;
-        
-        // Add timeout to individual reverse geocode calls
-        const geocodePromise = reverseGeocodeCoordinate(latitude, longitude);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Reverse geocode timeout')), REVERSE_GEOCODE_TIMEOUT)
-        );
-        
-        const details = await Promise.race([geocodePromise, timeoutPromise]);
-        if (details && details.addressLine1) {
-          return {
-            success: true,
-            address: {
-              ...details,
-              source: source || details.source || 'unknown'
-            }
-          };
-        } else {
-          // No address returned, use coordinates
+      // Process batch in parallel
+      const batchPromises = batch.map(async (coord, batchIndex) => {
+        try {
+          const { latitude, longitude, source } = coord;
+          
+          // Add timeout to individual reverse geocode calls
+          const geocodePromise = reverseGeocodeCoordinate(latitude, longitude);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Reverse geocode timeout')), REVERSE_GEOCODE_TIMEOUT)
+          );
+          
+          const details = await Promise.race([geocodePromise, timeoutPromise]);
+          if (details && details.addressLine1) {
+            return {
+              success: true,
+              address: {
+                ...details,
+                source: source || details.source || 'unknown'
+              }
+            };
+          } else {
+            // No address returned, use coordinates
+            return {
+              success: false,
+              address: {
+                addressLine1: `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,
+                latitude,
+                longitude,
+                country: 'US',
+                source: source || 'unknown'
+              }
+            };
+          }
+        } catch (error) {
+          console.warn('[MarketingDiscovery] Reverse geocode failed for coordinate:', {
+            lat: coord.latitude,
+            lon: coord.longitude,
+            source: coord.source,
+            error: error?.message || error
+          });
+          // Fallback to coordinates
           return {
             success: false,
             address: {
-              addressLine1: `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,
-              latitude,
-              longitude,
+              addressLine1: `${coord.latitude.toFixed(7)}, ${coord.longitude.toFixed(7)}`,
+              latitude: coord.latitude,
+              longitude: coord.longitude,
               country: 'US',
-              source: source || 'unknown'
+              source: coord.source || 'unknown'
             }
           };
         }
-      } catch (error) {
-        console.warn('[MarketingDiscovery] Reverse geocode failed for coordinate:', {
-          lat: coord.latitude,
-          lon: coord.longitude,
-          source: coord.source,
-          error: error?.message || error
-        });
-        // Fallback to coordinates
-        return {
-          success: false,
-          address: {
-            addressLine1: `${coord.latitude.toFixed(7)}, ${coord.longitude.toFixed(7)}`,
-            latitude: coord.latitude,
-            longitude: coord.longitude,
-            country: 'US',
-            source: coord.source || 'unknown'
-          }
-        };
-      }
-    });
+      });
 
-    // Wait for batch to complete
-    const batchResults = await Promise.all(batchPromises);
-    
-    // Process batch results
-    for (const result of batchResults) {
-      addresses.push(result.address);
-      if (result.success) {
-        geocodedCount += 1;
-      } else {
-        failedCount += 1;
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Process batch results
+      for (const result of batchResults) {
+        addresses.push(result.address);
+        if (result.success) {
+          geocodedCount += 1;
+        } else {
+          failedCount += 1;
+        }
       }
-    }
 
       // No delay needed for ArcGIS - it's designed for high throughput
       // Only delay for Nominatim to respect rate limits
