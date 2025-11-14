@@ -827,6 +827,149 @@ const reverseGeocodeCoordinate = async (lat, lon) => {
   };
 };
 
+// Batch reverse geocode all coordinates - processes all at once for efficiency
+const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback) => {
+  if (!coordinates || coordinates.length === 0) {
+    return { addresses: [], geocoded: 0, failed: 0 };
+  }
+
+  const addresses = [];
+  let geocodedCount = 0;
+  let failedCount = 0;
+  const reverseGeocodeStartTime = Date.now();
+  
+  // Configuration for batch processing
+  const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
+  const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS can handle more parallel requests
+  const MAX_REVERSE_GEOCODE_TIME = ARC_GIS_API_KEY ? 10 * 60 * 1000 : 5 * 60 * 1000; // 10 min for ArcGIS, 5 min for Nominatim
+  const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
+
+  console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
+    totalCoordinates: coordinates.length,
+    usingArcGIS: !!ARC_GIS_API_KEY,
+    maxParallel: MAX_PARALLEL_GEOCODES,
+    maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
+  });
+
+  // Process coordinates in batches for parallel geocoding
+  for (let batchStart = 0; batchStart < coordinates.length; batchStart += MAX_PARALLEL_GEOCODES) {
+    // Check overall timeout
+    if (Date.now() > overallTimeout) {
+      console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinates.length} coordinates.`);
+      // Add remaining coordinates as coordinate-only addresses
+      for (let i = batchStart; i < coordinates.length; i += 1) {
+        addresses.push({
+          addressLine1: `${coordinates[i].latitude.toFixed(7)}, ${coordinates[i].longitude.toFixed(7)}`,
+          latitude: coordinates[i].latitude,
+          longitude: coordinates[i].longitude,
+          country: 'US',
+          source: coordinates[i].source || 'unknown'
+        });
+        failedCount += 1;
+      }
+      break;
+    }
+
+    const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, coordinates.length);
+    const batch = coordinates.slice(batchStart, batchEnd);
+    
+    if (progressCallback && batchStart % 20 === 0) {
+      const geocodeProgress = (batchStart / coordinates.length) * 100;
+      progressCallback(`Reverse geocoding ${batchStart + 1}/${coordinates.length}`, geocodeProgress, {
+        current: batchStart + 1,
+        total: coordinates.length,
+        geocoded: geocodedCount,
+        failed: failedCount
+      });
+    }
+
+    // Process batch in parallel
+    const batchPromises = batch.map(async (coord, batchIndex) => {
+      try {
+        const { latitude, longitude, source } = coord;
+        
+        // Add timeout to individual reverse geocode calls
+        const geocodePromise = reverseGeocodeCoordinate(latitude, longitude);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Reverse geocode timeout')), REVERSE_GEOCODE_TIMEOUT)
+        );
+        
+        const details = await Promise.race([geocodePromise, timeoutPromise]);
+        if (details && details.addressLine1) {
+          return {
+            success: true,
+            address: {
+              ...details,
+              source: source || details.source || 'unknown'
+            }
+          };
+        } else {
+          // No address returned, use coordinates
+          return {
+            success: false,
+            address: {
+              addressLine1: `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,
+              latitude,
+              longitude,
+              country: 'US',
+              source: source || 'unknown'
+            }
+          };
+        }
+      } catch (error) {
+        console.warn('[MarketingDiscovery] Reverse geocode failed for coordinate:', {
+          lat: coord.latitude,
+          lon: coord.longitude,
+          source: coord.source,
+          error: error?.message || error
+        });
+        // Fallback to coordinates
+        return {
+          success: false,
+          address: {
+            addressLine1: `${coord.latitude.toFixed(7)}, ${coord.longitude.toFixed(7)}`,
+            latitude: coord.latitude,
+            longitude: coord.longitude,
+            country: 'US',
+            source: coord.source || 'unknown'
+          }
+        };
+      }
+    });
+
+    // Wait for batch to complete
+    const batchResults = await Promise.all(batchPromises);
+    
+    // Process batch results
+    for (const result of batchResults) {
+      addresses.push(result.address);
+      if (result.success) {
+        geocodedCount += 1;
+      } else {
+        failedCount += 1;
+      }
+    }
+
+    // No delay needed for ArcGIS - it's designed for high throughput
+    // Only delay for Nominatim to respect rate limits
+    if (batchEnd < coordinates.length && !ARC_GIS_API_KEY) {
+      await delay(1000); // 1 second delay between batches for Nominatim rate limiting
+    }
+  }
+    
+  const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
+  console.log('[MarketingDiscovery] Batch reverse geocoding completed', { 
+    duration: `${reverseGeocodeDuration}ms`,
+    durationPerCoordinate: coordinates.length ? `${(reverseGeocodeDuration / coordinates.length).toFixed(0)}ms` : '0ms',
+    geocoded: geocodedCount,
+    failed: failedCount,
+    total: coordinates.length,
+    successRate: coordinates.length ? `${((geocodedCount / coordinates.length) * 100).toFixed(1)}%` : '0%'
+  });
+
+  return { addresses, geocoded: geocodedCount, failed: failedCount };
+};
+
 const toRadians = (degrees) => degrees * (Math.PI / 180);
 
 const distanceInMeters = (lat1, lon1, lat2, lon2) => {
@@ -1016,18 +1159,18 @@ async function runArcgisGridSampler({ boundingBox, spacingMeters = 40 }) {
   return { addresses, geocoded, failed };
 }
 
+// Modified to return coordinates only - reverse geocoding happens later in batch
 async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions, progressCallback }) {
   const result = {
-    addresses: [],
+    coordinates: [], // Changed from addresses to coordinates
     stats: {
-      rawCandidates: 0,
-      geocoded: 0
+      rawCandidates: 0
     },
     error: null
   };
 
   try {
-    console.log('[MarketingDiscovery] Starting OSM building discovery', { boundingBox });
+    console.log('[MarketingDiscovery] Starting OSM building discovery (coordinates only)', { boundingBox });
     if (progressCallback) progressCallback('Building Overpass query', 5);
 
     const areaKm2 = computeBoundingBoxAreaKm2(boundingBox);
@@ -1135,167 +1278,25 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       sample: candidates.slice(0, 5).map((c) => ({
         lat: c.lat,
         lon: c.lon,
-        source: c.source,
-        hasAddress: Boolean(
-          c.tags?.['addr:housenumber'] || c.tags?.['addr:street'] || c.tags?.name
-        )
+        source: c.source
       }))
     });
 
-    if (progressCallback) progressCallback('Parsing Overpass results', 25);
+    if (progressCallback) progressCallback('Extracting coordinates', 25);
 
-    const addresses = [];
-    let geocodedCount = 0;
-    let failedCount = 0;
-    const reverseGeocodeStartTime = Date.now();
-    const REVERSE_GEOCODE_TIMEOUT = 8000; // 8 seconds per geocode (reduced from 10)
-    const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS (it's much faster)
-    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS is faster, can handle more parallel requests
-    const MAX_REVERSE_GEOCODE_TIME = ARC_GIS_API_KEY ? 10 * 60 * 1000 : 5 * 60 * 1000; // 10 min for ArcGIS, 5 min for Nominatim
-    const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
+    // Return coordinates only - no reverse geocoding
+    const coordinates = candidates.map((candidate) => ({
+      latitude: candidate.lat,
+      longitude: candidate.lon,
+      source: 'osm_buildings',
+      tags: candidate.tags || {} // Keep tags for potential later use
+    }));
 
-    console.log('[MarketingDiscovery] Starting reverse geocoding for OSM candidates', {
-      totalCandidates: candidates.length,
-      usingArcGIS: !!ARC_GIS_API_KEY,
-      maxParallel: MAX_PARALLEL_GEOCODES,
-      maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
-    });
-
-    // Process candidates in batches for parallel geocoding
-    for (let batchStart = 0; batchStart < candidates.length; batchStart += MAX_PARALLEL_GEOCODES) {
-      // Check overall timeout
-      if (Date.now() > overallTimeout) {
-        console.warn(`[MarketingDiscovery] Reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${candidates.length} candidates.`);
-        // Add remaining candidates as coordinate-only addresses
-        for (let i = batchStart; i < candidates.length; i += 1) {
-          addresses.push({
-            addressLine1: `${candidates[i].lat.toFixed(7)}, ${candidates[i].lon.toFixed(7)}`,
-            latitude: candidates[i].lat,
-            longitude: candidates[i].lon,
-            country: 'US',
-            source: 'osm_buildings'
-          });
-        }
-        break;
-      }
-
-      const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, candidates.length);
-      const batch = candidates.slice(batchStart, batchEnd);
-      
-      if (progressCallback && batchStart % 20 === 0) {
-        const geocodeProgress = 20 + ((batchStart / candidates.length) * 60);
-        progressCallback(`Reverse geocoding ${batchStart + 1}/${candidates.length}`, geocodeProgress, {
-          current: batchStart + 1,
-          total: candidates.length,
-          geocoded: geocodedCount,
-          failed: failedCount
-        });
-      }
-
-      // Process batch in parallel
-      const batchPromises = batch.map(async (candidate, batchIndex) => {
-        try {
-          // No delays needed for ArcGIS - it's fast and can handle high throughput
-          // Only delay for Nominatim (OSM fallback) which has strict rate limits
-          const globalIndex = batchStart + batchIndex;
-          if (globalIndex > 0 && !ARC_GIS_API_KEY) {
-            await delay(reverseDelay * batchIndex); // Stagger delays within batch for Nominatim
-          }
-          
-          // Add timeout to individual reverse geocode calls
-          const timeoutMs = ARC_GIS_API_KEY ? REVERSE_GEOCODE_TIMEOUT : 5000;
-          const geocodePromise = reverseGeocodeCoordinate(candidate.lat, candidate.lon);
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Reverse geocode timeout')), timeoutMs)
-          );
-          
-          const details = await Promise.race([geocodePromise, timeoutPromise]);
-          if (details && details.addressLine1) {
-            return {
-              success: true,
-              address: {
-                ...details,
-                source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
-              }
-            };
-          } else {
-            // No address returned, use coordinates
-            return {
-              success: false,
-              address: {
-                addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
-                latitude: candidate.lat,
-                longitude: candidate.lon,
-                country: 'US',
-                source: 'osm_buildings'
-              }
-            };
-          }
-        } catch (error) {
-          console.warn('[MarketingDiscovery] Reverse geocode failed for centroid:', {
-            lat: candidate.lat,
-            lon: candidate.lon,
-            error: error?.message || error
-          });
-          // Fallback to coordinates
-          return {
-            success: false,
-            address: {
-              addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
-              latitude: candidate.lat,
-              longitude: candidate.lon,
-              country: 'US',
-              source: 'osm_buildings'
-            }
-          };
-        }
-      });
-
-      // Wait for batch to complete
-      const batchResults = await Promise.all(batchPromises);
-      
-      // Process batch results
-      for (const result of batchResults) {
-        addresses.push(result.address);
-        if (result.success) {
-          geocodedCount += 1;
-        } else {
-          failedCount += 1;
-        }
-      }
-
-      // No delay needed for ArcGIS - it's designed for high throughput
-      // Only delay for Nominatim to respect rate limits
-      if (batchEnd < candidates.length && !ARC_GIS_API_KEY) {
-        await delay(1000); // 1 second delay between batches for Nominatim rate limiting
-      }
-    }
-      
-    const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
-    console.log('[MarketingDiscovery] Reverse geocoding completed', { 
-      duration: `${reverseGeocodeDuration}ms`,
-      durationPerAddress: candidates.length ? `${(reverseGeocodeDuration / candidates.length).toFixed(0)}ms` : '0ms',
-      geocoded: geocodedCount,
-      failed: failedCount,
-      total: candidates.length,
-      addressesWithLine1: addresses.filter(a => a.addressLine1).length,
-      sampleAddresses: addresses.slice(0, 5).map(a => a.addressLine1),
-      successRate: candidates.length ? `${((geocodedCount / candidates.length) * 100).toFixed(1)}%` : '0%'
-    });
-
-    result.addresses = addresses;
+    result.coordinates = coordinates;
     result.stats.rawCandidates = candidates.length;
-    result.stats.geocoded = geocodedCount;
-    console.log('[MarketingDiscovery] OSM discovery completed', { 
+    console.log('[MarketingDiscovery] OSM discovery completed (coordinates only)', { 
       totalCandidates: candidates.length,
-      successfullyGeocoded: geocodedCount,
-      failedGeocoding: failedCount,
-      totalAddresses: addresses.length,
-      accuracyRate: addresses.length ? `${((geocodedCount / addresses.length) * 100).toFixed(1)}%` : '0%',
-      sampleAddresses: addresses.slice(0, 5).map((address) => ({
-        addressLine1: address.addressLine1,
-        source: address.source
-      }))
+      coordinatesReturned: coordinates.length
     });
     return result;
   } catch (error) {
@@ -1308,7 +1309,8 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
   }
 }
 
-const filterArcgisCandidates = (candidates = []) => {
+// Modified to extract coordinates only - reverse geocoding happens later in batch
+const extractArcgisCoordinates = (candidates = []) => {
   const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company)\b/i;
 
   return candidates
@@ -1332,18 +1334,12 @@ const filterArcgisCandidates = (candidates = []) => {
         return null;
       }
 
-      const addressLine1 = candidate.address || attributes.Match_addr || attributes.PlaceName || null;
-
+      // Return coordinates only
       return {
-        addressLine1: addressLine1 || `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,
-        addressLine2: undefined,
-        city: attributes.City || undefined,
-        state: attributes.Region || undefined,
-        postalCode: attributes.Postal || undefined,
-        country: 'US',
         latitude,
         longitude,
-        source: 'arcgis_address_points'
+        source: 'arcgis_address_points',
+        attributes: attributes // Keep for potential later use
       };
     })
     .filter(Boolean);
@@ -1380,14 +1376,12 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) =
 
   const payload = await response.json();
   const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-  const addresses = filterArcgisCandidates(candidates);
   const exceededLimit = Boolean(payload?.exceededTransferLimit) || candidates.length >= ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
 
   return {
-    addresses,
     candidateCount: candidates.length,
     exceededLimit,
-    rawCandidates: candidates
+    rawCandidates: candidates // Return raw candidates for coordinate extraction
   };
 };
 
@@ -1405,25 +1399,26 @@ const shouldSubdivideArcgisExtent = ({ spanMiles, depth, candidateCount, exceede
   return false;
 };
 
+// Modified to return coordinates only - reverse geocoding happens later in batch
 async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
-  console.log('[MarketingDiscovery] ArcGIS Address Points Discovery called', {
+  console.log('[MarketingDiscovery] ArcGIS Address Points Discovery called (coordinates only)', {
     hasApiKey: !!ARC_GIS_API_KEY,
     boundingBox
   });
   
   if (!ARC_GIS_API_KEY) {
     console.warn('[MarketingDiscovery] ArcGIS API key not configured, skipping address points');
-    return { addresses: [], error: 'ArcGIS API key not configured' };
+    return { coordinates: [], error: 'ArcGIS API key not configured' };
   }
 
   if (!isValidBoundingBox(boundingBox)) {
     console.warn('[MarketingDiscovery] Invalid bounding box provided to ArcGIS discovery', boundingBox);
-    return { addresses: [], error: 'Invalid bounding box' };
+    return { coordinates: [], error: 'Invalid bounding box' };
   }
 
   try {
     const queue = [{ bbox: boundingBox, depth: 0 }];
-    const uniqueAddresses = [];
+    const uniqueCoordinates = [];
     const seenKeys = new Set();
 
     while (queue.length > 0) {
@@ -1440,13 +1435,23 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
         centerOverride: requestCenter
       });
 
-      const newlyAdded = mergeArcgisAddresses(uniqueAddresses, result.addresses, seenKeys, boundingBox);
+      // Extract coordinates instead of full addresses
+      const coordinates = extractArcgisCoordinates(result.rawCandidates || []);
+      
+      // Deduplicate coordinates
+      for (const coord of coordinates) {
+        const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueCoordinates.push(coord);
+        }
+      }
 
       console.log('[MarketingDiscovery] ArcGIS address extent processed', {
         depth,
         spanMiles,
         candidateCount: result.candidateCount,
-        addressesAdded: newlyAdded,
+        coordinatesAdded: coordinates.length,
         exceededLimit: result.exceededLimit,
         bbox: currentBBox
       });
@@ -1464,26 +1469,40 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       }
     }
 
-    if (uniqueAddresses.length === 0) {
+    if (uniqueCoordinates.length === 0) {
       console.log('[MarketingDiscovery] ArcGIS address points subdivisions yielded no results, falling back to grid sampler');
       const gridResult = await runArcgisGridSampler({
         boundingBox,
         spacingMeters: 40
       });
-      mergeArcgisAddresses(uniqueAddresses, gridResult.addresses, seenKeys, boundingBox);
+      // Grid sampler returns addresses, extract coordinates from them
+      for (const addr of gridResult.addresses || []) {
+        if (addr.latitude !== undefined && addr.longitude !== undefined) {
+          const key = `${addr.latitude.toFixed(7)},${addr.longitude.toFixed(7)}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueCoordinates.push({
+              latitude: addr.latitude,
+              longitude: addr.longitude,
+              source: 'arcgis_address_points'
+            });
+          }
+        }
+      }
     }
 
-    return { addresses: uniqueAddresses };
+    return { coordinates: uniqueCoordinates };
   } catch (error) {
     const message = error?.message || (typeof error === 'string' ? error : 'Unknown ArcGIS address points error');
     console.warn('[MarketingDiscovery] ArcGIS address points error', message);
-    return { addresses: [], error: message };
+    return { coordinates: [], error: message };
   }
 }
 
+// Modified to return coordinates only - reverse geocoding happens later in batch
 async function runArcgisPlacesDiscovery({ boundingBox, center }) {
   if (!ARC_GIS_API_KEY) {
-    return { addresses: [], error: 'ArcGIS API key not configured' };
+    return { coordinates: [], error: 'ArcGIS API key not configured' };
   }
 
   try {
@@ -1513,47 +1532,36 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
     if (!response.ok) {
       const details = await response.text().catch(() => '');
       console.warn('[MarketingDiscovery] ArcGIS places request failed', response.status, details);
-      return { addresses: [], error: `ArcGIS API returned ${response.status}` };
+      return { coordinates: [], error: `ArcGIS API returned ${response.status}` };
     }
 
     const payload = await response.json();
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
 
-    const addresses = candidates
+    // Extract coordinates only
+    const coordinates = candidates
       .map((candidate) => {
         const location = candidate?.location;
-        const attributes = candidate?.attributes || {};
         const latitude = toNumber(location?.y);
         const longitude = toNumber(location?.x);
         if (latitude === undefined || longitude === undefined) {
           return null;
         }
 
-        const addressLine1 =
-          attributes.PlaceName ||
-          attributes.Address ||
-          candidate.address ||
-          `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
-
         return {
-          addressLine1,
-          addressLine2: undefined,
-          city: attributes.City || undefined,
-          state: attributes.Region || undefined,
-          postalCode: attributes.Postal || undefined,
-          country: 'US',
           latitude,
           longitude,
-          source: 'arcgis_places'
+          source: 'arcgis_places',
+          attributes: candidate?.attributes || {} // Keep for potential later use
         };
       })
       .filter(Boolean);
 
-    return { addresses };
+    return { coordinates };
   } catch (error) {
     const message = error?.message || (typeof error === 'string' ? error : 'Unknown ArcGIS places error');
     console.warn('[MarketingDiscovery] ArcGIS places error', message);
-    return { addresses: [], error: message };
+    return { coordinates: [], error: message };
   }
 }
 
@@ -2150,122 +2158,184 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     };
 
-    // Run algorithms sequentially but optimized (parallel was causing too much load)
-    // Progress allocation: OSM 10-50%, ArcGIS Address Points 50-70%, ArcGIS Places 70-85%
-    let progressOffset = 10;
-    const progressPerAlgorithm = algorithms.length > 0 ? 70 / algorithms.length : 70;
+    // NEW APPROACH: Collect all coordinates first, then batch reverse geocode
+    // Progress allocation: Coordinate collection 10-60%, Reverse geocoding 60-90%
+    const allCoordinates = [];
+    const coordinateKeys = new Set(); // For deduplication
 
+    // Step 1: Collect coordinates from OSM (centroids)
     if (algorithms.includes('osm_buildings')) {
       try {
-        updateProgress('Running OSM building discovery', progressOffset);
-        console.log('[MarketingDiscovery] Running OSM building discovery algorithm');
+        updateProgress('Running OSM centroid lookup', 10);
+        console.log('[MarketingDiscovery] Running OSM building discovery algorithm (coordinates only)');
         const osmResult = await runOsmBuildingDiscovery({
           boundingBox,
           radiusMiles,
           center: computedCenter,
           advancedOptions,
           progressCallback: (step, progress, details) => {
-            updateProgress(`OSM: ${step}`, progressOffset + (progress * progressPerAlgorithm * 0.01), details);
+            updateProgress(`OSM: ${step}`, 10 + (progress * 15 * 0.01), details);
           }
         });
-        updateProgress('OSM discovery completed', progressOffset + progressPerAlgorithm, { 
-          addresses: osmResult.addresses?.length || 0,
-          error: osmResult.error 
-        });
-        console.log('[MarketingDiscovery] OSM algorithm completed', { 
-          addresses: osmResult.addresses?.length || 0,
-          error: osmResult.error 
-        });
-
-        let produced = 0;
-        let geocoded = 0;
-
-        if (Array.isArray(osmResult.addresses)) {
-          for (const address of osmResult.addresses) {
-            produced += 1;
-            if (address.addressLine1) {
-              geocoded += 1;
+        
+        if (Array.isArray(osmResult.coordinates)) {
+          for (const coord of osmResult.coordinates) {
+            const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+            if (!coordinateKeys.has(key)) {
+              coordinateKeys.add(key);
+              allCoordinates.push(coord);
             }
-            addAddressToCombined(address, 'osm_buildings');
           }
         }
 
-        recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
+        updateProgress('OSM centroid lookup completed', 25, { 
+          coordinates: osmResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length,
+          error: osmResult.error 
+        });
+        console.log('[MarketingDiscovery] OSM algorithm completed', { 
+          coordinates: osmResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length,
+          error: osmResult.error 
+        });
+
+        recordAlgorithmStats('osm_buildings', osmResult.coordinates?.length || 0, 0, osmResult.error);
       } catch (err) {
-        updateProgress('OSM discovery failed', progressOffset + progressPerAlgorithm, { error: err.message });
+        updateProgress('OSM centroid lookup failed', 25, { error: err.message });
         console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
         recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
       }
-      progressOffset += progressPerAlgorithm;
     }
 
+    // Step 2: Collect coordinates from ArcGIS address points
     if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
       try {
-        console.log('[MarketingDiscovery] Starting ArcGIS address points discovery', {
+        console.log('[MarketingDiscovery] Starting ArcGIS address points discovery (coordinates only)', {
           boundingBox,
           center: computedCenter,
           hasApiKey: !!ARC_GIS_API_KEY
         });
-        updateProgress('Running ArcGIS address points discovery', progressOffset);
+        updateProgress('Running ArcGIS address points lookup', 25);
         const arcgisResult = await runArcgisAddressPointsDiscovery({
           boundingBox,
           center: computedCenter,
           radiusMiles
         });
-        updateProgress('ArcGIS address points completed', progressOffset + progressPerAlgorithm);
-
-        let produced = 0;
-        let geocoded = 0;
-
-        if (Array.isArray(arcgisResult.addresses)) {
-          for (const address of arcgisResult.addresses) {
-            produced += 1;
-            if (address.addressLine1) {
-              geocoded += 1;
+        
+        if (Array.isArray(arcgisResult.coordinates)) {
+          for (const coord of arcgisResult.coordinates) {
+            const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+            if (!coordinateKeys.has(key)) {
+              coordinateKeys.add(key);
+              allCoordinates.push(coord);
             }
-            addAddressToCombined(address, 'arcgis_address_points');
           }
         }
 
-        recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
+        updateProgress('ArcGIS address points lookup completed', 40, { 
+          coordinates: arcgisResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length,
+          error: arcgisResult.error 
+        });
+        console.log('[MarketingDiscovery] ArcGIS address points completed', {
+          coordinates: arcgisResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length
+        });
+
+        recordAlgorithmStats('arcgis_address_points', arcgisResult.coordinates?.length || 0, 0, arcgisResult.error);
       } catch (err) {
-        updateProgress('ArcGIS address points failed', progressOffset + progressPerAlgorithm, { error: err.message });
+        updateProgress('ArcGIS address points failed', 40, { error: err.message });
         console.error('[MarketingDiscovery] ArcGIS Address Points Discovery failed:', err);
         recordAlgorithmStats('arcgis_address_points', 0, 0, err.message || 'Unknown error');
       }
-      progressOffset += progressPerAlgorithm;
     }
 
+    // Step 3: Collect coordinates from ArcGIS places
     if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
       try {
-        updateProgress('Running ArcGIS places discovery', progressOffset);
+        updateProgress('Running ArcGIS places lookup', 40);
         const arcgisPlacesResult = await runArcgisPlacesDiscovery({
           boundingBox,
           center: computedCenter,
           radiusMiles
         });
-        updateProgress('ArcGIS places completed', progressOffset + progressPerAlgorithm);
-
-        let produced = 0;
-        let geocoded = 0;
-
-        if (Array.isArray(arcgisPlacesResult.addresses)) {
-          for (const address of arcgisPlacesResult.addresses) {
-            produced += 1;
-            if (address.addressLine1) {
-              geocoded += 1;
+        
+        if (Array.isArray(arcgisPlacesResult.coordinates)) {
+          for (const coord of arcgisPlacesResult.coordinates) {
+            const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+            if (!coordinateKeys.has(key)) {
+              coordinateKeys.add(key);
+              allCoordinates.push(coord);
             }
-            addAddressToCombined(address, 'arcgis_places');
           }
         }
 
-        recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
+        updateProgress('ArcGIS places lookup completed', 55, { 
+          coordinates: arcgisPlacesResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length,
+          error: arcgisPlacesResult.error 
+        });
+        console.log('[MarketingDiscovery] ArcGIS places completed', {
+          coordinates: arcgisPlacesResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length
+        });
+
+        recordAlgorithmStats('arcgis_places', arcgisPlacesResult.coordinates?.length || 0, 0, arcgisPlacesResult.error);
       } catch (err) {
-        updateProgress('ArcGIS places failed', progressOffset + progressPerAlgorithm, { error: err.message });
+        updateProgress('ArcGIS places failed', 55, { error: err.message });
         console.error('[MarketingDiscovery] ArcGIS Places Discovery failed:', err);
         recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
       }
-      progressOffset += progressPerAlgorithm;
+    }
+
+    // Step 4: Batch reverse geocode all coordinates
+    console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
+      totalCoordinates: allCoordinates.length,
+      coordinateSources: allCoordinates.reduce((acc, coord) => {
+        acc[coord.source] = (acc[coord.source] || 0) + 1;
+        return acc;
+      }, {})
+    });
+
+    updateProgress('Reverse geocoding all coordinates', 60);
+    const reverseGeocodeResult = await batchReverseGeocodeCoordinates(allCoordinates, (step, progress, details) => {
+      updateProgress(`Reverse geocoding: ${step}`, 60 + (progress * 30 * 0.01), details);
+    });
+
+    // Add all reverse geocoded addresses to combined addresses
+    if (Array.isArray(reverseGeocodeResult.addresses)) {
+      for (const address of reverseGeocodeResult.addresses) {
+        addAddressToCombined(address, address.source || 'unknown');
+      }
+    }
+
+    updateProgress('Reverse geocoding completed', 90, {
+      totalCoordinates: allCoordinates.length,
+      geocoded: reverseGeocodeResult.geocoded,
+      failed: reverseGeocodeResult.failed
+    });
+
+    // Update algorithm stats with geocoding results - count geocoded per source
+    if (Array.isArray(reverseGeocodeResult.addresses)) {
+      const geocodedBySource = {};
+      for (const address of reverseGeocodeResult.addresses) {
+        if (address.addressLine1 && !address.addressLine1.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/)) {
+          // Only count as geocoded if it's not just coordinates
+          const source = address.source || 'unknown';
+          geocodedBySource[source] = (geocodedBySource[source] || 0) + 1;
+        }
+      }
+      
+      // Update algorithm stats
+      if (algorithmStats['osm_buildings']) {
+        algorithmStats['osm_buildings'].geocoded = geocodedBySource['osm_buildings'] || 0;
+      }
+      if (algorithmStats['arcgis_address_points']) {
+        algorithmStats['arcgis_address_points'].geocoded = geocodedBySource['arcgis_address_points'] || 0;
+      }
+      if (algorithmStats['arcgis_places']) {
+        algorithmStats['arcgis_places'].geocoded = geocodedBySource['arcgis_places'] || 0;
+      }
     }
 
     // Don't filter existing addresses - only new addresses were already filtered in addAddressToCombined
