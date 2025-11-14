@@ -1779,14 +1779,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
 
     if (!plan) {
-      clearTimeout(timeoutCleanup);
+      if (timeoutCleanup) clearTimeout(timeoutCleanup);
       progressStore.delete(requestId);
       return res.status(404).json({ error: 'Plan not found' });
     }
 
-    const boundingBox = parseBoundingBox(req.body.boundingBox);
+    const boundingBox = parseBoundingBox(req.body?.boundingBox);
     if (!boundingBox) {
-      console.error('[MarketingDiscovery] Invalid bounding box received:', req.body.boundingBox);
+      console.error('[MarketingDiscovery] Invalid bounding box received:', req.body?.boundingBox);
+      if (timeoutCleanup) clearTimeout(timeoutCleanup);
+      progressStore.delete(requestId);
       return res.status(400).json({
         error: 'Invalid bounding box',
         message: 'Provide boundingBox with numeric west, south, east, north values'
