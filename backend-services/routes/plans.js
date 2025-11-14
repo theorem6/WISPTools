@@ -2399,7 +2399,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
     if (!res.headersSent) {
       // Limit response size - only send a sample of addresses if there are too many
       // This prevents 502 errors from response size limits or memory issues
-      const MAX_RESPONSE_ADDRESSES = 1000;
+      // Using 250 instead of 1000 to avoid Node.js JSON.stringify "Invalid string length" error
+      const MAX_RESPONSE_ADDRESSES = 250;
       const addressesToReturn = combinedAddresses.length > MAX_RESPONSE_ADDRESSES
         ? combinedAddresses.slice(0, MAX_RESPONSE_ADDRESSES)
         : combinedAddresses;
@@ -2408,37 +2409,96 @@ router.post('/:id/marketing/discover', async (req, res) => {
         console.log(`[MarketingDiscovery] Limiting response addresses from ${combinedAddresses.length} to ${MAX_RESPONSE_ADDRESSES} to prevent response size issues`);
       }
       
-      res.json({
-        summary: {
-          totalCandidates: totalUniqueAddresses,
-          geocodedCount,
-          radiusMiles,
-          boundingBox,
-          center: computedCenter,
-          algorithmsUsed: algorithms,
-          algorithmStats,
-          newlyAdded: newAddressesAdded,
-          previousCount: previousAddressCount,
-          totalUniqueAddresses,
-          totalRuns,
-          // Indicate if response was truncated
-          responseTruncated: combinedAddresses.length > MAX_RESPONSE_ADDRESSES,
-          responseAddressCount: addressesToReturn.length
-        },
-        addresses: addressesToReturn,
-        metadata: {
-          totalUniqueAddresses,
-          newlyAdded: newAddressesAdded,
-          previousCount: previousAddressCount,
-          totalRuns,
-          runTimestamp: runTimestampIso,
-          // Note: All addresses are saved to database, even if not all returned in response
-          note: combinedAddresses.length > MAX_RESPONSE_ADDRESSES 
-            ? `Showing first ${MAX_RESPONSE_ADDRESSES} of ${totalUniqueAddresses} addresses. All addresses have been saved to the database.`
-            : undefined
-        },
-        requestId // Include requestId in response
-      });
+      // Strip down address objects to only essential fields for response (reduce JSON size)
+      const strippedAddresses = addressesToReturn.map(addr => ({
+        addressLine1: addr.addressLine1,
+        addressLine2: addr.addressLine2,
+        city: addr.city,
+        state: addr.state,
+        postalCode: addr.postalCode,
+        country: addr.country,
+        latitude: addr.latitude,
+        longitude: addr.longitude,
+        source: addr.source
+        // Omit discoveredAt and other non-essential fields to reduce JSON size
+      }));
+      
+      try {
+        res.json({
+          summary: {
+            totalCandidates: totalUniqueAddresses,
+            geocodedCount,
+            radiusMiles,
+            boundingBox,
+            center: computedCenter,
+            algorithmsUsed: algorithms,
+            algorithmStats,
+            newlyAdded: newAddressesAdded,
+            previousCount: previousAddressCount,
+            totalUniqueAddresses,
+            totalRuns,
+            // Indicate if response was truncated
+            responseTruncated: combinedAddresses.length > MAX_RESPONSE_ADDRESSES,
+            responseAddressCount: strippedAddresses.length
+          },
+          addresses: strippedAddresses,
+          metadata: {
+            totalUniqueAddresses,
+            newlyAdded: newAddressesAdded,
+            previousCount: previousAddressCount,
+            totalRuns,
+            runTimestamp: runTimestampIso,
+            // Note: All addresses are saved to database, even if not all returned in response
+            note: combinedAddresses.length > MAX_RESPONSE_ADDRESSES 
+              ? `Showing first ${MAX_RESPONSE_ADDRESSES} of ${totalUniqueAddresses} addresses. All addresses have been saved to the database.`
+              : undefined
+          },
+          requestId // Include requestId in response
+        });
+      } catch (jsonError) {
+        if (jsonError.message && jsonError.message.includes('Invalid string length')) {
+          console.error('[MarketingDiscovery] JSON response too large even after limiting. Further reducing response size.');
+          // Try with even fewer addresses
+          const minimalAddresses = combinedAddresses.slice(0, 100).map(addr => ({
+            addressLine1: addr.addressLine1,
+            city: addr.city,
+            state: addr.state,
+            postalCode: addr.postalCode,
+            latitude: addr.latitude,
+            longitude: addr.longitude,
+            source: addr.source
+          }));
+          
+          res.json({
+            summary: {
+              totalCandidates: totalUniqueAddresses,
+              geocodedCount,
+              radiusMiles,
+              boundingBox,
+              center: computedCenter,
+              algorithmsUsed: algorithms,
+              newlyAdded: newAddressesAdded,
+              previousCount: previousAddressCount,
+              totalUniqueAddresses,
+              totalRuns,
+              responseTruncated: true,
+              responseAddressCount: minimalAddresses.length
+            },
+            addresses: minimalAddresses,
+            metadata: {
+              totalUniqueAddresses,
+              newlyAdded: newAddressesAdded,
+              previousCount: previousAddressCount,
+              totalRuns,
+              runTimestamp: runTimestampIso,
+              note: `Showing first 100 of ${totalUniqueAddresses} addresses. All addresses have been saved to the database.`
+            },
+            requestId
+          });
+        } else {
+          throw jsonError; // Re-throw if it's a different error
+        }
+      }
       
       // Clean up progress entry after successful response (but keep for 30 seconds for progress polling)
       clearTimeout(timeoutCleanup);
@@ -2459,9 +2519,23 @@ router.post('/:id/marketing/discover', async (req, res) => {
     const requestDuration = Date.now() - requestStartTime;
     
     // Only update progress if we haven't already sent a response
+    // Note: updateProgress may not be defined if error occurs before it's initialized
     if (!res.headersSent) {
       try {
-        updateProgress('Request failed', 0, { error: error.message });
+        if (typeof updateProgress === 'function') {
+          updateProgress('Request failed', 0, { error: error.message });
+        } else {
+          // Update progress store directly if updateProgress function isn't available
+          const existingProgress = progressStore.get(requestId);
+          if (existingProgress) {
+            progressStore.set(requestId, {
+              ...existingProgress,
+              progress: 0,
+              step: 'Failed',
+              details: { error: error.message }
+            });
+          }
+        }
       } catch (updateError) {
         console.error('[MarketingDiscovery] Failed to update progress on error:', updateError);
       }
