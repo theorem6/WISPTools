@@ -829,27 +829,29 @@ const reverseGeocodeCoordinate = async (lat, lon) => {
 
 // Batch reverse geocode all coordinates - processes all at once for efficiency
 const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback) => {
-  if (!coordinates || coordinates.length === 0) {
-    return { addresses: [], geocoded: 0, failed: 0 };
-  }
+  try {
+    if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0) {
+      console.log('[MarketingDiscovery] No coordinates to reverse geocode');
+      return { addresses: [], geocoded: 0, failed: 0 };
+    }
 
-  const addresses = [];
-  let geocodedCount = 0;
-  let failedCount = 0;
-  const reverseGeocodeStartTime = Date.now();
-  
-  // Configuration for batch processing
-  const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
-  const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS can handle more parallel requests
-  const MAX_REVERSE_GEOCODE_TIME = ARC_GIS_API_KEY ? 10 * 60 * 1000 : 5 * 60 * 1000; // 10 min for ArcGIS, 5 min for Nominatim
-  const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
+    const addresses = [];
+    let geocodedCount = 0;
+    let failedCount = 0;
+    const reverseGeocodeStartTime = Date.now();
+    
+    // Configuration for batch processing
+    const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
+    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS can handle more parallel requests
+    const MAX_REVERSE_GEOCODE_TIME = ARC_GIS_API_KEY ? 10 * 60 * 1000 : 5 * 60 * 1000; // 10 min for ArcGIS, 5 min for Nominatim
+    const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
 
-  console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
-    totalCoordinates: coordinates.length,
-    usingArcGIS: !!ARC_GIS_API_KEY,
-    maxParallel: MAX_PARALLEL_GEOCODES,
-    maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
-  });
+    console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
+      totalCoordinates: coordinates.length,
+      usingArcGIS: !!ARC_GIS_API_KEY,
+      maxParallel: MAX_PARALLEL_GEOCODES,
+      maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
+    });
 
   // Process coordinates in batches for parallel geocoding
   for (let batchStart = 0; batchStart < coordinates.length; batchStart += MAX_PARALLEL_GEOCODES) {
@@ -957,17 +959,26 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     }
   }
     
-  const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
-  console.log('[MarketingDiscovery] Batch reverse geocoding completed', { 
-    duration: `${reverseGeocodeDuration}ms`,
-    durationPerCoordinate: coordinates.length ? `${(reverseGeocodeDuration / coordinates.length).toFixed(0)}ms` : '0ms',
-    geocoded: geocodedCount,
-    failed: failedCount,
-    total: coordinates.length,
-    successRate: coordinates.length ? `${((geocodedCount / coordinates.length) * 100).toFixed(1)}%` : '0%'
-  });
+    const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
+    console.log('[MarketingDiscovery] Batch reverse geocoding completed', { 
+      duration: `${reverseGeocodeDuration}ms`,
+      durationPerCoordinate: coordinates.length ? `${(reverseGeocodeDuration / coordinates.length).toFixed(0)}ms` : '0ms',
+      geocoded: geocodedCount,
+      failed: failedCount,
+      total: coordinates.length,
+      successRate: coordinates.length ? `${((geocodedCount / coordinates.length) * 100).toFixed(1)}%` : '0%'
+    });
 
-  return { addresses, geocoded: geocodedCount, failed: failedCount };
+    return { addresses, geocoded: geocodedCount, failed: failedCount };
+  } catch (error) {
+    console.error('[MarketingDiscovery] Batch reverse geocoding error:', {
+      error: error?.message || error,
+      stack: error?.stack,
+      coordinatesCount: coordinates?.length || 0
+    });
+    // Return whatever addresses we've collected so far, even if there was an error
+    return { addresses: [], geocoded: 0, failed: coordinates?.length || 0, error: error?.message || 'Unknown error' };
+  }
 };
 
 const toRadians = (degrees) => degrees * (Math.PI / 180);
@@ -2292,27 +2303,47 @@ router.post('/:id/marketing/discover', async (req, res) => {
     console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
       totalCoordinates: allCoordinates.length,
       coordinateSources: allCoordinates.reduce((acc, coord) => {
-        acc[coord.source] = (acc[coord.source] || 0) + 1;
+        if (coord && coord.source) {
+          acc[coord.source] = (acc[coord.source] || 0) + 1;
+        }
         return acc;
       }, {})
     });
 
     updateProgress('Reverse geocoding all coordinates', 60);
-    const reverseGeocodeResult = await batchReverseGeocodeCoordinates(allCoordinates, (step, progress, details) => {
-      updateProgress(`Reverse geocoding: ${step}`, 60 + (progress * 30 * 0.01), details);
-    });
+    
+    let reverseGeocodeResult = { addresses: [], geocoded: 0, failed: 0 };
+    try {
+      reverseGeocodeResult = await batchReverseGeocodeCoordinates(allCoordinates, (step, progress, details) => {
+        if (typeof progress === 'number' && !isNaN(progress)) {
+          updateProgress(`Reverse geocoding: ${step}`, 60 + (progress * 30 * 0.01), details);
+        } else {
+          updateProgress(`Reverse geocoding: ${step}`, 60, details);
+        }
+      });
+    } catch (error) {
+      console.error('[MarketingDiscovery] Batch reverse geocoding failed:', {
+        error: error?.message || error,
+        stack: error?.stack,
+        totalCoordinates: allCoordinates.length
+      });
+      updateProgress('Reverse geocoding failed', 75, { error: error?.message || 'Unknown error' });
+    }
 
     // Add all reverse geocoded addresses to combined addresses
-    if (Array.isArray(reverseGeocodeResult.addresses)) {
+    if (reverseGeocodeResult && Array.isArray(reverseGeocodeResult.addresses)) {
       for (const address of reverseGeocodeResult.addresses) {
-        addAddressToCombined(address, address.source || 'unknown');
+        if (address && address.latitude !== undefined && address.longitude !== undefined) {
+          addAddressToCombined(address, address.source || 'unknown');
+        }
       }
     }
 
     updateProgress('Reverse geocoding completed', 90, {
       totalCoordinates: allCoordinates.length,
-      geocoded: reverseGeocodeResult.geocoded,
-      failed: reverseGeocodeResult.failed
+      geocoded: reverseGeocodeResult?.geocoded || 0,
+      failed: reverseGeocodeResult?.failed || 0,
+      error: reverseGeocodeResult?.error
     });
 
     // Update algorithm stats with geocoding results - count geocoded per source
