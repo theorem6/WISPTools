@@ -2137,115 +2137,161 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     };
 
+    // Run all algorithms in parallel for better performance
+    updateProgress('Running discovery algorithms in parallel', 10);
+    console.log('[MarketingDiscovery] Starting parallel algorithm execution', { algorithms });
+    
+    const algorithmPromises = [];
+    
+    // OSM Buildings Discovery
     if (algorithms.includes('osm_buildings')) {
-      try {
-        updateProgress('Running OSM building discovery', 10);
-        console.log('[MarketingDiscovery] Running OSM building discovery algorithm');
-        const osmResult = await runOsmBuildingDiscovery({
-          boundingBox,
-          radiusMiles,
-          center: computedCenter,
-          advancedOptions,
-          progressCallback: (step, progress, details) => {
-            updateProgress(`OSM: ${step}`, 10 + (progress * 0.4), details); // 10-50%
-          }
-        });
-        updateProgress('OSM discovery completed', 50, { 
-          addresses: osmResult.addresses?.length || 0,
-          error: osmResult.error 
-        });
-        console.log('[MarketingDiscovery] OSM algorithm completed', { 
-          addresses: osmResult.addresses?.length || 0,
-          error: osmResult.error 
-        });
-
-        let produced = 0;
-        let geocoded = 0;
-
-        if (Array.isArray(osmResult.addresses)) {
-          for (const address of osmResult.addresses) {
-            produced += 1;
-            if (address.addressLine1) {
-              geocoded += 1;
+      const osmPromise = (async () => {
+        try {
+          console.log('[MarketingDiscovery] Running OSM building discovery algorithm');
+          const osmResult = await runOsmBuildingDiscovery({
+            boundingBox,
+            radiusMiles,
+            center: computedCenter,
+            advancedOptions,
+            progressCallback: (step, progress, details) => {
+              // Progress updates for OSM (10-50% when running alone, but shared with others)
+              updateProgress(`OSM: ${step}`, 10 + (progress * 0.3), details);
             }
-            addAddressToCombined(address, 'osm_buildings');
-          }
-        }
+          });
+          
+          let produced = 0;
+          let geocoded = 0;
 
-        recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
-      } catch (err) {
-        updateProgress('OSM discovery failed', 50, { error: err.message });
-        console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
-        recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
-      }
+          if (Array.isArray(osmResult.addresses)) {
+            for (const address of osmResult.addresses) {
+              produced += 1;
+              if (address.addressLine1) {
+                geocoded += 1;
+              }
+              addAddressToCombined(address, 'osm_buildings');
+            }
+          }
+
+          recordAlgorithmStats('osm_buildings', produced, geocoded, osmResult.error);
+          console.log('[MarketingDiscovery] OSM algorithm completed', { 
+            addresses: osmResult.addresses?.length || 0,
+            error: osmResult.error 
+          });
+          return { algorithm: 'osm_buildings', success: true, count: produced };
+        } catch (err) {
+          console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
+          recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
+          return { algorithm: 'osm_buildings', success: false, error: err.message };
+        }
+      })();
+      algorithmPromises.push(osmPromise);
     }
 
+    // ArcGIS Address Points Discovery
     if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
-      try {
-        console.log('[MarketingDiscovery] Starting ArcGIS address points discovery', {
-          boundingBox,
-          center: computedCenter,
-          hasApiKey: !!ARC_GIS_API_KEY
-        });
-        updateProgress('Running ArcGIS address points discovery', 50);
-        const arcgisResult = await runArcgisAddressPointsDiscovery({
-          boundingBox,
-          center: computedCenter,
-          radiusMiles
-        });
-        updateProgress('ArcGIS address points completed', 70);
+      const arcgisPromise = (async () => {
+        try {
+          console.log('[MarketingDiscovery] Starting ArcGIS address points discovery', {
+            boundingBox,
+            center: computedCenter,
+            hasApiKey: !!ARC_GIS_API_KEY
+          });
+          const arcgisResult = await runArcgisAddressPointsDiscovery({
+            boundingBox,
+            center: computedCenter,
+            radiusMiles
+          });
 
-        let produced = 0;
-        let geocoded = 0;
+          let produced = 0;
+          let geocoded = 0;
 
-        if (Array.isArray(arcgisResult.addresses)) {
-          for (const address of arcgisResult.addresses) {
-            produced += 1;
-            if (address.addressLine1) {
-              geocoded += 1;
+          if (Array.isArray(arcgisResult.addresses)) {
+            for (const address of arcgisResult.addresses) {
+              produced += 1;
+              if (address.addressLine1) {
+                geocoded += 1;
+              }
+              addAddressToCombined(address, 'arcgis_address_points');
             }
-            addAddressToCombined(address, 'arcgis_address_points');
           }
-        }
 
-        recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
-      } catch (err) {
-        updateProgress('ArcGIS address points failed', 70, { error: err.message });
-        console.error('[MarketingDiscovery] ArcGIS Address Points Discovery failed:', err);
-        recordAlgorithmStats('arcgis_address_points', 0, 0, err.message || 'Unknown error');
-      }
+          recordAlgorithmStats('arcgis_address_points', produced, geocoded, arcgisResult.error);
+          console.log('[MarketingDiscovery] ArcGIS address points completed', { 
+            addresses: arcgisResult.addresses?.length || 0 
+          });
+          return { algorithm: 'arcgis_address_points', success: true, count: produced };
+        } catch (err) {
+          console.error('[MarketingDiscovery] ArcGIS Address Points Discovery failed:', err);
+          recordAlgorithmStats('arcgis_address_points', 0, 0, err.message || 'Unknown error');
+          return { algorithm: 'arcgis_address_points', success: false, error: err.message };
+        }
+      })();
+      algorithmPromises.push(arcgisPromise);
     }
 
+    // ArcGIS Places Discovery
     if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
-      try {
-        updateProgress('Running ArcGIS places discovery', 70);
-        const arcgisPlacesResult = await runArcgisPlacesDiscovery({
-          boundingBox,
-          center: computedCenter,
-          radiusMiles
-        });
-        updateProgress('ArcGIS places completed', 85);
+      const arcgisPlacesPromise = (async () => {
+        try {
+          console.log('[MarketingDiscovery] Running ArcGIS places discovery');
+          const arcgisPlacesResult = await runArcgisPlacesDiscovery({
+            boundingBox,
+            center: computedCenter,
+            radiusMiles
+          });
 
-        let produced = 0;
-        let geocoded = 0;
+          let produced = 0;
+          let geocoded = 0;
 
-        if (Array.isArray(arcgisPlacesResult.addresses)) {
-          for (const address of arcgisPlacesResult.addresses) {
-            produced += 1;
-            if (address.addressLine1) {
-              geocoded += 1;
+          if (Array.isArray(arcgisPlacesResult.addresses)) {
+            for (const address of arcgisPlacesResult.addresses) {
+              produced += 1;
+              if (address.addressLine1) {
+                geocoded += 1;
+              }
+              addAddressToCombined(address, 'arcgis_places');
             }
-            addAddressToCombined(address, 'arcgis_places');
           }
-        }
 
-        recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
-      } catch (err) {
-        updateProgress('ArcGIS places failed', 85, { error: err.message });
-        console.error('[MarketingDiscovery] ArcGIS Places Discovery failed:', err);
-        recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
-      }
+          recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
+          console.log('[MarketingDiscovery] ArcGIS places completed', { 
+            addresses: arcgisPlacesResult.addresses?.length || 0 
+          });
+          return { algorithm: 'arcgis_places', success: true, count: produced };
+        } catch (err) {
+          console.error('[MarketingDiscovery] ArcGIS Places Discovery failed:', err);
+          recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
+          return { algorithm: 'arcgis_places', success: false, error: err.message };
+        }
+      })();
+      algorithmPromises.push(arcgisPlacesPromise);
     }
+
+    // Wait for all algorithms to complete in parallel
+    updateProgress('Waiting for all algorithms to complete', 50);
+    const algorithmResults = await Promise.all(algorithmPromises);
+    
+    // Log results from all algorithms
+    const successfulAlgorithms = algorithmResults.filter(r => r.success);
+    const failedAlgorithms = algorithmResults.filter(r => !r.success);
+    
+    console.log('[MarketingDiscovery] All algorithms completed', {
+      total: algorithmResults.length,
+      successful: successfulAlgorithms.length,
+      failed: failedAlgorithms.length,
+      results: algorithmResults.map(r => ({
+        algorithm: r.algorithm,
+        success: r.success,
+        count: r.count || 0,
+        error: r.error
+      }))
+    });
+    
+    updateProgress('All algorithms completed', 80, {
+      successful: successfulAlgorithms.length,
+      failed: failedAlgorithms.length,
+      totalAlgorithms: algorithmResults.length
+    });
 
     // Don't filter existing addresses - only new addresses were already filtered in addAddressToCombined
     // This allows re-discover to merge addresses from multiple areas scanned
