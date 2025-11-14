@@ -82,6 +82,7 @@ export class CoverageMapController {
       showFiber: true,
       showWirelessLicensed: true,
       showWirelessUnlicensed: true,
+      showMarketing: true,
       bandFilters: [],
       statusFilter: [],
       technologyFilter: [],
@@ -211,7 +212,29 @@ export class CoverageMapController {
   public setMarketingLeads(leads: PlanMarketingAddress[]): void {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];
-    this.marketingLeads = incomingLeads;
+    
+    // Merge new leads with existing ones, deduplicating by coordinate + address hash
+    const existingHashes = new Set(
+      this.marketingLeads.map(lead => {
+        const lat = this.toNumeric(lead.latitude);
+        const lon = this.toNumeric(lead.longitude);
+        if (lat === null || lon === null) return null;
+        return `${lat.toFixed(7)}|${lon.toFixed(7)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
+      }).filter(h => h !== null) as string[]
+    );
+    
+    // Add new leads that don't already exist
+    const newLeads = incomingLeads.filter(lead => {
+      const lat = this.toNumeric(lead.latitude);
+      const lon = this.toNumeric(lead.longitude);
+      if (lat === null || lon === null) return false;
+      const hash = `${lat.toFixed(7)}|${lon.toFixed(7)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
+      return !existingHashes.has(hash);
+    });
+    
+    // Merge: keep existing + add new (backend returns all addresses, so this should be minimal)
+    // But if backend returns full list, just use that to ensure consistency
+    this.marketingLeads = incomingLeads.length > 0 ? incomingLeads : this.marketingLeads;
 
     const shouldAutoFit =
       previousCount === 0 &&
@@ -423,8 +446,9 @@ export class CoverageMapController {
         ? webMercatorUtilsModule.default
         : webMercatorUtilsModule) ?? null;
     this.reactiveUtils =
-      reactiveUtilsModule?.reactiveUtils ??
-      (reactiveUtilsModule && 'default' in reactiveUtilsModule ? reactiveUtilsModule.default : null);
+      (reactiveUtilsModule && 'default' in reactiveUtilsModule
+        ? reactiveUtilsModule.default
+        : reactiveUtilsModule) ?? null;
 
     this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
     this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
@@ -1233,7 +1257,8 @@ export class CoverageMapController {
   private async renderMarketingLeads(): Promise<void> {
     if (!this.marketingLayer || !this.mapView) return;
 
-    this.marketingLayer.removeAll();
+    // Don't clear existing markers - accumulate them so user can see progress
+    // Only add new markers that don't already exist
 
     if (!this.filters.showMarketing || !Array.isArray(this.marketingLeads) || this.marketingLeads.length === 0) {
       return;
@@ -1286,7 +1311,24 @@ export class CoverageMapController {
         }
       });
 
+      // Track which markers are already on the map to avoid duplicates
+      const existingGraphicHashes = new Set<string>();
+      if (this.marketingLayer.graphics?.length > 0) {
+        this.marketingLayer.graphics.forEach((graphic: any) => {
+          const attrs = graphic.attributes || {};
+          const lat = attrs.latitude;
+          const lon = attrs.longitude;
+          const addr = attrs.addressLine1 || '';
+          const postal = attrs.postalCode || '';
+          if (typeof lat === 'number' && typeof lon === 'number') {
+            const hash = `${lat.toFixed(7)}|${lon.toFixed(7)}|${addr.toLowerCase()}|${postal}`;
+            existingGraphicHashes.add(hash);
+          }
+        });
+      }
+
       const seen = new Set<string>();
+      let newMarkersAdded = 0;
 
       deduplicatedLeads.forEach((lead, index) => {
         const latitude = this.toNumeric(lead.latitude);
@@ -1295,11 +1337,14 @@ export class CoverageMapController {
           return;
         }
 
-        const hash = `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
-        if (seen.has(hash)) {
+        const hash = `${latitude.toFixed(7)}|${longitude.toFixed(7)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
+        
+        // Skip if already in this batch or already on the map
+        if (seen.has(hash) || existingGraphicHashes.has(hash)) {
           return;
         }
         seen.add(hash);
+        existingGraphicHashes.add(hash); // Track as rendered
 
         const point = new Point({
           latitude,
@@ -1342,9 +1387,10 @@ export class CoverageMapController {
         });
 
         this.marketingLayer!.add(graphic);
+        newMarkersAdded++;
       });
 
-      console.log(`[CoverageMap] Rendered ${this.marketingLayer.graphics?.length ?? 0} marketing leads`);
+      console.log(`[CoverageMap] Added ${newMarkersAdded} new marketing leads (${this.marketingLayer.graphics?.length ?? 0} total on map)`);
     } catch (err) {
       console.error('[CoverageMap] Failed to render marketing leads:', err);
     }

@@ -2201,23 +2201,28 @@ router.post('/:id/marketing/discover', async (req, res) => {
       addressesCountCheck: marketingUpdate.addresses?.length === combinedAddresses.length
     });
     
-    // Verify addresses were saved correctly
+    // Verify addresses were saved correctly (non-blocking - don't fail if verification fails)
     if (updateResult.modifiedCount > 0) {
-      const savedPlan = await PlanProject.findById(plan._id).select('marketing.addresses').lean();
-      const savedAddressCount = savedPlan?.marketing?.addresses?.length || 0;
-      console.log('[MarketingDiscovery] Verification - addresses in database after save', {
-        planId: plan._id.toString(),
-        savedAddressCount,
-        expectedCount: totalUniqueAddresses,
-        match: savedAddressCount === totalUniqueAddresses
-      });
-      
-      if (savedAddressCount !== totalUniqueAddresses) {
-        console.error('[MarketingDiscovery] WARNING: Address count mismatch!', {
-          expected: totalUniqueAddresses,
-          actual: savedAddressCount,
-          difference: totalUniqueAddresses - savedAddressCount
+      try {
+        const savedPlan = await PlanProject.findById(plan._id).select('marketing.addresses').lean();
+        const savedAddressCount = savedPlan?.marketing?.addresses?.length || 0;
+        console.log('[MarketingDiscovery] Verification - addresses in database after save', {
+          planId: plan._id.toString(),
+          savedAddressCount,
+          expectedCount: totalUniqueAddresses,
+          match: savedAddressCount === totalUniqueAddresses
         });
+        
+        if (savedAddressCount !== totalUniqueAddresses) {
+          console.error('[MarketingDiscovery] WARNING: Address count mismatch!', {
+            expected: totalUniqueAddresses,
+            actual: savedAddressCount,
+            difference: totalUniqueAddresses - savedAddressCount
+          });
+        }
+      } catch (verifyError) {
+        // Don't fail the request if verification fails - just log it
+        console.warn('[MarketingDiscovery] Verification query failed (non-critical):', verifyError?.message);
       }
     }
 
