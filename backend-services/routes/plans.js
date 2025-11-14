@@ -1137,31 +1137,57 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
     let geocodedCount = 0;
     let failedCount = 0;
     const reverseGeocodeStartTime = Date.now();
-    const REVERSE_GEOCODE_TIMEOUT = 10000; // 10 seconds per geocode
+    const REVERSE_GEOCODE_TIMEOUT = 8000; // 8 seconds per geocode (reduced from 10)
     const reverseDelay = ARC_GIS_API_KEY ? 0 : NOMINATIM_DELAY_MS; // No delay for ArcGIS
+    const MAX_PARALLEL_GEOCODES = 5; // Process up to 5 geocodes in parallel
+    const MAX_REVERSE_GEOCODE_TIME = 5 * 60 * 1000; // 5 minutes max for reverse geocoding
+    const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
 
     console.log('[MarketingDiscovery] Starting reverse geocoding for OSM candidates', {
       totalCandidates: candidates.length,
-      usingArcGIS: !!ARC_GIS_API_KEY
+      usingArcGIS: !!ARC_GIS_API_KEY,
+      maxParallel: MAX_PARALLEL_GEOCODES,
+      maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
     });
 
-    for (let index = 0; index < candidates.length; index += 1) {
-        const candidate = candidates[index];
-        
-        if (progressCallback && index % 10 === 0) {
-          const geocodeProgress = 20 + ((index / candidates.length) * 60);
-          progressCallback(`Reverse geocoding ${index + 1}/${candidates.length}`, geocodeProgress, {
-            current: index + 1,
-            total: candidates.length,
-            geocoded: geocodedCount,
-            failed: failedCount
+    // Process candidates in batches for parallel geocoding
+    for (let batchStart = 0; batchStart < candidates.length; batchStart += MAX_PARALLEL_GEOCODES) {
+      // Check overall timeout
+      if (Date.now() > overallTimeout) {
+        console.warn(`[MarketingDiscovery] Reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${candidates.length} candidates.`);
+        // Add remaining candidates as coordinate-only addresses
+        for (let i = batchStart; i < candidates.length; i += 1) {
+          addresses.push({
+            addressLine1: `${candidates[i].lat.toFixed(7)}, ${candidates[i].lon.toFixed(7)}`,
+            latitude: candidates[i].lat,
+            longitude: candidates[i].lon,
+            country: 'US',
+            source: 'osm_buildings'
           });
         }
+        break;
+      }
 
+      const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, candidates.length);
+      const batch = candidates.slice(batchStart, batchEnd);
+      
+      if (progressCallback && batchStart % 20 === 0) {
+        const geocodeProgress = 20 + ((batchStart / candidates.length) * 60);
+        progressCallback(`Reverse geocoding ${batchStart + 1}/${candidates.length}`, geocodeProgress, {
+          current: batchStart + 1,
+          total: candidates.length,
+          geocoded: geocodedCount,
+          failed: failedCount
+        });
+      }
+
+      // Process batch in parallel
+      const batchPromises = batch.map(async (candidate, batchIndex) => {
         try {
           // Only delay for Nominatim (OSM fallback) - ArcGIS doesn't need delays
-          if (index > 0 && !ARC_GIS_API_KEY) {
-            await delay(reverseDelay);
+          const globalIndex = batchStart + batchIndex;
+          if (globalIndex > 0 && !ARC_GIS_API_KEY) {
+            await delay(reverseDelay * batchIndex); // Stagger delays within batch
           }
           
           // Add timeout to individual reverse geocode calls
@@ -1173,21 +1199,25 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           
           const details = await Promise.race([geocodePromise, timeoutPromise]);
           if (details && details.addressLine1) {
-            addresses.push({
-              ...details,
-              source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
-            });
-            geocodedCount += 1;
+            return {
+              success: true,
+              address: {
+                ...details,
+                source: details.source === 'arcgis' ? 'osm_buildings+arcgis' : 'osm_buildings'
+              }
+            };
           } else {
             // No address returned, use coordinates
-            failedCount += 1;
-            addresses.push({
-              addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
-              latitude: candidate.lat,
-              longitude: candidate.lon,
-              country: 'US',
-              source: 'osm_buildings'
-            });
+            return {
+              success: false,
+              address: {
+                addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
+                latitude: candidate.lat,
+                longitude: candidate.lon,
+                country: 'US',
+                source: 'osm_buildings'
+              }
+            };
           }
         } catch (error) {
           console.warn('[MarketingDiscovery] Reverse geocode failed for centroid:', {
@@ -1195,17 +1225,38 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
             lon: candidate.lon,
             error: error?.message || error
           });
-          failedCount += 1;
           // Fallback to coordinates
-          addresses.push({
-            addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
-            latitude: candidate.lat,
-            longitude: candidate.lon,
-            country: 'US',
-            source: 'osm_buildings'
-          });
+          return {
+            success: false,
+            address: {
+              addressLine1: `${candidate.lat.toFixed(7)}, ${candidate.lon.toFixed(7)}`,
+              latitude: candidate.lat,
+              longitude: candidate.lon,
+              country: 'US',
+              source: 'osm_buildings'
+            }
+          };
+        }
+      });
+
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Process batch results
+      for (const result of batchResults) {
+        addresses.push(result.address);
+        if (result.success) {
+          geocodedCount += 1;
+        } else {
+          failedCount += 1;
         }
       }
+
+      // Small delay between batches to avoid overwhelming the API
+      if (batchEnd < candidates.length && ARC_GIS_API_KEY) {
+        await delay(100); // 100ms delay between batches for ArcGIS
+      }
+    }
       
     const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
     console.log('[MarketingDiscovery] Reverse geocoding completed', { 
