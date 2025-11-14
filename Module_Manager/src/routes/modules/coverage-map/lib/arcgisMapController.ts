@@ -756,13 +756,20 @@ export class CoverageMapController {
   }
 
   private handleMessage(event: MessageEvent): void {
-    const { source, type } = event.data || {};
+    const { source, type, payload } = event.data || {};
     if (source !== 'shared-map') return;
 
     if (type === 'request-extent') {
       const currentExtent = this.mapView?.extent;
       if (currentExtent) {
         this.broadcastViewExtent(currentExtent);
+      }
+    } else if (type === 'center-map-on-location' && payload) {
+      const { lat, lon, zoom } = payload;
+      if (typeof lat === 'number' && typeof lon === 'number') {
+        this.centerMapOnLocation(lat, lon, zoom).catch(err => {
+          console.error('[CoverageMap] Failed to center map on location:', err);
+        });
       }
     }
   }

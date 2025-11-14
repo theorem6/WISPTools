@@ -1776,11 +1776,22 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     const boundingBox = parseBoundingBox(req.body.boundingBox);
     if (!boundingBox) {
+      console.error('[MarketingDiscovery] Invalid bounding box received:', req.body.boundingBox);
       return res.status(400).json({
         error: 'Invalid bounding box',
         message: 'Provide boundingBox with numeric west, south, east, north values'
       });
     }
+
+    console.log('[MarketingDiscovery] Received bounding box:', {
+      west: boundingBox.west.toFixed(7),
+      south: boundingBox.south.toFixed(7),
+      east: boundingBox.east.toFixed(7),
+      north: boundingBox.north.toFixed(7),
+      rawInput: req.body.boundingBox,
+      requestId,
+      timestamp: new Date().toISOString()
+    });
 
     const radiusMiles =
       toNumber(req.body.radiusMiles ?? req.body.radius ?? plan.marketing?.targetRadiusMiles) ?? 5;

@@ -91,6 +91,11 @@ const ALGORITHM_OPTIONS = [
       ? `${plan.location.addressLine1}, ${plan.location.city}, ${plan.location.state}`
       : plan.location?.addressLine1 ?? '';
 
+  // Location lookup for wizard
+  let locationLookup = '';
+  let isLookingUpLocation = false;
+  let locationLookupError: string | null = null;
+
   const derivedCenterLat =
     plan.marketing?.lastCenter?.lat ??
     plan.location?.latitude ??
@@ -445,7 +450,8 @@ let results: PlanMarketingAddress[] = [];
       advancedOptions,
       hasMapExtent,
       mapExtent: mapExtent,
-      latestExtent: latestExtent
+      latestExtent: latestExtent,
+      extentAtOpen: extentAtOpen
     });
 
     error = null;
@@ -460,11 +466,12 @@ let results: PlanMarketingAddress[] = [];
     // Request current extent from map when button is clicked
     window.dispatchEvent(new CustomEvent('request-map-extent'));
     
-    // Wait briefly for the extent update to propagate
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // Wait for the extent update to propagate (longer wait to ensure we get the latest)
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    // Use the most recent extent (either just updated mapExtent or fallback to latestExtent)
-    const extentForRun = mapExtent ? cloneMapExtent(mapExtent) : (latestExtent ?? extentAtOpen);
+    // ALWAYS use latestExtent (which is reactive) - not mapExtent prop which may be stale
+    // If latestExtent is not available, use extentAtOpen as fallback
+    const extentForRun = latestExtent ? cloneMapExtent(latestExtent) : (extentAtOpen ? cloneMapExtent(extentAtOpen) : null);
     
     if (!extentForRun?.boundingBox || !extentForRun?.center) {
       error = 'Unable to determine map bounds. Please zoom the map to define the search area.';
@@ -483,6 +490,13 @@ let results: PlanMarketingAddress[] = [];
       // Use map extent directly (clone so we don't mutate shared reference)
       const boundingBox = { ...extentForRun.boundingBox };
       const center = extentForRun.center;
+      
+      console.log('[PlanMarketingModal] Using extent for discovery:', {
+        boundingBox,
+        center,
+        extentSource: latestExtent ? 'latestExtent' : 'extentAtOpen',
+        timestamp: new Date().toISOString()
+      });
 
       const spanMiles = computeSpanMiles({ center, boundingBox });
       if (spanMiles) {
@@ -701,6 +715,110 @@ let results: PlanMarketingAddress[] = [];
     const numeric = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(numeric) ? numeric.toFixed(fractionDigits) : '—';
   }
+
+  async function handleLocationLookup() {
+    const input = locationLookup.trim();
+    if (!input) {
+      locationLookupError = 'Please enter a location to search for.';
+      return;
+    }
+
+    isLookingUpLocation = true;
+    locationLookupError = null;
+
+    try {
+      // Try to parse as coordinates first (format: lat, lng)
+      const coordMatch = input.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+      let lat: number | null = null;
+      let lon: number | null = null;
+
+      if (coordMatch) {
+        lat = parseFloat(coordMatch[1]);
+        lon = parseFloat(coordMatch[2]);
+        
+        if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          // Valid coordinates - center map
+          await centerMapOnLocation(lat, lon);
+          locationLookup = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+          isLookingUpLocation = false;
+          return;
+        } else {
+          locationLookupError = 'Invalid coordinates. Latitude must be -90 to 90, longitude -180 to 180.';
+          isLookingUpLocation = false;
+          return;
+        }
+      }
+
+      // Use ArcGIS geocoding service for addresses/cities/states/zip
+      const response = await fetch(
+        `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?` +
+        `singleLine=${encodeURIComponent(input)}` +
+        `&f=json` +
+        `&maxLocations=1`
+      );
+
+      if (!response.ok) {
+        throw new Error('Geocoding service unavailable');
+      }
+
+      const data = await response.json();
+
+      if (data.candidates && data.candidates.length > 0) {
+        const candidate = data.candidates[0];
+        lat = candidate.location.y;
+        lon = candidate.location.x;
+        const address = candidate.address || input;
+        
+        // Center map on the location
+        await centerMapOnLocation(lat, lon);
+        
+        // Update location lookup with the found address
+        locationLookup = address;
+        
+        // Update project location if plan exists
+        if (plan?.id && lat && lon) {
+          try {
+            await planService.updatePlan(plan.id, {
+              location: {
+                ...plan.location,
+                latitude: lat,
+                longitude: lon,
+                addressLine1: address.split(',')[0] || address,
+                city: candidate.attributes?.City || plan.location?.city,
+                state: candidate.attributes?.Region || plan.location?.state,
+                postalCode: candidate.attributes?.Postal || plan.location?.postalCode
+              }
+            });
+            console.log('[PlanMarketingModal] Updated project location from lookup:', { lat, lon, address });
+          } catch (err) {
+            console.warn('[PlanMarketingModal] Failed to update project location:', err);
+            // Don't show error to user - location lookup succeeded even if update failed
+          }
+        }
+      } else {
+        locationLookupError = 'Location not found. Try: "New York, NY", "10001", or coordinates like "40.7128, -74.0060"';
+      }
+    } catch (err: any) {
+      console.error('[PlanMarketingModal] Location lookup error:', err);
+      locationLookupError = err.message || 'Failed to lookup location. Please try again.';
+    } finally {
+      isLookingUpLocation = false;
+    }
+  }
+
+  async function centerMapOnLocation(lat: number, lon: number) {
+    // Send message to map to center on location
+    window.dispatchEvent(new CustomEvent('center-map-on-location', {
+      detail: { lat, lon, zoom: 14 }
+    }));
+    
+    // Wait a bit for map to center, then request new extent
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    window.dispatchEvent(new CustomEvent('request-map-extent'));
+    
+    // Wait for extent to update
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
 </script>
 
 <div class="marketing-backdrop" role="presentation" aria-hidden="false">
@@ -744,6 +862,45 @@ let results: PlanMarketingAddress[] = [];
             <h3>Select Algorithms & Search Area</h3>
             <p>Choose discovery methods and verify the map area. The search uses the visible map extent as the boundary.</p>
           </header>
+          
+          <!-- Location Lookup Field -->
+          <div class="location-lookup-section" style="margin-bottom: 1.5rem; padding: 1rem; background: #f5f5f5; border-radius: 6px;">
+            <label for="location-lookup" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+              <strong>📍 Location Lookup</strong>
+              <span style="font-size: 0.85rem; font-weight: normal; color: #666; display: block; margin-top: 0.25rem;">
+                Enter coordinates (lat, lon), city, state, or zip code
+              </span>
+            </label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input
+                id="location-lookup"
+                type="text"
+                placeholder="e.g., 40.7128, -74.0060 or New York, NY or 10001"
+                bind:value={locationLookup}
+                disabled={isLookingUpLocation}
+                on:keydown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleLocationLookup();
+                  }
+                }}
+                style="flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem;"
+              />
+              <button
+                type="button"
+                on:click={handleLocationLookup}
+                disabled={!locationLookup.trim() || isLookingUpLocation}
+                style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap;"
+              >
+                {isLookingUpLocation ? 'Looking up...' : 'Lookup & Center'}
+              </button>
+            </div>
+            {#if locationLookupError}
+              <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fee; color: #c33; border-radius: 4px; font-size: 0.85rem;">
+                {locationLookupError}
+              </div>
+            {/if}
+          </div>
           
           {#if !hasMapExtent}
             <div class="alert alert-warning">

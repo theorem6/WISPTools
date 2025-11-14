@@ -216,6 +216,23 @@ $: marketingAvailable = Boolean(
     latestMapExtent = event.detail;
   }
 
+  function handleCenterMapOnLocation(event: CustomEvent<{ lat: number; lon: number; zoom?: number }>) {
+    const { lat, lon, zoom } = event.detail;
+    // Send message to map iframe to center on location
+    const mapIframe = document.querySelector('iframe[src*="coverage-map"]') as HTMLIFrameElement;
+    if (mapIframe?.contentWindow) {
+      mapIframe.contentWindow.postMessage(
+        {
+          source: 'shared-map',
+          type: 'center-map-on-location',
+          payload: { lat, lon, zoom: zoom ?? 14 }
+        },
+        '*'
+      );
+    }
+  }
+
+
   // Project workflow states
   let activeProject: PlanProject | null = null;
   let showProjectActions = false;
@@ -416,6 +433,16 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         const listener: EventListener = (event: Event) => handleIframeObjectAction(event);
         window.addEventListener('iframe-object-action', listener);
         removeListener = () => window.removeEventListener('iframe-object-action', listener);
+        
+        // Add center-map-on-location listener
+        window.addEventListener('center-map-on-location', handleCenterMapOnLocation as any);
+        const removeCenterListener = () => window.removeEventListener('center-map-on-location', handleCenterMapOnLocation as any);
+        const originalRemove = removeListener;
+        removeListener = () => {
+          originalRemove();
+          removeCenterListener();
+        };
+        
         iframeInitialized = true;
       }
     })().catch(err => {
