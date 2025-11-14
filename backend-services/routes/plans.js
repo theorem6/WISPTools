@@ -2405,10 +2405,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
     
     if (!res.headersSent) {
-      // Limit response size - only send a sample of addresses if there are too many
-      // This prevents 502 errors from response size limits or memory issues
-      // Using 250 instead of 1000 to avoid Node.js JSON.stringify "Invalid string length" error
-      const MAX_RESPONSE_ADDRESSES = 250;
+      // Limit response size aggressively to avoid Node.js JSON.stringify "Invalid string length" error
+      // Start with 100 addresses, reduce further if needed
+      const MAX_RESPONSE_ADDRESSES = 100;
       const addressesToReturn = combinedAddresses.length > MAX_RESPONSE_ADDRESSES
         ? combinedAddresses.slice(0, MAX_RESPONSE_ADDRESSES)
         : combinedAddresses;
@@ -2417,90 +2416,60 @@ router.post('/:id/marketing/discover', async (req, res) => {
         console.log(`[MarketingDiscovery] Limiting response addresses from ${combinedAddresses.length} to ${MAX_RESPONSE_ADDRESSES} to prevent response size issues`);
       }
       
-      // Strip down address objects to only essential fields for response (reduce JSON size)
+      // Strip down address objects to minimal essential fields for response (reduce JSON size)
       const strippedAddresses = addressesToReturn.map(addr => ({
-        addressLine1: addr.addressLine1,
-        addressLine2: addr.addressLine2,
-        city: addr.city,
-        state: addr.state,
-        postalCode: addr.postalCode,
-        country: addr.country,
-        latitude: addr.latitude,
-        longitude: addr.longitude,
-        source: addr.source
-        // Omit discoveredAt and other non-essential fields to reduce JSON size
+        a1: addr.addressLine1, // Shortened field names to reduce JSON size
+        c: addr.city,
+        s: addr.state,
+        z: addr.postalCode,
+        lat: addr.latitude,
+        lon: addr.longitude,
+        src: addr.source
+        // Omit addressLine2, country, discoveredAt and other non-essential fields
       }));
+      
+      // Strip down algorithmStats to just counts (remove error messages that could be large)
+      const strippedAlgorithmStats = {};
+      for (const [key, value] of Object.entries(algorithmStats || {})) {
+        strippedAlgorithmStats[key] = {
+          produced: value.produced || 0,
+          geocoded: value.geocoded || 0
+          // Omit error messages to reduce size
+        };
+      }
       
       try {
         res.json({
           summary: {
-            totalCandidates: totalUniqueAddresses,
-            geocodedCount,
-            radiusMiles,
-            boundingBox,
-            center: computedCenter,
-            algorithmsUsed: algorithms,
-            algorithmStats,
-            newlyAdded: newAddressesAdded,
-            previousCount: previousAddressCount,
-            totalUniqueAddresses,
-            totalRuns,
-            // Indicate if response was truncated
-            responseTruncated: combinedAddresses.length > MAX_RESPONSE_ADDRESSES,
-            responseAddressCount: strippedAddresses.length
+            total: totalUniqueAddresses,
+            geocoded: geocodedCount,
+            new: newAddressesAdded,
+            prev: previousAddressCount,
+            runs: totalRuns,
+            truncated: combinedAddresses.length > MAX_RESPONSE_ADDRESSES,
+            shown: strippedAddresses.length
           },
           addresses: strippedAddresses,
-          metadata: {
-            totalUniqueAddresses,
-            newlyAdded: newAddressesAdded,
-            previousCount: previousAddressCount,
-            totalRuns,
-            runTimestamp: runTimestampIso,
-            // Note: All addresses are saved to database, even if not all returned in response
-            note: combinedAddresses.length > MAX_RESPONSE_ADDRESSES 
-              ? `Showing first ${MAX_RESPONSE_ADDRESSES} of ${totalUniqueAddresses} addresses. All addresses have been saved to the database.`
-              : undefined
-          },
-          requestId // Include requestId in response
+          algorithms: algorithms,
+          stats: strippedAlgorithmStats,
+          requestId
         });
       } catch (jsonError) {
         if (jsonError.message && jsonError.message.includes('Invalid string length')) {
-          console.error('[MarketingDiscovery] JSON response too large even after limiting. Further reducing response size.');
-          // Try with even fewer addresses
-          const minimalAddresses = combinedAddresses.slice(0, 100).map(addr => ({
-            addressLine1: addr.addressLine1,
-            city: addr.city,
-            state: addr.state,
-            postalCode: addr.postalCode,
-            latitude: addr.latitude,
-            longitude: addr.longitude,
-            source: addr.source
+          console.error('[MarketingDiscovery] JSON response too large even after limiting. Sending minimal response.');
+          // Try with even fewer addresses and minimal fields
+          const minimalAddresses = combinedAddresses.slice(0, 50).map(addr => ({
+            a1: addr.addressLine1,
+            lat: addr.latitude,
+            lon: addr.longitude
           }));
           
           res.json({
-            summary: {
-              totalCandidates: totalUniqueAddresses,
-              geocodedCount,
-              radiusMiles,
-              boundingBox,
-              center: computedCenter,
-              algorithmsUsed: algorithms,
-              newlyAdded: newAddressesAdded,
-              previousCount: previousAddressCount,
-              totalUniqueAddresses,
-              totalRuns,
-              responseTruncated: true,
-              responseAddressCount: minimalAddresses.length
-            },
+            total: totalUniqueAddresses,
+            shown: minimalAddresses.length,
+            truncated: true,
             addresses: minimalAddresses,
-            metadata: {
-              totalUniqueAddresses,
-              newlyAdded: newAddressesAdded,
-              previousCount: previousAddressCount,
-              totalRuns,
-              runTimestamp: runTimestampIso,
-              note: `Showing first 100 of ${totalUniqueAddresses} addresses. All addresses have been saved to the database.`
-            },
+            note: `Showing first 50 of ${totalUniqueAddresses} addresses. All saved to database.`,
             requestId
           });
         } else {
