@@ -853,8 +853,8 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
     });
 
-  // Process coordinates in batches for parallel geocoding
-  for (let batchStart = 0; batchStart < coordinates.length; batchStart += MAX_PARALLEL_GEOCODES) {
+    // Process coordinates in batches for parallel geocoding
+    for (let batchStart = 0; batchStart < coordinates.length; batchStart += MAX_PARALLEL_GEOCODES) {
     // Check overall timeout
     if (Date.now() > overallTimeout) {
       console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinates.length} coordinates.`);
@@ -952,12 +952,12 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       }
     }
 
-    // No delay needed for ArcGIS - it's designed for high throughput
-    // Only delay for Nominatim to respect rate limits
-    if (batchEnd < coordinates.length && !ARC_GIS_API_KEY) {
-      await delay(1000); // 1 second delay between batches for Nominatim rate limiting
+      // No delay needed for ArcGIS - it's designed for high throughput
+      // Only delay for Nominatim to respect rate limits
+      if (batchEnd < coordinates.length && !ARC_GIS_API_KEY) {
+        await delay(1000); // 1 second delay between batches for Nominatim rate limiting
+      }
     }
-  }
     
     const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
     console.log('[MarketingDiscovery] Batch reverse geocoding completed', { 
