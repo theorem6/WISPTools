@@ -892,7 +892,17 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       // Process batch in parallel
       const batchPromises = batch.map(async (coord, batchIndex) => {
         try {
-          const { latitude, longitude, source } = coord;
+          const latitude = toNumber(coord?.latitude);
+          const longitude = toNumber(coord?.longitude);
+          const source = coord?.source || 'unknown';
+          
+          if (latitude === undefined || longitude === undefined) {
+            console.warn('[MarketingDiscovery] Skipping invalid coordinate in batch:', coord);
+            return {
+              success: false,
+              address: null
+            };
+          }
           
           // Add timeout to individual reverse geocode calls
           const geocodePromise = reverseGeocodeCoordinate(latitude, longitude);
