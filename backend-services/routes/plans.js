@@ -2346,6 +2346,17 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
     
     if (!res.headersSent) {
+      // Limit response size - only send a sample of addresses if there are too many
+      // This prevents 502 errors from response size limits or memory issues
+      const MAX_RESPONSE_ADDRESSES = 1000;
+      const addressesToReturn = combinedAddresses.length > MAX_RESPONSE_ADDRESSES
+        ? combinedAddresses.slice(0, MAX_RESPONSE_ADDRESSES)
+        : combinedAddresses;
+      
+      if (combinedAddresses.length > MAX_RESPONSE_ADDRESSES) {
+        console.log(`[MarketingDiscovery] Limiting response addresses from ${combinedAddresses.length} to ${MAX_RESPONSE_ADDRESSES} to prevent response size issues`);
+      }
+      
       res.json({
         summary: {
           totalCandidates: totalUniqueAddresses,
@@ -2358,15 +2369,22 @@ router.post('/:id/marketing/discover', async (req, res) => {
           newlyAdded: newAddressesAdded,
           previousCount: previousAddressCount,
           totalUniqueAddresses,
-          totalRuns
+          totalRuns,
+          // Indicate if response was truncated
+          responseTruncated: combinedAddresses.length > MAX_RESPONSE_ADDRESSES,
+          responseAddressCount: addressesToReturn.length
         },
-        addresses: combinedAddresses,
+        addresses: addressesToReturn,
         metadata: {
           totalUniqueAddresses,
           newlyAdded: newAddressesAdded,
           previousCount: previousAddressCount,
           totalRuns,
-          runTimestamp: runTimestampIso
+          runTimestamp: runTimestampIso,
+          // Note: All addresses are saved to database, even if not all returned in response
+          note: combinedAddresses.length > MAX_RESPONSE_ADDRESSES 
+            ? `Showing first ${MAX_RESPONSE_ADDRESSES} of ${totalUniqueAddresses} addresses. All addresses have been saved to the database.`
+            : undefined
         },
         requestId // Include requestId in response
       });
