@@ -1922,7 +1922,14 @@ router.post('/:id/marketing/discover', async (req, res) => {
         return false;
       }
 
-      for (const existing of combinedAddresses) {
+      // Optimized distance check: only check against a sample of nearby addresses if there are many
+      // This prevents O(n²) performance issues with large datasets
+      const MAX_DISTANCE_CHECKS = 100;
+      const addressesToCheck = combinedAddresses.length > MAX_DISTANCE_CHECKS
+        ? combinedAddresses.slice(-MAX_DISTANCE_CHECKS) // Check most recently added
+        : combinedAddresses;
+      
+      for (const existing of addressesToCheck) {
         if (distanceInMeters(latitude, longitude, existing.latitude, existing.longitude) <= dedupDistanceMeters) {
           return false;
         }
@@ -1947,7 +1954,38 @@ router.post('/:id/marketing/discover', async (req, res) => {
     };
 
     const seedExistingAddresses = (addresses = []) => {
-      for (const existing of addresses) {
+      const MAX_EXISTING_ADDRESSES = 10000; // Limit to prevent performance issues
+      const addressesToSeed = addresses.slice(0, MAX_EXISTING_ADDRESSES);
+      
+      if (addresses.length > MAX_EXISTING_ADDRESSES) {
+        console.warn(`[MarketingDiscovery] Limiting existing addresses from ${addresses.length} to ${MAX_EXISTING_ADDRESSES} for performance`);
+      }
+      
+      // Use a spatial grid to optimize distance checks for large datasets
+      // Grid cell size ~50m to match dedupDistanceMeters
+      const GRID_CELL_SIZE = 0.0005; // ~50m at equator
+      const spatialGrid = new Map();
+      
+      const getGridKey = (lat, lon) => {
+        const latCell = Math.floor(lat / GRID_CELL_SIZE);
+        const lonCell = Math.floor(lon / GRID_CELL_SIZE);
+        return `${latCell},${lonCell}`;
+      };
+      
+      const getNearbyGridKeys = (lat, lon) => {
+        const centerKey = getGridKey(lat, lon);
+        const [latCell, lonCell] = centerKey.split(',').map(Number);
+        const keys = [];
+        // Check current cell and 8 surrounding cells
+        for (let dLat = -1; dLat <= 1; dLat++) {
+          for (let dLon = -1; dLon <= 1; dLon++) {
+            keys.push(`${latCell + dLat},${lonCell + dLon}`);
+          }
+        }
+        return keys;
+      };
+      
+      for (const existing of addressesToSeed) {
         const latitude = toNumber(existing.latitude);
         const longitude = toNumber(existing.longitude);
         if (latitude === undefined || longitude === undefined) {
@@ -1973,13 +2011,20 @@ router.post('/:id/marketing/discover', async (req, res) => {
           continue;
         }
 
+        // Optimized distance check using spatial grid
         let duplicateWithinRadius = false;
-        for (const saved of combinedAddresses) {
-          if (distanceInMeters(latitude, longitude, saved.latitude, saved.longitude) <= dedupDistanceMeters) {
-            duplicateWithinRadius = true;
-            break;
+        const nearbyKeys = getNearbyGridKeys(latitude, longitude);
+        for (const key of nearbyKeys) {
+          const candidates = spatialGrid.get(key) || [];
+          for (const candidate of candidates) {
+            if (distanceInMeters(latitude, longitude, candidate.latitude, candidate.longitude) <= dedupDistanceMeters) {
+              duplicateWithinRadius = true;
+              break;
+            }
           }
+          if (duplicateWithinRadius) break;
         }
+        
         if (duplicateWithinRadius) {
           continue;
         }
@@ -1997,18 +2042,29 @@ router.post('/:id/marketing/discover', async (req, res) => {
           }
         }
 
-        combinedAddresses.push({
+        const seededAddress = {
           ...workingAddress,
           latitude,
           longitude,
           source: workingAddress.source || 'existing',
           discoveredAt: discoveredAtIso
-        });
+        };
+        
+        combinedAddresses.push(seededAddress);
         coordinateHashes.add(coordinateKey);
         if (normalizedAddressKey) {
           addressHashes.add(normalizedAddressKey);
         }
+        
+        // Add to spatial grid for future distance checks
+        const gridKey = getGridKey(latitude, longitude);
+        if (!spatialGrid.has(gridKey)) {
+          spatialGrid.set(gridKey, []);
+        }
+        spatialGrid.get(gridKey).push(seededAddress);
       }
+      
+      console.log(`[MarketingDiscovery] Seeded ${combinedAddresses.length} existing addresses from ${addressesToSeed.length} input addresses`);
     };
 
     seedExistingAddresses(existingAddresses);
