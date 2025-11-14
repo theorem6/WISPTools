@@ -16,7 +16,8 @@ const router = express.Router();
 
 // Configuration
 const ISO_BUILD_DIR = '/opt/epc-iso-builder';
-const ISO_OUTPUT_DIR = '/var/www/html/downloads/isos';
+// Use temporary storage for ISO/ZIP files - they will be auto-deleted after 1 hour
+const ISO_OUTPUT_DIR = '/tmp/iso-downloads';
 // Minimal boot assets (holding folder). Pre-stage these once on the VM.
 // Required files:
 //  - /opt/base-images/minimal/vmlinuz
