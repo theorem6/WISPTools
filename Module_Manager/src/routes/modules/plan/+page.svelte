@@ -111,6 +111,11 @@ $: marketingAvailable = Boolean(
   // New project form
   let newProject: NewProjectForm = createDefaultProject();
   
+  // Location lookup for new project
+  let projectLocationLookup = '';
+  let isLookingUpProjectLocation = false;
+  let projectLocationLookupError: string | null = null;
+  
   // New hardware requirement form
   let newRequirement = {
     category: 'Radio Equipment',
@@ -176,40 +181,109 @@ $: marketingAvailable = Boolean(
     return undefined;
   }
 
-  async function geocodeNewProjectLocation() {
-    const tenantId = $currentTenant?.id;
-    if (!tenantId) {
-      error = 'Select a tenant before geocoding a project location.';
-      setTimeout(() => (error = ''), 5000);
+  async function handleProjectLocationLookup() {
+    const input = projectLocationLookup.trim();
+    if (!input) {
+      projectLocationLookupError = 'Please enter a location to search for.';
       return;
     }
 
-    const address = buildAddressString(newProject.location);
-    if (!address) {
-      error = 'Enter address details (street, city, state) before geocoding.';
-      setTimeout(() => (error = ''), 5000);
-      return;
-    }
+    isLookingUpProjectLocation = true;
+    projectLocationLookupError = null;
 
     try {
-      isLoading = true;
-      const result = await coverageMapService.geocodeAddress(address);
-      if (result && typeof result.latitude === 'number' && typeof result.longitude === 'number') {
-        newProject.location.latitude = result.latitude.toFixed(6);
-        newProject.location.longitude = result.longitude.toFixed(6);
-        successMessage = `Coordinates located at ${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}`;
-        setTimeout(() => (successMessage = ''), 5000);
+      // Try to parse as coordinates first (format: lat, lng)
+      const coordMatch = input.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+      let lat: number | null = null;
+      let lon: number | null = null;
+
+      if (coordMatch) {
+        lat = parseFloat(coordMatch[1]);
+        lon = parseFloat(coordMatch[2]);
+        
+        if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+          // Valid coordinates - center map
+          await centerMapOnProjectLocation(lat, lon);
+          projectLocationLookup = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+          isLookingUpProjectLocation = false;
+          return;
+        } else {
+          projectLocationLookupError = 'Invalid coordinates. Latitude must be -90 to 90, longitude -180 to 180.';
+          isLookingUpProjectLocation = false;
+          return;
+        }
+      }
+
+      // Use ArcGIS geocoding service for addresses/cities/states/zip
+      const response = await fetch(
+        `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?` +
+        `singleLine=${encodeURIComponent(input)}` +
+        `&f=json` +
+        `&maxLocations=5`
+      );
+
+      if (!response.ok) {
+        throw new Error('Geocoding service unavailable');
+      }
+
+      const data = await response.json();
+
+      if (data.candidates && data.candidates.length > 0) {
+        // Use the first candidate (best match)
+        const candidate = data.candidates[0];
+        lat = candidate.location.y;
+        lon = candidate.location.x;
+        const address = candidate.address || input;
+        
+        // Center map on the location
+        await centerMapOnProjectLocation(lat, lon);
+        
+        // Update location lookup with the found address
+        projectLocationLookup = address;
+        
+        // Optionally populate form fields if available
+        if (candidate.attributes) {
+          if (!newProject.location.city && candidate.attributes.City) {
+            newProject.location.city = candidate.attributes.City;
+          }
+          if (!newProject.location.state && candidate.attributes.Region) {
+            newProject.location.state = candidate.attributes.Region;
+          }
+          if (!newProject.location.postalCode && candidate.attributes.Postal) {
+            newProject.location.postalCode = candidate.attributes.Postal;
+          }
+          if (!newProject.location.addressLine1 && address) {
+            newProject.location.addressLine1 = address.split(',')[0] || address;
+          }
+        }
       } else {
-        error = 'Unable to resolve geolocation for the provided address.';
-        setTimeout(() => (error = ''), 5000);
+        projectLocationLookupError = 'Location not found. Try: "New York, NY", "10001", or coordinates like "40.7128, -74.0060"';
       }
     } catch (err: any) {
-      console.error('Error geocoding project address:', err);
-      error = err?.message || 'Failed to geocode address.';
-      setTimeout(() => (error = ''), 5000);
+      console.error('[CreateProject] Location lookup error:', err);
+      projectLocationLookupError = err.message || 'Failed to lookup location. Please try again.';
     } finally {
-      isLoading = false;
+      isLookingUpProjectLocation = false;
     }
+  }
+
+  async function centerMapOnProjectLocation(lat: number, lon: number) {
+    // Send message to map to center on location
+    window.dispatchEvent(new CustomEvent('center-map-on-location', {
+      detail: { lat, lon, zoom: 14 }
+    }));
+    
+    // Wait a bit for map to center, then request new extent
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    window.dispatchEvent(new CustomEvent('request-map-extent'));
+    
+    // Wait for extent to update
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  async function geocodeNewProjectLocation() {
+    // This function is kept for backwards compatibility but we use handleProjectLocationLookup now
+    await handleProjectLocationLookup();
   }
 
   function handleMapExtent(event: CustomEvent<MapViewExtentPayload>) {
@@ -620,29 +694,6 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
   }
 
   async function createProject() {
-    if (!newProject.name.trim()) {
-      error = 'Project name is required';
-      setTimeout(() => error = '', 5000);
-      return;
-    }
-
-    const requiredLocation: Array<{ field: keyof NewProjectForm['location']; label: string }> = [
-      { field: 'addressLine1', label: 'street address' },
-      { field: 'city', label: 'city' },
-      { field: 'state', label: 'state' },
-      { field: 'postalCode', label: 'postal code' }
-    ];
-
-    const missingLocationFields = requiredLocation
-      .filter(item => !newProject.location[item.field].trim())
-      .map(item => item.label);
-
-    if (missingLocationFields.length > 0) {
-      error = `Please provide ${missingLocationFields.join(', ')} for the project location.`;
-      setTimeout(() => (error = ''), 6000);
-      return;
-    }
-    
     isLoading = true;
     error = '';
     
@@ -654,24 +705,43 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
 
       const createdByEmail = currentUser?.email || 'System';
 
-      let locationPayload = buildPlanLocationPayload();
+      // Use current map center if available, otherwise use location from form
+      let locationPayload: PlanProjectLocation | undefined = undefined;
+      
+      if (latestMapExtent?.center?.lat && latestMapExtent?.center?.lon) {
+        // Use map center - this is the primary method
+        locationPayload = {
+          latitude: latestMapExtent.center.lat,
+          longitude: latestMapExtent.center.lon,
+          addressLine1: projectLocationLookup.trim() || undefined,
+          city: newProject.location.city?.trim() || undefined,
+          state: newProject.location.state?.trim() || undefined,
+          postalCode: newProject.location.postalCode?.trim() || undefined,
+          country: newProject.location.country?.trim() || 'US'
+        };
+        console.log('[CreateProject] Using map center for project location:', locationPayload);
+      } else {
+        // Fallback to form location or geocode lookup
+        locationPayload = buildPlanLocationPayload();
 
-      if (locationPayload && (locationPayload.latitude === undefined || locationPayload.longitude === undefined)) {
-        const searchAddress = buildAddressString(newProject.location);
-        if (searchAddress) {
-          try {
-            const geocodeResult = await coverageMapService.geocodeAddress(searchAddress);
-            if (geocodeResult && typeof geocodeResult.latitude === 'number' && typeof geocodeResult.longitude === 'number') {
-              locationPayload = {
-                ...locationPayload,
-                latitude: geocodeResult.latitude,
-                longitude: geocodeResult.longitude
-              };
-              newProject.location.latitude = geocodeResult.latitude.toFixed(6);
-              newProject.location.longitude = geocodeResult.longitude.toFixed(6);
+        if (locationPayload && (locationPayload.latitude === undefined || locationPayload.longitude === undefined)) {
+          // Try to geocode if we have address components
+          const searchAddress = buildAddressString(newProject.location) || projectLocationLookup.trim();
+          if (searchAddress) {
+            try {
+              const geocodeResult = await coverageMapService.geocodeAddress(searchAddress);
+              if (geocodeResult && typeof geocodeResult.latitude === 'number' && typeof geocodeResult.longitude === 'number') {
+                locationPayload = {
+                  ...locationPayload,
+                  latitude: geocodeResult.latitude,
+                  longitude: geocodeResult.longitude
+                };
+                newProject.location.latitude = geocodeResult.latitude.toFixed(6);
+                newProject.location.longitude = geocodeResult.longitude.toFixed(6);
+              }
+            } catch (geocodeError) {
+              console.warn('Automatic geocode for project creation failed:', geocodeError);
             }
-          } catch (geocodeError) {
-            console.warn('Automatic geocode for project creation failed:', geocodeError);
           }
         }
       }
@@ -1632,101 +1702,64 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
             <div class="form-section">
               <h3>Project Location</h3>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="projectAddress1">Street Address *</label>
+              <p style="font-size: 0.9rem; color: #ccc; margin-bottom: 1rem;">
+                Enter coordinates (lat, lon), city, state, or zip code to center the map. 
+                Once you zoom the map to your desired location, the project will be created at the map center.
+              </p>
+              
+              <!-- Location Lookup Field -->
+              <div class="location-lookup-section" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                <label for="project-location-lookup" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                  <strong>📍 Location Lookup</strong>
+                  <span style="font-size: 0.85rem; font-weight: normal; color: #999; display: block; margin-top: 0.25rem;">
+                    Enter coordinates (lat, lon), city, state, or zip code
+                  </span>
+                </label>
+                <div style="display: flex; gap: 0.5rem;">
                   <input
-                    id="projectAddress1"
+                    id="project-location-lookup"
                     type="text"
-                    bind:value={newProject.location.addressLine1}
-                    placeholder="123 Main St"
-                    required
-                    disabled={isLoading}
+                    placeholder="e.g., 40.7128, -74.0060 or New York, NY or 10001"
+                    bind:value={projectLocationLookup}
+                    disabled={isLoading || isLookingUpProjectLocation}
+                    on:keydown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleProjectLocationLookup();
+                      }
+                    }}
+                    style="flex: 1; padding: 0.5rem; border: 1px solid #555; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff; font-size: 0.9rem;"
                   />
+                  <button
+                    type="button"
+                    on:click={handleProjectLocationLookup}
+                    disabled={!projectLocationLookup.trim() || isLoading || isLookingUpProjectLocation}
+                    style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap;"
+                  >
+                    {isLookingUpProjectLocation ? 'Looking up...' : 'Lookup & Center Map'}
+                  </button>
                 </div>
-                <div class="form-group">
-                  <label for="projectAddress2">Suite / Unit</label>
-                  <input
-                    id="projectAddress2"
-                    type="text"
-                    bind:value={newProject.location.addressLine2}
-                    placeholder="Suite 200"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="projectCity">City *</label>
-                  <input
-                    id="projectCity"
-                    type="text"
-                    bind:value={newProject.location.city}
-                    placeholder="City"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="projectState">State / Region *</label>
-                  <input
-                    id="projectState"
-                    type="text"
-                    bind:value={newProject.location.state}
-                    placeholder="State"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="projectPostalCode">Postal Code *</label>
-                  <input
-                    id="projectPostalCode"
-                    type="text"
-                    bind:value={newProject.location.postalCode}
-                    placeholder="ZIP / Postal Code"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="projectCountry">Country</label>
-                  <input
-                    id="projectCountry"
-                    type="text"
-                    bind:value={newProject.location.country}
-                    placeholder="Country"
-                    disabled={isLoading}
-                  />
-                </div>
+                {#if projectLocationLookupError}
+                  <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(255,0,0,0.2); color: #ff6b6b; border-radius: 4px; font-size: 0.85rem;">
+                    {projectLocationLookupError}
+                  </div>
+                {/if}
               </div>
-              <div class="coordinate-row">
-                <div class="form-group">
-                  <label for="projectLatitude">Latitude</label>
-                  <input
-                    id="projectLatitude"
-                    type="text"
-                    bind:value={newProject.location.latitude}
-                    placeholder="Auto populated after geocoding"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div class="form-group">
-                  <label for="projectLongitude">Longitude</label>
-                  <input
-                    id="projectLongitude"
-                    type="text"
-                    bind:value={newProject.location.longitude}
-                    placeholder="Auto populated after geocoding"
-                    disabled={isLoading}
-                  />
-                </div>
-                <button
-                  class="btn-secondary geocode-btn"
-                  type="button"
-                  on:click={geocodeNewProjectLocation}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Geocoding...' : 'Geocode Address'}
-                </button>
+              
+              <div style="padding: 1rem; background: rgba(0,123,255,0.1); border-radius: 6px; border: 1px solid rgba(0,123,255,0.3);">
+                <strong style="color: #4dabf7;">💡 Tip:</strong>
+                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #ccc;">
+                  After using the lookup, zoom and pan the map to your desired project location. 
+                  The project will be created at the current map center when you click "Create Project".
+                </p>
+                {#if latestMapExtent?.center}
+                  <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <strong style="color: #4dabf7;">Current Map Center:</strong>
+                    <span style="color: #ccc; font-family: monospace; margin-left: 0.5rem;">
+                      {latestMapExtent.center.lat.toFixed(6)}, {latestMapExtent.center.lon.toFixed(6)}
+                    </span>
+                  </div>
+                {/if}
               </div>
             </div>
 
@@ -1750,7 +1783,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         
         <div class="modal-footer">
           <button class="btn-secondary" on:click={closeCreateProjectModal} disabled={isLoading}>Cancel</button>
-          <button class="btn-primary" on:click={createProject} disabled={!newProject.name.trim() || isLoading}>
+          <button class="btn-primary" on:click={createProject} disabled={isLoading}>
             {isLoading ? 'Creating...' : 'Create Project'}
           </button>
         </div>
