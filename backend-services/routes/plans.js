@@ -1739,16 +1739,25 @@ router.post('/:id/marketing/discover', async (req, res) => {
     details: {}
   });
   
-  // Clean up progress after 5 minutes
-  setTimeout(() => {
+  // Clean up progress after 5 minutes (safety net)
+  const timeoutCleanup = setTimeout(() => {
     progressStore.delete(requestId);
+    console.log('[MarketingDiscovery] Timeout cleanup for progress entry:', requestId);
   }, 5 * 60 * 1000);
+  
+  // Handle client abort
+  req.on('close', () => {
+    clearTimeout(timeoutCleanup);
+    progressStore.delete(requestId);
+    console.log('[MarketingDiscovery] Client disconnected, cleaned up progress entry:', requestId);
+  });
   
   console.log('[MarketingDiscovery] Request received', { 
     requestId,
     planId: req.params.id, 
     tenantId: req.tenantId,
-    boundingBox: req.body.boundingBox 
+    boundingBox: req.body.boundingBox,
+    progressStoreSize: progressStore.size
   });
   
   // Removed timeout temporarily - will add progress feedback instead
@@ -1760,6 +1769,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
 
     if (!plan) {
+      clearTimeout(timeoutCleanup);
+      progressStore.delete(requestId);
       return res.status(404).json({ error: 'Plan not found' });
     }
 
@@ -2280,29 +2291,57 @@ router.post('/:id/marketing/discover', async (req, res) => {
         },
         requestId // Include requestId in response
       });
+      
+      // Clean up progress entry after successful response (but keep for 30 seconds for progress polling)
+      clearTimeout(timeoutCleanup);
+      setTimeout(() => {
+        progressStore.delete(requestId);
+        console.log('[MarketingDiscovery] Cleaned up progress entry:', requestId, 'Store size:', progressStore.size);
+      }, 30000); // Keep for 30 seconds after completion for progress polling
     } else {
       console.warn('[MarketingDiscovery] Response already sent, skipping duplicate response');
+      // Still clean up even if response was already sent
+      clearTimeout(timeoutCleanup);
+      setTimeout(() => {
+        progressStore.delete(requestId);
+        console.log('[MarketingDiscovery] Cleaned up progress entry (response already sent):', requestId);
+      }, 30000);
     }
   } catch (error) {
     const requestDuration = Date.now() - requestStartTime;
-    updateProgress('Request failed', 0, { error: error.message });
+    
+    // Only update progress if we haven't already sent a response
+    if (!res.headersSent) {
+      try {
+        updateProgress('Request failed', 0, { error: error.message });
+      } catch (updateError) {
+        console.error('[MarketingDiscovery] Failed to update progress on error:', updateError);
+      }
+    }
     
     // Mark progress as failed
-    progressStore.set(requestId, {
-      ...progressStore.get(requestId),
-      progress: 0,
-      step: 'Failed',
-      completed: true,
-      failed: true,
-      error: error.message,
-      completedAt: new Date().toISOString()
-    });
+    try {
+      progressStore.set(requestId, {
+        ...progressStore.get(requestId),
+        progress: 0,
+        step: 'Failed',
+        completed: true,
+        failed: true,
+        error: error.message,
+        errorType: error.constructor.name,
+        completedAt: new Date().toISOString()
+      });
+    } catch (storeError) {
+      console.error('[MarketingDiscovery] Failed to update progress store on error:', storeError);
+    }
     
-    console.error('[MarketingDiscovery] Error discovering marketing addresses:', error);
-    console.error('[MarketingDiscovery] Error stack:', error.stack);
-    console.error('[MarketingDiscovery] Request failed after', { 
+    console.error('[MarketingDiscovery] Error discovering marketing addresses:', {
       requestId,
-      duration: `${requestDuration}ms` 
+      error: error.message,
+      errorType: error.constructor.name,
+      stack: error.stack,
+      duration: `${requestDuration}ms`,
+      progressStoreSize: progressStore.size
     });
     
     if (!res.headersSent) {
@@ -2312,8 +2351,21 @@ router.post('/:id/marketing/discover', async (req, res) => {
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
         requestId
       });
+      
+      // Clean up progress entry after error response
+      clearTimeout(timeoutCleanup);
+      setTimeout(() => {
+        progressStore.delete(requestId);
+        console.log('[MarketingDiscovery] Cleaned up failed progress entry:', requestId, 'Store size:', progressStore.size, 'Error:', error.message);
+      }, 30000); // Keep for 30 seconds for debugging
     } else {
       console.warn('[MarketingDiscovery] Response already sent, skipping error response');
+      // Still clean up even if response was already sent
+      clearTimeout(timeoutCleanup);
+      setTimeout(() => {
+        progressStore.delete(requestId);
+        console.log('[MarketingDiscovery] Cleaned up failed progress entry (response already sent):', requestId);
+      }, 30000);
     }
   }
 });
