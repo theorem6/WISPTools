@@ -2233,6 +2233,28 @@ router.post('/:id/marketing/discover', async (req, res) => {
         });
         updateProgress('ArcGIS places completed', progressOffset + progressPerAlgorithm);
 
+        let produced = 0;
+        let geocoded = 0;
+
+        if (Array.isArray(arcgisPlacesResult.addresses)) {
+          for (const address of arcgisPlacesResult.addresses) {
+            produced += 1;
+            if (address.addressLine1) {
+              geocoded += 1;
+            }
+            addAddressToCombined(address, 'arcgis_places');
+          }
+        }
+
+        recordAlgorithmStats('arcgis_places', produced, geocoded, arcgisPlacesResult.error);
+      } catch (err) {
+        updateProgress('ArcGIS places failed', progressOffset + progressPerAlgorithm, { error: err.message });
+        console.error('[MarketingDiscovery] ArcGIS Places Discovery failed:', err);
+        recordAlgorithmStats('arcgis_places', 0, 0, err.message || 'Unknown error');
+      }
+      progressOffset += progressPerAlgorithm;
+    }
+
     // Don't filter existing addresses - only new addresses were already filtered in addAddressToCombined
     // This allows re-discover to merge addresses from multiple areas scanned
     // New addresses are already checked against bounding box at line 1840 in addAddressToCombined
