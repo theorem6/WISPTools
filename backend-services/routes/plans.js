@@ -1845,48 +1845,59 @@ router.post('/:id/marketing/discover', async (req, res) => {
   let timeoutCleanup = null;
   
   try {
+    console.log('[MarketingDiscovery] Request received', {
+      requestId,
+      planId: req.params?.id,
+      tenantId: req.tenantId,
+      hasBoundingBox: !!req.body?.boundingBox,
+      timestamp: new Date().toISOString()
+    });
+    
     // Validate request parameters
     if (!req.params?.id) {
+      console.error('[MarketingDiscovery] Missing plan ID');
       return res.status(400).json({ error: 'Plan ID is required' });
     }
     
     if (!req.tenantId) {
+      console.error('[MarketingDiscovery] Missing tenant ID');
       return res.status(400).json({ error: 'Tenant ID is required' });
     }
     
     // Initialize progress
-    progressStore.set(requestId, {
+    try {
+      progressStore.set(requestId, {
+        requestId,
+        planId: req.params.id,
+        progress: 0,
+        step: 'Initializing',
+        startedAt: new Date().toISOString(),
+        details: {}
+      });
+      
+      // Clean up progress after 5 minutes (safety net)
+      timeoutCleanup = setTimeout(() => {
+        progressStore.delete(requestId);
+        console.log('[MarketingDiscovery] Timeout cleanup for progress entry:', requestId);
+      }, 5 * 60 * 1000);
+      
+      // Handle client abort
+      req.on('close', () => {
+        if (timeoutCleanup) clearTimeout(timeoutCleanup);
+        progressStore.delete(requestId);
+        console.log('[MarketingDiscovery] Client disconnected, cleaned up progress entry:', requestId);
+      });
+    } catch (progressError) {
+      console.error('[MarketingDiscovery] Error initializing progress:', progressError);
+      // Continue anyway - progress is optional
+    }
+  
+    console.log('[MarketingDiscovery] Fetching plan from database...', {
       requestId,
       planId: req.params.id,
-      progress: 0,
-      step: 'Initializing',
-      startedAt: new Date().toISOString(),
-      details: {}
+      tenantId: req.tenantId
     });
     
-    // Clean up progress after 5 minutes (safety net)
-    timeoutCleanup = setTimeout(() => {
-      progressStore.delete(requestId);
-      console.log('[MarketingDiscovery] Timeout cleanup for progress entry:', requestId);
-    }, 5 * 60 * 1000);
-    
-    // Handle client abort
-    req.on('close', () => {
-      if (timeoutCleanup) clearTimeout(timeoutCleanup);
-      progressStore.delete(requestId);
-      console.log('[MarketingDiscovery] Client disconnected, cleaned up progress entry:', requestId);
-    });
-    
-    console.log('[MarketingDiscovery] Request received', { 
-      requestId,
-      planId: req.params.id, 
-      tenantId: req.tenantId,
-      boundingBox: req.body?.boundingBox,
-      progressStoreSize: progressStore.size
-    });
-    
-    // Removed timeout temporarily - will add progress feedback instead
-  
     const plan = await PlanProject.findOne({
       _id: req.params.id,
       tenantId: req.tenantId
@@ -1898,11 +1909,20 @@ router.post('/:id/marketing/discover', async (req, res) => {
       return res.status(404).json({ error: 'Plan not found' });
     }
 
+    console.log('[MarketingDiscovery] Parsing bounding box...', {
+      requestId,
+      rawBoundingBox: req.body?.boundingBox
+    });
+    
     const boundingBox = parseBoundingBox(req.body?.boundingBox);
-    if (!boundingBox) {
-      console.error('[MarketingDiscovery] Invalid bounding box received:', req.body?.boundingBox);
+    if (!boundingBox || !isValidBoundingBox(boundingBox)) {
+      console.error('[MarketingDiscovery] Invalid bounding box received:', req.body?.boundingBox, 'Parsed:', boundingBox);
       if (timeoutCleanup) clearTimeout(timeoutCleanup);
-      progressStore.delete(requestId);
+      try {
+        progressStore.delete(requestId);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
       return res.status(400).json({
         error: 'Invalid bounding box',
         message: 'Provide boundingBox with numeric west, south, east, north values'
