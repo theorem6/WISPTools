@@ -662,14 +662,15 @@ let results: PlanMarketingAddress[] = [];
         }
       };
       
+      // Reset loading state FIRST - before any async operations
+      // This ensures buttons are re-enabled immediately after discovery completes
+      isLoading = false;
+      
       // Dispatch update event so parent can sync to map
       dispatch('updated', plan);
       
-      // Reset loading state - this was missing and caused buttons to stay disabled
-      isLoading = false;
-      
       // Also fetch the updated plan from backend to ensure consistency
-      // But do it in the background without blocking
+      // But do it in the background without blocking (and don't set isLoading = true)
       try {
         const refreshed = await planService.getPlan(plan.id);
         if (refreshed) {
@@ -681,6 +682,7 @@ let results: PlanMarketingAddress[] = [];
       } catch (refreshErr) {
         console.warn('[PlanMarketingModal] Background plan refresh failed (non-critical):', refreshErr);
         // Don't fail the whole operation if refresh fails - the local update is enough
+        // isLoading is already false, so buttons stay enabled
       }
     } catch (err: any) {
       console.error('[PlanMarketingModal] Marketing discovery failed:', err);

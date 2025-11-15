@@ -578,13 +578,9 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
   
   console.log(`[MarketingDiscovery] Extracting building candidates from ${elements.length} elements (source: ${sourceLabel})`);
 
-  // Sort elements to prioritize ways (which have centroids) over nodes (which are just points)
-  const sortedElements = [...elements].sort((a, b) => {
-    // Ways with centroids come first (these are building polygons with calculated centroids)
-    if (a.type === 'way' && a.center && b.type !== 'way') return -1;
-    if (b.type === 'way' && b.center && a.type !== 'way') return 1;
-    return 0;
-  });
+  // Don't sort by size - include all buildings equally (ways and nodes)
+  // This ensures small buildings aren't filtered out
+  const sortedElements = [...elements]; // Keep original order - no size-based filtering
 
   let extracted = 0;
   let skipped = 0;
