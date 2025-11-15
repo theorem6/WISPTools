@@ -49,11 +49,86 @@ const httpClient = axios.create({
 const apiCache = new Map();
 
 /**
- * Get state name from coordinates (approximate)
+ * Get county and state from coordinates using reverse geocoding
+ * Uses ArcGIS reverse geocoding to get accurate county/state information
+ */
+async function getCountyStateFromCoordinates(lat, lon) {
+  try {
+    const appConfig = require('../config/app');
+    const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
+    const ARCGIS_REVERSE_GEOCODE_URL = appConfig?.externalServices?.arcgis?.reverseGeocodeUrl || 
+      'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode';
+    
+    if (ARC_GIS_API_KEY) {
+      // Use ArcGIS reverse geocoding with API key for better accuracy
+      const params = {
+        f: 'json',
+        location: `${lon},${lat}`,
+        outFields: 'Subregion,Region,State,CountryCode',
+        maxLocations: '1',
+        token: ARC_GIS_API_KEY
+      };
+      
+      const response = await httpClient.get(ARCGIS_REVERSE_GEOCODE_URL, {
+        params,
+        timeout: 8000
+      });
+      
+      const data = response.data;
+      if (data && data.address) {
+        const address = data.address;
+        const county = address.Subregion || null; // County name
+        const state = address.Region || address.State || null; // State name or abbreviation
+        const stateAbbr = address.Region || null; // State abbreviation (2-letter)
+        
+        return {
+          county: county ? county.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') : null,
+          state: state ? state.toLowerCase().replace(/\s+/g, '_') : null,
+          stateAbbr: stateAbbr ? stateAbbr.toLowerCase() : null
+        };
+      }
+    } else {
+      // Fallback: Use Nominatim (free, but slower and less accurate)
+      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+      const response = await httpClient.get(nominatimUrl, {
+        headers: {
+          'User-Agent': 'LTE-PCI-Mapper/1.0 (admin@wisptools.io)',
+          'Accept': 'application/json'
+        },
+        timeout: 5000
+      });
+      
+      const data = response.data;
+      if (data && data.address) {
+        const address = data.address;
+        const county = address.county || address.state_district || null;
+        const state = address.state || null;
+        
+        return {
+          county: county ? county.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') : null,
+          state: state ? state.toLowerCase().replace(/\s+/g, '_') : null,
+          stateAbbr: STATE_ABBREVIATIONS[state?.toLowerCase()] || null
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('[MicrosoftFootprints] Reverse geocoding failed, using fallback:', error.message);
+  }
+  
+  // Fallback: Approximate state from coordinates (simplified ranges)
+  const state = getStateFromCoordinates(lat, lon);
+  return {
+    county: null,
+    state: state,
+    stateAbbr: state ? STATE_ABBREVIATIONS[state] : null
+  };
+}
+
+/**
+ * Get state name from coordinates (approximate fallback)
  */
 function getStateFromCoordinates(lat, lon) {
-  // This is a simplified approach - in production you'd use a proper reverse geocoding service
-  // For now, we'll try to determine state from lat/lon ranges
+  // This is a simplified approach - used as fallback when reverse geocoding fails
   // US approximate bounds: lat: 24.5-49.4, lon: -125.0 to -66.9
   
   // Major state bounds (simplified)
@@ -68,7 +143,7 @@ function getStateFromCoordinates(lat, lon) {
   // Default to Ohio for testing (user's area appears to be around 41.24, -82.61)
   if (lat >= 38.0 && lat <= 42.0 && lon >= -84.0 && lon <= -80.0) return 'ohio';
   
-  return null; // Unknown - would need proper reverse geocoding
+  return null; // Unknown
 }
 
 /**
@@ -143,44 +218,91 @@ function filterFeaturesByBoundingBox(features, bbox) {
 
 /**
  * Fetch Microsoft Building Footprints from GitHub for a specific state/county
+ * Tries county-level file first (much smaller), falls back to state-level file
  */
 async function fetchFromGitHub(stateName, countyName = null) {
-  try {
-    const stateAbbr = STATE_ABBREVIATIONS[stateName.toLowerCase()] || stateName.toLowerCase();
-    const cacheKey = `github_${stateAbbr}_${countyName || 'all'}`;
+  const stateAbbr = STATE_ABBREVIATIONS[stateName?.toLowerCase()] || stateName?.toLowerCase();
+  
+  if (!stateAbbr) {
+    console.warn('[MicrosoftFootprints] Invalid state name:', stateName);
+    return null;
+  }
+  
+  // Try county-level file first (much smaller and faster to download)
+  if (countyName) {
+    const countyCacheKey = `github_${stateAbbr}_${countyName}`;
     
     // Check in-memory cache
-    if (apiCache.has(cacheKey)) {
-      const cached = apiCache.get(cacheKey);
+    if (apiCache.has(countyCacheKey)) {
+      const cached = apiCache.get(countyCacheKey);
       if (Date.now() - cached.timestamp < 300000) { // 5 minute in-memory cache
+        console.log(`[MicrosoftFootprints] Using cached county file: ${stateAbbr}/${countyName}`);
         return cached.data;
       }
     }
     
-    // Try to get the latest release or main branch
-    const url = countyName 
-      ? `${GITHUB_RAW_BASE}/${MICROSOFT_FOOTPRINTS_GITHUB_REPO}/main/${stateAbbr}/${countyName}.geojson`
-      : `${GITHUB_RAW_BASE}/${MICROSOFT_FOOTPRINTS_GITHUB_REPO}/main/${stateAbbr}.geojson`;
+    try {
+      // Try county-level file first (typically 1-10 MB vs 100+ MB for state files)
+      const countyUrl = `${GITHUB_RAW_BASE}/${MICROSOFT_FOOTPRINTS_GITHUB_REPO}/main/${stateAbbr}/${countyName}.geojson`;
+      console.log(`[MicrosoftFootprints] Fetching county-level file from GitHub: ${stateAbbr}/${countyName}`);
+      
+      const response = await httpClient.get(countyUrl, {
+        responseType: 'json',
+        timeout: 60000 // 1 minute for county files (usually small)
+      });
+      
+      const data = response.data;
+      
+      // Cache result
+      apiCache.set(countyCacheKey, { data, timestamp: Date.now() });
+      
+      console.log(`[MicrosoftFootprints] Successfully fetched county file: ${stateAbbr}/${countyName} (${data?.features?.length || 0} features)`);
+      return data;
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        console.log(`[MicrosoftFootprints] County file not found: ${stateAbbr}/${countyName}, trying state-level file`);
+        // Fall through to state-level file
+      } else {
+        console.error(`[MicrosoftFootprints] GitHub county fetch error:`, error.message);
+        // Try state-level file as fallback
+      }
+    }
+  }
+  
+  // Fallback: Try state-level file (larger but covers entire state)
+  const stateCacheKey = `github_${stateAbbr}_all`;
+  
+  // Check in-memory cache
+  if (apiCache.has(stateCacheKey)) {
+    const cached = apiCache.get(stateCacheKey);
+    if (Date.now() - cached.timestamp < 300000) { // 5 minute in-memory cache
+      console.log(`[MicrosoftFootprints] Using cached state file: ${stateAbbr}`);
+      return cached.data;
+    }
+  }
+  
+  try {
+    const stateUrl = `${GITHUB_RAW_BASE}/${MICROSOFT_FOOTPRINTS_GITHUB_REPO}/main/${stateAbbr}.geojson`;
+    console.log(`[MicrosoftFootprints] Fetching state-level file from GitHub: ${stateAbbr}`);
     
-    console.log(`[MicrosoftFootprints] Fetching from GitHub: ${url}`);
-    
-    const response = await httpClient.get(url, {
+    const response = await httpClient.get(stateUrl, {
       responseType: 'json',
-      timeout: 120000 // 2 minutes for large files
+      timeout: 120000 // 2 minutes for state files (can be large)
     });
     
     const data = response.data;
     
     // Cache result
-    apiCache.set(cacheKey, { data, timestamp: Date.now() });
+    apiCache.set(stateCacheKey, { data, timestamp: Date.now() });
     
+    console.log(`[MicrosoftFootprints] Successfully fetched state file: ${stateAbbr} (${data?.features?.length || 0} features)`);
     return data;
   } catch (error) {
     if (error.response && error.response.status === 404) {
-      console.warn(`[MicrosoftFootprints] GitHub file not found: ${stateName}${countyName ? '/' + countyName : ''}`);
+      console.warn(`[MicrosoftFootprints] GitHub file not found: ${stateAbbr}`);
       return null;
     }
-    console.error(`[MicrosoftFootprints] GitHub fetch error:`, error.message);
+    console.error(`[MicrosoftFootprints] GitHub state fetch error:`, error.message);
     throw error;
   }
 }
@@ -222,18 +344,26 @@ async function queryByBoundingBox(bbox) {
       }
     }
     
-    // Method 2: Try GitHub (determine state from bbox center)
+    // Method 2: Try GitHub (determine county/state from bbox center using reverse geocoding)
     const centerLat = (bbox.north + bbox.south) / 2;
     const centerLon = (bbox.east + bbox.west) / 2;
-    const stateName = getStateFromCoordinates(centerLat, centerLon);
+    
+    // Get county and state from coordinates using reverse geocoding
+    const locationInfo = await getCountyStateFromCoordinates(centerLat, centerLon);
+    const stateName = locationInfo?.state;
+    const countyName = locationInfo?.county;
     
     if (stateName) {
       try {
-        // Try state-level file first (smaller, faster)
-        const stateData = await fetchFromGitHub(stateName);
-        if (stateData && stateData.features) {
-          // Filter features by bounding box
-          const filteredFeatures = filterFeaturesByBoundingBox(stateData.features, bbox);
+        // Try county-level file first (much smaller, typically 1-10 MB vs 100+ MB for state)
+        // Falls back to state-level file if county file not found
+        const geojsonData = await fetchFromGitHub(stateName, countyName);
+        if (geojsonData && geojsonData.features) {
+          // Filter features by bounding box (still needed since county files may cover areas beyond bbox)
+          const filteredFeatures = filterFeaturesByBoundingBox(geojsonData.features, bbox);
+          
+          console.log(`[MicrosoftFootprints] Filtered ${filteredFeatures.length} features from ${geojsonData.features.length} total for bbox`);
+          
           return {
             type: 'FeatureCollection',
             features: filteredFeatures
