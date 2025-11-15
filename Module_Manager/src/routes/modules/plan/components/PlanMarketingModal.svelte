@@ -518,6 +518,9 @@ let results: PlanMarketingAddress[] = [];
 
     isLoading = true;
     info = 'Discovering addresses from map view...';
+    error = null;
+    // Clear previous summary to prevent stale data from showing
+    summary = null;
 
     const previousSavedCount =
       plan.marketing?.totalUniqueAddresses ?? plan.marketing?.addresses?.length ?? 0;
@@ -575,11 +578,43 @@ let results: PlanMarketingAddress[] = [];
       }
 
       results = response.addresses;
-      summary = response.summary;
+      
+      // Map backend response fields to frontend summary structure
+      // Backend returns: { total, geocoded, new, prev, runs, truncated, shown }
+      // Frontend expects: { totalCandidates, geocodedCount, newlyAdded, totalRuns, totalUniqueAddresses, ... }
+      const backendSummary = response.summary || {};
+      const backendStats = response.stats || {};
+      
+      // Calculate total candidates from algorithm stats (sum of all produced)
+      let totalCandidatesFromStats = 0;
+      if (backendStats && typeof backendStats === 'object') {
+        for (const [algId, stats] of Object.entries(backendStats)) {
+          if (stats && typeof stats === 'object' && 'produced' in stats) {
+            totalCandidatesFromStats += Number(stats.produced) || 0;
+          }
+        }
+      }
+      
+      summary = {
+        totalCandidates: totalCandidatesFromStats || backendSummary.total ?? results.length,
+        geocodedCount: backendSummary.geocoded ?? 0,
+        newlyAdded: backendSummary.new ?? 0,
+        totalUniqueAddresses: backendSummary.total ?? results.length, // Total unique addresses saved
+        totalRuns: backendSummary.runs ?? previousTotalRuns + 1,
+        previousCount: backendSummary.prev ?? previousSavedCount,
+        truncated: backendSummary.truncated ?? false,
+        shown: backendSummary.shown ?? results.length,
+        radiusMiles: radiusMiles,
+        boundingBox: boundingBox,
+        center: center,
+        algorithmsUsed: selectedAlgorithms,
+        algorithmStats: backendStats
+      };
+      
       const runtimeSpan = computeSpanMiles({ center, boundingBox });
-      const totalSaved = summary?.totalUniqueAddresses ?? results.length;
-      const newlyAdded = summary?.newlyAdded ?? Math.max(totalSaved - previousSavedCount, 0);
-      const totalRuns = summary?.totalRuns ?? previousTotalRuns + 1;
+      const totalSaved = summary.totalUniqueAddresses ?? results.length;
+      const newlyAdded = summary.newlyAdded ?? Math.max(totalSaved - previousSavedCount, 0);
+      const totalRuns = summary.totalRuns ?? previousTotalRuns + 1;
 
       // Update lastRunExtentKey - but don't set it directly, let the reactive statement handle it
       // This ensures it stays in sync with the plan's marketing data
