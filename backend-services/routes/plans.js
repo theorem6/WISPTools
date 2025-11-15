@@ -2386,32 +2386,52 @@ router.post('/:id/marketing/discover', async (req, res) => {
     // Step 4: Batch reverse geocode all coordinates
     console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
       totalCoordinates: allCoordinates.length,
-      coordinateSources: allCoordinates.reduce((acc, coord) => {
+      algorithms: algorithms,
+      coordinateSources: allCoordinates.length > 0 ? allCoordinates.reduce((acc, coord) => {
         if (coord && coord.source) {
           acc[coord.source] = (acc[coord.source] || 0) + 1;
         }
         return acc;
-      }, {})
+      }, {}) : {}
     });
 
-    updateProgress('Reverse geocoding all coordinates', 60);
-    
     let reverseGeocodeResult = { addresses: [], geocoded: 0, failed: 0 };
-    try {
-      reverseGeocodeResult = await batchReverseGeocodeCoordinates(allCoordinates, (step, progress, details) => {
-        if (typeof progress === 'number' && !isNaN(progress)) {
-          updateProgress(`Reverse geocoding: ${step}`, 60 + (progress * 30 * 0.01), details);
-        } else {
-          updateProgress(`Reverse geocoding: ${step}`, 60, details);
-        }
+    
+    if (allCoordinates.length === 0) {
+      console.warn('[MarketingDiscovery] No coordinates collected from any algorithm. Algorithms selected:', algorithms);
+      updateProgress('No coordinates found to reverse geocode', 60, { 
+        algorithms: algorithms,
+        warning: 'No coordinates were collected from the selected algorithms'
       });
-    } catch (error) {
-      console.error('[MarketingDiscovery] Batch reverse geocoding failed:', {
-        error: error?.message || error,
-        stack: error?.stack,
+      // Continue to save results (empty set)
+    } else {
+      updateProgress('Reverse geocoding all coordinates', 60, {
         totalCoordinates: allCoordinates.length
       });
-      updateProgress('Reverse geocoding failed', 75, { error: error?.message || 'Unknown error' });
+      
+      try {
+        reverseGeocodeResult = await batchReverseGeocodeCoordinates(allCoordinates, (step, progress, details) => {
+          if (typeof progress === 'number' && !isNaN(progress)) {
+            updateProgress(`Reverse geocoding: ${step}`, 60 + (progress * 30 * 0.01), details);
+          } else {
+            updateProgress(`Reverse geocoding: ${step}`, 60, details);
+          }
+        });
+      } catch (error) {
+        console.error('[MarketingDiscovery] Batch reverse geocoding failed:', {
+          error: error?.message || error,
+          stack: error?.stack,
+          totalCoordinates: allCoordinates.length
+        });
+        updateProgress('Reverse geocoding failed', 75, { error: error?.message || 'Unknown error' });
+        // Set error but continue - return empty addresses
+        reverseGeocodeResult = { 
+          addresses: [], 
+          geocoded: 0, 
+          failed: allCoordinates.length,
+          error: error?.message || 'Unknown error during reverse geocoding'
+        };
+      }
     }
 
     // Add all reverse geocoded addresses to combined addresses
@@ -2431,10 +2451,10 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
 
     // Update algorithm stats with geocoding results - count geocoded per source
-    if (Array.isArray(reverseGeocodeResult.addresses)) {
+    if (reverseGeocodeResult && Array.isArray(reverseGeocodeResult.addresses)) {
       const geocodedBySource = {};
       for (const address of reverseGeocodeResult.addresses) {
-        if (address.addressLine1 && !address.addressLine1.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/)) {
+        if (address && address.addressLine1 && !address.addressLine1.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/)) {
           // Only count as geocoded if it's not just coordinates
           const source = address.source || 'unknown';
           geocodedBySource[source] = (geocodedBySource[source] || 0) + 1;
