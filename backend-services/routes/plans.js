@@ -593,12 +593,15 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
     // Always prefer way centroids (building polygon centers) over node coordinates (point locations)
     if (element.type === 'way' && element.center) {
       // Use the calculated centroid for building polygons - this is the actual building center
+      // Overpass API's `out center;` returns the bounding box center for ways, which is a good approximation
       latitude = toNumber(element.center.lat);
       longitude = toNumber(element.center.lon);
     } else if (element.type === 'way' && !element.center && Array.isArray(element.geometry) && element.geometry.length > 0) {
-      // Fallback: Calculate centroid from geometry if center is missing
-      const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined);
+      // Fallback: Calculate proper centroid from geometry if center is missing
+      // Average all vertices to get the true geometric centroid (better than first point)
+      const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
       if (coords.length > 0) {
+        // Calculate geometric centroid (average of all vertices)
         const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
         const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
         latitude = sumLat / coords.length;
@@ -610,8 +613,18 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
       latitude = toNumber(element.lat);
       longitude = toNumber(element.lon);
     } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
-      latitude = toNumber(element.geometry[0]?.lat);
-      longitude = toNumber(element.geometry[0]?.lon);
+      // For other element types with geometry, calculate centroid from all points
+      const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
+      if (coords.length > 0) {
+        const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
+        const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
+        latitude = sumLat / coords.length;
+        longitude = sumLon / coords.length;
+      } else {
+        // Last resort: use first point if available
+        latitude = toNumber(element.geometry[0]?.lat);
+        longitude = toNumber(element.geometry[0]?.lon);
+      }
     }
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
@@ -929,9 +942,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     // Configuration for batch processing
     // Limit to 45 seconds to respond before proxy/nginx timeout (usually 60 seconds)
     const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
-    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS can handle more parallel requests
-    const MAX_REVERSE_GEOCODE_TIME = 45 * 1000; // 45 seconds - must finish before proxy timeout
-    const MAX_COORDINATES_TO_GEOCODE = 1000; // Increased limit - axios retry improves reliability
+    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 30 : 5; // ArcGIS can handle more parallel requests
+    const MAX_REVERSE_GEOCODE_TIME = 50 * 1000; // 50 seconds - increased timeout slightly
+    const MAX_COORDINATES_TO_GEOCODE = 5000; // Significantly increased - process all found coordinates
     const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
     
     // Limit coordinates if too many to prevent timeout
