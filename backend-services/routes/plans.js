@@ -1404,8 +1404,12 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       return result; // Return early with error
     }
 
+    // Use higher precision to avoid deduplicating nearby small buildings
+    // Lower precision values = more aggressive deduplication (may remove houses close together)
+    // Higher precision values = less aggressive deduplication (preserves more buildings)
+    // For houses, use precision of 50000 (preserves buildings ~2 meters apart) instead of 10000/20000
     let candidates = extractBuildingCandidates(primaryElements, {
-      precision: isRuralArea ? 10000 : 20000,
+      precision: 50000, // Higher precision to preserve small buildings
       sourceLabel: 'osm_primary'
     });
 
@@ -1451,7 +1455,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       }
 
       const fallbackCandidates = extractBuildingCandidates(fallbackElements, {
-        precision: 10000,
+        precision: 50000, // Higher precision to preserve small buildings
         sourceLabel: 'osm_fallback'
       }).slice(0, RURAL_FALLBACK_MAX_RESULTS);
 
@@ -1460,7 +1464,7 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         fallbackCandidates: fallbackCandidates.length
       });
 
-      candidates = mergeCandidateSets(candidates, fallbackCandidates, 10000);
+      candidates = mergeCandidateSets(candidates, fallbackCandidates, 50000); // Higher precision
       console.log('[MarketingDiscovery] Candidate count after fallback merge', {
         mergedCandidates: candidates.length
       });
@@ -1492,34 +1496,31 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
           interpolated: interpolated.length
         });
 
-        candidates = mergeCandidateSets(candidates, interpolated, 10000);
+        candidates = mergeCandidateSets(candidates, interpolated, 50000); // Higher precision
       }
     }
 
-    candidates = candidates.slice(0, MAX_BUILDING_RESULTS);
-
+    // Don't filter by residential signal - include ALL buildings
+    // The residential filter was too aggressive and excluded many houses
+    // Just filter out obvious non-buildings (roads, railways, etc.)
     const beforeFilterCount = candidates.length;
     const filteredCandidates = candidates.filter((candidate) => {
       if (!candidate || !candidate.tags) return false;
+      // Only filter out obvious non-buildings (roads, railways, waterways)
+      // Keep ALL buildings, even if not explicitly tagged as residential
       if (candidateLooksLikeRoad(candidate.tags)) return false;
-      return candidateHasResidentialSignal(candidate.tags);
+      // Keep everything else - reverse geocoding will determine if it's a valid address
+      return true;
     });
 
-    if (filteredCandidates.length === 0 && beforeFilterCount > 0) {
-      console.log('[MarketingDiscovery] Residential filter removed all candidates, falling back to original set', {
-        beforeFilterCount
-      });
-      candidates = candidates.slice(0, Math.min(beforeFilterCount, RURAL_FALLBACK_MAX_RESULTS));
-    } else {
-      console.log('[MarketingDiscovery] Residential filter applied', {
-        beforeFilterCount,
-        afterFilterCount: filteredCandidates.length,
-        removed: beforeFilterCount - filteredCandidates.length
-      });
-      if (filteredCandidates.length > 0) {
-        candidates = filteredCandidates;
-      }
-    }
+    console.log('[MarketingDiscovery] Building filter applied (only removing roads/non-buildings)', {
+      beforeFilterCount,
+      afterFilterCount: filteredCandidates.length,
+      removed: beforeFilterCount - filteredCandidates.length
+    });
+    
+    // Use filtered candidates, but don't limit - keep ALL buildings
+    candidates = filteredCandidates.slice(0, MAX_BUILDING_RESULTS);
 
     console.log('[MarketingDiscovery] Final OSM candidate summary', {
       totalCandidates: candidates.length,
