@@ -55,6 +55,15 @@ module.exports = {
       apiKey: process.env.ARCGIS_API_KEY || ''
     },
     
+    // Microsoft Building Footprints
+    // Microsoft provides building footprints as GeoJSON files organized by state/county
+    // For live access, configure a tile service or API endpoint that provides access to the data
+    // Options: 1) Tile service URL 2) Pre-indexed data service 3) Third-party API
+    microsoftFootprints: {
+      url: process.env.MICROSOFT_FOOTPRINTS_URL || '',
+      enabled: process.env.MICROSOFT_FOOTPRINTS_ENABLED === 'true'
+    },
+    
     // HSS Management (GCE VM)
     hss: {
       baseUrl: process.env.HSS_API_URL || 'https://136.112.111.167:3001',
