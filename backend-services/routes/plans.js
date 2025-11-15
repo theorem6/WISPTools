@@ -1385,6 +1385,9 @@ async function runArcgisGridSampler({ boundingBox, spacingMeters = 40 }) {
   return { addresses, geocoded, failed };
 }
 
+// Microsoft Building Footprints service
+const microsoftFootprintsService = require('../services/microsoftFootprints');
+
 // Microsoft Building Footprints discovery - returns coordinates only
 // Microsoft provides building footprints via their GitHub releases or tile services
 // For now, we'll use a tile-based approach if available, or skip if not configured
@@ -1421,47 +1424,20 @@ async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCa
     // This could be enhanced with a tile service or pre-processed data
     // Microsoft's data is organized by state/county, so we'd need to identify which files to load
     
-    // Check if we have access to Microsoft Building Footprints service
-    // Microsoft provides data as GeoJSON files organized by state/county
-    // For live access, you'd need a tile service or pre-indexed data service
-    // This could be configured via environment variable or app config
-    const MICROSOFT_FOOTPRINTS_URL = 
-      appConfig?.externalServices?.microsoftFootprints?.url ||
-      process.env.MICROSOFT_FOOTPRINTS_URL || 
-      '';
-    
-    if (!MICROSOFT_FOOTPRINTS_URL) {
-      // No Microsoft Footprints service configured - skip gracefully
-      // Note: To enable this, you'd need to set up a service that provides access to Microsoft's building footprints
-      // Options: 1) Use a tile service 2) Download and index the GeoJSON files 3) Use a third-party service
-      console.log('[MarketingDiscovery] Microsoft Building Footprints service not configured. Set MICROSOFT_FOOTPRINTS_URL or configure in app.config.externalServices.microsoftFootprints.url');
-      result.error = 'Microsoft Building Footprints service not configured';
-      return result;
-    }
-
-    // Build bounding box query
-    const bbox = `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`;
-    
+    // Use the Microsoft Footprints service to query by bounding box
+    // This will try: 1) Configured API 2) GitHub 3) Return empty if neither available
     try {
-      if (progressCallback) progressCallback('Querying Microsoft building footprints API', 10);
+      if (progressCallback) progressCallback('Querying Microsoft building footprints', 10);
       
-      const response = await httpClient.get(MICROSOFT_FOOTPRINTS_URL, {
-        params: {
-          bbox: bbox,
-          format: 'geojson'
-        },
-        timeout: 30000 // 30 second timeout
-      });
-
-      const data = response.data;
+      const geojsonData = await microsoftFootprintsService.queryByBoundingBox(boundingBox);
       
-      if (!data || !data.features || !Array.isArray(data.features)) {
+      if (!geojsonData || !geojsonData.features || !Array.isArray(geojsonData.features)) {
         console.warn('[MarketingDiscovery] Microsoft Building Footprints returned invalid data format');
         result.error = 'Invalid response format from Microsoft Building Footprints service';
         return result;
       }
 
-      const features = data.features;
+      const features = geojsonData.features;
       console.log('[MarketingDiscovery] Microsoft Building Footprints API returned', {
         featuresCount: features.length,
         sampleFeature: features[0]
@@ -1475,77 +1451,8 @@ async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCa
       for (const feature of features) {
         if (!feature || !feature.geometry) continue;
 
-        const geometry = feature.geometry;
-        let centroid = null;
-
-        // Calculate centroid based on geometry type
-        if (geometry.type === 'Point') {
-          const coords = geometry.coordinates;
-          if (Array.isArray(coords) && coords.length >= 2) {
-            centroid = {
-              latitude: toNumber(coords[1]),
-              longitude: toNumber(coords[0])
-            };
-          }
-        } else if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
-          // Calculate centroid from polygon coordinates
-          const ring = geometry.coordinates[0]; // Use outer ring
-          if (Array.isArray(ring) && ring.length > 0) {
-            let sumLat = 0;
-            let sumLon = 0;
-            let count = 0;
-            
-            for (const coord of ring) {
-              if (Array.isArray(coord) && coord.length >= 2) {
-                const lat = toNumber(coord[1]);
-                const lon = toNumber(coord[0]);
-                if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                  sumLat += lat;
-                  sumLon += lon;
-                  count += 1;
-                }
-              }
-            }
-            
-            if (count > 0) {
-              centroid = {
-                latitude: sumLat / count,
-                longitude: sumLon / count
-              };
-            }
-          }
-        } else if (geometry.type === 'MultiPolygon' && Array.isArray(geometry.coordinates)) {
-          // Calculate centroid from all polygons
-          let sumLat = 0;
-          let sumLon = 0;
-          let count = 0;
-          
-          for (const polygon of geometry.coordinates) {
-            if (Array.isArray(polygon) && polygon.length > 0) {
-              const ring = polygon[0]; // Use outer ring of each polygon
-              if (Array.isArray(ring)) {
-                for (const coord of ring) {
-                  if (Array.isArray(coord) && coord.length >= 2) {
-                    const lat = toNumber(coord[1]);
-                    const lon = toNumber(coord[0]);
-                    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-                      sumLat += lat;
-                      sumLon += lon;
-                      count += 1;
-                    }
-                  }
-                }
-              }
-            }
-          }
-          
-          if (count > 0) {
-            centroid = {
-              latitude: sumLat / count,
-              longitude: sumLon / count
-            };
-          }
-        }
+        // Use the service's centroid calculation function
+        const centroid = microsoftFootprintsService.calculateCentroid(feature.geometry);
 
         if (!centroid || !Number.isFinite(centroid.latitude) || !Number.isFinite(centroid.longitude)) {
           continue;
