@@ -17,6 +17,8 @@ const appConfig = require('../config/app');
 const MICROSOFT_FOOTPRINTS_GITHUB_REPO = 'microsoft/USBuildingFootprints';
 const GITHUB_API_BASE = 'https://api.github.com/repos';
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com';
+// Microsoft Building Footprints Azure Blob Storage (alternative source)
+const MICROSOFT_AZURE_BLOB_BASE = 'https://usbuildingdata.blob.core.windows.net/usbuildings-v2';
 
 // Cache directory for downloaded files
 const CACHE_DIR = process.env.MICROSOFT_FOOTPRINTS_CACHE_DIR || path.join(process.cwd(), '.cache', 'microsoft-footprints');
@@ -405,67 +407,102 @@ async function queryByBoundingBox(bbox) {
       }
     }
     
-    // Method 2: Try GitHub (determine county/state from bbox center using reverse geocoding)
-    const centerLat = (bbox.north + bbox.south) / 2;
-    const centerLon = (bbox.east + bbox.west) / 2;
-    
-    // Get county and state from coordinates using reverse geocoding
-    const locationInfo = await getCountyStateFromCoordinates(centerLat, centerLon);
-    const stateName = locationInfo?.state;
-    const countyName = locationInfo?.county;
-    const stateAbbr = locationInfo?.stateAbbr;
-    
-    console.log('[MicrosoftFootprints] Location info from reverse geocoding:', {
-      stateName,
-      stateAbbr,
-      countyName,
-      centerLat,
-      centerLon
-    });
-    
-    // Use state abbreviation if available, otherwise use state name
-    const stateToUse = stateAbbr || stateName;
-    
-    if (stateToUse) {
-      try {
-        // Try county-level file first (much smaller, typically 1-10 MB vs 100+ MB for state)
-        // Falls back to state-level file if county file not found
-        console.log(`[MicrosoftFootprints] Attempting to fetch data for state: ${stateToUse}, county: ${countyName || 'none'}`);
-        const geojsonData = await fetchFromGitHub(stateToUse, countyName);
-        if (geojsonData && geojsonData.features && geojsonData.features.length > 0) {
-          // Filter features by bounding box (still needed since county files may cover areas beyond bbox)
-          const filteredFeatures = filterFeaturesByBoundingBox(geojsonData.features, bbox);
-          
-          console.log(`[MicrosoftFootprints] Filtered ${filteredFeatures.length} features from ${geojsonData.features.length} total for bbox`);
-          
-          if (filteredFeatures.length === 0) {
-            console.warn('[MicrosoftFootprints] No features match the bounding box after filtering');
-          }
-          
-          return {
-            type: 'FeatureCollection',
-            features: filteredFeatures
-          };
-        } else {
-          console.warn('[MicrosoftFootprints] GitHub fetch returned empty or invalid data:', {
-            hasData: !!geojsonData,
-            featureCount: geojsonData?.features?.length || 0
-          });
-        }
-      } catch (gitHubError) {
-        console.error('[MicrosoftFootprints] GitHub fetch failed:', {
-          error: gitHubError.message,
-          stack: gitHubError.stack,
-          state: stateToUse,
-          county: countyName
-        });
-      }
-    } else {
-      console.warn('[MicrosoftFootprints] Could not determine state from coordinates:', {
-        locationInfo,
+    // Method 2: Try Azure Blob Storage (Microsoft's hosting)
+    try {
+      // Azure Blob Storage has files like: usbuildings-v2/{stateAbbr}.geojson
+      const centerLat = (bbox.north + bbox.south) / 2;
+      const centerLon = (bbox.east + bbox.west) / 2;
+      
+      // Get county and state from coordinates using reverse geocoding
+      const locationInfo = await getCountyStateFromCoordinates(centerLat, centerLon);
+      const stateName = locationInfo?.state;
+      const stateAbbr = locationInfo?.stateAbbr;
+      
+      console.log('[MicrosoftFootprints] Location info from reverse geocoding:', {
+        stateName,
+        stateAbbr,
+        countyName: locationInfo?.county,
         centerLat,
         centerLon
       });
+      
+      // Use state abbreviation if available, otherwise use state name
+      const stateToUse = stateAbbr || stateName;
+      
+      if (stateToUse) {
+        // Try Azure Blob Storage first (official Microsoft hosting)
+        const azureStateUrl = `${MICROSOFT_AZURE_BLOB_BASE}/${stateToUse}.geojson`;
+        console.log(`[MicrosoftFootprints] Attempting Azure Blob Storage: ${azureStateUrl}`);
+        
+        try {
+          const azureResponse = await httpClient.get(azureStateUrl, {
+            responseType: 'json',
+            timeout: 120000 // 2 minutes for state files (can be large)
+          });
+          
+          if (azureResponse.data && azureResponse.data.features && azureResponse.data.features.length > 0) {
+            // Filter features by bounding box
+            const filteredFeatures = filterFeaturesByBoundingBox(azureResponse.data.features, bbox);
+            
+            console.log(`[MicrosoftFootprints] Azure Blob: Filtered ${filteredFeatures.length} features from ${azureResponse.data.features.length} total for bbox`);
+            
+            if (filteredFeatures.length === 0) {
+              console.warn('[MicrosoftFootprints] No features match the bounding box after filtering');
+            }
+            
+            return {
+              type: 'FeatureCollection',
+              features: filteredFeatures
+            };
+          }
+        } catch (azureError) {
+          if (azureError.response && azureError.response.status === 404) {
+            console.log(`[MicrosoftFootprints] Azure Blob file not found: ${stateToUse}.geojson, trying GitHub`);
+          } else {
+            console.warn(`[MicrosoftFootprints] Azure Blob fetch error:`, azureError.message);
+          }
+          // Fall through to GitHub method
+        }
+        
+        // Method 2b: Try GitHub (fallback)
+        try {
+          console.log(`[MicrosoftFootprints] Attempting GitHub fetch for state: ${stateToUse}`);
+          const geojsonData = await fetchFromGitHub(stateToUse, locationInfo?.county);
+          if (geojsonData && geojsonData.features && geojsonData.features.length > 0) {
+            // Filter features by bounding box
+            const filteredFeatures = filterFeaturesByBoundingBox(geojsonData.features, bbox);
+            
+            console.log(`[MicrosoftFootprints] GitHub: Filtered ${filteredFeatures.length} features from ${geojsonData.features.length} total for bbox`);
+            
+            if (filteredFeatures.length === 0) {
+              console.warn('[MicrosoftFootprints] No features match the bounding box after filtering');
+            }
+            
+            return {
+              type: 'FeatureCollection',
+              features: filteredFeatures
+            };
+          } else {
+            console.warn('[MicrosoftFootprints] GitHub fetch returned empty or invalid data:', {
+              hasData: !!geojsonData,
+              featureCount: geojsonData?.features?.length || 0
+            });
+          }
+        } catch (gitHubError) {
+          console.error('[MicrosoftFootprints] GitHub fetch failed:', {
+            error: gitHubError.message,
+            state: stateToUse
+          });
+        }
+      } else {
+        console.warn('[MicrosoftFootprints] Could not determine state from coordinates:', {
+          locationInfo,
+          centerLat,
+          centerLon
+        });
+      }
+    } catch (error) {
+      console.error('[MicrosoftFootprints] Error in location detection or data fetch:', error.message);
     }
     
     // Method 3: Return empty result
