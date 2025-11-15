@@ -863,25 +863,37 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     const reverseGeocodeStartTime = Date.now();
     
     // Configuration for batch processing
+    // Limit to 45 seconds to respond before proxy/nginx timeout (usually 60 seconds)
     const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
     const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS can handle more parallel requests
-    const MAX_REVERSE_GEOCODE_TIME = ARC_GIS_API_KEY ? 10 * 60 * 1000 : 5 * 60 * 1000; // 10 min for ArcGIS, 5 min for Nominatim
+    const MAX_REVERSE_GEOCODE_TIME = 45 * 1000; // 45 seconds - must finish before proxy timeout
+    const MAX_COORDINATES_TO_GEOCODE = 300; // Limit to prevent timeout
     const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
+    
+    // Limit coordinates if too many to prevent timeout
+    const coordinatesToProcess = coordinates.length > MAX_COORDINATES_TO_GEOCODE 
+      ? coordinates.slice(0, MAX_COORDINATES_TO_GEOCODE)
+      : coordinates;
+    
+    if (coordinates.length > MAX_COORDINATES_TO_GEOCODE) {
+      console.warn(`[MarketingDiscovery] Limiting reverse geocoding to ${MAX_COORDINATES_TO_GEOCODE} of ${coordinates.length} coordinates to prevent timeout`);
+    }
 
     console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
       totalCoordinates: coordinates.length,
+      processingCoordinates: coordinatesToProcess.length,
       usingArcGIS: !!ARC_GIS_API_KEY,
       maxParallel: MAX_PARALLEL_GEOCODES,
       maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
     });
 
     // Process coordinates in batches for parallel geocoding
-    for (let batchStart = 0; batchStart < coordinates.length; batchStart += MAX_PARALLEL_GEOCODES) {
-      // Check overall timeout
+    for (let batchStart = 0; batchStart < coordinatesToProcess.length; batchStart += MAX_PARALLEL_GEOCODES) {
+      // Check overall timeout - must respond before proxy timeout
       if (Date.now() > overallTimeout) {
-        console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinates.length} coordinates.`);
+        console.warn(`[MarketingDiscovery] Batch reverse geocoding timeout reached after ${MAX_REVERSE_GEOCODE_TIME / 1000}s. Processed ${batchStart}/${coordinatesToProcess.length} coordinates. Returning partial results.`);
         // Add remaining coordinates as coordinate-only addresses
-        for (let i = batchStart; i < coordinates.length; i += 1) {
+        for (let i = batchStart; i < coordinatesToProcess.length; i += 1) {
           const lat = toNumber(coordinates[i]?.latitude);
           const lon = toNumber(coordinates[i]?.longitude);
           if (lat !== undefined && lon !== undefined) {
@@ -898,14 +910,14 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
         break;
       }
 
-      const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, coordinates.length);
-      const batch = coordinates.slice(batchStart, batchEnd);
+      const batchEnd = Math.min(batchStart + MAX_PARALLEL_GEOCODES, coordinatesToProcess.length);
+      const batch = coordinatesToProcess.slice(batchStart, batchEnd);
       
       if (progressCallback && batchStart % 20 === 0) {
-        const geocodeProgress = (batchStart / coordinates.length) * 100;
-        progressCallback(`Reverse geocoding ${batchStart + 1}/${coordinates.length}`, geocodeProgress, {
+        const geocodeProgress = (batchStart / coordinatesToProcess.length) * 100;
+        progressCallback(`Reverse geocoding ${batchStart + 1}/${coordinatesToProcess.length}`, geocodeProgress, {
           current: batchStart + 1,
-          total: coordinates.length,
+          total: coordinatesToProcess.length,
           geocoded: geocodedCount,
           failed: failedCount
         });
@@ -1007,19 +1019,61 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
 
       // No delay needed for ArcGIS - it's designed for high throughput
       // Only delay for Nominatim to respect rate limits
-      if (batchEnd < coordinates.length && !ARC_GIS_API_KEY) {
+      // Also check timeout before continuing
+      if (batchEnd < coordinatesToProcess.length && !ARC_GIS_API_KEY && Date.now() < overallTimeout) {
         await delay(1000); // 1 second delay between batches for Nominatim rate limiting
+      }
+      
+      // Check timeout before next batch
+      if (Date.now() > overallTimeout) {
+        console.warn(`[MarketingDiscovery] Timeout reached before processing all batches. Processed ${batchEnd}/${coordinatesToProcess.length} coordinates.`);
+        // Add remaining coordinates as coordinate-only addresses
+        for (let i = batchEnd; i < coordinatesToProcess.length; i += 1) {
+          const lat = toNumber(coordinatesToProcess[i]?.latitude);
+          const lon = toNumber(coordinatesToProcess[i]?.longitude);
+          if (lat !== undefined && lon !== undefined) {
+            addresses.push({
+              addressLine1: `${lat.toFixed(7)}, ${lon.toFixed(7)}`,
+              latitude: lat,
+              longitude: lon,
+              country: 'US',
+              source: coordinatesToProcess[i]?.source || 'unknown'
+            });
+            failedCount += 1;
+          }
+        }
+        break;
       }
     }
     
+    // Add any remaining unprocessed coordinates from original list as coordinate-only addresses
+    if (coordinates.length > coordinatesToProcess.length) {
+      console.log(`[MarketingDiscovery] Adding ${coordinates.length - coordinatesToProcess.length} remaining coordinates as coordinate-only addresses`);
+      for (let i = coordinatesToProcess.length; i < coordinates.length; i += 1) {
+        const lat = toNumber(coordinates[i]?.latitude);
+        const lon = toNumber(coordinates[i]?.longitude);
+        if (lat !== undefined && lon !== undefined) {
+          addresses.push({
+            addressLine1: `${lat.toFixed(7)}, ${lon.toFixed(7)}`,
+            latitude: lat,
+            longitude: lon,
+            country: 'US',
+            source: coordinates[i]?.source || 'unknown'
+          });
+          failedCount += 1;
+        }
+      }
+    }
+      
     const reverseGeocodeDuration = Date.now() - reverseGeocodeStartTime;
     console.log('[MarketingDiscovery] Batch reverse geocoding completed', { 
       duration: `${reverseGeocodeDuration}ms`,
-      durationPerCoordinate: coordinates.length ? `${(reverseGeocodeDuration / coordinates.length).toFixed(0)}ms` : '0ms',
+      durationPerCoordinate: coordinatesToProcess.length ? `${(reverseGeocodeDuration / coordinatesToProcess.length).toFixed(0)}ms` : '0ms',
       geocoded: geocodedCount,
       failed: failedCount,
+      processed: coordinatesToProcess.length,
       total: coordinates.length,
-      successRate: coordinates.length ? `${((geocodedCount / coordinates.length) * 100).toFixed(1)}%` : '0%'
+      successRate: coordinatesToProcess.length ? `${((geocodedCount / coordinatesToProcess.length) * 100).toFixed(1)}%` : '0%'
     });
 
     return { addresses, geocoded: geocodedCount, failed: failedCount };
