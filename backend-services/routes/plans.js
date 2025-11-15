@@ -3,8 +3,33 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
-const fetch = require('node-fetch');
+const axios = require('axios');
+const axiosRetry = require('axios-retry');
 const router = express.Router();
+
+// Configure axios with retry logic for all requests
+const httpClient = axios.create({
+  timeout: 30000, // 30 second default timeout
+  headers: {
+    'User-Agent': 'LTE-PCI-Mapper/1.0 (admin@wisptools.io)'
+  }
+});
+
+// Configure automatic retries with exponential backoff
+axiosRetry(httpClient, {
+  retries: 3, // Retry 3 times on failure
+  retryDelay: axiosRetry.exponentialDelay, // Exponential backoff: 1s, 2s, 4s
+  retryCondition: (error) => {
+    // Retry on network errors, 5xx errors, or timeout
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+           (error.response && error.response.status >= 500) ||
+           error.code === 'ECONNABORTED' || // Timeout
+           error.code === 'ETIMEDOUT';
+  },
+  onRetry: (retryCount, error, requestConfig) => {
+    console.log(`[API] Retry attempt ${retryCount} for ${requestConfig.url}: ${error.message}`);
+  }
+});
 const { PlanProject } = require('../models/plan');
 const { InventoryItem } = require('../models/inventory');
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../models/network');
@@ -501,33 +526,24 @@ const computeBoundingBoxAreaKm2 = (bbox) => {
 };
 
 async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
     if (!query || typeof query !== 'string') {
       throw new Error(`Invalid Overpass query for ${label}: query must be a non-empty string`);
     }
 
     console.log(`[MarketingDiscovery] Overpass request (${label}) starting`);
-    const response = await fetch(OVERPASS_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(query)}`,
-      signal: controller.signal
-    });
+    
+    // Use axios with automatic retries instead of fetch
+    const response = await httpClient.post(
+      OVERPASS_ENDPOINT,
+      `data=${encodeURIComponent(query)}`,
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: timeoutMs
+      }
+    );
 
-    if (!response.ok) {
-      const details = await response.text().catch(() => '');
-      const errorMsg = `Overpass API returned ${response.status}: ${details.substring(0, 500)}`;
-      console.error(`[MarketingDiscovery] Overpass API error (${label}):`, errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    const payload = await response.json().catch((parseError) => {
-      console.error(`[MarketingDiscovery] Overpass JSON parse error (${label}):`, parseError);
-      throw new Error(`Failed to parse Overpass API response: ${parseError.message}`);
-    });
+    const payload = response.data;
 
     if (payload?.remark) {
       console.log(`[MarketingDiscovery] Overpass remark (${label}):`, payload.remark);
@@ -540,14 +556,17 @@ async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
 
     return Array.isArray(payload?.elements) ? payload.elements : [];
   } catch (error) {
-    if (error.name === 'AbortError') {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
       console.error(`[MarketingDiscovery] Overpass request (${label}) timed out after ${timeoutMs}ms`);
       throw new Error(`Overpass query (${label}) timed out after ${timeoutMs}ms`);
     }
-    console.error(`[MarketingDiscovery] Overpass request (${label}) failed:`, error);
+    if (error.response) {
+      const errorMsg = `Overpass API returned ${error.response.status}: ${error.response.data ? JSON.stringify(error.response.data).substring(0, 500) : 'Unknown error'}`;
+      console.error(`[MarketingDiscovery] Overpass API error (${label}):`, errorMsg);
+      throw new Error(errorMsg);
+    }
+    console.error(`[MarketingDiscovery] Overpass request (${label}) failed:`, error.message || error);
     throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
@@ -769,30 +788,26 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
   }
 
   try {
-    // FTTH approach: Request specific fields for residential street addresses
-    const params = new URLSearchParams({
+    // Use axios with automatic retries instead of fetch
+    const params = {
       f: 'json',
       location: `${lon},${lat}`,
       outFields: 'Address,City,Postal,Region,State,CountryCode',
-      maxLocations: '1'
+      maxLocations: '1',
+      token: ARC_GIS_API_KEY
+    };
+
+    const response = await httpClient.get(`${ARCGIS_GEOCODER_URL}/reverseGeocode`, {
+      params,
+      timeout: 8000 // 8 second timeout for ArcGIS
     });
-
-    params.set('token', ARC_GIS_API_KEY);
-
-    const response = await fetch(`${ARCGIS_GEOCODER_URL}/reverseGeocode?${params.toString()}`);
     
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', response.status, errorText.substring(0, 200));
-      return null; // Fall back to Nominatim
-    }
-
-    const data = await response.json();
+    const data = response.data;
     
     // Check for ArcGIS API errors
     if (data.error) {
       console.warn('[MarketingDiscovery] ArcGIS reverse geocode API error:', data.error.code, data.error.message);
-      return null; // Fall back to Nominatim
+      return null;
     }
     
     if (!data.address) {
@@ -826,8 +841,12 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
       source: 'arcgis'
     };
   } catch (error) {
-    console.warn('[MarketingDiscovery] ArcGIS reverse geocode failed:', error?.message);
-    return null; // Fall back to Nominatim
+    if (error.response) {
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', error.response.status, error.response.data ? JSON.stringify(error.response.data).substring(0, 200) : 'Unknown error');
+    } else {
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode failed:', error.message || error);
+    }
+    return null;
   }
 };
 
@@ -850,38 +869,50 @@ const reverseGeocodeCoordinate = async (lat, lon) => {
   }
 
   // Only use Nominatim if ArcGIS API key is not available (shouldn't happen in production)
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': NOMINATIM_USER_AGENT,
-      Accept: 'application/json'
+  try {
+    const response = await httpClient.get('https://nominatim.openstreetmap.org/reverse', {
+      params: {
+        format: 'jsonv2',
+        lat: lat,
+        lon: lon,
+        zoom: 18,
+        addressdetails: 1
+      },
+      headers: {
+        'User-Agent': NOMINATIM_USER_AGENT,
+        Accept: 'application/json'
+      },
+      timeout: 5000 // 5 second timeout for Nominatim
+    });
+
+    const data = response.data;
+    const address = data.address || {};
+
+    const line1 =
+      address.house_number && address.road
+        ? `${address.house_number} ${address.road}`
+        : data.display_name?.split(',')?.slice(0, 1)?.[0] || undefined;
+
+    return {
+      addressLine1: line1 ? line1.trim() : undefined,
+      addressLine2: undefined,
+      city: address.city || address.town || address.village || address.hamlet || undefined,
+      state: address.state || address.region || undefined,
+      postalCode: address.postcode || undefined,
+      country: address.country || address.country_code?.toUpperCase() || undefined,
+      latitude: lat,
+      longitude: lon,
+      source: 'nominatim'
+    };
+  } catch (error) {
+    if (error.response) {
+      const errorMsg = `Reverse geocoding failed: ${error.response.status} ${error.response.statusText}`;
+      console.warn('[MarketingDiscovery] Nominatim reverse geocode failed:', errorMsg);
+      throw new Error(errorMsg);
     }
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`Reverse geocoding failed: ${response.status} ${response.statusText} ${errorText}`);
+    console.warn('[MarketingDiscovery] Nominatim reverse geocode failed:', error.message || error);
+    throw error;
   }
-
-  const data = await response.json();
-  const address = data.address || {};
-
-  const line1 =
-    address.house_number && address.road
-      ? `${address.house_number} ${address.road}`
-      : data.display_name?.split(',')?.slice(0, 1)?.[0] || undefined;
-
-  return {
-    addressLine1: line1 ? line1.trim() : undefined,
-    addressLine2: undefined,
-    city: address.city || address.town || address.village || address.hamlet || undefined,
-    state: address.state || address.region || undefined,
-    postalCode: address.postcode || undefined,
-    country: address.country || address.country_code?.toUpperCase() || undefined,
-    latitude: lat,
-    longitude: lon,
-    source: 'nominatim'
-  };
 };
 
 // Batch reverse geocode all coordinates - processes all at once for efficiency
@@ -1552,43 +1583,49 @@ const extractArcgisCoordinates = (candidates = []) => {
 };
 
 const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
-  const params = new URLSearchParams({
-    f: 'json',
-    outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
-    maxLocations: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
-    searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
-    category: 'Point Address',
-    forStorage: 'false'
-  });
+  try {
+    const params = new URLSearchParams({
+      f: 'json',
+      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
+      maxLocations: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
+      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+      category: 'Point Address',
+      forStorage: 'false',
+      token: ARC_GIS_API_KEY
+    });
 
-  if (centerOverride?.lon !== undefined && centerOverride?.lat !== undefined) {
-    params.set('location', `${centerOverride.lon},${centerOverride.lat}`);
+    if (centerOverride?.lon !== undefined && centerOverride?.lat !== undefined) {
+      params.set('location', `${centerOverride.lon},${centerOverride.lat}`);
+    }
+
+    // Use axios with automatic retries instead of fetch
+    const response = await httpClient.post(
+      `${ARCGIS_GEOCODER_URL}/findAddressCandidates`,
+      params.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        timeout: 15000 // 15 second timeout for ArcGIS address search
+      }
+    );
+
+    const payload = response.data;
+    const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+    const exceededLimit = Boolean(payload?.exceededTransferLimit) || candidates.length >= ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
+
+    return {
+      candidateCount: candidates.length,
+      exceededLimit,
+      rawCandidates: candidates // Return raw candidates for coordinate extraction
+    };
+  } catch (error) {
+    if (error.response) {
+      const details = error.response.data ? JSON.stringify(error.response.data).substring(0, 500) : 'Unknown error';
+      throw new Error(`ArcGIS API returned ${error.response.status}: ${details}`);
+    }
+    throw error;
   }
-
-  params.set('token', ARC_GIS_API_KEY);
-
-  const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: params.toString()
-  });
-
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    throw new Error(`ArcGIS API returned ${response.status}: ${details}`);
-  }
-
-  const payload = await response.json();
-  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
-  const exceededLimit = Boolean(payload?.exceededTransferLimit) || candidates.length >= ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
-
-  return {
-    candidateCount: candidates.length,
-    exceededLimit,
-    rawCandidates: candidates // Return raw candidates for coordinate extraction
-  };
 };
 
 const shouldSubdivideArcgisExtent = ({ spanMiles, depth, candidateCount, exceededLimit }) => {
@@ -1742,21 +1779,19 @@ async function runArcgisPlacesDiscovery({ boundingBox, center }) {
 
     params.set('token', ARC_GIS_API_KEY);
 
-    const response = await fetch(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString()
-    });
+    // Use axios with automatic retries instead of fetch
+    const response = await httpClient.post(
+      `${ARCGIS_GEOCODER_URL}/findAddressCandidates`,
+      params.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        timeout: 15000 // 15 second timeout for ArcGIS places search
+      }
+    );
 
-    if (!response.ok) {
-      const details = await response.text().catch(() => '');
-      console.warn('[MarketingDiscovery] ArcGIS places request failed', response.status, details);
-      return { coordinates: [], error: `ArcGIS API returned ${response.status}` };
-    }
-
-    const payload = await response.json();
+    const payload = response.data || {};
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
 
     // Extract coordinates only
@@ -3968,7 +4003,7 @@ async function analyzeMissingHardware(plan) {
 async function estimateHardwareCost(tenantId, requirement) {
   try {
     // Try to get price from pricing database
-    const axios = require('axios');
+    // axios already required at top of file
     const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
     
     const params = new URLSearchParams({

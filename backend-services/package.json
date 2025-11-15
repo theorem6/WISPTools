@@ -10,12 +10,17 @@
   },
   "dependencies": {
     "@paypal/checkout-server-sdk": "^1.0.3",
+    "@esri/arcgis-rest-geocoding": "^5.1.0",
+    "@esri/arcgis-rest-request": "^5.1.0",
+    "axios": "^1.6.0",
+    "axios-retry": "^4.2.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "firebase-admin": "^13.5.0",
     "mongoose": "^7.5.0",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
