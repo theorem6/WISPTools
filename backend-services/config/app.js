@@ -52,7 +52,13 @@ module.exports = {
     arcgis: {
       geocodeUrl: 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates',
       reverseGeocodeUrl: 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode',
-      apiKey: process.env.ARCGIS_API_KEY || ''
+      apiKey: process.env.ARCGIS_API_KEY || '',
+      // ArcGIS Building Footprints Feature Service (if you have access)
+      // Example: 'https://services.arcgis.com/your_organization_id/arcgis/rest/services/YourBuildingFootprints/FeatureServer'
+      // Or state/local government services like:
+      // - 'https://gisservices.its.ny.gov/arcgis/rest/services/BuildingFootprints/FeatureServer' (NY only)
+      // - 'https://mapit.tarrantcounty.com/arcgis/rest/services/Dynamic/Building_Footprint/MapServer' (TX only)
+      buildingFootprintsServiceUrl: process.env.ARCGIS_BUILDING_FOOTPRINTS_SERVICE_URL || ''
     },
     
     // Microsoft Building Footprints

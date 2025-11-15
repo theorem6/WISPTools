@@ -67,6 +67,11 @@ const ALGORITHM_OPTIONS = [
       description: 'Uses Esri World Geocoding service to return residential and parcel address points.'
     },
     {
+      id: 'arcgis_building_footprints',
+      label: 'ArcGIS Building Footprints (Feature Service)',
+      description: 'Queries ArcGIS Feature Services for building footprint polygons (requires configured service URL).'
+    },
+    {
       id: 'arcgis_places',
       label: 'ArcGIS Places & Amenities',
       description: 'Targets nearby places of interest (schools, businesses, amenities) for marketing outreach.'
