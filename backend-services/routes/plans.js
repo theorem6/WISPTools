@@ -2351,12 +2351,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     if (!ARC_GIS_API_KEY) {
       // Filter out ArcGIS-based algorithms but keep Microsoft Footprints and OSM
+      const arcgisAlgorithms = ['arcgis_address_points', 'arcgis_places', 'arcgis_building_footprints'];
       const filtered = algorithms.filter((id) => 
-        id === 'osm_buildings' || 
-        id === 'microsoft_footprints' ||
-        id !== 'arcgis_address_points' && 
-        id !== 'arcgis_places' && 
-        id !== 'arcgis_building_footprints'
+        !arcgisAlgorithms.includes(id) || id === 'osm_buildings' || id === 'microsoft_footprints'
       );
       if (algorithms.length !== filtered.length) {
         console.warn('[MarketingDiscovery] ArcGIS API key missing. Skipping ArcGIS-based algorithms.');
