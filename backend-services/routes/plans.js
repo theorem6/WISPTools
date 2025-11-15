@@ -2347,7 +2347,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     const advancedOptions = req.body?.options?.advancedOptions || {};
     const userAlgorithms = parseMarketingAlgorithms(req.body?.options?.algorithms);
-    let algorithms = (userAlgorithms && userAlgorithms.length ? userAlgorithms : ['osm_buildings', 'arcgis_address_points']).filter(Boolean);
+    let algorithms = (userAlgorithms && userAlgorithms.length ? userAlgorithms : ['microsoft_footprints', 'osm_buildings', 'arcgis_address_points']).filter(Boolean);
 
     if (!ARC_GIS_API_KEY) {
       const filtered = algorithms.filter((id) => id === 'osm_buildings');
@@ -2985,11 +2985,17 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
       
       // Update algorithm stats
+      if (algorithmStats['microsoft_footprints']) {
+        algorithmStats['microsoft_footprints'].geocoded = geocodedBySource['microsoft_footprints'] || 0;
+      }
       if (algorithmStats['osm_buildings']) {
         algorithmStats['osm_buildings'].geocoded = geocodedBySource['osm_buildings'] || 0;
       }
       if (algorithmStats['arcgis_address_points']) {
         algorithmStats['arcgis_address_points'].geocoded = geocodedBySource['arcgis_address_points'] || 0;
+      }
+      if (algorithmStats['arcgis_building_footprints']) {
+        algorithmStats['arcgis_building_footprints'].geocoded = geocodedBySource['arcgis_building_footprints'] || 0;
       }
       if (algorithmStats['arcgis_places']) {
         algorithmStats['arcgis_places'].geocoded = geocodedBySource['arcgis_places'] || 0;
