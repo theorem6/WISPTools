@@ -19,6 +19,9 @@ const GITHUB_API_BASE = 'https://api.github.com/repos';
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com';
 // Microsoft Building Footprints Azure Blob Storage (alternative source)
 const MICROSOFT_AZURE_BLOB_BASE = 'https://usbuildingdata.blob.core.windows.net/usbuildings-v2';
+// ArcGIS Web Map ID (if user has a map with Microsoft Building Footprints layer)
+const ARCGIS_WEB_MAP_ID = process.env.ARCGIS_WEB_MAP_ID || '69916b107de641b4a85121086c4d9fca';
+const ARCGIS_PORTAL_URL = 'https://www.arcgis.com/sharing/rest/content/items';
 
 // Cache directory for downloaded files
 const CACHE_DIR = process.env.MICROSOFT_FOOTPRINTS_CACHE_DIR || path.join(process.cwd(), '.cache', 'microsoft-footprints');
@@ -377,9 +380,165 @@ async function fetchFromGitHub(stateName, countyName = null) {
  * 2. GitHub API (downloads state/county files)
  * 3. Returns empty result if neither available
  */
+/**
+ * Get Feature Service URL from ArcGIS Web Map
+ */
+async function getFeatureServiceFromWebMap(webMapId) {
+  try {
+    console.log('[MicrosoftFootprints] Attempting to access ArcGIS Web Map:', webMapId);
+    
+    // Get web map details
+    const mapUrl = `${ARCGIS_PORTAL_URL}/${webMapId}`;
+    const params = {
+      f: 'json'
+    };
+    
+    // Add API key if available
+    const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
+    if (ARC_GIS_API_KEY) {
+      params.token = ARC_GIS_API_KEY;
+    }
+    
+    const mapResponse = await httpClient.get(mapUrl, { params, timeout: 10000 });
+    const mapData = mapResponse.data;
+    
+    if (!mapData || !mapData.data || !mapData.data.operationalLayers) {
+      console.warn('[MicrosoftFootprints] Web map data invalid or no operational layers');
+      return null;
+    }
+    
+    // Search for Microsoft Building Footprints layer
+    const layers = mapData.data.operationalLayers || [];
+    for (const layer of layers) {
+      // Check if layer URL contains Microsoft Building Footprints indicators
+      const url = layer.url || layer.serviceUrl || '';
+      const title = (layer.title || '').toLowerCase();
+      
+      if (
+        url.includes('BuildingFootprints') ||
+        url.includes('Building_Footprints') ||
+        url.includes('USBuildingFootprints') ||
+        title.includes('microsoft') ||
+        title.includes('building footprints')
+      ) {
+        console.log('[MicrosoftFootprints] Found Microsoft Building Footprints layer:', {
+          url,
+          title: layer.title,
+          id: layer.id,
+          layerType: layer.layerType
+        });
+        
+        // Extract Feature Service URL
+        // Layer URL format examples:
+        // - https://.../FeatureServer/0
+        // - https://.../MapServer/0
+        // - https://.../FeatureServer (with layer.id)
+        // - https://.../rest/services/.../FeatureServer/0/query (full query URL)
+        
+        let featureServiceUrl = url;
+        let layerId = layer.id || 0;
+        
+        // If URL contains /query, extract the service URL and layer ID
+        if (url.includes('/query')) {
+          // Extract service URL (everything before /query)
+          featureServiceUrl = url.split('/query')[0];
+          // Extract layer ID from path (number before /query)
+          const layerIdMatch = featureServiceUrl.match(/\/(\d+)$/);
+          if (layerIdMatch) {
+            layerId = parseInt(layerIdMatch[1]);
+            featureServiceUrl = featureServiceUrl.replace(/\/\d+$/, ''); // Remove layer ID from URL
+          }
+        } else if (url.match(/\/\d+$/)) {
+          // URL ends with layer ID
+          const layerIdMatch = url.match(/\/(\d+)$/);
+          if (layerIdMatch) {
+            layerId = parseInt(layerIdMatch[1]);
+            featureServiceUrl = url.replace(/\/\d+$/, '');
+          }
+        }
+        
+        // If it's a Map Server, try converting to Feature Server
+        if (featureServiceUrl.includes('/MapServer')) {
+          featureServiceUrl = featureServiceUrl.replace('/MapServer', '/FeatureServer');
+        }
+        
+        // Ensure URL ends with FeatureServer or MapServer (not with /query or layer ID)
+        featureServiceUrl = featureServiceUrl.replace(/\/\d+$/, '').replace(/\/query.*$/, '');
+        
+        console.log('[MicrosoftFootprints] Extracted Feature Service info:', {
+          originalUrl: url,
+          serviceUrl: featureServiceUrl,
+          layerId,
+          layerTitle: layer.title
+        });
+        
+        return {
+          serviceUrl: featureServiceUrl,
+          layerId: layerId || 0,
+          requiresAuth: !!ARC_GIS_API_KEY
+        };
+      }
+    }
+    
+    console.warn('[MicrosoftFootprints] No Microsoft Building Footprints layer found in web map');
+    return null;
+  } catch (error) {
+    console.error('[MicrosoftFootprints] Error accessing ArcGIS Web Map:', {
+      error: error.message,
+      webMapId
+    });
+    return null;
+  }
+}
+
 async function queryByBoundingBox(bbox) {
   try {
-    // Method 1: Try configured API endpoint
+    // Method 1: Try ArcGIS Web Map (user's map with Microsoft Building Footprints layer)
+    try {
+      const mapServiceInfo = await getFeatureServiceFromWebMap(ARCGIS_WEB_MAP_ID);
+      if (mapServiceInfo && mapServiceInfo.serviceUrl) {
+        console.log('[MicrosoftFootprints] Using ArcGIS Web Map Feature Service:', mapServiceInfo.serviceUrl);
+        
+        // Use ArcGIS Building Footprints service to query
+        const arcgisBuildingFootprintsService = require('./arcgisBuildingFootprints');
+        const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
+          bbox,
+          {
+            serviceUrls: [mapServiceInfo.serviceUrl],
+            layerIds: [mapServiceInfo.layerId],
+            requiresAuth: mapServiceInfo.requiresAuth
+          }
+        );
+        
+        if (queryResult.coordinates && queryResult.coordinates.length > 0) {
+          // Convert coordinates to GeoJSON features (for centroid extraction later)
+          const geojsonFeatures = queryResult.coordinates.map(coord => {
+            // Create a point feature from the centroid
+            return {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [coord.longitude, coord.latitude]
+              },
+              properties: coord.attributes || {}
+            };
+          });
+          
+          console.log(`[MicrosoftFootprints] ArcGIS Web Map: Found ${geojsonFeatures.length} building footprints`);
+          
+          return {
+            type: 'FeatureCollection',
+            features: geojsonFeatures
+          };
+        } else if (queryResult.error) {
+          console.warn('[MicrosoftFootprints] ArcGIS Web Map query failed:', queryResult.error);
+        }
+      }
+    } catch (mapError) {
+      console.warn('[MicrosoftFootprints] ArcGIS Web Map access failed, trying other methods:', mapError.message);
+    }
+    
+    // Method 2: Try configured API endpoint
     const apiUrl = 
       appConfig?.externalServices?.microsoftFootprints?.url ||
       process.env.MICROSOFT_FOOTPRINTS_URL || 
