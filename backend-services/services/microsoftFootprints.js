@@ -413,26 +413,59 @@ async function queryByBoundingBox(bbox) {
     const locationInfo = await getCountyStateFromCoordinates(centerLat, centerLon);
     const stateName = locationInfo?.state;
     const countyName = locationInfo?.county;
+    const stateAbbr = locationInfo?.stateAbbr;
     
-    if (stateName) {
+    console.log('[MicrosoftFootprints] Location info from reverse geocoding:', {
+      stateName,
+      stateAbbr,
+      countyName,
+      centerLat,
+      centerLon
+    });
+    
+    // Use state abbreviation if available, otherwise use state name
+    const stateToUse = stateAbbr || stateName;
+    
+    if (stateToUse) {
       try {
         // Try county-level file first (much smaller, typically 1-10 MB vs 100+ MB for state)
         // Falls back to state-level file if county file not found
-        const geojsonData = await fetchFromGitHub(stateName, countyName);
-        if (geojsonData && geojsonData.features) {
+        console.log(`[MicrosoftFootprints] Attempting to fetch data for state: ${stateToUse}, county: ${countyName || 'none'}`);
+        const geojsonData = await fetchFromGitHub(stateToUse, countyName);
+        if (geojsonData && geojsonData.features && geojsonData.features.length > 0) {
           // Filter features by bounding box (still needed since county files may cover areas beyond bbox)
           const filteredFeatures = filterFeaturesByBoundingBox(geojsonData.features, bbox);
           
           console.log(`[MicrosoftFootprints] Filtered ${filteredFeatures.length} features from ${geojsonData.features.length} total for bbox`);
           
+          if (filteredFeatures.length === 0) {
+            console.warn('[MicrosoftFootprints] No features match the bounding box after filtering');
+          }
+          
           return {
             type: 'FeatureCollection',
             features: filteredFeatures
           };
+        } else {
+          console.warn('[MicrosoftFootprints] GitHub fetch returned empty or invalid data:', {
+            hasData: !!geojsonData,
+            featureCount: geojsonData?.features?.length || 0
+          });
         }
       } catch (gitHubError) {
-        console.warn('[MicrosoftFootprints] GitHub fetch failed:', gitHubError.message);
+        console.error('[MicrosoftFootprints] GitHub fetch failed:', {
+          error: gitHubError.message,
+          stack: gitHubError.stack,
+          state: stateToUse,
+          county: countyName
+        });
       }
+    } else {
+      console.warn('[MicrosoftFootprints] Could not determine state from coordinates:', {
+        locationInfo,
+        centerLat,
+        centerLon
+      });
     }
     
     // Method 3: Return empty result
