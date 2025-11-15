@@ -935,7 +935,7 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
     const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 20 : 5; // ArcGIS can handle more parallel requests
     const MAX_REVERSE_GEOCODE_TIME = 45 * 1000; // 45 seconds - must finish before proxy timeout
-    const MAX_COORDINATES_TO_GEOCODE = 300; // Limit to prevent timeout
+    const MAX_COORDINATES_TO_GEOCODE = 1000; // Increased limit - axios retry improves reliability
     const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
     
     // Limit coordinates if too many to prevent timeout
@@ -2862,9 +2862,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
     });
     
     if (!res.headersSent) {
-      // Limit response size aggressively to avoid Node.js JSON.stringify "Invalid string length" error
-      // Start with 100 addresses, reduce further if needed
-      const MAX_RESPONSE_ADDRESSES = 100;
+      // Limit response size to avoid Node.js JSON.stringify "Invalid string length" error
+      // Increased to 1000 since addresses are stripped down (minimal fields)
+      const MAX_RESPONSE_ADDRESSES = 1000;
       const addressesToReturn = combinedAddresses.length > MAX_RESPONSE_ADDRESSES
         ? combinedAddresses.slice(0, MAX_RESPONSE_ADDRESSES)
         : combinedAddresses;
