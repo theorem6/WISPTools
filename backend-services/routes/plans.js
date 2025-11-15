@@ -2023,6 +2023,22 @@ router.post('/:id/marketing/discover', async (req, res) => {
   const requestId = `${req.params?.id || 'unknown'}-${Date.now()}`;
   let timeoutCleanup = null;
   
+  // Log immediately - before any try/catch or validation
+  console.log('[MarketingDiscovery] ===== ENDPOINT HIT =====', {
+    requestId,
+    planId: req.params?.id,
+    tenantId: req.tenantId || 'MISSING',
+    method: req.method,
+    url: req.url,
+    hasBody: !!req.body,
+    hasBoundingBox: !!req.body?.boundingBox,
+    timestamp: new Date().toISOString(),
+    headers: {
+      contentType: req.headers['content-type'],
+      userAgent: req.headers['user-agent']
+    }
+  });
+  
   try {
     console.log('[MarketingDiscovery] Request received', {
       requestId,
