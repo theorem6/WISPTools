@@ -24,7 +24,7 @@ on:
   workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
 
 env:
-  FIREBASE_PROJECT_ID: lte-pci-mapper-65450042-bbf71
+  FIREBASE_PROJECT_ID: wisptools-production
   NODE_VERSION: '20'
 
 jobs:
