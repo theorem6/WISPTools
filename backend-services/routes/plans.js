@@ -823,23 +823,6 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
       return null;
     }
 
-    // Filter out businesses - check if address contains business keywords or is just a business name
-    const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company|corporation)\b/i;
-    
-    // Check if Address field is missing (only Match_addr with business name) or if it contains business keywords
-    // If Match_addr contains a street number, it's likely a real address even if it has a business name
-    const hasStreetNumber = /\d+/.test(addressLine1);
-    
-    // If no street number and contains business keywords, it's likely just a business name, not an address
-    if (!hasStreetNumber && businessKeywords.test(addressLine1)) {
-      return null;
-    }
-    
-    // If Address field is missing and Match_addr looks like just a business name (no street number), skip it
-    if (!address.Address && address.Match_addr && !hasStreetNumber && businessKeywords.test(address.Match_addr)) {
-      return null;
-    }
-
     const location = data.location || {};
     const resolvedLat = toNumber(location?.y);
     const resolvedLon = toNumber(location?.x);
@@ -2686,27 +2669,18 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     }
 
-    // Add all reverse geocoded addresses to combined addresses (filter businesses)
+    // Add all reverse geocoded addresses to combined addresses
+    // Filter out only arcgis_places (explicitly POI/businesses) - don't filter other sources
     if (reverseGeocodeResult && Array.isArray(reverseGeocodeResult.addresses)) {
-      const businessKeywords = /\b(restaurant|mall|store|shop|market|office|hotel|hospital|school|university|church|warehouse|factory|garage|auto|car|dealership|gas|station|bank|pharmacy|drug|clinic|dental|law|attorney|realty|agency|plaza|center|centre|park|complex|inc|llc|corp|company|corporation)\b/i;
-      
       for (const address of reverseGeocodeResult.addresses) {
         if (!address || address.latitude === undefined || address.longitude === undefined) {
           continue;
         }
         
-        // Additional business filtering for addresses from arcgis_places or other sources
-        // Skip if source is arcgis_places (explicitly businesses/POI)
+        // Skip only arcgis_places - they're businesses/POI by definition
+        // Don't filter other sources - let them through (they were already filtered at source if needed)
         if (address.source === 'arcgis_places') {
-          continue; // Skip all places - they're businesses/POI by definition
-        }
-        
-        // Filter out addresses that look like just business names (no street number + business keywords)
-        if (address.addressLine1) {
-          const hasStreetNumber = /\d+/.test(address.addressLine1);
-          if (!hasStreetNumber && businessKeywords.test(address.addressLine1)) {
-            continue; // Skip this address - it's likely just a business name
-          }
+          continue;
         }
         
         addAddressToCombined(address, address.source || 'unknown');
