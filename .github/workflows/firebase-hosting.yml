@@ -29,6 +29,7 @@ on:
     paths:
       - 'Module_Manager/**'
       - 'firebase.json'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
 
 env:
   FIREBASE_PROJECT_ID: wisptools-production
@@ -80,7 +81,7 @@ jobs:
           exit 0
 
       - name: Setup Node.js
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -100,18 +101,18 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Install Firebase CLI
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: npm install -g firebase-tools@latest
         
       - name: Authenticate to Firebase
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
           export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
           firebase login:ci --token $FIREBASE_TOKEN
 
       - name: Verify build output
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: ./Module_Manager
         run: |
           if [ ! -f "build/client/index.html" ]; then
@@ -125,13 +126,13 @@ jobs:
           du -sh build/client || true
 
       - name: Deploy to Firebase Hosting
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
           firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
 
       - name: Deployment summary
-        if: steps.changes.outputs.frontend == 'true'
+        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           echo "✅ Deployment successful!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

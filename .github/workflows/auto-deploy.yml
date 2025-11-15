@@ -21,8 +21,7 @@ on:
       - 'firestore.indexes.json'
       # Firebase config changes
       - 'firebase.json'
-      # Force deployment on manual trigger
-  workflow_dispatch:  # Allow manual triggers
+  workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
 
 env:
   FIREBASE_PROJECT_ID: lte-pci-mapper-65450042-bbf71
@@ -117,22 +116,29 @@ jobs:
             - 'deploy*.sh'
             - '*.sh'
     
-    - name: Skip if no frontend changes
-      if: steps.changes.outputs.frontend == 'false'
+    - name: Skip if no frontend changes (unless manual trigger)
+      if: steps.changes.outputs.frontend == 'false' && github.event_name != 'workflow_dispatch'
       run: |
         echo "⏭️ No frontend changes detected, skipping frontend deployment"
         echo "Backend-only changes will not trigger frontend deployment"
+        echo "To force deployment, use 'workflow_dispatch' from Actions tab"
         exit 0
     
-    - name: Skip if only backend changes (no frontend)
-      if: steps.changes.outputs.frontend == 'false' && steps.changes.outputs.backend == 'true'
+    - name: Skip if only backend changes (unless manual trigger)
+      if: steps.changes.outputs.frontend == 'false' && steps.changes.outputs.backend == 'true' && github.event_name != 'workflow_dispatch'
       run: |
         echo "⏭️ Only backend changes detected - skipping frontend deployment"
         echo "Frontend will only deploy when frontend files are changed"
+        echo "To force deployment, use 'workflow_dispatch' from Actions tab"
         exit 0
     
+    - name: Force deployment on manual trigger
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        echo "🔧 Manual trigger detected - forcing frontend deployment"
+    
     - name: Setup Node.js
-      if: steps.changes.outputs.frontend == 'true'
+      if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
@@ -140,25 +146,25 @@ jobs:
         cache-dependency-path: Module_Manager/package-lock.json
         
     - name: Install Firebase CLI
-      if: steps.changes.outputs.frontend == 'true'
+      if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
       run: npm install -g firebase-tools@latest
       
     - name: Authenticate to Firebase
-      if: steps.changes.outputs.frontend == 'true'
+      if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
       run: |
         echo '${{ secrets.FIREBASE_TOKEN }}' > /tmp/firebase-token
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase login:ci --token $FIREBASE_TOKEN
         
     - name: Build Frontend
-      if: steps.changes.outputs.frontend == 'true'
+      if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
       run: |
         cd Module_Manager
         npm ci
         npm run build
         
     - name: Deploy Frontend
-      if: steps.changes.outputs.frontend == 'true'
+      if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
       run: |
         export FIREBASE_TOKEN="$(cat /tmp/firebase-token)"
         firebase deploy --only hosting --project ${{ env.FIREBASE_PROJECT_ID }} --token $FIREBASE_TOKEN
