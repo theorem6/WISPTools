@@ -521,6 +521,8 @@ let results: PlanMarketingAddress[] = [];
     error = null;
     // Clear previous summary to prevent stale data from showing
     summary = null;
+    // Clear results to show fresh data
+    results = [];
 
     const previousSavedCount =
       plan.marketing?.totalUniqueAddresses ?? plan.marketing?.addresses?.length ?? 0;
@@ -595,9 +597,16 @@ let results: PlanMarketingAddress[] = [];
         }
       }
       
+      // Calculate actual geocoded count from results (addresses with addressLine1)
+      const actualGeocodedCount = results.filter(addr => addr && addr.addressLine1 && addr.addressLine1.trim().length > 0).length;
+      // Also calculate from backend summary if available (might be more accurate)
+      const backendGeocodedCount = backendSummary.geocoded ?? 0;
+      // Use the higher value (backend might have the real count from database, results might be truncated)
+      const finalGeocodedCount = Math.max(actualGeocodedCount, backendGeocodedCount);
+      
       summary = {
         totalCandidates: totalCandidatesFromStats || backendSummary.total ?? results.length,
-        geocodedCount: backendSummary.geocoded ?? 0,
+        geocodedCount: finalGeocodedCount,
         newlyAdded: backendSummary.new ?? 0,
         totalUniqueAddresses: backendSummary.total ?? results.length, // Total unique addresses saved
         totalRuns: backendSummary.runs ?? previousTotalRuns + 1,
@@ -664,7 +673,20 @@ let results: PlanMarketingAddress[] = [];
       
       // Reset loading state FIRST - before any async operations
       // This ensures buttons are re-enabled immediately after discovery completes
+      // CRITICAL: Set isLoading to false BEFORE dispatch to ensure UI updates immediately
       isLoading = false;
+      
+      // Ensure info is set to final message (already set above, but ensure it's not "Discovering...")
+      if (!info || info.includes('Discovering')) {
+        // Fallback: set info to a completion message if it wasn't set properly
+        if (totalSaved === 0) {
+          info = `No addresses found in current map view.`;
+        } else if (newlyAdded === 0) {
+          info = `No new addresses detected. ${totalSaved} saved leads available.`;
+        } else {
+          info = `Added ${newlyAdded} new addresses (${totalSaved} total saved).`;
+        }
+      }
       
       // Dispatch update event so parent can sync to map
       dispatch('updated', plan);
@@ -1220,7 +1242,7 @@ let results: PlanMarketingAddress[] = [];
             class="btn-secondary"
             type="button"
             on:click={downloadLatestCsv}
-            disabled={isLoading || results.length === 0}
+            disabled={isLoading || (!results.length && !summary)}
           >
             ⬇️ Download This Run
           </button>
@@ -1228,7 +1250,7 @@ let results: PlanMarketingAddress[] = [];
             class="btn-secondary"
             type="button"
             on:click={downloadAllCsv}
-            disabled={isLoading || getAllSavedAddresses().length === 0}
+            disabled={isLoading || (!getAllSavedAddresses().length && !getTotalSavedAddresses())}
           >
             ⬇️ Download All Addresses
           </button>
