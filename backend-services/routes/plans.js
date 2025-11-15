@@ -1385,6 +1385,217 @@ async function runArcgisGridSampler({ boundingBox, spacingMeters = 40 }) {
   return { addresses, geocoded, failed };
 }
 
+// Microsoft Building Footprints discovery - returns coordinates only
+// Microsoft provides building footprints via their GitHub releases or tile services
+// For now, we'll use a tile-based approach if available, or skip if not configured
+async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCallback }) {
+  const result = {
+    coordinates: [],
+    stats: {
+      rawCandidates: 0
+    },
+    error: null
+  };
+
+  try {
+    console.log('[MarketingDiscovery] Starting Microsoft Building Footprints discovery', { 
+      boundingBox,
+      hasBoundingBox: !!boundingBox
+    });
+
+    if (!boundingBox || !isValidBoundingBox(boundingBox)) {
+      const errorMsg = 'Invalid bounding box provided to Microsoft Building Footprints discovery';
+      console.error('[MarketingDiscovery]', errorMsg, boundingBox);
+      result.error = errorMsg;
+      return result;
+    }
+
+    if (progressCallback) progressCallback('Fetching Microsoft building footprints', 5);
+
+    // Microsoft Building Footprints are available via various methods:
+    // 1. GitHub releases (state/county GeoJSON files) - would require pre-download
+    // 2. Tile services - if available
+    // 3. Cloud services that index the data
+    
+    // For now, we'll use a simple bounding box query approach
+    // This could be enhanced with a tile service or pre-processed data
+    // Microsoft's data is organized by state/county, so we'd need to identify which files to load
+    
+    // Check if we have access to Microsoft Building Footprints service
+    // Microsoft provides data as GeoJSON files organized by state/county
+    // For live access, you'd need a tile service or pre-indexed data service
+    // This could be configured via environment variable or app config
+    const MICROSOFT_FOOTPRINTS_URL = 
+      appConfig?.externalServices?.microsoftFootprints?.url ||
+      process.env.MICROSOFT_FOOTPRINTS_URL || 
+      '';
+    
+    if (!MICROSOFT_FOOTPRINTS_URL) {
+      // No Microsoft Footprints service configured - skip gracefully
+      // Note: To enable this, you'd need to set up a service that provides access to Microsoft's building footprints
+      // Options: 1) Use a tile service 2) Download and index the GeoJSON files 3) Use a third-party service
+      console.log('[MarketingDiscovery] Microsoft Building Footprints service not configured. Set MICROSOFT_FOOTPRINTS_URL or configure in app.config.externalServices.microsoftFootprints.url');
+      result.error = 'Microsoft Building Footprints service not configured';
+      return result;
+    }
+
+    // Build bounding box query
+    const bbox = `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`;
+    
+    try {
+      if (progressCallback) progressCallback('Querying Microsoft building footprints API', 10);
+      
+      const response = await httpClient.get(MICROSOFT_FOOTPRINTS_URL, {
+        params: {
+          bbox: bbox,
+          format: 'geojson'
+        },
+        timeout: 30000 // 30 second timeout
+      });
+
+      const data = response.data;
+      
+      if (!data || !data.features || !Array.isArray(data.features)) {
+        console.warn('[MarketingDiscovery] Microsoft Building Footprints returned invalid data format');
+        result.error = 'Invalid response format from Microsoft Building Footprints service';
+        return result;
+      }
+
+      const features = data.features;
+      console.log('[MarketingDiscovery] Microsoft Building Footprints API returned', {
+        featuresCount: features.length,
+        sampleFeature: features[0]
+      });
+
+      if (progressCallback) progressCallback('Processing building footprints', 20);
+
+      const coordinates = [];
+      const seenKeys = new Set();
+
+      for (const feature of features) {
+        if (!feature || !feature.geometry) continue;
+
+        const geometry = feature.geometry;
+        let centroid = null;
+
+        // Calculate centroid based on geometry type
+        if (geometry.type === 'Point') {
+          const coords = geometry.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            centroid = {
+              latitude: toNumber(coords[1]),
+              longitude: toNumber(coords[0])
+            };
+          }
+        } else if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+          // Calculate centroid from polygon coordinates
+          const ring = geometry.coordinates[0]; // Use outer ring
+          if (Array.isArray(ring) && ring.length > 0) {
+            let sumLat = 0;
+            let sumLon = 0;
+            let count = 0;
+            
+            for (const coord of ring) {
+              if (Array.isArray(coord) && coord.length >= 2) {
+                const lat = toNumber(coord[1]);
+                const lon = toNumber(coord[0]);
+                if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                  sumLat += lat;
+                  sumLon += lon;
+                  count += 1;
+                }
+              }
+            }
+            
+            if (count > 0) {
+              centroid = {
+                latitude: sumLat / count,
+                longitude: sumLon / count
+              };
+            }
+          }
+        } else if (geometry.type === 'MultiPolygon' && Array.isArray(geometry.coordinates)) {
+          // Calculate centroid from all polygons
+          let sumLat = 0;
+          let sumLon = 0;
+          let count = 0;
+          
+          for (const polygon of geometry.coordinates) {
+            if (Array.isArray(polygon) && polygon.length > 0) {
+              const ring = polygon[0]; // Use outer ring of each polygon
+              if (Array.isArray(ring)) {
+                for (const coord of ring) {
+                  if (Array.isArray(coord) && coord.length >= 2) {
+                    const lat = toNumber(coord[1]);
+                    const lon = toNumber(coord[0]);
+                    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                      sumLat += lat;
+                      sumLon += lon;
+                      count += 1;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          if (count > 0) {
+            centroid = {
+              latitude: sumLat / count,
+              longitude: sumLon / count
+            };
+          }
+        }
+
+        if (!centroid || !Number.isFinite(centroid.latitude) || !Number.isFinite(centroid.longitude)) {
+          continue;
+        }
+
+        // Deduplicate using coordinate key
+        const key = `${centroid.latitude.toFixed(7)},${centroid.longitude.toFixed(7)}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          coordinates.push({
+            latitude: centroid.latitude,
+            longitude: centroid.longitude,
+            source: 'microsoft_footprints',
+            properties: feature.properties || {}
+          });
+        }
+
+        // Limit to prevent too many coordinates
+        if (coordinates.length >= MAX_BUILDING_RESULTS) {
+          break;
+        }
+      }
+
+      result.coordinates = coordinates;
+      result.stats.rawCandidates = coordinates.length;
+      
+      console.log('[MarketingDiscovery] Microsoft Building Footprints discovery completed', { 
+        totalCandidates: coordinates.length,
+        coordinatesReturned: coordinates.length
+      });
+      
+      return result;
+    } catch (apiError) {
+      console.error('[MarketingDiscovery] Microsoft Building Footprints API error:', {
+        error: apiError?.message || apiError,
+        response: apiError?.response?.data
+      });
+      result.error = apiError?.message || 'Failed to fetch Microsoft building footprints';
+      return result;
+    }
+  } catch (error) {
+    const message =
+      error?.message ||
+      (typeof error === 'string' ? error : 'Unexpected error during Microsoft Building Footprints discovery');
+    console.warn('[MarketingDiscovery] Microsoft Building Footprints discovery error:', message);
+    result.error = message;
+    return result;
+  }
+}
+
 // Modified to return coordinates only - reverse geocoding happens later in batch
 async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advancedOptions, progressCallback }) {
   const result = {
@@ -2505,7 +2716,59 @@ router.post('/:id/marketing/discover', async (req, res) => {
     const allCoordinates = [];
     const coordinateKeys = new Set(); // For deduplication
 
-    // Step 1: Collect coordinates from OSM (centroids)
+    // Step 1: Collect coordinates from Microsoft Building Footprints (if enabled)
+    if (algorithms.includes('microsoft_footprints')) {
+      try {
+        updateProgress('Running Microsoft Building Footprints lookup', 10);
+        console.log('[MarketingDiscovery] Running Microsoft Building Footprints discovery algorithm (coordinates only)');
+        const microsoftResult = await runMicrosoftBuildingFootprintsDiscovery({
+          boundingBox,
+          progressCallback: (step, progress, details) => {
+            updateProgress(`Microsoft: ${step}`, 10 + (progress * 5 * 0.01), details);
+          }
+        });
+        
+        if (Array.isArray(microsoftResult.coordinates)) {
+          for (const coord of microsoftResult.coordinates) {
+            const latitude = toNumber(coord?.latitude);
+            const longitude = toNumber(coord?.longitude);
+            if (latitude === undefined || longitude === undefined) {
+              console.warn('[MarketingDiscovery] Skipping invalid Microsoft coordinate:', coord);
+              continue;
+            }
+            const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
+            if (!coordinateKeys.has(key)) {
+              coordinateKeys.add(key);
+              allCoordinates.push({
+                latitude,
+                longitude,
+                source: coord.source || 'microsoft_footprints',
+                properties: coord.properties || {}
+              });
+            }
+          }
+        }
+
+        updateProgress('Microsoft Building Footprints lookup completed', 15, { 
+          coordinates: microsoftResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length,
+          error: microsoftResult.error 
+        });
+        console.log('[MarketingDiscovery] Microsoft Building Footprints algorithm completed', { 
+          coordinates: microsoftResult.coordinates?.length || 0,
+          totalCoordinates: allCoordinates.length,
+          error: microsoftResult.error 
+        });
+
+        recordAlgorithmStats('microsoft_footprints', microsoftResult.coordinates?.length || 0, 0, microsoftResult.error);
+      } catch (err) {
+        updateProgress('Microsoft Building Footprints lookup failed', 15, { error: err.message });
+        console.error('[MarketingDiscovery] Microsoft Building Footprints Discovery failed:', err);
+        recordAlgorithmStats('microsoft_footprints', 0, 0, err.message || 'Unknown error');
+      }
+    }
+
+    // Step 2: Collect coordinates from OSM (centroids)
     if (algorithms.includes('osm_buildings')) {
       try {
         updateProgress('Running OSM centroid lookup', 10);
@@ -2541,7 +2804,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
           }
         }
 
-        updateProgress('OSM centroid lookup completed', 25, { 
+        updateProgress('OSM centroid lookup completed', 40, { 
           coordinates: osmResult.coordinates?.length || 0,
           totalCoordinates: allCoordinates.length,
           error: osmResult.error 
@@ -2554,7 +2817,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
         recordAlgorithmStats('osm_buildings', osmResult.coordinates?.length || 0, 0, osmResult.error);
       } catch (err) {
-        updateProgress('OSM centroid lookup failed', 25, { error: err.message });
+        updateProgress('OSM centroid lookup failed', 40, { error: err.message });
         console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
         recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
       }
@@ -2568,7 +2831,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
           center: computedCenter,
           hasApiKey: !!ARC_GIS_API_KEY
         });
-        updateProgress('Running ArcGIS address points lookup', 25);
+        updateProgress('Running ArcGIS address points lookup', 40);
         const arcgisResult = await runArcgisAddressPointsDiscovery({
           boundingBox,
           center: computedCenter,
@@ -2596,7 +2859,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
           }
         }
 
-        updateProgress('ArcGIS address points lookup completed', 40, { 
+        updateProgress('ArcGIS address points lookup completed', 50, { 
           coordinates: arcgisResult.coordinates?.length || 0,
           totalCoordinates: allCoordinates.length,
           error: arcgisResult.error 
@@ -2608,7 +2871,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
         recordAlgorithmStats('arcgis_address_points', arcgisResult.coordinates?.length || 0, 0, arcgisResult.error);
       } catch (err) {
-        updateProgress('ArcGIS address points failed', 40, { error: err.message });
+        updateProgress('ArcGIS address points failed', 50, { error: err.message });
         console.error('[MarketingDiscovery] ArcGIS Address Points Discovery failed:', err);
         recordAlgorithmStats('arcgis_address_points', 0, 0, err.message || 'Unknown error');
       }
@@ -2617,7 +2880,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
     // Step 3: Collect coordinates from ArcGIS places
     if (algorithms.includes('arcgis_places') && ARC_GIS_API_KEY) {
       try {
-        updateProgress('Running ArcGIS places lookup', 40);
+        updateProgress('Running ArcGIS places lookup', 50);
         const arcgisPlacesResult = await runArcgisPlacesDiscovery({
           boundingBox,
           center: computedCenter,

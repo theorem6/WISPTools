@@ -52,6 +52,11 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
 
 const ALGORITHM_OPTIONS = [
     {
+      id: 'microsoft_footprints',
+      label: 'Microsoft Building Footprints',
+      description: 'Uses Microsoft\'s AI-generated building footprints from satellite imagery for comprehensive building coverage.'
+    },
+    {
       id: 'osm_buildings',
       label: 'OpenStreetMap Building Footprints',
       description: 'Pulls building centroids from OpenStreetMap and reverse-geocodes the top matches.'
@@ -68,7 +73,7 @@ const ALGORITHM_OPTIONS = [
     }
   ] as const;
 
-  const DEFAULT_ALGORITHMS = ['osm_buildings', 'arcgis_address_points'];
+  const DEFAULT_ALGORITHMS = ['microsoft_footprints', 'osm_buildings', 'arcgis_address_points'];
 
   let isLoading = false;
   let error: string | null = null;
