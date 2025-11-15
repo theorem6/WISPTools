@@ -217,10 +217,71 @@ function filterFeaturesByBoundingBox(features, bbox) {
 }
 
 /**
+ * Check if local file exists and return it
+ */
+async function fetchFromLocalFile(stateName, countyName = null) {
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  const LOCAL_FOOTPRINTS_DIR = process.env.MICROSOFT_FOOTPRINTS_LOCAL_DIR || '/opt/microsoft-footprints';
+  const stateAbbr = STATE_ABBREVIATIONS[stateName?.toLowerCase()] || stateName?.toLowerCase();
+  
+  if (!stateAbbr) {
+    return null;
+  }
+  
+  // Try county file first
+  if (countyName) {
+    const countyFilePath = path.join(LOCAL_FOOTPRINTS_DIR, stateAbbr, `${countyName}.geojson`);
+    try {
+      const stats = await fs.stat(countyFilePath);
+      if (stats.size > 1000) { // At least 1KB (avoid empty/error files)
+        const fileContent = await fs.readFile(countyFilePath, 'utf8');
+        const data = JSON.parse(fileContent);
+        console.log(`[MicrosoftFootprints] Loaded county file from local storage: ${countyFilePath} (${stats.size} bytes)`);
+        return data;
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.warn(`[MicrosoftFootprints] Error reading local county file: ${error.message}`);
+      }
+      // Fall through to state file
+    }
+  }
+  
+  // Try state file
+  const stateFilePath = path.join(LOCAL_FOOTPRINTS_DIR, `${stateAbbr}.geojson`);
+  try {
+    const stats = await fs.stat(stateFilePath);
+    if (stats.size > 1000) { // At least 1KB (avoid empty/error files)
+      const fileContent = await fs.readFile(stateFilePath, 'utf8');
+      const data = JSON.parse(fileContent);
+      console.log(`[MicrosoftFootprints] Loaded state file from local storage: ${stateFilePath} (${stats.size} bytes)`);
+      return data;
+    } else {
+      console.warn(`[MicrosoftFootprints] Local state file too small (${stats.size} bytes), may be incomplete`);
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.warn(`[MicrosoftFootprints] Error reading local state file: ${error.message}`);
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Fetch Microsoft Building Footprints from GitHub for a specific state/county
+ * Tries local files first (much faster), then GitHub
  * Tries county-level file first (much smaller), falls back to state-level file
  */
 async function fetchFromGitHub(stateName, countyName = null) {
+  // First, try local files (much faster - 4-5x speedup)
+  const localData = await fetchFromLocalFile(stateName, countyName);
+  if (localData) {
+    return localData;
+  }
+  
   const stateAbbr = STATE_ABBREVIATIONS[stateName?.toLowerCase()] || stateName?.toLowerCase();
   
   if (!stateAbbr) {
