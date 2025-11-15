@@ -1485,12 +1485,12 @@ async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCa
       });
       
       return result;
-    } catch (apiError) {
-      console.error('[MarketingDiscovery] Microsoft Building Footprints API error:', {
-        error: apiError?.message || apiError,
-        response: apiError?.response?.data
+    } catch (serviceError) {
+      console.error('[MarketingDiscovery] Microsoft Building Footprints service error:', {
+        error: serviceError?.message || serviceError,
+        stack: serviceError?.stack
       });
-      result.error = apiError?.message || 'Failed to fetch Microsoft building footprints';
+      result.error = serviceError?.message || 'Failed to fetch Microsoft building footprints';
       return result;
     }
   } catch (error) {
