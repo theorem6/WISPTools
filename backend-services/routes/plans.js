@@ -4,7 +4,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const axios = require('axios');
-const axiosRetry = require('axios-retry');
+const axiosRetryModule = require('axios-retry');
+const axiosRetry = axiosRetryModule.default || axiosRetryModule;
 const router = express.Router();
 
 // Configure axios with retry logic for all requests
@@ -16,12 +17,13 @@ const httpClient = axios.create({
 });
 
 // Configure automatic retries with exponential backoff
+const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
 axiosRetry(httpClient, {
   retries: 3, // Retry 3 times on failure
-  retryDelay: axiosRetry.exponentialDelay, // Exponential backoff: 1s, 2s, 4s
+  retryDelay: exponentialDelay, // Exponential backoff: 1s, 2s, 4s
   retryCondition: (error) => {
     // Retry on network errors, 5xx errors, or timeout
-    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+    return isNetworkOrIdempotentRequestError(error) ||
            (error.response && error.response.status >= 500) ||
            error.code === 'ECONNABORTED' || // Timeout
            error.code === 'ETIMEDOUT';
