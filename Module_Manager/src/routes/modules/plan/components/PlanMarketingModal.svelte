@@ -492,9 +492,10 @@ let results: PlanMarketingAddress[] = [];
     window.dispatchEvent(new CustomEvent('request-map-extent'));
     
     // Wait for the extent update to propagate (longer wait to ensure we get the latest)
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // ALWAYS use latestExtent (which is reactive) - not mapExtent prop which may be stale
+    // CRITICAL: Lock the extent NOW before any map changes can occur
+    // Use the current latestExtent at button click time - this prevents issues if map zooms out during discovery
     // If latestExtent is not available, use extentAtOpen as fallback
     const extentForRun = latestExtent ? cloneMapExtent(latestExtent) : (extentAtOpen ? cloneMapExtent(extentAtOpen) : null);
     
@@ -504,6 +505,17 @@ let results: PlanMarketingAddress[] = [];
       return;
     }
 
+    // Lock the bounding box and center - don't use reactive latestExtent during the API call
+    const lockedBoundingBox = { ...extentForRun.boundingBox };
+    const lockedCenter = { ...extentForRun.center };
+
+    console.log('[PlanMarketingModal] Locked extent for discovery (prevents map zoom changes):', {
+      boundingBox: lockedBoundingBox,
+      center: lockedCenter,
+      extentSource: latestExtent ? 'latestExtent' : 'extentAtOpen',
+      timestamp: new Date().toISOString()
+    });
+
     isLoading = true;
     info = 'Discovering addresses from map view...';
 
@@ -512,16 +524,9 @@ let results: PlanMarketingAddress[] = [];
     const previousTotalRuns = plan.marketing?.totalRuns ?? 0;
 
     try {
-      // Use map extent directly (clone so we don't mutate shared reference)
-      const boundingBox = { ...extentForRun.boundingBox };
-      const center = extentForRun.center;
-      
-      console.log('[PlanMarketingModal] Using extent for discovery:', {
-        boundingBox,
-        center,
-        extentSource: latestExtent ? 'latestExtent' : 'extentAtOpen',
-        timestamp: new Date().toISOString()
-      });
+      // Use the locked extent (not reactive latestExtent) to prevent map zoom-out from affecting discovery
+      const boundingBox = lockedBoundingBox;
+      const center = lockedCenter;
 
       const spanMiles = computeSpanMiles({ center, boundingBox });
       if (spanMiles) {
@@ -624,6 +629,9 @@ let results: PlanMarketingAddress[] = [];
       
       // Dispatch update event so parent can sync to map
       dispatch('updated', plan);
+      
+      // Reset loading state - this was missing and caused buttons to stay disabled
+      isLoading = false;
       
       // Also fetch the updated plan from backend to ensure consistency
       // But do it in the background without blocking
