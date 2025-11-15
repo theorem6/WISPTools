@@ -1234,7 +1234,18 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
   };
 
   try {
-    console.log('[MarketingDiscovery] Starting OSM building discovery (coordinates only)', { boundingBox });
+    console.log('[MarketingDiscovery] Starting OSM building discovery (coordinates only)', { 
+      boundingBox,
+      hasBoundingBox: !!boundingBox
+    });
+
+    if (!boundingBox || !isValidBoundingBox(boundingBox)) {
+      const errorMsg = 'Invalid bounding box provided to OSM discovery';
+      console.error('[MarketingDiscovery]', errorMsg, boundingBox);
+      result.error = errorMsg;
+      return result;
+    }
+
     if (progressCallback) progressCallback('Building Overpass query', 5);
 
     const areaKm2 = computeBoundingBoxAreaKm2(boundingBox);
@@ -1245,10 +1256,22 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
     });
 
     if (progressCallback) progressCallback('Fetching primary OSM dataset', 10);
-    const primaryElements = await executeOverpassQuery({
-      query: buildPrimaryOverpassQuery(boundingBox),
-      label: 'primary'
-    });
+    
+    let primaryElements = [];
+    try {
+      const query = buildPrimaryOverpassQuery(boundingBox);
+      if (!query || typeof query !== 'string') {
+        throw new Error('Failed to build Overpass query');
+      }
+      primaryElements = await executeOverpassQuery({
+        query,
+        label: 'primary'
+      });
+    } catch (queryError) {
+      console.error('[MarketingDiscovery] Primary Overpass query failed:', queryError);
+      result.error = queryError?.message || 'Failed to fetch primary OSM dataset';
+      return result; // Return early with error
+    }
 
     let candidates = extractBuildingCandidates(primaryElements, {
       precision: isRuralArea ? 10000 : 20000,
@@ -1271,10 +1294,20 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
       });
 
       if (progressCallback) progressCallback('Running rural fallback query', 18);
-      const fallbackElements = await executeOverpassQuery({
-        query: buildFallbackOverpassQuery(boundingBox),
-        label: 'fallback'
-      });
+      
+      let fallbackElements = [];
+      try {
+        const fallbackQuery = buildFallbackOverpassQuery(boundingBox);
+        if (fallbackQuery && typeof fallbackQuery === 'string') {
+          fallbackElements = await executeOverpassQuery({
+            query: fallbackQuery,
+            label: 'fallback'
+          });
+        }
+      } catch (fallbackError) {
+        console.warn('[MarketingDiscovery] Fallback Overpass query failed (non-critical):', fallbackError);
+        // Continue with primary results only - fallback is optional
+      }
 
       const fallbackCandidates = extractBuildingCandidates(fallbackElements, {
         precision: 10000,
