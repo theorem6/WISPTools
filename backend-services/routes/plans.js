@@ -433,7 +433,7 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const MAX_BUILDING_RESULTS = 2000; // Increase limit to capture more buildings
+const MAX_BUILDING_RESULTS = 10000; // Increase limit to capture more buildings
 const MAX_REVERSE_GEOCODE = 500; // No artificial limit - geocode all (FTTH approach)
 const NOMINATIM_DELAY_MS = 500; // Reduced delay since ArcGIS doesn't need rate limiting
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
@@ -976,7 +976,7 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
     const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 30 : 5; // ArcGIS can handle more parallel requests
     const MAX_REVERSE_GEOCODE_TIME = 50 * 1000; // 50 seconds - increased timeout slightly
-    const MAX_COORDINATES_TO_GEOCODE = 5000; // Significantly increased - process all found coordinates
+    const MAX_COORDINATES_TO_GEOCODE = 10000; // Significantly increased - process all found coordinates
     const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
     
     // Limit coordinates if too many to prevent timeout
@@ -3147,8 +3147,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
     
     if (!res.headersSent) {
       // Limit response size to avoid Node.js JSON.stringify "Invalid string length" error
-      // Increased to 1000 since addresses are stripped down (minimal fields)
-      const MAX_RESPONSE_ADDRESSES = 1000;
+      // Increased to 5000 since addresses are stripped down (minimal fields)
+      const MAX_RESPONSE_ADDRESSES = 5000;
       const addressesToReturn = combinedAddresses.length > MAX_RESPONSE_ADDRESSES
         ? combinedAddresses.slice(0, MAX_RESPONSE_ADDRESSES)
         : combinedAddresses;
