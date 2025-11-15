@@ -479,8 +479,15 @@ const buildPrimaryOverpassQuery = (bbox) => `
   // Strategy 8: Residential landuse polygons with addresses
   way["landuse"~"^(residential|village_green)$"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   node["landuse"~"^(residential|village_green)$"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // CRITICAL: Recursively get all nodes that are part of ways, and all referenced elements
+  // This ensures we get full geometry for ways, not just their center
+  // (._;>;); means: take the current set, and recursively get all nodes/ways referenced by it
+  (._;>;);
 );
-out center;
+// Use out body to get full geometry (all nodes for ways), not just centers
+// This is essential for calculating accurate centroids from actual geometry
+out body;
 `;
 
 const buildFallbackOverpassQuery = (bbox) => `
@@ -506,8 +513,13 @@ const buildFallbackOverpassQuery = (bbox) => `
   node["power"~"^(pole|tower)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   way["name"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
   node["name"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+  
+  // CRITICAL: Recursively get all nodes that are part of ways
+  // This ensures we get full geometry for ways, not just their center
+  (._;>;);
 );
-out center;
+// Use out body to get full geometry (all nodes for ways), not just centers
+out body;
 `;
 
 const buildInterpolationOverpassQuery = (bbox) => `
@@ -590,28 +602,47 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
     let latitude;
     let longitude;
 
-    // Always prefer way centroids (building polygon centers) over node coordinates (point locations)
-    if (element.type === 'way' && element.center) {
-      // Use the calculated centroid for building polygons - this is the actual building center
-      // Overpass API's `out center;` returns the bounding box center for ways, which is a good approximation
-      latitude = toNumber(element.center.lat);
-      longitude = toNumber(element.center.lon);
-    } else if (element.type === 'way' && !element.center && Array.isArray(element.geometry) && element.geometry.length > 0) {
-      // Fallback: Calculate proper centroid from geometry if center is missing
-      // Average all vertices to get the true geometric centroid (better than first point)
-      const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
-      if (coords.length > 0) {
-        // Calculate geometric centroid (average of all vertices)
-        const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
-        const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
-        latitude = sumLat / coords.length;
-        longitude = sumLon / coords.length;
+    // With out body, we get full geometry for ways (all nodes)
+    // Always prefer calculating centroid from actual geometry over center property
+    if (element.type === 'way') {
+      // For ways, calculate centroid from actual geometry (all nodes)
+      // With out body, geometry array contains actual node coordinates
+      if (Array.isArray(element.geometry) && element.geometry.length > 0) {
+        // Calculate proper geometric centroid from all vertices
+        // This is more accurate than using center (which is bounding box center)
+        const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
+        if (coords.length > 0) {
+          // Calculate geometric centroid (average of all vertices)
+          const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
+          const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
+          latitude = sumLat / coords.length;
+          longitude = sumLon / coords.length;
+        } else if (element.center) {
+          // Fallback: Use center if geometry is empty or invalid
+          latitude = toNumber(element.center.lat);
+          longitude = toNumber(element.center.lon);
+        }
+      } else if (element.center) {
+        // Fallback: Use center if no geometry available
+        latitude = toNumber(element.center.lat);
+        longitude = toNumber(element.center.lon);
       }
     } else if (element.type === 'node') {
       // Nodes are just points - use their coordinates directly
       // Note: These may not be true building centroids if the building is represented as a point
       latitude = toNumber(element.lat);
       longitude = toNumber(element.lon);
+    } else if (element.type === 'relation') {
+      // Relations (multipolygons) - calculate centroid from all members' geometry
+      if (Array.isArray(element.geometry) && element.geometry.length > 0) {
+        const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
+        if (coords.length > 0) {
+          const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
+          const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
+          latitude = sumLat / coords.length;
+          longitude = sumLon / coords.length;
+        }
+      }
     } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
       // For other element types with geometry, calculate centroid from all points
       const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
