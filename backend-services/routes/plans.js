@@ -1962,9 +1962,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
       algorithms = filtered;
     }
 
-    if (!algorithms.length) {
+    if (!algorithms || algorithms.length === 0) {
+      console.warn('[MarketingDiscovery] No valid algorithms selected, defaulting to OSM');
       algorithms = ['osm_buildings'];
     }
+
+    console.log('[MarketingDiscovery] Algorithms selected:', {
+      algorithms,
+      hasArcGisKey: !!ARC_GIS_API_KEY,
+      userAlgorithms: userAlgorithms
+    });
 
     // Always deduplicate addresses within 25 meters (≈82 feet)
     const dedupDistanceMeters = 25;
