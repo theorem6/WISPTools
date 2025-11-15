@@ -554,6 +554,8 @@ async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
 function extractBuildingCandidates(elements, { precision = 100000, sourceLabel = 'osm_primary' }) {
   const seen = new Map();
   const candidates = [];
+  
+  console.log(`[MarketingDiscovery] Extracting building candidates from ${elements.length} elements (source: ${sourceLabel})`);
 
   // Sort elements to prioritize ways (which have centroids) over nodes (which are just points)
   const sortedElements = [...elements].sort((a, b) => {
@@ -562,6 +564,10 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
     if (b.type === 'way' && b.center && a.type !== 'way') return 1;
     return 0;
   });
+
+  let extracted = 0;
+  let skipped = 0;
+  let skippedReasons = { noCoords: 0, duplicate: 0, invalid: 0 };
 
   for (const element of sortedElements) {
     let latitude;
@@ -572,6 +578,15 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
       // Use the calculated centroid for building polygons - this is the actual building center
       latitude = toNumber(element.center.lat);
       longitude = toNumber(element.center.lon);
+    } else if (element.type === 'way' && !element.center && Array.isArray(element.geometry) && element.geometry.length > 0) {
+      // Fallback: Calculate centroid from geometry if center is missing
+      const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined);
+      if (coords.length > 0) {
+        const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
+        const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
+        latitude = sumLat / coords.length;
+        longitude = sumLon / coords.length;
+      }
     } else if (element.type === 'node') {
       // Nodes are just points - use their coordinates directly
       // Note: These may not be true building centroids if the building is represented as a point
@@ -583,6 +598,17 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
     }
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      skipped++;
+      skippedReasons.noCoords++;
+      if (extracted === 0 && skipped < 10) {
+        console.warn(`[MarketingDiscovery] Skipping element with invalid coordinates:`, {
+          type: element.type,
+          hasCenter: !!element.center,
+          hasGeometry: !!element.geometry,
+          geometryLength: element.geometry?.length || 0,
+          elementKeys: Object.keys(element).filter(k => !['tags', 'members'].includes(k))
+        });
+      }
       continue;
     }
 
@@ -629,11 +655,20 @@ function extractBuildingCandidates(elements, { precision = 100000, sourceLabel =
         }
       }
     }
-
+    
+    extracted++;
     if (candidates.length >= MAX_BUILDING_RESULTS) {
       break;
     }
   }
+
+  console.log(`[MarketingDiscovery] Extraction complete for ${sourceLabel}:`, {
+    totalElements: elements.length,
+    extracted,
+    candidates: candidates.length,
+    skipped,
+    skippedReasons
+  });
 
   return candidates;
 }
@@ -1334,8 +1369,18 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
 
     console.log('[MarketingDiscovery] OSM primary extraction stats', {
       totalElements: primaryElements.length,
+      waysWithCenters: primaryElements.filter(e => e.type === 'way' && e.center).length,
+      waysWithoutCenters: primaryElements.filter(e => e.type === 'way' && !e.center).length,
+      nodes: primaryElements.filter(e => e.type === 'node').length,
       candidates: candidates.length,
-      isRuralArea
+      isRuralArea,
+      sampleElements: primaryElements.slice(0, 3).map(e => ({
+        type: e.type,
+        hasCenter: !!e.center,
+        center: e.center || null,
+        hasGeometry: !!e.geometry,
+        geometryLength: e.geometry?.length || 0
+      }))
     });
 
     if (isRuralArea) {
