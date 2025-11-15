@@ -505,6 +505,10 @@ async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    if (!query || typeof query !== 'string') {
+      throw new Error(`Invalid Overpass query for ${label}: query must be a non-empty string`);
+    }
+
     console.log(`[MarketingDiscovery] Overpass request (${label}) starting`);
     const response = await fetch(OVERPASS_ENDPOINT, {
       method: 'POST',
@@ -515,15 +519,33 @@ async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
 
     if (!response.ok) {
       const details = await response.text().catch(() => '');
-      throw new Error(`Overpass API returned ${response.status}: ${details}`);
+      const errorMsg = `Overpass API returned ${response.status}: ${details.substring(0, 500)}`;
+      console.error(`[MarketingDiscovery] Overpass API error (${label}):`, errorMsg);
+      throw new Error(errorMsg);
     }
 
-    const payload = await response.json();
+    const payload = await response.json().catch((parseError) => {
+      console.error(`[MarketingDiscovery] Overpass JSON parse error (${label}):`, parseError);
+      throw new Error(`Failed to parse Overpass API response: ${parseError.message}`);
+    });
+
     if (payload?.remark) {
       console.log(`[MarketingDiscovery] Overpass remark (${label}):`, payload.remark);
     }
 
+    if (payload?.error) {
+      console.error(`[MarketingDiscovery] Overpass API error (${label}):`, payload.error);
+      throw new Error(`Overpass API error: ${payload.error}`);
+    }
+
     return Array.isArray(payload?.elements) ? payload.elements : [];
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error(`[MarketingDiscovery] Overpass request (${label}) timed out after ${timeoutMs}ms`);
+      throw new Error(`Overpass query (${label}) timed out after ${timeoutMs}ms`);
+    }
+    console.error(`[MarketingDiscovery] Overpass request (${label}) failed:`, error);
+    throw error;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -1275,10 +1297,20 @@ async function runOsmBuildingDiscovery({ boundingBox, radiusMiles, center, advan
         });
 
         if (progressCallback) progressCallback('Interpolating rural houses', 22);
-        const interpolationElements = await executeOverpassQuery({
-          query: buildInterpolationOverpassQuery(boundingBox),
-          label: 'interpolation'
-        });
+        
+        let interpolationElements = [];
+        try {
+          const interpolationQuery = buildInterpolationOverpassQuery(boundingBox);
+          if (interpolationQuery && typeof interpolationQuery === 'string') {
+            interpolationElements = await executeOverpassQuery({
+              query: interpolationQuery,
+              label: 'interpolation'
+            });
+          }
+        } catch (interpolationError) {
+          console.warn('[MarketingDiscovery] Interpolation Overpass query failed (non-critical):', interpolationError);
+          // Continue without interpolation - it's optional
+        }
 
         const interpolated = generateInterpolatedCandidates(interpolationElements);
         console.log('[MarketingDiscovery] Interpolation generated candidates', {
@@ -1480,12 +1512,27 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       // Extract coordinates instead of full addresses
       const coordinates = extractArcgisCoordinates(result.rawCandidates || []);
       
-      // Deduplicate coordinates
+      // Deduplicate coordinates with validation
       for (const coord of coordinates) {
-        const key = `${coord.latitude.toFixed(7)},${coord.longitude.toFixed(7)}`;
+        if (!coord || coord.latitude === undefined || coord.longitude === undefined) {
+          console.warn('[MarketingDiscovery] Skipping invalid ArcGIS coordinate:', coord);
+          continue;
+        }
+        const latitude = toNumber(coord.latitude);
+        const longitude = toNumber(coord.longitude);
+        if (latitude === undefined || longitude === undefined) {
+          console.warn('[MarketingDiscovery] Skipping invalid ArcGIS coordinate (non-numeric):', coord);
+          continue;
+        }
+        const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
-          uniqueCoordinates.push(coord);
+          uniqueCoordinates.push({
+            latitude,
+            longitude,
+            source: coord.source || 'arcgis_address_points',
+            attributes: coord.attributes || {}
+          });
         }
       }
 
