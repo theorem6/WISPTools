@@ -30,14 +30,14 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           echo "🔥 Deploying Firestore Rules..."
-          firebase deploy --only firestore:rules --project lte-pci-mapper-65450042-bbf71 --token "$FIREBASE_TOKEN"
+          firebase deploy --only firestore:rules --project wisptools-production --token "$FIREBASE_TOKEN"
           
       - name: Deploy Firestore Indexes
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           echo "📊 Deploying Firestore Indexes..."
-          firebase deploy --only firestore:indexes --project lte-pci-mapper-65450042-bbf71 --token "$FIREBASE_TOKEN"
+          firebase deploy --only firestore:indexes --project wisptools-production --token "$FIREBASE_TOKEN"
 
       - name: Deployment Success
         run: |
