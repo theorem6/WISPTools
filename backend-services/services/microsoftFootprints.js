@@ -22,6 +22,10 @@ const MICROSOFT_AZURE_BLOB_BASE = 'https://usbuildingdata.blob.core.windows.net/
 // ArcGIS Web Map ID (if user has a map with Microsoft Building Footprints layer)
 const ARCGIS_WEB_MAP_ID = process.env.ARCGIS_WEB_MAP_ID || '69916b107de641b4a85121086c4d9fca';
 const ARCGIS_PORTAL_URL = 'https://www.arcgis.com/sharing/rest/content/items';
+// Microsoft Building Footprints Feature Service (official Esri hosting)
+const MICROSOFT_FOOTPRINTS_FEATURE_SERVICE = process.env.MICROSOFT_FOOTPRINTS_FEATURE_SERVICE || 
+  'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/MSBFP2/FeatureServer';
+const MICROSOFT_FOOTPRINTS_LAYER_ID = 0; // MSBFP layer
 
 // Cache directory for downloaded files
 const CACHE_DIR = process.env.MICROSOFT_FOOTPRINTS_CACHE_DIR || path.join(process.cwd(), '.cache', 'microsoft-footprints');
@@ -493,7 +497,53 @@ async function getFeatureServiceFromWebMap(webMapId) {
 
 async function queryByBoundingBox(bbox) {
   try {
-    // Method 1: Try ArcGIS Web Map (user's map with Microsoft Building Footprints layer)
+    // Method 1: Try Microsoft Building Footprints Feature Service (official Esri hosting)
+    try {
+      console.log('[MicrosoftFootprints] Using Microsoft Building Footprints Feature Service:', MICROSOFT_FOOTPRINTS_FEATURE_SERVICE);
+      
+      // Use ArcGIS Building Footprints service to query
+      const arcgisBuildingFootprintsService = require('./arcgisBuildingFootprints');
+      const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
+      
+      const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
+        bbox,
+        {
+          serviceUrls: [MICROSOFT_FOOTPRINTS_FEATURE_SERVICE],
+          layerIds: [MICROSOFT_FOOTPRINTS_LAYER_ID],
+          requiresAuth: !!ARC_GIS_API_KEY // May require auth for some features
+        }
+      );
+      
+      if (queryResult.coordinates && queryResult.coordinates.length > 0) {
+        // Convert coordinates to GeoJSON features (for centroid extraction later)
+        const geojsonFeatures = queryResult.coordinates.map(coord => {
+          // Create a point feature from the centroid
+          return {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [coord.longitude, coord.latitude]
+            },
+            properties: coord.attributes || {}
+          };
+        });
+        
+        console.log(`[MicrosoftFootprints] Feature Service: Found ${geojsonFeatures.length} building footprints`);
+        
+        return {
+          type: 'FeatureCollection',
+          features: geojsonFeatures
+        };
+      } else if (queryResult.error) {
+        console.warn('[MicrosoftFootprints] Feature Service query failed:', queryResult.error);
+      } else {
+        console.log('[MicrosoftFootprints] Feature Service: No building footprints found in bounding box');
+      }
+    } catch (featureServiceError) {
+      console.warn('[MicrosoftFootprints] Feature Service access failed, trying other methods:', featureServiceError.message);
+    }
+    
+    // Method 2: Try ArcGIS Web Map (fallback - user's map with Microsoft Building Footprints layer)
     try {
       const mapServiceInfo = await getFeatureServiceFromWebMap(ARCGIS_WEB_MAP_ID);
       if (mapServiceInfo && mapServiceInfo.serviceUrl) {

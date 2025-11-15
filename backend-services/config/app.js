@@ -61,14 +61,16 @@ module.exports = {
       buildingFootprintsServiceUrl: process.env.ARCGIS_BUILDING_FOOTPRINTS_SERVICE_URL || ''
     },
     
-    // Microsoft Building Footprints
-    // Microsoft provides building footprints as GeoJSON files organized by state/county
-    // For live access, configure a tile service or API endpoint that provides access to the data
-    // Options: 1) Tile service URL 2) Pre-indexed data service 3) Third-party API
-    microsoftFootprints: {
-      url: process.env.MICROSOFT_FOOTPRINTS_URL || '',
-      enabled: process.env.MICROSOFT_FOOTPRINTS_ENABLED === 'true'
-    },
+      // Microsoft Building Footprints
+      // Official Esri Feature Service: https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/MSBFP2/FeatureServer
+      // Layer 0: MSBFP - Microsoft Building Footprints (covers entire US)
+      // Max Record Count: 2000 per query
+      microsoftFootprints: {
+        url: process.env.MICROSOFT_FOOTPRINTS_URL || '',
+        featureService: process.env.MICROSOFT_FOOTPRINTS_FEATURE_SERVICE || 
+          'https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/MSBFP2/FeatureServer',
+        enabled: process.env.MICROSOFT_FOOTPRINTS_ENABLED !== 'false' // Enabled by default
+      },
     
     // HSS Management (GCE VM)
     hss: {
