@@ -614,8 +614,8 @@ let results: PlanMarketingAddress[] = [];
       // Use the higher value (backend might have the real count from database, results might be truncated)
       const finalGeocodedCount = Math.max(actualGeocodedCount, backendGeocodedCount);
       
-      summary = {
-        totalCandidates: totalCandidatesFromStats || backendSummary.total ?? results.length,
+        summary = {
+          totalCandidates: (totalCandidatesFromStats || backendSummary?.total) ?? results.length,
         geocodedCount: finalGeocodedCount,
         newlyAdded: backendSummary.new ?? 0,
         totalUniqueAddresses: backendSummary.total ?? results.length, // Total unique addresses saved
