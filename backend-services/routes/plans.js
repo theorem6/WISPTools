@@ -439,7 +439,7 @@ const NOMINATIM_DELAY_MS = 500; // Reduced delay since ArcGIS doesn't need rate 
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
-const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || '';
+const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
 
 const RURAL_AREA_THRESHOLD_KM2 = 1.0;
 const RURAL_MIN_PRIMARY_RESULTS = 150;
@@ -974,8 +974,11 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     // Configuration for batch processing
     // Limit to 45 seconds to respond before proxy/nginx timeout (usually 60 seconds)
     const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
-    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 30 : 5; // ArcGIS can handle more parallel requests
-    const MAX_REVERSE_GEOCODE_TIME = 50 * 1000; // 50 seconds - increased timeout slightly
+    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 30 : 10; // Increased Nominatim parallel from 5 to 10 (still rate-limited)
+    // Increase timeout when using Nominatim (slower) or when processing many coordinates
+    const baseTimeout = ARC_GIS_API_KEY ? 50 * 1000 : 90 * 1000; // 90 seconds for Nominatim (allows more time)
+    const coordinateBasedTimeout = Math.max(baseTimeout, Math.ceil(coordinates.length / MAX_PARALLEL_GEOCODES) * REVERSE_GEOCODE_TIMEOUT + 10000); // Extra time for large batches
+    const MAX_REVERSE_GEOCODE_TIME = Math.min(coordinateBasedTimeout, 90 * 1000); // Cap at 90 seconds (before proxy timeout)
     const MAX_COORDINATES_TO_GEOCODE = 10000; // Significantly increased - process all found coordinates
     const overallTimeout = Date.now() + MAX_REVERSE_GEOCODE_TIME;
     
