@@ -50,22 +50,27 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
     const queryUrl = `${serviceUrl}/${layerId}/query`;
     
     // Build query parameters
+    // Note: Feature Service may use Web Mercator (3857) but we send WGS84 (4326)
+    // ArcGIS will auto-convert if we specify inSR and outSR
     const queryParams = {
       f: 'json',
       geometry: JSON.stringify({
         xmin: boundingBox.west,
         ymin: boundingBox.south,
         xmax: boundingBox.east,
-        ymax: boundingBox.north
+        ymax: boundingBox.north,
+        spatialReference: { wkid: 4326 } // Specify WGS84 input
       }),
       geometryType: 'esriGeometryEnvelope',
       spatialRel: 'esriSpatialRelIntersects',
+      inSR: 4326, // Input spatial reference: WGS84
+      outSR: 4326, // Output spatial reference: WGS84 (for consistency)
       outFields: '*',
       returnGeometry: true,
       returnIdsOnly: false,
       returnCountOnly: false,
       where: '1=1', // Return all features
-      resultRecordCount: 1000, // Limit results per query
+      resultRecordCount: 2000, // Use max record count for MSBFP2 service
       resultOffset: 0
     };
     
