@@ -1489,8 +1489,11 @@ async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCa
           });
         }
 
-        // Limit to prevent too many coordinates
-        if (coordinates.length >= MAX_BUILDING_RESULTS) {
+        // Don't break early - process all features from service
+        // The service will handle pagination if needed
+        // Only check for safety limit to prevent memory issues
+        if (coordinates.length >= 50000) {
+          console.warn('[MarketingDiscovery] Microsoft Building Footprints: Reached safety limit of 50000 coordinates, stopping early');
           break;
         }
       }

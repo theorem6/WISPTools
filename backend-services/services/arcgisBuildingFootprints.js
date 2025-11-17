@@ -70,7 +70,7 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       returnIdsOnly: false,
       returnCountOnly: false,
       where: '1=1', // Return all features
-      resultRecordCount: 2000, // Use max record count for MSBFP2 service
+      resultRecordCount: 5000, // Increased from 2000 to reduce pagination overhead for large queries
       resultOffset: 0
     };
     
@@ -131,13 +131,23 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       });
       
       // Fetch remaining pages
-      const maxRecordCount = queryParams.resultRecordCount || 2000;
+      const maxRecordCount = Math.min(queryParams.resultRecordCount || 5000, 5000); // Use up to 5000 per batch
       let offset = allFeatures.length;
       const remainingObjectIds = data.objectIds.slice(allFeatures.length);
       
+      console.log('[ArcGISBuildingFootprints] Starting pagination', {
+        totalObjectIds: data.objectIds.length,
+        alreadyFetched: allFeatures.length,
+        remaining: remainingObjectIds.length,
+        batchSize: maxRecordCount,
+        estimatedBatches: Math.ceil(remainingObjectIds.length / maxRecordCount)
+      });
+      
       // Fetch in batches
+      let batchCount = 0;
       while (offset < remainingObjectIds.length) {
         const batchObjectIds = remainingObjectIds.slice(offset, offset + maxRecordCount);
+        batchCount++;
         
         const paginationParams = {
           ...queryParams,
@@ -167,17 +177,19 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
           allFeatures = allFeatures.concat(paginationFeatures);
           
           console.log('[ArcGISBuildingFootprints] Pagination batch', {
+            batchNumber: batchCount,
             offset,
             batchSize: paginationFeatures.length,
             totalFetched: allFeatures.length,
-            remaining: remainingObjectIds.length - offset - paginationFeatures.length
+            remaining: remainingObjectIds.length - offset - paginationFeatures.length,
+            progress: `${((allFeatures.length / data.objectIds.length) * 100).toFixed(1)}%`
           });
           
           offset += batchObjectIds.length;
           
-          // Safety limit: don't fetch more than 10000 features
-          if (allFeatures.length >= 10000) {
-            console.warn('[ArcGISBuildingFootprints] Reached safety limit of 10000 features, stopping pagination');
+          // Safety limit: don't fetch more than 50000 features (increased from 10000)
+          if (allFeatures.length >= 50000) {
+            console.warn('[ArcGISBuildingFootprints] Reached safety limit of 50000 features, stopping pagination');
             break;
           }
         } catch (error) {
