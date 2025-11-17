@@ -2882,6 +2882,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
           null;
         
         if (!customServiceUrl) {
+          // If arcgis_building_footprints is the ONLY selected algorithm and no service URL is configured,
+          // return an error immediately instead of silently skipping
+          if (algorithms.length === 1 && algorithms[0] === 'arcgis_building_footprints') {
+            const errorMsg = 'ArcGIS Building Footprints requires a custom service URL. Configure ARCGIS_BUILDING_FOOTPRINTS_SERVICE_URL or select a different algorithm like arcgis_address_points or microsoft_footprints.';
+            console.error('[MarketingDiscovery]', errorMsg);
+            updateProgress('ArcGIS Building Footprints failed (no service URL)', 50);
+            recordAlgorithmStats('arcgis_building_footprints', 0, 0, errorMsg);
+            throw new Error(errorMsg);
+          }
+          // Otherwise, just skip it if other algorithms are also selected
           console.warn('[MarketingDiscovery] ArcGIS Building Footprints skipped - no custom service URL configured. Use ARCGIS_BUILDING_FOOTPRINTS_SERVICE_URL or microsoft_footprints instead.');
           updateProgress('ArcGIS Building Footprints skipped (no service URL)', 50);
           recordAlgorithmStats('arcgis_building_footprints', 0, 0, 'No custom service URL configured');
