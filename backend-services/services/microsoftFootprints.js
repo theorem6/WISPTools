@@ -767,8 +767,114 @@ async function queryByBoundingBox(bbox) {
 }
 
 /**
+ * Point-in-polygon test using ray casting algorithm
+ * Returns true if point is inside the polygon ring
+ */
+function pointInPolygon(point, ring) {
+  if (!Array.isArray(ring) || ring.length < 3) return false;
+  
+  const x = point[0]; // longitude
+  const y = point[1]; // latitude
+  let inside = false;
+  
+  // Ensure ring is closed
+  let closedRing = ring;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    closedRing = [...ring, first];
+  }
+  
+  for (let i = 0, j = closedRing.length - 1; i < closedRing.length; j = i++) {
+    const xi = closedRing[i][0];
+    const yi = closedRing[i][1];
+    const xj = closedRing[j][0];
+    const yj = closedRing[j][1];
+    
+    const intersect = ((yi > y) !== (yj > y)) && 
+                     (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  
+  return inside;
+}
+
+/**
+ * Find a point inside the polygon that's away from edges
+ * Uses bounding box center and moves it toward the polygon interior if needed
+ */
+function findInteriorPoint(ring) {
+  if (!Array.isArray(ring) || ring.length < 3) return null;
+  
+  // Calculate bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const coord of ring) {
+    if (Array.isArray(coord) && coord.length >= 2) {
+      minX = Math.min(minX, coord[0]);
+      minY = Math.min(minY, coord[1]);
+      maxX = Math.max(maxX, coord[0]);
+      maxY = Math.max(maxY, coord[1]);
+    }
+  }
+  
+  // Start with bounding box center
+  let centerX = (minX + maxX) / 2;
+  let centerY = (minY + maxY) / 2;
+  
+  // Check if bounding box center is inside
+  if (pointInPolygon([centerX, centerY], ring)) {
+    return { longitude: centerX, latitude: centerY };
+  }
+  
+  // If not inside, try to find a point inside by sampling
+  // Use a grid search approach - try multiple points within the bounding box
+  const samples = [
+    [0.25, 0.25], [0.75, 0.25], [0.5, 0.5], [0.25, 0.75], [0.75, 0.75],
+    [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9],
+    [0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]
+  ];
+  
+  for (const [fx, fy] of samples) {
+    const testX = minX + (maxX - minX) * fx;
+    const testY = minY + (maxY - minY) * fy;
+    if (pointInPolygon([testX, testY], ring)) {
+      return { longitude: testX, latitude: testY };
+    }
+  }
+  
+  // If no sampled point is inside, calculate the centroid of a shrunk polygon
+  // This is a simplified approach: use the average of all vertices weighted by distance from edges
+  let sumX = 0, sumY = 0, count = 0;
+  for (const coord of ring) {
+    if (Array.isArray(coord) && coord.length >= 2) {
+      sumX += coord[0];
+      sumY += coord[1];
+      count++;
+    }
+  }
+  
+  if (count > 0) {
+    const avgX = sumX / count;
+    const avgY = sumY / count;
+    
+    // If average is inside, use it; otherwise use the first vertex
+    if (pointInPolygon([avgX, avgY], ring)) {
+      return { longitude: avgX, latitude: avgY };
+    }
+  }
+  
+  // Last resort: use first vertex (should always be on the polygon)
+  if (ring.length > 0 && Array.isArray(ring[0]) && ring[0].length >= 2) {
+    return { longitude: ring[0][0], latitude: ring[0][1] };
+  }
+  
+  return null;
+}
+
+/**
  * Calculate the geometric centroid (area-weighted center) of a polygon ring
  * Uses the shoelace formula for accurate centroid calculation
+ * Ensures the centroid is inside the polygon (away from roads/edges)
  */
 function calculatePolygonCentroid(ring) {
   if (!Array.isArray(ring) || ring.length < 3) {
@@ -810,17 +916,32 @@ function calculatePolygonCentroid(ring) {
       sumXSimple += ring[i][0];
       sumYSimple += ring[i][1];
     }
-    return {
+    const centroid = {
       longitude: sumXSimple / ring.length,
       latitude: sumYSimple / ring.length
     };
+    
+    // Check if inside polygon, if not find interior point
+    if (!pointInPolygon([centroid.longitude, centroid.latitude], ring)) {
+      return findInteriorPoint(ring);
+    }
+    return centroid;
   }
   
   // Centroid = (sumX / (6*area), sumY / (6*area))
-  return {
+  const centroid = {
     longitude: sumX / (6 * area),
     latitude: sumY / (6 * area)
   };
+  
+  // Check if geometric centroid is inside the polygon
+  // If not (which can happen with concave polygons), find an interior point
+  if (!pointInPolygon([centroid.longitude, centroid.latitude], ring)) {
+    // Geometric centroid is outside polygon (concave shape), find interior point
+    return findInteriorPoint(ring);
+  }
+  
+  return centroid;
 }
 
 /**
