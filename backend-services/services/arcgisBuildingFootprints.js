@@ -70,7 +70,7 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       returnIdsOnly: false,
       returnCountOnly: false,
       where: '1=1', // Return all features
-      resultRecordCount: 5000, // Increased from 2000 to reduce pagination overhead for large queries
+      resultRecordCount: 2000, // Keep at 2000 for MSBFP2 service compatibility (service max limit)
       resultOffset: 0
     };
     
@@ -131,7 +131,7 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       });
       
       // Fetch remaining pages
-      const maxRecordCount = Math.min(queryParams.resultRecordCount || 5000, 5000); // Use up to 5000 per batch
+      const maxRecordCount = Math.min(queryParams.resultRecordCount || 2000, 2000); // Use service max limit (2000 for MSBFP2)
       let offset = allFeatures.length;
       const remainingObjectIds = data.objectIds.slice(allFeatures.length);
       
