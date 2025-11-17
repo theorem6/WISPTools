@@ -149,18 +149,23 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
         const batchObjectIds = remainingObjectIds.slice(offset, offset + maxRecordCount);
         batchCount++;
         
+        // Build pagination params - use objectIds instead of geometry
         const paginationParams = {
-          ...queryParams,
+          f: 'json',
           objectIds: batchObjectIds.join(','),
+          outFields: queryParams.outFields || '*',
+          returnGeometry: queryParams.returnGeometry !== false,
+          returnIdsOnly: false,
+          returnCountOnly: false,
           resultRecordCount: batchObjectIds.length,
-          resultOffset: 0 // Reset offset for objectIds query
+          resultOffset: 0,
+          outSR: queryParams.outSR || 4326
         };
         
-        // Remove geometry bounding box for objectIds queries (not needed)
-        delete paginationParams.geometry;
-        delete paginationParams.geometryType;
-        delete paginationParams.spatialRel;
-        delete paginationParams.inSR;
+        // Copy authentication token if present
+        if (queryParams.token) {
+          paginationParams.token = queryParams.token;
+        }
         
         try {
           const paginationResponse = await httpClient.get(queryUrl, {
