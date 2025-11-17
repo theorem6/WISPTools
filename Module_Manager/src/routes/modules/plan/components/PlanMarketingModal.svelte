@@ -48,37 +48,13 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
     totalRuns?: number;
   } | null;
 
-  const steps = ['Select Algorithms', 'Review & Run'];
-
-const ALGORITHM_OPTIONS = [
-    {
-      id: 'microsoft_footprints',
-      label: 'Microsoft Building Footprints',
-      description: 'Uses Microsoft\'s AI-generated building footprints from satellite imagery for comprehensive building coverage.'
-    },
-    {
-      id: 'osm_buildings',
-      label: 'OpenStreetMap Building Footprints',
-      description: 'Pulls building centroids from OpenStreetMap and reverse-geocodes the top matches.'
-    },
-    {
-      id: 'arcgis_address_points',
-      label: 'ArcGIS Address Points',
-      description: 'Uses Esri World Geocoding service to return residential and parcel address points.'
-    },
-    {
-      id: 'arcgis_building_footprints',
-      label: 'ArcGIS Building Footprints (Feature Service)',
-      description: 'Queries ArcGIS Feature Services for building footprint polygons (requires configured service URL).'
-    },
-    {
-      id: 'arcgis_places',
-      label: 'ArcGIS Places & Amenities',
-      description: 'Targets nearby places of interest (schools, businesses, amenities) for marketing outreach.'
-    }
-  ] as const;
+  // Single step wizard - no algorithm selection needed
+  const steps = ['Review & Run'];
 
   const DEFAULT_ALGORITHMS = ['microsoft_footprints', 'osm_buildings', 'arcgis_address_points'];
+  
+  // Remove algorithm options - always use default algorithms
+  const ALGORITHM_OPTIONS = [] as const;
 
   let isLoading = false;
   let error: string | null = null;
@@ -188,9 +164,10 @@ let results: PlanMarketingAddress[] = [];
     plan.marketing?.lastBoundingBox &&
     boundingBoxChangedSignificantly(latestExtent.boundingBox, plan.marketing.lastBoundingBox);
 
-  let selectedAlgorithms: string[] = [];
-  let initializedAlgorithms = false;
-  let selectedAlgorithmLabels: string[] = [];
+  // Always use default algorithms - no selection needed
+  let selectedAlgorithms: string[] = DEFAULT_ALGORITHMS;
+  let initializedAlgorithms = true; // Always initialized with fixed algorithms
+  let selectedAlgorithmLabels: string[] = ['Microsoft Building Footprints', 'OSM Building Footprints', 'ArcGIS Address Points'];
 
   let advancedOptions = {
     forceReverse: false,
@@ -207,10 +184,10 @@ let results: PlanMarketingAddress[] = [];
 
   onMount(() => {
     console.log('[PlanMarketingModal] Wizard opened', { planId: plan?.id, planName: plan?.name });
-    // Reset wizard state
+    // Reset wizard state - start at step 0 (which is now the only step)
     currentStep = 0;
     results = [];
-    summary = null;
+    // Don't reset summary - keep it so buildings cumulate properly
     error = null;
     info = null;
     isLoading = false;
@@ -237,25 +214,18 @@ let results: PlanMarketingAddress[] = [];
   });
 
   function initializeAlgorithms() {
-    if (initializedAlgorithms) return;
-    const existing = Array.isArray(plan.marketing?.algorithms)
-      ? plan.marketing.algorithms.filter((id) => ALGORITHM_OPTIONS.some(option => option.id === id))
-      : [];
-    selectedAlgorithms = existing.length ? existing : [...DEFAULT_ALGORITHMS];
+    // Always use default algorithms - no selection needed
+    selectedAlgorithms = [...DEFAULT_ALGORITHMS];
     initializedAlgorithms = true;
   }
 
-  function toggleAlgorithm(id: string) {
-    if (selectedAlgorithms.includes(id)) {
-      selectedAlgorithms = selectedAlgorithms.filter((alg) => alg !== id);
-    } else {
-      selectedAlgorithms = [...selectedAlgorithms, id];
-    }
-  }
-
   function algorithmLabel(id: string): string {
-    const match = ALGORITHM_OPTIONS.find(option => option.id === id);
-    return match ? match.label : id;
+    if (id === 'microsoft_footprints') return 'Microsoft Building Footprints';
+    if (id === 'osm_buildings') return 'OSM Building Footprints';
+    if (id === 'arcgis_address_points') return 'ArcGIS Address Points';
+    if (id === 'arcgis_building_footprints') return 'ArcGIS Building Footprints';
+    if (id === 'arcgis_places') return 'ArcGIS Places';
+    return id;
   }
 
   $: if (!initializedAlgorithms && plan) {
@@ -529,9 +499,8 @@ let results: PlanMarketingAddress[] = [];
     isLoading = true;
     info = 'Discovering addresses from map view...';
     error = null;
-    // Clear previous summary to prevent stale data from showing
-    summary = null;
-    // Clear results to show fresh data
+    // Don't clear summary - keep previous data so buildings cumulate properly
+    // Clear results for this run only
     results = [];
 
     const previousSavedCount =
@@ -614,11 +583,17 @@ let results: PlanMarketingAddress[] = [];
       // Use the higher value (backend might have the real count from database, results might be truncated)
       const finalGeocodedCount = Math.max(actualGeocodedCount, backendGeocodedCount);
       
-        summary = {
-          totalCandidates: (totalCandidatesFromStats || backendSummary?.total) ?? results.length,
-        geocodedCount: finalGeocodedCount,
+      // Update summary with new run data - CUMULATE the totalUniqueAddresses from backend
+      // Backend returns the actual total from database which includes all previous runs
+      // This is the cumulated total across all runs, not just this run
+      const newTotalUniqueAddresses = backendSummary.total ?? (summary?.totalUniqueAddresses ?? previousSavedCount);
+      const newGeocodedThisRun = finalGeocodedCount;
+      
+      summary = {
+        totalCandidates: (totalCandidatesFromStats || backendSummary?.total) ?? (summary?.totalCandidates ?? 0) + results.length,
+        geocodedCount: newGeocodedThisRun,
         newlyAdded: backendSummary.new ?? 0,
-        totalUniqueAddresses: backendSummary.total ?? results.length, // Total unique addresses saved
+        totalUniqueAddresses: newTotalUniqueAddresses, // Use backend total (cumulated from database across all runs)
         totalRuns: backendSummary.runs ?? previousTotalRuns + 1,
         previousCount: backendSummary.prev ?? previousSavedCount,
         truncated: backendSummary.truncated ?? false,
@@ -631,7 +606,8 @@ let results: PlanMarketingAddress[] = [];
       };
       
       const runtimeSpan = computeSpanMiles({ center, boundingBox });
-      const totalSaved = summary.totalUniqueAddresses ?? results.length;
+      // Use summary.totalUniqueAddresses (from backend, cumulated across all runs) - this is the real total
+      const totalSaved = summary.totalUniqueAddresses ?? previousSavedCount;
       const newlyAdded = summary.newlyAdded ?? Math.max(totalSaved - previousSavedCount, 0);
       const totalRuns = summary.totalRuns ?? previousTotalRuns + 1;
 
@@ -737,8 +713,11 @@ let results: PlanMarketingAddress[] = [];
   }
 
   function getTotalSavedAddresses(): number {
+    // Prioritize summary (from latest run) - it has the cumulated total from backend
     if (summary?.totalUniqueAddresses !== undefined) return summary.totalUniqueAddresses;
+    // Fall back to plan.marketing.totalUniqueAddresses (from database)
     if (plan.marketing?.totalUniqueAddresses !== undefined) return plan.marketing.totalUniqueAddresses;
+    // Last resort: count addresses array (might be truncated in response)
     if (Array.isArray(plan.marketing?.addresses)) return plan.marketing.addresses.length;
     return results.length;
   }
@@ -825,12 +804,8 @@ let results: PlanMarketingAddress[] = [];
   }
 
   $: hasMapExtent = Boolean(latestExtent?.boundingBox && latestExtent?.center);
-  $: canAdvance =
-    currentStep === 0
-      ? selectedAlgorithms.length > 0 && hasMapExtent
-      : true;
-  $: canRun =
-    currentStep === steps.length - 1 && hasMapExtent && selectedAlgorithms.length > 0;
+  $: canAdvance = true; // No longer need to check algorithms since they're always set
+  $: canRun = hasMapExtent; // Only need map extent to run
 
   function formatCoord(value: number | string | undefined, fractionDigits = 5): string {
     if (value === undefined || value === null) return '—';
@@ -981,128 +956,11 @@ let results: PlanMarketingAddress[] = [];
       {#if currentStep === 0}
         <section class="wizard-panel">
           <header>
-            <h3>Select Algorithms & Search Area</h3>
-            <p>Choose discovery methods and verify the map area. The search uses the visible map extent as the boundary.</p>
-          </header>
-          
-          <!-- Location Lookup Field -->
-          <div class="location-lookup-section" style="margin-bottom: 1.5rem; padding: 1rem; background: #f5f5f5; border-radius: 6px;">
-            <label for="location-lookup" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
-              <strong>📍 Location Lookup</strong>
-              <span style="font-size: 0.85rem; font-weight: normal; color: #666; display: block; margin-top: 0.25rem;">
-                Enter coordinates (lat, lon), city, state, or zip code
-              </span>
-            </label>
-            <div style="display: flex; gap: 0.5rem;">
-              <input
-                id="location-lookup"
-                type="text"
-                placeholder="e.g., 40.7128, -74.0060 or New York, NY or 10001"
-                bind:value={locationLookup}
-                disabled={isLookingUpLocation}
-                on:keydown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleLocationLookup();
-                  }
-                }}
-                style="flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem;"
-              />
-              <button
-                type="button"
-                on:click={handleLocationLookup}
-                disabled={!locationLookup.trim() || isLookingUpLocation}
-                style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap;"
-              >
-                {isLookingUpLocation ? 'Looking up...' : 'Lookup & Center'}
-              </button>
-            </div>
-            {#if locationLookupError}
-              <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fee; color: #c33; border-radius: 4px; font-size: 0.85rem;">
-                {locationLookupError}
-              </div>
-            {/if}
-          </div>
-          
-          {#if !hasMapExtent}
-            <div class="alert alert-warning">
-              <strong>⚠️ Map extent not available.</strong> Please zoom the map to define the search area before continuing.
-            </div>
-          {:else if latestExtent?.boundingBox}
-            <div class="extent-summary-prominent">
-              <h4>📍 Search Area (from map view)</h4>
-              <div class="extent-details">
-                <span>
-                  <strong>Bounds:</strong> lat {formatCoord(latestExtent.boundingBox.south, 4)} → {formatCoord(latestExtent.boundingBox.north, 4)},
-                  lon {formatCoord(latestExtent.boundingBox.west, 4)} → {formatCoord(latestExtent.boundingBox.east, 4)}
-                </span>
-                {#if extentSpanMiles}
-                  <span><strong>Span:</strong> {extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} miles</span>
-                  {#if Math.max(extentSpanMiles.width, extentSpanMiles.height) > 100}
-                    <span class="extent-warning">⚠️ Large area - will be auto-constrained to 50×50 miles max</span>
-                  {/if}
-                {/if}
-              </div>
-            </div>
-          {/if}
-          
-          <div class="options-grid">
-            <fieldset class="algorithm-fieldset">
-              <legend>Discovery Algorithms</legend>
-              <p class="section-help">
-                Select one or more address discovery strategies. Results are automatically deduplicated.
-              </p>
-              {#each ALGORITHM_OPTIONS as option}
-                <label class="algorithm-option">
-                  <input
-                    type="checkbox"
-                    checked={selectedAlgorithms.includes(option.id)}
-                    on:change={() => toggleAlgorithm(option.id)}
-                  />
-                  <span class="option-body">
-                    <span class="option-label">{option.label}</span>
-                    <span class="option-description">{option.description}</span>
-                  </span>
-                </label>
-              {/each}
-              {#if selectedAlgorithms.length === 0}
-                <p class="algorithm-warning">⚠️ Select at least one algorithm before continuing.</p>
-              {/if}
-            </fieldset>
-            
-            <details class="advanced-options-toggle">
-              <summary>Advanced Options (optional)</summary>
-              <div class="advanced-options-content">
-                <fieldset>
-                  <legend>Reverse Geocoding</legend>
-                  <label>
-                    <span>Force server reverse geocoding</span>
-                    <input type="checkbox" bind:checked={advancedOptions.forceReverse} />
-                  </label>
-                  <label>
-                    <span>Server batch size</span>
-                    <input
-                      type="number"
-                      min="5"
-                      max="50"
-                      step="5"
-                      bind:value={advancedOptions.reverse.batchSize}
-                    />
-                  </label>
-                </fieldset>
-              </div>
-            </details>
-          </div>
-        </section>
-      {/if}
-
-      {#if currentStep === 1}
-        <section class="wizard-panel">
-          <header>
             <h3>Review & Run Discovery</h3>
-            <p>The system will: (1) Find OSM building centroids in map view → (2) Reverse geocode with ArcGIS → (3) Deduplicate → (4) Place markers</p>
+            <p>The system will: (1) Find building footprints in map view → (2) Calculate centroids → (3) Reverse geocode with ArcGIS → (4) Deduplicate → (5) Place markers</p>
           </header>
           
+          <!-- Combined information from both steps -->
           <div class="review-grid">
             {#if latestExtent?.center}
               <div>
@@ -1120,9 +978,25 @@ let results: PlanMarketingAddress[] = [];
             {/if}
             <div>
               <span class="label">Algorithms</span>
-              <span class="value">{selectedAlgorithms.length} selected</span>
+              <span class="value">{selectedAlgorithmLabels.join(', ')}</span>
             </div>
           </div>
+          
+          {#if latestExtent?.boundingBox && extentSpanMiles}
+            <div class="extent-summary-prominent" style="margin-top: 1rem;">
+              <h4>📍 Search Area Details</h4>
+              <div class="extent-details">
+                <span>
+                  <strong>Bounds:</strong> lat {formatCoord(latestExtent.boundingBox.south, 4)} → {formatCoord(latestExtent.boundingBox.north, 4)},
+                  lon {formatCoord(latestExtent.boundingBox.west, 4)} → {formatCoord(latestExtent.boundingBox.east, 4)}
+                </span>
+                <span><strong>Span:</strong> {extentSpanMiles.width.toFixed(1)} × {extentSpanMiles.height.toFixed(1)} miles</span>
+                {#if Math.max(extentSpanMiles.width, extentSpanMiles.height) > 100}
+                  <span class="extent-warning">⚠️ Large area - will be auto-constrained to 50×50 miles max</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
 
           {#if error}
             <div class="alert alert-error">
