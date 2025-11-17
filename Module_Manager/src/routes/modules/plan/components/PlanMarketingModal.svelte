@@ -51,7 +51,9 @@ $: extentSpanMiles = computeSpanMiles(latestExtent);
   // Single step wizard - no algorithm selection needed
   const steps = ['Review & Run'];
 
-  const DEFAULT_ALGORITHMS = ['microsoft_footprints', 'osm_buildings', 'arcgis_address_points'];
+  // Only use building footprint algorithms - these return centroids inside buildings
+  // Do not use arcgis_address_points as it can return address points on roads/intersections
+  const DEFAULT_ALGORITHMS = ['microsoft_footprints', 'osm_buildings'];
   
   // Remove algorithm options - always use default algorithms
   const ALGORITHM_OPTIONS = [] as const;
@@ -167,7 +169,7 @@ let results: PlanMarketingAddress[] = [];
   // Always use default algorithms - no selection needed
   let selectedAlgorithms: string[] = DEFAULT_ALGORITHMS;
   let initializedAlgorithms = true; // Always initialized with fixed algorithms
-  let selectedAlgorithmLabels: string[] = ['Microsoft Building Footprints', 'OSM Building Footprints', 'ArcGIS Address Points'];
+  let selectedAlgorithmLabels: string[] = ['Microsoft Building Footprints', 'OSM Building Footprints'];
 
   let advancedOptions = {
     forceReverse: false,
