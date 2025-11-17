@@ -1764,6 +1764,11 @@ const extractArcgisCoordinates = (candidates = []) => {
 
 const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
   try {
+    if (!ARC_GIS_API_KEY) {
+      console.warn('[MarketingDiscovery] fetchArcgisCandidatesForExtent: ARC_GIS_API_KEY is not set');
+      throw new Error('ArcGIS API key not configured');
+    }
+
     const params = new URLSearchParams({
       f: 'json',
       outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
@@ -1778,6 +1783,13 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) =
       params.set('location', `${centerOverride.lon},${centerOverride.lat}`);
     }
 
+    console.log('[MarketingDiscovery] fetchArcgisCandidatesForExtent: Calling ArcGIS API', {
+      boundingBox,
+      centerOverride,
+      hasToken: !!ARC_GIS_API_KEY,
+      tokenPrefix: ARC_GIS_API_KEY ? ARC_GIS_API_KEY.substring(0, 20) + '...' : 'none'
+    });
+
     // Use axios with automatic retries instead of fetch
     const response = await httpClient.post(
       `${ARCGIS_GEOCODER_URL}/findAddressCandidates`,
@@ -1791,8 +1803,24 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) =
     );
 
     const payload = response.data;
+    
+    // Check for ArcGIS API errors
+    if (payload.error) {
+      console.error('[MarketingDiscovery] fetchArcgisCandidatesForExtent: ArcGIS API error', {
+        error: payload.error,
+        code: payload.error.code,
+        message: payload.error.message
+      });
+      throw new Error(`ArcGIS API error: ${payload.error.code || 'unknown'} - ${payload.error.message || 'Unknown error'}`);
+    }
+    
     const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
     const exceededLimit = Boolean(payload?.exceededTransferLimit) || candidates.length >= ARC_GIS_MAX_CANDIDATES_PER_REQUEST;
+
+    console.log('[MarketingDiscovery] fetchArcgisCandidatesForExtent: Success', {
+      candidateCount: candidates.length,
+      exceededLimit
+    });
 
     return {
       candidateCount: candidates.length,
@@ -1800,6 +1828,13 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) =
       rawCandidates: candidates // Return raw candidates for coordinate extraction
     };
   } catch (error) {
+    console.error('[MarketingDiscovery] fetchArcgisCandidatesForExtent: Failed', {
+      error: error.message,
+      response: error.response ? {
+        status: error.response.status,
+        data: error.response.data
+      } : null
+    });
     if (error.response) {
       const details = error.response.data ? JSON.stringify(error.response.data).substring(0, 500) : 'Unknown error';
       throw new Error(`ArcGIS API returned ${error.response.status}: ${details}`);
