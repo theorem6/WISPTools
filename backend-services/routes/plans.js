@@ -849,6 +849,11 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
     
     // Check for ArcGIS API errors
     if (data.error) {
+      // Don't log 498 Invalid Token errors - API key is invalid/expired, just return null silently
+      if (data.error.code === 498 || data.error.message === 'Invalid Token') {
+        // API key is invalid - return null silently (will fall back to Nominatim or coordinates)
+        return null;
+      }
       console.warn('[MarketingDiscovery] ArcGIS reverse geocode API error:', data.error.code, data.error.message);
       return null;
     }
@@ -885,7 +890,14 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
     };
   } catch (error) {
     if (error.response) {
-      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', error.response.status, error.response.data ? JSON.stringify(error.response.data).substring(0, 200) : 'Unknown error');
+      const status = error.response.status;
+      const errorData = error.response.data;
+      // Don't log 498 Invalid Token errors - API key is invalid/expired, just return null silently
+      if (status === 498 || (errorData && (errorData.error?.code === 498 || errorData.error?.message === 'Invalid Token'))) {
+        // API key is invalid - return null silently (will fall back to Nominatim or coordinates)
+        return null;
+      }
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', status, errorData ? JSON.stringify(errorData).substring(0, 200) : 'Unknown error');
     } else {
       console.warn('[MarketingDiscovery] ArcGIS reverse geocode failed:', error.message || error);
     }
@@ -2798,56 +2810,65 @@ router.post('/:id/marketing/discover', async (req, res) => {
     // Step 3: Collect coordinates from ArcGIS Building Footprints Feature Service (if enabled)
     if (algorithms.includes('arcgis_building_footprints')) {
       try {
-        updateProgress('Running ArcGIS Building Footprints lookup', 50);
-        console.log('[MarketingDiscovery] Running ArcGIS Building Footprints Feature Service discovery');
-        
-        // Check if custom service URL is configured
+        // Check if custom service URL is configured - skip if not configured
+        // The default "world" service doesn't exist, so we need a custom service URL
         const customServiceUrl = 
           appConfig?.externalServices?.arcgis?.buildingFootprintsServiceUrl ||
           process.env.ARCGIS_BUILDING_FOOTPRINTS_SERVICE_URL ||
           null;
         
-        const arcgisFootprintsResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
-          boundingBox,
-          {
-            serviceUrls: customServiceUrl ? [customServiceUrl] : null, // Use custom if configured
-            layerIds: [0], // Default to layer 0
-            requiresAuth: !!ARC_GIS_API_KEY // Require auth if API key is configured
-          }
-        );
-        
-        if (Array.isArray(arcgisFootprintsResult.coordinates)) {
-          for (const coord of arcgisFootprintsResult.coordinates) {
-            const latitude = toNumber(coord?.latitude);
-            const longitude = toNumber(coord?.longitude);
-            if (latitude === undefined || longitude === undefined) {
-              console.warn('[MarketingDiscovery] Skipping invalid ArcGIS building footprint coordinate:', coord);
-              continue;
+        if (!customServiceUrl) {
+          console.warn('[MarketingDiscovery] ArcGIS Building Footprints skipped - no custom service URL configured. Use ARCGIS_BUILDING_FOOTPRINTS_SERVICE_URL or microsoft_footprints instead.');
+          updateProgress('ArcGIS Building Footprints skipped (no service URL)', 50);
+          recordAlgorithmStats('arcgis_building_footprints', 0, 0, 'No custom service URL configured');
+        } else {
+          updateProgress('Running ArcGIS Building Footprints lookup', 50);
+          console.log('[MarketingDiscovery] Running ArcGIS Building Footprints Feature Service discovery', {
+            customServiceUrl
+          });
+          
+          const arcgisFootprintsResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
+            boundingBox,
+            {
+              serviceUrls: [customServiceUrl], // Use only the custom service
+              layerIds: [0], // Default to layer 0
+              requiresAuth: !!ARC_GIS_API_KEY // Require auth if API key is configured
             }
-            const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
-            if (!coordinateKeys.has(key)) {
-              coordinateKeys.add(key);
-              allCoordinates.push({
-                latitude,
-                longitude,
-                source: coord.source || 'arcgis_building_footprints',
-                attributes: coord.attributes || {}
-              });
+          );
+          
+          if (Array.isArray(arcgisFootprintsResult.coordinates)) {
+            for (const coord of arcgisFootprintsResult.coordinates) {
+              const latitude = toNumber(coord?.latitude);
+              const longitude = toNumber(coord?.longitude);
+              if (latitude === undefined || longitude === undefined) {
+                console.warn('[MarketingDiscovery] Skipping invalid ArcGIS building footprint coordinate:', coord);
+                continue;
+              }
+              const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
+              if (!coordinateKeys.has(key)) {
+                coordinateKeys.add(key);
+                allCoordinates.push({
+                  latitude,
+                  longitude,
+                  source: coord.source || 'arcgis_building_footprints',
+                  attributes: coord.attributes || {}
+                });
+              }
             }
           }
+
+          updateProgress('ArcGIS Building Footprints lookup completed', 52, { 
+            coordinates: arcgisFootprintsResult.coordinates?.length || 0,
+            totalCoordinates: allCoordinates.length,
+            error: arcgisFootprintsResult.error 
+          });
+          console.log('[MarketingDiscovery] ArcGIS Building Footprints completed', {
+            coordinates: arcgisFootprintsResult.coordinates?.length || 0,
+            totalCoordinates: allCoordinates.length
+          });
+
+          recordAlgorithmStats('arcgis_building_footprints', arcgisFootprintsResult.coordinates?.length || 0, 0, arcgisFootprintsResult.error);
         }
-
-        updateProgress('ArcGIS Building Footprints lookup completed', 52, { 
-          coordinates: arcgisFootprintsResult.coordinates?.length || 0,
-          totalCoordinates: allCoordinates.length,
-          error: arcgisFootprintsResult.error 
-        });
-        console.log('[MarketingDiscovery] ArcGIS Building Footprints completed', {
-          coordinates: arcgisFootprintsResult.coordinates?.length || 0,
-          totalCoordinates: allCoordinates.length
-        });
-
-        recordAlgorithmStats('arcgis_building_footprints', arcgisFootprintsResult.coordinates?.length || 0, 0, arcgisFootprintsResult.error);
       } catch (err) {
         updateProgress('ArcGIS Building Footprints failed', 52, { error: err.message });
         console.error('[MarketingDiscovery] ArcGIS Building Footprints Discovery failed:', err);
