@@ -119,25 +119,85 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
     }
     
     const data = response.data;
-    const features = Array.isArray(data.features) ? data.features : [];
+    let allFeatures = Array.isArray(data.features) ? data.features : [];
     const exceededTransferLimit = Boolean(data.exceededTransferLimit);
+    const totalCount = data.objectIds?.length || allFeatures.length;
     
     // Handle pagination if results exceeded limit
-    if (exceededTransferLimit && data.objectIds) {
-      console.log('[ArcGISBuildingFootprints] Results exceeded limit, would need pagination');
-      // Note: Could implement pagination here if needed
+    if (exceededTransferLimit && data.objectIds && data.objectIds.length > allFeatures.length) {
+      console.log('[ArcGISBuildingFootprints] Results exceeded limit, implementing pagination', {
+        returned: allFeatures.length,
+        total: totalCount
+      });
+      
+      // Fetch remaining pages
+      const maxRecordCount = queryParams.resultRecordCount || 2000;
+      let offset = allFeatures.length;
+      const remainingObjectIds = data.objectIds.slice(allFeatures.length);
+      
+      // Fetch in batches
+      while (offset < remainingObjectIds.length) {
+        const batchObjectIds = remainingObjectIds.slice(offset, offset + maxRecordCount);
+        
+        const paginationParams = {
+          ...queryParams,
+          objectIds: batchObjectIds.join(','),
+          resultRecordCount: batchObjectIds.length,
+          resultOffset: 0 // Reset offset for objectIds query
+        };
+        
+        // Remove geometry bounding box for objectIds queries (not needed)
+        delete paginationParams.geometry;
+        delete paginationParams.geometryType;
+        delete paginationParams.spatialRel;
+        delete paginationParams.inSR;
+        
+        try {
+          const paginationResponse = await httpClient.get(queryUrl, {
+            params: paginationParams,
+            timeout: 15000
+          });
+          
+          if (paginationResponse.data && paginationResponse.data.error) {
+            console.warn('[ArcGISBuildingFootprints] Pagination query error:', paginationResponse.data.error);
+            break;
+          }
+          
+          const paginationFeatures = Array.isArray(paginationResponse.data.features) ? paginationResponse.data.features : [];
+          allFeatures = allFeatures.concat(paginationFeatures);
+          
+          console.log('[ArcGISBuildingFootprints] Pagination batch', {
+            offset,
+            batchSize: paginationFeatures.length,
+            totalFetched: allFeatures.length,
+            remaining: remainingObjectIds.length - offset - paginationFeatures.length
+          });
+          
+          offset += batchObjectIds.length;
+          
+          // Safety limit: don't fetch more than 10000 features
+          if (allFeatures.length >= 10000) {
+            console.warn('[ArcGISBuildingFootprints] Reached safety limit of 10000 features, stopping pagination');
+            break;
+          }
+        } catch (error) {
+          console.error('[ArcGISBuildingFootprints] Pagination query failed:', error.message);
+          break;
+        }
+      }
     }
     
     console.log('[ArcGISBuildingFootprints] Query successful', {
-      featuresReturned: features.length,
+      featuresReturned: allFeatures.length,
       exceededLimit: exceededTransferLimit,
-      totalCount: data.objectIds?.length || features.length
+      totalCount: totalCount,
+      paginationUsed: exceededTransferLimit && allFeatures.length > (queryParams.resultRecordCount || 2000)
     });
     
     return {
-      features,
-      exceededLimit: exceededTransferLimit,
-      totalCount: data.objectIds?.length || features.length
+      features: allFeatures,
+      exceededLimit: exceededTransferLimit && allFeatures.length < totalCount,
+      totalCount: totalCount
     };
   } catch (error) {
     if (error.response) {
@@ -190,7 +250,65 @@ function convertEsriGeometryToGeoJSON(esriGeometry) {
 }
 
 /**
+ * Calculate the geometric centroid (area-weighted center) of a polygon ring
+ * Uses the shoelace formula for accurate centroid calculation
+ */
+function calculatePolygonCentroid(ring) {
+  if (!Array.isArray(ring) || ring.length < 3) {
+    return null;
+  }
+  
+  // Ensure the ring is closed (first point == last point)
+  let closedRing = ring;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    closedRing = [...ring, first];
+  }
+  
+  let area = 0;
+  let sumX = 0;
+  let sumY = 0;
+  
+  for (let i = 0; i < closedRing.length - 1; i++) {
+    const x1 = closedRing[i][0]; // longitude
+    const y1 = closedRing[i][1]; // latitude
+    const x2 = closedRing[i + 1][0];
+    const y2 = closedRing[i + 1][1];
+    
+    const cross = x1 * y2 - x2 * y1;
+    area += cross;
+    sumX += (x1 + x2) * cross;
+    sumY += (y1 + y2) * cross;
+  }
+  
+  // Area is twice the signed area
+  area = area / 2;
+  
+  if (Math.abs(area) < 1e-10) {
+    // Degenerate polygon (area too small), fall back to simple average
+    let sumXSimple = 0;
+    let sumYSimple = 0;
+    for (let i = 0; i < ring.length; i++) {
+      sumXSimple += ring[i][0];
+      sumYSimple += ring[i][1];
+    }
+    return {
+      longitude: sumXSimple / ring.length,
+      latitude: sumYSimple / ring.length
+    };
+  }
+  
+  // Centroid = (sumX / (6*area), sumY / (6*area))
+  return {
+    longitude: sumX / (6 * area),
+    latitude: sumY / (6 * area)
+  };
+}
+
+/**
  * Extract centroids from ArcGIS building footprint features
+ * Uses proper geometric centroid calculation (area-weighted center)
  */
 function extractCentroids(features) {
   const centroids = [];
@@ -201,33 +319,26 @@ function extractCentroids(features) {
     const geometry = feature.geometry;
     let centroid = null;
     
-    // Handle polygon (rings) - calculate centroid from vertices
+    // Handle polygon (rings) - calculate geometric centroid
     if (geometry.rings && Array.isArray(geometry.rings) && geometry.rings.length > 0) {
       const ring = geometry.rings[0]; // Use outer ring
       if (Array.isArray(ring) && ring.length > 0) {
-        let sumX = 0;
-        let sumY = 0;
-        let count = 0;
-        
-        for (const coord of ring) {
+        // Convert ring coordinates to flat array format [lon, lat]
+        const ringCoords = ring.map(coord => {
           if (Array.isArray(coord) && coord.length >= 2) {
-            sumX += coord[0]; // longitude
-            sumY += coord[1]; // latitude
-            count += 1;
+            return [coord[0], coord[1]]; // [lon, lat]
           }
-        }
+          return null;
+        }).filter(coord => coord !== null);
         
-        if (count > 0) {
-          centroid = {
-            longitude: sumX / count,
-            latitude: sumY / count
-          };
+        if (ringCoords.length >= 3) {
+          centroid = calculatePolygonCentroid(ringCoords);
         }
       }
     }
     
     // Handle point
-    if (geometry.x !== undefined && geometry.y !== undefined) {
+    if (!centroid && geometry.x !== undefined && geometry.y !== undefined) {
       centroid = {
         longitude: geometry.x,
         latitude: geometry.y

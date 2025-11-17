@@ -767,7 +767,65 @@ async function queryByBoundingBox(bbox) {
 }
 
 /**
+ * Calculate the geometric centroid (area-weighted center) of a polygon ring
+ * Uses the shoelace formula for accurate centroid calculation
+ */
+function calculatePolygonCentroid(ring) {
+  if (!Array.isArray(ring) || ring.length < 3) {
+    return null;
+  }
+  
+  // Ensure the ring is closed (first point == last point)
+  let closedRing = ring;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    closedRing = [...ring, first];
+  }
+  
+  let area = 0;
+  let sumX = 0;
+  let sumY = 0;
+  
+  for (let i = 0; i < closedRing.length - 1; i++) {
+    const x1 = closedRing[i][0]; // longitude
+    const y1 = closedRing[i][1]; // latitude
+    const x2 = closedRing[i + 1][0];
+    const y2 = closedRing[i + 1][1];
+    
+    const cross = x1 * y2 - x2 * y1;
+    area += cross;
+    sumX += (x1 + x2) * cross;
+    sumY += (y1 + y2) * cross;
+  }
+  
+  // Area is twice the signed area
+  area = area / 2;
+  
+  if (Math.abs(area) < 1e-10) {
+    // Degenerate polygon (area too small), fall back to simple average
+    let sumXSimple = 0;
+    let sumYSimple = 0;
+    for (let i = 0; i < ring.length; i++) {
+      sumXSimple += ring[i][0];
+      sumYSimple += ring[i][1];
+    }
+    return {
+      longitude: sumXSimple / ring.length,
+      latitude: sumYSimple / ring.length
+    };
+  }
+  
+  // Centroid = (sumX / (6*area), sumY / (6*area))
+  return {
+    longitude: sumX / (6 * area),
+    latitude: sumY / (6 * area)
+  };
+}
+
+/**
  * Calculate centroid from GeoJSON geometry
+ * Uses proper geometric centroid (area-weighted center) for polygons
  */
 function calculateCentroid(geometry) {
   if (!geometry) return null;
@@ -781,52 +839,41 @@ function calculateCentroid(geometry) {
   
   if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
     const ring = geometry.coordinates[0]; // Outer ring
-    if (Array.isArray(ring) && ring.length > 0) {
-      let sumLat = 0;
-      let sumLon = 0;
-      let count = 0;
-      
-      for (const coord of ring) {
-        if (Array.isArray(coord) && coord.length >= 2) {
-          sumLat += coord[1];
-          sumLon += coord[0];
-          count += 1;
-        }
-      }
-      
-      if (count > 0) {
+    if (Array.isArray(ring) && ring.length >= 3) {
+      const centroid = calculatePolygonCentroid(ring);
+      if (centroid) {
         return {
-          latitude: sumLat / count,
-          longitude: sumLon / count
+          latitude: centroid.latitude,
+          longitude: centroid.longitude
         };
       }
     }
   }
   
   if (geometry.type === 'MultiPolygon' && Array.isArray(geometry.coordinates)) {
-    let sumLat = 0;
-    let sumLon = 0;
-    let count = 0;
+    // For MultiPolygon, calculate centroids for each polygon and return the weighted average
+    const polygonCentroids = [];
     
     for (const polygon of geometry.coordinates) {
       if (Array.isArray(polygon) && polygon.length > 0) {
         const ring = polygon[0]; // Outer ring
-        if (Array.isArray(ring)) {
-          for (const coord of ring) {
-            if (Array.isArray(coord) && coord.length >= 2) {
-              sumLat += coord[1];
-              sumLon += coord[0];
-              count += 1;
-            }
+        if (Array.isArray(ring) && ring.length >= 3) {
+          const centroid = calculatePolygonCentroid(ring);
+          if (centroid) {
+            polygonCentroids.push(centroid);
           }
         }
       }
     }
     
-    if (count > 0) {
+    if (polygonCentroids.length > 0) {
+      // Return simple average of all polygon centroids
+      // For true area-weighted average, we'd need to calculate area of each polygon
+      const sumLat = polygonCentroids.reduce((sum, c) => sum + c.latitude, 0);
+      const sumLon = polygonCentroids.reduce((sum, c) => sum + c.longitude, 0);
       return {
-        latitude: sumLat / count,
-        longitude: sumLon / count
+        latitude: sumLat / polygonCentroids.length,
+        longitude: sumLon / polygonCentroids.length
       };
     }
   }
