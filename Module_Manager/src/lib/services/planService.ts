@@ -836,25 +836,35 @@ class PlanService {
     };
     const addresses: PlanMarketingAddress[] = Array.isArray(response.addresses)
       ? response.addresses.map((addr: any) => ({
-          addressLine1: addr.addressLine1 ?? addr.address ?? undefined,
+          // Backend sends shortened field names (a1, c, s, z, lat, lon, src) to reduce JSON size
+          // Map both shortened and full field names for compatibility
+          addressLine1: addr.a1 ?? addr.addressLine1 ?? addr.address ?? undefined,
           addressLine2: addr.addressLine2 ?? addr.unit ?? undefined,
-          city: addr.city ?? undefined,
-          state: addr.state ?? undefined,
-          postalCode: addr.postalCode ?? addr.zip ?? addr.postcode ?? undefined,
+          city: addr.c ?? addr.city ?? undefined,
+          state: addr.s ?? addr.state ?? undefined,
+          postalCode: addr.z ?? addr.postalCode ?? addr.zip ?? addr.postcode ?? undefined,
           country: addr.country ?? undefined,
           latitude:
-            typeof addr.latitude === 'number'
-              ? addr.latitude
-              : addr.latitude !== undefined
-                ? Number(addr.latitude)
-                : undefined,
+            typeof addr.lat === 'number'
+              ? addr.lat
+              : typeof addr.latitude === 'number'
+                ? addr.latitude
+                : addr.lat !== undefined
+                  ? Number(addr.lat)
+                  : addr.latitude !== undefined
+                    ? Number(addr.latitude)
+                    : undefined,
           longitude:
-            typeof addr.longitude === 'number'
-              ? addr.longitude
-              : addr.longitude !== undefined
-                ? Number(addr.longitude)
-                : undefined,
-          source: addr.source ?? undefined,
+            typeof addr.lon === 'number'
+              ? addr.lon
+              : typeof addr.longitude === 'number'
+                ? addr.longitude
+                : addr.lon !== undefined
+                  ? Number(addr.lon)
+                  : addr.longitude !== undefined
+                    ? Number(addr.longitude)
+                    : undefined,
+          source: addr.src ?? addr.source ?? undefined,
           discoveredAt: normalizeIsoString(addr.discoveredAt ?? addr.discovered_at ?? addr.runTimestamp)
         }))
       : [];

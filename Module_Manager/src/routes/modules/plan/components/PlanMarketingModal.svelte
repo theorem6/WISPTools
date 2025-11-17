@@ -576,22 +576,29 @@ let results: PlanMarketingAddress[] = [];
         }
       }
       
-      // Calculate actual geocoded count from results (addresses with addressLine1)
-      const actualGeocodedCount = results.filter(addr => addr && addr.addressLine1 && addr.addressLine1.trim().length > 0).length;
-      // Also calculate from backend summary if available (might be more accurate)
-      const backendGeocodedCount = backendSummary.geocoded ?? 0;
-      // Use the higher value (backend might have the real count from database, results might be truncated)
-      const finalGeocodedCount = Math.max(actualGeocodedCount, backendGeocodedCount);
+      // Backend sends geocoded count which is the TOTAL geocoded addresses across ALL runs
+      // This is more accurate than counting from results (which might be truncated to 5000)
+      // Backend has access to all addresses in the database, not just the response subset
+      const totalGeocodedCount = backendSummary.geocoded ?? 0;
+      
+      // Calculate geocoded count from results as a sanity check (only if results are not truncated)
+      const actualGeocodedCountFromResults = results.filter(addr => addr && addr.addressLine1 && addr.addressLine1.trim().length > 0).length;
+      
+      // Use backend count as primary source (it has the full database count)
+      // Only use results count if backend count is missing AND results are not truncated
+      const finalGeocodedCount = totalGeocodedCount > 0 
+        ? totalGeocodedCount 
+        : (backendSummary.truncated ? totalGeocodedCount : actualGeocodedCountFromResults);
       
       // Update summary with new run data - CUMULATE the totalUniqueAddresses from backend
       // Backend returns the actual total from database which includes all previous runs
       // This is the cumulated total across all runs, not just this run
       const newTotalUniqueAddresses = backendSummary.total ?? (summary?.totalUniqueAddresses ?? previousSavedCount);
-      const newGeocodedThisRun = finalGeocodedCount;
+      const newGeocodedCount = finalGeocodedCount;
       
       summary = {
         totalCandidates: (totalCandidatesFromStats || backendSummary?.total) ?? (summary?.totalCandidates ?? 0) + results.length,
-        geocodedCount: newGeocodedThisRun,
+        geocodedCount: newGeocodedCount, // Total geocoded addresses across all runs (from backend)
         newlyAdded: backendSummary.new ?? 0,
         totalUniqueAddresses: newTotalUniqueAddresses, // Use backend total (cumulated from database across all runs)
         totalRuns: backendSummary.runs ?? previousTotalRuns + 1,
