@@ -1777,11 +1777,22 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride, api
       throw new Error('ArcGIS API key not configured');
     }
 
+    // Use JSON envelope format for searchExtent (required for proper coordinate system handling)
+    const searchExtentJson = {
+      xmin: boundingBox.west,
+      ymin: boundingBox.south,
+      xmax: boundingBox.east,
+      ymax: boundingBox.north,
+      spatialReference: { wkid: 4326 } // WGS84
+    };
+
     const params = new URLSearchParams({
       f: 'json',
       outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
       maxLocations: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
-      searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
+      searchExtent: JSON.stringify(searchExtentJson), // JSON envelope format with spatial reference
+      inSR: '4326', // Input spatial reference: WGS84
+      outSR: '4326', // Output spatial reference: WGS84
       category: 'Point Address',
       forStorage: 'false',
       token: apiKey
@@ -1793,6 +1804,7 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride, api
 
     console.log('[MarketingDiscovery] fetchArcgisCandidatesForExtent: Calling ArcGIS API', {
       boundingBox,
+      searchExtent: searchExtentJson,
       centerOverride,
       hasToken: !!apiKey,
       tokenLength: apiKey.length,
@@ -1828,7 +1840,11 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride, api
 
     console.log('[MarketingDiscovery] fetchArcgisCandidatesForExtent: Success', {
       candidateCount: candidates.length,
-      exceededLimit
+      exceededLimit,
+      sampleCandidates: candidates.length > 0 ? candidates.slice(0, 3).map(c => ({
+        address: c.address,
+        location: c.location
+      })) : []
     });
 
     return {
