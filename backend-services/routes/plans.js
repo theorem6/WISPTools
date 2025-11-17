@@ -1788,12 +1788,13 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride, api
 
     const params = new URLSearchParams({
       f: 'json',
-      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal',
+      outFields: 'Match_addr,Addr_type,PlaceName,City,Region,Postal,Address,Score',
       maxLocations: String(ARC_GIS_MAX_CANDIDATES_PER_REQUEST),
       searchExtent: JSON.stringify(searchExtentJson), // JSON envelope format with spatial reference
       inSR: '4326', // Input spatial reference: WGS84
       outSR: '4326', // Output spatial reference: WGS84
-      category: 'Point Address',
+      // Remove category filter - it may be too restrictive. We'll filter by Addr_type in extractArcgisCoordinates instead.
+      // category: 'Point Address',
       forStorage: 'false',
       token: apiKey
     });
