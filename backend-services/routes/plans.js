@@ -1762,10 +1762,18 @@ const extractArcgisCoordinates = (candidates = []) => {
     .filter(Boolean);
 };
 
-const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) => {
+const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride, apiKey: providedApiKey }) => {
   try {
-    if (!ARC_GIS_API_KEY) {
-      console.warn('[MarketingDiscovery] fetchArcgisCandidatesForExtent: ARC_GIS_API_KEY is not set');
+    // Use provided API key, or fall back to module-level constant, or runtime env
+    const apiKey = providedApiKey || ARC_GIS_API_KEY || appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
+    
+    if (!apiKey || apiKey.length === 0) {
+      console.error('[MarketingDiscovery] fetchArcgisCandidatesForExtent: API key is not set', {
+        provided: !!providedApiKey,
+        moduleLevel: !!ARC_GIS_API_KEY,
+        processEnv: !!process.env.ARCGIS_API_KEY,
+        appConfig: !!appConfig?.externalServices?.arcgis?.apiKey
+      });
       throw new Error('ArcGIS API key not configured');
     }
 
@@ -1776,7 +1784,7 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) =
       searchExtent: `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`,
       category: 'Point Address',
       forStorage: 'false',
-      token: ARC_GIS_API_KEY
+      token: apiKey
     });
 
     if (centerOverride?.lon !== undefined && centerOverride?.lat !== undefined) {
@@ -1786,8 +1794,9 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride }) =
     console.log('[MarketingDiscovery] fetchArcgisCandidatesForExtent: Calling ArcGIS API', {
       boundingBox,
       centerOverride,
-      hasToken: !!ARC_GIS_API_KEY,
-      tokenPrefix: ARC_GIS_API_KEY ? ARC_GIS_API_KEY.substring(0, 20) + '...' : 'none'
+      hasToken: !!apiKey,
+      tokenLength: apiKey.length,
+      tokenPrefix: apiKey ? apiKey.substring(0, 20) + '...' : 'none'
     });
 
     // Use axios with automatic retries instead of fetch
@@ -1859,14 +1868,27 @@ const shouldSubdivideArcgisExtent = ({ spanMiles, depth, candidateCount, exceede
 
 // Modified to return coordinates only - reverse geocoding happens later in batch
 async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
+  // Re-check API key at runtime (in case it wasn't loaded at module load time)
+  const apiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+  
   console.log('[MarketingDiscovery] ArcGIS Address Points Discovery called (coordinates only)', {
-    hasApiKey: !!ARC_GIS_API_KEY,
-    boundingBox
+    hasApiKey: !!apiKey,
+    apiKeyLength: apiKey.length,
+    apiKeyPrefix: apiKey ? apiKey.substring(0, 20) + '...' : 'none',
+    boundingBox,
+    moduleLevelKey: !!ARC_GIS_API_KEY,
+    processEnvKey: !!process.env.ARCGIS_API_KEY,
+    appConfigKey: !!appConfig?.externalServices?.arcgis?.apiKey
   });
   
-  if (!ARC_GIS_API_KEY) {
-    console.warn('[MarketingDiscovery] ArcGIS API key not configured, skipping address points');
-    return { coordinates: [], error: 'ArcGIS API key not configured' };
+  if (!apiKey || apiKey.length === 0) {
+    const errorMsg = 'ArcGIS API key not configured';
+    console.error('[MarketingDiscovery]', errorMsg, {
+      moduleLevel: !!ARC_GIS_API_KEY,
+      processEnv: !!process.env.ARCGIS_API_KEY,
+      appConfig: !!appConfig?.externalServices?.arcgis?.apiKey
+    });
+    return { coordinates: [], error: errorMsg };
   }
 
   if (!isValidBoundingBox(boundingBox)) {
@@ -1888,9 +1910,12 @@ async function runArcgisAddressPointsDiscovery({ boundingBox, center }) {
       const requestCenter = center ?? computeBoundingBoxCenter(currentBBox);
       const spanMiles = computeBoundingBoxSpanMiles(currentBBox);
 
+      // Use runtime API key (not module-level constant)
+      const apiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
       const result = await fetchArcgisCandidatesForExtent({
         boundingBox: currentBBox,
-        centerOverride: requestCenter
+        centerOverride: requestCenter,
+        apiKey // Pass API key explicitly
       });
 
       // Extract coordinates instead of full addresses
@@ -2789,12 +2814,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
     }
 
     // Step 2: Collect coordinates from ArcGIS address points
-    if (algorithms.includes('arcgis_address_points') && ARC_GIS_API_KEY) {
+    // Check API key at runtime (not just module-level constant)
+    const runtimeApiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+    if (algorithms.includes('arcgis_address_points') && runtimeApiKey) {
       try {
         console.log('[MarketingDiscovery] Starting ArcGIS address points discovery (coordinates only)', {
           boundingBox,
           center: computedCenter,
-          hasApiKey: !!ARC_GIS_API_KEY
+          hasApiKey: !!runtimeApiKey,
+          apiKeyLength: runtimeApiKey.length,
+          apiKeyPrefix: runtimeApiKey ? runtimeApiKey.substring(0, 20) + '...' : 'none'
         });
         updateProgress('Running ArcGIS address points lookup', 40);
         const arcgisResult = await runArcgisAddressPointsDiscovery({
