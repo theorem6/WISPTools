@@ -1844,8 +1844,17 @@ const fetchArcgisCandidatesForExtent = async ({ boundingBox, centerOverride, api
       exceededLimit,
       sampleCandidates: candidates.length > 0 ? candidates.slice(0, 3).map(c => ({
         address: c.address,
-        location: c.location
-      })) : []
+        location: c.location,
+        score: c.score,
+        attributes: c.attributes
+      })) : [],
+      // Log full response if no candidates to debug
+      fullResponse: candidates.length === 0 ? {
+        hasError: !!payload.error,
+        error: payload.error,
+        spatialReference: payload.spatialReference,
+        extent: payload.extent
+      } : undefined
     });
 
     return {
