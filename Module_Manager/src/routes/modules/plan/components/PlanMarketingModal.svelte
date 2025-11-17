@@ -742,10 +742,15 @@ let results: PlanMarketingAddress[] = [];
   }
 
   function getAllSavedAddresses(): PlanMarketingAddress[] {
-    if (Array.isArray(plan.marketing?.addresses) && plan.marketing.addresses.length > 0) {
-      return plan.marketing.addresses;
-    }
-    return results;
+    // Get addresses from plan or results
+    const allAddresses = Array.isArray(plan.marketing?.addresses) && plan.marketing.addresses.length > 0
+      ? plan.marketing.addresses
+      : results;
+    
+    // Filter out addresses without address information (no addressLine1)
+    return allAddresses.filter((addr) => {
+      return addr && addr.addressLine1 && addr.addressLine1.trim().length > 0;
+    });
   }
 
   function exportAddresses(addresses: PlanMarketingAddress[], filenameSuffix: string) {

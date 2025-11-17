@@ -834,7 +834,8 @@ class PlanService {
       const parsed = new Date(value as any);
       return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
     };
-    const addresses: PlanMarketingAddress[] = Array.isArray(response.addresses)
+    // Map addresses and filter out those without address information
+    const mappedAddresses = Array.isArray(response.addresses)
       ? response.addresses.map((addr: any) => ({
           // Backend sends shortened field names (a1, c, s, z, lat, lon, src) to reduce JSON size
           // Map both shortened and full field names for compatibility
@@ -868,6 +869,47 @@ class PlanService {
           discoveredAt: normalizeIsoString(addr.discoveredAt ?? addr.discovered_at ?? addr.runTimestamp)
         }))
       : [];
+
+    // Filter out addresses without address information (no addressLine1)
+    const addressesWithInfo = mappedAddresses.filter((addr) => {
+      return addr && addr.addressLine1 && addr.addressLine1.trim().length > 0;
+    });
+
+    // Deduplicate addresses based on addressLine1 + city + state + postalCode
+    // Also deduplicate by coordinates (within 0.0001 degrees ≈ 11 meters)
+    const seenAddressKeys = new Set<string>();
+    const seenCoordinateKeys = new Set<string>();
+    const addresses: PlanMarketingAddress[] = [];
+
+    for (const addr of addressesWithInfo) {
+      // Create unique key from address components
+      const addressKey = [
+        (addr.addressLine1 || '').toLowerCase().trim(),
+        (addr.city || '').toLowerCase().trim(),
+        (addr.state || '').toLowerCase().trim(),
+        (addr.postalCode || '').trim()
+      ].join('|');
+
+      // Create coordinate key for spatial deduplication
+      const coordKey = addr.latitude !== undefined && addr.longitude !== undefined
+        ? `${addr.latitude.toFixed(4)},${addr.longitude.toFixed(4)}`
+        : null;
+
+      // Skip if duplicate by address or coordinates
+      if (seenAddressKeys.has(addressKey)) {
+        continue;
+      }
+      if (coordKey && seenCoordinateKeys.has(coordKey)) {
+        continue;
+      }
+
+      // Add to seen sets and result array
+      seenAddressKeys.add(addressKey);
+      if (coordKey) {
+        seenCoordinateKeys.add(coordKey);
+      }
+      addresses.push(addr);
+    }
 
     return {
       summary: {
