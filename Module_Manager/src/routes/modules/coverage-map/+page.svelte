@@ -656,6 +656,21 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       } else {
         console.warn('[CoverageMap] Map component not ready for centering');
       }
+    } else if (source === 'plan-page') {
+      // Handle messages from plan page
+      if (type === 'enable-rectangle-drawing') {
+        if (mapComponent) {
+          mapComponent.enableRectangleDrawing().catch(err => {
+            console.error('[CoverageMap] Failed to enable rectangle drawing:', err);
+          });
+        }
+      } else if (type === 'disable-rectangle-drawing') {
+        if (mapComponent) {
+          mapComponent.disableRectangleDrawing().catch(err => {
+            console.error('[CoverageMap] Failed to disable rectangle drawing:', err);
+          });
+        }
+      }
     }
   }
   

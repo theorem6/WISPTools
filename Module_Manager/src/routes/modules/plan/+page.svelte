@@ -8,6 +8,7 @@
   import { planService, type PlanProject, type PlanProjectLocation, type PlanProjectMarketing } from '$lib/services/planService';
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
   import PlanMarketingModal from './components/PlanMarketingModal.svelte';
+  import PlanMarketingResultsPopup from './components/PlanMarketingResultsPopup.svelte';
 import SettingsButton from '$lib/components/SettingsButton.svelte';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
 import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
@@ -34,7 +35,11 @@ interface MapViewExtentPayload {
   let showMissingHardwareModal = false;
   let showAddRequirementModal = false;
   let showMarketingModal = false;
+  let showMarketingResultsPopup = false;
   let marketingAvailable = false;
+  let isDrawingRectangle = false;
+  let discoveryResults: PlanMarketingAddress[] = [];
+  let isDiscoveringAddresses = false;
   
   // Data
   let projects: PlanProject[] = [];
@@ -546,10 +551,24 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         // Add center-map-on-location listener
         window.addEventListener('center-map-on-location', handleCenterMapOnLocation as any);
         const removeCenterListener = () => window.removeEventListener('center-map-on-location', handleCenterMapOnLocation as any);
+        
+        // Listen for messages from iframe (coverage-map)
+        const handleMessage = (event: MessageEvent) => {
+          const { source, type, detail } = event.data || {};
+          if (source === 'coverage-map') {
+            if (type === 'rectangle-drawn') {
+              handleRectangleDrawn(new CustomEvent('rectangle-drawn', { detail }));
+            }
+          }
+        };
+        window.addEventListener('message', handleMessage);
+        const removeMessageListener = () => window.removeEventListener('message', handleMessage);
+        
         const originalRemove = removeListener;
         removeListener = () => {
           originalRemove();
           removeCenterListener();
+          removeMessageListener();
         };
         
         iframeInitialized = true;
@@ -899,7 +918,64 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     showMarketingModal = false;
   }
 
-  function openMarketingTools(project?: PlanProject, options: { closeProjectModal?: boolean } = {}) {
+  function closeMarketingResultsPopup() {
+    showMarketingResultsPopup = false;
+    discoveryResults = [];
+    // Disable drawing mode
+    isDrawingRectangle = false;
+    const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({
+        source: 'plan-page',
+        type: 'disable-rectangle-drawing'
+      }, '*');
+    }
+  }
+
+  async function handleRectangleDrawn(event: CustomEvent<any>) {
+    const { boundingBox, center } = event.detail;
+    if (!boundingBox || !center || !selectedProject) {
+      return;
+    }
+
+    isDrawingRectangle = false;
+    isDiscoveringAddresses = true;
+    showMarketingResultsPopup = true;
+    discoveryResults = [];
+
+    try {
+      // Calculate radius from bounding box
+      const latSpan = boundingBox.north - boundingBox.south;
+      const lonSpan = boundingBox.east - boundingBox.west;
+      const maxSpan = Math.max(latSpan, lonSpan);
+      // Rough conversion: 1 degree ≈ 69 miles at equator
+      const radiusMiles = Math.min((maxSpan * 69) / 2, 50);
+
+      const response = await planService.discoverMarketingAddresses(selectedProject.id, {
+        boundingBox,
+        radiusMiles,
+        center,
+        options: {
+          algorithms: ['microsoft_footprints', 'osm_buildings']
+        }
+      });
+
+      discoveryResults = response.addresses || [];
+      
+      // Refresh plan data
+      await loadData(true);
+      
+    } catch (err: any) {
+      console.error('[Plan] Address discovery failed:', err);
+      error = err?.message || 'Failed to discover addresses. Please try again.';
+      setTimeout(() => error = '', 5000);
+      showMarketingResultsPopup = false;
+    } finally {
+      isDiscoveringAddresses = false;
+    }
+  }
+
+  async function openMarketingTools(project?: PlanProject, options: { closeProjectModal?: boolean } = {}) {
     const { closeProjectModal: shouldCloseProjectModal = false } = options;
 
     const targetPlan =
@@ -919,14 +995,31 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
       closeProjectModal();
     }
 
-    console.log('[Plan] Opening find addresses wizard', {
-      planId: targetPlan.id,
-      planName: targetPlan.name,
-      source: project ? 'project-row' : 'map-control'
-    });
-
     selectedProject = targetPlan;
-    showMarketingModal = true;
+
+    // Enable rectangle drawing on the map
+    try {
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          source: 'plan-page',
+          type: 'enable-rectangle-drawing'
+        }, '*');
+        
+        isDrawingRectangle = true;
+        console.log('[Plan] Enabled rectangle drawing for address discovery', {
+          planId: targetPlan.id,
+          planName: targetPlan.name
+        });
+      } else {
+        error = 'Map not ready. Please wait for the map to load.';
+        setTimeout(() => error = '', 5000);
+      }
+    } catch (err: any) {
+      console.error('[Plan] Failed to enable rectangle drawing:', err);
+      error = 'Failed to enable drawing mode. Please try again.';
+      setTimeout(() => error = '', 5000);
+    }
   }
 
   function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
@@ -1356,13 +1449,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </button>
         <button
           class="control-btn marketing-btn"
+          class:drawing={isDrawingRectangle}
           type="button"
           on:click={() => openMarketingTools()}
-          title="Discover serviceable addresses for marketing outreach"
-          disabled={!marketingAvailable}
+          title={isDrawingRectangle ? "Click and drag on map to draw a rectangle" : "Draw a rectangle on the map to discover addresses"}
+          disabled={!marketingAvailable || isDiscoveringAddresses}
         >
           <span class="control-icon">🔍</span>
-          <span class="control-label">Find Addresses</span>
+          <span class="control-label">{isDrawingRectangle ? "Drawing..." : "Find Addresses"}</span>
         </button>
         {#if selectedProject}
           <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
@@ -1582,9 +1676,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     class="action-btn marketing-btn"
                     type="button"
                     on:click={() => openMarketingTools(project, { closeProjectModal: true })}
-                    title="Discover serviceable addresses for marketing outreach"
+                    title={isDrawingRectangle ? "Click and drag on map to draw a rectangle" : "Draw a rectangle on the map to discover addresses"}
                   >
-                    🔍 Find Addresses
+                    {isDrawingRectangle ? "📐 Drawing..." : "🔍 Find Addresses"}
                   </button>
                   {#if project.status === 'draft'}
                     <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
@@ -1945,13 +2039,23 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     </div>
   {/if}
 
-  <!-- Marketing Modal -->
+  <!-- Marketing Modal (deprecated - kept for backward compatibility) -->
   {#if showMarketingModal && selectedProject}
     <PlanMarketingModal
       plan={selectedProject}
       mapExtent={latestMapExtent}
       on:close={closeMarketingTools}
       on:updated={handleMarketingUpdated}
+    />
+  {/if}
+
+  <!-- Marketing Results Popup -->
+  {#if showMarketingResultsPopup && selectedProject}
+    <PlanMarketingResultsPopup
+      plan={selectedProject}
+      addresses={discoveryResults}
+      isLoading={isDiscoveringAddresses}
+      on:close={closeMarketingResultsPopup}
     />
   {/if}
 

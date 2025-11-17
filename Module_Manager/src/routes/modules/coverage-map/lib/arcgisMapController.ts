@@ -70,6 +70,11 @@ export class CoverageMapController {
   private planDraftFeatures: PlanLayerFeature[] = [];
   private marketingLeads: PlanMarketingAddress[] = [];
   private hasPerformedInitialFit = false;
+  
+  // Drawing state for marketing address discovery
+  private sketchWidget: any = null;
+  private drawingGraphicsLayer: any = null;
+  private isDrawingMode = false;
 
   constructor(dispatch: DispatchFn) {
     this.dispatch = dispatch;
@@ -159,6 +164,137 @@ export class CoverageMapController {
 
   public isReady(): boolean {
     return this.mapReady;
+  }
+
+  public async enableRectangleDrawing(): Promise<void> {
+    if (!this.mapView || !this.mapReady) {
+      console.warn('[CoverageMap] Map not ready for drawing');
+      return;
+    }
+
+    try {
+      await this.mapView.when();
+      
+      // Import Sketch widget
+      const [{ default: Sketch }, { default: GraphicsLayer }] = await Promise.all([
+        import('@arcgis/core/widgets/Sketch.js'),
+        import('@arcgis/core/layers/GraphicsLayer.js')
+      ]);
+
+      // Create drawing graphics layer if it doesn't exist
+      if (!this.drawingGraphicsLayer) {
+        this.drawingGraphicsLayer = new GraphicsLayer();
+        this.map.add(this.drawingGraphicsLayer);
+      }
+
+      // Create sketch widget if it doesn't exist
+      if (!this.sketchWidget) {
+        this.sketchWidget = new Sketch({
+          view: this.mapView,
+          layer: this.drawingGraphicsLayer,
+          creationMode: 'single',
+          visibleElements: {
+            createTools: {
+              point: false,
+              polygon: false,
+              polyline: false,
+              circle: false,
+              rectangle: true
+            },
+            selectionTools: {
+              'lasso-selection': false,
+              'rectangle-selection': false
+            },
+            undoRedoMenu: false,
+            settingsMenu: false
+          }
+        });
+
+        // Handle when rectangle is created
+        this.sketchWidget.on('create', async (event: any) => {
+          if (event.state === 'complete') {
+            const geometry = event.graphic.geometry;
+            if (geometry && geometry.type === 'polygon') {
+              // Extract bounding box from rectangle
+              const extent = geometry.extent;
+              if (extent) {
+                const boundingBox = {
+                  west: extent.xmin,
+                  east: extent.xmax,
+                  south: extent.ymin,
+                  north: extent.ymax
+                };
+
+                const center = {
+                  lat: (extent.ymin + extent.ymax) / 2,
+                  lon: (extent.xmin + extent.xmax) / 2
+                };
+
+                // Clear the drawing
+                this.drawingGraphicsLayer.removeAll();
+                
+                // Disable drawing mode
+                await this.disableRectangleDrawing();
+
+                // Dispatch event with bounding box
+                this.dispatch('rectangle-drawn', {
+                  boundingBox,
+                  center,
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates: [geometry.rings[0].map((ring: any) => [ring[0], ring[1]])]
+                  }
+                });
+              }
+            }
+          }
+        });
+      }
+
+      // Show the sketch widget
+      this.mapView.ui.add(this.sketchWidget, {
+        position: 'top-left',
+        index: 0
+      });
+
+      // Enable rectangle creation
+      this.sketchWidget.create('rectangle');
+      this.isDrawingMode = true;
+
+      console.log('[CoverageMap] Rectangle drawing enabled');
+    } catch (error) {
+      console.error('[CoverageMap] Failed to enable rectangle drawing:', error);
+    }
+  }
+
+  public async disableRectangleDrawing(): Promise<void> {
+    if (!this.mapView || !this.sketchWidget) {
+      return;
+    }
+
+    try {
+      // Cancel any active drawing
+      if (this.sketchWidget.activeTool) {
+        this.sketchWidget.cancel();
+      }
+
+      // Remove widget from UI
+      this.mapView.ui.remove(this.sketchWidget);
+
+      // Clear drawing graphics
+      if (this.drawingGraphicsLayer) {
+        this.drawingGraphicsLayer.removeAll();
+      }
+
+      this.isDrawingMode = false;
+      console.log('[CoverageMap] Rectangle drawing disabled');
+    } catch (error) {
+      console.error('[CoverageMap] Failed to disable rectangle drawing:', error);
+    }
+  }
+
+  public isDrawingRectangle(): boolean {
+    return this.isDrawingMode;
   }
 
   public changeBasemap(basemapId: string): void {

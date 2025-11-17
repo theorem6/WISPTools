@@ -22,7 +22,18 @@ export let isPlanMode = false;
   let controller: CoverageMapController | null = null;
 
   onMount(async () => {
-    controller = new CoverageMapController((event, detail) => dispatch(event, detail));
+    controller = new CoverageMapController((event, detail) => {
+      dispatch(event, detail);
+      
+      // Also post message to parent window for iframe communication
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          source: 'coverage-map',
+          type: event,
+          detail
+        }, '*');
+      }
+    });
     const { mapView: view } = await controller.initialize({
       container: mapContainer,
       filters,
@@ -61,6 +72,22 @@ export let isPlanMode = false;
     if (controller && controller.isReady()) {
       await controller.centerMapOnFeatures(features);
     }
+  }
+
+  export async function enableRectangleDrawing(): Promise<void> {
+    if (controller && controller.isReady()) {
+      await controller.enableRectangleDrawing();
+    }
+  }
+
+  export async function disableRectangleDrawing(): Promise<void> {
+    if (controller && controller.isReady()) {
+      await controller.disableRectangleDrawing();
+    }
+  }
+
+  export function isDrawingRectangle(): boolean {
+    return controller?.isDrawingRectangle() ?? false;
   }
 </script>
 
