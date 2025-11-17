@@ -37,7 +37,7 @@ const BUILDING_FOOTPRINT_SERVICES = {
 /**
  * Query building footprints from ArcGIS Feature Service
  */
-async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, requiresAuth = false }) {
+async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, requiresAuth = false, useOAuth = false, accessToken = null }) {
   try {
     if (!serviceUrl) {
       return { features: [], error: 'Service URL not provided' };
@@ -74,9 +74,31 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       resultOffset: 0
     };
     
-    // Add API key if required
-    if (requiresAuth && ARC_GIS_API_KEY) {
-      queryParams.token = ARC_GIS_API_KEY;
+    // Add authentication token if required
+    // Can be OAuth2 token (for private services) or API key
+    if (requiresAuth) {
+      // Use provided OAuth2 token if available, otherwise try to get one, or fall back to API key
+      if (accessToken) {
+        queryParams.token = accessToken;
+        console.log('[ArcGISBuildingFootprints] Using provided OAuth2 token for query');
+      } else if (useOAuth) {
+        const arcgisOAuth = require('./arcgisOAuth');
+        const oauthToken = await arcgisOAuth.getValidToken();
+        if (oauthToken) {
+          queryParams.token = oauthToken;
+          console.log('[ArcGISBuildingFootprints] Using OAuth2 token for query');
+        } else {
+          console.warn('[ArcGISBuildingFootprints] OAuth2 token requested but could not be obtained, trying API key');
+          if (ARC_GIS_API_KEY) {
+            queryParams.token = ARC_GIS_API_KEY;
+          }
+        }
+      } else if (ARC_GIS_API_KEY) {
+        queryParams.token = ARC_GIS_API_KEY;
+        console.log('[ArcGISBuildingFootprints] Using API key for query');
+      } else {
+        console.warn('[ArcGISBuildingFootprints] Authentication required but no credentials available');
+      }
     }
     
     console.log('[ArcGISBuildingFootprints] Querying Feature Service', {
@@ -233,7 +255,9 @@ async function queryBuildingFootprintsByBoundingBox(boundingBox, options = {}) {
   const {
     serviceUrls = null, // If provided, use these specific services
     layerIds = [0], // Which layers to query (default: layer 0)
-    requiresAuth = false // Whether services require authentication
+    requiresAuth = false, // Whether services require authentication
+    useOAuth = false, // Whether to use OAuth2 token (for private services)
+    accessToken = null // Pre-obtained OAuth2 token (if provided)
   } = options;
   
   // Determine which services to query
@@ -258,7 +282,9 @@ async function queryBuildingFootprintsByBoundingBox(boundingBox, options = {}) {
           serviceUrl,
           layerId,
           boundingBox,
-          requiresAuth
+          requiresAuth: requiresAuth || useOAuth,
+          useOAuth: useOAuth || !!accessToken,
+          accessToken
         });
         
         if (result.error) {

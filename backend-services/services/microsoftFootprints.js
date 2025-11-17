@@ -397,10 +397,23 @@ async function getFeatureServiceFromWebMap(webMapId) {
       f: 'json'
     };
     
-    // Add API key if available
-    const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
-    if (ARC_GIS_API_KEY) {
-      params.token = ARC_GIS_API_KEY;
+    // Try OAuth2 token first (for private items), then fall back to API key
+    let accessToken = null;
+    const arcgisOAuth = require('./arcgisOAuth');
+    accessToken = await arcgisOAuth.getValidToken();
+    
+    if (accessToken) {
+      console.log('[MicrosoftFootprints] Using OAuth2 token to access web map');
+      params.token = accessToken;
+    } else {
+      // Fall back to API key
+      const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
+      if (ARC_GIS_API_KEY) {
+        console.log('[MicrosoftFootprints] Using API key to access web map');
+        params.token = ARC_GIS_API_KEY;
+      } else {
+        console.warn('[MicrosoftFootprints] No authentication credentials available (OAuth2 or API key)');
+      }
     }
     
     const mapResponse = await httpClient.get(mapUrl, { params, timeout: 10000 });
@@ -479,7 +492,9 @@ async function getFeatureServiceFromWebMap(webMapId) {
         return {
           serviceUrl: featureServiceUrl,
           layerId: layerId || 0,
-          requiresAuth: !!ARC_GIS_API_KEY
+          requiresAuth: true, // Always require auth for private web map layers
+          useOAuth: !!accessToken, // Use OAuth token if available
+          accessToken: accessToken // Pass token for querying the service
         };
       }
     }
@@ -487,10 +502,26 @@ async function getFeatureServiceFromWebMap(webMapId) {
     console.warn('[MicrosoftFootprints] No Microsoft Building Footprints layer found in web map');
     return null;
   } catch (error) {
-    console.error('[MicrosoftFootprints] Error accessing ArcGIS Web Map:', {
-      error: error.message,
-      webMapId
-    });
+    if (error.response) {
+      if (error.response.status === 401 || error.response.status === 403) {
+        console.error('[MicrosoftFootprints] Authentication failed accessing web map. Map may be private and require OAuth2.', {
+          status: error.response.status,
+          webMapId,
+          error: error.response.data?.error || error.message
+        });
+      } else {
+        console.error('[MicrosoftFootprints] Error accessing ArcGIS Web Map:', {
+          status: error.response.status,
+          error: error.response.data?.error || error.message,
+          webMapId
+        });
+      }
+    } else {
+      console.error('[MicrosoftFootprints] Error accessing ArcGIS Web Map:', {
+        error: error.message,
+        webMapId
+      });
+    }
     return null;
   }
 }
@@ -503,6 +534,10 @@ async function queryByBoundingBox(bbox) {
       
       // Use ArcGIS Building Footprints service to query
       const arcgisBuildingFootprintsService = require('./arcgisBuildingFootprints');
+      const arcgisOAuth = require('./arcgisOAuth');
+      
+      // Try OAuth2 first for Microsoft Footprints service, then fall back to API key
+      const oauthToken = await arcgisOAuth.getValidToken();
       const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
       
       const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
@@ -510,7 +545,9 @@ async function queryByBoundingBox(bbox) {
         {
           serviceUrls: [MICROSOFT_FOOTPRINTS_FEATURE_SERVICE],
           layerIds: [MICROSOFT_FOOTPRINTS_LAYER_ID],
-          requiresAuth: !!ARC_GIS_API_KEY // May require auth for some features
+          requiresAuth: true, // Always try to authenticate
+          useOAuth: !!oauthToken, // Use OAuth if available
+          accessToken: oauthToken || null
         }
       );
       
@@ -556,7 +593,9 @@ async function queryByBoundingBox(bbox) {
           {
             serviceUrls: [mapServiceInfo.serviceUrl],
             layerIds: [mapServiceInfo.layerId],
-            requiresAuth: mapServiceInfo.requiresAuth
+            requiresAuth: mapServiceInfo.requiresAuth,
+            useOAuth: mapServiceInfo.useOAuth || false,
+            accessToken: mapServiceInfo.accessToken || null
           }
         );
         
