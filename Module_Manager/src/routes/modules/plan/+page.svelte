@@ -1100,7 +1100,7 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     }
   }
 
-  async function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
+  function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
     const updatedPlan = event.detail;
     if (!updatedPlan) return;
     selectedProject = updatedPlan;
@@ -1108,30 +1108,28 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     if (idx !== -1) {
       projects[idx] = updatedPlan;
     }
-    // Fetch the full plan from backend to ensure we have all marketing addresses
-    // This ensures the map gets the complete address list for marker refresh
-    try {
-      const fullPlan = await planService.getPlan(updatedPlan.id);
+    // Update the active plan in the map data store - the updated plan from the modal
+    // already contains all the marketing addresses from the discovery response
+    // This preserves the map center and only updates marketing leads
+    // The SharedMap component will pick up the updated plan via reactive state
+    // and pass the marketing leads to the iframe without resetting the map
+    setMapData({ activePlan: updatedPlan });
+    
+    // Optionally fetch the full plan in the background to ensure we have the latest
+    // but don't block the map update
+    planService.getPlan(updatedPlan.id).then((fullPlan) => {
       if (fullPlan) {
-        // Update the active plan in the map data store with the full plan data
-        // This preserves the map center and only updates marketing leads
-        // The SharedMap component will pick up the updated plan via reactive state
-        // and pass the marketing leads to the iframe without resetting the map
-        setMapData({ activePlan: fullPlan });
-        // Also update local state
         selectedProject = fullPlan;
+        const idx = projects.findIndex(p => p.id === fullPlan.id);
         if (idx !== -1) {
           projects[idx] = fullPlan;
         }
-      } else {
-        // Fallback to using the updated plan from the event
-        setMapData({ activePlan: updatedPlan });
+        setMapData({ activePlan: fullPlan });
       }
-    } catch (err) {
-      console.warn('[Plan] Failed to fetch full plan for map refresh, using event data:', err);
-      // Fallback to using the updated plan from the event
-      setMapData({ activePlan: updatedPlan });
-    }
+    }).catch((err) => {
+      console.warn('[Plan] Failed to fetch full plan for background refresh:', err);
+      // Ignore - we already have the updated plan from the modal
+    });
   }
 
 

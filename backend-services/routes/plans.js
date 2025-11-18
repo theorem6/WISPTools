@@ -3486,8 +3486,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
     
     if (!res.headersSent) {
       // Limit response size to avoid Node.js JSON.stringify "Invalid string length" error
-      // Increased to 5000 since addresses are stripped down (minimal fields)
-      const MAX_RESPONSE_ADDRESSES = 5000;
+      // Reduced to 2000 to prevent proxy timeout issues with large responses
+      const MAX_RESPONSE_ADDRESSES = 2000;
       const addressesToReturn = combinedAddresses.length > MAX_RESPONSE_ADDRESSES
         ? combinedAddresses.slice(0, MAX_RESPONSE_ADDRESSES)
         : combinedAddresses;
