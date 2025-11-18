@@ -1014,20 +1014,40 @@ export class CoverageMapController {
 
   private handleMessage(event: MessageEvent): void {
     const { source, type, payload } = event.data || {};
-    if (source !== 'shared-map') return;
-
-    if (type === 'request-extent') {
-      const currentExtent = this.mapView?.extent;
-      if (currentExtent) {
-        this.broadcastViewExtent(currentExtent);
+    
+    // Handle messages from shared-map (internal communication)
+    if (source === 'shared-map') {
+      if (type === 'request-extent') {
+        const currentExtent = this.mapView?.extent;
+        if (currentExtent) {
+          this.broadcastViewExtent(currentExtent);
+        }
+      } else if (type === 'center-map-on-location' && payload) {
+        const { lat, lon, zoom } = payload;
+        if (typeof lat === 'number' && typeof lon === 'number') {
+          this.centerMapOnLocation(lat, lon, zoom).catch(err => {
+            console.error('[CoverageMap] Failed to center map on location:', err);
+          });
+        }
       }
-    } else if (type === 'center-map-on-location' && payload) {
-      const { lat, lon, zoom } = payload;
-      if (typeof lat === 'number' && typeof lon === 'number') {
-        this.centerMapOnLocation(lat, lon, zoom).catch(err => {
-          console.error('[CoverageMap] Failed to center map on location:', err);
+      return;
+    }
+    
+    // Handle messages from plan-page (external communication from parent iframe)
+    if (source === 'plan-page') {
+      if (type === 'enable-rectangle-drawing') {
+        console.log('[CoverageMap] Received message from plan-page: enable-rectangle-drawing');
+        this.enableRectangleDrawing().catch(err => {
+          console.error('[CoverageMap] Failed to enable rectangle drawing:', err);
         });
+      } else if (type === 'disable-rectangle-drawing') {
+        console.log('[CoverageMap] Received message from plan-page: disable-rectangle-drawing');
+        this.disableRectangleDrawing(false); // Don't clear graphics when disabling
+      } else if (type === 'clear-drawing-graphics') {
+        console.log('[CoverageMap] Received message from plan-page: clear-drawing-graphics');
+        this.clearDrawingGraphics();
       }
+      return;
     }
   }
 
