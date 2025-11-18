@@ -1056,6 +1056,15 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
         if (activeProject && activeProject.id === updatedPlan.id) {
           activeProject = updatedPlan;
         }
+        
+        // Update the map context to trigger map refresh with new marketing addresses
+        // This ensures SharedMap posts the updated plan to the iframe, which will render the new markers
+        setMapData({ activePlan: updatedPlan });
+        
+        console.log('[Plan] Map updated with new marketing addresses after rectangle discovery', {
+          planId: updatedPlan.id,
+          addressCount: updatedPlan.marketing?.addresses?.length || 0
+        });
       }
       
       // Clear the drawing rectangle after discovery completes
