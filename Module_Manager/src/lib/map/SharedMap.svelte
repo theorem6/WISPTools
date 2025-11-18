@@ -208,6 +208,12 @@
   $: if (mode && iframeLoaded) {
     postStateToIframe();
   }
+  
+  // Explicitly watch for activePlan changes to ensure marketing addresses are updated
+  // This ensures the map refreshes when marketing addresses change after wizard completion
+  $: if (iframeLoaded && mapState?.activePlan && mapState?.lastUpdated) {
+    postStateToIframe();
+  }
 </script>
 
 <div class="shared-map">

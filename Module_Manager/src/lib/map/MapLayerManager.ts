@@ -63,37 +63,52 @@ export class MapLayerManager {
   async loadPlan(tenantId: string, plan: PlanProject) {
     this.updateState({ activePlan: plan, isLoading: true, error: undefined });
     setMapLoading(true);
-    setMapData({ activePlan: plan });
+    
+    // Fetch the full plan from backend to ensure we have all marketing addresses
+    // The plan object passed in might not include all marketing data
+    let fullPlan = plan;
+    try {
+      const fetchedPlan = await planService.getPlan(plan.id);
+      if (fetchedPlan) {
+        fullPlan = fetchedPlan;
+      }
+    } catch (err) {
+      console.warn('[MapLayerManager] Failed to fetch full plan, using provided plan:', err);
+      // Continue with provided plan if fetch fails
+    }
+    
+    setMapData({ activePlan: fullPlan });
+    
     try {
       const [{ features }] = await Promise.all([
-        planService.getPlanFeatures(plan.id),
+        planService.getPlanFeatures(fullPlan.id),
         this.ensureProductionLoaded(tenantId)
       ]);
 
-      const syncedLocals = await this.syncLocalPlanFeatures(plan.id);
-      const combinedFeatures = this.mergeWithLocalFeatures(plan.id, [...features, ...syncedLocals]);
+      const syncedLocals = await this.syncLocalPlanFeatures(fullPlan.id);
+      const combinedFeatures = this.mergeWithLocalFeatures(fullPlan.id, [...features, ...syncedLocals]);
       const summary = this.computeSummaryFromFeatures(combinedFeatures);
 
       this.updateState({
-        activePlan: plan,
+        activePlan: fullPlan,
         stagedFeatures: combinedFeatures,
         summary,
         isLoading: false
       });
 
       setMapData({
-        activePlan: plan,
+        activePlan: fullPlan,
         stagedFeatures: combinedFeatures,
         stagedSummary: summary,
         isLoading: false
       });
     } catch (error: any) {
       const message = error?.message || 'Failed to load plan features';
-      const localFeatures = this.getLocalFeaturesForPlan(plan.id);
+      const localFeatures = this.getLocalFeaturesForPlan(fullPlan.id);
       const summary = this.computeSummaryFromFeatures(localFeatures);
 
       this.updateState({
-        activePlan: plan,
+        activePlan: fullPlan,
         stagedFeatures: localFeatures,
         summary,
         isLoading: false,
@@ -101,7 +116,7 @@ export class MapLayerManager {
       });
 
       setMapData({
-        activePlan: plan,
+        activePlan: fullPlan,
         stagedFeatures: localFeatures,
         stagedSummary: summary,
         isLoading: false,

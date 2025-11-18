@@ -1114,36 +1114,58 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     }
   }
 
-  function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
+  async function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
     const updatedPlan = event.detail;
     if (!updatedPlan) return;
-    selectedProject = updatedPlan;
-    const idx = projects.findIndex(p => p.id === updatedPlan.id);
-    if (idx !== -1) {
-      projects[idx] = updatedPlan;
-    }
-    // Update the active plan in the map data store - the updated plan from the modal
-    // already contains all the marketing addresses from the discovery response
-    // This preserves the map center and only updates marketing leads
-    // The SharedMap component will pick up the updated plan via reactive state
-    // and pass the marketing leads to the iframe without resetting the map
-    setMapData({ activePlan: updatedPlan });
     
-    // Optionally fetch the full plan in the background to ensure we have the latest
-    // but don't block the map update
-    planService.getPlan(updatedPlan.id).then((fullPlan) => {
+    // Fetch the full plan from backend to ensure we have ALL marketing addresses
+    // The plan from the modal might only have truncated results (max 2000 addresses)
+    // This ensures the map displays all addresses, not just the discovery response subset
+    try {
+      const fullPlan = await planService.getPlan(updatedPlan.id);
       if (fullPlan) {
+        // Update local state with full plan
         selectedProject = fullPlan;
         const idx = projects.findIndex(p => p.id === fullPlan.id);
         if (idx !== -1) {
           projects[idx] = fullPlan;
         }
+        
+        // Update active project if it matches
+        if (activeProject && activeProject.id === fullPlan.id) {
+          activeProject = fullPlan;
+        }
+        
+        // Update the map with the full plan containing all marketing addresses
+        // This preserves the map center and only updates marketing leads
+        // The SharedMap component will pick up the updated plan via reactive state
+        // and pass the marketing leads to the iframe without resetting the map
         setMapData({ activePlan: fullPlan });
+        
+        console.log('[Plan] Map updated with full plan after marketing discovery', {
+          planId: fullPlan.id,
+          addressCount: fullPlan.marketing?.addresses?.length || 0
+        });
+      } else {
+        // Fallback to using the updated plan from the modal if fetch fails
+        console.warn('[Plan] Failed to fetch full plan, using event data');
+        selectedProject = updatedPlan;
+        const idx = projects.findIndex(p => p.id === updatedPlan.id);
+        if (idx !== -1) {
+          projects[idx] = updatedPlan;
+        }
+        setMapData({ activePlan: updatedPlan });
       }
-    }).catch((err) => {
-      console.warn('[Plan] Failed to fetch full plan for background refresh:', err);
-      // Ignore - we already have the updated plan from the modal
-    });
+    } catch (err) {
+      console.warn('[Plan] Failed to fetch full plan for map refresh, using event data:', err);
+      // Fallback to using the updated plan from the modal
+      selectedProject = updatedPlan;
+      const idx = projects.findIndex(p => p.id === updatedPlan.id);
+      if (idx !== -1) {
+        projects[idx] = updatedPlan;
+      }
+      setMapData({ activePlan: updatedPlan });
+    }
   }
 
 
