@@ -28,16 +28,19 @@
     ];
 
     const rows = addresses.map(addr => {
-      // Check if addressLine1 is just coordinates (format: "lat, lon")
-      const isCoordinates = addr.addressLine1 && /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.addressLine1.trim());
+      // Check if addressLine1 is just coordinates (format: "lat, lon" with any number of decimal places)
+      // Must match the full string - coordinates don't contain letters or other characters
+      const addressLine1Str = addr.addressLine1 ? String(addr.addressLine1).trim() : '';
+      const isCoordinates = addressLine1Str.length > 0 && 
+                            /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addressLine1Str);
       
       // Extract latitude and longitude - prioritize existing fields, then extract from addressLine1 if needed
       let latitude = addr.latitude;
       let longitude = addr.longitude;
       
       // If lat/lon are missing, try to extract from addressLine1
-      if ((latitude === undefined || latitude === null || longitude === undefined || longitude === null) && addr.addressLine1) {
-        const coordMatch = addr.addressLine1.trim().match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
+      if ((latitude === undefined || latitude === null || longitude === undefined || longitude === null) && addressLine1Str) {
+        const coordMatch = addressLine1Str.match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
         if (coordMatch) {
           const lat = parseFloat(coordMatch[1]);
           const lon = parseFloat(coordMatch[2]);
@@ -50,9 +53,26 @@
       }
       
       // If addressLine1/addressLine2 are coordinates, leave address columns empty (use lat/lon columns instead)
-      // Otherwise, use the actual address values
-      const address = isCoordinates ? '' : (addr.addressLine1 || '');
+      // Otherwise, use the actual address values (even if empty, let it be empty rather than omitting)
+      const address = isCoordinates ? '' : addressLine1Str;
       const address2 = isCoordinates ? '' : (addr.addressLine2 || '');
+      
+      // Debug log first few addresses to see what's happening
+      // Note: rows.length won't work here since we're building the array, so we'll log based on index
+      const currentIndex = addresses.indexOf(addr);
+      if (currentIndex < 5) {
+        console.log('[PlanMarketingResultsPopup] CSV export address:', {
+          index: currentIndex,
+          addressLine1: addr.addressLine1,
+          addressLine1Str,
+          isCoordinates,
+          address,
+          hasCity: !!addr.city,
+          hasState: !!addr.state,
+          latitude,
+          longitude
+        });
+      }
       
       return [
         address,
