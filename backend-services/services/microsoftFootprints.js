@@ -539,6 +539,7 @@ async function queryByBoundingBox(bbox) {
       const arcgisOAuth = require('./arcgisOAuth');
       
       // Get OAuth2 token - this is required for Microsoft Footprints service
+      console.log('[MicrosoftFootprints] Requesting OAuth2 token for Feature Service access...');
       const oauthToken = await arcgisOAuth.getValidToken();
       
       if (!oauthToken) {
@@ -547,7 +548,12 @@ async function queryByBoundingBox(bbox) {
         throw new Error(errorMsg);
       }
       
-      console.log('[MicrosoftFootprints] OAuth2 token obtained, querying Feature Service');
+      console.log('[MicrosoftFootprints] OAuth2 token obtained successfully', {
+        tokenLength: oauthToken.length,
+        tokenPrefix: oauthToken.substring(0, 20) + '...'
+      });
+      
+      console.log('[MicrosoftFootprints] Querying Feature Service with OAuth2 token');
       
       // Always use OAuth2 for Microsoft Footprints - never fall back to API key for this service
       const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(

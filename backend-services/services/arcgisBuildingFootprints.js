@@ -82,17 +82,29 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       // Use provided OAuth2 token if available, otherwise try to get one, or fall back to API key
       if (accessToken) {
         queryParams.token = accessToken;
-        console.log('[ArcGISBuildingFootprints] Using provided OAuth2 token for query');
+        console.log('[ArcGISBuildingFootprints] Using provided OAuth2 token for query', {
+          tokenLength: accessToken.length,
+          tokenPrefix: accessToken.substring(0, 20) + '...',
+          serviceUrl,
+          layerId
+        });
       } else if (useOAuth) {
         const arcgisOAuth = require('./arcgisOAuth');
+        console.log('[ArcGISBuildingFootprints] Requesting OAuth2 token for query...');
         const oauthToken = await arcgisOAuth.getValidToken();
         if (oauthToken) {
           queryParams.token = oauthToken;
-          console.log('[ArcGISBuildingFootprints] Using OAuth2 token for query');
+          console.log('[ArcGISBuildingFootprints] Using OAuth2 token for query', {
+            tokenLength: oauthToken.length,
+            tokenPrefix: oauthToken.substring(0, 20) + '...',
+            serviceUrl,
+            layerId
+          });
         } else {
           console.warn('[ArcGISBuildingFootprints] OAuth2 token requested but could not be obtained, trying API key');
           if (ARC_GIS_API_KEY) {
             queryParams.token = ARC_GIS_API_KEY;
+            console.log('[ArcGISBuildingFootprints] Using API key as fallback');
           }
         }
       } else if (ARC_GIS_API_KEY) {
@@ -116,8 +128,29 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
     });
     
     if (response.data && response.data.error) {
-      console.error('[ArcGISBuildingFootprints] Query error:', response.data.error);
-      return { features: [], error: response.data.error.message || 'Query failed' };
+      const errorCode = response.data.error.code;
+      const errorMessage = response.data.error.message;
+      console.error('[ArcGISBuildingFootprints] Query error:', {
+        code: errorCode,
+        message: errorMessage,
+        details: response.data.error.details,
+        serviceUrl,
+        layerId,
+        hasToken: !!queryParams.token,
+        tokenLength: queryParams.token?.length || 0,
+        tokenPrefix: queryParams.token ? queryParams.token.substring(0, 20) + '...' : 'none'
+      });
+      
+      // If token is invalid, clear cache and try again if OAuth2 is being used
+      if (errorCode === 498 || errorMessage === 'Invalid token' || errorMessage?.includes('Invalid token')) {
+        if (accessToken || useOAuth) {
+          console.warn('[ArcGISBuildingFootprints] Invalid OAuth2 token detected, clearing cache');
+          const arcgisOAuth = require('./arcgisOAuth');
+          arcgisOAuth.clearTokenCache();
+        }
+      }
+      
+      return { features: [], error: errorMessage || 'Query failed' };
     }
     
     const data = response.data;
