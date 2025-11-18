@@ -27,12 +27,31 @@
     ];
 
     const rows = addresses.map(addr => {
-      // If addressLine1 is just coordinates and we have separate lat/lon, prefer the coordinates
-      // Otherwise use addressLine1 as-is
-      const isCoordinates = addr.addressLine1?.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/);
-      const address = isCoordinates && addr.latitude !== undefined && addr.longitude !== undefined 
-        ? '' // Empty address field if it's just coordinates (lat/lon columns will have the values)
-        : (addr.addressLine1 || '');
+      // Check if addressLine1 is just coordinates (format: "lat, lon")
+      const isCoordinates = addr.addressLine1 && /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.addressLine1.trim());
+      
+      // If addressLine1 is coordinates, leave address column empty (use lat/lon columns instead)
+      // Also extract coordinates if they're in addressLine1 but not in lat/lon fields
+      let address = addr.addressLine1 || '';
+      let latitude = addr.latitude;
+      let longitude = addr.longitude;
+      
+      if (isCoordinates) {
+        // Extract coordinates from addressLine1 if lat/lon are missing
+        if (latitude === undefined || longitude === undefined) {
+          const coordMatch = addr.addressLine1.trim().match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
+          if (coordMatch) {
+            const lat = parseFloat(coordMatch[1]);
+            const lon = parseFloat(coordMatch[2]);
+            if (!isNaN(lat) && !isNaN(lon)) {
+              latitude = latitude ?? lat;
+              longitude = longitude ?? lon;
+            }
+          }
+        }
+        // Clear address field since we have coordinates in separate columns
+        address = '';
+      }
       
       return [
         address,
@@ -41,8 +60,8 @@
         addr.state || '',
         addr.postalCode || '',
         addr.country || '',
-        addr.latitude !== undefined && addr.latitude !== null ? addr.latitude.toString() : '',
-        addr.longitude !== undefined && addr.longitude !== null ? addr.longitude.toString() : '',
+        latitude !== undefined && latitude !== null ? latitude.toString() : '',
+        longitude !== undefined && longitude !== null ? longitude.toString() : '',
         addr.source || ''
       ];
     });
