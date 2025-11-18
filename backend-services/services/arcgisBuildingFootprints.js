@@ -71,7 +71,9 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       returnCountOnly: false,
       where: '1=1', // Return all features
       resultRecordCount: 2000, // Keep at 2000 for MSBFP2 service compatibility (service max limit)
-      resultOffset: 0
+      resultOffset: 0,
+      // Enable returning all features for pagination
+      returnExceededLimitFeatures: true // Important: This allows us to get objectIds when limit is exceeded
     };
     
     // Add authentication token if required
@@ -192,10 +194,16 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
           
           offset += batchObjectIds.length;
           
-          // Safety limit: don't fetch more than 50000 features (increased from 10000)
-          if (allFeatures.length >= 50000) {
-            console.warn('[ArcGISBuildingFootprints] Reached safety limit of 50000 features, stopping pagination');
+          // Safety limit: don't fetch more than 100000 features (increased for large areas)
+          // This allows us to find more buildings in dense urban areas
+          if (allFeatures.length >= 100000) {
+            console.warn('[ArcGISBuildingFootprints] Reached safety limit of 100000 features, stopping pagination');
             break;
+          }
+          
+          // Add a small delay between pagination requests to avoid rate limiting
+          if (batchCount % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay every 10 batches
           }
         } catch (error) {
           console.error('[ArcGISBuildingFootprints] Pagination query failed:', error.message);
