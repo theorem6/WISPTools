@@ -177,6 +177,7 @@ const parseCenter = (input) => {
 };
 
 const AVAILABLE_MARKETING_ALGORITHMS = {
+  microsoft_footprints: 'Microsoft Building Footprints (OAuth2)',
   osm_buildings: 'OpenStreetMap Building Footprints',
   arcgis_address_points: 'ArcGIS Address Points',
   arcgis_building_footprints: 'ArcGIS Building Footprints (Feature Service)',
