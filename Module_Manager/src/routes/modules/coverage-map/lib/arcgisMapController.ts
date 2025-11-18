@@ -212,11 +212,17 @@ export class CoverageMapController {
 
         // Handle when rectangle is created
         this.sketchWidget.on('create', async (event: any) => {
+          console.log('[CoverageMap] Sketch create event:', event.state, event);
+          
           if (event.state === 'complete') {
             const geometry = event.graphic.geometry;
+            console.log('[CoverageMap] Rectangle completed, geometry:', geometry);
+            
             if (geometry && geometry.type === 'polygon') {
               // Extract bounding box from rectangle
               const extent = geometry.extent;
+              console.log('[CoverageMap] Rectangle extent:', extent);
+              
               if (extent) {
                 const boundingBox = {
                   west: extent.xmin,
@@ -230,23 +236,34 @@ export class CoverageMapController {
                   lon: (extent.xmin + extent.xmax) / 2
                 };
 
-                // Clear the drawing
-                this.drawingGraphicsLayer.removeAll();
-                
-                // Disable drawing mode
-                await this.disableRectangleDrawing();
+                console.log('[CoverageMap] Extracted bounding box:', boundingBox, 'center:', center);
+
+                // Keep the rectangle visible - don't clear it immediately
+                // Only disable drawing mode so user can't draw another one
+                this.isDrawingMode = false;
+                // Don't remove the widget yet - keep it visible
+                // Don't clear graphics yet - keep rectangle visible
 
                 // Dispatch event with bounding box
-                this.dispatch('rectangle-drawn', {
+                const eventData = {
                   boundingBox,
                   center,
                   geometry: {
                     type: 'Polygon',
                     coordinates: [geometry.rings[0].map((ring: any) => [ring[0], ring[1]])]
                   }
-                });
+                };
+                
+                console.log('[CoverageMap] Dispatching rectangle-drawn event:', eventData);
+                this.dispatch('rectangle-drawn', eventData);
+              } else {
+                console.warn('[CoverageMap] Rectangle extent is null');
               }
+            } else {
+              console.warn('[CoverageMap] Rectangle geometry type is not polygon:', geometry?.type);
             }
+          } else {
+            console.log('[CoverageMap] Sketch create event state:', event.state);
           }
         });
       }
@@ -277,7 +294,7 @@ export class CoverageMapController {
     }
   }
 
-  public async disableRectangleDrawing(): Promise<void> {
+  public async disableRectangleDrawing(clearGraphics: boolean = false): Promise<void> {
     if (!this.mapView || !this.sketchWidget) {
       return;
     }
@@ -289,17 +306,29 @@ export class CoverageMapController {
       }
 
       // Remove widget from UI
-      this.mapView.ui.remove(this.sketchWidget);
+      try {
+        this.mapView.ui.remove(this.sketchWidget);
+      } catch (e) {
+        // Widget might not be in UI, that's okay
+        console.log('[CoverageMap] Widget not in UI or error removing:', e);
+      }
 
-      // Clear drawing graphics
-      if (this.drawingGraphicsLayer) {
+      // Only clear drawing graphics if requested (e.g., after discovery completes)
+      if (clearGraphics && this.drawingGraphicsLayer) {
         this.drawingGraphicsLayer.removeAll();
       }
 
       this.isDrawingMode = false;
-      console.log('[CoverageMap] Rectangle drawing disabled');
+      console.log('[CoverageMap] Rectangle drawing disabled', { clearGraphics });
     } catch (error) {
       console.error('[CoverageMap] Failed to disable rectangle drawing:', error);
+    }
+  }
+
+  public clearDrawingGraphics(): void {
+    if (this.drawingGraphicsLayer) {
+      this.drawingGraphicsLayer.removeAll();
+      console.log('[CoverageMap] Drawing graphics cleared');
     }
   }
 

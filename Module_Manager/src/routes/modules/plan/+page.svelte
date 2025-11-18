@@ -933,8 +933,11 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
   }
 
   async function handleRectangleDrawn(event: CustomEvent<any>) {
+    console.log('[Plan] Received rectangle-drawn event:', event.detail);
     const { boundingBox, center } = event.detail;
+    
     if (!boundingBox || !center || !selectedProject) {
+      console.warn('[Plan] Invalid rectangle-drawn event data:', { boundingBox, center, selectedProject: !!selectedProject });
       return;
     }
 
@@ -943,6 +946,8 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     showMarketingResultsPopup = true;
     discoveryResults = [];
 
+    console.log('[Plan] Starting address discovery for rectangle:', { boundingBox, center, planId: selectedProject.id });
+
     try {
       // Calculate radius from bounding box
       const latSpan = boundingBox.north - boundingBox.south;
@@ -950,6 +955,8 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
       const maxSpan = Math.max(latSpan, lonSpan);
       // Rough conversion: 1 degree ≈ 69 miles at equator
       const radiusMiles = Math.min((maxSpan * 69) / 2, 50);
+
+      console.log('[Plan] Calling discoverMarketingAddresses API...');
 
       const response = await planService.discoverMarketingAddresses(selectedProject.id, {
         boundingBox,
@@ -960,10 +967,21 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
         }
       });
 
+      console.log('[Plan] Discovery response received:', { addressCount: response.addresses?.length || 0 });
+
       discoveryResults = response.addresses || [];
       
       // Refresh plan data
       await loadData(true);
+      
+      // Clear the drawing rectangle after discovery completes
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          source: 'plan-page',
+          type: 'clear-drawing-graphics'
+        }, '*');
+      }
       
     } catch (err: any) {
       console.error('[Plan] Address discovery failed:', err);

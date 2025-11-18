@@ -89,6 +89,10 @@ export let isPlanMode = false;
   export function isDrawingRectangle(): boolean {
     return controller?.isDrawingRectangle() ?? false;
   }
+
+  export function clearDrawingGraphics(): void {
+    controller?.clearDrawingGraphics();
+  }
 </script>
 
 <div class="coverage-map-container">

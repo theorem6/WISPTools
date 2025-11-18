@@ -679,9 +679,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       } else if (type === 'disable-rectangle-drawing') {
         if (mapComponent) {
           console.log('[CoverageMap] Disabling rectangle drawing...');
-          mapComponent.disableRectangleDrawing().catch((err: any) => {
+          mapComponent.disableRectangleDrawing(true).catch((err: any) => {
             console.error('[CoverageMap] Failed to disable rectangle drawing:', err);
           });
+        }
+      } else if (type === 'clear-drawing-graphics') {
+        if (mapComponent) {
+          console.log('[CoverageMap] Clearing drawing graphics...');
+          mapComponent.clearDrawingGraphics();
         }
       }
     }
