@@ -221,43 +221,77 @@ export class CoverageMapController {
             if (geometry && geometry.type === 'polygon') {
               // Extract bounding box from rectangle
               const extent = geometry.extent;
-              console.log('[CoverageMap] Rectangle extent:', extent);
+              console.log('[CoverageMap] Rectangle extent (Web Mercator):', extent);
               
-              if (extent) {
-                const boundingBox = {
-                  west: extent.xmin,
-                  east: extent.xmax,
-                  south: extent.ymin,
-                  north: extent.ymax
-                };
+              if (extent && this.webMercatorUtils) {
+                try {
+                  // Convert Web Mercator coordinates to WGS84 (lat/lon degrees)
+                  const [west, south] = this.webMercatorUtils.xyToLngLat(extent.xmin, extent.ymin);
+                  const [east, north] = this.webMercatorUtils.xyToLngLat(extent.xmax, extent.ymax);
+                  const [centerLon, centerLat] = this.webMercatorUtils.xyToLngLat(
+                    (extent.xmin + extent.xmax) / 2,
+                    (extent.ymin + extent.ymax) / 2
+                  );
 
-                const center = {
-                  lat: (extent.ymin + extent.ymax) / 2,
-                  lon: (extent.xmin + extent.xmax) / 2
-                };
+                  const boundingBox = {
+                    west,
+                    east,
+                    south,
+                    north
+                  };
 
-                console.log('[CoverageMap] Extracted bounding box:', boundingBox, 'center:', center);
+                  const center = {
+                    lat: centerLat,
+                    lon: centerLon
+                  };
 
-                // Keep the rectangle visible - don't clear it immediately
-                // Only disable drawing mode so user can't draw another one
-                this.isDrawingMode = false;
-                // Don't remove the widget yet - keep it visible
-                // Don't clear graphics yet - keep rectangle visible
+                  console.log('[CoverageMap] Extracted bounding box (WGS84):', boundingBox, 'center:', center);
 
-                // Dispatch event with bounding box
-                const eventData = {
-                  boundingBox,
-                  center,
-                  geometry: {
-                    type: 'Polygon',
-                    coordinates: [geometry.rings[0].map((ring: any) => [ring[0], ring[1]])]
-                  }
-                };
-                
-                console.log('[CoverageMap] Dispatching rectangle-drawn event:', eventData);
-                this.dispatch('rectangle-drawn', eventData);
+                  // Keep the rectangle visible - don't clear it immediately
+                  // Only disable drawing mode so user can't draw another one
+                  this.isDrawingMode = false;
+                  // Don't remove the widget yet - keep it visible
+                  // Don't clear graphics yet - keep rectangle visible
+
+                  // Dispatch event with bounding box
+                  const eventData = {
+                    boundingBox,
+                    center,
+                    geometry: {
+                      type: 'Polygon',
+                      coordinates: [geometry.rings[0].map((ring: any) => {
+                        // Convert ring coordinates to WGS84
+                        return ring.map((coord: any) => {
+                          const [lon, lat] = this.webMercatorUtils.xyToLngLat(coord[0], coord[1]);
+                          return [lon, lat];
+                        });
+                      })]
+                    }
+                  };
+                  
+                  console.log('[CoverageMap] Dispatching rectangle-drawn event:', eventData);
+                  this.dispatch('rectangle-drawn', eventData);
+                } catch (convErr) {
+                  console.error('[CoverageMap] Failed to convert coordinates:', convErr);
+                  console.warn('[CoverageMap] Falling back to extent coordinates (may be wrong projection)');
+                  
+                  // Fallback: use extent as-is (this will be wrong but at least won't crash)
+                  const boundingBox = {
+                    west: extent.xmin,
+                    east: extent.xmax,
+                    south: extent.ymin,
+                    north: extent.ymax
+                  };
+
+                  const center = {
+                    lat: (extent.ymin + extent.ymax) / 2,
+                    lon: (extent.xmin + extent.xmax) / 2
+                  };
+
+                  this.dispatch('rectangle-drawn', { boundingBox, center });
+                }
               } else {
-                console.warn('[CoverageMap] Rectangle extent is null');
+                console.warn('[CoverageMap] Rectangle extent is null or webMercatorUtils not available');
               }
             } else {
               console.warn('[CoverageMap] Rectangle geometry type is not polygon:', geometry?.type);
