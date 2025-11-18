@@ -61,8 +61,8 @@
         addr.state || '',
         addr.postalCode || '',
         addr.country || '',
-        latitude !== undefined && latitude !== null ? latitude.toString() : '',
-        longitude !== undefined && longitude !== null ? longitude.toString() : '',
+        latitude !== undefined && latitude !== null ? latitude.toFixed(7) : '',
+        longitude !== undefined && longitude !== null ? longitude.toFixed(7) : '',
         addr.source || ''
       ];
     });
@@ -130,7 +130,7 @@
                   {[addr.city, addr.state, addr.postalCode].filter(Boolean).join(', ')}
                 {/if}
                 {#if addr.latitude !== undefined && addr.longitude !== undefined}
-                  <br><small>📍 {addr.latitude.toFixed(6)}, {addr.longitude.toFixed(6)}</small>
+                  <br><small>📍 {addr.latitude.toFixed(7)}, {addr.longitude.toFixed(7)}</small>
                 {/if}
               </div>
               {#if addr.source}

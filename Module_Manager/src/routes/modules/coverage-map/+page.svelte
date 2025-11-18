@@ -1055,8 +1055,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         <p>Drag the marker to refine this deployment location.</p>
         <p class="coords">
           📍
-          {selectedPlanDraftCoords.latitude !== null ? selectedPlanDraftCoords.latitude.toFixed(5) : '—'},
-          {selectedPlanDraftCoords.longitude !== null ? selectedPlanDraftCoords.longitude.toFixed(5) : '—'}
+          {selectedPlanDraftCoords.latitude !== null ? selectedPlanDraftCoords.latitude.toFixed(7) : '—'},
+          {selectedPlanDraftCoords.longitude !== null ? selectedPlanDraftCoords.longitude.toFixed(7) : '—'}
         </p>
       </div>
       <button class="menu-item" on:click={() => handlePlanDraftMenuAction('edit-site')}>

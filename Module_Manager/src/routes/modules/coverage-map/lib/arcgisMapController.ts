@@ -2099,7 +2099,7 @@ export class CoverageMapController {
     if (lead.country) {
       rows.push(`<strong>Country:</strong> ${lead.country}`);
     }
-    rows.push(`<strong>Coordinates:</strong> ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+    rows.push(`<strong>Coordinates:</strong> ${latitude.toFixed(7)}, ${longitude.toFixed(7)}`);
     if (lead.source) {
       rows.push(`<strong>Source:</strong> ${lead.source}`);
     }
