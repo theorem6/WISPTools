@@ -1008,8 +1008,18 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
 
       discoveryResults = response.addresses || [];
       
-      // Refresh plan data
-      await loadData(true);
+      // Refresh plan data but don't recenter map - preserve user's view
+      // Only refresh the plan data, don't reload everything which would recenter the map
+      if (selectedProject) {
+        const updatedPlan = await planService.getPlan(selectedProject.id);
+        if (updatedPlan) {
+          selectedProject = updatedPlan;
+          // Update active project if it matches
+          if (activeProject && activeProject.id === updatedPlan.id) {
+            activeProject = updatedPlan;
+          }
+        }
+      }
       
       // Clear the drawing rectangle after discovery completes
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
