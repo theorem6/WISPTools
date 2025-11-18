@@ -2868,6 +2868,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
         });
         
         if (Array.isArray(microsoftResult.coordinates)) {
+          let addedCount = 0;
+          let duplicateCount = 0;
           for (const coord of microsoftResult.coordinates) {
             const latitude = toNumber(coord?.latitude);
             const longitude = toNumber(coord?.longitude);
@@ -2884,8 +2886,28 @@ router.post('/:id/marketing/discover', async (req, res) => {
                 source: coord.source || 'microsoft_footprints',
                 properties: coord.properties || {}
               });
+              addedCount++;
+            } else {
+              duplicateCount++;
             }
           }
+          console.log('[MarketingDiscovery] Microsoft Footprints coordinates collected', {
+            totalFound: microsoftResult.coordinates.length,
+            addedToAllCoordinates: addedCount,
+            duplicatesSkipped: duplicateCount,
+            totalCoordinatesNow: allCoordinates.length,
+            sampleCoordinate: microsoftResult.coordinates[0] ? {
+              latitude: microsoftResult.coordinates[0].latitude,
+              longitude: microsoftResult.coordinates[0].longitude,
+              source: microsoftResult.coordinates[0].source
+            } : null
+          });
+        } else {
+          console.warn('[MarketingDiscovery] Microsoft Footprints returned non-array coordinates:', {
+            type: typeof microsoftResult.coordinates,
+            isArray: Array.isArray(microsoftResult.coordinates),
+            value: microsoftResult.coordinates
+          });
         }
 
         updateProgress('Microsoft Building Footprints lookup completed', 15, { 
@@ -3201,6 +3223,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     // Add all reverse geocoded addresses to combined addresses
     // Filter out only arcgis_places (explicitly POI/businesses) - don't filter other sources
+    const addressesAddedBySource = {};
     if (reverseGeocodeResult && Array.isArray(reverseGeocodeResult.addresses)) {
       for (const address of reverseGeocodeResult.addresses) {
         if (!address || address.latitude === undefined || address.longitude === undefined) {
@@ -3213,8 +3236,25 @@ router.post('/:id/marketing/discover', async (req, res) => {
           continue;
         }
         
-        addAddressToCombined(address, address.source || 'unknown');
+        const source = address.source || 'unknown';
+        const wasAdded = addAddressToCombined(address, source);
+        if (wasAdded) {
+          addressesAddedBySource[source] = (addressesAddedBySource[source] || 0) + 1;
+        }
       }
+      
+      console.log('[MarketingDiscovery] Reverse geocoded addresses added to combined', {
+        totalAddresses: reverseGeocodeResult.addresses.length,
+        addressesAddedBySource: addressesAddedBySource,
+        hasMicrosoftFootprints: addressesAddedBySource['microsoft_footprints'] > 0,
+        hasOsmBuildings: addressesAddedBySource['osm_buildings'] > 0
+      });
+    } else {
+      console.warn('[MarketingDiscovery] No reverse geocoded addresses to add', {
+        hasResult: !!reverseGeocodeResult,
+        isArray: Array.isArray(reverseGeocodeResult?.addresses),
+        addressCount: reverseGeocodeResult?.addresses?.length || 0
+      });
     }
 
     updateProgress('Reverse geocoding completed', 90, {
