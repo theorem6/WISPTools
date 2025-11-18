@@ -531,6 +531,43 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     let removeListener: () => void = () => {};
     let iframeInitialized = false;
 
+    // Set up message listener FIRST, before iframe is found
+    // This ensures we capture messages even if sent early
+    const handleMessage = (event: MessageEvent) => {
+      // Log all messages to debug
+      console.log('[Plan] Message received from:', event.origin, {
+        source: event.data?.source,
+        type: event.data?.type,
+        hasDetail: !!event.data?.detail,
+        data: event.data
+      });
+      
+      const { source, type, detail } = event.data || {};
+      
+      if (source === 'coverage-map') {
+        console.log('[Plan] Message is from coverage-map:', type);
+        if (type === 'rectangle-drawn') {
+          console.log('[Plan] Processing rectangle-drawn message:', detail);
+          if (detail && detail.boundingBox && detail.center) {
+            handleRectangleDrawn(new CustomEvent('rectangle-drawn', { detail }));
+          } else {
+            console.error('[Plan] Invalid rectangle-drawn message - missing required fields:', detail);
+          }
+        } else {
+          console.log('[Plan] Unknown message type from coverage-map:', type);
+        }
+      } else if (source && (source.includes('coverage') || source.includes('map'))) {
+        console.log('[Plan] Message from related source:', source, type);
+      }
+    };
+    
+    console.log('[Plan] Setting up global message listener for rectangle-drawn events');
+    window.addEventListener('message', handleMessage);
+    const removeMessageListener = () => {
+      console.log('[Plan] Removing message listener');
+      window.removeEventListener('message', handleMessage);
+    };
+
     (async () => {
       currentUser = await authService.getCurrentUser();
       if (!currentUser) {
@@ -552,37 +589,6 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         window.addEventListener('center-map-on-location', handleCenterMapOnLocation as any);
         const removeCenterListener = () => window.removeEventListener('center-map-on-location', handleCenterMapOnLocation as any);
         
-        // Listen for messages from iframe (coverage-map)
-        const handleMessage = (event: MessageEvent) => {
-          // Log all messages to debug
-          console.log('[Plan] Message received from:', event.origin, {
-            source: event.data?.source,
-            type: event.data?.type,
-            hasDetail: !!event.data?.detail,
-            data: event.data
-          });
-          
-          const { source, type, detail } = event.data || {};
-          
-          if (source === 'coverage-map') {
-            console.log('[Plan] Message is from coverage-map:', type);
-            if (type === 'rectangle-drawn') {
-              console.log('[Plan] Processing rectangle-drawn message:', detail);
-              handleRectangleDrawn(new CustomEvent('rectangle-drawn', { detail }));
-            } else {
-              console.log('[Plan] Unknown message type from coverage-map:', type);
-            }
-          } else if (source) {
-            console.log('[Plan] Message from unknown source:', source);
-          }
-        };
-        window.addEventListener('message', handleMessage);
-        console.log('[Plan] Message listener added for rectangle-drawn events');
-        const removeMessageListener = () => {
-          window.removeEventListener('message', handleMessage);
-          console.log('[Plan] Message listener removed');
-        };
-        
         // Also listen for direct events from the map component (if not in iframe)
         const handleRectangleEvent = (event: CustomEvent) => {
           console.log('[Plan] Received rectangle-drawn event directly:', event.detail);
@@ -600,6 +606,9 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         };
         
         iframeInitialized = true;
+        console.log('[Plan] Iframe communication initialized');
+      } else {
+        console.warn('[Plan] Iframe not found - message listener is still active');
       }
     })().catch(err => {
       console.error('[Plan] Failed to initialize iframe communication:', err);
