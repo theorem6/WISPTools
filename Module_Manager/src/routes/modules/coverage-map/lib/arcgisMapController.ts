@@ -274,12 +274,23 @@ export class CoverageMapController {
                   
                   // Also post message to parent window for iframe communication
                   if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-                    console.log('[CoverageMap] Posting rectangle-drawn message to parent window');
-                    window.parent.postMessage({
-                      source: 'coverage-map',
-                      type: 'rectangle-drawn',
-                      detail: eventData
-                    }, '*');
+                    console.log('[CoverageMap] Posting rectangle-drawn message to parent window', {
+                      hasParent: !!window.parent,
+                      parentSame: window.parent === window,
+                      eventData: eventData
+                    });
+                    try {
+                      window.parent.postMessage({
+                        source: 'coverage-map',
+                        type: 'rectangle-drawn',
+                        detail: eventData
+                      }, '*');
+                      console.log('[CoverageMap] Message posted successfully to parent window');
+                    } catch (err) {
+                      console.error('[CoverageMap] Failed to post message to parent:', err);
+                    }
+                  } else {
+                    console.warn('[CoverageMap] Cannot post message - no parent window or same window');
                   }
                 } catch (convErr) {
                   console.error('[CoverageMap] Failed to convert coordinates:', convErr);

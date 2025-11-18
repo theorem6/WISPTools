@@ -150,6 +150,17 @@
       postStateToIframe(replyTarget);
     } else if (type === 'view-extent' && event.data?.payload) {
       dispatch('viewExtent', event.data.payload);
+    } else if (type === 'rectangle-drawn') {
+      // Forward rectangle-drawn messages to parent window (plan page)
+      console.log('[SharedMap] Forwarding rectangle-drawn message to parent:', event.data);
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          source: 'coverage-map',
+          type: 'rectangle-drawn',
+          detail: event.data.detail
+        }, '*');
+        console.log('[SharedMap] Rectangle-drawn message forwarded to parent window');
+      }
     }
   };
 
