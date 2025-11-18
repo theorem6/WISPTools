@@ -119,7 +119,16 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       serviceUrl,
       layerId,
       boundingBox,
-      requiresAuth
+      requiresAuth,
+      geometryEnvelope: {
+        xmin: boundingBox.west,
+        ymin: boundingBox.south,
+        xmax: boundingBox.east,
+        ymax: boundingBox.north,
+        spatialReference: 'WGS84 (4326)'
+      },
+      hasToken: !!queryParams.token,
+      tokenLength: queryParams.token?.length || 0
     });
     
     const response = await httpClient.get(queryUrl, {
@@ -157,6 +166,16 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
     let allFeatures = Array.isArray(data.features) ? data.features : [];
     const exceededTransferLimit = Boolean(data.exceededTransferLimit);
     const totalCount = data.objectIds?.length || allFeatures.length;
+    
+    console.log('[ArcGISBuildingFootprints] Query response', {
+      featuresReturned: allFeatures.length,
+      exceededLimit: exceededTransferLimit,
+      totalCount: totalCount,
+      hasObjectIds: !!data.objectIds,
+      objectIdsCount: data.objectIds?.length || 0,
+      serviceUrl,
+      layerId
+    });
     
     // Handle pagination if results exceeded limit
     if (exceededTransferLimit && data.objectIds && data.objectIds.length > allFeatures.length) {
