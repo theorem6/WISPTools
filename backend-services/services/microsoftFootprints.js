@@ -45,6 +45,18 @@ const STATE_ABBREVIATIONS = {
   'virginia': 'va', 'washington': 'wa', 'west virginia': 'wv', 'wisconsin': 'wi', 'wyoming': 'wy'
 };
 
+const unique = (values = []) => Array.from(new Set(values.filter(Boolean)));
+
+function getBoundingBoxCenter(bbox) {
+  if (!bbox) return null;
+  const latitude = (bbox.north + bbox.south) / 2;
+  const longitude = (bbox.east + bbox.west) / 2;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+  return { latitude, longitude };
+}
+
 // HTTP client with retry logic
 const httpClient = axios.create({
   timeout: 60000, // 60 second timeout for large downloads
@@ -528,6 +540,8 @@ async function getFeatureServiceFromWebMap(webMapId) {
 
 async function queryByBoundingBox(bbox) {
   try {
+    let lastEmptyResult = null;
+
     // Method 1: Try Microsoft Building Footprints Feature Service (official Esri hosting)
     // Try OAuth2 first, then fall back to API key if needed
     try {
@@ -599,8 +613,7 @@ async function queryByBoundingBox(bbox) {
         // Continue to try fallback methods
       } else {
         console.log('[MicrosoftFootprints] Feature Service: No building footprints found in bounding box');
-        // Return empty result if no features found
-        return {
+        lastEmptyResult = {
           type: 'FeatureCollection',
           features: []
         };
@@ -652,16 +665,31 @@ async function queryByBoundingBox(bbox) {
             type: 'FeatureCollection',
             features: geojsonFeatures
           };
+        } else {
+          lastEmptyResult = {
+            type: 'FeatureCollection',
+            features: []
+          };
         }
       }
     } catch (webMapError) {
       console.warn('[MicrosoftFootprints] Web Map fallback failed:', webMapError.message);
       // Continue - return empty result
     }
+
+    // Method 3: GitHub (state/county GeoJSON) fallback
+    try {
+      const githubResult = await queryGitHubFallbackByBoundingBox(bbox);
+      if (githubResult) {
+        return githubResult;
+      }
+    } catch (githubError) {
+      console.warn('[MicrosoftFootprints] GitHub fallback failed:', githubError.message);
+    }
     
     // No methods succeeded - return empty result
     console.warn('[MicrosoftFootprints] All methods failed to retrieve building footprints');
-    return {
+    return lastEmptyResult || {
       type: 'FeatureCollection',
       features: []
     };
@@ -670,6 +698,74 @@ async function queryByBoundingBox(bbox) {
     console.error('[MicrosoftFootprints] Query error:', error);
     throw error;
   }
+}
+
+async function queryGitHubFallbackByBoundingBox(bbox) {
+  if (!bbox) {
+    return null;
+  }
+
+  const center = getBoundingBoxCenter(bbox);
+  const locationInfo = center
+    ? await getCountyStateFromCoordinates(center.latitude, center.longitude)
+    : null;
+
+  const countyName = locationInfo?.county || null;
+  const stateCandidates = [];
+
+  if (locationInfo?.state) {
+    stateCandidates.push(locationInfo.state.replace(/_/g, ' '));
+  }
+  if (locationInfo?.stateAbbr) {
+    stateCandidates.push(locationInfo.stateAbbr);
+  }
+
+  if (center) {
+    const heuristicState = getStateFromCoordinates(center.latitude, center.longitude);
+    if (heuristicState) {
+      stateCandidates.push(heuristicState);
+    }
+  }
+
+  const uniqueStateCandidates = unique(
+    stateCandidates
+      .filter(Boolean)
+      .map((candidate) => candidate.toLowerCase())
+  );
+
+  let lastResult = null;
+
+  for (const candidate of uniqueStateCandidates) {
+    try {
+      const data = await fetchFromGitHub(candidate, countyName);
+      if (data && Array.isArray(data.features)) {
+        const filteredFeatures = filterFeaturesByBoundingBox(data.features, bbox);
+        lastResult = {
+          type: 'FeatureCollection',
+          features: filteredFeatures
+        };
+
+        console.log('[MicrosoftFootprints] GitHub fallback result', {
+          state: candidate,
+          county: countyName,
+          totalFeatures: data.features.length,
+          filteredFeatures: filteredFeatures.length
+        });
+
+        if (filteredFeatures.length > 0) {
+          return lastResult;
+        }
+      }
+    } catch (error) {
+      console.warn('[MicrosoftFootprints] GitHub fallback attempt failed', {
+        state: candidate,
+        county: countyName,
+        error: error.message
+      });
+    }
+  }
+
+  return lastResult;
 }
 
 /**

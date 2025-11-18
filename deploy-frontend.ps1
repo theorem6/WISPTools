@@ -90,7 +90,7 @@ function Test-Prerequisites {
 # Build Frontend
 function Build-Frontend {
     if ($SkipBuild) {
-        Write-Warning "Skipping build (--SkipBuild flag)"
+        Write-Warning "Skipping build (`--SkipBuild flag)"
         return
     }
     
@@ -152,7 +152,7 @@ function Deploy-ToFirebase {
 # Verify Deployment
 function Test-Deployment {
     if ($SkipVerification) {
-        Write-Warning "Skipping verification (--SkipVerification flag)"
+        Write-Warning "Skipping verification (`--SkipVerification flag)"
         return $true
     }
     
@@ -171,7 +171,7 @@ function Test-Deployment {
                 
                 # Check content
                 $content = Invoke-WebRequest -Uri $siteUrl -UseBasicParsing -ErrorAction Stop
-                if ($content.Content -match "<title>.*</title>") {
+                if ($content.Content -match '<title>.*</title>') {
                     Write-Success "Site content verified"
                     return $true
                 }

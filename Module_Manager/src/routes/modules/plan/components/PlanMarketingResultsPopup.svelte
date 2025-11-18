@@ -17,6 +17,7 @@
 
     const headers = [
       'Address',
+      'Address 2',
       'City',
       'State',
       'Postal Code',
@@ -48,13 +49,14 @@
         }
       }
       
-      // If addressLine1 is coordinates, leave address column empty (use lat/lon columns instead)
-      // Otherwise, use the actual address
+      // If addressLine1/addressLine2 are coordinates, leave address columns empty (use lat/lon columns instead)
+      // Otherwise, use the actual address values
       const address = isCoordinates ? '' : (addr.addressLine1 || '');
+      const address2 = isCoordinates ? '' : (addr.addressLine2 || '');
       
       return [
         address,
-        addr.addressLine2 || '',
+        address2,
         addr.city || '',
         addr.state || '',
         addr.postalCode || '',
