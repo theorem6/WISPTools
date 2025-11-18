@@ -826,7 +826,11 @@ function candidateLooksLikeRoad(tags = {}) {
 }
 
 const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
-  if (!ARC_GIS_API_KEY) {
+  // Check for API key at runtime (not just module-level constant)
+  // This ensures we use the latest API key even if it changes
+  const runtimeApiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+  
+  if (!runtimeApiKey) {
     return null; // Fall back to Nominatim if no API key
   }
 
@@ -837,7 +841,7 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
       location: `${lon},${lat}`,
       outFields: 'Address,City,Postal,Region,State,CountryCode',
       maxLocations: '1',
-      token: ARC_GIS_API_KEY
+      token: runtimeApiKey
     };
 
     const response = await httpClient.get(`${ARCGIS_GEOCODER_URL}/reverseGeocode`, {
@@ -907,7 +911,10 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
 
 const reverseGeocodeCoordinate = async (lat, lon) => {
   // Always use ArcGIS if available - it's much faster and more accurate
-  if (ARC_GIS_API_KEY) {
+  // Check for API key at runtime (not just module-level constant)
+  const runtimeApiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+  
+  if (runtimeApiKey) {
     const arcgisResult = await reverseGeocodeCoordinateArcgis(lat, lon);
     if (arcgisResult) {
       return arcgisResult;
@@ -984,11 +991,15 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     const reverseGeocodeStartTime = Date.now();
     
     // Configuration for batch processing
+    // Check for API key at runtime (not just module-level constant)
+    const runtimeApiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+    const hasApiKey = !!runtimeApiKey;
+    
     // Limit to 45 seconds to respond before proxy/nginx timeout (usually 60 seconds)
-    const REVERSE_GEOCODE_TIMEOUT = ARC_GIS_API_KEY ? 8000 : 5000;
-    const MAX_PARALLEL_GEOCODES = ARC_GIS_API_KEY ? 30 : 10; // Increased Nominatim parallel from 5 to 10 (still rate-limited)
+    const REVERSE_GEOCODE_TIMEOUT = hasApiKey ? 8000 : 5000;
+    const MAX_PARALLEL_GEOCODES = hasApiKey ? 30 : 10; // Increased Nominatim parallel from 5 to 10 (still rate-limited)
     // Increase timeout when using Nominatim (slower) or when processing many coordinates
-    const baseTimeout = ARC_GIS_API_KEY ? 50 * 1000 : 90 * 1000; // 90 seconds for Nominatim (allows more time)
+    const baseTimeout = hasApiKey ? 50 * 1000 : 90 * 1000; // 90 seconds for Nominatim (allows more time)
     const coordinateBasedTimeout = Math.max(baseTimeout, Math.ceil(coordinates.length / MAX_PARALLEL_GEOCODES) * REVERSE_GEOCODE_TIMEOUT + 10000); // Extra time for large batches
     const MAX_REVERSE_GEOCODE_TIME = Math.min(coordinateBasedTimeout, 90 * 1000); // Cap at 90 seconds (before proxy timeout)
     const MAX_COORDINATES_TO_GEOCODE = 10000; // Significantly increased - process all found coordinates
@@ -1006,7 +1017,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
     console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
       totalCoordinates: coordinates.length,
       processingCoordinates: coordinatesToProcess.length,
-      usingArcGIS: !!ARC_GIS_API_KEY,
+      usingArcGIS: hasApiKey,
+      hasApiKey: hasApiKey,
+      apiKeyLength: runtimeApiKey ? runtimeApiKey.length : 0,
       maxParallel: MAX_PARALLEL_GEOCODES,
       maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
     });
@@ -1144,7 +1157,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       // No delay needed for ArcGIS - it's designed for high throughput
       // Only delay for Nominatim to respect rate limits
       // Also check timeout before continuing
-      if (batchEnd < coordinatesToProcess.length && !ARC_GIS_API_KEY && Date.now() < overallTimeout) {
+      // Check for API key at runtime (not just module-level constant)
+      const runtimeApiKeyCheck = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+      if (batchEnd < coordinatesToProcess.length && !runtimeApiKeyCheck && Date.now() < overallTimeout) {
         await delay(1000); // 1 second delay between batches for Nominatim rate limiting
       }
       
