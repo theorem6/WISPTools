@@ -1151,7 +1151,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
                 longitude,
                 country: 'US',
                 source: source || 'unknown'
-              }
+              },
+              index: originalIndex,
+              source: source
             };
           }
           
