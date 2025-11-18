@@ -854,12 +854,23 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
     
     // Check for ArcGIS API errors
     if (data.error) {
-      // Don't log 498 Invalid Token errors - API key is invalid/expired, just return null silently
+      // Log API key errors to help diagnose issues
       if (data.error.code === 498 || data.error.message === 'Invalid Token') {
-        // API key is invalid - return null silently (will fall back to Nominatim or coordinates)
+        console.warn('[MarketingDiscovery] ArcGIS reverse geocode API key invalid/expired:', {
+          code: data.error.code,
+          message: data.error.message,
+          hasApiKey: !!runtimeApiKey,
+          apiKeyLength: runtimeApiKey?.length || 0,
+          apiKeyPrefix: runtimeApiKey ? runtimeApiKey.substring(0, 10) + '...' : 'none'
+        });
+        // API key is invalid - return null (will fall back to Nominatim)
         return null;
       }
-      console.warn('[MarketingDiscovery] ArcGIS reverse geocode API error:', data.error.code, data.error.message);
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode API error:', {
+        code: data.error.code,
+        message: data.error.message,
+        details: data.error.details
+      });
       return null;
     }
     
@@ -897,12 +908,24 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
     if (error.response) {
       const status = error.response.status;
       const errorData = error.response.data;
-      // Don't log 498 Invalid Token errors - API key is invalid/expired, just return null silently
+      // Log API key errors to help diagnose issues
       if (status === 498 || (errorData && (errorData.error?.code === 498 || errorData.error?.message === 'Invalid Token'))) {
-        // API key is invalid - return null silently (will fall back to Nominatim or coordinates)
+        console.warn('[MarketingDiscovery] ArcGIS reverse geocode API key invalid/expired:', {
+          status,
+          code: errorData?.error?.code,
+          message: errorData?.error?.message,
+          hasApiKey: !!runtimeApiKey,
+          apiKeyLength: runtimeApiKey?.length || 0,
+          apiKeyPrefix: runtimeApiKey ? runtimeApiKey.substring(0, 10) + '...' : 'none'
+        });
+        // API key is invalid - return null (will fall back to Nominatim)
         return null;
       }
-      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', status, errorData ? JSON.stringify(errorData).substring(0, 200) : 'Unknown error');
+      console.warn('[MarketingDiscovery] ArcGIS reverse geocode HTTP error:', {
+        status,
+        statusText: error.response.statusText,
+        error: errorData ? JSON.stringify(errorData).substring(0, 200) : 'Unknown error'
+      });
     } else {
       console.warn('[MarketingDiscovery] ArcGIS reverse geocode failed:', error.message || error);
     }
