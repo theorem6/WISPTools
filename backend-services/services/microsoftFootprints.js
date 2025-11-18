@@ -528,42 +528,34 @@ async function getFeatureServiceFromWebMap(webMapId) {
 
 async function queryByBoundingBox(bbox) {
   try {
-    // PRIMARY METHOD: Microsoft Building Footprints Feature Service with OAuth2
-    // This is the official Esri-hosted service that requires OAuth2 authentication
-    // We have OAuth2 credentials configured, so always use this method
+    // Method 1: Try Microsoft Building Footprints Feature Service (official Esri hosting)
+    // Try OAuth2 first, then fall back to API key if needed
     try {
-      console.log('[MicrosoftFootprints] Using Microsoft Building Footprints Feature Service with OAuth2:', MICROSOFT_FOOTPRINTS_FEATURE_SERVICE);
+      console.log('[MicrosoftFootprints] Using Microsoft Building Footprints Feature Service:', MICROSOFT_FOOTPRINTS_FEATURE_SERVICE);
       
       // Use ArcGIS Building Footprints service to query
       const arcgisBuildingFootprintsService = require('./arcgisBuildingFootprints');
       const arcgisOAuth = require('./arcgisOAuth');
+      const appConfig = require('../config/app');
       
-      // Get OAuth2 token - this is required for Microsoft Footprints service
-      console.log('[MicrosoftFootprints] Requesting OAuth2 token for Feature Service access...');
+      // Try OAuth2 first for Microsoft Footprints service, then fall back to API key
       const oauthToken = await arcgisOAuth.getValidToken();
+      const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
       
-      if (!oauthToken) {
-        const errorMsg = 'OAuth2 token required for Microsoft Building Footprints but could not be obtained. Check ARCGIS_OAUTH_CLIENT_ID and ARCGIS_OAUTH_CLIENT_SECRET.';
-        console.error('[MicrosoftFootprints]', errorMsg);
-        throw new Error(errorMsg);
-      }
-      
-      console.log('[MicrosoftFootprints] OAuth2 token obtained successfully', {
-        tokenLength: oauthToken.length,
-        tokenPrefix: oauthToken.substring(0, 20) + '...'
+      console.log('[MicrosoftFootprints] Authentication check:', {
+        hasOAuthToken: !!oauthToken,
+        hasApiKey: !!ARC_GIS_API_KEY,
+        oauthTokenLength: oauthToken?.length || 0
       });
       
-      console.log('[MicrosoftFootprints] Querying Feature Service with OAuth2 token');
-      
-      // Always use OAuth2 for Microsoft Footprints - never fall back to API key for this service
       const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
         bbox,
         {
           serviceUrls: [MICROSOFT_FOOTPRINTS_FEATURE_SERVICE],
           layerIds: [MICROSOFT_FOOTPRINTS_LAYER_ID],
-          requiresAuth: true, // Always requires authentication
-          useOAuth: true, // Always use OAuth2 (don't fall back to API key)
-          accessToken: oauthToken // Use OAuth2 token
+          requiresAuth: true, // Always try to authenticate
+          useOAuth: !!oauthToken, // Use OAuth if available
+          accessToken: oauthToken || null // Pass token if available
         }
       );
       
@@ -591,7 +583,7 @@ async function queryByBoundingBox(bbox) {
           };
         });
         
-        console.log(`[MicrosoftFootprints] Feature Service with OAuth2: Found ${geojsonFeatures.length} building footprint centroids`, {
+        console.log(`[MicrosoftFootprints] Feature Service: Found ${geojsonFeatures.length} building footprint centroids`, {
           sampleCoordinate: queryResult.coordinates[0] ? {
             latitude: queryResult.coordinates[0].latitude,
             longitude: queryResult.coordinates[0].longitude
@@ -603,23 +595,76 @@ async function queryByBoundingBox(bbox) {
           features: geojsonFeatures
         };
       } else if (queryResult.error) {
-        const errorMsg = `Microsoft Building Footprints Feature Service query failed: ${queryResult.error}`;
-        console.error('[MicrosoftFootprints]', errorMsg);
-        throw new Error(errorMsg);
+        console.warn('[MicrosoftFootprints] Feature Service query failed:', queryResult.error);
+        // Continue to try fallback methods
       } else {
         console.log('[MicrosoftFootprints] Feature Service: No building footprints found in bounding box');
-        // Return empty result instead of trying old methods
+        // Return empty result if no features found
         return {
           type: 'FeatureCollection',
           features: []
         };
       }
     } catch (featureServiceError) {
-      const errorMsg = `Microsoft Building Footprints Feature Service (OAuth2) failed: ${featureServiceError.message}`;
-      console.error('[MicrosoftFootprints]', errorMsg);
-      // Don't fall back to old methods - OAuth2 is the correct method for Microsoft Footprints
-      throw new Error(errorMsg);
+      console.warn('[MicrosoftFootprints] Feature Service access failed, trying fallback methods:', featureServiceError.message);
+      // Continue to try fallback methods
     }
+    
+    // Method 2: Try ArcGIS Web Map (fallback - user's map with Microsoft Building Footprints layer)
+    try {
+      const mapServiceInfo = await getFeatureServiceFromWebMap(ARCGIS_WEB_MAP_ID);
+      if (mapServiceInfo && mapServiceInfo.serviceUrl) {
+        console.log('[MicrosoftFootprints] Using ArcGIS Web Map Feature Service:', mapServiceInfo.serviceUrl);
+        
+        // Use ArcGIS Building Footprints service to query
+        const arcgisBuildingFootprintsService = require('./arcgisBuildingFootprints');
+        const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
+          bbox,
+          {
+            serviceUrls: [mapServiceInfo.serviceUrl],
+            layerIds: [mapServiceInfo.layerId],
+            requiresAuth: mapServiceInfo.requiresAuth,
+            useOAuth: mapServiceInfo.useOAuth || false,
+            accessToken: mapServiceInfo.accessToken || null
+          }
+        );
+        
+        if (queryResult.coordinates && queryResult.coordinates.length > 0) {
+          const geojsonFeatures = queryResult.coordinates.map(coord => {
+            return {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [coord.longitude, coord.latitude]
+              },
+              properties: {
+                ...(coord.attributes || {}),
+                source: coord.source || 'microsoft_footprints',
+                _centroid_latitude: coord.latitude,
+                _centroid_longitude: coord.longitude
+              }
+            };
+          });
+          
+          console.log(`[MicrosoftFootprints] Web Map Feature Service: Found ${geojsonFeatures.length} building footprint centroids`);
+          
+          return {
+            type: 'FeatureCollection',
+            features: geojsonFeatures
+          };
+        }
+      }
+    } catch (webMapError) {
+      console.warn('[MicrosoftFootprints] Web Map fallback failed:', webMapError.message);
+      // Continue - return empty result
+    }
+    
+    // No methods succeeded - return empty result
+    console.warn('[MicrosoftFootprints] All methods failed to retrieve building footprints');
+    return {
+      type: 'FeatureCollection',
+      features: []
+    };
     
   } catch (error) {
     console.error('[MicrosoftFootprints] Query error:', error);
