@@ -1033,6 +1033,13 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       console.warn(`[MarketingDiscovery] Limiting reverse geocoding to ${MAX_COORDINATES_TO_GEOCODE} of ${coordinates.length} coordinates to prevent timeout`);
     }
 
+    // Count coordinates by source
+    const coordinatesBySource = {};
+    for (const coord of coordinatesToProcess) {
+      const source = coord?.source || 'unknown';
+      coordinatesBySource[source] = (coordinatesBySource[source] || 0) + 1;
+    }
+    
     console.log('[MarketingDiscovery] Starting batch reverse geocoding', {
       totalCoordinates: coordinates.length,
       processingCoordinates: coordinatesToProcess.length,
@@ -1041,7 +1048,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       apiKeyLength: runtimeApiKey ? runtimeApiKey.length : 0,
       maxParallel: MAX_PARALLEL_GEOCODES,
       maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`,
-      sampleCoordinates: coordinatesToProcess.slice(0, 3).map(c => ({
+      coordinatesBySource: coordinatesBySource,
+      sampleCoordinates: coordinatesToProcess.slice(0, 5).map((c, idx) => ({
+        index: idx,
         latitude: c.latitude,
         longitude: c.longitude,
         source: c.source,
@@ -1087,7 +1096,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       }
 
       // Process batch in parallel
+      // Track original index to preserve order
       const batchPromises = batch.map(async (coord, batchIndex) => {
+        const originalIndex = batchStart + batchIndex; // Global index in coordinatesToProcess
         try {
           const latitude = toNumber(coord?.latitude);
           const longitude = toNumber(coord?.longitude);
@@ -1097,7 +1108,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
             console.warn('[MarketingDiscovery] Skipping invalid coordinate in batch:', coord);
             return {
               success: false,
-              address: null
+              address: null,
+              index: originalIndex,
+              source: source
             };
           }
           
@@ -1117,7 +1130,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
                 longitude: longitude || 0,
                 country: 'US',
                 source: source || 'unknown'
-              }
+              },
+              index: originalIndex,
+              source: source
             };
           }
           
@@ -1154,16 +1169,22 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
               address: {
                 ...details,
                 source: source || details.source || 'unknown'
-              }
+              },
+              index: originalIndex,
+              source: source
             };
           } else {
             // No address returned or only coordinates returned
-            console.log('[MarketingDiscovery] Reverse geocode returned no address for centroid:', {
-              latitude,
-              longitude,
-              source,
-              returnedAddress: details?.addressLine1 || 'none'
-            });
+            if (source === 'microsoft_footprints') {
+              console.log('[MarketingDiscovery] Reverse geocode returned no address for Microsoft Footprints centroid:', {
+                latitude,
+                longitude,
+                source,
+                returnedAddress: details?.addressLine1 || 'none',
+                hasDetails: !!details,
+                detailsSource: details?.source
+              });
+            }
             return {
               success: false,
               address: {
@@ -1172,7 +1193,9 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
                 longitude,
                 country: 'US',
                 source: source || 'unknown'
-              }
+              },
+              index: originalIndex,
+              source: source
             };
           }
         } catch (error) {
@@ -1198,12 +1221,16 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
                 longitude: lon,
                 country: 'US',
                 source: coordSource
-              }
+              },
+              index: originalIndex,
+              source: coordSource
             };
           } else {
             return {
               success: false,
-              address: null
+              address: null,
+              index: originalIndex,
+              source: coordSource
             };
           }
         }
@@ -1212,7 +1239,10 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       // Wait for batch to complete
       const batchResults = await Promise.all(batchPromises);
       
-      // Process batch results
+      // Sort results by original index to preserve order
+      batchResults.sort((a, b) => (a.index || 0) - (b.index || 0));
+      
+      // Process batch results in order
       for (const result of batchResults) {
         if (result.address) {
           addresses.push(result.address);
