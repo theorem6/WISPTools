@@ -870,8 +870,32 @@ class PlanService {
         }))
       : [];
 
+    // Extract latitude/longitude from coordinate strings in addressLine1 if not already set
+    const addressesWithExtractedCoords = mappedAddresses.map((addr) => {
+      // If latitude/longitude are missing but addressLine1 contains coordinates, extract them
+      if ((addr.latitude === undefined || addr.longitude === undefined) && addr.addressLine1) {
+        const coordMatch = addr.addressLine1.match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
+        if (coordMatch) {
+          const lat = parseFloat(coordMatch[1]);
+          const lon = parseFloat(coordMatch[2]);
+          if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+            return {
+              ...addr,
+              latitude: addr.latitude ?? lat,
+              longitude: addr.longitude ?? lon,
+              // Don't set addressLine1 to empty - keep coordinates for reference
+              // But mark it so we know it's just coordinates
+              _isCoordinates: true
+            };
+          }
+        }
+      }
+      return addr;
+    });
+    
     // Filter out addresses without address information (no addressLine1)
-    const addressesWithInfo = mappedAddresses.filter((addr) => {
+    // BUT keep addresses with coordinates (even if no real address)
+    const addressesWithInfo = addressesWithExtractedCoords.filter((addr) => {
       return addr && addr.addressLine1 && addr.addressLine1.trim().length > 0;
     });
 

@@ -26,17 +26,26 @@
       'Source'
     ];
 
-    const rows = addresses.map(addr => [
-      addr.addressLine1 || '',
-      addr.addressLine2 || '',
-      addr.city || '',
-      addr.state || '',
-      addr.postalCode || '',
-      addr.country || '',
-      addr.latitude?.toString() || '',
-      addr.longitude?.toString() || '',
-      addr.source || ''
-    ]);
+    const rows = addresses.map(addr => {
+      // If addressLine1 is just coordinates and we have separate lat/lon, prefer the coordinates
+      // Otherwise use addressLine1 as-is
+      const isCoordinates = addr.addressLine1?.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/);
+      const address = isCoordinates && addr.latitude !== undefined && addr.longitude !== undefined 
+        ? '' // Empty address field if it's just coordinates (lat/lon columns will have the values)
+        : (addr.addressLine1 || '');
+      
+      return [
+        address,
+        addr.addressLine2 || '',
+        addr.city || '',
+        addr.state || '',
+        addr.postalCode || '',
+        addr.country || '',
+        addr.latitude !== undefined && addr.latitude !== null ? addr.latitude.toString() : '',
+        addr.longitude !== undefined && addr.longitude !== null ? addr.longitude.toString() : '',
+        addr.source || ''
+      ];
+    });
 
     const csvContent = [
       headers.join(','),
