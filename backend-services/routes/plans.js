@@ -917,18 +917,13 @@ const reverseGeocodeCoordinate = async (lat, lon) => {
   
   if (runtimeApiKey) {
     const arcgisResult = await reverseGeocodeCoordinateArcgis(lat, lon);
-    if (arcgisResult) {
+    if (arcgisResult && arcgisResult.addressLine1 && !arcgisResult.addressLine1.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/)) {
+      // Successfully got a real address from ArcGIS
       return arcgisResult;
     }
-    // If ArcGIS fails, return coordinates instead of slow Nominatim
-    // This speeds up the process significantly
-    return {
-      addressLine1: `${lat.toFixed(7)}, ${lon.toFixed(7)}`,
-      latitude: lat,
-      longitude: lon,
-      country: 'US',
-      source: 'arcgis_failed'
-    };
+    // ArcGIS failed or returned invalid result - fall back to Nominatim for real addresses
+    // Only return coordinates as last resort if both fail
+    console.log('[MarketingDiscovery] ArcGIS reverse geocode failed for', lat, lon, '- falling back to Nominatim');
   }
 
   // Only use Nominatim if ArcGIS API key is not available (shouldn't happen in production)
