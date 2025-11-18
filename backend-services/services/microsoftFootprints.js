@@ -562,6 +562,14 @@ async function queryByBoundingBox(bbox) {
         oauthTokenLength: oauthToken?.length || 0
       });
       
+      console.log('[MicrosoftFootprints] Querying Feature Service with bounding box', {
+        boundingBox: bbox,
+        serviceUrl: MICROSOFT_FOOTPRINTS_FEATURE_SERVICE,
+        layerId: MICROSOFT_FOOTPRINTS_LAYER_ID,
+        hasOAuthToken: !!oauthToken,
+        hasApiKey: !!ARC_GIS_API_KEY
+      });
+      
       const queryResult = await arcgisBuildingFootprintsService.queryBuildingFootprintsByBoundingBox(
         bbox,
         {
@@ -572,6 +580,12 @@ async function queryByBoundingBox(bbox) {
           accessToken: oauthToken || null // Pass token if available
         }
       );
+      
+      console.log('[MicrosoftFootprints] Feature Service query result', {
+        coordinatesCount: queryResult?.coordinates?.length || 0,
+        hasError: !!queryResult?.error,
+        error: queryResult?.error || null
+      });
       
       if (queryResult.coordinates && queryResult.coordinates.length > 0) {
         // queryBuildingFootprintsByBoundingBox already returns centroids (coordinates are already calculated)

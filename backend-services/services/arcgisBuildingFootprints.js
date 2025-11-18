@@ -150,16 +150,59 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
         tokenPrefix: queryParams.token ? queryParams.token.substring(0, 20) + '...' : 'none'
       });
       
-      // If token is invalid, clear cache and try again if OAuth2 is being used
+      // If token is invalid, clear cache and retry with API key if available
       if (errorCode === 498 || errorMessage === 'Invalid token' || errorMessage?.includes('Invalid token')) {
         if (accessToken || useOAuth) {
-          console.warn('[ArcGISBuildingFootprints] Invalid OAuth2 token detected, clearing cache');
+          console.warn('[ArcGISBuildingFootprints] Invalid OAuth2 token detected, clearing cache and retrying with API key');
           const arcgisOAuth = require('./arcgisOAuth');
           arcgisOAuth.clearTokenCache();
+          
+          // Retry with API key if available
+          if (ARC_GIS_API_KEY && queryParams.token !== ARC_GIS_API_KEY) {
+            console.log('[ArcGISBuildingFootprints] Retrying query with API key instead of OAuth2 token');
+            queryParams.token = ARC_GIS_API_KEY;
+            
+            try {
+              const retryResponse = await httpClient.get(queryUrl, {
+                params: queryParams,
+                timeout: 15000
+              });
+              
+              if (retryResponse.data && retryResponse.data.error) {
+                console.error('[ArcGISBuildingFootprints] Retry with API key also failed:', retryResponse.data.error);
+                return { features: [], error: retryResponse.data.error.message || 'Query failed even with API key' };
+              }
+              
+              // Use the retry response instead of the original error
+              const retryData = retryResponse.data;
+              let allFeatures = Array.isArray(retryData.features) ? retryData.features : [];
+              const exceededTransferLimit = Boolean(retryData.exceededTransferLimit);
+              const totalCount = retryData.objectIds?.length || allFeatures.length;
+              
+              console.log('[ArcGISBuildingFootprints] Retry with API key successful', {
+                featuresReturned: allFeatures.length,
+                exceededLimit: exceededTransferLimit,
+                totalCount: totalCount
+              });
+              
+              // Continue with pagination logic below using retryData
+              response.data = retryData;
+            } catch (retryError) {
+              console.error('[ArcGISBuildingFootprints] Retry with API key failed:', retryError.message);
+              return { features: [], error: errorMessage || 'Query failed' };
+            }
+          } else {
+            // No API key available, return error
+            return { features: [], error: errorMessage || 'Query failed' };
+          }
+        } else {
+          // Not using OAuth2, just return error
+          return { features: [], error: errorMessage || 'Query failed' };
         }
+      } else {
+        // Other error, return it
+        return { features: [], error: errorMessage || 'Query failed' };
       }
-      
-      return { features: [], error: errorMessage || 'Query failed' };
     }
     
     const data = response.data;
