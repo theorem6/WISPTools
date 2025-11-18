@@ -470,7 +470,15 @@ export class CoverageMapController {
   }
 
   public setFilters(filters: CoverageMapFilters): void {
+    const previousShowMarketing = this.filters?.showMarketing ?? true;
     this.filters = filters;
+    
+    // Clear marketing layer when filter is turned off
+    if (this.mapReady && previousShowMarketing && !filters.showMarketing && this.marketingLayer) {
+      this.marketingLayer.removeAll();
+      console.log('[CoverageMap] Marketing layer cleared (filter hidden)');
+    }
+    
     if (this.mapReady) {
       this.renderAllAssets().catch(err => console.error('[CoverageMap] Asset render error:', err));
       this.renderMarketingLeads().catch(err => console.error('[CoverageMap] Marketing render error:', err));
@@ -497,6 +505,13 @@ export class CoverageMapController {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];
     
+    // Clear layer if we had leads before and now have none (project deleted/cleared)
+    const isClearing = previousCount > 0 && incomingLeads.length === 0;
+    if (isClearing && this.marketingLayer && this.mapReady) {
+      this.marketingLayer.removeAll();
+      console.log('[CoverageMap] Marketing layer cleared (leads became empty)');
+    }
+    
     // Always update the leads array (even if empty) to reflect current state
     // Backend returns full list, not incremental updates
     this.marketingLeads = incomingLeads;
@@ -507,14 +522,10 @@ export class CoverageMapController {
       !this.hasPerformedInitialFit;
     
     if (this.mapReady) {
-      // Only clear the layer if we have incoming leads to render
-      // This ensures markers refresh when new data arrives, but doesn't clear unnecessarily
-      if (this.marketingLayer && incomingLeads.length > 0) {
-        // Clear existing markers before rendering new ones to ensure full refresh
-        this.marketingLayer.removeAll();
-      }
-      
-      // Render leads (this will return early if leads array is empty, which is fine)
+      // Don't clear the layer here for updates - only add/update markers
+      // Layer clearing happens when:
+      // 1. Filter is turned off (in setFilters)
+      // 2. Leads become empty after having leads (project deleted/cleared)
       this.renderMarketingLeads()
         .then(() => {
           console.log('[CoverageMap] Marketing leads rendered', {
@@ -542,6 +553,15 @@ export class CoverageMapController {
         })
         .catch(err => console.error('[CoverageMap] Marketing render error:', err));
     }
+  }
+
+  public clearMarketingLeads(): void {
+    // Clear marketing leads data and layer
+    this.marketingLeads = [];
+    if (this.marketingLayer) {
+      this.marketingLayer.removeAll();
+    }
+    console.log('[CoverageMap] Marketing leads cleared');
   }
 
   public async centerMapOnLocation(lat: number, lon: number, zoom?: number): Promise<void> {

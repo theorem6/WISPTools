@@ -1549,7 +1549,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         mapLayerManager.setMode('plan');
         mapLayerManager.setCapabilities(PLANNING_LOCK_CAPABILITIES);
         mapLocked = true;
-        // Clear map layers for deleted project - just reload map with no active plan
+        // Clear map layers and marketing data for deleted project
+        // Set activePlan to null to clear marketing leads from map
+        setMapData({ activePlan: null });
+        // Reload map with no active plan
         if ($currentTenant?.id) {
           await mapLayerManager.loadProductionHardware($currentTenant.id);
         }
