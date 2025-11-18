@@ -1021,7 +1021,14 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
       hasApiKey: hasApiKey,
       apiKeyLength: runtimeApiKey ? runtimeApiKey.length : 0,
       maxParallel: MAX_PARALLEL_GEOCODES,
-      maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`
+      maxDuration: `${MAX_REVERSE_GEOCODE_TIME / 1000}s`,
+      sampleCoordinates: coordinatesToProcess.slice(0, 3).map(c => ({
+        latitude: c.latitude,
+        longitude: c.longitude,
+        source: c.source,
+        isValidLat: Number.isFinite(c.latitude) && c.latitude >= -90 && c.latitude <= 90,
+        isValidLon: Number.isFinite(c.longitude) && c.longitude >= -180 && c.longitude <= 180
+      }))
     });
 
     // Process coordinates in batches for parallel geocoding
@@ -1075,6 +1082,45 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
             };
           }
           
+          // Validate coordinates before reverse geocoding
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            console.warn('[MarketingDiscovery] Invalid coordinate values for reverse geocoding:', {
+              latitude,
+              longitude,
+              source,
+              coord
+            });
+            return {
+              success: false,
+              address: {
+                addressLine1: `${latitude?.toFixed(7) || 'invalid'}, ${longitude?.toFixed(7) || 'invalid'}`,
+                latitude: latitude || 0,
+                longitude: longitude || 0,
+                country: 'US',
+                source: source || 'unknown'
+              }
+            };
+          }
+          
+          // Ensure coordinates are valid lat/lon ranges
+          if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            console.warn('[MarketingDiscovery] Coordinate out of valid range:', {
+              latitude,
+              longitude,
+              source
+            });
+            return {
+              success: false,
+              address: {
+                addressLine1: `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`,
+                latitude,
+                longitude,
+                country: 'US',
+                source: source || 'unknown'
+              }
+            };
+          }
+          
           // Add timeout to individual reverse geocode calls
           const geocodePromise = reverseGeocodeCoordinate(latitude, longitude);
           const timeoutPromise = new Promise((_, reject) => 
@@ -1082,7 +1128,8 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
           );
           
           const details = await Promise.race([geocodePromise, timeoutPromise]);
-          if (details && details.addressLine1) {
+          if (details && details.addressLine1 && !details.addressLine1.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/)) {
+            // Successfully reverse geocoded (not just coordinates)
             return {
               success: true,
               address: {
@@ -1091,7 +1138,13 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
               }
             };
           } else {
-            // No address returned, use coordinates
+            // No address returned or only coordinates returned
+            console.log('[MarketingDiscovery] Reverse geocode returned no address for centroid:', {
+              latitude,
+              longitude,
+              source,
+              returnedAddress: details?.addressLine1 || 'none'
+            });
             return {
               success: false,
               address: {
@@ -1108,11 +1161,12 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
           const lon = toNumber(coord?.longitude);
           const coordSource = coord?.source || 'unknown';
           
-          console.warn('[MarketingDiscovery] Reverse geocode failed for coordinate:', {
+          console.warn('[MarketingDiscovery] Reverse geocode error for coordinate:', {
             lat,
             lon,
             source: coordSource,
-            error: error?.message || error
+            error: error?.message || error,
+            errorType: error?.name || typeof error
           });
           
           // Fallback to coordinates if valid

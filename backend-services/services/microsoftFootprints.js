@@ -562,20 +562,35 @@ async function queryByBoundingBox(bbox) {
       );
       
       if (queryResult.coordinates && queryResult.coordinates.length > 0) {
-        // Convert coordinates to GeoJSON features (for centroid extraction later)
+        // queryBuildingFootprintsByBoundingBox already returns centroids (coordinates are already calculated)
+        // Convert to GeoJSON FeatureCollection format for compatibility
+        // Each coordinate is already a centroid with latitude/longitude
         const geojsonFeatures = queryResult.coordinates.map(coord => {
-          // Create a point feature from the centroid
+          // Coordinates are already centroids - use them directly
+          // Create a Point feature with the centroid coordinates
           return {
             type: 'Feature',
             geometry: {
               type: 'Point',
-              coordinates: [coord.longitude, coord.latitude]
+              coordinates: [coord.longitude, coord.latitude] // [lon, lat] format for GeoJSON
             },
-            properties: coord.attributes || {}
+            properties: {
+              ...(coord.attributes || {}),
+              // Preserve source information
+              source: coord.source || 'microsoft_footprints',
+              // Store original coordinates for reference
+              _centroid_latitude: coord.latitude,
+              _centroid_longitude: coord.longitude
+            }
           };
         });
         
-        console.log(`[MicrosoftFootprints] Feature Service with OAuth2: Found ${geojsonFeatures.length} building footprints`);
+        console.log(`[MicrosoftFootprints] Feature Service with OAuth2: Found ${geojsonFeatures.length} building footprint centroids`, {
+          sampleCoordinate: queryResult.coordinates[0] ? {
+            latitude: queryResult.coordinates[0].latitude,
+            longitude: queryResult.coordinates[0].longitude
+          } : null
+        });
         
         return {
           type: 'FeatureCollection',
