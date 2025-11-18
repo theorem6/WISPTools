@@ -435,13 +435,28 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         const activePlan = plans.find((p: any) => String(p.id || p._id) === planId);
         activePlanName = activePlan?.name || null;
         if (!sharedActivePlanId) {
-          const addresses = activePlan?.marketing?.addresses;
-          marketingLeads = Array.isArray(addresses) ? addresses : [];
+          // Only show marketing addresses if the active plan is visible
+          if (activePlan && currentVisiblePlanIds.has(String(planId))) {
+            const addresses = activePlan?.marketing?.addresses;
+            marketingLeads = Array.isArray(addresses) ? addresses : [];
+          } else {
+            marketingLeads = [];
+          }
         }
       } else {
         activePlanName = null;
         if (!sharedActivePlanId) {
-          marketingLeads = [];
+          // Aggregate marketing addresses from all visible plans
+          const allMarketingAddresses: any[] = [];
+          plans.forEach((plan: any) => {
+            const planIdStr = String(plan.id || plan._id);
+            if (currentVisiblePlanIds.has(planIdStr) && plan.marketing?.addresses) {
+              const addresses = Array.isArray(plan.marketing.addresses) ? plan.marketing.addresses : [];
+              allMarketingAddresses.push(...addresses);
+            }
+          });
+          marketingLeads = allMarketingAddresses;
+          console.log(`[CoverageMap] Loaded ${marketingLeads.length} marketing addresses from ${currentVisiblePlanIds.size} visible plans`);
         }
       }
 
@@ -638,12 +653,15 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       sharedActivePlanId = activePlanIdFromState;
 
       const inboundMarketing = state.activePlanMarketing?.addresses ?? [];
-      // Create a new array reference to ensure Svelte detects the change and updates the map
-      marketingLeads = Array.isArray(inboundMarketing) ? [...inboundMarketing] : [];
+      // Only use marketing addresses if the plan is visible
+      // SharedMap already filters by visibility, but double-check here for safety
+      const isPlanVisible = !activePlanIdFromState || currentVisiblePlanIds.has(String(activePlanIdFromState));
+      marketingLeads = (isPlanVisible && Array.isArray(inboundMarketing)) ? [...inboundMarketing] : [];
       console.log('[CoverageMap] Marketing leads updated from state', {
         count: marketingLeads.length,
         hasActivePlan: !!state.activePlan,
-        activePlanId: state.activePlanId
+        activePlanId: activePlanIdFromState,
+        isPlanVisible
       });
     } else if (source === 'shared-map' && type === 'center-map') {
       // Handle center-map message from parent

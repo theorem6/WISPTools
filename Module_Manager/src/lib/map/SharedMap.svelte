@@ -82,8 +82,10 @@
           }
         : null;
 
+      // Only send marketing addresses if the plan is visible on the map
       const marketing = activePlan?.marketing;
-      const activePlanMarketing = marketing
+      const isPlanVisible = activePlan?.showOnMap !== false; // Default to true if undefined
+      const activePlanMarketing = marketing && isPlanVisible
         ? {
             targetRadiusMiles: marketing.targetRadiusMiles ?? null,
             lastRunAt: marketing.lastRunAt ? new Date(marketing.lastRunAt).toISOString() : null,
