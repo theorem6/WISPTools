@@ -996,25 +996,38 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     }
 
     selectedProject = targetPlan;
+    
+    // Ensure modal is closed
+    showMarketingModal = false;
 
     // Enable rectangle drawing on the map
     try {
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
-      if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage({
-          source: 'plan-page',
-          type: 'enable-rectangle-drawing'
-        }, '*');
-        
-        isDrawingRectangle = true;
-        console.log('[Plan] Enabled rectangle drawing for address discovery', {
-          planId: targetPlan.id,
-          planName: targetPlan.name
-        });
-      } else {
+      if (!iframe) {
         error = 'Map not ready. Please wait for the map to load.';
         setTimeout(() => error = '', 5000);
+        return;
       }
+
+      // Wait for iframe to be ready
+      if (!iframe.contentWindow) {
+        error = 'Map iframe not ready. Please wait for the map to load.';
+        setTimeout(() => error = '', 5000);
+        return;
+      }
+
+      // Send message to enable rectangle drawing
+      iframe.contentWindow.postMessage({
+        source: 'plan-page',
+        type: 'enable-rectangle-drawing'
+      }, '*');
+      
+      isDrawingRectangle = true;
+      console.log('[Plan] Enabled rectangle drawing for address discovery', {
+        planId: targetPlan.id,
+        planName: targetPlan.name,
+        iframeSrc: iframe.src
+      });
     } catch (err: any) {
       console.error('[Plan] Failed to enable rectangle drawing:', err);
       error = 'Failed to enable drawing mode. Please try again.';

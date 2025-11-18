@@ -251,17 +251,27 @@ export class CoverageMapController {
         });
       }
 
-      // Show the sketch widget
-      this.mapView.ui.add(this.sketchWidget, {
-        position: 'top-left',
-        index: 0
-      });
+      // Show the sketch widget (only if it's not already in the UI)
+      try {
+        this.mapView.ui.add(this.sketchWidget, {
+          position: 'top-left',
+          index: 0
+        });
+      } catch (e) {
+        // Widget might already be in UI, that's okay
+        console.log('[CoverageMap] Sketch widget already in UI or error adding:', e);
+      }
 
       // Enable rectangle creation
-      this.sketchWidget.create('rectangle');
-      this.isDrawingMode = true;
-
-      console.log('[CoverageMap] Rectangle drawing enabled');
+      try {
+        this.sketchWidget.create('rectangle');
+        this.isDrawingMode = true;
+        console.log('[CoverageMap] Rectangle drawing enabled');
+      } catch (error) {
+        console.error('[CoverageMap] Failed to start rectangle creation:', error);
+        // Reset drawing mode if creation failed
+        this.isDrawingMode = false;
+      }
     } catch (error) {
       console.error('[CoverageMap] Failed to enable rectangle drawing:', error);
     }

@@ -658,15 +658,28 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       }
     } else if (source === 'plan-page') {
       // Handle messages from plan page
+      console.log('[CoverageMap] Received message from plan-page:', type);
       if (type === 'enable-rectangle-drawing') {
         if (mapComponent) {
-          mapComponent.enableRectangleDrawing().catch(err => {
+          console.log('[CoverageMap] Enabling rectangle drawing...');
+          mapComponent.enableRectangleDrawing().catch((err: any) => {
             console.error('[CoverageMap] Failed to enable rectangle drawing:', err);
           });
+        } else {
+          console.warn('[CoverageMap] Map component not ready for rectangle drawing');
+          // Try again after a short delay
+          setTimeout(() => {
+            if (mapComponent) {
+              mapComponent.enableRectangleDrawing().catch((err: any) => {
+                console.error('[CoverageMap] Failed to enable rectangle drawing (retry):', err);
+              });
+            }
+          }, 500);
         }
       } else if (type === 'disable-rectangle-drawing') {
         if (mapComponent) {
-          mapComponent.disableRectangleDrawing().catch(err => {
+          console.log('[CoverageMap] Disabling rectangle drawing...');
+          mapComponent.disableRectangleDrawing().catch((err: any) => {
             console.error('[CoverageMap] Failed to disable rectangle drawing:', err);
           });
         }
