@@ -497,28 +497,9 @@ export class CoverageMapController {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];
     
-    // Merge new leads with existing ones, deduplicating by coordinate + address hash
-    const existingHashes = new Set(
-      this.marketingLeads.map(lead => {
-        const lat = this.toNumeric(lead.latitude);
-        const lon = this.toNumeric(lead.longitude);
-        if (lat === null || lon === null) return null;
-        return `${lat.toFixed(7)}|${lon.toFixed(7)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
-      }).filter(h => h !== null) as string[]
-    );
-    
-    // Add new leads that don't already exist
-    const newLeads = incomingLeads.filter(lead => {
-      const lat = this.toNumeric(lead.latitude);
-      const lon = this.toNumeric(lead.longitude);
-      if (lat === null || lon === null) return false;
-      const hash = `${lat.toFixed(7)}|${lon.toFixed(7)}|${(lead.addressLine1 ?? '').toLowerCase()}|${lead.postalCode ?? ''}`;
-      return !existingHashes.has(hash);
-    });
-    
-    // Merge: keep existing + add new (backend returns all addresses, so this should be minimal)
-    // But if backend returns full list, just use that to ensure consistency
-    this.marketingLeads = incomingLeads.length > 0 ? incomingLeads : this.marketingLeads;
+    // Always replace with incoming leads (backend returns full list, not incremental)
+    // This ensures consistency when wizard completes or project is reloaded
+    this.marketingLeads = incomingLeads;
 
     const shouldAutoFit =
       previousCount === 0 &&
@@ -526,8 +507,19 @@ export class CoverageMapController {
       !this.hasPerformedInitialFit;
     
     if (this.mapReady) {
+      // Always clear the layer before rendering to ensure all markers refresh
+      // This is necessary because backend returns the full list, not incremental updates
+      if (this.marketingLayer) {
+        this.marketingLayer.removeAll();
+      }
+      
       this.renderMarketingLeads()
         .then(() => {
+          console.log('[CoverageMap] Marketing leads rendered', {
+            leadCount: this.marketingLeads.length,
+            markerCount: this.marketingLayer?.graphics?.length || 0
+          });
+          
           if (!shouldAutoFit) {
             return;
           }

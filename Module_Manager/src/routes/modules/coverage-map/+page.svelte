@@ -638,7 +638,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       sharedActivePlanId = activePlanIdFromState;
 
       const inboundMarketing = state.activePlanMarketing?.addresses ?? [];
-      marketingLeads = Array.isArray(inboundMarketing) ? inboundMarketing : [];
+      // Create a new array reference to ensure Svelte detects the change and updates the map
+      marketingLeads = Array.isArray(inboundMarketing) ? [...inboundMarketing] : [];
+      console.log('[CoverageMap] Marketing leads updated from state', {
+        count: marketingLeads.length,
+        hasActivePlan: !!state.activePlan,
+        activePlanId: state.activePlanId
+      });
     } else if (source === 'shared-map' && type === 'center-map') {
       // Handle center-map message from parent
       const { lat, lon, zoom, features } = payload || {};

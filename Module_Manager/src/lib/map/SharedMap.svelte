@@ -209,9 +209,13 @@
     postStateToIframe();
   }
   
-  // Explicitly watch for activePlan changes to ensure marketing addresses are updated
+  // Explicitly watch for activePlan and marketing addresses changes to ensure map refreshes
   // This ensures the map refreshes when marketing addresses change after wizard completion
-  $: if (iframeLoaded && mapState?.activePlan && mapState?.lastUpdated) {
+  $: marketingAddressCount = mapState?.activePlan?.marketing?.addresses?.length ?? 0;
+  $: activePlanId = mapState?.activePlan?.id ?? null;
+  $: lastUpdatedTimestamp = mapState?.lastUpdated?.getTime() ?? 0;
+  $: if (iframeLoaded && activePlanId && lastUpdatedTimestamp > 0) {
+    // Post state to iframe whenever activePlan changes, marketing addresses are updated, or lastUpdated changes
     postStateToIframe();
   }
 </script>

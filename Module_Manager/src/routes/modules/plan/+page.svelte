@@ -951,8 +951,31 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
   }
 }
 
-  function closeMarketingTools() {
+  async function closeMarketingTools() {
     showMarketingModal = false;
+    
+    // Refresh the map when wizard closes to ensure all addresses are displayed
+    // Check if we have a selected/active project and refresh it
+    const project = selectedProject ?? activeProject ?? contextActivePlan;
+    if (project) {
+      try {
+        const fullPlan = await planService.getPlan(project.id);
+        if (fullPlan) {
+          selectedProject = fullPlan;
+          if (activeProject && activeProject.id === fullPlan.id) {
+            activeProject = fullPlan;
+          }
+          // Update map with full plan containing all marketing addresses
+          setMapData({ activePlan: fullPlan });
+          console.log('[Plan] Map refreshed when marketing wizard closed', {
+            planId: fullPlan.id,
+            addressCount: fullPlan.marketing?.addresses?.length || 0
+          });
+        }
+      } catch (err) {
+        console.warn('[Plan] Failed to refresh plan when closing marketing wizard:', err);
+      }
+    }
   }
 
   function closeMarketingResultsPopup() {
