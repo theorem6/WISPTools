@@ -555,8 +555,11 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         // Listen for messages from iframe (coverage-map)
         const handleMessage = (event: MessageEvent) => {
           const { source, type, detail } = event.data || {};
+          console.log('[Plan] Received message from iframe:', { source, type, hasDetail: !!detail });
+          
           if (source === 'coverage-map') {
             if (type === 'rectangle-drawn') {
+              console.log('[Plan] Processing rectangle-drawn message:', detail);
               handleRectangleDrawn(new CustomEvent('rectangle-drawn', { detail }));
             }
           }
@@ -564,11 +567,20 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         window.addEventListener('message', handleMessage);
         const removeMessageListener = () => window.removeEventListener('message', handleMessage);
         
+        // Also listen for direct events from the map component (if not in iframe)
+        const handleRectangleEvent = (event: CustomEvent) => {
+          console.log('[Plan] Received rectangle-drawn event directly:', event.detail);
+          handleRectangleDrawn(event);
+        };
+        window.addEventListener('rectangle-drawn', handleRectangleEvent as any);
+        const removeRectangleListener = () => window.removeEventListener('rectangle-drawn', handleRectangleEvent as any);
+        
         const originalRemove = removeListener;
         removeListener = () => {
           originalRemove();
           removeCenterListener();
           removeMessageListener();
+          removeRectangleListener();
         };
         
         iframeInitialized = true;

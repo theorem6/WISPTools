@@ -271,6 +271,16 @@ export class CoverageMapController {
                   
                   console.log('[CoverageMap] Dispatching rectangle-drawn event:', eventData);
                   this.dispatch('rectangle-drawn', eventData);
+                  
+                  // Also post message to parent window for iframe communication
+                  if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+                    console.log('[CoverageMap] Posting rectangle-drawn message to parent window');
+                    window.parent.postMessage({
+                      source: 'coverage-map',
+                      type: 'rectangle-drawn',
+                      detail: eventData
+                    }, '*');
+                  }
                 } catch (convErr) {
                   console.error('[CoverageMap] Failed to convert coordinates:', convErr);
                   console.warn('[CoverageMap] Falling back to extent coordinates (may be wrong projection)');
