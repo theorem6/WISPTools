@@ -3222,8 +3222,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
       console.log('[MarketingDiscovery] Reverse geocoded addresses added to combined', {
         totalAddresses: reverseGeocodeResult.addresses.length,
         addressesAddedBySource: addressesAddedBySource,
-        hasMicrosoftFootprints: addressesAddedBySource['microsoft_footprints'] > 0,
-        hasOsmBuildings: addressesAddedBySource['osm_buildings'] > 0
+        hasMicrosoftFootprints: addressesAddedBySource['microsoft_footprints'] > 0
       });
     } else {
       console.warn('[MarketingDiscovery] No reverse geocoded addresses to add', {
@@ -3254,9 +3253,6 @@ router.post('/:id/marketing/discover', async (req, res) => {
       // Update algorithm stats
       if (algorithmStats['microsoft_footprints']) {
         algorithmStats['microsoft_footprints'].geocoded = geocodedBySource['microsoft_footprints'] || 0;
-      }
-      if (algorithmStats['osm_buildings']) {
-        algorithmStats['osm_buildings'].geocoded = geocodedBySource['osm_buildings'] || 0;
       }
       if (algorithmStats['arcgis_address_points']) {
         algorithmStats['arcgis_address_points'].geocoded = geocodedBySource['arcgis_address_points'] || 0;
