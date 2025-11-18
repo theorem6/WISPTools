@@ -5,7 +5,7 @@
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
-  import { planService, type PlanProject, type PlanProjectLocation, type PlanProjectMarketing } from '$lib/services/planService';
+  import { planService, type PlanProject, type PlanProjectLocation, type PlanProjectMarketing, type PlanMarketingAddress } from '$lib/services/planService';
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
   import PlanMarketingModal from './components/PlanMarketingModal.svelte';
   import PlanMarketingResultsPopup from './components/PlanMarketingResultsPopup.svelte';
@@ -1100,7 +1100,7 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     }
   }
 
-  function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
+  async function handleMarketingUpdated(event: CustomEvent<PlanProject>) {
     const updatedPlan = event.detail;
     if (!updatedPlan) return;
     selectedProject = updatedPlan;
@@ -1108,11 +1108,30 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     if (idx !== -1) {
       projects[idx] = updatedPlan;
     }
-    // Update the active plan in the map data store without reloading everything
-    // This preserves the map center and only updates marketing leads
-    // The SharedMap component will pick up the updated plan via reactive state
-    // and pass the marketing leads to the iframe without resetting the map
-    setMapData({ activePlan: updatedPlan });
+    // Fetch the full plan from backend to ensure we have all marketing addresses
+    // This ensures the map gets the complete address list for marker refresh
+    try {
+      const fullPlan = await planService.getPlan(updatedPlan.id);
+      if (fullPlan) {
+        // Update the active plan in the map data store with the full plan data
+        // This preserves the map center and only updates marketing leads
+        // The SharedMap component will pick up the updated plan via reactive state
+        // and pass the marketing leads to the iframe without resetting the map
+        setMapData({ activePlan: fullPlan });
+        // Also update local state
+        selectedProject = fullPlan;
+        if (idx !== -1) {
+          projects[idx] = fullPlan;
+        }
+      } else {
+        // Fallback to using the updated plan from the event
+        setMapData({ activePlan: updatedPlan });
+      }
+    } catch (err) {
+      console.warn('[Plan] Failed to fetch full plan for map refresh, using event data:', err);
+      // Fallback to using the updated plan from the event
+      setMapData({ activePlan: updatedPlan });
+    }
   }
 
 
@@ -1125,6 +1144,101 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
       closeAddRequirementModal();
     } catch (error) {
       console.error('Error adding hardware requirement:', error);
+    }
+  }
+
+  async function downloadProjectAddressesCSV(project: PlanProject) {
+    try {
+      // Fetch the full plan to ensure we have all marketing addresses
+      const fullPlan = await planService.getPlan(project.id);
+      if (!fullPlan) {
+        error = 'Failed to load project data.';
+        setTimeout(() => error = '', 5000);
+        return;
+      }
+
+      const addresses = fullPlan.marketing?.addresses || [];
+      if (addresses.length === 0) {
+        error = 'No addresses found in this project.';
+        setTimeout(() => error = '', 5000);
+        return;
+      }
+
+      const headers = [
+        'Address',
+        'Address 2',
+        'City',
+        'State',
+        'Postal Code',
+        'Country',
+        'Latitude',
+        'Longitude',
+        'Source'
+      ];
+
+      const rows = addresses.map(addr => {
+        const addressLine1Str = addr.addressLine1 ? String(addr.addressLine1).trim() : '';
+        const isCoordinates = addressLine1Str.length > 0 && 
+                              /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addressLine1Str);
+        
+        let latitude = addr.latitude;
+        let longitude = addr.longitude;
+        
+        if ((latitude === undefined || latitude === null || longitude === undefined || longitude === null) && addressLine1Str) {
+          const coordMatch = addressLine1Str.match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
+          if (coordMatch) {
+            const lat = parseFloat(coordMatch[1]);
+            const lon = parseFloat(coordMatch[2]);
+            if (!isNaN(lat) && !isNaN(lon) && 
+                lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+              latitude = latitude ?? lat;
+              longitude = longitude ?? lon;
+            }
+          }
+        }
+        
+        const address = isCoordinates ? '' : addressLine1Str;
+        const address2 = isCoordinates ? '' : (addr.addressLine2 || '');
+        
+        return [
+          address,
+          address2,
+          addr.city || '',
+          addr.state || '',
+          addr.postalCode || '',
+          addr.country || '',
+          latitude !== undefined && latitude !== null ? latitude.toFixed(7) : '',
+          longitude !== undefined && longitude !== null ? longitude.toFixed(7) : '',
+          addr.source || ''
+        ];
+      });
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => {
+          const cellStr = String(cell).replace(/"/g, '""');
+          return /[,"\n]/.test(cellStr) ? `"${cellStr}"` : cellStr;
+        }).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const safePlanName = project.name ? project.name.replace(/\s+/g, '_') : 'marketing-addresses';
+      link.href = url;
+      link.setAttribute('download', `${safePlanName}-addresses-${timestamp}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      successMessage = `Downloaded ${addresses.length} addresses from "${project.name}".`;
+      setTimeout(() => successMessage = '', 5000);
+    } catch (err: any) {
+      console.error('Error downloading project addresses:', err);
+      error = err?.message || 'Failed to download addresses.';
+      setTimeout(() => error = '', 5000);
     }
   }
 
@@ -1347,10 +1461,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   }
 
   async function deleteProject(project: PlanProject) {
-    const allowedStatuses = ['draft', 'active', 'ready', 'cancelled', 'rejected'];
-
-    if (!allowedStatuses.includes(project.status)) {
-      error = 'Only draft, active, ready, cancelled, or rejected projects can be deleted.';
+    // Allow deletion of all projects except 'authorized' (which are merged into production)
+    if (project.status === 'authorized') {
+      error = 'Authorized projects cannot be deleted as they are merged into production.';
       setTimeout(() => error = '', 5000);
       return;
     }
@@ -1753,17 +1866,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   <button
                     class="action-btn marketing-btn"
                     type="button"
-                    on:click={() => openMarketingTools(project, { closeProjectModal: true })}
-                    title={isDrawingRectangle ? "Click and drag on map to draw a rectangle" : "Draw a rectangle on the map to discover addresses"}
+                    on:click={() => downloadProjectAddressesCSV(project)}
+                    title="Download all addresses from this project as CSV"
                   >
-                    {isDrawingRectangle ? "📐 Drawing..." : "🔍 Find Addresses"}
+                    📥 Download CSV
                   </button>
                   {#if project.status === 'draft'}
                     <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
-                    </button>
-                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Project">
-                      🗑️ Delete
                     </button>
                   {/if}
                   
@@ -1774,6 +1884,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project - Send back for revision">
                       ❌ Reject
                     </button>
+                  {/if}
+                  
+                  {#if project.status !== 'authorized'}
                     <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Project">
                       🗑️ Delete
                     </button>
