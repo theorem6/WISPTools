@@ -2791,6 +2791,9 @@ router.post('/:id/marketing/discover', async (req, res) => {
         console.warn(`[MarketingDiscovery] Limiting existing addresses from ${addresses.length} to ${MAX_EXISTING_ADDRESSES} for performance`);
       }
       
+      let existingAddressesWithRealAddresses = 0;
+      let existingAddressesSkippedAsDuplicates = 0;
+      
       // Use a spatial grid to optimize distance checks for large datasets
       // Grid cell size ~50m to match dedupDistanceMeters
       const GRID_CELL_SIZE = 0.0005; // ~50m at equator
@@ -2823,11 +2826,29 @@ router.post('/:id/marketing/discover', async (req, res) => {
         }
 
         const workingAddress = { ...existing };
-        if (!workingAddress.addressLine1) {
-          workingAddress.addressLine1 = `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
+        const addressLine1Str = workingAddress.addressLine1 ? String(workingAddress.addressLine1).trim() : '';
+        
+        // Check if addressLine1 is just coordinates (these are duplicates with less precision)
+        // Skip these - they'll be replaced by new addresses with full precision and proper geocoding
+        const isCoordinates = addressLine1Str.length > 0 && 
+                             /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addressLine1Str);
+        
+        // If existing address only has coordinates, skip it as a duplicate
+        // The new discovery will replace it with properly geocoded addresses
+        if (isCoordinates || !addressLine1Str) {
+          // Mark coordinate as seen to prevent adding it as a duplicate later
+          const coordinateKey = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
+          if (!coordinateHashes.has(coordinateKey)) {
+            coordinateHashes.add(coordinateKey);
+          }
+          existingAddressesSkippedAsDuplicates++;
+          continue;
         }
+        
+        existingAddressesWithRealAddresses++;
 
-        // Always include existing addresses, regardless of current bounding box
+        // Address has a real address (not just coordinates), so include it directly
+        // Always include existing addresses with real addresses, regardless of current bounding box
         // This allows re-discover to merge addresses from multiple areas scanned
 
         const normalizedAddressKey = buildAddressHash(workingAddress);
@@ -2894,7 +2915,12 @@ router.post('/:id/marketing/discover', async (req, res) => {
         spatialGrid.get(gridKey).push(seededAddress);
       }
       
-      console.log(`[MarketingDiscovery] Seeded ${combinedAddresses.length} existing addresses from ${addressesToSeed.length} input addresses`);
+      console.log(`[MarketingDiscovery] Seeded existing addresses`, {
+        totalInput: addressesToSeed.length,
+        withRealAddresses: existingAddressesWithRealAddresses,
+        skippedAsCoordinateDuplicates: existingAddressesSkippedAsDuplicates,
+        addedToCombined: combinedAddresses.length
+      });
     };
 
     seedExistingAddresses(existingAddresses);
