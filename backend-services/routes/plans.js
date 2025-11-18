@@ -2557,6 +2557,25 @@ router.post('/:id/marketing/discover', async (req, res) => {
       requestId,
       timestamp: new Date().toISOString()
     });
+    
+    // Calculate bounding box size for debugging
+    const latSpan = Math.abs(boundingBox.north - boundingBox.south);
+    const lonSpan = Math.abs(boundingBox.east - boundingBox.west);
+    const centerLat = (boundingBox.north + boundingBox.south) / 2;
+    const milesPerLat = 69.0;
+    const milesPerLon = Math.cos((centerLat * Math.PI) / 180) * 69.172 || 69.172;
+    const widthMiles = lonSpan * Math.abs(milesPerLon);
+    const heightMiles = latSpan * milesPerLat;
+    
+    console.log('[MarketingDiscovery] Bounding box dimensions:', {
+      latSpan: latSpan.toFixed(7),
+      lonSpan: lonSpan.toFixed(7),
+      widthMiles: widthMiles.toFixed(2),
+      heightMiles: heightMiles.toFixed(2),
+      centerLat: centerLat.toFixed(7),
+      centerLon: ((boundingBox.east + boundingBox.west) / 2).toFixed(7),
+      requestId
+    });
 
     const radiusMiles =
       toNumber(req.body.radiusMiles ?? req.body.radius ?? plan.marketing?.targetRadiusMiles) ?? 5;
@@ -2860,6 +2879,13 @@ router.post('/:id/marketing/discover', async (req, res) => {
       try {
         updateProgress('Running Microsoft Building Footprints lookup', 10);
         console.log('[MarketingDiscovery] Running Microsoft Building Footprints discovery algorithm (coordinates only)');
+        console.log('[MarketingDiscovery] Calling runMicrosoftBuildingFootprintsDiscovery with bounding box:', {
+          west: boundingBox.west.toFixed(7),
+          south: boundingBox.south.toFixed(7),
+          east: boundingBox.east.toFixed(7),
+          north: boundingBox.north.toFixed(7)
+        });
+        
         const microsoftResult = await runMicrosoftBuildingFootprintsDiscovery({
           boundingBox,
           progressCallback: (step, progress, details) => {
@@ -2934,6 +2960,15 @@ router.post('/:id/marketing/discover', async (req, res) => {
       try {
         updateProgress('Running OSM centroid lookup', 10);
         console.log('[MarketingDiscovery] Running OSM building discovery algorithm (coordinates only)');
+        console.log('[MarketingDiscovery] Calling runOsmBuildingDiscovery with bounding box:', {
+          west: boundingBox.west.toFixed(7),
+          south: boundingBox.south.toFixed(7),
+          east: boundingBox.east.toFixed(7),
+          north: boundingBox.north.toFixed(7),
+          radiusMiles,
+          center: computedCenter
+        });
+        
         const osmResult = await runOsmBuildingDiscovery({
           boundingBox,
           radiusMiles,
