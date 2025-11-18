@@ -30,28 +30,27 @@
       // Check if addressLine1 is just coordinates (format: "lat, lon")
       const isCoordinates = addr.addressLine1 && /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr.addressLine1.trim());
       
-      // If addressLine1 is coordinates, leave address column empty (use lat/lon columns instead)
-      // Also extract coordinates if they're in addressLine1 but not in lat/lon fields
-      let address = addr.addressLine1 || '';
+      // Extract latitude and longitude - prioritize existing fields, then extract from addressLine1 if needed
       let latitude = addr.latitude;
       let longitude = addr.longitude;
       
-      if (isCoordinates) {
-        // Extract coordinates from addressLine1 if lat/lon are missing
-        if (latitude === undefined || longitude === undefined) {
-          const coordMatch = addr.addressLine1.trim().match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
-          if (coordMatch) {
-            const lat = parseFloat(coordMatch[1]);
-            const lon = parseFloat(coordMatch[2]);
-            if (!isNaN(lat) && !isNaN(lon)) {
-              latitude = latitude ?? lat;
-              longitude = longitude ?? lon;
-            }
+      // If lat/lon are missing, try to extract from addressLine1
+      if ((latitude === undefined || latitude === null || longitude === undefined || longitude === null) && addr.addressLine1) {
+        const coordMatch = addr.addressLine1.trim().match(/^(-?\d+\.\d+),\s*(-?\d+\.\d+)$/);
+        if (coordMatch) {
+          const lat = parseFloat(coordMatch[1]);
+          const lon = parseFloat(coordMatch[2]);
+          if (!isNaN(lat) && !isNaN(lon) && 
+              lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+            latitude = latitude ?? lat;
+            longitude = longitude ?? lon;
           }
         }
-        // Clear address field since we have coordinates in separate columns
-        address = '';
       }
+      
+      // If addressLine1 is coordinates, leave address column empty (use lat/lon columns instead)
+      // Otherwise, use the actual address
+      const address = isCoordinates ? '' : (addr.addressLine1 || '');
       
       return [
         address,

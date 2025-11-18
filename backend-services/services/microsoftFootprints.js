@@ -852,42 +852,163 @@ function calculatePolygonCentroid(ring) {
 
 /**
  * Calculate centroid from GeoJSON geometry
- * Uses proper geometric centroid (area-weighted center) for polygons
+ * Uses the best centroid extraction method: geometric centroid (area-weighted center) with fallback to interior point
+ * This ensures centroids are always inside the building polygon and away from edges
  */
 function calculateCentroid(geometry) {
   if (!geometry) return null;
   
+  // Handle Point geometry - coordinates are already the centroid
   if (geometry.type === 'Point' && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
-    return {
-      latitude: geometry.coordinates[1],
-      longitude: geometry.coordinates[0]
-    };
+    const lon = geometry.coordinates[0];
+    const lat = geometry.coordinates[1];
+    // Validate coordinates
+    if (typeof lon === 'number' && typeof lat === 'number' &&
+        Number.isFinite(lon) && Number.isFinite(lat) &&
+        lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+      return {
+        latitude: lat,
+        longitude: lon
+      };
+    }
+    return null;
   }
   
+  // Handle Polygon geometry - calculate geometric centroid
   if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
     const ring = geometry.coordinates[0]; // Outer ring
     if (Array.isArray(ring) && ring.length >= 3) {
-      const centroid = calculatePolygonCentroid(ring);
-      if (centroid) {
-        return {
-          latitude: centroid.latitude,
-          longitude: centroid.longitude
-        };
+      // Validate and filter ring coordinates
+      const validRing = ring
+        .map(coord => {
+          if (Array.isArray(coord) && coord.length >= 2) {
+            const lon = coord[0];
+            const lat = coord[1];
+            // Validate coordinates are finite numbers within valid ranges
+            if (typeof lon === 'number' && typeof lat === 'number' &&
+                Number.isFinite(lon) && Number.isFinite(lat) &&
+                lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+              return [lon, lat]; // [lon, lat] format for GeoJSON
+            }
+          }
+          return null;
+        })
+        .filter(coord => coord !== null);
+      
+      if (validRing.length >= 3) {
+        // Try geometric centroid first (area-weighted center)
+        let centroid = calculatePolygonCentroid(validRing);
+        
+        // If geometric centroid is null or invalid, try interior point
+        if (!centroid || 
+            typeof centroid.latitude !== 'number' || 
+            typeof centroid.longitude !== 'number' ||
+            !Number.isFinite(centroid.latitude) || 
+            !Number.isFinite(centroid.longitude)) {
+          centroid = findInteriorPoint(validRing);
+        }
+        
+        // Last resort: use average of vertices (simple centroid)
+        if (!centroid || 
+            typeof centroid.latitude !== 'number' || 
+            typeof centroid.longitude !== 'number' ||
+            !Number.isFinite(centroid.latitude) || 
+            !Number.isFinite(centroid.longitude)) {
+          let sumLon = 0;
+          let sumLat = 0;
+          for (const [lon, lat] of validRing) {
+            sumLon += lon;
+            sumLat += lat;
+          }
+          centroid = {
+            longitude: sumLon / validRing.length,
+            latitude: sumLat / validRing.length
+          };
+        }
+        
+        // Validate final centroid
+        if (centroid && 
+            typeof centroid.latitude === 'number' && 
+            typeof centroid.longitude === 'number' &&
+            Number.isFinite(centroid.latitude) && 
+            Number.isFinite(centroid.longitude) &&
+            centroid.latitude >= -90 && centroid.latitude <= 90 &&
+            centroid.longitude >= -180 && centroid.longitude <= 180) {
+          return {
+            latitude: centroid.latitude,
+            longitude: centroid.longitude
+          };
+        }
       }
     }
+    return null;
   }
   
+  // Handle MultiPolygon geometry - calculate centroids for each polygon and return weighted average
   if (geometry.type === 'MultiPolygon' && Array.isArray(geometry.coordinates)) {
-    // For MultiPolygon, calculate centroids for each polygon and return the weighted average
     const polygonCentroids = [];
     
     for (const polygon of geometry.coordinates) {
       if (Array.isArray(polygon) && polygon.length > 0) {
         const ring = polygon[0]; // Outer ring
         if (Array.isArray(ring) && ring.length >= 3) {
-          const centroid = calculatePolygonCentroid(ring);
-          if (centroid) {
-            polygonCentroids.push(centroid);
+          // Validate and filter ring coordinates
+          const validRing = ring
+            .map(coord => {
+              if (Array.isArray(coord) && coord.length >= 2) {
+                const lon = coord[0];
+                const lat = coord[1];
+                if (typeof lon === 'number' && typeof lat === 'number' &&
+                    Number.isFinite(lon) && Number.isFinite(lat) &&
+                    lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+                  return [lon, lat];
+                }
+              }
+              return null;
+            })
+            .filter(coord => coord !== null);
+          
+          if (validRing.length >= 3) {
+            // Try geometric centroid first
+            let centroid = calculatePolygonCentroid(validRing);
+            
+            // If geometric centroid fails, try interior point
+            if (!centroid || 
+                typeof centroid.latitude !== 'number' || 
+                typeof centroid.longitude !== 'number' ||
+                !Number.isFinite(centroid.latitude) || 
+                !Number.isFinite(centroid.longitude)) {
+              centroid = findInteriorPoint(validRing);
+            }
+            
+            // Last resort: simple average
+            if (!centroid || 
+                typeof centroid.latitude !== 'number' || 
+                typeof centroid.longitude !== 'number' ||
+                !Number.isFinite(centroid.latitude) || 
+                !Number.isFinite(centroid.longitude)) {
+              let sumLon = 0;
+              let sumLat = 0;
+              for (const [lon, lat] of validRing) {
+                sumLon += lon;
+                sumLat += lat;
+              }
+              centroid = {
+                longitude: sumLon / validRing.length,
+                latitude: sumLat / validRing.length
+              };
+            }
+            
+            // Only add valid centroids
+            if (centroid && 
+                typeof centroid.latitude === 'number' && 
+                typeof centroid.longitude === 'number' &&
+                Number.isFinite(centroid.latitude) && 
+                Number.isFinite(centroid.longitude) &&
+                centroid.latitude >= -90 && centroid.latitude <= 90 &&
+                centroid.longitude >= -180 && centroid.longitude <= 180) {
+              polygonCentroids.push(centroid);
+            }
           }
         }
       }

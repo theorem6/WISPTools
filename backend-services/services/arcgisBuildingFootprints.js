@@ -506,7 +506,8 @@ function calculatePolygonCentroid(ring) {
 
 /**
  * Extract centroids from ArcGIS building footprint features
- * Uses proper geometric centroid calculation (area-weighted center)
+ * Uses the best centroid extraction method: geometric centroid (area-weighted center) with fallback to interior point
+ * This ensures centroids are always inside the building polygon and away from edges
  */
 function extractCentroids(features) {
   const centroids = [];
@@ -522,33 +523,94 @@ function extractCentroids(features) {
       const ring = geometry.rings[0]; // Use outer ring
       if (Array.isArray(ring) && ring.length > 0) {
         // Convert ring coordinates to flat array format [lon, lat]
-        const ringCoords = ring.map(coord => {
-          if (Array.isArray(coord) && coord.length >= 2) {
-            return [coord[0], coord[1]]; // [lon, lat]
-          }
-          return null;
-        }).filter(coord => coord !== null);
+        // Filter out invalid coordinates and ensure we have at least 3 points
+        const ringCoords = ring
+          .map(coord => {
+            if (Array.isArray(coord) && coord.length >= 2) {
+              const lon = coord[0];
+              const lat = coord[1];
+              // Validate coordinates are finite numbers
+              if (typeof lon === 'number' && typeof lat === 'number' &&
+                  Number.isFinite(lon) && Number.isFinite(lat) &&
+                  lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+                return [lon, lat]; // [lon, lat] format
+              }
+            }
+            return null;
+          })
+          .filter(coord => coord !== null);
         
         if (ringCoords.length >= 3) {
+          // Try geometric centroid first (area-weighted center)
           centroid = calculatePolygonCentroid(ringCoords);
+          
+          // If geometric centroid is null or invalid, try interior point
+          if (!centroid || 
+              typeof centroid.latitude !== 'number' || 
+              typeof centroid.longitude !== 'number' ||
+              !Number.isFinite(centroid.latitude) || 
+              !Number.isFinite(centroid.longitude)) {
+            console.warn('[ArcGISBuildingFootprints] Geometric centroid failed, trying interior point', {
+              ringLength: ringCoords.length,
+              featureAttributes: feature.attributes
+            });
+            centroid = findInteriorPoint(ringCoords);
+          }
+          
+          // Last resort: use average of vertices (simple centroid)
+          if (!centroid || 
+              typeof centroid.latitude !== 'number' || 
+              typeof centroid.longitude !== 'number' ||
+              !Number.isFinite(centroid.latitude) || 
+              !Number.isFinite(centroid.longitude)) {
+            let sumLon = 0;
+            let sumLat = 0;
+            for (const [lon, lat] of ringCoords) {
+              sumLon += lon;
+              sumLat += lat;
+            }
+            centroid = {
+              longitude: sumLon / ringCoords.length,
+              latitude: sumLat / ringCoords.length
+            };
+          }
         }
       }
     }
     
-    // Handle point
+    // Handle point geometry
     if (!centroid && geometry.x !== undefined && geometry.y !== undefined) {
-      centroid = {
-        longitude: geometry.x,
-        latitude: geometry.y
-      };
+      const lon = geometry.x;
+      const lat = geometry.y;
+      // Validate point coordinates
+      if (typeof lon === 'number' && typeof lat === 'number' &&
+          Number.isFinite(lon) && Number.isFinite(lat) &&
+          lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90) {
+        centroid = {
+          longitude: lon,
+          latitude: lat
+        };
+      }
     }
     
-    if (centroid && typeof centroid.latitude === 'number' && typeof centroid.longitude === 'number') {
+    // Only add valid centroids
+    if (centroid && 
+        typeof centroid.latitude === 'number' && 
+        typeof centroid.longitude === 'number' &&
+        Number.isFinite(centroid.latitude) && 
+        Number.isFinite(centroid.longitude) &&
+        centroid.latitude >= -90 && centroid.latitude <= 90 &&
+        centroid.longitude >= -180 && centroid.longitude <= 180) {
       centroids.push({
         latitude: centroid.latitude,
         longitude: centroid.longitude,
         attributes: feature.attributes || {},
         geometry: geometry // Keep for reference
+      });
+    } else {
+      console.warn('[ArcGISBuildingFootprints] Skipped invalid centroid', {
+        centroid,
+        featureAttributes: feature.attributes
       });
     }
   }

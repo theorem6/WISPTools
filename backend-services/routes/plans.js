@@ -1579,35 +1579,57 @@ async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCa
       const features = geojsonData.features;
       console.log('[MarketingDiscovery] Microsoft Building Footprints API returned', {
         featuresCount: features.length,
-        sampleFeature: features[0]
+        sampleFeature: features[0] ? {
+          type: features[0].type,
+          geometryType: features[0].geometry?.type,
+          hasCoordinates: !!features[0].geometry?.coordinates,
+          propertiesKeys: features[0].properties ? Object.keys(features[0].properties) : []
+        } : null
       });
 
       if (progressCallback) progressCallback('Processing building footprints', 20);
 
       const coordinates = [];
       const seenKeys = new Set();
+      let skippedInvalidGeometry = 0;
+      let skippedInvalidCentroid = 0;
+      let skippedDuplicate = 0;
 
       for (const feature of features) {
-        if (!feature || !feature.geometry) continue;
+        if (!feature || !feature.geometry) {
+          skippedInvalidGeometry++;
+          continue;
+        }
 
         // Use the service's centroid calculation function
         const centroid = microsoftFootprintsService.calculateCentroid(feature.geometry);
 
         if (!centroid || !Number.isFinite(centroid.latitude) || !Number.isFinite(centroid.longitude)) {
+          skippedInvalidCentroid++;
+          if (skippedInvalidCentroid <= 3) {
+            console.warn('[MarketingDiscovery] Microsoft Building Footprints: Skipped invalid centroid', {
+              geometryType: feature.geometry?.type,
+              centroid,
+              featureProperties: feature.properties
+            });
+          }
           continue;
         }
 
         // Deduplicate using coordinate key
         const key = `${centroid.latitude.toFixed(7)},${centroid.longitude.toFixed(7)}`;
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          coordinates.push({
-            latitude: centroid.latitude,
-            longitude: centroid.longitude,
-            source: 'microsoft_footprints',
-            properties: feature.properties || {}
-          });
+        if (seenKeys.has(key)) {
+          skippedDuplicate++;
+          continue;
         }
+
+        seenKeys.add(key);
+        coordinates.push({
+          latitude: centroid.latitude,
+          longitude: centroid.longitude,
+          source: 'microsoft_footprints',
+          properties: feature.properties || {}
+        });
 
         // Don't break early - process all features from service
         // The service will handle pagination if needed
@@ -1623,7 +1645,12 @@ async function runMicrosoftBuildingFootprintsDiscovery({ boundingBox, progressCa
       
       console.log('[MarketingDiscovery] Microsoft Building Footprints discovery completed', { 
         totalCandidates: coordinates.length,
-        coordinatesReturned: coordinates.length
+        coordinatesReturned: coordinates.length,
+        featuresProcessed: features.length,
+        skippedInvalidGeometry,
+        skippedInvalidCentroid,
+        skippedDuplicate,
+        successRate: features.length > 0 ? `${((coordinates.length / features.length) * 100).toFixed(1)}%` : '0%'
       });
       
       return result;
