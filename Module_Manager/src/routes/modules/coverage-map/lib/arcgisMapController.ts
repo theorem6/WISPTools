@@ -192,7 +192,7 @@ export class CoverageMapController {
         this.sketchWidget = new Sketch({
           view: this.mapView,
           layer: this.drawingGraphicsLayer,
-          creationMode: 'single',
+          creationMode: 'update',
           visibleElements: {
             createTools: {
               point: false,
@@ -323,12 +323,29 @@ export class CoverageMapController {
         });
       }
 
+      // Wait for widget to be ready before adding to UI
+      try {
+        await this.sketchWidget.when();
+        console.log('[CoverageMap] Sketch widget ready');
+      } catch (widgetError) {
+        console.error('[CoverageMap] Failed to wait for sketch widget:', widgetError);
+      }
+
       // Show the sketch widget (only if it's not already in the UI)
       try {
+        // Try to remove it first if it exists
+        try {
+          this.mapView.ui.remove(this.sketchWidget);
+        } catch (e) {
+          // Not in UI, that's okay
+        }
+        
+        // Add to UI
         this.mapView.ui.add(this.sketchWidget, {
           position: 'top-left',
           index: 0
         });
+        console.log('[CoverageMap] Sketch widget added to UI');
       } catch (e) {
         // Widget might already be in UI, that's okay
         console.log('[CoverageMap] Sketch widget already in UI or error adding:', e);
@@ -336,11 +353,17 @@ export class CoverageMapController {
 
       // Enable rectangle creation
       try {
-        // Wait for widget to be ready
-        await this.sketchWidget.when();
-        
         // Ensure the view is ready and interactive
         await this.mapView.when();
+        console.log('[CoverageMap] MapView ready');
+        
+        // Wait a bit for UI to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Cancel any existing drawing first
+        if (this.sketchWidget.activeTool) {
+          this.sketchWidget.cancel();
+        }
         
         console.log('[CoverageMap] Starting rectangle creation tool...');
         this.isDrawingMode = true;
@@ -352,10 +375,19 @@ export class CoverageMapController {
         console.log('[CoverageMap] Sketch widget state:', {
           activeTool: this.sketchWidget.activeTool,
           creationMode: this.sketchWidget.creationMode,
-          isDrawingMode: this.isDrawingMode
+          isDrawingMode: this.isDrawingMode,
+          viewReady: this.mapView.ready,
+          viewInteractive: this.mapView.interactive
         });
       } catch (error) {
         console.error('[CoverageMap] Failed to start rectangle creation:', error);
+        console.error('[CoverageMap] Error details:', {
+          errorMessage: error?.message,
+          errorStack: error?.stack,
+          sketchWidgetExists: !!this.sketchWidget,
+          mapViewExists: !!this.mapView,
+          mapViewReady: this.mapView?.ready
+        });
         // Reset drawing mode if creation failed
         this.isDrawingMode = false;
         
