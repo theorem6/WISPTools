@@ -1000,7 +1000,7 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
         radiusMiles,
         center,
         options: {
-          algorithms: ['microsoft_footprints', 'osm_buildings']
+          algorithms: ['microsoft_footprints']
         }
       });
 

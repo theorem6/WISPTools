@@ -2590,13 +2590,16 @@ router.post('/:id/marketing/discover', async (req, res) => {
 
     const advancedOptions = req.body?.options?.advancedOptions || {};
     const userAlgorithms = parseMarketingAlgorithms(req.body?.options?.algorithms);
-    let algorithms = (userAlgorithms && userAlgorithms.length ? userAlgorithms : ['microsoft_footprints', 'osm_buildings', 'arcgis_address_points']).filter(Boolean);
+    let algorithms = (userAlgorithms && userAlgorithms.length ? userAlgorithms : ['microsoft_footprints']).filter(Boolean);
+
+    // Remove OSM from algorithms if present
+    algorithms = algorithms.filter((id) => id !== 'osm_buildings');
 
     if (!ARC_GIS_API_KEY) {
-      // Filter out ArcGIS-based algorithms but keep Microsoft Footprints and OSM
+      // Filter out ArcGIS-based algorithms but keep Microsoft Footprints
       const arcgisAlgorithms = ['arcgis_address_points', 'arcgis_places', 'arcgis_building_footprints'];
       const filtered = algorithms.filter((id) => 
-        id === 'osm_buildings' || id === 'microsoft_footprints' || !arcgisAlgorithms.includes(id)
+        id === 'microsoft_footprints' || !arcgisAlgorithms.includes(id)
       );
       if (algorithms.length !== filtered.length) {
         console.warn('[MarketingDiscovery] ArcGIS API key missing. Skipping ArcGIS-based algorithms.');
@@ -2605,8 +2608,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
     }
 
     if (!algorithms || algorithms.length === 0) {
-      console.warn('[MarketingDiscovery] No valid algorithms selected, defaulting to Microsoft Footprints and OSM');
-      algorithms = ['microsoft_footprints', 'osm_buildings'];
+      console.warn('[MarketingDiscovery] No valid algorithms selected, defaulting to Microsoft Footprints');
+      algorithms = ['microsoft_footprints'];
     }
 
     console.log('[MarketingDiscovery] Algorithms selected:', {
@@ -2955,69 +2958,7 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     }
 
-    // Step 2: Collect coordinates from OSM (centroids)
-    if (algorithms.includes('osm_buildings')) {
-      try {
-        updateProgress('Running OSM centroid lookup', 10);
-        console.log('[MarketingDiscovery] Running OSM building discovery algorithm (coordinates only)');
-        console.log('[MarketingDiscovery] Calling runOsmBuildingDiscovery with bounding box:', {
-          west: boundingBox.west.toFixed(7),
-          south: boundingBox.south.toFixed(7),
-          east: boundingBox.east.toFixed(7),
-          north: boundingBox.north.toFixed(7),
-          radiusMiles,
-          center: computedCenter
-        });
-        
-        const osmResult = await runOsmBuildingDiscovery({
-          boundingBox,
-          radiusMiles,
-          center: computedCenter,
-          advancedOptions,
-          progressCallback: (step, progress, details) => {
-            updateProgress(`OSM: ${step}`, 10 + (progress * 15 * 0.01), details);
-          }
-        });
-        
-        if (Array.isArray(osmResult.coordinates)) {
-          for (const coord of osmResult.coordinates) {
-            const latitude = toNumber(coord?.latitude);
-            const longitude = toNumber(coord?.longitude);
-            if (latitude === undefined || longitude === undefined) {
-              console.warn('[MarketingDiscovery] Skipping invalid OSM coordinate:', coord);
-              continue;
-            }
-            const key = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
-            if (!coordinateKeys.has(key)) {
-              coordinateKeys.add(key);
-              allCoordinates.push({
-                latitude,
-                longitude,
-                source: coord.source || 'osm_buildings',
-                tags: coord.tags || {}
-              });
-            }
-          }
-        }
-
-        updateProgress('OSM centroid lookup completed', 40, { 
-          coordinates: osmResult.coordinates?.length || 0,
-          totalCoordinates: allCoordinates.length,
-          error: osmResult.error 
-        });
-        console.log('[MarketingDiscovery] OSM algorithm completed', { 
-          coordinates: osmResult.coordinates?.length || 0,
-          totalCoordinates: allCoordinates.length,
-          error: osmResult.error 
-        });
-
-        recordAlgorithmStats('osm_buildings', osmResult.coordinates?.length || 0, 0, osmResult.error);
-      } catch (err) {
-        updateProgress('OSM centroid lookup failed', 40, { error: err.message });
-        console.error('[MarketingDiscovery] OSM Building Discovery failed:', err);
-        recordAlgorithmStats('osm_buildings', 0, 0, err.message || 'Unknown error');
-      }
-    }
+    // OSM buildings removed - using Microsoft Footprints only
 
     // Step 2: Collect coordinates from ArcGIS address points
     // Check API key at runtime (not just module-level constant)
