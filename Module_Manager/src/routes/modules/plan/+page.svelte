@@ -973,8 +973,22 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     console.log('[Plan] Received rectangle-drawn event:', event.detail);
     const { boundingBox, center } = event.detail;
     
-    if (!boundingBox || !center || !selectedProject) {
-      console.warn('[Plan] Invalid rectangle-drawn event data:', { boundingBox, center, selectedProject: !!selectedProject });
+    if (!boundingBox || !center) {
+      console.warn('[Plan] Invalid rectangle-drawn event data - missing boundingBox or center:', { boundingBox, center });
+      return;
+    }
+    
+    // Use selectedProject, activeProject, or contextActivePlan as fallback
+    const project = selectedProject ?? activeProject ?? contextActivePlan;
+    if (!project) {
+      console.warn('[Plan] Invalid rectangle-drawn event data - no project available:', { 
+        hasSelectedProject: !!selectedProject, 
+        hasActiveProject: !!activeProject, 
+        hasContextActivePlan: !!contextActivePlan 
+      });
+      error = 'Please select a project first before discovering addresses.';
+      setTimeout(() => error = '', 5000);
+      isDrawingRectangle = false;
       return;
     }
 
@@ -983,7 +997,7 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
     showMarketingResultsPopup = true;
     discoveryResults = [];
 
-    console.log('[Plan] Starting address discovery for rectangle:', { boundingBox, center, planId: selectedProject.id });
+    console.log('[Plan] Starting address discovery for rectangle:', { boundingBox, center, planId: project.id });
 
     try {
       // Calculate radius from bounding box
@@ -995,7 +1009,7 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
 
       console.log('[Plan] Calling discoverMarketingAddresses API...');
 
-      const response = await planService.discoverMarketingAddresses(selectedProject.id, {
+      const response = await planService.discoverMarketingAddresses(project.id, {
         boundingBox,
         radiusMiles,
         center,
@@ -1010,14 +1024,14 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
       
       // Refresh plan data but don't recenter map - preserve user's view
       // Only refresh the plan data, don't reload everything which would recenter the map
-      if (selectedProject) {
-        const updatedPlan = await planService.getPlan(selectedProject.id);
-        if (updatedPlan) {
+      const updatedPlan = await planService.getPlan(project.id);
+      if (updatedPlan) {
+        // Update whichever project variable was used
+        if (selectedProject && selectedProject.id === updatedPlan.id) {
           selectedProject = updatedPlan;
-          // Update active project if it matches
-          if (activeProject && activeProject.id === updatedPlan.id) {
-            activeProject = updatedPlan;
-          }
+        }
+        if (activeProject && activeProject.id === updatedPlan.id) {
+          activeProject = updatedPlan;
         }
       }
       
