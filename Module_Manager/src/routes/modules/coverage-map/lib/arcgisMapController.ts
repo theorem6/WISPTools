@@ -497,8 +497,8 @@ export class CoverageMapController {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];
     
-    // Always replace with incoming leads (backend returns full list, not incremental)
-    // This ensures consistency when wizard completes or project is reloaded
+    // Always update the leads array (even if empty) to reflect current state
+    // Backend returns full list, not incremental updates
     this.marketingLeads = incomingLeads;
 
     const shouldAutoFit =
@@ -507,17 +507,20 @@ export class CoverageMapController {
       !this.hasPerformedInitialFit;
     
     if (this.mapReady) {
-      // Always clear the layer before rendering to ensure all markers refresh
-      // This is necessary because backend returns the full list, not incremental updates
-      if (this.marketingLayer) {
+      // Only clear the layer if we have incoming leads to render
+      // This ensures markers refresh when new data arrives, but doesn't clear unnecessarily
+      if (this.marketingLayer && incomingLeads.length > 0) {
+        // Clear existing markers before rendering new ones to ensure full refresh
         this.marketingLayer.removeAll();
       }
       
+      // Render leads (this will return early if leads array is empty, which is fine)
       this.renderMarketingLeads()
         .then(() => {
           console.log('[CoverageMap] Marketing leads rendered', {
             leadCount: this.marketingLeads.length,
-            markerCount: this.marketingLayer?.graphics?.length || 0
+            markerCount: this.marketingLayer?.graphics?.length || 0,
+            hadPrevious: previousCount > 0
           });
           
           if (!shouldAutoFit) {
