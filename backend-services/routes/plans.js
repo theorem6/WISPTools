@@ -837,9 +837,10 @@ const reverseGeocodeCoordinateArcgis = async (lat, lon) => {
 
   try {
     // Use axios with automatic retries instead of fetch
+    // Use toFixed(7) to ensure full precision (7 decimal places = ~1cm accuracy)
     const params = {
       f: 'json',
-      location: `${lon},${lat}`,
+      location: `${lon.toFixed(7)},${lat.toFixed(7)}`,
       outFields: 'Address,City,Postal,Region,State,CountryCode',
       maxLocations: '1',
       token: runtimeApiKey
@@ -951,11 +952,12 @@ const reverseGeocodeCoordinate = async (lat, lon) => {
 
   // Only use Nominatim if ArcGIS API key is not available (shouldn't happen in production)
   try {
+    // Use toFixed(7) to ensure full precision (7 decimal places = ~1cm accuracy)
     const response = await httpClient.get('https://nominatim.openstreetmap.org/reverse', {
       params: {
         format: 'jsonv2',
-        lat: lat,
-        lon: lon,
+        lat: lat.toFixed(7),
+        lon: lon.toFixed(7),
         zoom: 18,
         addressdetails: 1
       },
@@ -1158,12 +1160,27 @@ const batchReverseGeocodeCoordinates = async (coordinates = [], progressCallback
           }
           
           // Add timeout to individual reverse geocode calls
+          // Ensure coordinates have full precision when passing to reverse geocoding
           const geocodePromise = reverseGeocodeCoordinate(latitude, longitude);
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Reverse geocode timeout')), REVERSE_GEOCODE_TIMEOUT)
           );
           
           const details = await Promise.race([geocodePromise, timeoutPromise]);
+          
+          // Log reverse geocoding attempts for debugging (first few only to avoid spam)
+          if (originalIndex < 5) {
+            console.log('[MarketingDiscovery] Reverse geocode result for coordinate', {
+              index: originalIndex,
+              latitude,
+              longitude,
+              hasDetails: !!details,
+              hasAddressLine1: !!details?.addressLine1,
+              addressLine1: details?.addressLine1 || 'none',
+              source: source
+            });
+          }
+          
           if (details && details.addressLine1 && !details.addressLine1.match(/^-?\d+\.\d+,\s*-?\d+\.\d+$/)) {
             // Successfully reverse geocoded (not just coordinates)
             return {
