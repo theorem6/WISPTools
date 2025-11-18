@@ -2284,6 +2284,28 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /plans/:id/marketing/addresses - Get all marketing addresses for a plan
+router.get('/:id/marketing/addresses', async (req, res) => {
+  try {
+    const plan = await PlanProject.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId
+    }).select('marketing.addresses').lean();
+    
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    
+    const addresses = plan.marketing?.addresses || [];
+    console.log(`[plans] Returning ${addresses.length} marketing addresses for plan ${req.params.id}`);
+    
+    res.json({ addresses });
+  } catch (error) {
+    console.error('Error fetching marketing addresses:', error);
+    res.status(500).json({ error: 'Failed to fetch marketing addresses', message: error.message });
+  }
+});
+
 // GET /plans/:id - Get single plan
 router.get('/:id', async (req, res) => {
   try {

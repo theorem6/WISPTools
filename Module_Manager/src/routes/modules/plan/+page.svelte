@@ -1215,20 +1215,17 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
 
   async function downloadProjectAddressesCSV(project: PlanProject) {
     try {
-      // Fetch the full plan to ensure we have all marketing addresses
-      const fullPlan = await planService.getPlan(project.id);
-      if (!fullPlan) {
-        error = 'Failed to load project data.';
-        setTimeout(() => error = '', 5000);
-        return;
-      }
-
-      const addresses = fullPlan.marketing?.addresses || [];
+      // Fetch all marketing addresses directly to ensure we get the complete list
+      // This avoids any potential size limits on the full plan document response
+      const addresses = await planService.getPlanMarketingAddresses(project.id);
+      
       if (addresses.length === 0) {
         error = 'No addresses found in this project.';
         setTimeout(() => error = '', 5000);
         return;
       }
+      
+      console.log(`[Plan] Downloading CSV with ${addresses.length} addresses for project ${project.id}`);
 
       const headers = [
         'Address',

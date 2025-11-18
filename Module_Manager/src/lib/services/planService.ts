@@ -553,6 +553,21 @@ class PlanService {
       throw error;
     }
   }
+
+  /**
+   * Get all marketing addresses for a plan
+   */
+  async getPlanMarketingAddresses(planId: string): Promise<PlanMarketingAddress[]> {
+    try {
+      const response = await this.apiCall(`/${planId}/marketing/addresses`);
+      return Array.isArray(response.addresses) ? response.addresses : [];
+    } catch (error: any) {
+      if (error.message.includes('404')) {
+        return [];
+      }
+      throw error;
+    }
+  }
   
   /**
    * Update a plan
