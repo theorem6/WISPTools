@@ -192,7 +192,7 @@ export class CoverageMapController {
         this.sketchWidget = new Sketch({
           view: this.mapView,
           layer: this.drawingGraphicsLayer,
-          creationMode: 'update',
+          creationMode: 'single', // Use 'single' to allow creating one rectangle at a time
           visibleElements: {
             createTools: {
               point: false,
@@ -356,6 +356,12 @@ export class CoverageMapController {
         // Ensure the view is ready and interactive
         await this.mapView.when();
         console.log('[CoverageMap] MapView ready');
+        
+        // Ensure view is interactive
+        if (!this.mapView.interactive) {
+          this.mapView.interactive = true;
+          console.log('[CoverageMap] Enabled map view interactivity');
+        }
         
         // Wait a bit for UI to update
         await new Promise(resolve => setTimeout(resolve, 100));
