@@ -151,14 +151,18 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
       });
       
       // If token is invalid, clear cache and retry with API key if available
+      // Only retry if we haven't already tried the API key (to prevent infinite loops)
       if (errorCode === 498 || errorMessage === 'Invalid token' || errorMessage?.includes('Invalid token')) {
-        if (accessToken || useOAuth) {
+        const isApiKey = queryParams.token === ARC_GIS_API_KEY;
+        const hasOAuthToken = (accessToken || useOAuth) && !isApiKey;
+        
+        if (hasOAuthToken) {
           console.warn('[ArcGISBuildingFootprints] Invalid OAuth2 token detected, clearing cache and retrying with API key');
           const arcgisOAuth = require('./arcgisOAuth');
           arcgisOAuth.clearTokenCache();
           
-          // Retry with API key if available
-          if (ARC_GIS_API_KEY && queryParams.token !== ARC_GIS_API_KEY) {
+          // Retry with API key if available and not already using it
+          if (ARC_GIS_API_KEY && !isApiKey) {
             console.log('[ArcGISBuildingFootprints] Retrying query with API key instead of OAuth2 token');
             queryParams.token = ARC_GIS_API_KEY;
             
@@ -169,8 +173,16 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
               });
               
               if (retryResponse.data && retryResponse.data.error) {
-                console.error('[ArcGISBuildingFootprints] Retry with API key also failed:', retryResponse.data.error);
-                return { features: [], error: retryResponse.data.error.message || 'Query failed even with API key' };
+                const retryErrorCode = retryResponse.data.error.code;
+                const retryErrorMessage = retryResponse.data.error.message || 'Query failed';
+                console.error('[ArcGISBuildingFootprints] Retry with API key also failed:', {
+                  code: retryErrorCode,
+                  message: retryErrorMessage,
+                  serviceUrl,
+                  layerId
+                });
+                // Return error - don't retry again to prevent infinite loops
+                return { features: [], error: retryErrorMessage };
               }
               
               // Use the retry response instead of the original error
@@ -182,21 +194,29 @@ async function queryBuildingFootprints({ serviceUrl, layerId = 0, boundingBox, r
               console.log('[ArcGISBuildingFootprints] Retry with API key successful', {
                 featuresReturned: allFeatures.length,
                 exceededLimit: exceededTransferLimit,
-                totalCount: totalCount
+                totalCount: totalCount,
+                serviceUrl,
+                layerId
               });
               
               // Continue with pagination logic below using retryData
               response.data = retryData;
             } catch (retryError) {
-              console.error('[ArcGISBuildingFootprints] Retry with API key failed:', retryError.message);
+              console.error('[ArcGISBuildingFootprints] Retry with API key failed:', {
+                error: retryError.message,
+                serviceUrl,
+                layerId
+              });
               return { features: [], error: errorMessage || 'Query failed' };
             }
           } else {
-            // No API key available, return error
+            // No API key available or already using it, return error
+            console.warn('[ArcGISBuildingFootprints] No API key available for retry or already using API key');
             return { features: [], error: errorMessage || 'Query failed' };
           }
         } else {
-          // Not using OAuth2, just return error
+          // Not using OAuth2 or already using API key and it failed, just return error
+          console.warn('[ArcGISBuildingFootprints] Token error and no OAuth2 token to retry with');
           return { features: [], error: errorMessage || 'Query failed' };
         }
       } else {
