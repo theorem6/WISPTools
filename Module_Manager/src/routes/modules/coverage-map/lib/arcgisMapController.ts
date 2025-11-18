@@ -336,13 +336,35 @@ export class CoverageMapController {
 
       // Enable rectangle creation
       try {
-        this.sketchWidget.create('rectangle');
+        // Wait for widget to be ready
+        await this.sketchWidget.when();
+        
+        // Ensure the view is ready and interactive
+        await this.mapView.when();
+        
+        console.log('[CoverageMap] Starting rectangle creation tool...');
         this.isDrawingMode = true;
-        console.log('[CoverageMap] Rectangle drawing enabled');
+        
+        // Start rectangle creation - this makes the map interactive for drawing
+        this.sketchWidget.create('rectangle');
+        
+        console.log('[CoverageMap] Rectangle drawing enabled - click and drag on map to draw');
+        console.log('[CoverageMap] Sketch widget state:', {
+          activeTool: this.sketchWidget.activeTool,
+          creationMode: this.sketchWidget.creationMode,
+          isDrawingMode: this.isDrawingMode
+        });
       } catch (error) {
         console.error('[CoverageMap] Failed to start rectangle creation:', error);
         // Reset drawing mode if creation failed
         this.isDrawingMode = false;
+        
+        // Try to remove widget if creation failed
+        try {
+          this.mapView.ui.remove(this.sketchWidget);
+        } catch (removeErr) {
+          // Ignore removal errors
+        }
       }
     } catch (error) {
       console.error('[CoverageMap] Failed to enable rectangle drawing:', error);
@@ -809,6 +831,11 @@ export class CoverageMapController {
     if (!this.mapView) return;
 
     this.mapView.on('click', (event: any) => {
+      // Don't handle clicks when drawing - let Sketch widget handle them
+      if (this.isDrawingMode && this.sketchWidget) {
+        console.log('[CoverageMap] Click during drawing mode - letting Sketch widget handle it');
+        return;
+      }
       this.handleMapClick(event).catch(err => console.error('Map click error:', err));
     });
 
