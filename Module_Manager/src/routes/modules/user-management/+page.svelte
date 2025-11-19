@@ -61,8 +61,14 @@ let canManageUsers = false;
       console.log('Loaded users:', users);
       applyFilters();
     } catch (err: any) {
-      error = err.message || 'Failed to load users';
       console.error('Error loading users:', err);
+      
+      // Provide more helpful error messages
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('CONNECTION_REFUSED') || err.name === 'TypeError') {
+        error = 'Cannot connect to the server. Please check if the backend service is running and try again.';
+      } else {
+        error = err.message || 'Failed to load users';
+      }
     } finally {
       loading = false;
     }
