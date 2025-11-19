@@ -558,6 +558,11 @@ CPE Installation Kit,CPE installation bundle,cpe-installation,active,"[{""catego
       return;
     }
     
+    if (!tenantId || tenantId.trim() === '') {
+      error = 'No tenant selected. Please select a tenant before importing.';
+      return;
+    }
+    
     if (validationErrors.length > 0) {
       error = `Please fix ${validationErrors.length} validation error(s) before importing`;
       return;
@@ -934,8 +939,27 @@ CPE Installation Kit,CPE installation bundle,cpe-installation,active,"[{""catego
 </script>
 
 {#if show}
-  <div class="import-overlay" on:click={close}>
-    <div class="import-panel" on:click|stopPropagation>
+  {#if !tenantId || tenantId.trim() === ''}
+    <div class="import-overlay" on:click={close}>
+      <div class="import-panel" on:click|stopPropagation>
+        <div class="import-header">
+          <h2>📥 Import Data</h2>
+          <button class="close-btn" on:click={close}>✕</button>
+        </div>
+        <div class="import-content">
+          <div class="alert alert-error">
+            <span>❌</span>
+            <span>No tenant selected. Please select a tenant before importing data.</span>
+          </div>
+          <div class="import-actions">
+            <button class="btn-primary" on:click={close}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {:else}
+    <div class="import-overlay" on:click={close}>
+      <div class="import-panel" on:click|stopPropagation>
       <div class="import-header">
         <h2>📥 Import Data</h2>
         <button class="close-btn" on:click={close}>✕</button>
@@ -1179,6 +1203,7 @@ CPE Installation Kit,CPE installation bundle,cpe-installation,active,"[{""catego
       </div>
     </div>
   </div>
+  {/if}
 {/if}
 
 <style>

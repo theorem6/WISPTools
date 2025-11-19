@@ -651,6 +651,11 @@ router.get('/stats/summary', async (req, res) => {
 router.post('/bulk-import', async (req, res) => {
   try {
     const tenantId = req.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+    
     const { items } = req.body;
     
     if (!Array.isArray(items) || items.length === 0) {

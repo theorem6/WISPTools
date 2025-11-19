@@ -818,6 +818,11 @@ router.post('/import/cbrs', async (req, res) => {
 router.post('/sites/bulk-import', async (req, res) => {
   try {
     const tenantId = req.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+    
     const { sites } = req.body;
     
     if (!Array.isArray(sites) || sites.length === 0) {
@@ -901,6 +906,11 @@ router.post('/sites/bulk-import', async (req, res) => {
 router.post('/equipment/bulk-import', async (req, res) => {
   try {
     const tenantId = req.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+    
     const { equipment } = req.body;
     
     if (!Array.isArray(equipment) || equipment.length === 0) {

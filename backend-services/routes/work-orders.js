@@ -318,6 +318,11 @@ router.get('/stats/dashboard', async (req, res) => {
 router.post('/bulk-import', async (req, res) => {
   try {
     const tenantId = req.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+    
     const { workOrders } = req.body;
     
     if (!Array.isArray(workOrders) || workOrders.length === 0) {
