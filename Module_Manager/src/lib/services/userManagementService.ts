@@ -24,8 +24,23 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
  * - Production: Uses Firebase Hosting rewrites (/api -> apiProxy Cloud Function)
  * - Local Development: http://localhost:3001/api (Main API) or http://localhost:3002/api (EPC API)
  * - Cloud Functions URL: Automatically includes /api if needed
+ * 
+ * IMPORTANT: Never use localhost in production builds - always use relative URLs
  */
 function getApiPath(): string {
+  // In production (browser environment), always use relative URLs for Firebase Hosting rewrites
+  if (typeof window !== 'undefined') {
+    // Check if we're in production (not localhost)
+    const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    
+    // If in production and API_BASE_URL is not explicitly set or points to localhost, use relative URL
+    if (isProduction && (!API_BASE_URL || API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1'))) {
+      // Production: Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+      return '/api';
+    }
+  }
+  
+  // Handle API_BASE_URL if set (for local development or explicit Cloud Functions URL)
   if (!API_BASE_URL || API_BASE_URL.trim() === '') {
     // Production: Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
     return '/api';
@@ -101,6 +116,14 @@ export async function getTenantUsers(tenantId: string, scope: 'full' | 'visible'
     const endpoint = scope === 'visible'
       ? `${apiPath}/users/tenant/${tenantId}/visible`
       : `${apiPath}/users/tenant/${tenantId}`;
+
+    // Debug logging
+    console.log('[userManagementService] Request details:', {
+      apiPath,
+      endpoint,
+      hasAuth: !!headers['Authorization'],
+      tenantId
+    });
 
     const response = await fetch(endpoint, {
       method: 'GET',
