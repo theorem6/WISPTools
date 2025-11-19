@@ -1139,9 +1139,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <button class="control-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
       ←
     </button>
-    <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
-      🔍
-    </button>
+    {#if !isDeployMode}
+      <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
+        🔍
+      </button>
+    {/if}
     <button class="control-btn" on:click={() => showStats = !showStats} title="Toggle Statistics">
       📊
     </button>
@@ -1258,7 +1260,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   {/if}
 
   <!-- Filters Modal -->
-  {#if showFilters}
+  {#if showFilters && !isDeployMode}
   <div class="modal-overlay" on:click={() => showFilters = false}>
     <div class="modal-content filters-modal" on:click|stopPropagation>
       <div class="modal-header">

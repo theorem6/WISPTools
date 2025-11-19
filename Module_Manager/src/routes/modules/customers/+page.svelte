@@ -168,7 +168,12 @@
   <div class="customers-page">
     <div class="page-header">
       <div class="header-content">
-        <h1>👥 Customer Management</h1>
+        <div class="header-top">
+          <button class="back-btn" on:click={() => goto('/modules')} title="Back to Module Manager">
+            ←
+          </button>
+          <h1>👥 Customer Management</h1>
+        </div>
         <p class="subtitle">Manage your tenant's customers and subscribers</p>
       </div>
       <button class="btn-primary" on:click={handleAdd}>
@@ -357,6 +362,38 @@
     margin-bottom: 2rem;
     padding-bottom: 1rem;
     border-bottom: 2px solid var(--border-color);
+  }
+  
+  .header-content {
+    flex: 1;
+  }
+  
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .back-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.5rem 0.75rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .back-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--brand-primary);
+    transform: translateX(-2px);
   }
   
   .header-content h1 {
