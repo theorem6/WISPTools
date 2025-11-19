@@ -1761,10 +1761,6 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-icon">📁</span>
           <span class="control-label">Projects</span>
         </button>
-        <button class="control-btn" on:click={openCreateProject} title="Create New Project">
-          <span class="control-icon">➕</span>
-          <span class="control-label">New Project</span>
-        </button>
         <button
           class="control-btn marketing-btn"
           class:drawing={isDrawingRectangle}
@@ -1779,65 +1775,41 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         <button 
           class="control-btn filter-btn" 
           class:active={showFilterPanel}
-          on:click={() => showFilterPanel = !showFilterPanel} 
+          type="button"
+          on:click={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showFilterPanel = !showFilterPanel;
+            console.log('[Plan] Filter panel toggled:', showFilterPanel);
+          }}
           title="Toggle Layer Filters"
         >
           <span class="control-icon">🎛️</span>
           <span class="control-label">Layers</span>
         </button>
-        {#if selectedProject}
-          <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
-            <span class="control-icon">🛒</span>
-            <span class="control-label">Gaps</span>
-          </button>
-          <button class="control-btn" on:click={openAddRequirementModal} title="Add Hardware Requirement">
-            <span class="control-icon">📋</span>
-            <span class="control-label">Needs</span>
-          </button>
-          {#if selectedProject?.status === 'active' && (!activeProject || activeProject.id !== selectedProject.id)}
-            <button class="control-btn resume-btn" on:click={() => selectedProject && enterProject(selectedProject)} title="Resume planning this project">
-              <span class="control-icon">🔁</span>
-              <span class="control-label">Resume</span>
-            </button>
-          {/if}
-          {#if selectedProject && ['ready','approved','rejected','cancelled'].includes(selectedProject.status)}
-            <button class="control-btn reopen-btn" on:click={() => selectedProject && reopenProject(selectedProject)} title="Reopen project for updates">
-              <span class="control-icon">♻️</span>
-              <span class="control-label">Reopen</span>
-            </button>
-          {/if}
-        {/if}
-        
-        <!-- Project Workflow Actions -->
-        {#if activeProject}
-          <button class="control-btn finish-btn" on:click={finishProject} title="Finish Project">
-            <span class="control-icon">✅</span>
-            <span class="control-label">Finish</span>
-          </button>
-          <button class="control-btn pause-btn" on:click={pauseProject} title="Pause Project">
-            <span class="control-icon">⏸️</span>
-            <span class="control-label">Pause</span>
-          </button>
-          <button class="control-btn cancel-btn" on:click={cancelProject} title="Cancel Project">
-            <span class="control-icon">❌</span>
-            <span class="control-label">Cancel</span>
-          </button>
-          {#if activeProject && ['draft','active','ready','cancelled','rejected'].includes(activeProject.status)}
-            <button class="control-btn delete-btn" on:click={() => activeProject && deleteProject(activeProject)} title="Delete Project">
-              <span class="control-icon">🗑️</span>
-              <span class="control-label">Delete</span>
-            </button>
-          {/if}
-        {/if}
       </div>
     </div>
   </div>
 
   <!-- Filter Panel (non-modal) -->
   {#if showFilterPanel}
-    <div class="filter-panel-container">
+    <div 
+      class="filter-panel-container"
+      on:click|stopPropagation
+      role="dialog"
+      aria-label="Layer Filters"
+    >
       <PlanLayerFilterPanel filters={layerFilters} on:change={handleLayerFiltersChange} />
     </div>
+  {/if}
+  
+  <!-- Click outside to close filter panel -->
+  {#if showFilterPanel}
+    <div 
+      class="filter-panel-overlay"
+      on:click={() => showFilterPanel = false}
+      role="presentation"
+    ></div>
   {/if}
 
   <!-- Hardware View Modal -->
@@ -2036,8 +2008,23 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   {/if}
                   
                   {#if project.status === 'active'}
-                    <button class="action-btn resume-btn" on:click={() => enterProject(project)} title="Resume planning this project">
-                      🔁 Resume
+                    <button class="action-btn finish-btn" on:click={() => {
+                      activeProject = project;
+                      finishProject();
+                    }} title="Finish Project - Mark as ready for deployment">
+                      ✅ Finish
+                    </button>
+                    <button class="action-btn pause-btn" on:click={() => {
+                      activeProject = project;
+                      pauseProject();
+                    }} title="Pause Project - Save progress and pause work">
+                      ⏸️ Pause
+                    </button>
+                    <button class="action-btn cancel-btn" on:click={() => {
+                      activeProject = project;
+                      cancelProject();
+                    }} title="Cancel Project - Cancel this project">
+                      ❌ Cancel
                     </button>
                     <span class="active-indicator" title="This project is currently active - all map changes will be saved to this project">🔄 Active</span>
                   {/if}
@@ -2690,6 +2677,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     background: rgba(59, 130, 246, 0.4);
   }
 
+  .filter-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+    background: transparent;
+  }
+
   .filter-panel-container {
     position: fixed;
     top: 80px;
@@ -2699,6 +2696,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     max-height: calc(100vh - 100px);
     overflow-y: auto;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    background: var(--card-bg, #1e293b);
+    border-radius: 8px;
   }
 
   .control-btn.delete-btn {
