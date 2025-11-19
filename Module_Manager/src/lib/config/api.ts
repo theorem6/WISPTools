@@ -14,6 +14,7 @@ export const API_CONFIG = {
     NETWORK: '/api/network',
     CUSTOMERS: '/api/customers',
     INVENTORY: '/api/inventory',
+    BUNDLES: '/api/bundles',
     DEPLOY: '/api/deploy',
     HSS: '/api/hss',
     MONITORING: '/api/monitoring',

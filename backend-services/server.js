@@ -102,6 +102,7 @@ app.use('/api/user-tenants', require('./routes/users/tenant-details'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/inventory', require('./routes/inventory'));
+app.use('/api/bundles', require('./routes/hardwareBundles'));
 app.use('/api/work-orders', require('./routes/work-orders'));
 app.use('/api/maintain', require('./routes/maintain'));
 app.use('/api/network', require('./routes/network'));

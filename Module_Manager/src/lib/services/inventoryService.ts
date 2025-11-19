@@ -313,9 +313,37 @@ class InventoryService {
   }
   
   // ============================================================================
+  // Scan Operations
+  // ============================================================================
+
+  async scanLookup(identifier: string): Promise<InventoryItem> {
+    const result = await this.apiCall('/scan/lookup', {
+      method: 'POST',
+      body: JSON.stringify({ identifier })
+    });
+    return result.item;
+  }
+
+  async scanCheckIn(identifier: string, location: any, notes?: string): Promise<InventoryItem> {
+    const result = await this.apiCall('/scan/check-in', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, location, notes })
+    });
+    return result.item;
+  }
+
+  async scanCheckOut(identifier: string, location: any, notes?: string, status?: string): Promise<InventoryItem> {
+    const result = await this.apiCall('/scan/check-out', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, location, notes, status })
+    });
+    return result.item;
+  }
+
+  // ============================================================================
   // Convenience Aliases
   // ============================================================================
-  
+
   async createInventory(tenantId: string, item: Partial<InventoryItem>): Promise<InventoryItem> {
     return await this.createItem(item);
   }

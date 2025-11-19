@@ -11,6 +11,7 @@
   } from '$lib/services/inventoryService';
   import { barcodeService } from '$lib/services/barcodeService';
   import AssetTagViewer from './components/AssetTagViewer.svelte';
+  import ScanModal from './components/ScanModal.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   
@@ -23,6 +24,10 @@
   // Manual barcode entry (mobile app handles camera scanning)
   let showManualEntry = false;
   let manualBarcode = '';
+  
+  // Scanning
+  let showScanModal = false;
+  let scanMode: 'check-in' | 'check-out' | 'lookup' = 'lookup';
   
   // Asset Tag
   let showAssetTag = false;
@@ -285,8 +290,20 @@
     </div>
     
     <div class="header-actions">
+      <button class="btn-secondary" on:click={() => { scanMode = 'lookup'; showScanModal = true; }}>
+        🔍 Scan Lookup
+      </button>
+      <button class="btn-secondary" on:click={() => { scanMode = 'check-in'; showScanModal = true; }}>
+        📥 Scan Check In
+      </button>
+      <button class="btn-secondary" on:click={() => { scanMode = 'check-out'; showScanModal = true; }}>
+        📤 Scan Check Out
+      </button>
       <button class="btn-secondary" on:click={() => showManualEntry = true}>
         🔍 Manual Lookup
+      </button>
+      <button class="btn-secondary" on:click={() => goto('/modules/inventory/bundles')}>
+        📦 Bundles
       </button>
       <button class="btn-secondary" on:click={() => goto('/modules/inventory/reports')}>
         📊 View Reports
@@ -558,6 +575,20 @@
   <!-- Asset Tag Viewer -->
   {#if selectedItemForTag}
     <AssetTagViewer bind:show={showAssetTag} item={selectedItemForTag} />
+  {/if}
+  
+  <!-- Scan Modal -->
+  {#if showScanModal}
+    <ScanModal 
+      show={showScanModal}
+      mode={scanMode}
+      on:close={() => { 
+        showScanModal = false; 
+        loadData(); 
+      }}
+      on:checked-in={() => { loadData(); }}
+      on:checked-out={() => { loadData(); }}
+    />
   {/if}
 </div>
 </TenantGuard>

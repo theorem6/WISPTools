@@ -486,6 +486,147 @@ router.get('/by-site/:siteId', async (req, res) => {
 });
 
 // ============================================================================
+// SCAN IN/OUT OPERATIONS
+// ============================================================================
+
+// POST /inventory/scan/check-in - Check in item by barcode/QR/asset tag
+router.post('/scan/check-in', async (req, res) => {
+  try {
+    const { identifier, location, notes } = req.body;
+    
+    if (!identifier) {
+      return res.status(400).json({ error: 'identifier is required (barcode, QR code, or asset tag)' });
+    }
+    
+    if (!location) {
+      return res.status(400).json({ error: 'location is required' });
+    }
+    
+    // Find item by barcode, QR code, or asset tag
+    const item = await InventoryItem.findOne({
+      tenantId: req.tenantId,
+      $or: [
+        { barcode: identifier },
+        { qrCode: identifier },
+        { assetTag: identifier },
+        { serialNumber: identifier }
+      ]
+    });
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found', identifier });
+    }
+    
+    // Check in: Transfer to new location and set status to available if not already
+    const movedBy = req.user?.name || req.user?.email || 'system';
+    await item.transferTo(location, 'check-in', movedBy, notes || 'Checked in via scanner');
+    
+    // Update status to available if currently in-transit or reserved
+    if (item.status === 'in-transit' || item.status === 'reserved') {
+      item.status = 'available';
+      await item.save();
+    }
+    
+    res.json({ 
+      message: 'Item checked in successfully', 
+      item,
+      action: 'check-in'
+    });
+  } catch (error) {
+    console.error('Error checking in item:', error);
+    res.status(500).json({ error: 'Failed to check in item', message: error.message });
+  }
+});
+
+// POST /inventory/scan/check-out - Check out item by barcode/QR/asset tag
+router.post('/scan/check-out', async (req, res) => {
+  try {
+    const { identifier, location, notes, status } = req.body;
+    
+    if (!identifier) {
+      return res.status(400).json({ error: 'identifier is required (barcode, QR code, or asset tag)' });
+    }
+    
+    if (!location) {
+      return res.status(400).json({ error: 'location is required' });
+    }
+    
+    // Find item by barcode, QR code, or asset tag
+    const item = await InventoryItem.findOne({
+      tenantId: req.tenantId,
+      $or: [
+        { barcode: identifier },
+        { qrCode: identifier },
+        { assetTag: identifier },
+        { serialNumber: identifier }
+      ]
+    });
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found', identifier });
+    }
+    
+    // Verify item is available for checkout
+    if (item.status === 'deployed' && location.type !== 'customer') {
+      return res.status(400).json({ 
+        error: 'Item is already deployed and cannot be checked out',
+        currentStatus: item.status,
+        currentLocation: item.currentLocation
+      });
+    }
+    
+    // Check out: Transfer to new location
+    const movedBy = req.user?.name || req.user?.email || 'system';
+    await item.transferTo(location, 'check-out', movedBy, notes || 'Checked out via scanner');
+    
+    // Update status based on checkout type
+    const newStatus = status || (location.type === 'customer' ? 'deployed' : 'in-transit');
+    item.status = newStatus;
+    await item.save();
+    
+    res.json({ 
+      message: 'Item checked out successfully', 
+      item,
+      action: 'check-out'
+    });
+  } catch (error) {
+    console.error('Error checking out item:', error);
+    res.status(500).json({ error: 'Failed to check out item', message: error.message });
+  }
+});
+
+// POST /inventory/scan/lookup - Look up item by barcode/QR/asset tag
+router.post('/scan/lookup', async (req, res) => {
+  try {
+    const { identifier } = req.body;
+    
+    if (!identifier) {
+      return res.status(400).json({ error: 'identifier is required' });
+    }
+    
+    // Find item by barcode, QR code, asset tag, or serial number
+    const item = await InventoryItem.findOne({
+      tenantId: req.tenantId,
+      $or: [
+        { barcode: identifier },
+        { qrCode: identifier },
+        { assetTag: identifier },
+        { serialNumber: identifier }
+      ]
+    });
+    
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found', identifier });
+    }
+    
+    res.json({ item });
+  } catch (error) {
+    console.error('Error looking up item:', error);
+    res.status(500).json({ error: 'Failed to look up item', message: error.message });
+  }
+});
+
+// ============================================================================
 // REPORTS & EXPORT
 // ============================================================================
 
