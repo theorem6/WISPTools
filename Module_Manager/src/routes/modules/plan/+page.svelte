@@ -1419,6 +1419,27 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       
       // Reload map to reflect visibility changes
       await loadData();
+      
+      // Notify coverage map iframe to reload
+      try {
+        const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            source: 'plan-page',
+            type: 'visibility-changed',
+            detail: {
+              planId: project.id,
+              visible: updatedPlan.showOnMap
+            }
+          }, '*');
+          console.log('[Plan] Notified coverage map of visibility change', {
+            planId: project.id,
+            visible: updatedPlan.showOnMap
+          });
+        }
+      } catch (err) {
+        console.warn('[Plan] Failed to notify coverage map of visibility change:', err);
+      }
     } catch (error) {
       console.error('Error toggling project visibility:', error);
       alert('Failed to toggle project visibility');

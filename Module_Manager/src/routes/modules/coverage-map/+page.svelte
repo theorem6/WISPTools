@@ -682,8 +682,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       }
     } else if (source === 'plan-page') {
       // Handle messages from plan page
-      console.log('[CoverageMap] Received message from plan-page:', type);
-      if (type === 'enable-rectangle-drawing') {
+      if (type === 'visibility-changed') {
+        console.log('[CoverageMap] Plan visibility changed, reloading data:', event.data.detail);
+        // Reload all data to reflect visibility changes
+        loadAllData().catch(err => {
+          console.error('[CoverageMap] Failed to reload after visibility change:', err);
+        });
+      } else if (type === 'enable-rectangle-drawing') {
         if (mapComponent) {
           console.log('[CoverageMap] Enabling rectangle drawing...');
           mapComponent.enableRectangleDrawing().catch((err: any) => {
