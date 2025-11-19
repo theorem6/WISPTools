@@ -183,7 +183,10 @@ export class CoverageMapController {
 
       // Create drawing graphics layer if it doesn't exist
       if (!this.drawingGraphicsLayer) {
-        this.drawingGraphicsLayer = new GraphicsLayer();
+        this.drawingGraphicsLayer = new GraphicsLayer({ 
+          title: 'Drawing Rectangle',
+          listMode: 'hide' // Hide from layer list - it's temporary
+        });
         this.map.add(this.drawingGraphicsLayer);
       }
 
@@ -363,19 +366,38 @@ export class CoverageMapController {
           console.log('[CoverageMap] Enabled map view interactivity');
         }
         
+        // Ensure drawing layer exists and is visible
+        if (!this.drawingGraphicsLayer) {
+          const { default: GraphicsLayer } = await import('@arcgis/core/layers/GraphicsLayer.js');
+          this.drawingGraphicsLayer = new GraphicsLayer({ 
+            title: 'Drawing Rectangle',
+            listMode: 'hide'
+          });
+          this.map.add(this.drawingGraphicsLayer);
+        }
+        this.drawingGraphicsLayer.visible = true;
+        
         // Wait a bit for UI to update
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Cancel any existing drawing first
-        if (this.sketchWidget.activeTool) {
+        if (this.sketchWidget && this.sketchWidget.activeTool) {
           this.sketchWidget.cancel();
         }
+        
+        // Ensure sketch widget is properly initialized
+        if (!this.sketchWidget) {
+          throw new Error('Sketch widget not initialized');
+        }
+        
+        // Wait for sketch widget to be ready
+        await this.sketchWidget.when();
         
         console.log('[CoverageMap] Starting rectangle creation tool...');
         this.isDrawingMode = true;
         
         // Start rectangle creation - this makes the map interactive for drawing
-        this.sketchWidget.create('rectangle');
+        await this.sketchWidget.create('rectangle');
         
         console.log('[CoverageMap] Rectangle drawing enabled - click and drag on map to draw');
         console.log('[CoverageMap] Sketch widget state:', {
@@ -383,7 +405,8 @@ export class CoverageMapController {
           creationMode: this.sketchWidget.creationMode,
           isDrawingMode: this.isDrawingMode,
           viewReady: this.mapView.ready,
-          viewInteractive: this.mapView.interactive
+          viewInteractive: this.mapView.interactive,
+          drawingLayerVisible: this.drawingGraphicsLayer.visible
         });
       } catch (error) {
         console.error('[CoverageMap] Failed to start rectangle creation:', error);
@@ -392,14 +415,18 @@ export class CoverageMapController {
           errorStack: error?.stack,
           sketchWidgetExists: !!this.sketchWidget,
           mapViewExists: !!this.mapView,
-          mapViewReady: this.mapView?.ready
+          mapViewReady: this.mapView?.ready,
+          mapViewInteractive: this.mapView?.interactive,
+          drawingLayerExists: !!this.drawingGraphicsLayer
         });
         // Reset drawing mode if creation failed
         this.isDrawingMode = false;
         
         // Try to remove widget if creation failed
         try {
-          this.mapView.ui.remove(this.sketchWidget);
+          if (this.mapView && this.sketchWidget) {
+            this.mapView.ui.remove(this.sketchWidget);
+          }
         } catch (removeErr) {
           // Ignore removal errors
         }
@@ -773,10 +800,10 @@ export class CoverageMapController {
         ? reactiveUtilsModule.default
         : reactiveUtilsModule) ?? null;
 
-    this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links' });
-    this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets' });
-    this.marketingLayer = new GraphicsLayer({ title: 'Marketing Leads', listMode: 'hide' });
-    this.planDraftLayer = new GraphicsLayer({ title: 'Plan Drafts', listMode: 'hide' });
+    this.backhaulLayer = new GraphicsLayer({ title: 'Backhaul Links', listMode: 'show' });
+    this.graphicsLayer = new GraphicsLayer({ title: 'Network Assets', listMode: 'show' });
+    this.marketingLayer = new GraphicsLayer({ title: 'Marketing Addresses', listMode: 'show' });
+    this.planDraftLayer = new GraphicsLayer({ title: 'Plan Features', listMode: 'show' });
 
     try {
       this.map = new Map({
@@ -866,10 +893,12 @@ export class CoverageMapController {
     try {
       const [
         { default: Zoom },
-        { default: Compass }
+        { default: Compass },
+        { default: LayerList }
       ] = await Promise.all([
         import('@arcgis/core/widgets/Zoom.js'),
-        import('@arcgis/core/widgets/Compass.js')
+        import('@arcgis/core/widgets/Compass.js'),
+        import('@arcgis/core/widgets/LayerList.js')
       ]);
 
       const zoom = new Zoom({
@@ -882,6 +911,24 @@ export class CoverageMapController {
         index: 0
       });
 
+      // Add LayerList widget to allow toggling layers
+      const layerList = new LayerList({
+        view: this.mapView,
+        listItemCreatedFunction: (event) => {
+          const item = event.item;
+          // Customize layer list items if needed
+          if (item.layer === this.drawingGraphicsLayer) {
+            // Hide drawing layer from list (it's temporary)
+            item.visible = false;
+          }
+        }
+      });
+
+      this.mapView.ui.add(layerList, {
+        position: 'top-right',
+        index: 1
+      });
+
       if (isMobile) {
         const compass = new Compass({
           view: this.mapView,
@@ -890,7 +937,7 @@ export class CoverageMapController {
 
         this.mapView.ui.add(compass, {
           position: 'top-left',
-          index: 1
+          index: 2
         });
       }
     } catch (err) {
