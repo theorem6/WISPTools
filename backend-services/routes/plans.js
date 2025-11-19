@@ -287,229 +287,37 @@ const normalizePlanNameForLead = planMarketingLeadService.normalizePlanNameForLe
 const createMarketingLeadsForPlan = planMarketingLeadService.createMarketingLeadsForPlan;
 
 // Old inline implementations removed - see backend-services/services/planMarketingLeadService.js
-/* COMMENTED OUT - see planMarketingLeadService.js
-const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
-  const marketing = plan?.marketing;
-  if (!marketing || !Array.isArray(marketing.addresses) || marketing.addresses.length === 0) {
-    return { created: 0, updated: 0, skipped: 0 };
-  }
 
-  const planIdString =
-    (typeof plan._id === 'object' && plan._id !== null && plan._id.toString) ? plan._id.toString() :
-    (typeof plan.id === 'string' ? plan.id : null);
+// Marketing discovery constants and utilities - use service module
+const delay = marketingDiscovery.delay;
+const buildPrimaryOverpassQuery = marketingDiscovery.buildPrimaryOverpassQuery;
+const buildFallbackOverpassQuery = marketingDiscovery.buildFallbackOverpassQuery;
+const executeOverpassQuery = marketingDiscovery.executeOverpassQuery;
+const extractBuildingCandidates = marketingDiscovery.extractBuildingCandidates;
+const mergeCandidateSets = marketingDiscovery.mergeCandidateSets;
+const candidateHasResidentialSignal = marketingDiscovery.candidateHasResidentialSignal;
+const candidateLooksLikeRoad = marketingDiscovery.candidateLooksLikeRoad;
+const discoverMicrosoftFootprints = marketingDiscovery.discoverMicrosoftFootprints;
+const computeBoundingBoxAreaKm2 = marketingDiscovery.computeBoundingBoxAreaKm2;
 
-  const radiusMiles = toNumber(marketing.targetRadiusMiles) ?? null;
-  const marketingRunAt = marketing.lastRunAt ? new Date(marketing.lastRunAt).toISOString() : new Date().toISOString();
-  const boundingBox = marketing.lastBoundingBox ?? null;
-  const center = marketing.lastCenter ?? null;
+// Marketing discovery constants
+const MAX_BUILDING_RESULTS = marketingDiscovery.MAX_BUILDING_RESULTS;
+const MAX_REVERSE_GEOCODE = marketingDiscovery.MAX_REVERSE_GEOCODE;
+const NOMINATIM_DELAY_MS = marketingDiscovery.NOMINATIM_DELAY_MS;
+const OVERPASS_ENDPOINT = marketingDiscovery.OVERPASS_ENDPOINT;
+const RURAL_AREA_THRESHOLD_KM2 = marketingDiscovery.RURAL_AREA_THRESHOLD_KM2;
+const RURAL_MIN_PRIMARY_RESULTS = marketingDiscovery.RURAL_MIN_PRIMARY_RESULTS;
+const RURAL_MIN_AFTER_FALLBACK = marketingDiscovery.RURAL_MIN_AFTER_FALLBACK;
+const RURAL_FALLBACK_MAX_RESULTS = marketingDiscovery.RURAL_FALLBACK_MAX_RESULTS;
 
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
-
-  for (const address of marketing.addresses) {
-    const latitude = toNumber(address.latitude);
-    const longitude = toNumber(address.longitude);
-    if (latitude === undefined || longitude === undefined) {
-      skipped += 1;
-      continue;
-    }
-
-    const leadHash = buildLeadHash(latitude, longitude, address.addressLine1, address.postalCode);
-    if (!leadHash) {
-      skipped += 1;
-      continue;
-    }
-
-    const street = address.addressLine1 ?? `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
-    const now = new Date();
-    const metadata = {
-      planId: planIdString,
-      planName: plan.name ?? null,
-      marketingRunAt,
-      radiusMiles,
-      boundingBox,
-      center,
-      source: address.source ?? 'marketing',
-      addressLine2: address.addressLine2 ?? null
-    };
-
-    const setPayload = {
-      isLead: true,
-      leadSource: 'plan-marketing',
-      associatedPlanId: planIdString,
-      leadMetadata: metadata,
-      leadHash,
-      updatedAt: now,
-      updatedBy: userEmail || 'system',
-      'serviceAddress.street': street,
-      'serviceAddress.latitude': latitude,
-      'serviceAddress.longitude': longitude
-    };
-
-    if (address.city) {
-      setPayload['serviceAddress.city'] = address.city;
-    }
-    if (address.state) {
-      setPayload['serviceAddress.state'] = address.state;
-    }
-    if (address.postalCode) {
-      setPayload['serviceAddress.zipCode'] = address.postalCode;
-    }
-    setPayload['serviceAddress.country'] = address.country || 'USA';
-    if (address.email) {
-      setPayload.email = address.email;
-    }
-
-    const setOnInsertPayload = {
-      tenantId,
-      customerId: await generateLeadCustomerId(tenantId),
-      firstName: 'Prospect',
-      lastName: normalizePlanNameForLead(plan.name),
-      primaryPhone: '000-000-0000',
-      serviceStatus: 'pending',
-      accountStatus: 'good-standing',
-      isActive: true,
-      createdAt: now,
-      createdBy: userEmail || 'system',
-      notes: 'Auto-generated marketing lead',
-      leadStatus: 'new',
-      fullName: `Prospect (${street})`
-    };
-
-    if (address.email) {
-      setOnInsertPayload.email = address.email;
-    }
-
-    const updateDoc = {
-      $setOnInsert: setOnInsertPayload,
-      $set: setPayload,
-      $addToSet: {
-        tags: { $each: ['marketing', 'lead'] }
-      }
-    };
-
-    try {
-      const result = await Customer.updateOne(
-        { tenantId, leadHash },
-        updateDoc,
-        { upsert: true }
-      );
-
-      if (result.upsertedCount && result.upsertedCount > 0) {
-        created += 1;
-      } else if (result.matchedCount && result.matchedCount > 0) {
-        updated += 1;
-      } else {
-        skipped += 1;
-      }
-    } catch (err) {
-      console.error('Failed to sync marketing lead:', {
-        tenantId,
-        planId: planIdString,
-        address: street,
-        error: err.message
-      });
-      skipped += 1;
-    }
-  }
-
-  return { created, updated, skipped };
-};
-*/
-
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const MAX_BUILDING_RESULTS = 10000; // Increase limit to capture more buildings
-const MAX_REVERSE_GEOCODE = 500; // No artificial limit - geocode all (FTTH approach)
-const NOMINATIM_DELAY_MS = 500; // Reduced delay since ArcGIS doesn't need rate limiting
+// Legacy constants (for backward compatibility with existing code)
 const NOMINATIM_USER_AGENT = 'LTE-PCI-Mapper-Marketing/1.0 (admin@wisptools.io)';
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const ARCGIS_GEOCODER_URL = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer';
 const ARC_GIS_API_KEY = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || '';
 
-const RURAL_AREA_THRESHOLD_KM2 = 1.0;
-const RURAL_MIN_PRIMARY_RESULTS = 150;
-const RURAL_MIN_AFTER_FALLBACK = 150;
-const RURAL_FALLBACK_MAX_RESULTS = 600;
+// Old inline implementations removed - see backend-services/services/marketingDiscovery.js
 
-const buildPrimaryOverpassQuery = (bbox) => `
-[out:json][timeout:90][maxsize:100000000];
-(
-  // Strategy 1: All buildings with any building tag (most comprehensive)
-  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 2: Explicit residential buildings
-  way["building"~"^(residential|house|apartments|detached|semidetached_house|semi_detached_house|terrace|bungalow|cabin|farm|static_caravan|stilt_house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"~"^(residential|house|apartments|detached|semidetached_house|semi_detached_house|terrace|bungalow|cabin|farm|static_caravan|stilt_house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 3: Amenities tagged as dwellings
-  way["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["amenity"~"^(house|residential|dwelling)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 4: Small structures & outbuildings
-  way["building"~"^(garage|shed|barn|outbuilding|storage|warehouse|hangar)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"~"^(garage|shed|barn|outbuilding|storage|warehouse|hangar)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 5: Any structure with address information
-  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 6: Named structures
-  way["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["name"]["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 7: Rural tagging patterns
-  way["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["place"~"^(household|house)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-
-  // Strategy 8: Residential landuse polygons with addresses
-  way["landuse"~"^(residential|village_green)$"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["landuse"~"^(residential|village_green)$"]["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // CRITICAL: Recursively get all nodes that are part of ways, and all referenced elements
-  // This ensures we get full geometry for ways, not just their center
-  // (._;>;); means: take the current set, and recursively get all nodes/ways referenced by it
-  (._;>;);
-);
-// Use out body to get full geometry (all nodes for ways), not just centers
-// This is essential for calculating accurate centroids from actual geometry
-out body;
-`;
-
-const buildFallbackOverpassQuery = (bbox) => `
-[out:json][timeout:90][maxsize:100000000];
-(
-  way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["amenity"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["amenity"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["shop"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["shop"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["office"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["office"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:housenumber"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:street"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["addr:city"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:city"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["addr:postcode"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["addr:postcode"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["power"~"^(pole|tower)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["power"~"^(pole|tower)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  way["name"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  node["name"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-  
-  // CRITICAL: Recursively get all nodes that are part of ways
-  // This ensures we get full geometry for ways, not just their center
-  (._;>;);
-);
-// Use out body to get full geometry (all nodes for ways), not just centers
-out body;
-`;
-
+// Additional Overpass query builder (not in marketingDiscovery service - still needed here)
 const buildInterpolationOverpassQuery = (bbox) => `
 [out:json][timeout:90][maxsize:100000000];
 (
@@ -521,223 +329,7 @@ const buildInterpolationOverpassQuery = (bbox) => `
 out geom;
 `;
 
-const computeBoundingBoxAreaKm2 = (bbox) => {
-  const width = Math.abs(bbox.east - bbox.west);
-  const height = Math.abs(bbox.north - bbox.south);
-  return width * height * 111 * 111;
-};
-
-async function executeOverpassQuery({ query, label, timeoutMs = 45000 }) {
-  try {
-    if (!query || typeof query !== 'string') {
-      throw new Error(`Invalid Overpass query for ${label}: query must be a non-empty string`);
-    }
-
-    console.log(`[MarketingDiscovery] Overpass request (${label}) starting`);
-    
-    // Use axios with automatic retries instead of fetch
-    const response = await httpClient.post(
-      OVERPASS_ENDPOINT,
-      `data=${encodeURIComponent(query)}`,
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        timeout: timeoutMs
-      }
-    );
-
-    const payload = response.data;
-
-    if (payload?.remark) {
-      console.log(`[MarketingDiscovery] Overpass remark (${label}):`, payload.remark);
-    }
-
-    if (payload?.error) {
-      console.error(`[MarketingDiscovery] Overpass API error (${label}):`, payload.error);
-      throw new Error(`Overpass API error: ${payload.error}`);
-    }
-
-    return Array.isArray(payload?.elements) ? payload.elements : [];
-  } catch (error) {
-    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-      console.error(`[MarketingDiscovery] Overpass request (${label}) timed out after ${timeoutMs}ms`);
-      throw new Error(`Overpass query (${label}) timed out after ${timeoutMs}ms`);
-    }
-    if (error.response) {
-      const errorMsg = `Overpass API returned ${error.response.status}: ${error.response.data ? JSON.stringify(error.response.data).substring(0, 500) : 'Unknown error'}`;
-      console.error(`[MarketingDiscovery] Overpass API error (${label}):`, errorMsg);
-      throw new Error(errorMsg);
-    }
-    console.error(`[MarketingDiscovery] Overpass request (${label}) failed:`, error.message || error);
-    throw error;
-  }
-}
-
-function extractBuildingCandidates(elements, { precision = 100000, sourceLabel = 'osm_primary' }) {
-  const seen = new Map();
-  const candidates = [];
-  
-  console.log(`[MarketingDiscovery] Extracting building candidates from ${elements.length} elements (source: ${sourceLabel})`);
-
-  // Don't sort by size - include all buildings equally (ways and nodes)
-  // This ensures small buildings aren't filtered out
-  const sortedElements = [...elements]; // Keep original order - no size-based filtering
-
-  let extracted = 0;
-  let skipped = 0;
-  let skippedReasons = { noCoords: 0, duplicate: 0, invalid: 0 };
-
-  for (const element of sortedElements) {
-    let latitude;
-    let longitude;
-
-    // With out body, we get full geometry for ways (all nodes)
-    // Always prefer calculating centroid from actual geometry over center property
-    if (element.type === 'way') {
-      // For ways, calculate centroid from actual geometry (all nodes)
-      // With out body, geometry array contains actual node coordinates
-      if (Array.isArray(element.geometry) && element.geometry.length > 0) {
-        // Calculate proper geometric centroid from all vertices
-        // This is more accurate than using center (which is bounding box center)
-        const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
-        if (coords.length > 0) {
-          // Calculate geometric centroid (average of all vertices)
-          const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
-          const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
-          latitude = sumLat / coords.length;
-          longitude = sumLon / coords.length;
-        } else if (element.center) {
-          // Fallback: Use center if geometry is empty or invalid
-          latitude = toNumber(element.center.lat);
-          longitude = toNumber(element.center.lon);
-        }
-      } else if (element.center) {
-        // Fallback: Use center if no geometry available
-        latitude = toNumber(element.center.lat);
-        longitude = toNumber(element.center.lon);
-      }
-    } else if (element.type === 'node') {
-      // Nodes are just points - use their coordinates directly
-      // Note: These may not be true building centroids if the building is represented as a point
-      latitude = toNumber(element.lat);
-      longitude = toNumber(element.lon);
-    } else if (element.type === 'relation') {
-      // Relations (multipolygons) - calculate centroid from all members' geometry
-      if (Array.isArray(element.geometry) && element.geometry.length > 0) {
-        const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
-        if (coords.length > 0) {
-          const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
-          const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
-          latitude = sumLat / coords.length;
-          longitude = sumLon / coords.length;
-        }
-      }
-    } else if (Array.isArray(element.geometry) && element.geometry.length > 0) {
-      // For other element types with geometry, calculate centroid from all points
-      const coords = element.geometry.filter(g => g && g.lat !== undefined && g.lon !== undefined && Number.isFinite(toNumber(g.lat)) && Number.isFinite(toNumber(g.lon)));
-      if (coords.length > 0) {
-        const sumLat = coords.reduce((sum, g) => sum + toNumber(g.lat), 0);
-        const sumLon = coords.reduce((sum, g) => sum + toNumber(g.lon), 0);
-        latitude = sumLat / coords.length;
-        longitude = sumLon / coords.length;
-      } else {
-        // Last resort: use first point if available
-        latitude = toNumber(element.geometry[0]?.lat);
-        longitude = toNumber(element.geometry[0]?.lon);
-      }
-    }
-
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      skipped++;
-      skippedReasons.noCoords++;
-      if (extracted === 0 && skipped < 10) {
-        console.warn(`[MarketingDiscovery] Skipping element with invalid coordinates:`, {
-          type: element.type,
-          hasCenter: !!element.center,
-          hasGeometry: !!element.geometry,
-          geometryLength: element.geometry?.length || 0,
-          elementKeys: Object.keys(element).filter(k => !['tags', 'members'].includes(k))
-        });
-      }
-      continue;
-    }
-
-    const roundedLat = Math.round(latitude * precision) / precision;
-    const roundedLon = Math.round(longitude * precision) / precision;
-    const key = `${roundedLat},${roundedLon}`;
-
-    if (!seen.has(key)) {
-      const candidate = {
-        lat: latitude,
-        lon: longitude,
-        tags: element.tags || {},
-        source: sourceLabel
-      };
-      seen.set(key, candidate);
-      candidates.push(candidate);
-    } else {
-      const existing = seen.get(key);
-
-      const existingHasAddress =
-        existing.tags?.['addr:housenumber'] ||
-        existing.tags?.['addr:street'] ||
-        existing.tags?.name;
-      const incomingHasAddress =
-        element.tags?.['addr:housenumber'] ||
-        element.tags?.['addr:street'] ||
-        element.tags?.name;
-
-      if (!existingHasAddress && incomingHasAddress) {
-        const updated = {
-          lat: latitude,
-          lon: longitude,
-          tags: element.tags || {},
-          source: sourceLabel
-        };
-        seen.set(key, updated);
-        const index = candidates.findIndex(
-          (candidate) =>
-            Math.abs(candidate.lat - existing.lat) < 0.00001 &&
-            Math.abs(candidate.lon - existing.lon) < 0.00001
-        );
-        if (index >= 0) {
-          candidates[index] = updated;
-        }
-      }
-    }
-    
-    extracted++;
-    if (candidates.length >= MAX_BUILDING_RESULTS) {
-      break;
-    }
-  }
-
-  console.log(`[MarketingDiscovery] Extraction complete for ${sourceLabel}:`, {
-    totalElements: elements.length,
-    extracted,
-    candidates: candidates.length,
-    skipped,
-    skippedReasons
-  });
-
-  return candidates;
-}
-
-function mergeCandidateSets(primary, secondary, precision = 100000) {
-  const merged = new Map();
-  const addCandidate = (candidate) => {
-    const roundedLat = Math.round(candidate.lat * precision) / precision;
-    const roundedLon = Math.round(candidate.lon * precision) / precision;
-    const key = `${roundedLat},${roundedLon}`;
-    if (!merged.has(key)) {
-      merged.set(key, candidate);
-    }
-  };
-
-  primary.forEach(addCandidate);
-  secondary.forEach(addCandidate);
-
-  return Array.from(merged.values()).slice(0, MAX_BUILDING_RESULTS);
-}
+// Old implementations removed - now use marketingDiscovery service (see lines 293-301)
 
 function generateInterpolatedCandidates(elements) {
   const interpolated = [];
@@ -775,42 +367,7 @@ function generateInterpolatedCandidates(elements) {
   return interpolated;
 }
 
-const RESIDENTIAL_BUILDING_TYPES = new Set([
-  'house',
-  'residential',
-  'apartments',
-  'detached',
-  'semidetached_house',
-  'semi_detached_house',
-  'terrace',
-  'bungalow',
-  'cabin',
-  'farm',
-  'static_caravan',
-  'stilt_house',
-  'yes'
-]);
-
-function candidateHasResidentialSignal(tags = {}) {
-  if (!tags || typeof tags !== 'object') return false;
-  if (tags['addr:housenumber'] || tags['addr:unit']) return true;
-  const building = tags.building;
-  if (building && RESIDENTIAL_BUILDING_TYPES.has(building)) return true;
-  if (building && building !== 'commercial') return true;
-  const place = tags.place;
-  if (place && ['household', 'house', 'hamlet', 'village'].includes(place)) return true;
-  if (tags.amenity && ['dwelling', 'house'].includes(tags.amenity)) return true;
-  return false;
-}
-
-function candidateLooksLikeRoad(tags = {}) {
-  if (!tags) return false;
-  if (tags.highway) return true;
-  if (tags.railway) return true;
-  if (tags.route) return true;
-  if (tags.waterway) return true;
-  return false;
-}
+// RESIDENTIAL_BUILDING_TYPES, candidateHasResidentialSignal, candidateLooksLikeRoad now in marketingDiscovery service (see lines 298-299)
 
 // Marketing discovery functions - use service module
 // Batch reverse geocode all coordinates - processes all at once for efficiency
