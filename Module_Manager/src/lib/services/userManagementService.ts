@@ -16,6 +16,41 @@ import type { UserRole, ModuleAccess } from '$lib/models/userRole';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 /**
+ * Get the base API path, ensuring /api is included
+ * - If API_BASE_URL is empty: use '/api' (relative URL for Firebase Hosting rewrites)
+ * - If API_BASE_URL is set: ensure it ends with '/api' or append it
+ * 
+ * Supports multiple backend ports:
+ * - Production: Uses Firebase Hosting rewrites (/api -> apiProxy Cloud Function)
+ * - Local Development: http://localhost:3001/api (Main API) or http://localhost:3002/api (EPC API)
+ * - Cloud Functions URL: Automatically includes /api if needed
+ */
+function getApiPath(): string {
+  if (!API_BASE_URL || API_BASE_URL.trim() === '') {
+    // Production: Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    return '/api';
+  }
+  
+  // Development/Local: Ensure API_BASE_URL ends with /api
+  let base = API_BASE_URL.trim();
+  
+  // Remove trailing slashes
+  base = base.replace(/\/+$/, '');
+  
+  // Check if it already ends with /api
+  if (base.endsWith('/api')) {
+    return base;
+  }
+  
+  // Append /api if not present
+  // Handle cases like:
+  // - http://localhost:3001 -> http://localhost:3001/api
+  // - http://localhost:3002 -> http://localhost:3002/api
+  // - https://cloudfunctions.net -> https://cloudfunctions.net/api
+  return `${base}/api`;
+}
+
+/**
  * User in tenant
  */
 export interface TenantUser {
@@ -62,7 +97,7 @@ export async function getTenantUsers(tenantId: string, scope: 'full' | 'visible'
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const endpoint = scope === 'visible'
       ? `${apiPath}/users/tenant/${tenantId}/visible`
       : `${apiPath}/users/tenant/${tenantId}`;
@@ -103,7 +138,7 @@ export async function getAllUsers(): Promise<TenantUser[]> {
     };
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/all`, {
       method: 'GET',
       headers
@@ -134,7 +169,7 @@ export async function inviteUser(
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/invite`, {
       method: 'POST',
       headers,
@@ -170,7 +205,7 @@ export async function updateUserRole(
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/${userId}/role`, {
       method: 'PUT',
       headers,
@@ -202,7 +237,7 @@ export async function updateUserModuleAccess(
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/${userId}/modules`, {
       method: 'PUT',
       headers,
@@ -230,7 +265,7 @@ export async function suspendUser(tenantId: string, userId: string): Promise<voi
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/${userId}/suspend`, {
       method: 'POST',
       headers,
@@ -255,7 +290,7 @@ export async function activateUser(tenantId: string, userId: string): Promise<vo
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/${userId}/activate`, {
       method: 'POST',
       headers,
@@ -280,7 +315,7 @@ export async function removeUserFromTenant(tenantId: string, userId: string): Pr
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/${userId}/tenant/${tenantId}`, {
       method: 'DELETE',
       headers
@@ -304,7 +339,7 @@ export async function getUserActivity(tenantId: string, userId: string): Promise
     const headers = await getAuthHeaders(tenantId);
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
-    const apiPath = API_BASE_URL || '/api';
+    const apiPath = getApiPath();
     const response = await fetch(`${apiPath}/users/${userId}/activity?tenantId=${tenantId}`, {
       method: 'GET',
       headers
