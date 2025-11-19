@@ -139,8 +139,22 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
     }
 
     const query = { tenantId };
-    if (!isManagerRole) {
-      query.role = { $in: Array.from(allowedRoles) };
+    
+    // Exclude platform_admin users from tenant lists unless the requesting user is a platform admin
+    if (!req.user?.isPlatformAdmin) {
+      if (!isManagerRole) {
+        // Filter out platform_admin from allowed roles
+        const filteredRoles = Array.from(allowedRoles).filter(role => role !== 'platform_admin');
+        query.role = { $in: filteredRoles };
+      } else {
+        // Exclude platform_admin for managers who are not platform admins
+        query.role = { $ne: 'platform_admin' };
+      }
+    } else {
+      // Platform admin can see all roles, including platform_admin
+      if (!isManagerRole) {
+        query.role = { $in: Array.from(allowedRoles) };
+      }
     }
 
     let userTenants = await UserTenant.find(query).lean();
@@ -159,6 +173,11 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
     const users = [];
     for (const userTenant of userTenants) {
       try {
+        // Skip platform_admin users unless the requesting user is a platform admin
+        if (userTenant.role === 'platform_admin' && !req.user?.isPlatformAdmin) {
+          continue;
+        }
+        
         const userRecord = await auth.getUser(userTenant.userId);
         users.push({
           uid: userTenant.userId,
@@ -250,6 +269,11 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
     const users = [];
     for (const userTenant of userTenants) {
       try {
+        // Skip platform_admin users unless the requesting user is a platform admin
+        if (userTenant.role === 'platform_admin' && !req.user?.isPlatformAdmin) {
+          continue;
+        }
+        
         // Get user from Firebase Auth
         const userRecord = await auth.getUser(userTenant.userId);
         
