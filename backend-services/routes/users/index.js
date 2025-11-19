@@ -21,6 +21,7 @@ const {
   VALID_ROLES,
   getUserTenantRole
 } = require('../../middleware/auth');
+const { isPlatformAdminUser } = require('./role-auth-middleware');
 const { getCreatableRoles, canManageRole, determineRoleFromEmail } = require('../../config/user-hierarchy');
 const { isPlatformAdminEmail } = require('../../utils/platformAdmin');
 
@@ -111,7 +112,9 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    if (!req.user?.isPlatformAdmin && req.tenantId !== tenantId) {
+    const requestingUserIsPlatformAdmin = isPlatformAdminUser(req.user);
+    
+    if (!requestingUserIsPlatformAdmin && req.tenantId !== tenantId) {
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Cannot view users for another tenant'
@@ -119,7 +122,7 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
     }
 
     let currentUserRole = 'platform_admin';
-    if (!req.user?.isPlatformAdmin) {
+    if (!requestingUserIsPlatformAdmin) {
       currentUserRole = await getUserTenantRole(req.user.uid, tenantId);
       if (!currentUserRole) {
         return res.status(403).json({
@@ -129,7 +132,7 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
       }
     }
 
-    const isManagerRole = req.user?.isPlatformAdmin || ['owner', 'admin'].includes(currentUserRole);
+    const isManagerRole = requestingUserIsPlatformAdmin || ['owner', 'admin'].includes(currentUserRole);
     const allowedRoles = new Set();
 
     if (!isManagerRole) {
@@ -141,7 +144,7 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
     const query = { tenantId };
     
     // Exclude platform_admin users from tenant lists unless the requesting user is a platform admin
-    if (!req.user?.isPlatformAdmin) {
+    if (!requestingUserIsPlatformAdmin) {
       if (!isManagerRole) {
         // Filter out platform_admin from allowed roles
         const filteredRoles = Array.from(allowedRoles).filter(role => role !== 'platform_admin');
@@ -174,7 +177,8 @@ router.get('/tenant/:tenantId/visible', async (req, res) => {
     for (const userTenant of userTenants) {
       try {
         // Skip platform_admin users unless the requesting user is a platform admin
-        if (userTenant.role === 'platform_admin' && !req.user?.isPlatformAdmin) {
+        const requestingUserIsPlatformAdmin = isPlatformAdminUser(req.user);
+        if (userTenant.role === 'platform_admin' && !requestingUserIsPlatformAdmin) {
           continue;
         }
         
@@ -270,7 +274,8 @@ router.get('/tenant/:tenantId', requireAdmin, async (req, res) => {
     for (const userTenant of userTenants) {
       try {
         // Skip platform_admin users unless the requesting user is a platform admin
-        if (userTenant.role === 'platform_admin' && !req.user?.isPlatformAdmin) {
+        const requestingUserIsPlatformAdmin = isPlatformAdminUser(req.user);
+        if (userTenant.role === 'platform_admin' && !requestingUserIsPlatformAdmin) {
           continue;
         }
         
