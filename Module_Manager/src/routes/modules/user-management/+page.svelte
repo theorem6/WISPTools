@@ -359,6 +359,9 @@ let canManageUsers = false;
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
+    background: var(--bg-primary);
+    min-height: 100vh;
+    color: var(--text-primary);
   }
 
   .header {
@@ -372,11 +375,11 @@ let canManageUsers = false;
   .btn-back {
     padding: 0.75rem 1.25rem;
     border: 1px solid var(--border-color);
-    background: white;
+    background: var(--card-bg, var(--bg-secondary));
     border-radius: 0.5rem;
     cursor: pointer;
     font-weight: 500;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     transition: all 0.2s;
     white-space: nowrap;
   }
@@ -396,11 +399,14 @@ let canManageUsers = false;
     font-weight: 700;
     margin: 0;
     color: var(--text-primary);
+    line-height: 1.2;
   }
 
   .subtitle {
     color: var(--text-secondary);
     margin-top: 0.5rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
   }
 
   .filters {
@@ -431,26 +437,47 @@ let canManageUsers = false;
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     font-size: 1rem;
+    background: var(--card-bg, var(--bg-secondary));
+    color: var(--text-primary);
+  }
+  
+  .search-box input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+  
+  .search-box input:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
   }
 
   .select {
     padding: 0.75rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
-    background: white;
+    background: var(--card-bg, var(--bg-secondary));
+    color: var(--text-primary);
     cursor: pointer;
+  }
+  
+  .select:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
   }
 
   .results-count {
     color: var(--text-secondary);
     font-size: 0.875rem;
     margin-left: auto;
+    white-space: nowrap;
+    font-weight: 500;
   }
 
   .table-container {
-    background: white;
+    background: var(--card-bg, var(--bg-primary));
+    border: 1px solid var(--border-color);
     border-radius: 0.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-md);
     overflow-x: auto;
   }
 
@@ -468,18 +495,25 @@ let canManageUsers = false;
     padding: 1rem;
     text-align: left;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     font-size: 0.875rem;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .user-table td {
     padding: 1rem;
     border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    background: var(--card-bg, var(--bg-primary));
   }
 
   .user-table tbody tr:hover {
-    background: var(--bg-hover);
+    background: var(--bg-hover, var(--bg-secondary));
+  }
+  
+  .user-table tbody tr:hover td {
+    background: var(--bg-hover, var(--bg-secondary));
   }
 
   .user-cell {
@@ -516,16 +550,20 @@ let canManageUsers = false;
   .user-name {
     font-weight: 500;
     color: var(--text-primary);
+    line-height: 1.4;
   }
 
   .user-email {
     font-size: 0.875rem;
     color: var(--text-secondary);
+    line-height: 1.4;
+    margin-top: 0.125rem;
   }
 
   .time-cell {
     color: var(--text-secondary);
     font-size: 0.875rem;
+    white-space: nowrap;
   }
 
   .badge {
@@ -534,6 +572,8 @@ let canManageUsers = false;
     border-radius: 1rem;
     font-size: 0.875rem;
     font-weight: 500;
+    white-space: nowrap;
+    text-transform: capitalize;
   }
 
   .badge-primary { background: #8b5cf6; color: white; }
@@ -591,8 +631,18 @@ let canManageUsers = false;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 4rem;
+    padding: 4rem 2rem;
     color: var(--text-secondary);
+    background: var(--card-bg, var(--bg-secondary));
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    min-height: 300px;
+  }
+  
+  .loading-container p {
+    margin-top: 1rem;
+    color: var(--text-primary);
+    font-size: 0.95rem;
   }
 
   .spinner {
@@ -613,24 +663,33 @@ let canManageUsers = false;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 4rem;
+    padding: 4rem 2rem;
     text-align: center;
+    background: var(--card-bg, var(--bg-secondary));
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    min-height: 300px;
   }
 
   .empty-icon {
     font-size: 4rem;
-    opacity: 0.3;
+    opacity: 0.4;
     margin-bottom: 1rem;
+    color: var(--text-tertiary, var(--text-secondary));
   }
 
   .empty-state h3 {
     margin: 0 0 0.5rem;
     color: var(--text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
   }
 
   .empty-state p {
     color: var(--text-secondary);
     margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
   }
 
   .alert {
@@ -640,12 +699,19 @@ let canManageUsers = false;
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 1.5rem;
+    border: 1px solid;
   }
 
   .alert-error {
-    background: #fee;
-    border: 1px solid #fcc;
-    color: #c00;
+    background: var(--danger-light, rgba(239, 68, 68, 0.1));
+    border-color: var(--danger, #ef4444);
+    color: var(--danger, #ef4444);
+  }
+  
+  .alert-success {
+    background: var(--success-light, rgba(16, 185, 129, 0.1));
+    border-color: var(--success, #10b981);
+    color: var(--success, #10b981);
   }
 
   .alert button {
