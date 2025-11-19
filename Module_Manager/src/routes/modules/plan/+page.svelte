@@ -777,6 +777,53 @@ function handleReportOverlayKeydown(event: KeyboardEvent) {
 
   function closeProjectModal() {
     showProjectModal = false;
+    
+    // Zoom to active project's location when closing modal
+    if (activeProject) {
+      setTimeout(() => {
+        const iframe = document.querySelector('iframe.coverage-map-iframe') as HTMLIFrameElement;
+        if (!iframe?.contentWindow) {
+          console.warn('[Plan] Iframe not ready for centering');
+          return;
+        }
+
+        const planLat = activeProject.location?.latitude;
+        const planLon = activeProject.location?.longitude;
+
+        if (planLat !== undefined && planLon !== undefined && Number.isFinite(planLat) && Number.isFinite(planLon)) {
+          console.log('[Plan] Centering map on active project location:', planLat, planLon);
+          iframe.contentWindow.postMessage(
+            {
+              source: 'shared-map',
+              type: 'center-map',
+              payload: {
+                lat: planLat,
+                lon: planLon,
+                zoom: 12
+              }
+            },
+            '*'
+          );
+        } else {
+          // Try to center on plan features if no location
+          const unsubscribe = mapLayerManager.subscribe(state => {
+            const featuresToCenter = state.stagedFeatures ?? [];
+            unsubscribe(); // Unsubscribe immediately after reading state
+            if (featuresToCenter.length > 0) {
+              console.log('[Plan] Centering on plan features:', featuresToCenter.length);
+              iframe.contentWindow.postMessage(
+                {
+                  source: 'shared-map',
+                  type: 'center-map',
+                  payload: { features: featuresToCenter }
+                },
+                '*'
+              );
+            }
+          });
+        }
+      }, 100);
+    }
   }
 
   function handleProjectOverlayClick(event: MouseEvent) {
@@ -1391,6 +1438,17 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   async function startProject(project: PlanProject, options: { autoStart?: boolean } = {}) {
     const { autoStart = false } = options;
     try {
+      // Deactivate all other active projects first (only one active at a time)
+      const otherActiveProjects = projects.filter(p => p.status === 'active' && p.id !== project.id);
+      for (const otherProject of otherActiveProjects) {
+        try {
+          await planService.updatePlan(otherProject.id, { status: 'draft', showOnMap: false });
+          console.log('[Plan] Deactivated other active project:', otherProject.name);
+        } catch (err) {
+          console.warn('[Plan] Failed to deactivate other project:', err);
+        }
+      }
+
       const updatedPlan = await planService.updatePlan(project.id, { status: 'active', showOnMap: true });
       let active = updatedPlan ?? { ...project, status: 'active', showOnMap: true };
 
@@ -1725,6 +1783,17 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   async function reopenProject(project: PlanProject) {
     try {
+      // Deactivate all other active projects first (only one active at a time)
+      const otherActiveProjects = projects.filter(p => p.status === 'active' && p.id !== project.id);
+      for (const otherProject of otherActiveProjects) {
+        try {
+          await planService.updatePlan(otherProject.id, { status: 'draft', showOnMap: false });
+          console.log('[Plan] Deactivated other active project:', otherProject.name);
+        } catch (err) {
+          console.warn('[Plan] Failed to deactivate other project:', err);
+        }
+      }
+
       const updatedPlan = await planService.updatePlan(project.id, { status: 'active' });
       await loadData(true);
       const refreshed = projects.find(p => p.id === project.id) || updatedPlan || project;
@@ -3014,13 +3083,13 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     padding: 1.5rem;
     transition: all 0.2s;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     gap: 1rem;
+    min-width: 0; /* Prevent flex overflow */
   }
 
   .project-content {
-    flex: 1;
+    flex: 0 0 auto;
     background: none;
     border: none;
     cursor: pointer;
@@ -3028,6 +3097,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     padding: 0;
     font: inherit;
     color: inherit;
+    width: 100%;
+    min-width: 0; /* Prevent overflow */
   }
 
   .project-content:hover {
@@ -3043,8 +3114,17 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   .project-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
+    width: 100%;
+    min-width: 0; /* Prevent overflow */
+  }
+  
+  .project-actions .action-btn {
+    flex: 0 1 auto;
+    min-width: fit-content;
+    white-space: nowrap;
   }
 
   .action-btn {
