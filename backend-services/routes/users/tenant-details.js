@@ -4,6 +4,7 @@
  */
 
 const express = require('express');
+const mongoose = require('mongoose');
 const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
 const { Tenant } = require('../../models/tenant');
 const { UserTenant } = require('./user-schema');
@@ -24,15 +25,30 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     });
     
     const { userId } = req.params;
-    const requestingUserId = req.user.uid;
     
-        // Users can only query their own tenants (unless they're platform admin)
-        if (userId !== requestingUserId && !isPlatformAdminUser(req.user)) {
-          return res.status(403).json({
-            error: 'Forbidden',
-            message: 'You can only view your own tenants'
-          });
-        }
+    if (!userId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'userId is required'
+      });
+    }
+    
+    const requestingUserId = req.user?.uid;
+    
+    if (!requestingUserId) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'User not authenticated'
+      });
+    }
+    
+    // Users can only query their own tenants (unless they're platform admin)
+    if (userId !== requestingUserId && !isPlatformAdminUser(req.user)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You can only view your own tenants'
+      });
+    }
     
     // Get all tenant associations for this user
     const userTenants = await UserTenant.find({ 
@@ -41,29 +57,65 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     }).lean();
     
     if (!userTenants || userTenants.length === 0) {
+      console.log(`[tenant-details] No active tenant associations found for user: ${userId}`);
       return res.json([]);
     }
+    
+    console.log(`[tenant-details] Found ${userTenants.length} active tenant associations for user: ${userId}`);
     
     // Get full tenant details for each association
     const tenants = [];
     for (const ut of userTenants) {
-      const tenant = await Tenant.findById(ut.tenantId).lean();
-      if (tenant) {
-        tenants.push({
-          ...tenant,
-          id: tenant._id.toString(),
-          userRole: ut.role
-        });
+      try {
+        if (!ut.tenantId) {
+          console.warn(`[tenant-details] UserTenant record missing tenantId:`, ut);
+          continue;
+        }
+        
+        // tenantId is stored as String in UserTenant, but Tenant._id is ObjectId
+        // Convert string tenantId to ObjectId if valid
+        let tenant;
+        try {
+          if (mongoose.Types.ObjectId.isValid(ut.tenantId)) {
+            // Convert string to ObjectId for query
+            const tenantObjectId = new mongoose.Types.ObjectId(ut.tenantId);
+            tenant = await Tenant.findById(tenantObjectId).lean();
+          } else {
+            console.warn(`[tenant-details] Invalid tenantId format: ${ut.tenantId}`);
+            continue;
+          }
+          
+          if (tenant) {
+            tenants.push({
+              ...tenant,
+              id: tenant._id ? tenant._id.toString() : tenant.id,
+              userRole: ut.role || 'viewer'
+            });
+          } else {
+            console.warn(`[tenant-details] Tenant not found for tenantId: ${ut.tenantId}`);
+          }
+        } catch (idError) {
+          console.error(`[tenant-details] Error converting tenantId to ObjectId: ${ut.tenantId}`, idError.message);
+          continue;
+        }
+      } catch (tenantError) {
+        console.error(`[tenant-details] Error fetching tenant ${ut.tenantId}:`, tenantError.message);
+        console.error(`[tenant-details] Error stack:`, tenantError.stack);
+        // Continue with other tenants even if one fails
+        continue;
       }
     }
     
+    console.log(`[tenant-details] Returning ${tenants.length} tenants for user: ${userId}`);
     res.json(tenants);
     
   } catch (error) {
-    console.error('Error getting user tenants:', error);
+    console.error('[tenant-details] Error getting user tenants:', error);
+    console.error('[tenant-details] Error stack:', error.stack);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: error.message
+      message: error.message || 'Failed to get user tenants',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -91,8 +143,18 @@ router.get('/tenant/:tenantId', verifyAuth, async (req, res) => {
       });
     }
     
-    // Get tenant details
-    const tenant = await Tenant.findById(tenantId).lean();
+    // Get tenant details - tenantId may be string, convert to ObjectId
+    let tenant;
+    if (mongoose.Types.ObjectId.isValid(tenantId)) {
+      const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
+      tenant = await Tenant.findById(tenantObjectId).lean();
+    } else {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Invalid tenantId format'
+      });
+    }
+    
     if (!tenant) {
       return res.status(404).json({
         error: 'Not Found',
