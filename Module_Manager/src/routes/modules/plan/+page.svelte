@@ -7,8 +7,9 @@
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject, type PlanProjectLocation, type PlanProjectMarketing, type PlanMarketingAddress } from '$lib/services/planService';
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
-  import PlanMarketingModal from './components/PlanMarketingModal.svelte';
-  import PlanMarketingResultsPopup from './components/PlanMarketingResultsPopup.svelte';
+import PlanMarketingModal from './components/PlanMarketingModal.svelte';
+import PlanMarketingResultsPopup from './components/PlanMarketingResultsPopup.svelte';
+import PlanLayerFilterPanel, { type PlanLayerFilters } from './components/PlanLayerFilterPanel.svelte';
 import SettingsButton from '$lib/components/SettingsButton.svelte';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
 import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
@@ -40,6 +41,7 @@ interface MapViewExtentPayload {
   let isDrawingRectangle = false;
   let discoveryResults: PlanMarketingAddress[] = [];
   let isDiscoveringAddresses = false;
+  let showFilterPanel = false;
   
   // Data
   let projects: PlanProject[] = [];
@@ -62,10 +64,18 @@ $: {
     selectedProject = selectedProject ?? contextActivePlan;
   }
 }
-$: mapLocked = !(activeProject || contextActivePlan);
-$: marketingAvailable = Boolean(
-  selectedProject ?? activeProject ?? contextActivePlan ?? (projects?.length ?? 0)
-);
+  $: mapLocked = !(activeProject || contextActivePlan);
+  $: marketingAvailable = Boolean(
+    selectedProject ?? activeProject ?? contextActivePlan ?? (projects?.length ?? 0)
+  );
+
+  // Layer filters
+  let layerFilters: PlanLayerFilters = {
+    showMarketing: true,
+    showPlanFeatures: true,
+    showNetworkAssets: true,
+    showBackhaul: true
+  };
 
   function applyPlanningCapabilities(lock: boolean) {
     if (lock) {
@@ -636,6 +646,26 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
       // Handle allowed actions
       console.log(`Action '${action}' allowed for object ${objectId}`);
       // Add specific handling for different actions here
+    }
+  }
+
+  // Handle layer filter changes
+  function handleLayerFiltersChange(event: CustomEvent<PlanLayerFilters>) {
+    layerFilters = event.detail;
+    
+    // Send filter update to map iframe
+    try {
+      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          source: 'plan-page',
+          type: 'layer-filters-changed',
+          detail: layerFilters
+        }, '*');
+        console.log('[Plan] Sent layer filter update to map:', layerFilters);
+      }
+    } catch (err) {
+      console.warn('[Plan] Failed to send layer filter update to map:', err);
     }
   }
 
@@ -1417,6 +1447,16 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         visiblePlans.delete(project.id);
       }
       
+      // Clear staged features from map context if plan is hidden
+      if (!updatedPlan.showOnMap && mapState?.stagedFeatures) {
+        // Filter out features for this plan
+        const filteredFeatures = mapState.stagedFeatures.filter(f => {
+          const featurePlanId = f.planId || (f as any).projectId;
+          return featurePlanId !== project.id;
+        });
+        setMapData({ stagedFeatures: filteredFeatures });
+      }
+      
       // Reload map to reflect visibility changes
       await loadData();
       
@@ -1736,6 +1776,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-icon">🔍</span>
           <span class="control-label">{isDrawingRectangle ? "Drawing..." : "Find Addresses"}</span>
         </button>
+        <button 
+          class="control-btn" 
+          class:active={showFilterPanel}
+          on:click={() => showFilterPanel = !showFilterPanel} 
+          title="Toggle Layer Filters"
+        >
+          <span class="control-icon">🔍</span>
+          <span class="control-label">Filters</span>
+        </button>
         {#if selectedProject}
           <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
             <span class="control-icon">🛒</span>
@@ -1783,6 +1832,13 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       </div>
     </div>
   </div>
+
+  <!-- Filter Panel (non-modal) -->
+  {#if showFilterPanel}
+    <div class="filter-panel-container">
+      <PlanLayerFilterPanel filters={layerFilters} on:change={handleLayerFiltersChange} />
+    </div>
+  {/if}
 
   <!-- Hardware View Modal -->
 {#if showHardwareModal}
@@ -2623,6 +2679,26 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
+  }
+
+  .control-btn.active {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .control-btn.active:hover {
+    background: rgba(59, 130, 246, 0.4);
+  }
+
+  .filter-panel-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 300px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
   }
 
   .control-btn.delete-btn {

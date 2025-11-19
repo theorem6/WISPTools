@@ -534,6 +534,19 @@ export class CoverageMapController {
     }
   }
 
+  public setPlanFeaturesVisibility(visible: boolean): void {
+    if (this.planDraftLayer && this.mapReady) {
+      this.planDraftLayer.visible = visible;
+      if (!visible) {
+        this.planDraftLayer.removeAll();
+        console.log('[CoverageMap] Plan features layer hidden and cleared');
+      } else {
+        // Re-render plan features if visible
+        this.renderPlanDrafts().catch(err => console.error('[CoverageMap] Plan draft render error:', err));
+      }
+    }
+  }
+
   public setMarketingLeads(leads: PlanMarketingAddress[]): void {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];

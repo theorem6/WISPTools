@@ -717,6 +717,31 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           console.log('[CoverageMap] Clearing drawing graphics...');
           mapComponent.clearDrawingGraphics();
         }
+      } else if (type === 'layer-filters-changed') {
+        // Handle layer filter updates from plan page
+        const planFilters = event.data.detail;
+        if (planFilters && mapComponent) {
+          // Map plan layer filters to coverage map filters
+          filters.showMarketing = planFilters.showMarketing ?? filters.showMarketing;
+          filters.showBackhaul = planFilters.showBackhaul ?? filters.showBackhaul;
+          // Plan features visibility is handled via setPlanFeaturesVisibility
+          if (typeof planFilters.showPlanFeatures === 'boolean') {
+            mapComponent.setPlanFeaturesVisibility(planFilters.showPlanFeatures);
+          }
+          // Network assets map to towers, sectors, CPE, equipment
+          if (planFilters.showNetworkAssets === false) {
+            filters.showTowers = false;
+            filters.showSectors = false;
+            filters.showCPE = false;
+            filters.showEquipment = false;
+          } else if (planFilters.showNetworkAssets === true) {
+            // Only enable if they were previously enabled (don't force enable)
+            // This preserves user's individual asset type preferences
+          }
+          
+          mapComponent.setFilters(filters);
+          console.log('[CoverageMap] Layer filters updated from plan page:', filters);
+        }
       }
     }
   }

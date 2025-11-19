@@ -93,6 +93,10 @@ export let isPlanMode = false;
   export function clearDrawingGraphics(): void {
     controller?.clearDrawingGraphics();
   }
+
+  export function setPlanFeaturesVisibility(visible: boolean): void {
+    controller?.setPlanFeaturesVisibility(visible);
+  }
 </script>
 
 <div class="coverage-map-container">
