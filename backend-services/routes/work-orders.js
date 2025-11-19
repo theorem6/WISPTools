@@ -372,7 +372,7 @@ router.post('/bulk-import', async (req, res) => {
         
         await workOrder.save();
         results.imported++;
-      } catch (err: any) {
+      } catch (err) {
         results.failed++;
         results.errors.push({
           row: i + 1,

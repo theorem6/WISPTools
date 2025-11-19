@@ -880,7 +880,7 @@ router.post('/sites/bulk-import', async (req, res) => {
         
         await site.save();
         results.imported++;
-      } catch (err: any) {
+      } catch (err) {
         results.failed++;
         results.errors.push({
           row: i + 1,
@@ -957,7 +957,7 @@ router.post('/equipment/bulk-import', async (req, res) => {
         
         await equip.save();
         results.imported++;
-      } catch (err: any) {
+      } catch (err) {
         results.failed++;
         results.errors.push({
           row: i + 1,

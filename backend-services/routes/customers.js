@@ -731,7 +731,7 @@ router.post('/bulk-import', async (req, res) => {
         const customer = new Customer(customerData);
         await customer.save();
         results.imported++;
-      } catch (err: any) {
+      } catch (err) {
         results.failed++;
         results.errors.push({
           row: i + 1,
