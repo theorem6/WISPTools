@@ -24,6 +24,33 @@ router.get('/:userId', verifyAuth, async (req, res) => {
       headers: Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth'))
     });
     
+    // Check if mongoose is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error('[tenant-details] MongoDB not connected. ReadyState:', mongoose.connection.readyState);
+      return res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database connection not ready'
+      });
+    }
+    
+    // Check if UserTenant model is available
+    if (!UserTenant) {
+      console.error('[tenant-details] UserTenant model not available');
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'UserTenant model not initialized'
+      });
+    }
+    
+    // Check if Tenant model is available
+    if (!Tenant) {
+      console.error('[tenant-details] Tenant model not available');
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Tenant model not initialized'
+      });
+    }
+    
     const { userId } = req.params;
     
     if (!userId) {
@@ -50,11 +77,21 @@ router.get('/:userId', verifyAuth, async (req, res) => {
       });
     }
     
+    console.log('[tenant-details] Querying UserTenant for userId:', userId);
+    
     // Get all tenant associations for this user
-    const userTenants = await UserTenant.find({ 
-      userId,
-      status: 'active'
-    }).lean();
+    let userTenants;
+    try {
+      userTenants = await UserTenant.find({ 
+        userId,
+        status: 'active'
+      }).lean();
+      console.log('[tenant-details] UserTenant query result:', userTenants?.length || 0, 'records');
+    } catch (queryError) {
+      console.error('[tenant-details] Error querying UserTenant:', queryError);
+      console.error('[tenant-details] Query error stack:', queryError.stack);
+      throw queryError;
+    }
     
     if (!userTenants || userTenants.length === 0) {
       console.log(`[tenant-details] No active tenant associations found for user: ${userId}`);
