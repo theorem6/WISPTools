@@ -902,17 +902,36 @@ export class CoverageMapController {
     if (!this.mapView) return;
 
     const isMobile = window.innerWidth <= 768;
+    
+    // Check if we're in plan mode - if so, don't show LayerList (we have custom filter panel)
+    const isPlanMode = (() => {
+      if (typeof window === 'undefined') return false;
+      const urlParams = new URLSearchParams(window.location.search);
+      const modeParam = urlParams.get('mode');
+      if (modeParam) {
+        return modeParam.toLowerCase() === 'plan';
+      }
+      return urlParams.get('planMode') === 'true';
+    })();
 
     try {
+      const imports = [
+        import('@arcgis/core/widgets/Zoom.js'),
+        import('@arcgis/core/widgets/Compass.js')
+      ];
+      
+      // Only import LayerList if not in plan mode
+      if (!isPlanMode) {
+        imports.push(import('@arcgis/core/widgets/LayerList.js'));
+      }
+      
       const [
         { default: Zoom },
         { default: Compass },
-        { default: LayerList }
-      ] = await Promise.all([
-        import('@arcgis/core/widgets/Zoom.js'),
-        import('@arcgis/core/widgets/Compass.js'),
-        import('@arcgis/core/widgets/LayerList.js')
-      ]);
+        ...rest
+      ] = await Promise.all(imports);
+      
+      const LayerList = !isPlanMode ? rest[0]?.default : null;
 
       const zoom = new Zoom({
         view: this.mapView,
@@ -924,23 +943,25 @@ export class CoverageMapController {
         index: 0
       });
 
-      // Add LayerList widget to allow toggling layers
-      const layerList = new LayerList({
-        view: this.mapView,
-        listItemCreatedFunction: (event) => {
-          const item = event.item;
-          // Customize layer list items if needed
-          if (item.layer === this.drawingGraphicsLayer) {
-            // Hide drawing layer from list (it's temporary)
-            item.visible = false;
+      // Only add LayerList widget if not in plan mode (plan mode has custom filter panel)
+      if (!isPlanMode && LayerList) {
+        const layerList = new LayerList({
+          view: this.mapView,
+          listItemCreatedFunction: (event) => {
+            const item = event.item;
+            // Customize layer list items if needed
+            if (item.layer === this.drawingGraphicsLayer) {
+              // Hide drawing layer from list (it's temporary)
+              item.visible = false;
+            }
           }
-        }
-      });
+        });
 
-      this.mapView.ui.add(layerList, {
-        position: 'top-right',
-        index: 1
-      });
+        this.mapView.ui.add(layerList, {
+          position: 'top-right',
+          index: 1
+        });
+      }
 
       if (isMobile) {
         const compass = new Compass({

@@ -2997,7 +2997,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
 
   /* Project Modal Styles */
   .project-modal {
-    max-width: 800px;
+    width: min(95vw, 1400px);
+    max-width: 1400px;
   }
 
   .project-list {
