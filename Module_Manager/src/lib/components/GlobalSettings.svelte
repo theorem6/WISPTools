@@ -7,7 +7,10 @@
   
   const dispatch = createEventDispatcher();
   
-  let activeTab: 'appearance' | 'acs' | 'info' = 'appearance';
+  import ImportSystem from './ImportSystem.svelte';
+  
+  let activeTab: 'appearance' | 'acs' | 'info' | 'import' = 'appearance';
+  let showImportSystem = false;
   let loading = false;
   let saveSuccess = false;
   let saveError = '';
@@ -154,6 +157,13 @@
           on:click={() => activeTab = 'info'}
         >
           ℹ️ Company Info
+        </button>
+        <button 
+          class="tab" 
+          class:active={activeTab === 'import'}
+          on:click={() => { activeTab = 'import'; showImportSystem = true; }}
+        >
+          📥 Import Data
         </button>
       </div>
       
@@ -304,6 +314,29 @@
               {loading ? 'Saving...' : 'Save Company Info'}
             </button>
           </div>
+        {:else if activeTab === 'import'}
+          <div class="tab-content">
+            <h3>Data Import</h3>
+            <p class="description">Import data from CSV files for all database objects (except ACS items)</p>
+            
+            <div class="import-info">
+              <p>Use the import system to bulk import:</p>
+              <ul>
+                <li>📦 Inventory Items</li>
+                <li>👥 Customers</li>
+                <li>🗺️ Plans/Projects</li>
+                <li>🏗️ Sites/Towers</li>
+                <li>📡 Network Equipment</li>
+                <li>📋 Work Orders</li>
+                <li>👤 Users</li>
+                <li>📚 Hardware Bundles</li>
+              </ul>
+            </div>
+            
+            <button class="btn-save" on:click={() => { showImportSystem = true; }}>
+              📥 Open Import System
+            </button>
+          </div>
         {/if}
         
         {#if saveSuccess}
@@ -320,6 +353,14 @@
       </div>
     </div>
   </div>
+{/if}
+
+<!-- Import System Modal -->
+{#if showImportSystem}
+  <ImportSystem 
+    show={showImportSystem}
+    on:close={() => { showImportSystem = false; }}
+  />
 {/if}
 
 <style>
@@ -542,6 +583,32 @@
     border: 1px solid #fca5a5;
     border-radius: 6px;
     color: #991b1b;
+    font-size: 0.9rem;
+  }
+  
+  .import-info {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #e0e0e0);
+  }
+  
+  .import-info p {
+    margin: 0 0 1rem;
+    color: var(--text-primary, #1a202c);
+    font-weight: 500;
+  }
+  
+  .import-info ul {
+    margin: 0;
+    padding-left: 1.5rem;
+    list-style: none;
+  }
+  
+  .import-info li {
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary, #718096);
     font-size: 0.9rem;
   }
 </style>

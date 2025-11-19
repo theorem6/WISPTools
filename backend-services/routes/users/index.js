@@ -745,6 +745,132 @@ router.get('/:userId/activity', requireAdmin, async (req, res) => {
 });
 
 // ============================================================================
+// BULK IMPORT
+// ============================================================================
+
+/**
+ * POST /api/users/bulk-import
+ * Bulk import users from CSV/JSON
+ * Creates UserTenant records and optionally Firebase Auth users
+ */
+router.post('/bulk-import', requireAdmin, async (req, res) => {
+  try {
+    const tenantId = req.tenantId || req.body.tenantId;
+    
+    if (!tenantId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'tenantId is required'
+      });
+    }
+    
+    const { users } = req.body;
+    
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'users array is required and must not be empty'
+      });
+    }
+    
+    const results = {
+      imported: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    // Process users one by one
+    for (let i = 0; i < users.length; i++) {
+      try {
+        const userData = users[i];
+        
+        // Ensure required fields
+        if (!userData.email) {
+          throw new Error('email is required');
+        }
+        
+        const email = userData.email.trim().toLowerCase();
+        
+        // Check if user exists in Firebase Auth
+        let userId;
+        try {
+          const userRecord = await auth.getUserByEmail(email);
+          userId = userRecord.uid;
+        } catch (authError) {
+          // User doesn't exist in Firebase Auth - create them
+          try {
+            const newUser = await auth.createUser({
+              email,
+              displayName: userData.displayName || userData.name || '',
+              password: userData.password || `TempPassword${Date.now()}`, // Temporary password - should be changed
+              emailVerified: userData.emailVerified || false,
+              disabled: userData.status === 'suspended' || userData.disabled || false
+            });
+            userId = newUser.uid;
+            
+            // Set a temporary password and require password reset
+            if (!userData.password) {
+              await auth.updateUser(userId, {
+                password: `TempPassword${Date.now()}` // User will need to reset
+              });
+            }
+          } catch (createError) {
+            throw new Error(`Failed to create Firebase Auth user: ${createError.message}`);
+          }
+        }
+        
+        // Check if UserTenant record already exists
+        const existingUserTenant = await UserTenant.findOne({
+          userId,
+          tenantId
+        });
+        
+        if (existingUserTenant) {
+          // Update existing record
+          existingUserTenant.role = userData.role || existingUserTenant.role;
+          existingUserTenant.status = userData.status || existingUserTenant.status;
+          existingUserTenant.moduleAccess = userData.moduleAccess || existingUserTenant.moduleAccess;
+          existingUserTenant.updatedAt = new Date();
+          await existingUserTenant.save();
+        } else {
+          // Create new UserTenant record
+          const userTenant = new UserTenant({
+            userId,
+            tenantId,
+            role: userData.role || 'viewer',
+            status: userData.status || 'active',
+            moduleAccess: userData.moduleAccess || {},
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          await userTenant.save();
+        }
+        
+        results.imported++;
+      } catch (err: any) {
+        results.failed++;
+        results.errors.push({
+          row: i + 1,
+          error: err.message || 'Failed to import'
+        });
+      }
+    }
+    
+    res.json({
+      message: 'Bulk import completed',
+      ...results
+    });
+  } catch (error) {
+    console.error('Error bulk importing users:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to bulk import users',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

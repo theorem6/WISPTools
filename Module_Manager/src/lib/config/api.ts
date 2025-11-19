@@ -20,6 +20,8 @@ export const API_CONFIG = {
     MONITORING: '/api/monitoring',
     MAINTAIN: '/api/maintain',
     TENANTS: '/api/tenants',
+    USERS: '/api/users',
+    WORK_ORDERS: '/api/work-orders',
     ADMIN: '/admin',
     ISO: '/api/deploy' // ISO proxy uses deploy endpoint
   },

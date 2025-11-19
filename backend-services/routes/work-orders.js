@@ -307,5 +307,84 @@ router.get('/stats/dashboard', async (req, res) => {
   }
 });
 
+// ============================================================================
+// BULK IMPORT
+// ============================================================================
+
+/**
+ * POST /api/work-orders/bulk-import
+ * Bulk import work orders from CSV/JSON
+ */
+router.post('/bulk-import', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { workOrders } = req.body;
+    
+    if (!Array.isArray(workOrders) || workOrders.length === 0) {
+      return res.status(400).json({ error: 'workOrders array is required and must not be empty' });
+    }
+    
+    const results = {
+      imported: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    // Process work orders one by one
+    for (let i = 0; i < workOrders.length; i++) {
+      try {
+        const woData = workOrders[i];
+        
+        // Generate ticket number if not provided
+        let ticketNumber = woData.ticketNumber;
+        if (!ticketNumber) {
+          const count = await WorkOrder.countDocuments({ tenantId });
+          ticketNumber = `TKT-${new Date().getFullYear()}-${String(count + results.imported + 1).padStart(4, '0')}`;
+        }
+        
+        // Parse dates if strings
+        if (woData.scheduledDate && typeof woData.scheduledDate === 'string') {
+          woData.scheduledDate = new Date(woData.scheduledDate);
+        }
+        if (woData.dueDate && typeof woData.dueDate === 'string') {
+          woData.dueDate = new Date(woData.dueDate);
+        }
+        
+        // Ensure required fields
+        if (!woData.title) {
+          throw new Error('title is required');
+        }
+        
+        if (!woData.type) {
+          throw new Error('type is required');
+        }
+        
+        const workOrder = new WorkOrder({
+          ...woData,
+          tenantId,
+          ticketNumber
+        });
+        
+        await workOrder.save();
+        results.imported++;
+      } catch (err: any) {
+        results.failed++;
+        results.errors.push({
+          row: i + 1,
+          error: err.message || 'Failed to import'
+        });
+      }
+    }
+    
+    res.json({
+      message: 'Bulk import completed',
+      ...results
+    });
+  } catch (error) {
+    console.error('Error bulk importing work orders:', error);
+    res.status(500).json({ error: 'Failed to bulk import work orders', message: error.message });
+  }
+});
+
 module.exports = router;
 

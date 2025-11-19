@@ -807,4 +807,163 @@ router.post('/import/cbrs', async (req, res) => {
   }
 });
 
+// ============================================================================
+// BULK IMPORT
+// ============================================================================
+
+/**
+ * POST /api/network/sites/bulk-import
+ * Bulk import sites from CSV/JSON
+ */
+router.post('/sites/bulk-import', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { sites } = req.body;
+    
+    if (!Array.isArray(sites) || sites.length === 0) {
+      return res.status(400).json({ error: 'sites array is required and must not be empty' });
+    }
+    
+    const results = {
+      imported: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    // Process sites one by one
+    for (let i = 0; i < sites.length; i++) {
+      try {
+        const siteData = sites[i];
+        const createdBy = siteData.createdBy || req.user?.email || 'System';
+        
+        // Handle nested address fields
+        if (siteData['address.street'] || siteData['address.city']) {
+          siteData.address = {
+            street: siteData['address.street'] || siteData.address?.street,
+            city: siteData['address.city'] || siteData.address?.city,
+            state: siteData['address.state'] || siteData.address?.state,
+            zipCode: siteData['address.zipCode'] || siteData.address?.zipCode,
+            country: siteData['address.country'] || siteData.address?.country || 'USA'
+          };
+        }
+        
+        // Remove dot-notation fields
+        Object.keys(siteData).forEach(key => {
+          if (key.includes('.')) {
+            delete siteData[key];
+          }
+        });
+        
+        // Ensure required fields
+        if (!siteData.name) {
+          throw new Error('name is required');
+        }
+        
+        if (siteData.latitude !== undefined && (isNaN(parseFloat(siteData.latitude)) || parseFloat(siteData.latitude) < -90 || parseFloat(siteData.latitude) > 90)) {
+          throw new Error('Invalid latitude');
+        }
+        
+        if (siteData.longitude !== undefined && (isNaN(parseFloat(siteData.longitude)) || parseFloat(siteData.longitude) < -180 || parseFloat(siteData.longitude) > 180)) {
+          throw new Error('Invalid longitude');
+        }
+        
+        const site = new UnifiedSite({
+          ...siteData,
+          tenantId,
+          createdBy
+        });
+        
+        await site.save();
+        results.imported++;
+      } catch (err: any) {
+        results.failed++;
+        results.errors.push({
+          row: i + 1,
+          error: err.message || 'Failed to import'
+        });
+      }
+    }
+    
+    res.json({
+      message: 'Bulk import completed',
+      ...results
+    });
+  } catch (error) {
+    console.error('Error bulk importing sites:', error);
+    res.status(500).json({ error: 'Failed to bulk import sites', message: error.message });
+  }
+});
+
+/**
+ * POST /api/network/equipment/bulk-import
+ * Bulk import network equipment from CSV/JSON
+ */
+router.post('/equipment/bulk-import', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { equipment } = req.body;
+    
+    if (!Array.isArray(equipment) || equipment.length === 0) {
+      return res.status(400).json({ error: 'equipment array is required and must not be empty' });
+    }
+    
+    const results = {
+      imported: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    // Process equipment one by one
+    for (let i = 0; i < equipment.length; i++) {
+      try {
+        const equipData = equipment[i];
+        const createdBy = equipData.createdBy || req.user?.email || 'System';
+        
+        // Parse config if it's a string
+        if (typeof equipData.config === 'string') {
+          try {
+            equipData.config = JSON.parse(equipData.config);
+          } catch (e) {
+            // Keep as string if not valid JSON
+          }
+        }
+        
+        // Ensure required fields
+        if (!equipData.name) {
+          throw new Error('name is required');
+        }
+        
+        if (!equipData.hardware_type) {
+          throw new Error('hardware_type is required');
+        }
+        
+        const equip = new NetworkEquipment({
+          ...equipData,
+          tenantId,
+          createdBy,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        await equip.save();
+        results.imported++;
+      } catch (err: any) {
+        results.failed++;
+        results.errors.push({
+          row: i + 1,
+          error: err.message || 'Failed to import'
+        });
+      }
+    }
+    
+    res.json({
+      message: 'Bulk import completed',
+      ...results
+    });
+  } catch (error) {
+    console.error('Error bulk importing equipment:', error);
+    res.status(500).json({ error: 'Failed to bulk import equipment', message: error.message });
+  }
+});
+
 module.exports = router;

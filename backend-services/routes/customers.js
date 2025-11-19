@@ -640,5 +640,110 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
+// ============================================================================
+// BULK IMPORT
+// ============================================================================
+
+/**
+ * POST /api/customers/bulk-import
+ * Bulk import customers from CSV/JSON
+ */
+router.post('/bulk-import', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const { items } = req.body;
+    
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items array is required and must not be empty' });
+    }
+    
+    const results = {
+      imported: 0,
+      failed: 0,
+      errors: []
+    };
+    
+    // Process items one by one for better error handling
+    for (let i = 0; i < items.length; i++) {
+      try {
+        const item = items[i];
+        const isLead = Boolean(item.isLead);
+        
+        // Generate customer ID
+        const count = await Customer.countDocuments({ tenantId });
+        const idPrefix = isLead ? 'LEAD' : 'CUST';
+        const customerId = `${idPrefix}-${new Date().getFullYear()}-${String(count + results.imported + 1).padStart(4, '0')}`;
+        
+        // Generate fullName if not provided
+        const fullName = item.fullName || `${item.firstName || ''} ${item.lastName || ''}`.trim();
+        
+        // Handle nested fields (serviceAddress, billingAddress)
+        const customerData = {
+          ...item,
+          tenantId,
+          customerId,
+          fullName
+        };
+        
+        // Parse nested serviceAddress if provided as string or object
+        if (item['serviceAddress.street'] || item['serviceAddress.city']) {
+          customerData.serviceAddress = {
+            street: item['serviceAddress.street'] || item.serviceAddress?.street,
+            city: item['serviceAddress.city'] || item.serviceAddress?.city,
+            state: item['serviceAddress.state'] || item.serviceAddress?.state,
+            zipCode: item['serviceAddress.zipCode'] || item.serviceAddress?.zipCode,
+            country: item['serviceAddress.country'] || item.serviceAddress?.country || 'USA',
+            latitude: item['serviceAddress.latitude'] !== undefined ? parseFloat(item['serviceAddress.latitude']) : (item.serviceAddress?.latitude !== undefined ? parseFloat(item.serviceAddress.latitude) : undefined),
+            longitude: item['serviceAddress.longitude'] !== undefined ? parseFloat(item['serviceAddress.longitude']) : (item.serviceAddress?.longitude !== undefined ? parseFloat(item.serviceAddress.longitude) : undefined)
+          };
+        }
+        
+        // Parse nested billingAddress if provided
+        if (item['billingAddress.street'] || item['billingAddress.city']) {
+          customerData.billingAddress = {
+            street: item['billingAddress.street'] || item.billingAddress?.street,
+            city: item['billingAddress.city'] || item.billingAddress?.city,
+            state: item['billingAddress.state'] || item.billingAddress?.state,
+            zipCode: item['billingAddress.zipCode'] || item.billingAddress?.zipCode,
+            country: item['billingAddress.country'] || item.billingAddress?.country || 'USA'
+          };
+        }
+        
+        // Remove dot-notation fields
+        Object.keys(customerData).forEach(key => {
+          if (key.includes('.')) {
+            delete customerData[key];
+          }
+        });
+        
+        // Set defaults for leads
+        if (isLead) {
+          customerData.firstName = customerData.firstName || 'Prospect';
+          customerData.lastName = customerData.lastName || 'Lead';
+          customerData.primaryPhone = customerData.primaryPhone || '000-000-0000';
+        }
+        
+        const customer = new Customer(customerData);
+        await customer.save();
+        results.imported++;
+      } catch (err: any) {
+        results.failed++;
+        results.errors.push({
+          row: i + 1,
+          error: err.message || 'Failed to import'
+        });
+      }
+    }
+    
+    res.json({
+      message: 'Bulk import completed',
+      ...results
+    });
+  } catch (error) {
+    console.error('Error bulk importing customers:', error);
+    res.status(500).json({ error: 'Failed to bulk import customers', message: error.message });
+  }
+});
+
 module.exports = router;
 
