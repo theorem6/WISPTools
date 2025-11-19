@@ -1777,13 +1777,13 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-label">{isDrawingRectangle ? "Drawing..." : "Find Addresses"}</span>
         </button>
         <button 
-          class="control-btn" 
+          class="control-btn filter-btn" 
           class:active={showFilterPanel}
           on:click={() => showFilterPanel = !showFilterPanel} 
           title="Toggle Layer Filters"
         >
-          <span class="control-icon">🔍</span>
-          <span class="control-label">Filters</span>
+          <span class="control-icon">🎛️</span>
+          <span class="control-label">Layers</span>
         </button>
         {#if selectedProject}
           <button class="control-btn" on:click={openMissingHardwareModal} title="Missing Hardware Analysis">
