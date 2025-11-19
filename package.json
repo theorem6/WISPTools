@@ -1,6 +1,6 @@
 {
   "name": "lte-pci-mapper",
-  "version": "2.0.0",
+  "version": "0.2.0",
   "private": true,
   "description": "LTE WISP Management Platform - Module Manager System",
   "scripts": {

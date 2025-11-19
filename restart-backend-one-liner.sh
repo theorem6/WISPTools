@@ -1,3 +1,0 @@
-#!/bin/bash
-# One-liner backend restart for GCE server
-cd ~/lte-pci-mapper && git pull origin main && cd backend-services && npm install && pm2 stop all && pm2 delete all && export MONGODB_URI="mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0" && export PORT=3001 && pm2 start server.js --name "main-api" -- --port 3001 && pm2 save && sleep 5 && curl -s http://localhost:3001/health && echo "Backend restarted on port 3001"
