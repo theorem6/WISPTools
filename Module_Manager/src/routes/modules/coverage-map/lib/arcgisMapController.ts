@@ -511,11 +511,31 @@ export class CoverageMapController {
     const previousCount = this.marketingLeads.length;
     const incomingLeads = Array.isArray(leads) ? [...leads] : [];
     
-    // Clear layer if we had leads before and now have none (project deleted/cleared)
-    const isClearing = previousCount > 0 && incomingLeads.length === 0;
-    if (isClearing && this.marketingLayer && this.mapReady) {
+    // Check if leads have changed (different count or different content)
+    // If leads changed, we need to clear and re-render to remove markers from hidden plans
+    let leadsChanged = previousCount !== incomingLeads.length;
+    if (!leadsChanged && previousCount > 0 && incomingLeads.length > 0) {
+      // Check if the content is different by comparing address keys
+      const previousKeys = new Set(this.marketingLeads.map(l => 
+        `${this.toNumeric(l.latitude) ?? ''},${this.toNumeric(l.longitude) ?? ''},${(l.addressLine1 ?? '').toLowerCase()}`
+      ));
+      const incomingKeys = new Set(incomingLeads.map(l => 
+        `${this.toNumeric(l.latitude) ?? ''},${this.toNumeric(l.longitude) ?? ''},${(l.addressLine1 ?? '').toLowerCase()}`
+      ));
+      // Different if sizes don't match or if there are keys in one but not the other
+      leadsChanged = previousKeys.size !== incomingKeys.size || 
+        [...previousKeys].some(key => !incomingKeys.has(key)) ||
+        [...incomingKeys].some(key => !previousKeys.has(key));
+    }
+    
+    // Clear layer if leads changed (visibility toggle, project deleted, etc.)
+    // This ensures markers from hidden projects are removed
+    if (leadsChanged && this.marketingLayer && this.mapReady) {
       this.marketingLayer.removeAll();
-      console.log('[CoverageMap] Marketing layer cleared (leads became empty)');
+      console.log('[CoverageMap] Marketing layer cleared (leads changed)', {
+        previousCount,
+        incomingCount: incomingLeads.length
+      });
     }
     
     // Always update the leads array (even if empty) to reflect current state
@@ -528,16 +548,14 @@ export class CoverageMapController {
       !this.hasPerformedInitialFit;
     
     if (this.mapReady) {
-      // Don't clear the layer here for updates - only add/update markers
-      // Layer clearing happens when:
-      // 1. Filter is turned off (in setFilters)
-      // 2. Leads become empty after having leads (project deleted/cleared)
+      // Render leads (layer is already cleared if leads changed)
       this.renderMarketingLeads()
         .then(() => {
           console.log('[CoverageMap] Marketing leads rendered', {
             leadCount: this.marketingLeads.length,
             markerCount: this.marketingLayer?.graphics?.length || 0,
-            hadPrevious: previousCount > 0
+            hadPrevious: previousCount > 0,
+            leadsChanged
           });
           
           if (!shouldAutoFit) {
