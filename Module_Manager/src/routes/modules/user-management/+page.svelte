@@ -63,9 +63,13 @@ let canManageUsers = false;
     } catch (err: any) {
       console.error('Error loading users:', err);
       
-      // Provide more helpful error messages
+      // Provide more helpful error messages based on error type
       if (err.message?.includes('Failed to fetch') || err.message?.includes('CONNECTION_REFUSED') || err.name === 'TypeError') {
-        error = 'Cannot connect to the server. Please check if the backend service is running and try again.';
+        error = 'Cannot connect to the backend API server (port 3001). The service may be down or unreachable. Please contact support if the issue persists.';
+      } else if (err.message?.includes('ECONNREFUSED')) {
+        error = 'Connection refused by the backend API server. Please verify the main API service (port 3001) is running.';
+      } else if (err.message?.includes('timeout') || err.message?.includes('ETIMEDOUT')) {
+        error = 'Request timed out. The backend API server may be overloaded or unreachable.';
       } else {
         error = err.message || 'Failed to load users';
       }
