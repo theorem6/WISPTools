@@ -42,8 +42,11 @@ const { verifyAuth } = require('./users/role-auth-middleware');
 const { Customer } = require('../models/customer');
 const appConfig = require('../config/app');
 
-// Marketing discovery service (extracted functions)
+// Services (extracted functions)
 const marketingDiscovery = require('../services/marketingDiscovery');
+const planHardwareService = require('../services/planHardwareService');
+const planPromotionService = require('../services/planPromotionService');
+const planMarketingLeadService = require('../services/planMarketingLeadService');
 
 // ============================================================================
 // MIDDLEWARE
@@ -277,35 +280,14 @@ const parseMarketing = (input) => {
   return hasData ? marketing : undefined;
 };
 
-const generateLeadCustomerId = async (tenantId) => {
-  const year = new Date().getFullYear();
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-    const candidate = `LEAD-${year}-${suffix}`;
-    const exists = await Customer.exists({ tenantId, customerId: candidate });
-    if (!exists) {
-      return candidate;
-    }
-  }
-  return `LEAD-${Date.now()}`;
-};
+// Marketing lead functions - use service module
+const generateLeadCustomerId = planMarketingLeadService.generateLeadCustomerId;
+const buildLeadHash = planMarketingLeadService.buildLeadHash;
+const normalizePlanNameForLead = planMarketingLeadService.normalizePlanNameForLead;
+const createMarketingLeadsForPlan = planMarketingLeadService.createMarketingLeadsForPlan;
 
-const buildLeadHash = (latitude, longitude, addressLine1, postalCode) => {
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return null;
-  }
-  const streetKey = (addressLine1 || '').toLowerCase();
-  const postalKey = (postalCode || '').toLowerCase();
-  // Use 7 decimal places for better precision (~1cm vs ~1m with 5 places)
-  return `${latitude.toFixed(7)}|${longitude.toFixed(7)}|${streetKey}|${postalKey}`;
-};
-
-const normalizePlanNameForLead = (planName) => {
-  if (!planName) return 'Lead';
-  const str = String(planName).trim();
-  return str.length > 0 ? str.substring(0, 40) : 'Lead';
-};
-
+// Old inline implementations removed - see backend-services/services/planMarketingLeadService.js
+/* COMMENTED OUT - see planMarketingLeadService.js
 const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
   const marketing = plan?.marketing;
   if (!marketing || !Array.isArray(marketing.addresses) || marketing.addresses.length === 0) {
@@ -434,6 +416,7 @@ const createMarketingLeadsForPlan = async (plan, tenantId, userEmail) => {
 
   return { created, updated, skipped };
 };
+*/
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -3983,378 +3966,21 @@ router.get('/hardware/existing', async (req, res) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-async function analyzeMissingHardware(plan) {
-  try {
-    const existingInventory = await InventoryItem.find({ tenantId: plan.tenantId }).lean();
-    
-    // Clear existing missing hardware analysis
-    plan.purchasePlan.missingHardware = [];
-    plan.purchasePlan.totalEstimatedCost = 0;
-    
-    // Analyze each hardware requirement
-    for (const requirement of plan.hardwareRequirements.needed) {
-      const available = existingInventory.filter(item => 
-        item.category === requirement.category &&
-        item.equipmentType === requirement.equipmentType &&
-        (item.status === 'available' || item.status === 'reserved')
-      );
-      
-      const availableQuantity = available.length;
-      const neededQuantity = requirement.quantity;
-      
-      if (availableQuantity < neededQuantity) {
-        const missingQuantity = neededQuantity - availableQuantity;
-        const costEstimate = await estimateHardwareCost(plan.tenantId, requirement);
-        const estimatedCost = costEstimate.estimatedCost;
-        
-        plan.purchasePlan.missingHardware.push({
-          id: `missing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          category: requirement.category,
-          equipmentType: requirement.equipmentType,
-          manufacturer: requirement.manufacturer,
-          model: requirement.model,
-          quantity: missingQuantity,
-          estimatedCost: estimatedCost * missingQuantity,
-          priority: requirement.priority,
-          specifications: requirement.specifications,
-          reason: generateMissingHardwareReason(requirement, missingQuantity, availableQuantity),
-          alternatives: generateAlternatives(requirement),
-          costConfidence: costEstimate.confidence,
-          costSource: costEstimate.source
-        });
-        
-        plan.purchasePlan.totalEstimatedCost += estimatedCost * missingQuantity;
-      }
-    }
-    
-    plan.updatedAt = new Date();
-    await plan.save();
-  } catch (error) {
-    console.error('Error analyzing missing hardware:', error);
-    throw error;
-  }
-}
+// Hardware analysis functions - use service module
+const analyzeMissingHardware = planHardwareService.analyzeMissingHardware;
+const estimateHardwareCost = planHardwareService.estimateHardwareCost;
+const generateMissingHardwareReason = planHardwareService.generateMissingHardwareReason;
+const generateAlternatives = planHardwareService.generateAlternatives;
 
-/**
- * Estimate hardware cost using pricing database
- * Falls back to inventory averages, then hardcoded defaults
- */
-async function estimateHardwareCost(tenantId, requirement) {
-  try {
-    // Try to get price from pricing database
-    // axios already required at top of file
-    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
-    
-    const params = new URLSearchParams({
-      category: requirement.category || '',
-      equipmentType: requirement.equipmentType || '',
-      manufacturer: requirement.manufacturer || '',
-      model: requirement.model || ''
-    });
-    
-    try {
-      const response = await axios.get(`${baseUrl}/api/equipment-pricing/price?${params}`, {
-        headers: {
-          'x-tenant-id': tenantId
-        },
-        timeout: 5000 // 5 second timeout
-      });
-      
-      if (response.data?.price) {
-        return {
-          estimatedCost: response.data.price * (requirement.quantity || 1),
-          confidence: response.data.confidence || 'high',
-          source: response.data.source || 'pricing_database'
-        };
-      }
-    } catch (apiError) {
-      console.warn('Pricing API not available, using fallback:', apiError.message);
-    }
-    
-    // Fallback to hardcoded estimates (last resort)
-    const costEstimates = {
-      'tower': 50000,
-      'sector-antenna': 2000,
-      'cpe-device': 500,
-      'router': 300,
-      'switch': 200,
-      'power-supply': 150,
-      'cable': 5,
-      'connector': 10,
-      'mounting-hardware': 100,
-      'backhaul-radio': 3000,
-      'fiber-optic': 2,
-      'ups': 800,
-      'generator': 5000,
-      // Add more defaults
-      'Base Station (eNodeB/gNodeB)': 15000,
-      'Remote Radio Head (RRH)': 3000,
-      'Radio Unit (RU)': 2500,
-      'Baseband Unit (BBU)': 8000,
-      'Sector Antenna': 2000,
-      'Panel Antenna': 1500,
-      'Parabolic Dish': 2500,
-      'LTE CPE': 500,
-      'CBRS CPE': 600,
-      'Rectifier': 800,
-      'Battery Bank': 1500,
-      'UPS': 800,
-      'Generator': 5000
-    };
-    
-    const basePrice = costEstimates[requirement.equipmentType] || 1000;
-    
-    return {
-      estimatedCost: basePrice * (requirement.quantity || 1),
-      confidence: 'low',
-      source: 'fallback_default'
-    };
-  } catch (error) {
-    console.error('Error estimating cost:', error);
-    // Ultimate fallback
-    return {
-      estimatedCost: 1000 * (requirement.quantity || 1),
-      confidence: 'low',
-      source: 'error_fallback'
-    };
-  }
-}
+// Old inline implementations removed - see backend-services/services/planHardwareService.js and planPromotionService.js
 
-function generateMissingHardwareReason(requirement, missingQuantity, availableQuantity) {
-  if (availableQuantity === 0) {
-    return `No ${requirement.equipmentType} equipment available in inventory`;
-  } else {
-    return `Only ${availableQuantity} ${requirement.equipmentType} available, need ${missingQuantity} more`;
-  }
-}
-
-function generateAlternatives(requirement) {
-  const alternatives = [];
-  
-  // Add some generic alternatives based on equipment type
-  switch (requirement.equipmentType) {
-    case 'cpe-device':
-      alternatives.push(
-        { manufacturer: 'Ubiquiti', model: 'NanoStation M5', estimatedCost: 450, availability: 'in-stock' },
-        { manufacturer: 'MikroTik', model: 'SXT Lite5', estimatedCost: 380, availability: 'in-stock' },
-        { manufacturer: 'Cambium', model: 'ePMP 1000', estimatedCost: 520, availability: 'backorder' }
-      );
-      break;
-    case 'sector-antenna':
-      alternatives.push(
-        { manufacturer: 'RFS', model: 'Sector Antenna 120?', estimatedCost: 1800, availability: 'in-stock' },
-        { manufacturer: 'CommScope', model: 'Sector Antenna 90?', estimatedCost: 2200, availability: 'in-stock' }
-      );
-      break;
-    case 'router':
-      alternatives.push(
-        { manufacturer: 'Cisco', model: 'ISR 4331', estimatedCost: 2500, availability: 'in-stock' },
-        { manufacturer: 'Juniper', model: 'MX104', estimatedCost: 3000, availability: 'backorder' }
-      );
-      break;
-  }
-  
-  return alternatives;
-}
-
-async function updatePlanFeatureSummary(tenantId, planId, session) {
-  try {
-    const summary = await PlanLayerFeature.countByPlan(tenantId, planId);
-    const update = {
-      $set: {
-        stagedFeatureCounts: summary,
-        updatedAt: new Date()
-      }
-    };
-
-    const query = { _id: planId, tenantId };
-
-    if (session) {
-      await PlanProject.updateOne(query, update).session(session);
-    } else {
-      await PlanProject.updateOne(query, update);
-    }
-
-    return summary;
-  } catch (error) {
-    console.error('Error updating plan feature summary:', error);
-    return { total: 0, byType: {}, byStatus: {} };
-  }
-}
-
-async function promotePlanLayerFeatures(plan, tenantId, user, session) {
-  const planId = plan._id.toString();
-  const promotionResults = [];
-  const promotedFeatureIds = [];
-  const features = await PlanLayerFeature.find({ tenantId, planId }).session(session);
-
-  for (const feature of features) {
-    try {
-      let promotedDoc = null;
-      switch (feature.featureType) {
-        case 'site':
-          promotedDoc = await createSiteFromFeature(feature, planId, tenantId, user, session);
-          break;
-        case 'equipment':
-          promotedDoc = await createEquipmentFromFeature(feature, planId, tenantId, user, session);
-          break;
-        default:
-          promotionResults.push({
-            featureId: feature._id.toString(),
-            featureType: feature.featureType,
-            status: 'skipped'
-          });
-          continue;
-      }
-
-      if (promotedDoc) {
-        feature.status = 'authorized';
-        feature.promotedResourceId = promotedDoc._id.toString();
-        feature.promotedResourceType = promotedDoc.constructor.modelName;
-        feature.updatedBy = user?.email || feature.updatedBy || 'System';
-        feature.updatedById = user?.uid || feature.updatedById || null;
-        await feature.save({ session });
-
-        promotionResults.push({
-          featureId: feature._id.toString(),
-          featureType: feature.featureType,
-          status: 'promoted',
-          resourceId: promotedDoc._id.toString(),
-          resourceType: promotedDoc.constructor.modelName
-        });
-        promotedFeatureIds.push(feature._id);
-      }
-    } catch (error) {
-      console.error('Failed to promote plan feature:', {
-        featureId: feature._id.toString(),
-        featureType: feature.featureType,
-        error: error.message
-      });
-      promotionResults.push({
-        featureId: feature._id.toString(),
-        featureType: feature.featureType,
-        status: 'error',
-        message: error.message
-      });
-    }
-  }
-
-  if (promotedFeatureIds.length > 0) {
-    await PlanLayerFeature.deleteMany({
-      _id: { $in: promotedFeatureIds },
-      tenantId,
-      planId
-    }).session(session);
-
-    await updatePlanFeatureSummary(tenantId, planId, session);
-  }
-
-  return promotionResults;
-}
-
-async function createSiteFromFeature(feature, planId, tenantId, user, session) {
-  const { latitude, longitude } = extractLatLng(feature);
-  if (latitude === null || longitude === null) {
-    throw new Error('Site feature requires valid latitude/longitude');
-  }
-
-  const properties = feature.properties || {};
-  const site = new UnifiedSite({
-    tenantId,
-    name: properties.name || `Planned Site ${planId.slice(-6)}`,
-    type: properties.type || 'tower',
-    status: properties.status || 'planned',
-    location: {
-      latitude,
-      longitude,
-      address: properties.address || properties.location?.address || ''
-    },
-    contact: properties.contact,
-    towerContact: properties.towerContact,
-    buildingContact: properties.buildingContact,
-    siteContact: properties.siteContact,
-    accessInstructions: properties.accessInstructions,
-    gateCode: properties.gateCode,
-    safetyNotes: properties.safetyNotes,
-    accessHours: properties.accessHours,
-    height: properties.height,
-    structureType: properties.structureType,
-    planId: null,
-    originPlanId: planId,
-    createdBy: user?.email || feature.createdBy || 'System',
-    createdById: user?.uid || feature.createdById || null,
-    updatedBy: user?.email || feature.updatedBy || 'System',
-    updatedById: user?.uid || feature.updatedById || null
-  });
-
-  await site.save({ session });
-  return site;
-}
-
-async function createEquipmentFromFeature(feature, planId, tenantId, user, session) {
-  const { latitude, longitude } = extractLatLng(feature);
-  if (latitude === null || longitude === null) {
-    throw new Error('Equipment feature requires valid latitude/longitude');
-  }
-
-  const properties = feature.properties || {};
-  const equipmentType = properties.type || properties.equipmentType || 'other';
-
-  const equipment = new NetworkEquipment({
-    tenantId,
-    name: properties.name || `Planned Equipment ${planId.slice(-6)}`,
-    type: normalizeEquipmentType(equipmentType),
-    status: properties.status || 'planned',
-    manufacturer: properties.manufacturer,
-    model: properties.model,
-    serialNumber: properties.serialNumber,
-    partNumber: properties.partNumber,
-    location: {
-      latitude,
-      longitude,
-      address: properties.address || properties.location?.address || ''
-    },
-    siteId: properties.siteId || null,
-    inventoryId: properties.inventoryId,
-    notes: properties.notes,
-    planId: null,
-    originPlanId: planId,
-    createdBy: user?.email || feature.createdBy || 'System',
-    createdById: user?.uid || feature.createdById || null,
-    updatedBy: user?.email || feature.updatedBy || 'System',
-    updatedById: user?.uid || feature.updatedById || null
-  });
-
-  await equipment.save({ session });
-  return equipment;
-}
-
-function extractLatLng(feature) {
-  if (feature.geometry?.type === 'Point' && Array.isArray(feature.geometry.coordinates)) {
-    const [lng, lat] = feature.geometry.coordinates;
-    return {
-      latitude: typeof lat === 'number' ? lat : null,
-      longitude: typeof lng === 'number' ? lng : null
-    };
-  }
-
-  const location = feature.properties?.location;
-  if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-    return {
-      latitude: location.latitude,
-      longitude: location.longitude
-    };
-  }
-
-  return { latitude: null, longitude: null };
-}
-
-function normalizeEquipmentType(type) {
-  const allowed = ['router', 'switch', 'power-supply', 'ups', 'generator', 'cable', 'connector', 'mounting-hardware', 'backhaul', 'antenna', 'radio', 'other'];
-  if (!type) return 'other';
-  const normalized = type.toLowerCase();
-  return allowed.includes(normalized) ? normalized : 'other';
-}
+// Plan promotion functions - use service module
+const promotePlanLayerFeatures = planPromotionService.promotePlanLayerFeatures;
+const createSiteFromFeature = planPromotionService.createSiteFromFeature;
+const createEquipmentFromFeature = planPromotionService.createEquipmentFromFeature;
+const updatePlanFeatureSummary = planPromotionService.updatePlanFeatureSummary;
+const extractLatLng = planPromotionService.extractLatLng;
+const normalizeEquipmentType = planPromotionService.normalizeEquipmentType;
 
 module.exports = router;
 
