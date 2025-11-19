@@ -847,7 +847,7 @@ router.post('/bulk-import', requireAdmin, async (req, res) => {
         }
         
         results.imported++;
-      } catch (err: any) {
+      } catch (err) {
         results.failed++;
         results.errors.push({
           row: i + 1,
