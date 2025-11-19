@@ -702,18 +702,25 @@ router.delete('/:userId/tenant/:tenantId', requireAdmin, async (req, res) => {
   try {
     const { userId, tenantId } = req.params;
     
-    // Get user_tenant record
-    const userTenantId = `${userId}_${tenantId}`;
-    const userTenantDoc = await db.collection('user_tenants').doc(userTenantId).get();
+    if (!userId || !tenantId) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'userId and tenantId are required'
+      });
+    }
     
-    if (!userTenantDoc.exists) {
+    // Get user_tenant record from MongoDB
+    const userTenant = await UserTenant.findOne({ 
+      userId, 
+      tenantId 
+    });
+    
+    if (!userTenant) {
       return res.status(404).json({
         error: 'Not Found',
         message: 'User not found in tenant'
       });
     }
-    
-    const userTenant = userTenantDoc.data();
     
     // Cannot remove owner
     if (userTenant.role === 'owner') {
@@ -723,8 +730,10 @@ router.delete('/:userId/tenant/:tenantId', requireAdmin, async (req, res) => {
       });
     }
     
-    // Delete user_tenant record
-    await db.collection('user_tenants').doc(userTenantId).delete();
+    // Delete user_tenant record from MongoDB
+    await UserTenant.deleteOne({ userId, tenantId });
+    
+    console.log(`✅ Removed user ${userId} from tenant ${tenantId}`);
     
     res.json({
       message: 'User removed from tenant successfully',
@@ -733,9 +742,11 @@ router.delete('/:userId/tenant/:tenantId', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Error removing user from tenant:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to remove user from tenant'
+      message: error.message || 'Failed to remove user from tenant',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
