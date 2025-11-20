@@ -1,13 +1,25 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { browser } from '$app/environment';
   import { workOrderService } from '$lib/services/workOrderService';
   
   const dispatch = createEventDispatcher();
   onMount(() => {
     console.info('[CreateTicketModal] Mounted');
+    console.info('[CreateTicketModal] Current tenant on mount:', $currentTenant);
+    console.info('[CreateTicketModal] Selected tenant ID from localStorage:', browser ? localStorage.getItem('selectedTenantId') : 'N/A (server-side)');
     return () => console.info('[CreateTicketModal] Destroyed');
   });
+  
+  // Debug tenant changes
+  $: if ($currentTenant) {
+    console.info('[CreateTicketModal] Tenant changed:', $currentTenant.id, $currentTenant.name);
+    if (browser) {
+      localStorage.setItem('selectedTenantId', $currentTenant.id);
+      console.info('[CreateTicketModal] Set localStorage tenantId to:', $currentTenant.id);
+    }
+  }
   
   let title = '';
   let description = '';
@@ -19,9 +31,18 @@
   let error = '';
   
   async function handleSubmit() {
-    if (!$currentTenant) return;
+    console.info('[CreateTicketModal] handleSubmit called');
+    console.info('[CreateTicketModal] Current tenant:', $currentTenant);
+    console.info('[CreateTicketModal] Form data:', { title, description, priority, type, customerName, customerPhone });
+    
+    if (!$currentTenant) {
+      console.error('[CreateTicketModal] No tenant available');
+      error = 'No tenant selected. Please select a tenant and try again.';
+      return;
+    }
     
     if (!title.trim()) {
+      console.warn('[CreateTicketModal] Title validation failed');
       error = 'Please enter a ticket title';
       return;
     }
@@ -36,34 +57,50 @@
         priority,
         type
       });
-      const newTicket = await workOrderService.createWorkOrder({
+      
+      const workOrderData = {
         tenantId: $currentTenant.id,
-        title,
-        description,
+        title: title.trim(),
+        description: description?.trim() || undefined,
         priority,
         type,
-        status: 'open',
+        status: 'open' as const,
         customerReported: true,
         customerContact: customerName ? {
-          name: customerName,
-          phone: customerPhone || undefined
+          name: customerName.trim(),
+          phone: customerPhone?.trim() || undefined
         } : undefined,
         affectedCustomers: customerName ? [{
           customerId: 'manual-' + Date.now(),
-          customerName,
-          phoneNumber: customerPhone || undefined
+          customerName: customerName.trim(),
+          phoneNumber: customerPhone?.trim() || undefined
         }] : undefined
-      });
+      };
+      
+      console.info('[CreateTicketModal] Work order data:', workOrderData);
+      
+      const newTicket = await workOrderService.createWorkOrder(workOrderData);
 
-      console.info('[CreateTicketModal] Ticket created', newTicket);
+      console.info('[CreateTicketModal] Ticket created successfully:', newTicket);
       dispatch('created', newTicket);
       dispatch('close');
     } catch (err: any) {
       console.error('[CreateTicketModal] Failed to create ticket', err);
-      error = err.message || 'Failed to create ticket';
+      console.error('[CreateTicketModal] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        response: err.response,
+        data: err.data
+      });
+      error = err.message || 'Failed to create ticket. Please check the console for details.';
     } finally {
       loading = false;
     }
+  }
+  
+  // Debug: Log button clicks
+  function handleButtonClick() {
+    console.info('[CreateTicketModal] Submit button clicked');
   }
 </script>
 
@@ -172,7 +209,12 @@
         <button type="button" class="btn btn-secondary" on:click={() => dispatch('close')}>
           Cancel
         </button>
-        <button type="submit" class="btn btn-primary" disabled={loading}>
+        <button 
+          type="submit" 
+          class="btn btn-primary" 
+          disabled={loading}
+          on:click={handleButtonClick}
+        >
           {#if loading}
             <span class="spinner-sm" aria-hidden="true"></span>
             Creating...
