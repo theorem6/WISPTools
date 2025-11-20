@@ -112,6 +112,7 @@ app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
+app.use('/api/permissions', require('./routes/permissions')); // FCAPS permission management
 // Enable billing API (with graceful handling if PayPal not configured)
 try {
   app.use('/api/billing', require('./billing-api'));

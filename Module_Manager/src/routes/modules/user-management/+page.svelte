@@ -211,10 +211,16 @@ let canManageUsers = false;
     </div>
     
     {#if canManageUsers}
-      <button class="btn btn-primary" on:click={openInviteModal}>
-        <span>➕</span>
-        Invite User
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-secondary" on:click={() => goto('/modules/user-management/permissions')}>
+          <span>🔐</span>
+          FCAPS Permissions
+        </button>
+        <button class="btn btn-primary" on:click={openInviteModal}>
+          <span>➕</span>
+          Invite User
+        </button>
+      </div>
     {/if}
   </div>
 
@@ -400,6 +406,12 @@ let canManageUsers = false;
     margin: 0;
     color: var(--text-primary);
     line-height: 1.2;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
   }
 
   .subtitle {

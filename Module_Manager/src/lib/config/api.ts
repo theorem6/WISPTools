@@ -23,7 +23,8 @@ export const API_CONFIG = {
     USERS: '/api/users',
     WORK_ORDERS: '/api/work-orders',
     ADMIN: '/admin',
-    ISO: '/api/deploy' // ISO proxy uses deploy endpoint
+    ISO: '/api/deploy', // ISO proxy uses deploy endpoint
+    PERMISSIONS: '/api/permissions'
   },
   
   // Cloud Function endpoints (only used when direct access is needed)
