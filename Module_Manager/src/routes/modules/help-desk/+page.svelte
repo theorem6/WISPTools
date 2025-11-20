@@ -195,6 +195,9 @@
     </div>
     
     <div class="header-actions">
+      <button class="btn btn-secondary" on:click={() => goto('/modules/help-desk/reports')}>
+        📊 Reports
+      </button>
       <button class="btn btn-secondary" on:click={openCustomerLookup}>
         🔍 Customer Lookup
       </button>
@@ -382,9 +385,10 @@
   .header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 2rem;
     gap: 1.5rem;
+    flex-wrap: wrap;
   }
   
   .btn-back {
@@ -419,6 +423,8 @@
   .header-actions {
     display: flex;
     gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
   }
   
   .stats-grid {
