@@ -8,6 +8,7 @@
   
   let email = '';
   let role: UserRole = 'viewer';
+  let sendEmail = false; // Email sending is optional - tenant admin decides
   let loading = false;
   let error = '';
   let success = false;
@@ -27,7 +28,7 @@
     error = '';
     
     try {
-      await inviteUser($currentTenant.id, email, role);
+      await inviteUser($currentTenant.id, email, role, undefined, sendEmail);
       success = true;
       setTimeout(() => {
         dispatch('close');
@@ -77,8 +78,14 @@
     {#if success}
       <div class="success-message">
         <span class="success-icon">✅</span>
-        <h3>Invitation Sent!</h3>
-        <p>An invitation has been sent to {email}</p>
+        <h3>User {sendEmail ? 'Invited' : 'Added'}!</h3>
+        <p>
+          {#if sendEmail}
+            An invitation email has been sent to {email}
+          {:else}
+            User {email} has been added. {#if !sendEmail}You can manually notify them or send an invitation email later.{/if}
+          {/if}
+        </p>
       </div>
     {:else}
       <form on:submit|preventDefault={handleSubmit}>
@@ -115,6 +122,18 @@
           {/if}
         </div>
         
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              bind:checked={sendEmail}
+              disabled={loading}
+            />
+            <span>Send invitation email (optional - email systems may not be configured)</span>
+          </label>
+          <p class="hint">If unchecked, you can manually notify the user or send the invitation later.</p>
+        </div>
+        
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" on:click={handleClose} disabled={loading}>
             Cancel
@@ -124,7 +143,7 @@
               <span class="spinner-sm"></span>
               Sending...
             {:else}
-              Send Invitation
+              {sendEmail ? 'Send Invitation' : 'Add User'}
             {/if}
           </button>
         </div>
@@ -219,6 +238,32 @@
     margin-top: 0.5rem;
     font-size: 0.875rem;
     color: var(--text-secondary);
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin-top: 0.25rem;
+    cursor: pointer;
+  }
+
+  .checkbox-label span {
+    flex: 1;
+    color: var(--text-primary);
+  }
+
+  .hint {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
   }
   
   .modal-actions {

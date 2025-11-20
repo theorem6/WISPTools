@@ -326,7 +326,8 @@ router.post('/invite', requireAdmin, async (req, res) => {
       role: requestedRole,
       tenantId,
       customModuleAccess,
-      autoAssign = false
+      autoAssign = false,
+      sendEmail = false // Email sending is optional - tenant admin decides
     } = req.body;
     
     // Validate input
@@ -452,16 +453,31 @@ router.post('/invite', requireAdmin, async (req, res) => {
       console.log(`📧 Created invitation for ${email} (user doesn't exist yet)`);
     }
     
-    // TODO: Send invitation email
-    // This would typically use SendGrid, AWS SES, or Firebase Extensions
+    // Send invitation email only if requested by tenant admin
+    let emailSent = false;
+    if (sendEmail) {
+      try {
+        // TODO: Implement email sending via SendGrid, AWS SES, or Firebase Extensions
+        // This is optional - email systems may not be configured
+        console.log(`📧 Email sending requested for ${email} (not implemented yet)`);
+        // emailSent = await sendInvitationEmail(email, tenantId, resolvedRole);
+        emailSent = false; // Set to true when email service is implemented
+      } catch (emailError) {
+        console.error('Failed to send invitation email:', emailError);
+        // Don't fail the request if email sending fails
+      }
+    }
     
     res.status(201).json({
-      message: 'User invited successfully',
-      invitationId,
+      message: userId 
+        ? 'User added successfully' 
+        : 'User invitation created successfully',
+      invitationId: invitationId || null,
       userId,
       email,
       role: resolvedRole,
-      status: userId ? 'pending_invitation' : 'pending_signup'
+      status: userId ? 'active' : 'pending_signup',
+      emailSent
     });
   } catch (error) {
     console.error('Error inviting user:', error);

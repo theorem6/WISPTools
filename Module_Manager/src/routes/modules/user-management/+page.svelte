@@ -212,13 +212,17 @@ let canManageUsers = false;
     
     {#if canManageUsers}
       <div class="header-actions">
+        <button class="btn btn-secondary" on:click={() => goto('/modules/user-management/roles')}>
+          <span>👥</span>
+          Role Management
+        </button>
         <button class="btn btn-secondary" on:click={() => goto('/modules/user-management/permissions')}>
           <span>🔐</span>
-          FCAPS Permissions
+          User Permissions
         </button>
         <button class="btn btn-primary" on:click={openInviteModal}>
           <span>➕</span>
-          Invite User
+          Add User
         </button>
       </div>
     {/if}

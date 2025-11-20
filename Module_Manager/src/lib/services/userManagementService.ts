@@ -186,7 +186,8 @@ export async function inviteUser(
   tenantId: string,
   email: string,
   role: UserRole,
-  customModuleAccess?: ModuleAccess
+  customModuleAccess?: ModuleAccess,
+  sendEmail: boolean = false
 ): Promise<{ invitationId: string; userId: string | null; status: string }> {
   try {
     const headers = await getAuthHeaders(tenantId);
@@ -200,7 +201,8 @@ export async function inviteUser(
         email,
         role,
         tenantId,
-        customModuleAccess
+        customModuleAccess,
+        sendEmail
       })
     });
 
