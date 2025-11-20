@@ -3,10 +3,12 @@
   import { goto } from '$app/navigation';
   import { permissionService, type ModulePermission, type FCAPSCategory, type FCAPSOperation } from '$lib/services/permissionService';
   import { FCAPS_CATEGORIES, FCAPS_OPERATIONS } from '$lib/services/permissionService';
+  import { currentTenant } from '$lib/stores/tenantStore';
 
   let loading = false;
   let error = '';
   let success = '';
+  let tenantId: string | null = null;
   
   // Available modules/systems
   const MODULES = [
@@ -39,11 +41,34 @@
 
   const ROLES = ['admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'];
 
+  // Reactive statement to update tenantId when currentTenant changes
+  $: {
+    if ($currentTenant?.id) {
+      tenantId = $currentTenant.id;
+    }
+  }
+
   onMount(async () => {
-    await loadRolePermissions();
+    // Wait for tenant to be available
+    if (!$currentTenant) {
+      // Wait a bit for tenant to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    if ($currentTenant?.id) {
+      tenantId = $currentTenant.id;
+      await loadRolePermissions();
+    } else {
+      error = 'No tenant selected. Please select a tenant from the dashboard.';
+    }
   });
 
   async function loadRolePermissions() {
+    if (!tenantId) {
+      error = 'No tenant selected. Please select a tenant from the dashboard.';
+      return;
+    }
+    
     loading = true;
     error = '';
     

@@ -8,6 +8,8 @@
 
 import { getApiUrl } from '$lib/config/api';
 import { authService } from './authService';
+import { get } from 'svelte/store';
+import { currentTenant } from '$lib/stores/tenantStore';
 
 export interface FCAPSPermission {
   read: boolean;
@@ -83,9 +85,19 @@ class PermissionService {
   }
 
   private getTenantId(): string {
-    // Get from localStorage or store
+    // Get from tenant store (preferred method)
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('tenantId') || '';
+      try {
+        const tenant = get(currentTenant);
+        if (tenant?.id) {
+          return tenant.id;
+        }
+      } catch (error) {
+        console.warn('[permissionService] Could not get tenant from store:', error);
+      }
+      
+      // Fallback to localStorage
+      return localStorage.getItem('selectedTenantId') || localStorage.getItem('tenantId') || '';
     }
     return '';
   }
