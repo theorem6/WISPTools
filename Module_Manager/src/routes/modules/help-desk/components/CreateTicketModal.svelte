@@ -234,30 +234,35 @@
 
 <style>
   .modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.6) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 99999 !important;
     backdrop-filter: blur(4px);
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   .modal-content {
-    background: var(--card-bg, white);
+    background: white !important;
     border-radius: 0.75rem;
     padding: 0;
     max-width: 540px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    display: flex;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+    display: flex !important;
     flex-direction: column;
+    position: relative !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   .modal-header {
