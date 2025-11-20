@@ -9,6 +9,7 @@
     getTenantSubscription,
     getTenantInvoices,
     getTenantPaymentMethods,
+    updatePaymentMethod,
     createPayPalSubscription,
     cancelSubscription,
     type SubscriptionPlan,
@@ -25,6 +26,9 @@
   let error = '';
   let showUpgradeModal = false;
   let selectedPlan: SubscriptionPlan | null = null;
+  let showEditPaymentModal = false;
+  let selectedPaymentMethod: PaymentMethod | null = null;
+  let editingPaymentEmail = '';
 
   onMount(async () => {
     if (browser && $currentTenant) {
@@ -145,6 +149,40 @@
       return null;
     }
     return plans.find((plan) => plan.id === subscription.planId) ?? null;
+  }
+
+  function openEditPaymentMethod(method: PaymentMethod) {
+    selectedPaymentMethod = method;
+    editingPaymentEmail = method.paypalEmail;
+    showEditPaymentModal = true;
+  }
+
+  function closeEditPaymentModal() {
+    showEditPaymentModal = false;
+    selectedPaymentMethod = null;
+    editingPaymentEmail = '';
+  }
+
+  async function handleSavePaymentMethod() {
+    if (!$currentTenant || !selectedPaymentMethod) return;
+    
+    if (!editingPaymentEmail.trim()) {
+      error = 'Please enter a valid PayPal email address';
+      return;
+    }
+    
+    try {
+      await updatePaymentMethod(
+        $currentTenant.id,
+        selectedPaymentMethod.id,
+        editingPaymentEmail.trim()
+      );
+      await loadBillingData(); // Reload data
+      closeEditPaymentModal();
+    } catch (err: any) {
+      console.error('Error updating payment method:', err);
+      error = err.message || 'Failed to update payment method';
+    }
   }
 </script>
 
@@ -300,7 +338,7 @@
                     </div>
                   </div>
                   <div class="method-actions">
-                    <button class="edit-btn">Edit</button>
+                    <button class="edit-btn" on:click={() => openEditPaymentMethod(method)}>Edit</button>
                   </div>
                 </div>
               {/each}
@@ -346,6 +384,33 @@
         </div>
       {/if}
     </div>
+
+    <!-- Edit Payment Method Modal -->
+    {#if showEditPaymentModal && selectedPaymentMethod}
+      <div class="modal-overlay" on:click={closeEditPaymentModal}>
+        <div class="modal-content" on:click|stopPropagation>
+          <div class="modal-header">
+            <h3>Edit Payment Method</h3>
+            <button class="modal-close" on:click={closeEditPaymentModal}>✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>PayPal Email</label>
+              <input
+                type="email"
+                bind:value={editingPaymentEmail}
+                placeholder="paypal@example.com"
+                required
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" on:click={closeEditPaymentModal}>Cancel</button>
+            <button class="btn-primary" on:click={handleSavePaymentMethod}>Save</button>
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
 </TenantGuard>
 
@@ -854,6 +919,127 @@
     padding: 3rem;
     color: white;
     font-size: 1.125rem;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 0;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+  }
+
+  .modal-close:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group label {
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+  }
+
+  .form-group input {
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .btn-primary, .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #2563eb;
+  }
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
   }
 
   @media (max-width: 768px) {

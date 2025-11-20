@@ -344,7 +344,7 @@
 </div>
 
 {#if showCreateModal}
-  <CreateTicketModal on:close={closeCreateModal} />
+  <CreateTicketModal on:close={closeCreateModal} on:created={closeCreateModal} />
 {/if}
 
 {#if showDetailsModal && selectedTicket}
