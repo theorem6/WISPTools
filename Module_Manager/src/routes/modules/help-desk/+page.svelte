@@ -16,6 +16,7 @@
   let searchQuery = '';
   let statusFilter: WorkOrder['status'] | 'all' = 'all';
   let priorityFilter: WorkOrder['priority'] | 'all' = 'all';
+  let categoryFilter: 'customer-facing' | 'infrastructure' | 'all' = 'all';
   
   let showCreateModal = false;
   let showDetailsModal = false;
@@ -89,6 +90,11 @@
       
       // Priority filter
       if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) {
+        return false;
+      }
+      
+      // Category filter
+      if (categoryFilter !== 'all' && ticket.ticketCategory !== categoryFilter) {
         return false;
       }
       
@@ -269,6 +275,12 @@
       <option value="low">Low</option>
     </select>
     
+    <select bind:value={categoryFilter} on:change={() => applyFilters()} class="select">
+      <option value="all">All Categories</option>
+      <option value="customer-facing">Customer-Facing</option>
+      <option value="infrastructure">Infrastructure</option>
+    </select>
+    
     <div class="results-count">
       {filteredTickets.length} of {tickets.length} tickets
     </div>
@@ -283,9 +295,9 @@
     <div class="empty-state">
       <span class="empty-icon">🎧</span>
       <h3>No tickets found</h3>
-      {#if searchQuery || statusFilter !== 'all' || priorityFilter !== 'all'}
+      {#if searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all'}
         <p>Try adjusting your filters</p>
-        <button class="btn btn-secondary" on:click={() => { searchQuery = ''; statusFilter = 'all'; priorityFilter = 'all'; applyFilters(); }}>
+        <button class="btn btn-secondary" on:click={() => { searchQuery = ''; statusFilter = 'all'; priorityFilter = 'all'; categoryFilter = 'all'; applyFilters(); }}>
           Clear Filters
         </button>
       {:else}
@@ -300,7 +312,12 @@
       {#each filteredTickets as ticket (ticket._id)}
         <div class="ticket-card" on:click={() => openTicketDetails(ticket)}>
           <div class="ticket-header">
-            <div class="ticket-number">{ticket.ticketNumber || ticket._id}</div>
+            <div>
+              <div class="ticket-number">{ticket.ticketNumber || ticket._id}</div>
+              {#if ticket.ticketCategory}
+                <span class="ticket-category">{ticket.ticketCategory === 'customer-facing' ? 'Customer' : 'Infrastructure'}</span>
+              {/if}
+            </div>
             <div class="badges">
               <span class="badge {getPriorityBadgeClass(ticket.priority)}">
                 {ticket.priority}
@@ -529,6 +546,14 @@
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-secondary);
+  }
+  
+  .ticket-category {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 500;
+    margin-top: 0.25rem;
   }
   
   .badges {

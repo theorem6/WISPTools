@@ -24,7 +24,8 @@
   let title = '';
   let description = '';
   let priority: 'low' | 'medium' | 'high' | 'critical' = 'medium';
-  let type: 'troubleshoot' | 'repair' | 'installation' | 'other' = 'troubleshoot';
+  let type: 'troubleshoot' | 'repair' | 'installation' | 'maintenance' | 'upgrade' | 'removal' | 'inspection' | 'other' = 'troubleshoot';
+  let ticketCategory: 'customer-facing' | 'infrastructure' = 'customer-facing';
   let customerName = '';
   let customerPhone = '';
   let loading = false;
@@ -64,8 +65,9 @@
         description: description?.trim() || undefined,
         priority,
         type,
+        ticketCategory,
         status: 'open' as const,
-        customerReported: true,
+        customerReported: ticketCategory === 'customer-facing',
         customerContact: customerName ? {
           name: customerName.trim(),
           phone: customerPhone?.trim() || undefined
@@ -157,6 +159,14 @@
           />
         </div>
         
+        <div class="form-group">
+          <label for="ticketCategory">Ticket Category *</label>
+          <select id="ticketCategory" bind:value={ticketCategory} required>
+            <option value="customer-facing">Customer-Facing</option>
+            <option value="infrastructure">Infrastructure</option>
+          </select>
+        </div>
+        
         <div class="form-row">
           <div class="form-group">
             <label for="type">Type</label>
@@ -164,6 +174,10 @@
               <option value="troubleshoot">Troubleshoot</option>
               <option value="repair">Repair</option>
               <option value="installation">Installation</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="upgrade">Upgrade</option>
+              <option value="removal">Removal</option>
+              <option value="inspection">Inspection</option>
               <option value="other">Other</option>
             </select>
           </div>
@@ -179,6 +193,28 @@
           </div>
         </div>
         
+        {#if ticketCategory === 'customer-facing'}
+          <div class="form-group">
+            <label for="customer-name">Customer Name</label>
+            <input
+              id="customer-name"
+              type="text"
+              bind:value={customerName}
+              placeholder="Customer or contact name"
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="customer-phone">Customer Phone</label>
+            <input
+              id="customer-phone"
+              type="tel"
+              bind:value={customerPhone}
+              placeholder="Phone number"
+            />
+          </div>
+        {/if}
+        
         <div class="form-group">
           <label for="description">Description</label>
           <textarea
@@ -189,25 +225,6 @@
           ></textarea>
         </div>
         
-        <div class="form-group">
-          <label for="customer-name">Customer Name</label>
-          <input
-            id="customer-name"
-            type="text"
-            bind:value={customerName}
-            placeholder="Customer or contact name"
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="customer-phone">Customer Phone</label>
-          <input
-            id="customer-phone"
-            type="tel"
-            bind:value={customerPhone}
-            placeholder="Phone number"
-          />
-        </div>
       </section>
       
       <footer class="modal-footer">
@@ -250,7 +267,7 @@
   }
 
   .modal-content {
-    background: white !important;
+    background: var(--card-bg, #ffffff) !important;
     border-radius: 0.75rem;
     padding: 0;
     max-width: 540px;
@@ -263,6 +280,7 @@
     position: relative !important;
     visibility: visible !important;
     opacity: 1 !important;
+    border: 1px solid var(--border-color, #e5e7eb);
   }
 
   .modal-header {
@@ -341,12 +359,13 @@
   select,
   textarea {
     width: 100%;
-    padding: var(--spacing-sm);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--input-bg);
-    color: var(--text-primary);
+    padding: var(--spacing-sm, 0.5rem);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background: var(--input-bg, var(--color-background-secondary, #f9fafb));
+    color: var(--text-primary, #111827);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-size: 0.875rem;
   }
   
   input:focus,

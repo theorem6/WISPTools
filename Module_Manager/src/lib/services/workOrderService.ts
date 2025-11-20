@@ -19,6 +19,7 @@ export interface WorkOrder {
   tenantId: string;
   ticketNumber?: string;
   type: 'installation' | 'repair' | 'maintenance' | 'upgrade' | 'removal' | 'troubleshoot' | 'inspection' | 'other';
+  ticketCategory?: 'customer-facing' | 'infrastructure';
   issueCategory?: 'cpe-offline' | 'sector-down' | 'backhaul-failure' | 'network-outage' | 'poor-performance' | 'equipment-failure' | 'power-issue' | 'configuration-error' | 'other';
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: 'open' | 'assigned' | 'in-progress' | 'waiting-parts' | 'resolved' | 'closed' | 'cancelled';
@@ -152,6 +153,7 @@ export interface WorkOrderFilters {
   priority?: string;
   assignedTo?: string;
   type?: string;
+  ticketCategory?: string;
   siteId?: string;
 }
 
