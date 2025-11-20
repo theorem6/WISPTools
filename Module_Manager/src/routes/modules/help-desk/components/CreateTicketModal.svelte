@@ -296,6 +296,8 @@
     padding: 1.5rem;
     overflow-y: auto;
     flex: 1;
+    display: grid;
+    gap: var(--spacing-lg, 1.5rem);
   }
 
   .modal-eyebrow {
@@ -311,12 +313,6 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-  }
-
-  .modal-body {
-    display: grid;
-    gap: var(--spacing-lg, 1.5rem);
-    padding: 0;
   }
 
   .form-group {
