@@ -22,13 +22,14 @@ router.use(requireTenant);
 // Get all work orders with filters
 router.get('/', async (req, res) => {
   try {
-    const { status, priority, assignedTo, type, siteId } = req.query;
+    const { status, priority, assignedTo, type, ticketCategory, siteId } = req.query;
     const query = { tenantId: req.tenantId };
     
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (assignedTo) query.assignedTo = assignedTo;
     if (type) query.type = type;
+    if (ticketCategory) query.ticketCategory = ticketCategory;
     if (siteId) query['affectedSites.siteId'] = siteId;
     
     const workOrders = await WorkOrder.find(query)

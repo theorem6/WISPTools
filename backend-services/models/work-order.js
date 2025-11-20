@@ -28,6 +28,13 @@ const WorkOrderSchema = new mongoose.Schema({
     ]
   },
   
+  // Ticket Category (customer-facing vs infrastructure)
+  ticketCategory: {
+    type: String,
+    enum: ['customer-facing', 'infrastructure'],
+    default: 'customer-facing'
+  },
+  
   // Issue Category (for troubleshooting)
   issueCategory: {
     type: String,
