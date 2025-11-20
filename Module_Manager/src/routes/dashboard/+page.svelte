@@ -71,6 +71,16 @@
               status: 'active',
               path: '/modules/customers',
               features: ['Customer Database', 'Service Management', 'Billing Information', 'Installation History', 'Customer Support', 'Service Plans']
+            },
+            {
+              id: 'hardware',
+              name: '🔧 Hardware',
+              description: 'Comprehensive equipment and hardware management system',
+              icon: '🔧',
+              color: '#8b5cf6', // Purple
+              status: 'active',
+              path: '/modules/hardware',
+              features: ['Equipment Inventory', 'Asset Tracking', 'Hardware Management', 'Status Monitoring', 'Location Tracking', 'Maintenance Records']
             }
   ];
 
