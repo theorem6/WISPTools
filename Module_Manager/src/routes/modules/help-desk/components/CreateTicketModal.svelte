@@ -98,9 +98,14 @@
     }
   }
   
-  // Debug: Log button clicks
-  function handleButtonClick() {
+  // Debug: Log button clicks and manually trigger submission
+  function handleButtonClick(event: MouseEvent) {
     console.info('[CreateTicketModal] Submit button clicked');
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Manually call handleSubmit to ensure it runs
+    handleSubmit();
   }
 </script>
 
