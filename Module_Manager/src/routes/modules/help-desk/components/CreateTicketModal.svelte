@@ -114,7 +114,7 @@
   role="presentation"
   on:click={() => dispatch('close')}
 >
-  <article
+  <div
     class="modal-content"
     data-size="sm"
     role="dialog"
@@ -229,7 +229,7 @@
         </button>
       </footer>
     </form>
-  </article>
+  </div>
 </div>
 
 <style>

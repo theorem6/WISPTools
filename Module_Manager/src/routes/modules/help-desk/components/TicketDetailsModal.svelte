@@ -11,7 +11,7 @@
   role="presentation"
   on:click={() => dispatch('close')}
 >
-  <article
+  <div
     class="modal-content"
     data-size="sm"
     role="dialog"
@@ -39,7 +39,7 @@
       <p class="ticket-id">Ticket #{ticket.ticketNumber || ticket._id}</p>
       <p class="ticket-message">Full ticket details coming soon...</p>
     </section>
-  </article>
+  </div>
 </div>
 
 <style>
