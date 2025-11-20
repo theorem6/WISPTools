@@ -71,16 +71,6 @@
               status: 'active',
               path: '/modules/customers',
               features: ['Customer Database', 'Service Management', 'Billing Information', 'Installation History', 'Customer Support', 'Service Plans']
-            },
-            {
-              id: 'user-management',
-              name: '👤 User Management',
-              description: 'Manage company employees, workers, roles, and permissions',
-              icon: '👤',
-              color: 'var(--primary)', // Blue
-              status: 'active',
-              path: '/modules/user-management',
-              features: ['Employee Database', 'Role Management', 'Permission Control', 'User Invitations', 'Access Control', 'Hierarchical Permissions']
             }
   ];
 

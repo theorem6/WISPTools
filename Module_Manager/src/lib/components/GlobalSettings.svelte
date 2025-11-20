@@ -1,14 +1,16 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { authService } from '$lib/services/authService';
+  import { goto } from '$app/navigation';
   
   export let show = false;
   
   const dispatch = createEventDispatcher();
   
   import ImportSystem from './ImportSystem.svelte';
+  import UserManagementEmbedded from './UserManagementEmbedded.svelte';
   
-  let activeTab: 'appearance' | 'acs' | 'info' | 'import' = 'appearance';
+  let activeTab: 'appearance' | 'acs' | 'info' | 'import' | 'users' = 'appearance';
   let showImportSystem = false;
   let loading = false;
   let saveSuccess = false;
@@ -125,6 +127,11 @@
     saveError = '';
     dispatch('close');
   }
+
+  function handleExit() {
+    handleClose();
+    goto('/dashboard');
+  }
 </script>
 
 {#if show}
@@ -132,7 +139,12 @@
     <div class="settings-panel" on:click|stopPropagation>
       <div class="settings-header">
         <h2>⚙️ Settings</h2>
-        <button class="close-btn" on:click={handleClose}>✕</button>
+        <div class="header-actions">
+          <button class="exit-btn" on:click={handleExit} title="Exit to Modules">
+            ← Exit to Modules
+          </button>
+          <button class="close-btn" on:click={handleClose} title="Close">✕</button>
+        </div>
       </div>
       
       <div class="settings-tabs">
@@ -163,6 +175,13 @@
           on:click={() => { activeTab = 'import'; showImportSystem = true; }}
         >
           📥 Import Data
+        </button>
+        <button 
+          class="tab" 
+          class:active={activeTab === 'users'}
+          on:click={() => activeTab = 'users'}
+        >
+          👤 User Management
         </button>
       </div>
       
@@ -336,6 +355,10 @@
               📥 Open Import System
             </button>
           </div>
+        {:else if activeTab === 'users'}
+          <div class="tab-content full-height">
+            <UserManagementEmbedded />
+          </div>
         {/if}
         
         {#if saveSuccess}
@@ -369,21 +392,24 @@
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100vw;
+    height: 100vh;
     background: rgba(0, 0, 0, 0.5);
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
     z-index: 10000;
     backdrop-filter: blur(4px);
   }
   
   .settings-panel {
     background: var(--card-bg, white);
-    border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
+    border-radius: 0;
+    box-shadow: none;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -393,42 +419,74 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem;
+    padding: 1.5rem 2rem;
     border-bottom: 1px solid var(--border-color, #e0e0e0);
     background: var(--bg-secondary, #f8f9fa);
+    flex-shrink: 0;
   }
   
   .settings-header h2 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     color: var(--text-primary, #1a202c);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .exit-btn {
+    background: var(--primary, #3b82f6);
+    color: white;
+    border: none;
+    padding: 0.625rem 1.25rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+
+  .exit-btn:hover {
+    background: var(--primary-dark, #2563eb);
+    transform: translateY(-1px);
   }
   
   .close-btn {
-    background: none;
+    background: var(--bg-hover, #e2e8f0);
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
     color: var(--text-secondary, #718096);
-    padding: 0.25rem 0.5rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 6px;
     transition: all 0.2s;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .close-btn:hover {
     background: var(--bg-hover, #e2e8f0);
     color: var(--text-primary, #1a202c);
+    opacity: 0.8;
   }
   
   .settings-tabs {
     display: flex;
     border-bottom: 1px solid var(--border-color, #e0e0e0);
     background: var(--bg-secondary, #f8f9fa);
+    flex-shrink: 0;
+    overflow-x: auto;
   }
   
   .tab {
-    flex: 1;
-    padding: 1rem;
+    flex: 0 0 auto;
+    padding: 1rem 1.5rem;
     border: none;
     background: transparent;
     cursor: pointer;
@@ -436,6 +494,7 @@
     color: var(--text-secondary, #718096);
     border-bottom: 2px solid transparent;
     transition: all 0.2s;
+    white-space: nowrap;
   }
   
   .tab:hover {
@@ -450,10 +509,30 @@
   
   .settings-content {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+  }
+
+  .tab-content.full-height {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     padding: 2rem;
   }
   
+  .tab-content {
+    padding: 2rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .tab-content.full-height {
+    padding: 2rem;
+  }
+
   .tab-content h3 {
     margin: 0 0 0.5rem 0;
     font-size: 1.25rem;
