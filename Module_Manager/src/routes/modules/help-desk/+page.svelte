@@ -195,7 +195,11 @@
     </div>
     
     <div class="header-actions">
-      <button class="btn btn-secondary" on:click={() => goto('/modules/help-desk/reports')}>
+      <button 
+        class="btn btn-secondary btn-reports" 
+        on:click={() => goto('/modules/help-desk/reports')}
+        title="View Ticket Reports and Analytics"
+      >
         📊 Reports
       </button>
       <button class="btn btn-secondary" on:click={openCustomerLookup}>
@@ -389,6 +393,7 @@
     margin-bottom: 2rem;
     gap: 1.5rem;
     flex-wrap: wrap;
+    width: 100%;
   }
   
   .btn-back {
@@ -401,12 +406,18 @@
     color: var(--text-secondary);
     transition: all 0.2s;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   
   .btn-back:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
     border-color: var(--primary);
+  }
+  
+  .title-section {
+    flex: 1;
+    min-width: 0;
   }
   
   .title-section h1 {
@@ -421,10 +432,13 @@
   }
   
   .header-actions {
-    display: flex;
+    display: flex !important;
     gap: 1rem;
     flex-wrap: wrap;
     align-items: center;
+    flex-shrink: 0;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
   .stats-grid {
@@ -629,14 +643,45 @@
     align-items: center;
     gap: 0.5rem;
     transition: all 0.2s;
+    white-space: nowrap;
+    min-height: 2.75rem;
   }
   
-  .btn-primary { background: var(--primary); color: white; }
-  .btn-secondary { background: #6b7280; color: white; }
+  .btn-primary { 
+    background: var(--primary, #3b82f6); 
+    color: white; 
+  }
   
-  .btn:hover {
+  .btn-secondary { 
+    background: #6b7280 !important; 
+    color: white !important; 
+    border: 1px solid var(--border-color, #e5e7eb) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: inline-flex !important;
+  }
+  
+  .btn-reports {
+    background: #3b82f6 !important;
+    color: white !important;
+    border: 1px solid #2563eb !important;
+  }
+  
+  .btn-reports:hover {
+    background: #2563eb !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+  }
+  
+  .btn:hover:not(:disabled) {
     opacity: 0.9;
     transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   
   .alert {

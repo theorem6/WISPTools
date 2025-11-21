@@ -7,6 +7,9 @@
   import EmailSettings from './components/EmailSettings.svelte';
   import EPCMonitor from './components/EPCMonitor.svelte';
   import MMEConnections from './components/MMEConnections.svelte';
+  import SNMPConfigurationPanel from './components/SNMPConfigurationPanel.svelte';
+  import NetworkDeviceMap from './components/NetworkDeviceMap.svelte';
+  import NetworkTopologyMap from './components/NetworkTopologyMap.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
   
@@ -14,6 +17,10 @@
   const MONITORING_API = API_CONFIG.PATHS.MONITORING;
   
   let activeTab = 'overview';
+  let showSNMPConfig = false;
+  let networkDevices = [];
+  let snmpData = [];
+  let selectedDevice = null;
   let loading = true;
   
   // Tenant info - use currentTenant store
@@ -45,12 +52,18 @@
   onMount(async () => {
     if (tenantId) {
       await loadDashboard();
+      await loadNetworkDevices();
+      await loadSNMPData();
     }
     
     // Auto-refresh every 30 seconds
     refreshInterval = setInterval(() => {
       if (tenantId) {
         loadDashboard();
+        if (activeTab === 'device-map' || activeTab === 'topology') {
+          loadNetworkDevices();
+          loadSNMPData();
+        }
       }
     }, 30000);
   });
@@ -96,6 +109,94 @@
     } catch (error) {
       console.error('Error loading alert rules:', error);
     }
+  }
+
+  async function loadNetworkDevices() {
+    try {
+      // Load EPCs
+      const epcResponse = await fetch('/api/epc/list', {
+        headers: { 'x-tenant-id': tenantId }
+      });
+      
+      // Load Mikrotik devices
+      const mikrotikResponse = await fetch('/api/mikrotik/devices', {
+        headers: { 'x-tenant-id': tenantId }
+      });
+      
+      // Load SNMP devices
+      const snmpResponse = await fetch('/api/snmp/devices', {
+        headers: { 'x-tenant-id': tenantId }
+      });
+      
+      const devices = [];
+      
+      if (epcResponse.ok) {
+        const epcData = await epcResponse.json();
+        devices.push(...epcData.epcs.map(epc => ({
+          ...epc,
+          type: 'epc',
+          id: epc.epcId
+        })));
+      }
+      
+      if (mikrotikResponse.ok) {
+        const mikrotikData = await mikrotikResponse.json();
+        devices.push(...mikrotikData.devices.map(device => ({
+          ...device,
+          type: 'mikrotik'
+        })));
+      }
+      
+      if (snmpResponse.ok) {
+        const snmpDeviceData = await snmpResponse.json();
+        devices.push(...snmpDeviceData.devices.map(device => ({
+          ...device,
+          type: 'snmp'
+        })));
+      }
+      
+      networkDevices = devices;
+      console.log('[Monitoring] Loaded network devices:', devices.length);
+    } catch (error) {
+      console.error('[Monitoring] Failed to load network devices:', error);
+    }
+  }
+
+  async function loadSNMPData() {
+    try {
+      const response = await fetch('/api/snmp/metrics/latest', {
+        headers: { 'x-tenant-id': tenantId }
+      });
+      
+      if (response.ok) {
+        snmpData = await response.json();
+        console.log('[Monitoring] Loaded SNMP data:', snmpData.length);
+      }
+    } catch (error) {
+      console.error('[Monitoring] Failed to load SNMP data:', error);
+    }
+  }
+
+  function handleDeviceSelected(event) {
+    selectedDevice = event.detail;
+    console.log('[Monitoring] Device selected:', selectedDevice);
+  }
+
+  function handleViewDeviceDetails(event) {
+    const device = event.detail;
+    // Navigate to device details page or open modal
+    console.log('[Monitoring] View device details:', device);
+  }
+
+  function handleConfigureDevice(event) {
+    const device = event.detail;
+    // Open device configuration modal
+    console.log('[Monitoring] Configure device:', device);
+  }
+
+  function handleRefreshData() {
+    loadNetworkDevices();
+    loadSNMPData();
   }
   
   async function loadAuditLogs() {

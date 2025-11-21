@@ -332,6 +332,13 @@ $: if (showTicketDetails) {
         </button>
         <h1>🔧 Maintain Module</h1>
         <div class="header-actions">
+          <button 
+            class="btn btn-secondary btn-reports" 
+            on:click={() => goto('/modules/help-desk/reports')}
+            title="View Ticket Reports and Analytics"
+          >
+            📊 Reports
+          </button>
           {#if activeTab === 'tickets'}
             <button class="btn btn-primary" on:click={() => {
               console.info('[Maintain] Opening create ticket modal');
@@ -874,6 +881,28 @@ $: if (showTicketDetails) {
   
   .btn-primary:hover {
     opacity: 0.9;
+  }
+  
+  .btn-secondary {
+    background: #6b7280;
+    color: white;
+    border: 1px solid var(--border-color, #e5e7eb);
+  }
+  
+  .btn-secondary:hover {
+    background: #4b5563;
+  }
+  
+  .btn-reports {
+    background: #3b82f6 !important;
+    color: white !important;
+    border: 1px solid #2563eb !important;
+  }
+  
+  .btn-reports:hover {
+    background: #2563eb !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
   }
   
   .info-section {
