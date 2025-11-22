@@ -1711,8 +1711,9 @@ echo "🎉 Deployment successful!";
   .step-content {
     flex: 1;
     overflow-y: auto;
-    min-height: 500px;
-    padding: var(--spacing-md) 0;
+    overflow-x: hidden;
+    min-height: 550px;
+    padding: var(--spacing-lg) 0;
   }
   
   .step-content > * {
@@ -1721,6 +1722,12 @@ echo "🎉 Deployment successful!";
   
   .step-content > *:last-child {
     margin-bottom: 0;
+  }
+  
+  .form-group,
+  .form-field,
+  .input-group {
+    margin-bottom: var(--spacing-md);
   }
 
   .step-panel {
