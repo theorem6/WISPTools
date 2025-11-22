@@ -37,27 +37,56 @@
   
   // Convert devices to equipment format for the map
   function convertDevicesToEquipment() {
-    equipment = devices.map(device => ({
-      id: device.id,
-      name: device.name,
-      type: getEquipmentType(device),
-      status: device.status,
-      location: device.location,
-      ipAddress: device.ipAddress,
-      lastSeen: new Date().toISOString(),
-      metrics: device.metrics,
-      // Additional monitoring-specific fields
-      monitoringData: {
-        cpuUsage: device.metrics?.cpuUsage,
-        memoryUsage: device.metrics?.memoryUsage,
-        uptime: device.metrics?.uptime,
-        throughput: device.metrics?.throughput,
-        connectedClients: device.metrics?.connectedClients,
-        signalStrength: device.metrics?.signalStrength
-      }
-    }));
+    console.log('[MonitoringMap] Converting devices:', devices);
     
-    console.log('[MonitoringMap] Converted devices to equipment:', equipment.length);
+    equipment = devices.map(device => {
+      const equipmentItem = {
+        id: device.id,
+        name: device.name,
+        type: getEquipmentType(device),
+        status: device.status,
+        // Ensure location has the right structure
+        location: {
+          latitude: device.location?.coordinates?.latitude || device.location?.latitude || 0,
+          longitude: device.location?.coordinates?.longitude || device.location?.longitude || 0,
+          address: device.location?.address || 'Unknown Location'
+        },
+        ipAddress: device.ipAddress,
+        lastSeen: new Date().toISOString(),
+        metrics: device.metrics || {},
+        // Additional monitoring-specific fields
+        monitoringData: {
+          cpuUsage: device.metrics?.cpuUsage,
+          memoryUsage: device.metrics?.memoryUsage,
+          uptime: device.metrics?.uptime,
+          throughput: device.metrics?.throughput,
+          connectedClients: device.metrics?.connectedClients,
+          signalStrength: device.metrics?.signalStrength
+        }
+      };
+      
+      console.log('[MonitoringMap] Converted device:', device.name, 'to equipment:', equipmentItem);
+      return equipmentItem;
+    });
+    
+    // Also create some towers for devices that need them
+    towers = devices
+      .filter(device => device.type === 'epc' || (device.type === 'mikrotik' && device.deviceType === 'router'))
+      .map(device => ({
+        id: `tower-${device.id}`,
+        name: `${device.name} Site`,
+        type: 'tower',
+        status: device.status,
+        location: {
+          latitude: device.location?.coordinates?.latitude || device.location?.latitude || 0,
+          longitude: device.location?.coordinates?.longitude || device.location?.longitude || 0,
+          address: device.location?.address || 'Unknown Location'
+        },
+        height: 50,
+        equipment: [device.id]
+      }));
+    
+    console.log('[MonitoringMap] Converted devices to equipment:', equipment.length, 'towers:', towers.length);
   }
   
   function getEquipmentType(device) {
@@ -142,6 +171,9 @@
       marketingLeads={[]}
       planId={null}
       isPlanMode={false}
+      isDeployMode={false}
+      showFilterPanel={true}
+      showMainMenu={false}
       on:siteSelected={handleMapEvent}
       on:sectorSelected={handleMapEvent}
       on:cpeSelected={handleMapEvent}
