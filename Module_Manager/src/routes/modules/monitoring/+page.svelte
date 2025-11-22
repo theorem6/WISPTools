@@ -501,90 +501,34 @@
         </div>
       {:else}
         <div class="map-container">
-          <div class="map-content">
-            {#if mapView === 'geographic'}
-              <div class="map-wrapper">
-                <MonitoringMap 
-                  devices={networkDevices}
-                  height="calc(100vh - 280px)"
-                  on:deviceSelected={handleDeviceSelected}
-                  on:viewDeviceDetails={handleViewDeviceDetails}
-                  on:configureDevice={handleConfigureDevice}
-                />
-              </div>
-            {:else if mapView === 'topology'}
-              <div class="map-wrapper">
-                <NetworkTopologyMap 
-                  devices={networkDevices}
-                  {snmpData}
-                  height="calc(100vh - 280px)"
-                  on:nodeSelected={handleDeviceSelected}
-                  on:viewDeviceDetails={handleViewDeviceDetails}
-                  on:configureDevice={handleConfigureDevice}
-                  on:refreshData={handleRefreshData}
-                />
-              </div>
-            {/if}
-          </div>
-
-          <!-- Active Alerts Sidebar - Right Side -->
-          <div class="alerts-sidebar-right">
-            <div class="alerts-panel">
-              <div class="alerts-panel-header">
-                <h3>🚨 Active Alerts</h3>
-                <span class="alerts-count">{activeAlerts.length}</span>
-              </div>
-              
-              <div class="alerts-panel-actions">
-                <button class="btn btn-sm btn-secondary" on:click={() => loadDashboard()}>
-                  🔄 Refresh
-                </button>
-              </div>
-
-              <div class="alerts-list">
-                {#if activeAlerts.length > 0}
-                  {#each activeAlerts as alert, index}
-                    <div 
-                      class="alert-item clickable" 
-                      style="border-left-color: {getAlertSeverityColor(alert.severity)}"
-                      on:click={() => handleAlertClick(alert)}
-                      on:keydown={(e) => e.key === 'Enter' && handleAlertClick(alert)}
-                      tabindex="0"
-                      role="button"
-                    >
-                      <div class="alert-content">
-                        <div class="alert-header">
-                          <div class="alert-severity {alert.severity?.toLowerCase()}">{alert.severity}</div>
-                          <div class="alert-time">{new Date(alert.timestamp).toLocaleTimeString()}</div>
-                        </div>
-                        <div class="alert-message">{alert.message}</div>
-                        <div class="alert-actions">
-                          <button 
-                            class="alert-action-btn details"
-                            on:click|stopPropagation={() => showAlertDetails(alert)}
-                          >
-                            📋 Details
-                          </button>
-                          <button 
-                            class="alert-action-btn ticket"
-                            on:click|stopPropagation={() => createTicketFromAlert(alert)}
-                          >
-                            🎫 Create Ticket
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  {/each}
-                {:else}
-                  <div class="no-alerts">
-                    <div class="no-alerts-icon">✅</div>
-                    <div class="no-alerts-text">No active alerts</div>
-                    <div class="no-alerts-subtext">All systems operating normally</div>
-                  </div>
-                {/if}
-              </div>
+          {#if mapView === 'geographic'}
+            <div class="map-wrapper">
+              <MonitoringMap 
+                devices={networkDevices}
+                alerts={activeAlerts}
+                height="calc(100vh - 280px)"
+                on:deviceSelected={handleDeviceSelected}
+                on:viewDeviceDetails={handleViewDeviceDetails}
+                on:configureDevice={handleConfigureDevice}
+                on:alertClick={handleAlertClick}
+                on:showAlertDetails={showAlertDetails}
+                on:createTicketFromAlert={createTicketFromAlert}
+                on:refreshData={loadDashboard}
+              />
             </div>
-          </div>
+          {:else if mapView === 'topology'}
+            <div class="map-wrapper">
+              <NetworkTopologyMap 
+                devices={networkDevices}
+                {snmpData}
+                height="calc(100vh - 280px)"
+                on:nodeSelected={handleDeviceSelected}
+                on:viewDeviceDetails={handleViewDeviceDetails}
+                on:configureDevice={handleConfigureDevice}
+                on:refreshData={handleRefreshData}
+              />
+            </div>
+          {/if}
         </div>
       {/if}
 
@@ -840,13 +784,6 @@
     flex: 1;
     position: relative;
     overflow: hidden;
-    display: flex;
-  }
-
-  .map-content {
-    flex: 1;
-    position: relative;
-    margin-right: 350px; /* Account for alerts sidebar */
   }
 
   .map-wrapper {
@@ -908,66 +845,7 @@
     100% { transform: rotate(360deg); }
   }
 
-  .alerts-sidebar-right {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 350px;
-    height: 100%;
-    background: var(--card-bg, white);
-    border-left: 1px solid var(--border-color, #e5e7eb);
-    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-  }
 
-  .alerts-panel {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: var(--card-bg, white);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .alerts-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: var(--bg-secondary, #f9fafb);
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    flex-shrink: 0;
-  }
-
-  .alerts-panel-header h3 {
-    margin: 0;
-    font-size: 1rem;
-    color: var(--text-primary, #111827);
-    font-weight: 600;
-  }
-
-  .alerts-count {
-    background: #ef4444;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .alerts-panel-actions {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    flex-shrink: 0;
-  }
-
-  .alerts-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
-  }
 
   .alert-item {
     padding: 1rem;
@@ -1075,40 +953,6 @@
     text-align: center;
   }
 
-  .no-alerts-icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .no-alerts-text {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary, #111827);
-    margin-bottom: 0.25rem;
-  }
-
-  .no-alerts-subtext {
-    font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
-  }
-
-
-  .no-alerts-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-  }
-
-  .no-alerts-text {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary, #111827);
-    margin-bottom: 0.5rem;
-  }
-
-  .no-alerts-subtext {
-    font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
-  }
 
   .btn {
     padding: 0.75rem 1.5rem;
@@ -1304,16 +1148,6 @@
       grid-template-columns: 1fr;
     }
 
-    .alerts-sidebar {
-      position: fixed;
-      top: 0;
-      right: -350px;
-      transition: right 0.3s ease;
-    }
-
-    .alerts-sidebar.mobile-open {
-      right: 0;
-    }
 
     .modal-content {
       width: 95%;
