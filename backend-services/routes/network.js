@@ -275,10 +275,27 @@ router.get('/cpe', async (req, res) => {
     if (technology) query.technology = technology;
     if (siteId) query.siteId = siteId;
     
-    const cpe = await UnifiedCPE.find(query)
-      .populate('siteId', 'name type location')
-      .sort({ name: 1 })
-      .lean();
+    // Populate siteId if it exists and is a valid ObjectId, otherwise handle gracefully
+    let cpe;
+    try {
+      cpe = await UnifiedCPE.find(query)
+        .populate({
+          path: 'siteId',
+          select: 'name type location',
+          match: { tenantId: req.tenantId } // Only populate if site belongs to same tenant
+        })
+        .sort({ name: 1 })
+        .lean();
+      
+      // Filter out CPE where populate returned null (site not found or doesn't belong to tenant)
+      cpe = cpe.filter(item => !item.siteId || (item.siteId && item.siteId !== null && item.siteId !== undefined));
+    } catch (populateError) {
+      console.warn('[Network API] Populate failed for CPE, fetching without populate:', populateError.message);
+      // Fallback: fetch without populate if populate fails
+      cpe = await UnifiedCPE.find(query)
+        .sort({ name: 1 })
+        .lean();
+    }
     
     res.json(cpe);
   } catch (error) {
@@ -366,10 +383,27 @@ router.get('/equipment', async (req, res) => {
     if (status) query.status = status;
     if (type) query.type = type;
     
-    const equipment = await NetworkEquipment.find(query)
-      .populate('siteId', 'name type')
-      .sort({ name: 1 })
-      .lean();
+    // Populate siteId if it exists and is a valid ObjectId, otherwise handle gracefully
+    let equipment;
+    try {
+      equipment = await NetworkEquipment.find(query)
+        .populate({
+          path: 'siteId',
+          select: 'name type',
+          match: { tenantId: req.tenantId } // Only populate if site belongs to same tenant
+        })
+        .sort({ name: 1 })
+        .lean();
+      
+      // Filter out equipment where populate returned null (site not found or doesn't belong to tenant)
+      equipment = equipment.filter(item => !item.siteId || (item.siteId && item.siteId !== null && item.siteId !== undefined));
+    } catch (populateError) {
+      console.warn('[Network API] Populate failed for equipment, fetching without populate:', populateError.message);
+      // Fallback: fetch without populate if populate fails
+      equipment = await NetworkEquipment.find(query)
+        .sort({ name: 1 })
+        .lean();
+    }
     
     res.json(equipment);
   } catch (error) {
