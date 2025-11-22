@@ -145,13 +145,16 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     try {
       const tenantId = $currentTenant?.id;
       if (tenantId) {
-        // Get plans that are ready for approval OR approved (for deployment)
+        // Get ALL plans - we'll show draft, ready, approved, and authorized plans
         const allPlans = await planService.getPlans(tenantId);
+        
+        // Show all plans that can be finalized, approved, or deployed
         readyPlans = allPlans.filter(plan => 
-          plan.status === 'ready' || plan.status === 'approved' || plan.status === 'authorized'
+          plan.status === 'draft' || plan.status === 'active' || plan.status === 'ready' || 
+          plan.status === 'approved' || plan.status === 'authorized'
         );
         
-        // Separate approved plans for filtering
+        // Separate approved plans for filtering (only for map display)
         approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
         
         // Initialize visible plan IDs from plans with showOnMap = true
@@ -269,6 +272,31 @@ import { isPlatformAdmin } from '$lib/services/adminService';
       selectedPlan = readyPlans.find(p => p.status === 'ready' || p.status === 'approved' || p.status === 'authorized') || null;
       const nextPlanId = [...visiblePlanIds][0] || null;
       await focusPlanOnMap(nextPlanId);
+    }
+  }
+
+  async function handleFinalizePlan(plan: PlanProject) {
+    try {
+      isLoadingPlans = true;
+      await planService.markPlanReady(plan.id);
+      await loadReadyPlans();
+      
+      // Update selected plan if it was the one finalized
+      if (selectedPlan && selectedPlan.id === plan.id) {
+        const updatedPlan = readyPlans.find(p => p.id === plan.id);
+        if (updatedPlan) {
+          selectedPlan = updatedPlan;
+        }
+      }
+      
+      deploymentMessage = `Plan "${plan.name}" has been finalized and is ready for approval.`;
+      setTimeout(() => (deploymentMessage = ''), 5000);
+    } catch (err: any) {
+      error = err.message || 'Failed to finalize plan';
+      console.error('Error finalizing plan:', err);
+      setTimeout(() => (error = ''), 5000);
+    } finally {
+      isLoadingPlans = false;
     }
   }
 
@@ -474,7 +502,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     <div class="modal-overlay" on:click={closePlanApprovalModal}>
       <div class="plan-list-modal" on:click|stopPropagation>
         <div class="modal-header">
-          <h2>📋 Select Plan to Approve/Reject</h2>
+          <h2>📋 Plans - Finalize, Approve, or Reject</h2>
           <button class="close-btn" on:click={closePlanApprovalModal}>✕</button>
         </div>
         
@@ -483,23 +511,49 @@ import { isPlatformAdmin } from '$lib/services/adminService';
             <div class="loading">Loading plans...</div>
           {:else if readyPlans.length === 0}
             <div class="empty-state">
-              <p>No plans ready for approval</p>
+              <p>No plans available</p>
+              <p class="hint">Create plans in the Plan module to see them here</p>
             </div>
           {:else}
             <div class="plan-list">
               {#each readyPlans as plan}
-                <div class="plan-item" on:click={() => selectPlanForApproval(plan)}>
-                  <div class="plan-header">
-                    <h3>{plan.name}</h3>
-                    <span class="status-badge {plan.status}">{plan.status}</span>
+                <div class="plan-item">
+                  <div class="plan-content" on:click={() => {
+                    if (plan.status !== 'draft' && plan.status !== 'active') {
+                      selectPlanForApproval(plan);
+                    }
+                  }}>
+                    <div class="plan-header">
+                      <h3>{plan.name}</h3>
+                      <span class="status-badge {plan.status}">{plan.status}</span>
+                    </div>
+                    {#if plan.description}
+                      <p class="plan-description">{plan.description}</p>
+                    {/if}
+                    <div class="plan-meta">
+                      <span>Scope: {plan.scope.towers.length} towers, {plan.scope.sectors.length} sectors</span>
+                      {#if plan.purchasePlan?.totalEstimatedCost}
+                        <span>Cost: ${plan.purchasePlan.totalEstimatedCost.toLocaleString()}</span>
+                      {/if}
+                    </div>
                   </div>
-                  {#if plan.description}
-                    <p class="plan-description">{plan.description}</p>
-                  {/if}
-                  <div class="plan-meta">
-                    <span>Scope: {plan.scope.towers.length} towers, {plan.scope.sectors.length} sectors</span>
-                    {#if plan.purchasePlan?.totalEstimatedCost}
-                      <span>Cost: ${plan.purchasePlan.totalEstimatedCost.toLocaleString()}</span>
+                  <div class="plan-actions">
+                    {#if plan.status === 'draft' || plan.status === 'active'}
+                      <button 
+                        class="btn-finalize" 
+                        on:click={() => handleFinalizePlan(plan)}
+                        title="Finalize this plan to make it ready for approval"
+                      >
+                        ✅ Finalize
+                      </button>
+                    {:else if plan.status === 'ready' || plan.status === 'approved'}
+                      <button 
+                        class="btn-action" 
+                        on:click={() => selectPlanForApproval(plan)}
+                        title="Approve or reject this plan"
+                      >
+                        📋 Review
+                      </button>
                     {/if}
                   </div>
                 </div>
@@ -509,7 +563,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closePlanApprovalModal}>Cancel</button>
+          <button class="btn-secondary" on:click={closePlanApprovalModal}>Close</button>
         </div>
       </div>
     </div>
@@ -788,13 +842,64 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-md);
     padding: 1rem;
-    cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
   }
   
   .plan-item:hover {
     background: var(--bg-hover);
     border-color: var(--brand-primary);
+    transform: translateY(-1px);
+  }
+  
+  .plan-content {
+    flex: 1;
+    cursor: pointer;
+    min-width: 0;
+  }
+  
+  .plan-content:not(.disabled):hover {
+    cursor: pointer;
+  }
+  
+  .plan-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  
+  .btn-finalize,
+  .btn-action {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  
+  .btn-finalize {
+    background: var(--success);
+    color: white;
+  }
+  
+  .btn-finalize:hover {
+    background: var(--success-hover);
+    transform: translateY(-1px);
+  }
+  
+  .btn-action {
+    background: var(--brand-primary);
+    color: white;
+  }
+  
+  .btn-action:hover {
+    background: var(--brand-primary-hover);
     transform: translateY(-1px);
   }
   
@@ -830,6 +935,16 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
+  }
+  
+  .status-badge.draft {
+    background: rgba(148, 163, 184, 0.1);
+    color: #64748b;
+  }
+  
+  .status-badge.active {
+    background: rgba(234, 179, 8, 0.1);
+    color: #ca8a04;
   }
   
   .status-badge.ready {
