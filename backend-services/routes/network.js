@@ -161,7 +161,9 @@ router.get('/sectors', async (req, res) => {
     
     res.json(sectors);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch sectors' });
+    console.error('[Network API] Error fetching sectors:', error);
+    console.error('[Network API] Stack:', error.stack);
+    res.status(500).json({ error: 'Failed to fetch sectors', message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
   }
 });
 
@@ -263,7 +265,9 @@ router.get('/cpe', async (req, res) => {
     
     res.json(cpe);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch CPE' });
+    console.error('[Network API] Error fetching CPE:', error);
+    console.error('[Network API] Stack:', error.stack);
+    res.status(500).json({ error: 'Failed to fetch CPE', message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
   }
 });
 
@@ -352,7 +356,9 @@ router.get('/equipment', async (req, res) => {
     
     res.json(equipment);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch equipment' });
+    console.error('[Network API] Error fetching equipment:', error);
+    console.error('[Network API] Stack:', error.stack);
+    res.status(500).json({ error: 'Failed to fetch equipment', message: error.message, stack: process.env.NODE_ENV === 'development' ? error.stack : undefined });
   }
 });
 

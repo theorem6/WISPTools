@@ -38,9 +38,14 @@ const HSS_PORT = appConfig.externalServices.hss.port;
  */
 router.post('/generate-epc-iso', async (req, res) => {
   try {
-    const { siteName, location, networkConfig, contact, hssConfig } = req.body;
+    const { siteName, location, networkConfig, contact, hssConfig, deploymentType, snmpConfig, aptConfig } = req.body;
     
     console.log('[ISO Generator] Creating ISO for site:', siteName);
+    console.log('[ISO Generator] Deployment type:', deploymentType);
+    
+    if (!siteName) {
+      return res.status(400).json({ error: 'siteName is required' });
+    }
     
     // Generate unique EPC ID
     const epc_id = `epc_${crypto.randomBytes(16).toString('hex')}`;
@@ -351,7 +356,13 @@ fi
     
   } catch (error) {
     console.error('[ISO Generator] Error:', error);
-    res.status(500).json({ error: 'Failed to generate ISO', details: error.message });
+    console.error('[ISO Generator] Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to generate ISO', 
+      message: error.message,
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -547,7 +558,13 @@ echo "[Build] Complete!"
     
   } catch (error) {
     console.error('[ISO Generator] Error:', error);
-    res.status(500).json({ error: 'Failed to generate ISO', details: error.message });
+    console.error('[ISO Generator] Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to generate ISO', 
+      message: error.message,
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
