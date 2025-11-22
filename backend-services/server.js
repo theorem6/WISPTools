@@ -13,8 +13,19 @@ app.use(cors({
   credentials: appConfig.cors.credentials
 }));
 
-app.use(express.json({ limit: appConfig.limits.jsonBodySize }));
+// Body parser with error handling
+app.use(express.json({ limit: appConfig.limits.jsonBodySize, strict: false }));
 app.use(express.urlencoded({ extended: true, limit: appConfig.limits.urlEncodedBodySize }));
+
+// Log body parser errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('[Body Parser Error]', err.message);
+    console.error('[Body Parser Error] Request:', req.method, req.path);
+    return res.status(400).json({ error: 'Invalid JSON in request body', details: err.message });
+  }
+  next(err);
+});
 
 // Request logging middleware - log ALL requests
 app.use((req, res, next) => {
