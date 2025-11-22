@@ -395,4 +395,91 @@ router.get('/discovery', async (req, res) => {
   }
 });
 
+// POST /api/mikrotik/discover - Receive Mikrotik device discovery from SNMP agent
+router.post('/discover', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+
+    const { epcId, device, authCode } = req.body;
+    
+    if (!epcId || !device || !device.ip) {
+      return res.status(400).json({ error: 'epcId, device, and device.ip are required' });
+    }
+
+    console.log(`🔍 [Mikrotik API] Device discovery from EPC ${epcId}: ${device.ip}`);
+
+    // Find or create NetworkEquipment record for this Mikrotik device
+    const existingDevice = await NetworkEquipment.findOne({
+      tenantId: tenantId,
+      $or: [
+        { serialNumber: device.systemInfo?.serialNumber },
+        { 'notes.management_ip': device.ip }
+      ]
+    });
+
+    const deviceData = {
+      tenantId: tenantId,
+      name: device.name || `Mikrotik-${device.ip}`,
+      type: 'router',
+      manufacturer: 'Mikrotik',
+      model: device.systemInfo?.model || 'Unknown',
+      serialNumber: device.systemInfo?.serialNumber || device.ip,
+      status: 'active',
+      location: {
+        latitude: 0,
+        longitude: 0
+      },
+      notes: JSON.stringify({
+        management_ip: device.ip,
+        mikrotik_api: {
+          enabled: true,
+          port: 8728,
+          username: 'admin'
+        },
+        identity: device.identity,
+        systemInfo: device.systemInfo,
+        discoveredAt: device.discoveredAt,
+        discoveredBy: epcId,
+        discoverySource: 'snmp_agent'
+      }),
+      createdAt: existingDevice ? existingDevice.createdAt : new Date(),
+      updatedAt: new Date()
+    };
+
+    if (existingDevice) {
+      // Update existing device
+      await NetworkEquipment.findByIdAndUpdate(existingDevice._id, deviceData);
+      console.log(`✅ [Mikrotik API] Updated existing Mikrotik device: ${device.ip}`);
+      
+      return res.json({
+        success: true,
+        message: 'Device updated',
+        deviceId: existingDevice._id.toString(),
+        action: 'updated'
+      });
+    } else {
+      // Create new device
+      const newDevice = new NetworkEquipment(deviceData);
+      await newDevice.save();
+      console.log(`✅ [Mikrotik API] Registered new Mikrotik device: ${device.ip}`);
+      
+      return res.json({
+        success: true,
+        message: 'Device registered',
+        deviceId: newDevice._id.toString(),
+        action: 'created'
+      });
+    }
+  } catch (error) {
+    console.error('❌ [Mikrotik API] Error during device discovery:', error);
+    res.status(500).json({ 
+      error: 'Failed to process device discovery',
+      message: error.message 
+    });
+  }
+});
+
 module.exports = router;
