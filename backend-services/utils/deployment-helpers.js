@@ -329,6 +329,426 @@ EOF
 
 print_success "FreeDiameter configured to connect to Cloud HSS at \$HSS_ADDR:\$HSS_PORT"
 
+print_header "Installing SNMP Monitoring Agent"
+print_status "Installing Node.js and SNMP dependencies..."
+
+# Install Node.js if not already installed (check if already done earlier)
+if ! command -v node &> /dev/null; then
+    print_status "Installing Node.js..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt-get install -y nodejs
+    print_success "Node.js \$(node --version) installed"
+else
+    print_success "Node.js \$(node --version) already installed"
+fi
+
+# Install SNMP tools and libraries
+print_status "Installing SNMP tools..."
+apt-get install -y snmp snmp-mibs-downloader libsnmp-dev
+
+# Create SNMP agent directory
+print_status "Setting up SNMP monitoring agent..."
+mkdir -p /opt/epc-snmp-agent
+cd /opt/epc-snmp-agent
+
+# Initialize npm project and install dependencies
+print_status "Installing Node.js dependencies..."
+npm init -y > /dev/null 2>&1
+npm install net-snmp
+
+# Create SNMP agent script
+print_status "Creating SNMP agent script..."
+cat > epc-snmp-agent.js << 'SNMPAGENTEOF'
+const snmp = require('net-snmp');
+const os = require('os');
+const fs = require('fs').promises;
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const https = require('https');
+const http = require('http');
+
+const execAsync = promisify(exec);
+
+class EPCSNMPAgent {
+  constructor(config = {}) {
+    this.config = {
+      epcId: config.epcId || process.env.EPC_ID,
+      tenantId: config.tenantId || process.env.TENANT_ID,
+      authCode: config.authCode || process.env.EPC_AUTH_CODE,
+      cloudApiUrl: config.cloudApiUrl || process.env.GCE_SERVER ? \`http://\${process.env.GCE_SERVER}:\${process.env.HSS_PORT || 3001}\` : 'http://136.112.111.167:3001',
+      apiKey: config.apiKey || process.env.EPC_API_KEY,
+      snmpPort: config.snmpPort || 161,
+      snmpCommunity: config.snmpCommunity || 'public',
+      reportingInterval: config.reportingInterval || 60000,
+      enableSNMPAgent: config.enableSNMPAgent !== false,
+      enableCloudReporting: config.enableCloudReporting !== false,
+      healthCheckInterval: config.healthCheckInterval || 30000
+    };
+    this.agent = null;
+    this.reportingTimer = null;
+    this.healthCheckTimer = null;
+    this.isRunning = false;
+  }
+
+  async initialize() {
+    try {
+      console.log('[EPC SNMP Agent] Initializing...');
+      if (!this.config.epcId || !this.config.tenantId) {
+        throw new Error('EPC ID and Tenant ID are required');
+      }
+      if (this.config.enableSNMPAgent) {
+        await this.startSNMPAgent();
+      }
+      if (this.config.enableCloudReporting) {
+        await this.startCloudReporting();
+      }
+      await this.startHealthMonitoring();
+      this.isRunning = true;
+      console.log('[EPC SNMP Agent] Initialized successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Initialization failed:', error);
+      throw error;
+    }
+  }
+
+  async startSNMPAgent() {
+    try {
+      this.agent = snmp.createAgent({
+        port: this.config.snmpPort,
+        disableAuthorization: false
+      });
+      const mib = this.agent.getMib();
+      const epcSystemOID = '1.3.6.1.4.1.99999.1.1';
+      
+      mib.registerProvider({
+        name: 'epcSystem',
+        type: snmp.MibProviderType.Scalar,
+        oid: \`\${epcSystemOID}.1.0\`,
+        scalarType: snmp.ObjectType.OctetString,
+        handler: (mibRequest) => {
+          mibRequest.done(snmp.ErrorStatus.NoError, this.config.epcId);
+        }
+      });
+
+      mib.registerProvider({
+        name: 'epcUptime',
+        type: snmp.MibProviderType.Scalar,
+        oid: \`\${epcSystemOID}.3.0\`,
+        scalarType: snmp.ObjectType.TimeTicks,
+        handler: async (mibRequest) => {
+          const uptime = Math.floor(os.uptime());
+          mibRequest.done(snmp.ErrorStatus.NoError, uptime);
+        }
+      });
+
+      console.log(\`[EPC SNMP Agent] SNMP agent started on port \${this.config.snmpPort}\`);
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Failed to start SNMP agent:', error);
+      throw error;
+    }
+  }
+
+  async startCloudReporting() {
+    await this.reportToCloud();
+    this.reportingTimer = setInterval(async () => {
+      try {
+        await this.reportToCloud();
+      } catch (error) {
+        console.error('[EPC SNMP Agent] Cloud reporting failed:', error);
+      }
+    }, this.config.reportingInterval);
+    console.log(\`[EPC SNMP Agent] Cloud reporting started (interval: \${this.config.reportingInterval}ms)\`);
+  }
+
+  async startHealthMonitoring() {
+    this.healthCheckTimer = setInterval(async () => {
+      try {
+        await this.performHealthCheck();
+      } catch (error) {
+        console.error('[EPC SNMP Agent] Health check failed:', error);
+      }
+    }, this.config.healthCheckInterval);
+    console.log(\`[EPC SNMP Agent] Health monitoring started (interval: \${this.config.healthCheckInterval}ms)\`);
+  }
+
+  async collectMetrics() {
+    try {
+      const metrics = {
+        timestamp: new Date().toISOString(),
+        epcId: this.config.epcId,
+        tenantId: this.config.tenantId,
+        system: {
+          uptime: os.uptime(),
+          hostname: os.hostname(),
+          platform: os.platform(),
+          arch: os.arch(),
+          release: os.release()
+        },
+        resources: {
+          cpuUsage: await this.getCPUUsage(),
+          memoryUsage: await this.getMemoryUsage(),
+          diskUsage: await this.getDiskUsage(),
+          loadAverage: os.loadavg(),
+          freeMemory: os.freemem(),
+          totalMemory: os.totalmem()
+        },
+        network: {
+          interfaces: os.networkInterfaces()
+        },
+        epc: {
+          serviceStatus: await this.getServiceStatus()
+        }
+      };
+      return metrics;
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Failed to collect metrics:', error);
+      throw error;
+    }
+  }
+
+  async reportToCloud() {
+    try {
+      const metrics = await this.collectMetrics();
+      const payload = {
+        epcId: this.config.epcId,
+        tenantId: this.config.tenantId,
+        authCode: this.config.authCode,
+        metrics: metrics,
+        timestamp: new Date().toISOString()
+      };
+      await this.sendToCloudAPI('/api/epc/metrics', payload);
+      console.log('[EPC SNMP Agent] Metrics reported to cloud successfully');
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Failed to report to cloud:', error);
+    }
+  }
+
+  async performHealthCheck() {
+    try {
+      const health = {
+        timestamp: new Date().toISOString(),
+        epcId: this.config.epcId,
+        tenantId: this.config.tenantId,
+        cpuHealth: await this.checkCPUHealth(),
+        memoryHealth: await this.checkMemoryHealth(),
+        diskHealth: await this.checkDiskHealth(),
+        overallStatus: 'healthy'
+      };
+      if (health.cpuHealth.status === 'critical' || health.memoryHealth.status === 'critical' || health.diskHealth.status === 'critical') {
+        health.overallStatus = 'critical';
+      } else if (health.cpuHealth.status === 'warning' || health.memoryHealth.status === 'warning' || health.diskHealth.status === 'warning') {
+        health.overallStatus = 'warning';
+      }
+      if (health.overallStatus !== 'healthy') {
+        await this.sendHealthAlert(health);
+      }
+      return health;
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Health check failed:', error);
+      return { overallStatus: 'error', error: error.message };
+    }
+  }
+
+  async getCPUUsage() {
+    try {
+      const { stdout } = await execAsync("top -bn1 | grep 'Cpu(s)' | awk '{print \$2}' | sed 's/%us,//'");
+      return parseFloat(stdout.trim()) || 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  async getMemoryUsage() {
+    const total = os.totalmem();
+    const free = os.freemem();
+    return ((total - free) / total) * 100;
+  }
+
+  async getDiskUsage() {
+    try {
+      const { stdout } = await execAsync("df -h / | awk 'NR==2 {print \$5}' | sed 's/%//'");
+      return parseFloat(stdout.trim()) || 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  async getServiceStatus() {
+    try {
+      const services = ['open5gs-mmed', 'open5gs-sgwcd', 'open5gs-sgwud', 'open5gs-smfd', 'open5gs-upfd', 'open5gs-pcrfd'];
+      const status = {};
+      for (const service of services) {
+        try {
+          const { stdout } = await execAsync(\`systemctl is-active \${service}\`);
+          status[service] = stdout.trim() === 'active';
+        } catch (error) {
+          status[service] = false;
+        }
+      }
+      return status;
+    } catch (error) {
+      return {};
+    }
+  }
+
+  async checkCPUHealth() {
+    const cpuUsage = await this.getCPUUsage();
+    return {
+      metric: 'cpu',
+      value: cpuUsage,
+      status: cpuUsage > 90 ? 'critical' : cpuUsage > 70 ? 'warning' : 'healthy',
+      threshold: { warning: 70, critical: 90 }
+    };
+  }
+
+  async checkMemoryHealth() {
+    const memUsage = await this.getMemoryUsage();
+    return {
+      metric: 'memory',
+      value: memUsage,
+      status: memUsage > 95 ? 'critical' : memUsage > 80 ? 'warning' : 'healthy',
+      threshold: { warning: 80, critical: 95 }
+    };
+  }
+
+  async checkDiskHealth() {
+    const diskUsage = await this.getDiskUsage();
+    return {
+      metric: 'disk',
+      value: diskUsage,
+      status: diskUsage > 95 ? 'critical' : diskUsage > 85 ? 'warning' : 'healthy',
+      threshold: { warning: 85, critical: 95 }
+    };
+  }
+
+  async sendHealthAlert(health) {
+    try {
+      const alert = {
+        epcId: this.config.epcId,
+        tenantId: this.config.tenantId,
+        authCode: this.config.authCode,
+        alertType: 'health',
+        severity: health.overallStatus,
+        health: health,
+        timestamp: new Date().toISOString()
+      };
+      await this.sendToCloudAPI('/api/epc/alerts', alert);
+      console.log(\`[EPC SNMP Agent] Health alert sent: \${health.overallStatus}\`);
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Failed to send health alert:', error);
+    }
+  }
+
+  async sendToCloudAPI(endpoint, data) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(endpoint, this.config.cloudApiUrl);
+      const isHttps = url.protocol === 'https:';
+      const client = isHttps ? https : http;
+      const postData = JSON.stringify(data);
+      
+      const options = {
+        hostname: url.hostname,
+        port: url.port || (isHttps ? 443 : 80),
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+          'Authorization': \`Bearer \${this.config.apiKey}\`,
+          'x-tenant-id': this.config.tenantId
+        }
+      };
+      
+      const req = client.request(options, (res) => {
+        let responseData = '';
+        res.on('data', (chunk) => { responseData += chunk; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(JSON.parse(responseData || '{}'));
+          } else {
+            reject(new Error(\`HTTP \${res.statusCode}: \${responseData}\`));
+          }
+        });
+      });
+      
+      req.on('error', (error) => { reject(error); });
+      req.write(postData);
+      req.end();
+    });
+  }
+
+  async shutdown() {
+    try {
+      console.log('[EPC SNMP Agent] Shutting down...');
+      this.isRunning = false;
+      if (this.reportingTimer) clearInterval(this.reportingTimer);
+      if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
+      if (this.agent) this.agent.close();
+      console.log('[EPC SNMP Agent] Shutdown complete');
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Shutdown error:', error);
+    }
+  }
+}
+
+const agent = new EPCSNMPAgent();
+
+process.on('SIGINT', async () => {
+  await agent.shutdown();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await agent.shutdown();
+  process.exit(0);
+});
+
+agent.initialize().catch((error) => {
+  console.error('Failed to start EPC SNMP Agent:', error);
+  process.exit(1);
+});
+SNMPAGENTEOF
+
+# Create systemd service for SNMP agent
+print_status "Creating systemd service..."
+cat > /etc/systemd/system/epc-snmp-agent.service << 'SNMPSERVICEEOF'
+[Unit]
+Description=EPC SNMP Monitoring Agent
+Documentation=https://github.com/theorem6/lte-pci-mapper
+After=network-online.target open5gs-mmed.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/epc-snmp-agent
+EnvironmentFile=/etc/wisptools/credentials.env
+Environment=CLOUD_API_URL=http://$GCE_SERVER:$HSS_PORT
+ExecStart=/usr/bin/node epc-snmp-agent.js
+Restart=always
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=epc-snmp-agent
+
+[Install]
+WantedBy=multi-user.target
+SNMPSERVICEEOF
+
+# Set permissions
+chmod +x epc-snmp-agent.js
+
+# Reload systemd and enable service
+systemctl daemon-reload
+systemctl enable epc-snmp-agent
+
+print_success "SNMP monitoring agent installed and configured"
+
 print_header "Starting Open5GS Services"
 print_status "Enabling and starting all EPC components..."
 
@@ -338,6 +758,7 @@ systemctl enable open5gs-sgwud
 systemctl enable open5gs-smfd
 systemctl enable open5gs-upfd
 systemctl enable open5gs-pcrfd
+systemctl enable epc-snmp-agent
 
 systemctl start open5gs-mmed
 systemctl start open5gs-sgwcd
@@ -347,6 +768,11 @@ systemctl start open5gs-upfd
 systemctl start open5gs-pcrfd
 
 sleep 3
+
+# Start SNMP agent after EPC services are running
+print_status "Starting SNMP monitoring agent..."
+systemctl start epc-snmp-agent
+sleep 2
 
 # Check service status
 print_status "Checking service status..."
@@ -361,6 +787,13 @@ else
     print_error "Some services failed to start. Check logs: journalctl -u open5gs-*"
 fi
 
+# Check SNMP agent status
+if systemctl is-active --quiet epc-snmp-agent; then
+    print_success "SNMP monitoring agent is running"
+else
+    print_error "SNMP agent failed to start. Check logs: journalctl -u epc-snmp-agent"
+fi
+
 print_header "Deployment Complete"
 print_success "EPC \$EPC_ID has been deployed successfully!"
 echo ""
@@ -372,7 +805,11 @@ echo "  TAC: \${TAC}"
 echo "  APN: \$APN_NAME"
 echo ""
 echo "Services running:"
-systemctl list-units --type=service --state=running | grep open5gs || true
+systemctl list-units --type=service --state=running | grep -E "open5gs|epc-snmp-agent" || true
+echo ""
+echo "Monitoring:"
+echo "  SNMP Agent: Collecting metrics every 60 seconds"
+echo "  Reporting to: http://\$HSS_ADDR:\$HSS_PORT/api/epc/metrics"
 echo ""
 print_success "EPC is ready to accept connections!"
 echo ""
