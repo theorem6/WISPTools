@@ -354,12 +354,13 @@ cd /opt/epc-snmp-agent
 # Initialize npm project and install dependencies
 print_status "Installing Node.js dependencies..."
 npm init -y > /dev/null 2>&1
-npm install net-snmp
+npm install net-snmp node-routeros
 
 # Create SNMP agent script
 print_status "Creating SNMP agent script..."
 cat > epc-snmp-agent.js << 'SNMPAGENTEOF'
 const snmp = require('net-snmp');
+const { RouterOSAPI } = require('node-routeros');
 const os = require('os');
 const fs = require('fs').promises;
 const { exec } = require('child_process');
@@ -401,6 +402,7 @@ class EPCSNMPAgent {
     this.healthCheckTimer = null;
     this.networkScanTimer = null;
     this.discoveredDevices = new Map(); // ip -> device info
+    this.mikrotikDevices = new Map(); // ip -> mikrotik device info
     this.isRunning = false;
   }
 
@@ -595,15 +597,24 @@ class EPCSNMPAgent {
           }
           
           if (foundCommunity && deviceInfo) {
-            this.discoveredDevices.set(ip, {
+            const deviceData = {
               ...deviceInfo,
               community: foundCommunity,
               lastSeen: new Date(),
               discoveredAt: this.discoveredDevices.has(ip) ? this.discoveredDevices.get(ip).discoveredAt : new Date(),
               status: 'online'
-            });
+            };
+            
+            this.discoveredDevices.set(ip, deviceData);
             snmpDevices.push(ip);
             console.log(\`[EPC SNMP Agent] Discovered SNMP device: \${ip} (\${deviceInfo.name || 'Unknown'})\`);
+            
+            // Check if device is Mikrotik
+            const description = (deviceInfo.description || '').toLowerCase();
+            if (description.includes('mikrotik') || description.includes('routeros')) {
+              console.log(\`[EPC SNMP Agent] Detected Mikrotik device: \${ip}, attempting RouterOS API connection...\`);
+              await this.registerMikrotikDevice(ip, deviceInfo);
+            }
           }
         } catch (error) {
           // Host doesn't have SNMP or unreachable, skip
@@ -644,6 +655,202 @@ class EPCSNMPAgent {
     });
   }
 
+  async registerMikrotikDevice(ip, deviceInfo) {
+    try {
+      // Try common Mikrotik credentials
+      const credentials = [
+        { username: 'admin', password: '' },
+        { username: 'admin', password: 'admin' },
+        { username: 'admin', password: 'password' }
+      ];
+      
+      for (const cred of credentials) {
+        try {
+          const connection = await this.connectMikrotikAPI(ip, cred.username, cred.password);
+          if (connection) {
+            // Get Mikrotik device info
+            const identity = await this.getMikrotikIdentity(connection);
+            const systemInfo = await this.getMikrotikSystemInfo(connection);
+            
+            const mikrotikDevice = {
+              ip: ip,
+              name: identity.name || deviceInfo.name || ip,
+              description: deviceInfo.description || 'Mikrotik RouterOS',
+              identity: identity,
+              systemInfo: systemInfo,
+              credentials: {
+                username: cred.username,
+                // Don't store password in device info - it will be used from credentials env
+                hasPassword: !!cred.password
+              },
+              lastSeen: new Date(),
+              discoveredAt: new Date(),
+              status: 'online',
+              apiPort: 8728
+            };
+            
+            this.mikrotikDevices.set(ip, mikrotikDevice);
+            connection.close();
+            
+            console.log(\`[EPC SNMP Agent] Registered Mikrotik device: \${ip} (\${identity.name})\`);
+            
+            // Register with cloud API
+            await this.reportMikrotikDevice(mikrotikDevice);
+            
+            return mikrotikDevice;
+          }
+        } catch (error) {
+          // Try next credential set
+          continue;
+        }
+      }
+      
+      console.warn(\`[EPC SNMP Agent] Could not connect to Mikrotik device \${ip} with default credentials\`);
+    } catch (error) {
+      console.error(\`[EPC SNMP Agent] Failed to register Mikrotik device \${ip}:\`, error.message);
+    }
+  }
+
+  async connectMikrotikAPI(ip, username, password) {
+    return new Promise((resolve, reject) => {
+      const conn = new RouterOSAPI({
+        host: ip,
+        user: username,
+        password: password,
+        port: 8728,
+        timeout: 5000
+      });
+      
+      conn.connect().then(() => {
+        resolve(conn);
+      }).catch((error) => {
+        reject(error);
+      });
+    });
+  }
+
+  async getMikrotikIdentity(connection) {
+    try {
+      const result = await connection.write('/system/identity/print');
+      return {
+        name: result[0]?.name || 'Unknown',
+        comment: result[0]?.comment || ''
+      };
+    } catch (error) {
+      return { name: 'Unknown', comment: '' };
+    }
+  }
+
+  async getMikrotikSystemInfo(connection) {
+    try {
+      const [resource, routerboard] = await Promise.all([
+        connection.write('/system/resource/print').catch(() => [{}]),
+        connection.write('/system/routerboard/print').catch(() => [{}])
+      ]);
+      
+      return {
+        version: resource[0]?.version || 'Unknown',
+        architecture: resource[0]?.architecture || 'Unknown',
+        model: routerboard[0]?.model || 'Unknown',
+        serialNumber: routerboard[0]?.['serial-number'] || 'Unknown',
+        firmwareVersion: routerboard[0]?.['firmware-version'] || 'Unknown',
+        uptime: resource[0]?.uptime || '0s',
+        cpuLoad: resource[0]?.['cpu-load'] || 0,
+        freeMemory: resource[0]?.['free-memory'] || 0,
+        totalMemory: resource[0]?.['total-memory'] || 0
+      };
+    } catch (error) {
+      return {};
+    }
+  }
+
+  async reportMikrotikDevice(mikrotikDevice) {
+    try {
+      const payload = {
+        epcId: this.config.epcId,
+        tenantId: this.config.tenantId,
+        authCode: this.config.authCode,
+        device: {
+          type: 'mikrotik',
+          ip: mikrotikDevice.ip,
+          name: mikrotikDevice.name,
+          description: mikrotikDevice.description,
+          identity: mikrotikDevice.identity,
+          systemInfo: mikrotikDevice.systemInfo,
+          discoveredAt: mikrotikDevice.discoveredAt.toISOString()
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      await this.sendToCloudAPI('/api/mikrotik/discover', payload);
+      console.log(\`[EPC SNMP Agent] Reported Mikrotik device to cloud: \${mikrotikDevice.ip}\`);
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Failed to report Mikrotik device:', error.message);
+    }
+  }
+
+  async pollMikrotikDevices() {
+    if (this.mikrotikDevices.size === 0) {
+      return [];
+    }
+    
+    const mikrotikMetrics = [];
+    
+    for (const [ip, device] of this.mikrotikDevices.entries()) {
+      try {
+        // Try to connect and get metrics
+        const credentials = [
+          { username: 'admin', password: '' },
+          { username: 'admin', password: 'admin' }
+        ];
+        
+        let connection = null;
+        for (const cred of credentials) {
+          try {
+            connection = await this.connectMikrotikAPI(ip, cred.username, cred.password);
+            if (connection) break;
+          } catch (e) {
+            continue;
+          }
+        }
+        
+        if (!connection) {
+          device.status = 'offline';
+          continue;
+        }
+        
+        // Get current metrics
+        const resource = await connection.write('/system/resource/print').catch(() => [{}]);
+        const interfaces = await connection.write('/interface/print').catch(() => []);
+        
+        const metrics = {
+          ip: ip,
+          name: device.name,
+          type: 'mikrotik',
+          uptime: resource[0]?.uptime || '0s',
+          cpuLoad: resource[0]?.['cpu-load'] || 0,
+          freeMemory: resource[0]?.['free-memory'] || 0,
+          totalMemory: resource[0]?.['total-memory'] || 0,
+          interfaceCount: interfaces.length || 0,
+          timestamp: new Date().toISOString()
+        };
+        
+        mikrotikMetrics.push(metrics);
+        device.lastPolled = new Date();
+        device.status = 'online';
+        device.lastSeen = new Date();
+        
+        connection.close();
+      } catch (error) {
+        device.status = 'offline';
+        device.lastPolled = new Date();
+        console.warn(\`[EPC SNMP Agent] Failed to poll Mikrotik device \${ip}:\`, error.message);
+      }
+    }
+    
+    return mikrotikMetrics;
+  }
+
   async pollDiscoveredDevices() {
     if (this.discoveredDevices.size === 0) {
       return [];
@@ -651,7 +858,12 @@ class EPCSNMPAgent {
     
     const devicesMetrics = [];
     
+    // Skip Mikrotik devices here - they're handled separately
     for (const [ip, device] of this.discoveredDevices.entries()) {
+      // Skip if this is a Mikrotik device (handled in pollMikrotikDevices)
+      if (this.mikrotikDevices.has(ip)) {
+        continue;
+      }
       try {
         const session = snmp.createSession(ip, device.community);
         const oids = [
@@ -725,7 +937,8 @@ class EPCSNMPAgent {
         epc: {
           serviceStatus: await this.getServiceStatus()
         },
-        discoveredDevices: await this.pollDiscoveredDevices()
+        discoveredDevices: await this.pollDiscoveredDevices(),
+        mikrotikDevices: await this.pollMikrotikDevices()
       };
       return metrics;
     } catch (error) {
