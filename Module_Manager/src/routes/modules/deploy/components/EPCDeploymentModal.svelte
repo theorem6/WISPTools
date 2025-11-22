@@ -1583,7 +1583,7 @@ echo "🎉 Deployment successful!";
     box-shadow: var(--shadow-xl);
     max-width: 95vw;
     max-height: 95vh;
-    width: 1200px;
+    width: 800px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
