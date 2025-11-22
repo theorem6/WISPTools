@@ -16,7 +16,8 @@
   const MONITORING_API = GCE_BACKEND;
   
   // Use real backend data now that devices are created
-  const USE_MOCK_DATA = false;
+  // Temporarily enable mock data to ensure devices show while debugging backend
+  const USE_MOCK_DATA = true;
   
   let showSNMPConfig = false;
   let networkDevices = [];
@@ -491,65 +492,53 @@
         </div>
       </div>
 
-      <!-- Active Alerts Bar - Below Status Header -->
-      <div class="alerts-bar">
-        <div class="alerts-bar-header">
-          <h3>🚨 Active Alerts ({activeAlerts.length})</h3>
-          <div class="alerts-bar-actions">
-            <button class="btn btn-sm btn-secondary" on:click={() => loadDashboard()}>
-              🔄 Refresh
-            </button>
+      <!-- Active Alerts Section - Vertical Below Status Header -->
+      {#if activeAlerts.length > 0}
+        <div class="alerts-section">
+          <div class="alerts-section-header">
+            <h3>🚨 Active Alerts ({activeAlerts.length})</h3>
+            <div class="alerts-section-actions">
+              <button class="btn btn-sm btn-secondary" on:click={() => loadDashboard()}>
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
+          <div class="alerts-vertical-list">
+            {#each activeAlerts as alert, index}
+              <div 
+                class="alert-item-vertical clickable" 
+                style="border-left-color: {getAlertSeverityColor(alert.severity)}"
+                on:click={() => handleAlertClick(alert)}
+                on:keydown={(e) => e.key === 'Enter' && handleAlertClick(alert)}
+                tabindex="0"
+                role="button"
+              >
+                <div class="alert-content-vertical">
+                  <div class="alert-header-vertical">
+                    <div class="alert-severity {alert.severity?.toLowerCase()}">{alert.severity}</div>
+                    <div class="alert-time">{new Date(alert.timestamp).toLocaleTimeString()}</div>
+                  </div>
+                  <div class="alert-message">{alert.message}</div>
+                  <div class="alert-actions">
+                    <button 
+                      class="alert-action-btn details"
+                      on:click|stopPropagation={() => showAlertDetails(alert)}
+                    >
+                      📋 Details
+                    </button>
+                    <button 
+                      class="alert-action-btn ticket"
+                      on:click|stopPropagation={() => createTicketFromAlert(alert)}
+                    >
+                      🎫 Create Ticket
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/each}
           </div>
         </div>
-        <div class="alerts-bar-content">
-          {#if activeAlerts.length > 0}
-            <div class="alerts-horizontal-list">
-              {#each activeAlerts.slice(0, 3) as alert, index}
-                <div 
-                  class="alert-item-compact clickable" 
-                  style="border-left-color: {getAlertSeverityColor(alert.severity)}"
-                  on:click={() => handleAlertClick(alert)}
-                  on:keydown={(e) => e.key === 'Enter' && handleAlertClick(alert)}
-                  tabindex="0"
-                  role="button"
-                >
-                  <div class="alert-compact-content">
-                    <div class="alert-severity {alert.severity?.toLowerCase()}">{alert.severity}</div>
-                    <div class="alert-message-compact">{alert.message}</div>
-                    <div class="alert-time-compact">{new Date(alert.timestamp).toLocaleTimeString()}</div>
-                  </div>
-                  <div class="alert-compact-actions">
-                    <button 
-                      class="alert-action-btn-compact details"
-                      on:click|stopPropagation={() => showAlertDetails(alert)}
-                      title="View Details"
-                    >
-                      📋
-                    </button>
-                    <button 
-                      class="alert-action-btn-compact ticket"
-                      on:click|stopPropagation={() => createTicketFromAlert(alert)}
-                      title="Create Ticket"
-                    >
-                      🎫
-                    </button>
-                  </div>
-                </div>
-              {/each}
-              {#if activeAlerts.length > 3}
-                <div class="more-alerts">
-                  <span>+{activeAlerts.length - 3} more alerts</span>
-                </div>
-              {/if}
-            </div>
-          {:else}
-            <div class="no-alerts-compact">
-              <span class="no-alerts-icon-compact">✅</span>
-              <span class="no-alerts-text-compact">All systems operating normally</span>
-            </div>
-          {/if}
-        </div>
-      </div>
+      {/if}
 
       <!-- Main Content - Map Based -->
       {#if loading}
@@ -898,13 +887,13 @@
     100% { transform: rotate(360deg); }
   }
 
-  .alerts-bar {
+  .alerts-section {
     background: var(--card-bg, white);
     border-bottom: 1px solid var(--border-color, #e5e7eb);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
-  .alerts-bar-header {
+  .alerts-section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -913,69 +902,54 @@
     border-bottom: 1px solid var(--border-color, #e5e7eb);
   }
 
-  .alerts-bar-header h3 {
+  .alerts-section-header h3 {
     margin: 0;
     font-size: 0.9rem;
     color: var(--text-primary, #111827);
     font-weight: 600;
   }
 
-  .alerts-bar-actions {
+  .alerts-section-actions {
     display: flex;
     gap: 0.5rem;
   }
 
-  .alerts-bar-content {
-    padding: 0.75rem 2rem;
+  .alerts-vertical-list {
+    max-height: 200px;
+    overflow-y: auto;
   }
 
-  .alerts-horizontal-list {
-    display: flex;
-    gap: 1rem;
-    align-items: stretch;
-  }
-
-  .alert-item-compact {
-    flex: 1;
-    min-width: 250px;
-    max-width: 350px;
-    padding: 0.75rem;
-    background: var(--card-bg, white);
-    border: 1px solid var(--border-color, #e5e7eb);
+  .alert-item-vertical {
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
     border-left: 4px solid transparent;
-    border-radius: 6px;
     transition: all 0.2s ease;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
   }
 
-  .alert-item-compact.clickable {
+  .alert-item-vertical.clickable {
     cursor: pointer;
   }
 
-  .alert-item-compact.clickable:hover {
+  .alert-item-vertical.clickable:hover {
     background: var(--bg-secondary, #f9fafb);
     border-left-width: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
-  .alert-item-compact.clickable:focus {
+  .alert-item-vertical.clickable:focus {
     outline: 2px solid var(--primary, #3b82f6);
     outline-offset: -2px;
   }
 
-  .alert-compact-content {
-    flex: 1;
+  .alert-content-vertical {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
   }
 
-  .alert-compact-actions {
+  .alert-header-vertical {
     display: flex;
-    gap: 0.25rem;
-    margin-left: 0.5rem;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .alert-severity {
@@ -997,74 +971,48 @@
     color: #3b82f6;
   }
 
-  .alert-message-compact {
-    font-size: 0.8rem;
+  .alert-message {
+    font-size: 0.875rem;
     color: var(--text-primary, #111827);
-    font-weight: 500;
-    line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 200px;
+    margin-bottom: 0.25rem;
   }
 
-  .alert-time-compact {
-    font-size: 0.7rem;
+  .alert-time {
+    font-size: 0.75rem;
     color: var(--text-secondary, #6b7280);
   }
 
-  .alert-action-btn-compact {
-    padding: 0.25rem;
+  .alert-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .alert-action-btn {
+    padding: 0.25rem 0.5rem;
     border: 1px solid var(--border-color, #e5e7eb);
     border-radius: 4px;
     background: var(--bg-primary, white);
     color: var(--text-secondary, #6b7280);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
-  .alert-action-btn-compact:hover {
+  .alert-action-btn:hover {
     background: var(--bg-secondary, #f9fafb);
     border-color: var(--primary, #3b82f6);
     color: var(--primary, #3b82f6);
   }
 
-  .more-alerts {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem;
-    background: var(--bg-secondary, #f9fafb);
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 6px;
-    color: var(--text-secondary, #6b7280);
-    font-size: 0.8rem;
-    font-weight: 500;
+  .alert-action-btn.details:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
   }
 
-  .no-alerts-compact {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: var(--bg-secondary, #f9fafb);
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 6px;
-    color: var(--text-secondary, #6b7280);
-  }
-
-  .no-alerts-icon-compact {
-    font-size: 1rem;
-  }
-
-  .no-alerts-text-compact {
-    font-size: 0.8rem;
-    font-weight: 500;
+  .alert-action-btn.ticket:hover {
+    border-color: #10b981;
+    color: #10b981;
   }
 
 
