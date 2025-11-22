@@ -1581,20 +1581,21 @@ echo "🎉 Deployment successful!";
     background: var(--bg-primary);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
-    max-width: 90vw;
-    max-height: 90vh;
+    max-width: 95vw;
+    max-height: 95vh;
+    width: 1200px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    width: 100%;
   }
 
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--spacing-lg);
+    padding: var(--spacing-xl);
     border-bottom: 1px solid var(--color-gray-200);
+    flex-shrink: 0;
   }
 
   .modal-header h2 {
@@ -1624,13 +1625,12 @@ echo "🎉 Deployment successful!";
   .modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: var(--spacing-lg);
+    padding: var(--spacing-xl);
   }
 
   .epc-deployment-modal {
     width: 100%;
-    max-width: 700px;
-    max-height: 90vh;
+    max-width: 100%;
   }
 
   .error-banner {
@@ -1711,7 +1711,16 @@ echo "🎉 Deployment successful!";
   .step-content {
     flex: 1;
     overflow-y: auto;
-    min-height: 400px;
+    min-height: 500px;
+    padding: var(--spacing-md) 0;
+  }
+  
+  .step-content > * {
+    margin-bottom: var(--spacing-lg);
+  }
+  
+  .step-content > *:last-child {
+    margin-bottom: 0;
   }
 
   .step-panel {
