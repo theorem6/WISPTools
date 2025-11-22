@@ -15,6 +15,7 @@
   let success = '';
   let deploymentScript = '';
   let deploymentOption: 'script' | 'iso' = 'script';
+  let deploymentType: 'epc' | 'snmp' | 'both' = 'epc'; // Deployment type selection
   type TenantContactKey = 'contactName' | 'contactEmail' | 'contactPhone';
   type TenantContactRecord = Partial<Record<TenantContactKey, string>>;
 
@@ -53,6 +54,33 @@
       hssHost: '136.112.111.167',
       hssPort: '3001',
       diameterRealm: 'wisptools.io'
+    },
+    // SNMP Configuration
+    snmpConfig: {
+      enabled: true,
+      version: '2c', // '1', '2c', or '3'
+      community: 'public',
+      port: 161,
+      // SNMPv3 specific
+      username: '',
+      authProtocol: 'SHA',
+      authKey: '',
+      privProtocol: 'AES',
+      privKey: '',
+      // Cloud reporting
+      cloudApiUrl: 'http://136.112.111.167:3003',
+      reportingInterval: 60,
+      enableTraps: true,
+      trapPort: 162
+    },
+    // APT Repository Configuration
+    aptConfig: {
+      enabled: true,
+      repositoryUrl: 'http://136.112.111.167:3003/apt',
+      autoUpdate: false,
+      updateSchedule: 'daily', // 'hourly', 'daily', 'weekly'
+      updateTime: '02:00',
+      securityUpdatesOnly: false
     }
   };
 
@@ -98,6 +126,11 @@
       epcConfig.contact.email = siteData.siteContact.email || '';
       epcConfig.contact.phone = siteData.siteContact.phone || '';
     }
+  }
+
+  // Update SNMP enabled state based on deployment type
+  $: if (show) {
+    epcConfig.snmpConfig.enabled = deploymentType === 'snmp' || deploymentType === 'both';
   }
 
   $: if (show && $currentTenant?.id && $currentTenant.id.trim() !== '') {
@@ -147,6 +180,18 @@
     if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
       return false;
     }
+    // EPC network validation (only when EPC is selected)
+    if (deploymentType === 'epc' || deploymentType === 'both') {
+      if (!epcConfig.networkConfig.mcc || !epcConfig.networkConfig.mcc.trim()) {
+        return false;
+      }
+      if (!epcConfig.networkConfig.mnc || !epcConfig.networkConfig.mnc.trim()) {
+        return false;
+      }
+      if (!epcConfig.networkConfig.tac || !epcConfig.networkConfig.tac.trim()) {
+        return false;
+      }
+    }
     return true;
   }
 
@@ -163,6 +208,18 @@
     }
     if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
       errors.push('Contact Email is required');
+    }
+    // EPC network validation (only when EPC is selected)
+    if (deploymentType === 'epc' || deploymentType === 'both') {
+      if (!epcConfig.networkConfig.mcc || !epcConfig.networkConfig.mcc.trim()) {
+        errors.push('MCC is required for EPC deployment');
+      }
+      if (!epcConfig.networkConfig.mnc || !epcConfig.networkConfig.mnc.trim()) {
+        errors.push('MNC is required for EPC deployment');
+      }
+      if (!epcConfig.networkConfig.tac || !epcConfig.networkConfig.tac.trim()) {
+        errors.push('TAC is required for EPC deployment');
+      }
     }
     return errors;
   }
@@ -200,14 +257,20 @@
   }
 
   function generateScript(): string {
+    const deploymentTypes = deploymentType === 'both' ? ['epc', 'snmp'] : [deploymentType];
+    const includeEPC = deploymentTypes.includes('epc');
+    const includeSNMP = deploymentTypes.includes('snmp');
+    
     const script = `#!/bin/bash
-# Open5GS EPC Deployment Script
+# Ubuntu Deployment Script - ${deploymentType.toUpperCase()}
 # Generated for ${epcConfig.siteName}
 # Date: ${new Date().toISOString()}
+# Deployment Type: ${deploymentType}
 
 set -e
 
-echo "🚀 Starting Open5GS EPC deployment for ${epcConfig.siteName}..."
+echo "🚀 Starting deployment for ${epcConfig.siteName}..."
+echo "📦 Deployment Components: ${deploymentTypes.join(' + ').toUpperCase()}"
 
 # Configuration
 SITE_NAME="${epcConfig.siteName}"
@@ -241,6 +304,50 @@ echo "📍 Location: $ADDRESS, $CITY, $STATE, $COUNTRY"
 echo "📦 Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
+# Configure APT Repository (for remote updates)
+${epcConfig.aptConfig.enabled ? `# Setup APT Repository for remote updates
+echo "📦 Configuring APT repository for remote updates..."
+APT_REPO_URL="${epcConfig.aptConfig.repositoryUrl}"
+
+# Create APT source list entry
+sudo tee /etc/apt/sources.list.d/wisptools.list > /dev/null <<APTSOURCE
+deb ${epcConfig.aptConfig.repositoryUrl}/${$currentTenant?.id || 'default'} / 
+APTSOURCE
+
+# Download and add GPG key (if available)
+echo "🔑 Setting up APT repository GPG key..."
+curl -fsSL ${epcConfig.aptConfig.repositoryUrl}/gpg.asc | sudo apt-key add - || echo "⚠️  GPG key not available, continuing..."
+
+# Update package lists with new repository
+sudo apt update || echo "⚠️  APT repository not accessible, continuing..."
+
+${epcConfig.aptConfig.autoUpdate ? `# Setup automatic updates
+echo "⏰ Configuring automatic updates (${epcConfig.aptConfig.updateSchedule} at ${epcConfig.aptConfig.updateTime})..."
+sudo apt install -y unattended-upgrades
+
+# Configure unattended-upgrades
+sudo tee /etc/apt/apt.conf.d/50unattended-upgrades > /dev/null <<UNATTENDED
+Unattended-Upgrade::Allowed-Origins {
+    "\${distro_id}:\${distro_codename}-security";
+${epcConfig.aptConfig.securityUpdatesOnly ? '' : `    "\${distro_id}:\${distro_codename}-updates";
+    "wisptools:${$currentTenant?.id || 'default'}";`}
+};
+Unattended-Upgrade::Package-Blacklist {
+};
+Unattended-Upgrade::DevRelease "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Automatic-Reboot-Time "02:00";
+UNATTENDED
+
+# Enable automatic updates
+echo 'APT::Periodic::Update-Package-Lists "1";' | sudo tee /etc/apt/apt.conf.d/20auto-updates > /dev/null
+echo 'APT::Periodic::Unattended-Upgrade "1";' | sudo tee -a /etc/apt/apt.conf.d/20auto-updates > /dev/null
+` : ''}
+` : '# APT Repository disabled - remote updates not configured'}
+
 # Install dependencies
 echo "🔧 Installing dependencies..."
 sudo apt install -y \\
@@ -267,7 +374,173 @@ sudo apt install -y \\
     vim \\
     htop
 
-# Install Open5GS
+${includeSNMP ? `# Install SNMP Agent
+echo "📊 Installing SNMP Agent and Mikrotik monitoring modules..."
+sudo apt install -y snmpd snmp snmp-mibs-downloader nodejs npm
+
+# Create SNMP agent configuration
+echo "📝 Configuring SNMP agent..."
+sudo tee /etc/snmp/snmpd.conf > /dev/null <<SNMPCONF
+# SNMP Agent Configuration
+agentAddress udp:${epcConfig.snmpConfig.port || 161},udp6:${epcConfig.snmpConfig.port || 161}
+${epcConfig.snmpConfig.version === '3' ? `
+# SNMPv3 Configuration
+createUser ${epcConfig.snmpConfig.username || 'snmpuser'} ${epcConfig.snmpConfig.authProtocol || 'SHA'} "${epcConfig.snmpConfig.authKey || ''}" ${epcConfig.snmpConfig.privProtocol || 'AES'} "${epcConfig.snmpConfig.privKey || ''}"
+rwuser ${epcConfig.snmpConfig.username || 'snmpuser'}
+` : `# SNMPv${epcConfig.snmpConfig.version || '2c'} Configuration
+rocommunity ${epcConfig.snmpConfig.community || 'public'} default
+rwcommunity ${epcConfig.snmpConfig.community || 'public'} default
+`}
+# System information
+sysLocation "${epcConfig.location.address || 'Unknown'}"
+sysContact "${epcConfig.contact.email || 'admin@wisptools.io'}"
+sysName "${epcConfig.siteName || 'WISP-Tools-Device'}"
+
+# Allow SNMP access
+${epcConfig.snmpConfig.enableTraps ? `# SNMP Traps
+trapsink localhost ${epcConfig.snmpConfig.trapPort || 162}
+` : ''}
+SNMPCONF
+
+# Install Node.js if not present (required for SNMP agent)
+if ! command -v node &> /dev/null; then
+    echo "📦 Installing Node.js for SNMP agent..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+fi
+
+# Create SNMP agent service for cloud reporting
+echo "⚙️ Creating SNMP cloud reporting service..."
+sudo mkdir -p /opt/wisptools/snmp-agent
+sudo tee /opt/wisptools/snmp-agent/agent.js > /dev/null <<SNMPAGENT
+#!/usr/bin/env node
+// WISP Tools SNMP Agent - Cloud Reporting Service
+const snmp = require('net-snmp');
+const http = require('http');
+
+const CLOUD_API_URL = "${epcConfig.snmpConfig.cloudApiUrl || 'http://136.112.111.167:3003'}";
+const REPORTING_INTERVAL = ${epcConfig.snmpConfig.reportingInterval || 60} * 1000;
+const SITE_NAME = "${epcConfig.siteName}";
+
+// SNMP session configuration
+const session = snmp.createSession("127.0.0.1", "${epcConfig.snmpConfig.community || 'public'}", {
+    port: ${epcConfig.snmpConfig.port || 161}
+});
+
+async function collectMetrics() {
+    const oids = [
+        "1.3.6.1.2.1.1.3.0",  // sysUpTime
+        "1.3.6.1.2.1.1.1.0",  // sysDescr
+        "1.3.6.1.2.1.25.3.3.1.2", // hrProcessorLoad
+        "1.3.6.1.2.1.25.2.3.1.5", // hrStorageSize
+        "1.3.6.1.2.1.25.2.3.1.6", // hrStorageUsed
+    ];
+    
+    return new Promise((resolve, reject) => {
+        session.get(oids, (error, varbinds) => {
+            if (error) {
+                console.error("SNMP Error:", error);
+                reject(error);
+            } else {
+                const metrics = {
+                    site: SITE_NAME,
+                    timestamp: new Date().toISOString(),
+                    uptime: varbinds[0].value,
+                    description: varbinds[1].value.toString(),
+                    cpuLoad: varbinds[2]?.value || 0,
+                    storageSize: varbinds[3]?.value || 0,
+                    storageUsed: varbinds[4]?.value || 0
+                };
+                resolve(metrics);
+            }
+        });
+    });
+}
+
+async function reportToCloud(metrics) {
+    try {
+        const data = JSON.stringify(metrics);
+        const url = new URL(CLOUD_API_URL + "/api/epc/metrics");
+        
+        const options = {
+            hostname: url.hostname,
+            port: url.port || 80,
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': data.length
+            }
+        };
+        
+        const req = http.request(options, (res) => {
+            console.log(\`Status: \${res.statusCode}\`);
+        });
+        
+        req.on('error', (error) => {
+            console.error("Cloud reporting error:", error);
+        });
+        
+        req.write(data);
+        req.end();
+    } catch (error) {
+        console.error("Failed to report metrics:", error);
+    }
+}
+
+// Start reporting loop
+async function startReporting() {
+    console.log("📊 Starting SNMP cloud reporting service...");
+    console.log(\`   Cloud API: \${CLOUD_API_URL}\`);
+    console.log(\`   Interval: \${REPORTING_INTERVAL / 1000}s\`);
+    
+    setInterval(async () => {
+        try {
+            const metrics = await collectMetrics();
+            await reportToCloud(metrics);
+            console.log("✅ Metrics reported:", new Date().toISOString());
+        } catch (error) {
+            console.error("❌ Failed to collect/report metrics:", error);
+        }
+    }, REPORTING_INTERVAL);
+}
+
+startReporting();
+SNMPAGENT
+
+# Install npm dependencies for SNMP agent
+cd /opt/wisptools/snmp-agent
+sudo npm init -y
+sudo npm install net-snmp --save
+
+# Create systemd service for SNMP cloud reporting agent
+sudo tee /etc/systemd/system/wisptools-snmp-agent.service > /dev/null <<SNMPSERVICE
+[Unit]
+Description=WISP Tools SNMP Cloud Reporting Agent
+After=network.target snmpd.service
+Requires=snmpd.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/wisptools/snmp-agent
+ExecStart=/usr/bin/node /opt/wisptools/snmp-agent/agent.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SNMPSERVICE
+
+sudo chmod +x /opt/wisptools/snmp-agent/agent.js
+sudo systemctl daemon-reload
+sudo systemctl enable wisptools-snmp-agent.service
+sudo systemctl start wisptools-snmp-agent.service
+
+echo "✅ SNMP Agent installed and configured"
+` : ''}
+
+${includeEPC ? `# Install Open5GS
 echo "📡 Installing Open5GS..."
 cd /opt
 if [ ! -d "open5gs" ]; then
@@ -567,48 +840,82 @@ sudo chown open5gs:open5gs /var/log/open5gs
 
 # Reload systemd
 sudo systemctl daemon-reload
+` : ''}
 
-# Enable services
-echo "🔧 Enabling services..."
+${includeEPC ? `# Enable EPC services
+echo "🔧 Enabling EPC services..."
 sudo systemctl enable open5gs-mmed
 sudo systemctl enable open5gs-sgwd
 sudo systemctl enable open5gs-pgwd
 sudo systemctl enable open5gs-pcrfd
 
-# Start services
-echo "🚀 Starting services..."
+# Start EPC services
+echo "🚀 Starting EPC services..."
 sudo systemctl start open5gs-mmed
 sudo systemctl start open5gs-sgwd
 sudo systemctl start open5gs-pgwd
 sudo systemctl start open5gs-pcrfd
 
-# Check service status
-echo "📊 Checking service status..."
-sudo systemctl status open5gs-mmed --no-pager
-sudo systemctl status open5gs-sgwd --no-pager
-sudo systemctl status open5gs-pgwd --no-pager
-sudo systemctl status open5gs-pcrfd --no-pager
+# Check EPC service status
+echo "📊 Checking EPC service status..."
+sudo systemctl status open5gs-mmed --no-pager || true
+sudo systemctl status open5gs-sgwd --no-pager || true
+sudo systemctl status open5gs-pgwd --no-pager || true
+sudo systemctl status open5gs-pcrfd --no-pager || true
+` : ''}
 
-echo "✅ Open5GS EPC deployment completed for $SITE_NAME!"
+${includeSNMP ? `# Enable SNMP services
+echo "🔧 Enabling SNMP services..."
+sudo systemctl enable snmpd
+sudo systemctl enable wisptools-snmp-agent.service
+
+# Start SNMP services
+echo "🚀 Starting SNMP services..."
+sudo systemctl start snmpd
+sudo systemctl start wisptools-snmp-agent.service
+
+# Check SNMP service status
+echo "📊 Checking SNMP service status..."
+sudo systemctl status snmpd --no-pager || true
+sudo systemctl status wisptools-snmp-agent.service --no-pager || true
+` : ''}
+
+echo "✅ Deployment completed for $SITE_NAME!"
 echo "📍 Site: $SITE_NAME"
-echo "🌐 Network: MCC=$MCC, MNC=$MNC, TAC=$TAC"
-echo "📡 HSS: $HSS_HOST:$HSS_PORT"
+${includeEPC ? `echo "🌐 Network: MCC=$MCC, MNC=$MNC, TAC=$TAC"
+echo "📡 HSS: $HSS_HOST:$HSS_PORT"` : ''}
 echo "📍 Location: $ADDRESS, $CITY, $STATE, $COUNTRY"
 echo "📞 Contact: $CONTACT_NAME ($CONTACT_EMAIL)"
 echo ""
 echo "🔧 Service Management:"
+${includeEPC ? `echo "  # EPC Services:"
 echo "  sudo systemctl status open5gs-mmed"
 echo "  sudo systemctl status open5gs-sgwd"
 echo "  sudo systemctl status open5gs-pgwd"
 echo "  sudo systemctl status open5gs-pcrfd"
+` : ''}
+${includeSNMP ? `echo "  # SNMP Services:"
+echo "  sudo systemctl status snmpd"
+echo "  sudo systemctl status wisptools-snmp-agent.service"
+` : ''}
 echo ""
 echo "📋 Logs:"
+${includeEPC ? `echo "  # EPC Logs:"
 echo "  sudo journalctl -u open5gs-mmed -f"
 echo "  sudo journalctl -u open5gs-sgwd -f"
 echo "  sudo journalctl -u open5gs-pgwd -f"
 echo "  sudo journalctl -u open5gs-pcrfd -f"
+` : ''}
+${includeSNMP ? `echo "  # SNMP Logs:"
+echo "  sudo journalctl -u snmpd -f"
+echo "  sudo journalctl -u wisptools-snmp-agent.service -f"
+` : ''}
 echo ""
-echo "🎉 EPC deployment successful!";
+${epcConfig.aptConfig.enabled ? `echo "📦 APT Repository configured for remote updates"
+echo "  Repository: ${epcConfig.aptConfig.repositoryUrl}"
+${epcConfig.aptConfig.autoUpdate ? `echo "  Auto-update: ${epcConfig.aptConfig.updateSchedule} at ${epcConfig.aptConfig.updateTime}"` : 'echo "  Auto-update: Disabled"'}
+` : ''}
+echo "🎉 Deployment successful!";
 `;
 
     return script;
@@ -625,7 +932,8 @@ echo "🎉 EPC deployment successful!";
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `epc-deploy-${epcConfig.siteName.replace(/[^a-zA-Z0-9]/g, '-')}.sh`;
+      const deployType = deploymentType === 'both' ? 'epc-snmp' : deploymentType;
+      a.download = `${deployType}-deploy-${epcConfig.siteName.replace(/[^a-zA-Z0-9]/g, '-')}.sh`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -681,7 +989,11 @@ echo "🎉 EPC deployment successful!";
             location: epcConfig.location,
             networkConfig: epcConfig.networkConfig,
             contact: epcConfig.contact,
-            hssConfig: epcConfig.hssConfig
+            hssConfig: epcConfig.hssConfig,
+            // Deployment configuration
+            deploymentType: deploymentType,
+            snmpConfig: epcConfig.snmpConfig,
+            aptConfig: epcConfig.aptConfig
           })
         });
       };
@@ -768,18 +1080,18 @@ echo "🎉 EPC deployment successful!";
 
   function getStepTitle(): string {
     switch (activeStep) {
-      case 'configure': return 'Configure EPC';
-      case 'deploy': return 'Deploy EPC';
-      case 'download': return 'Download Script';
+      case 'configure': return 'Configure Deployment';
+      case 'deploy': return 'Deploy';
+      case 'download': return 'Download';
       default: return 'Unknown';
     }
   }
 
   function getStepDescription(): string {
     switch (activeStep) {
-      case 'configure': return 'Configure EPC parameters and network settings';
-      case 'deploy': return 'Review configuration and generate deployment script';
-      case 'download': return 'Download and execute the deployment script';
+      case 'configure': return `Configure ${deploymentType === 'both' ? 'EPC and SNMP' : deploymentType.toUpperCase()} parameters and network settings`;
+      case 'deploy': return 'Review configuration and generate deployment package';
+      case 'download': return 'Download script or ISO for deployment';
       default: return '';
     }
   }
@@ -789,7 +1101,7 @@ echo "🎉 EPC deployment successful!";
   <div class="modal-overlay" on:click={handleClose}>
     <div class="modal-content epc-deployment-modal" on:click|stopPropagation>
       <div class="modal-header">
-        <h2>🚀 EPC Deployment</h2>
+        <h2>🚀 Ubuntu Deployment</h2>
         <button class="close-btn" on:click={handleClose}>✕</button>
       </div>
 
@@ -827,6 +1139,61 @@ echo "🎉 EPC deployment successful!";
 
           {#if activeStep === 'configure'}
             <div class="config-form">
+              <!-- Deployment Type Selection -->
+              <div class="form-section">
+                <h4>🚀 Deployment Type</h4>
+                <p class="section-description">Select what components to deploy on the Ubuntu machine</p>
+                <div class="deployment-type-options">
+                  <label class="deployment-option">
+                    <input 
+                      type="radio" 
+                      name="deploymentType" 
+                      value="epc" 
+                      bind:group={deploymentType}
+                    />
+                    <div class="option-content">
+                      <div class="option-icon">📡</div>
+                      <div class="option-info">
+                        <strong>EPC Core Only</strong>
+                        <p>Deploy Open5GS EPC components (MME, SGW, PGW, PCRF)</p>
+                      </div>
+                    </div>
+                  </label>
+                  
+                  <label class="deployment-option">
+                    <input 
+                      type="radio" 
+                      name="deploymentType" 
+                      value="snmp" 
+                      bind:group={deploymentType}
+                    />
+                    <div class="option-content">
+                      <div class="option-icon">📊</div>
+                      <div class="option-info">
+                        <strong>SNMP/Mikrotik Agent Only</strong>
+                        <p>Deploy SNMP agent and Mikrotik monitoring modules</p>
+                      </div>
+                    </div>
+                  </label>
+                  
+                  <label class="deployment-option">
+                    <input 
+                      type="radio" 
+                      name="deploymentType" 
+                      value="both" 
+                      bind:group={deploymentType}
+                    />
+                    <div class="option-content">
+                      <div class="option-icon">🔄</div>
+                      <div class="option-info">
+                        <strong>Both EPC + SNMP</strong>
+                        <p>Deploy both EPC Core and SNMP/Mikrotik monitoring agents</p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <div class="form-section">
                 <h4>📍 Site Information</h4>
                 <div class="form-group">
@@ -841,41 +1208,44 @@ echo "🎉 EPC deployment successful!";
                 </div>
               </div>
 
-              <div class="form-section">
-                <h4>🌐 Network Configuration</h4>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label for="mcc">MCC *</label>
-                    <input 
-                      id="mcc" 
-                      type="text" 
-                      bind:value={epcConfig.networkConfig.mcc} 
-                      placeholder="001"
-                      required
-                    />
-                  </div>
-                  <div class="form-group">
-                    <label for="mnc">MNC *</label>
-                    <input 
-                      id="mnc" 
-                      type="text" 
-                      bind:value={epcConfig.networkConfig.mnc} 
-                      placeholder="01"
-                      required
-                    />
-                  </div>
-                  <div class="form-group">
-                    <label for="tac">TAC *</label>
-                    <input 
-                      id="tac" 
-                      type="text" 
-                      bind:value={epcConfig.networkConfig.tac} 
-                      placeholder="1"
-                      required
-                    />
+              <!-- EPC Network Configuration (when EPC is selected) -->
+              {#if deploymentType === 'epc' || deploymentType === 'both'}
+                <div class="form-section">
+                  <h4>🌐 EPC Network Configuration</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="mcc">MCC *</label>
+                      <input 
+                        id="mcc" 
+                        type="text" 
+                        bind:value={epcConfig.networkConfig.mcc} 
+                        placeholder="001"
+                        required
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="mnc">MNC *</label>
+                      <input 
+                        id="mnc" 
+                        type="text" 
+                        bind:value={epcConfig.networkConfig.mnc} 
+                        placeholder="01"
+                        required
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="tac">TAC *</label>
+                      <input 
+                        id="tac" 
+                        type="text" 
+                        bind:value={epcConfig.networkConfig.tac} 
+                        placeholder="1"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              {/if}
 
               <div class="form-section">
                 <h4>📍 Location</h4>
@@ -955,38 +1325,222 @@ echo "🎉 EPC deployment successful!";
                 </div>
               </div>
 
-              <div class="form-section">
-                <h4>🏠 HSS Configuration</h4>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label for="hssHost">HSS Host</label>
-                    <input 
-                      id="hssHost" 
-                      type="text" 
-                      bind:value={epcConfig.hssConfig.hssHost} 
-                      placeholder="HSS host"
-                    />
+              <!-- HSS Configuration (when EPC is selected) -->
+              {#if deploymentType === 'epc' || deploymentType === 'both'}
+                <div class="form-section">
+                  <h4>🏠 HSS Configuration</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="hssHost">HSS Host</label>
+                      <input 
+                        id="hssHost" 
+                        type="text" 
+                        bind:value={epcConfig.hssConfig.hssHost} 
+                        placeholder="HSS host"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="hssPort">HSS Port</label>
+                      <input 
+                        id="hssPort" 
+                        type="text" 
+                        bind:value={epcConfig.hssConfig.hssPort} 
+                        placeholder="3868"
+                      />
+                    </div>
                   </div>
                   <div class="form-group">
-                    <label for="hssPort">HSS Port</label>
+                    <label for="diameterRealm">Diameter Realm</label>
                     <input 
-                      id="hssPort" 
+                      id="diameterRealm" 
                       type="text" 
-                      bind:value={epcConfig.hssConfig.hssPort} 
-                      placeholder="3868"
+                      bind:value={epcConfig.hssConfig.diameterRealm} 
+                      placeholder="example.com"
                     />
                   </div>
                 </div>
-                <div class="form-group">
-                  <label for="diameterRealm">Diameter Realm</label>
-                  <input 
-                    id="diameterRealm" 
-                    type="text" 
-                    bind:value={epcConfig.hssConfig.diameterRealm} 
-                    placeholder="example.com"
-                  />
+              {/if}
+
+              <!-- SNMP Configuration (when SNMP is selected) -->
+              {#if deploymentType === 'snmp' || deploymentType === 'both'}
+                <div class="form-section">
+                  <h4>📊 SNMP/Mikrotik Agent Configuration</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="snmpVersion">SNMP Version</label>
+                      <select id="snmpVersion" bind:value={epcConfig.snmpConfig.version}>
+                        <option value="2c">SNMPv2c (Recommended)</option>
+                        <option value="1">SNMPv1</option>
+                        <option value="3">SNMPv3 (Secure)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="snmpCommunity">Community String</label>
+                      <input 
+                        id="snmpCommunity" 
+                        type="text" 
+                        bind:value={epcConfig.snmpConfig.community} 
+                        placeholder="public"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="snmpPort">SNMP Port</label>
+                      <input 
+                        id="snmpPort" 
+                        type="number" 
+                        bind:value={epcConfig.snmpConfig.port} 
+                        placeholder="161"
+                      />
+                    </div>
+                  </div>
+                  
+                  {#if epcConfig.snmpConfig.version === '3'}
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="snmpUsername">SNMPv3 Username</label>
+                        <input 
+                          id="snmpUsername" 
+                          type="text" 
+                          bind:value={epcConfig.snmpConfig.username} 
+                          placeholder="Enter username"
+                        />
+                      </div>
+                      <div class="form-group">
+                        <label for="snmpAuthProtocol">Auth Protocol</label>
+                        <select id="snmpAuthProtocol" bind:value={epcConfig.snmpConfig.authProtocol}>
+                          <option value="SHA">SHA</option>
+                          <option value="MD5">MD5</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="snmpAuthKey">Auth Key</label>
+                        <input 
+                          id="snmpAuthKey" 
+                          type="password" 
+                          bind:value={epcConfig.snmpConfig.authKey} 
+                          placeholder="Enter auth key"
+                        />
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="snmpPrivProtocol">Privacy Protocol</label>
+                        <select id="snmpPrivProtocol" bind:value={epcConfig.snmpConfig.privProtocol}>
+                          <option value="AES">AES</option>
+                          <option value="DES">DES</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="snmpPrivKey">Privacy Key</label>
+                        <input 
+                          id="snmpPrivKey" 
+                          type="password" 
+                          bind:value={epcConfig.snmpConfig.privKey} 
+                          placeholder="Enter privacy key"
+                        />
+                      </div>
+                    </div>
+                  {/if}
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="snmpReportingInterval">Reporting Interval (seconds)</label>
+                      <input 
+                        id="snmpReportingInterval" 
+                        type="number" 
+                        bind:value={epcConfig.snmpConfig.reportingInterval} 
+                        placeholder="60"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="snmpCloudApiUrl">Cloud API URL</label>
+                      <input 
+                        id="snmpCloudApiUrl" 
+                        type="text" 
+                        bind:value={epcConfig.snmpConfig.cloudApiUrl} 
+                        placeholder="http://136.112.111.167:3003"
+                      />
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label>
+                        <input 
+                          type="checkbox" 
+                          bind:checked={epcConfig.snmpConfig.enableTraps}
+                        />
+                        Enable SNMP Traps
+                      </label>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              {/if}
+
+              <!-- APT Repository Configuration (for updates) -->
+              {#if deploymentType === 'epc' || deploymentType === 'snmp' || deploymentType === 'both'}
+                <div class="form-section">
+                  <h4>📦 APT Repository Configuration (Remote Updates)</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="aptRepositoryUrl">Repository URL</label>
+                      <input 
+                        id="aptRepositoryUrl" 
+                        type="text" 
+                        bind:value={epcConfig.aptConfig.repositoryUrl} 
+                        placeholder="http://136.112.111.167:3003/apt"
+                      />
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label>
+                        <input 
+                          type="checkbox" 
+                          bind:checked={epcConfig.aptConfig.enabled}
+                        />
+                        Enable APT Repository
+                      </label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label>
+                        <input 
+                          type="checkbox" 
+                          bind:checked={epcConfig.aptConfig.autoUpdate}
+                        />
+                        Auto-update Enabled
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {#if epcConfig.aptConfig.autoUpdate}
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label for="aptUpdateSchedule">Update Schedule</label>
+                        <select id="aptUpdateSchedule" bind:value={epcConfig.aptConfig.updateSchedule}>
+                          <option value="hourly">Hourly</option>
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label for="aptUpdateTime">Update Time (HH:MM)</label>
+                        <input 
+                          id="aptUpdateTime" 
+                          type="text" 
+                          bind:value={epcConfig.aptConfig.updateTime} 
+                          placeholder="02:00"
+                          pattern="[0-9]{2}:[0-9]{2}"
+                        />
+                      </div>
+                      <div class="form-group checkbox-group">
+                        <label>
+                          <input 
+                            type="checkbox" 
+                            bind:checked={epcConfig.aptConfig.securityUpdatesOnly}
+                          />
+                          Security Updates Only
+                        </label>
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
             </div>
 
           {:else if activeStep === 'deploy'}
@@ -994,13 +1548,37 @@ echo "🎉 EPC deployment successful!";
               <h4>📋 Configuration Review</h4>
               <div class="review-grid">
                 <div class="review-item">
+                  <strong>Deployment Type:</strong>
+                  <span>{deploymentType === 'both' ? 'EPC + SNMP' : deploymentType.toUpperCase()}</span>
+                </div>
+                <div class="review-item">
                   <strong>Site Name:</strong>
                   <span>{epcConfig.siteName}</span>
                 </div>
-                <div class="review-item">
-                  <strong>Network:</strong>
-                  <span>MCC: {epcConfig.networkConfig.mcc}, MNC: {epcConfig.networkConfig.mnc}, TAC: {epcConfig.networkConfig.tac}</span>
-                </div>
+                {#if deploymentType === 'epc' || deploymentType === 'both'}
+                  <div class="review-item">
+                    <strong>EPC Network:</strong>
+                    <span>MCC: {epcConfig.networkConfig.mcc}, MNC: {epcConfig.networkConfig.mnc}, TAC: {epcConfig.networkConfig.tac}</span>
+                  </div>
+                  <div class="review-item">
+                    <strong>HSS:</strong>
+                    <span>{epcConfig.hssConfig.hssHost}:{epcConfig.hssConfig.hssPort}</span>
+                  </div>
+                {/if}
+                {#if deploymentType === 'snmp' || deploymentType === 'both'}
+                  <div class="review-item">
+                    <strong>SNMP Version:</strong>
+                    <span>SNMPv{epcConfig.snmpConfig.version}</span>
+                  </div>
+                  <div class="review-item">
+                    <strong>SNMP Community:</strong>
+                    <span>{epcConfig.snmpConfig.community}</span>
+                  </div>
+                  <div class="review-item">
+                    <strong>Cloud API:</strong>
+                    <span>{epcConfig.snmpConfig.cloudApiUrl}</span>
+                  </div>
+                {/if}
                 <div class="review-item">
                   <strong>Location:</strong>
                   <span>{epcConfig.location.address}, {epcConfig.location.city}, {epcConfig.location.state}, {epcConfig.location.country}</span>
@@ -1009,21 +1587,42 @@ echo "🎉 EPC deployment successful!";
                   <strong>Contact:</strong>
                   <span>{epcConfig.contact.name} ({epcConfig.contact.email})</span>
                 </div>
-                <div class="review-item">
-                  <strong>HSS:</strong>
-                  <span>{epcConfig.hssConfig.hssHost}:{epcConfig.hssConfig.hssPort}</span>
-                </div>
+                {#if epcConfig.aptConfig.enabled}
+                  <div class="review-item">
+                    <strong>APT Repository:</strong>
+                    <span>{epcConfig.aptConfig.repositoryUrl}</span>
+                  </div>
+                  {#if epcConfig.aptConfig.autoUpdate}
+                    <div class="review-item">
+                      <strong>Auto-Update:</strong>
+                      <span>{epcConfig.aptConfig.updateSchedule} at {epcConfig.aptConfig.updateTime}</span>
+                    </div>
+                  {/if}
+                {/if}
               </div>
 
               <div class="deploy-info">
                 <h4>🚀 Deployment Information</h4>
-                <p>The deployment script will:</p>
+                <p>The deployment {deploymentOption === 'script' ? 'script' : 'ISO'} will:</p>
                 <ul>
-                  <li>Install Open5GS EPC components (MME, SGW, PGW, PCRF)</li>
-                  <li>Configure network parameters and HSS connection</li>
-                  <li>Set up systemd services for automatic startup</li>
+                  {#if deploymentType === 'epc' || deploymentType === 'both'}
+                    <li>Install Open5GS EPC components (MME, SGW, PGW, PCRF)</li>
+                    <li>Configure network parameters and HSS connection</li>
+                    <li>Set up systemd services for EPC components</li>
+                  {/if}
+                  {#if deploymentType === 'snmp' || deploymentType === 'both'}
+                    <li>Install SNMP agent and Mikrotik monitoring modules</li>
+                    <li>Configure SNMP for cloud reporting</li>
+                    <li>Set up SNMP cloud reporting service</li>
+                  {/if}
+                  {#if epcConfig.aptConfig.enabled}
+                    <li>Configure APT repository for remote updates</li>
+                    {#if epcConfig.aptConfig.autoUpdate}
+                      <li>Enable automatic updates ({epcConfig.aptConfig.updateSchedule})</li>
+                    {/if}
+                  {/if}
                   <li>Create configuration files with your settings</li>
-                  <li>Start all EPC services</li>
+                  <li>Start all configured services</li>
                 </ul>
               </div>
             </div>
@@ -1038,7 +1637,7 @@ echo "🎉 EPC deployment successful!";
                   <input type="radio" id="script-option" value="script" bind:group={deploymentOption} />
                   <label for="script-option">
                     <h5>📜 Deployment Script</h5>
-                    <p>Download a bash script to install and configure Open5GS EPC on an existing Linux server.</p>
+                    <p>Download a bash script to install and configure {deploymentType === 'both' ? 'EPC and SNMP/Mikrotik' : deploymentType === 'epc' ? 'Open5GS EPC' : 'SNMP/Mikrotik monitoring'} on an existing Ubuntu server.</p>
                   </label>
                 </div>
                 
@@ -1046,7 +1645,7 @@ echo "🎉 EPC deployment successful!";
                   <input type="radio" id="iso-option" value="iso" bind:group={deploymentOption} />
                   <label for="iso-option">
                     <h5>💿 ISO Image</h5>
-                    <p>Download a pre-configured ISO image ready to burn to a USB drive or DVD.</p>
+                    <p>Download a pre-configured ISO image with {deploymentType === 'both' ? 'EPC and SNMP/Mikrotik' : deploymentType === 'epc' ? 'EPC Core' : 'SNMP/Mikrotik'} components ready to burn to a USB drive or DVD.</p>
                   </label>
                 </div>
               </div>
@@ -1305,6 +1904,80 @@ echo "🎉 EPC deployment successful!";
     margin: 0 0 var(--spacing-md) 0;
     color: var(--text-primary);
     font-size: 1.1rem;
+  }
+
+  .section-description {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0 0 var(--spacing-md) 0;
+  }
+
+  .deployment-type-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+  }
+
+  .deployment-option {
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-lg);
+    transition: all 0.2s ease;
+    background: var(--bg-primary);
+  }
+
+  .deployment-option:hover {
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .deployment-option input[type="radio"] {
+    display: none;
+  }
+
+  .deployment-option input[type="radio"]:checked + .option-content {
+    color: var(--primary);
+  }
+
+  .deployment-option:has(input[type="radio"]:checked) {
+    border-color: var(--primary);
+    background: var(--color-primary-light, rgba(59, 130, 246, 0.05));
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .option-content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+  }
+
+  .option-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .option-info {
+    flex: 1;
+  }
+
+  .option-info strong {
+    display: block;
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+    font-weight: 600;
+  }
+
+  .option-info p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
   }
 
   .form-group {

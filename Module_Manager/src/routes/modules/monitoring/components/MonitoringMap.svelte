@@ -184,42 +184,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Display Options -->
-        <div class="monitoring-filters">
-          <h4>Display Options</h4>
-          <label>
-            <input type="checkbox" bind:checked={filters.showEquipment} />
-            📡 Network Equipment ({equipment.length})
-          </label>
-          <label>
-            <input type="checkbox" bind:checked={filters.showLabels} />
-            🏷️ Show Labels
-          </label>
-          <label>
-            <input type="checkbox" bind:checked={filters.showConnections} />
-            🔗 Show Connections
-          </label>
-        </div>
-
-        <!-- Device Status Summary -->
-        <div class="device-status">
-          <h4>Device Status</h4>
-          <div class="status-items">
-            <div class="status-item online">
-              <span class="status-dot"></span>
-              Online: {equipment.filter(e => e.status === 'online').length}
-            </div>
-            <div class="status-item offline">
-              <span class="status-dot"></span>
-              Offline: {equipment.filter(e => e.status === 'offline').length}
-            </div>
-            <div class="status-item unknown">
-              <span class="status-dot"></span>
-              Unknown: {equipment.filter(e => e.status === 'unknown').length}
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- Active Alerts Section - Bottom -->
@@ -319,103 +283,106 @@
   
   .combined-panel {
     background: var(--color-background-primary);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-lg);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     border: 1px solid var(--color-border);
     pointer-events: auto;
-    width: 320px;
+    width: 350px;
     max-height: calc(100vh - 60px);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    overflow: hidden;
   }
 
   .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: 1rem;
   }
   
   .section-header h3 {
     margin: 0;
     color: var(--color-text-primary);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
+    font-size: 1.1rem;
+    font-weight: 600;
   }
 
   .refresh-btn {
     background: transparent;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
     cursor: pointer;
-    font-size: var(--font-size-sm);
-    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
     color: var(--color-text-secondary);
   }
 
   .refresh-btn:hover {
     background: var(--color-background-secondary);
     color: var(--color-text-primary);
+    transform: translateY(-1px);
   }
   
   .combined-panel h4 {
-    margin: var(--spacing-md) 0 var(--spacing-sm) 0;
+    margin: 1.5rem 0 0.75rem 0;
     color: var(--color-text-primary);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
+    font-size: 0.95rem;
+    font-weight: 600;
   }
 
   /* Status Section */
   .status-section {
-    margin-bottom: var(--spacing-md);
-    padding-bottom: var(--spacing-md);
-    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--color-border);
   }
 
   .status-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-sm);
+    gap: 0.75rem;
+    margin-top: 0.75rem;
   }
 
   .status-card {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm);
+    gap: 0.75rem;
+    padding: 0.875rem;
     background: var(--color-background-primary);
-    border-radius: var(--radius-sm);
+    border-radius: 8px;
     border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-sm);
-    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
   }
 
   .status-card:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
   }
 
   .status-card.critical {
-    border-left: 3px solid var(--color-danger);
+    border-left: 4px solid var(--color-danger);
   }
 
   .status-card.warning {
-    border-left: 3px solid var(--color-warning);
+    border-left: 4px solid var(--color-warning);
   }
 
   .status-card.success {
-    border-left: 3px solid var(--color-success);
+    border-left: 4px solid var(--color-success);
   }
 
   .status-card.info {
-    border-left: 3px solid var(--color-info);
+    border-left: 4px solid var(--color-info);
   }
 
   .status-icon {
-    font-size: var(--font-size-base);
+    font-size: 1.25rem;
     flex-shrink: 0;
   }
 
@@ -425,82 +392,21 @@
   }
 
   .status-value {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-bold);
+    font-size: 1.25rem;
+    font-weight: 700;
     color: var(--color-text-primary);
-    line-height: var(--line-height-tight);
+    line-height: 1.2;
+    margin-bottom: 0.25rem;
   }
 
   .status-label {
-    font-size: var(--font-size-xs);
+    font-size: 0.75rem;
     color: var(--color-text-secondary);
-    font-weight: var(--font-weight-medium);
-    margin-top: var(--spacing-xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
   }
   
-  .monitoring-filters {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-  }
-  
-  .monitoring-filters label {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
-  }
-
-  .monitoring-filters label:hover {
-    color: var(--color-text-primary);
-  }
-
-  .monitoring-filters input[type="checkbox"] {
-    accent-color: var(--color-primary);
-  }
-  
-  .device-status {
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
-  }
-  
-  .status-items {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-  }
-  
-  .status-item {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-  }
-  
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-full);
-    flex-shrink: 0;
-  }
-  
-  .status-item.online .status-dot {
-    background: var(--color-success);
-  }
-  
-  .status-item.offline .status-dot {
-    background: var(--color-danger);
-  }
-  
-  .status-item.unknown .status-dot {
-    background: var(--color-text-tertiary);
-  }
   
   .map-wrapper {
     width: 100%;
@@ -530,33 +436,58 @@
 
   /* Alerts Section */
   .alerts-section {
-    border-top: 1px solid var(--color-border);
-    padding-top: var(--spacing-md);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .alerts-count {
     background: var(--color-danger);
     color: var(--color-text-inverse);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
 
   .alerts-list {
-    max-height: 300px;
+    flex: 1;
     overflow-y: auto;
-    margin: var(--spacing-sm) 0;
+    margin: 1rem 0 0 0;
+    padding-right: 0.5rem;
+    min-height: 0;
+  }
+
+  /* Custom scrollbar for alerts list */
+  .alerts-list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .alerts-list::-webkit-scrollbar-track {
+    background: var(--color-background-secondary);
+    border-radius: 3px;
+  }
+
+  .alerts-list::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+
+  .alerts-list::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-tertiary);
   }
 
   .alert-item {
-    padding: var(--spacing-sm);
+    padding: 1rem;
     border-bottom: 1px solid var(--color-border);
     border-left: 4px solid transparent;
-    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
-    border-radius: var(--radius-sm);
-    margin-bottom: var(--spacing-sm);
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
     background: var(--color-background-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
 
   .alert-item.clickable {
@@ -566,7 +497,8 @@
   .alert-item.clickable:hover {
     background: var(--color-background-secondary);
     border-left-width: 6px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
   }
 
   .alert-item.clickable:focus {
@@ -577,7 +509,7 @@
   .alert-content {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: 0.75rem;
   }
 
   .alert-header {
@@ -587,55 +519,65 @@
   }
 
   .alert-severity {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
+    font-size: 0.75rem;
+    font-weight: 600;
     text-transform: uppercase;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.025em;
   }
 
   .alert-severity.critical {
     color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.1);
   }
 
   .alert-severity.warning {
     color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.1);
   }
 
   .alert-severity.info {
     color: var(--color-info);
+    background: rgba(59, 130, 246, 0.1);
   }
 
   .alert-message {
-    font-size: var(--font-size-sm);
+    font-size: 0.875rem;
     color: var(--color-text-primary);
-    line-height: var(--line-height-normal);
+    line-height: 1.5;
+    font-weight: 500;
   }
 
   .alert-time {
-    font-size: var(--font-size-xs);
+    font-size: 0.75rem;
     color: var(--color-text-secondary);
+    font-weight: 500;
   }
 
   .alert-actions {
     display: flex;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-xs);
+    gap: 0.75rem;
+    margin-top: 0.5rem;
   }
 
   .alert-action-btn {
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: 0.5rem 0.75rem;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: 6px;
     background: var(--color-background-primary);
     color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
+    font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+    transition: all 0.2s ease;
   }
 
   .alert-action-btn:hover {
     background: var(--color-background-secondary);
     border-color: var(--color-primary);
     color: var(--color-primary);
+    transform: translateY(-1px);
   }
 
   .alert-action-btn.details:hover {
@@ -653,20 +595,20 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-xl) var(--spacing-md);
+    padding: 2rem 1rem;
     text-align: center;
     color: var(--color-text-secondary);
   }
 
   .no-alerts-icon {
-    font-size: var(--font-size-xl);
-    margin-bottom: var(--spacing-sm);
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
   }
 
   .no-alerts-text {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    margin-bottom: var(--spacing-xs);
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
     color: var(--color-text-primary);
   }
 </style>
