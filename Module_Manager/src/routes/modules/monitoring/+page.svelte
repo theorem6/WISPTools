@@ -10,15 +10,11 @@
   import NetworkTopologyMap from './components/NetworkTopologyMap.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
-  
-  // Use GCE backend for monitoring APIs (port 3003 per memory)
-  // Note: Using HTTP for now, should be HTTPS in production
-  const GCE_BACKEND = 'http://136.112.111.167:3003';
-  const MONITORING_API = GCE_BACKEND;
+  import { monitoringService } from '$lib/services/monitoringService';
   
   // Use real backend data now that devices are created
   // Temporarily enable mock data to ensure devices show while debugging backend
-  const USE_MOCK_DATA = true;
+  const USE_MOCK_DATA = false; // Use standard API service now
   
   let showSNMPConfig = false;
   let networkDevices = [];
@@ -76,7 +72,7 @@
     loading = true;
     try {
       if (USE_MOCK_DATA) {
-        // Use mock data for now to avoid CORS issues
+        // Use mock data for now
         dashboardData = {
           summary: {
             critical_alerts: 1,
@@ -119,14 +115,9 @@
         serviceHealth = dashboardData.service_health;
         activeAlerts = dashboardData.active_alerts;
       } else {
-        const response = await fetch(`${GCE_BACKEND}/health`, {
-          headers: {
-            'x-tenant-id': tenantId
-          }
-        });
-        
-        if (response.ok) {
-          const healthData = await response.json();
+        const result = await monitoringService.getHealth();
+        if (result.success && result.data) {
+          const healthData = result.data;
           // Create dashboard data from health response
           dashboardData = {
             summary: {
@@ -248,51 +239,42 @@
         return;
       }
       
-      // Real API calls (will be blocked by CORS for now)
+      // Use standard monitoring service API calls
       const devices = [];
       
       try {
-        const epcResponse = await fetch(`${GCE_BACKEND}/api/epc/list`, {
-          headers: { 'x-tenant-id': tenantId }
-        });
-        if (epcResponse.ok) {
-          const epcData = await epcResponse.json();
-          devices.push(...(epcData.epcs || []).map(epc => ({
+        const epcResult = await monitoringService.getEPCDevices();
+        if (epcResult.success && epcResult.data?.epcs) {
+          devices.push(...epcResult.data.epcs.map((epc: any) => ({
             ...epc,
             type: 'epc',
             id: epc.epcId || epc.id,
             status: epc.status || 'unknown'
           })));
         }
-      } catch (e) { console.log('EPC API not available:', e.message); }
+      } catch (e) { console.log('EPC API not available:', e); }
       
       try {
-        const mikrotikResponse = await fetch(`${GCE_BACKEND}/api/mikrotik/devices`, {
-          headers: { 'x-tenant-id': tenantId }
-        });
-        if (mikrotikResponse.ok) {
-          const mikrotikData = await mikrotikResponse.json();
-          devices.push(...(mikrotikData.devices || []).map(device => ({
+        const mikrotikResult = await monitoringService.getMikrotikDevices();
+        if (mikrotikResult.success && mikrotikResult.data?.devices) {
+          devices.push(...mikrotikResult.data.devices.map((device: any) => ({
             ...device,
             type: 'mikrotik',
             status: device.status || 'unknown'
           })));
         }
-      } catch (e) { console.log('Mikrotik API not available:', e.message); }
+      } catch (e) { console.log('Mikrotik API not available:', e); }
       
       try {
-        const snmpResponse = await fetch(`${GCE_BACKEND}/api/snmp/devices`, {
-          headers: { 'x-tenant-id': tenantId }
-        });
-        if (snmpResponse.ok) {
-          const snmpDeviceData = await snmpResponse.json();
-          devices.push(...(snmpDeviceData.devices || []).map(device => ({
+        const snmpResult = await monitoringService.getSNMPDevices();
+        if (snmpResult.success && snmpResult.data?.devices) {
+          devices.push(...snmpResult.data.devices.map((device: any) => ({
             ...device,
             type: 'snmp',
             status: device.status || 'unknown'
           })));
         }
-      } catch (e) { console.log('SNMP API not available:', e.message); }
+      } catch (e) { console.log('SNMP API not available:', e); }
       
       networkDevices = devices;
       console.log('[Network Monitoring] Loaded network devices:', devices.length);
@@ -333,12 +315,10 @@
         return;
       }
       
-      const response = await fetch(`${GCE_BACKEND}/api/snmp/metrics/latest`, {
-        headers: { 'x-tenant-id': tenantId }
-      });
+      const result = await monitoringService.getSNMPMetrics();
       
-      if (response.ok) {
-        snmpData = await response.json();
+      if (result.success && result.data) {
+        snmpData = Array.isArray(result.data) ? result.data : [result.data];
         console.log('[Network Monitoring] Loaded SNMP data:', snmpData.length);
       }
     } catch (error) {
