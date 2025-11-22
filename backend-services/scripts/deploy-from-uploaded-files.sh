@@ -96,7 +96,8 @@ cat > "$BACKEND_DIR/package.json" << 'EOF'
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "mongoose": "^7.5.0",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
