@@ -152,7 +152,6 @@ import { isPlatformAdmin } from '$lib/services/adminService';
         
         // Separate plans by status for accurate menu counts
         draftPlans = allPlans.filter(plan => plan.status === 'draft' || plan.status === 'active');
-        const readyOnlyPlans = allPlans.filter(plan => plan.status === 'ready');
         approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
         deployedPlans = allPlans.filter(plan => plan.status === 'deployed');
         
