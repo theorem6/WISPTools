@@ -15,8 +15,8 @@
   const GCE_BACKEND = 'http://136.112.111.167:3003';
   const MONITORING_API = GCE_BACKEND;
   
-  // For now, let's use mock data since CORS will block direct calls
-  const USE_MOCK_DATA = true;
+  // Use real backend data now that devices are created
+  const USE_MOCK_DATA = false;
   
   let showSNMPConfig = false;
   let networkDevices = [];
