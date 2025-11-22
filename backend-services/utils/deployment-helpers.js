@@ -657,16 +657,30 @@ class EPCSNMPAgent {
 
   async registerMikrotikDevice(ip, deviceInfo) {
     try {
-      // Try common Mikrotik credentials
-      const credentials = [
-        { username: 'admin', password: '' },
-        { username: 'admin', password: 'admin' },
-        { username: 'admin', password: 'password' }
-      ];
+      // First, try to get credentials from cloud API
+      let cloudCredentials = null;
+      try {
+        const credsResponse = await this.sendToCloudAPI('/api/mikrotik/devices/credentials', {}, 'GET');
+        if (credsResponse.success && credsResponse.credentials && credsResponse.credentials[ip]) {
+          cloudCredentials = credsResponse.credentials[ip];
+          console.log(\`[EPC SNMP Agent] Found cloud credentials for Mikrotik device: \${ip}\`);
+        }
+      } catch (error) {
+        console.warn(\`[EPC SNMP Agent] Could not fetch cloud credentials for \${ip}, trying defaults:\`, error.message);
+      }
       
-      for (const cred of credentials) {
+      // Try credentials from cloud, then fallback to defaults
+      const credentialsToTry = cloudCredentials ? 
+        [{ username: cloudCredentials.username, password: cloudCredentials.password || '', port: cloudCredentials.port || 8728, useSSL: cloudCredentials.useSSL || false }] :
+        [
+          { username: 'admin', password: '', port: 8728, useSSL: false },
+          { username: 'admin', password: 'admin', port: 8728, useSSL: false },
+          { username: 'admin', password: 'password', port: 8728, useSSL: false }
+        ];
+      
+      for (const cred of credentialsToTry) {
         try {
-          const connection = await this.connectMikrotikAPI(ip, cred.username, cred.password);
+          const connection = await this.connectMikrotikAPI(ip, cred.username, cred.password, cred.port, cred.useSSL);
           if (connection) {
             // Get Mikrotik device info
             const identity = await this.getMikrotikIdentity(connection);
@@ -680,13 +694,15 @@ class EPCSNMPAgent {
               systemInfo: systemInfo,
               credentials: {
                 username: cred.username,
-                // Don't store password in device info - it will be used from credentials env
-                hasPassword: !!cred.password
+                password: cred.password,
+                port: cred.port || 8728,
+                useSSL: cred.useSSL || false,
+                source: cloudCredentials ? 'cloud' : 'default'
               },
               lastSeen: new Date(),
               discoveredAt: new Date(),
               status: 'online',
-              apiPort: 8728
+              apiPort: cred.port || 8728
             };
             
             this.mikrotikDevices.set(ip, mikrotikDevice);
@@ -705,19 +721,19 @@ class EPCSNMPAgent {
         }
       }
       
-      console.warn(\`[EPC SNMP Agent] Could not connect to Mikrotik device \${ip} with default credentials\`);
+      console.warn(\`[EPC SNMP Agent] Could not connect to Mikrotik device \${ip} with available credentials\`);
     } catch (error) {
       console.error(\`[EPC SNMP Agent] Failed to register Mikrotik device \${ip}:\`, error.message);
     }
   }
 
-  async connectMikrotikAPI(ip, username, password) {
+  async connectMikrotikAPI(ip, username, password, port = 8728, useSSL = false) {
     return new Promise((resolve, reject) => {
       const conn = new RouterOSAPI({
         host: ip,
         user: username,
         password: password,
-        port: 8728,
+        port: useSSL ? 8729 : (port || 8728),
         timeout: 5000
       });
       
@@ -804,10 +820,37 @@ class EPCSNMPAgent {
           { username: 'admin', password: 'admin' }
         ];
         
+        // Try to get updated credentials from cloud API
+        let deviceCredentials = device.credentials || {};
+        try {
+          const credsResponse = await this.sendToCloudAPI(\`/api/mikrotik/devices/credentials?epcId=\${this.config.epcId}&authCode=\${this.config.authCode}\`, {}, 'GET');
+          if (credsResponse.success && credsResponse.credentials && credsResponse.credentials[ip]) {
+            deviceCredentials = credsResponse.credentials[ip];
+            // Update stored credentials
+            device.credentials = {
+              username: deviceCredentials.username,
+              password: deviceCredentials.password,
+              port: deviceCredentials.port || 8728,
+              useSSL: deviceCredentials.useSSL || false,
+              source: 'cloud'
+            };
+          }
+        } catch (error) {
+          console.warn(\`[EPC SNMP Agent] Could not fetch updated credentials for \${ip}, using cached:\`, error.message);
+        }
+        
+        // Try credentials from device (which may have been updated from cloud)
+        const credentials = deviceCredentials.username ? 
+          [{ username: deviceCredentials.username, password: deviceCredentials.password || '', port: deviceCredentials.port || 8728, useSSL: deviceCredentials.useSSL || false }] :
+          [
+            { username: 'admin', password: '', port: 8728, useSSL: false },
+            { username: 'admin', password: 'admin', port: 8728, useSSL: false }
+          ];
+        
         let connection = null;
         for (const cred of credentials) {
           try {
-            connection = await this.connectMikrotikAPI(ip, cred.username, cred.password);
+            connection = await this.connectMikrotikAPI(ip, cred.username, cred.password, cred.port, cred.useSSL);
             if (connection) break;
           } catch (e) {
             continue;
@@ -1080,32 +1123,43 @@ class EPCSNMPAgent {
     }
   }
 
-  async sendToCloudAPI(endpoint, data) {
+  async sendToCloudAPI(endpoint, data, method = 'POST') {
     return new Promise((resolve, reject) => {
       const url = new URL(endpoint, this.config.cloudApiUrl);
       const isHttps = url.protocol === 'https:';
       const client = isHttps ? https : http;
-      const postData = JSON.stringify(data);
+      const requestData = method === 'GET' ? null : JSON.stringify(data);
       
       const options = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 80),
-        path: url.pathname,
-        method: 'POST',
+        path: method === 'GET' && data && Object.keys(data).length > 0 ? 
+          \`\${url.pathname}?\${new URLSearchParams(data).toString()}\` : 
+          url.pathname,
+        method: method,
         headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData),
           'Authorization': \`Bearer \${this.config.apiKey}\`,
-          'x-tenant-id': this.config.tenantId
+          'x-tenant-id': this.config.tenantId,
+          'x-epc-id': this.config.epcId,
+          'x-auth-code': this.config.authCode
         }
       };
+      
+      if (method !== 'GET' && requestData) {
+        options.headers['Content-Type'] = 'application/json';
+        options.headers['Content-Length'] = Buffer.byteLength(requestData);
+      }
       
       const req = client.request(options, (res) => {
         let responseData = '';
         res.on('data', (chunk) => { responseData += chunk; });
         res.on('end', () => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(JSON.parse(responseData || '{}'));
+            try {
+              resolve(JSON.parse(responseData || '{}'));
+            } catch (e) {
+              resolve({});
+            }
           } else {
             reject(new Error(\`HTTP \${res.statusCode}: \${responseData}\`));
           }
@@ -1113,7 +1167,10 @@ class EPCSNMPAgent {
       });
       
       req.on('error', (error) => { reject(error); });
-      req.write(postData);
+      
+      if (method !== 'GET' && requestData) {
+        req.write(requestData);
+      }
       req.end();
     });
   }

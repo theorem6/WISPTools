@@ -474,6 +474,20 @@
       </div>
     </div>
   </div>
+
+<!-- Mikrotik Credentials Modal -->
+<MikrotikCredentialsModal
+  device={selectedMikrotikDevice}
+  open={showMikrotikCredentialsModal}
+  on:close={() => {
+    showMikrotikCredentialsModal = false;
+    selectedMikrotikDevice = null;
+  }}
+  on:saved={async () => {
+    // Reload devices after credentials are saved
+    await loadNetworkDevices();
+  }}
+/>
 </TenantGuard>
 
 <!-- SNMP Configuration Modal -->
