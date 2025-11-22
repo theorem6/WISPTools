@@ -10,6 +10,9 @@ const path = require('path');
 const crypto = require('crypto');
 const { Tenant } = require('../models/tenant');
 const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { generateCloudInitConfig } = require('../utils/iso-helpers');
+const { generateBootstrapScript } = require('../utils/bootstrap-helpers');
+const { generateFullDeploymentScript } = require('../utils/deployment-helpers');
 
 const execAsync = promisify(exec);
 const router = express.Router();
