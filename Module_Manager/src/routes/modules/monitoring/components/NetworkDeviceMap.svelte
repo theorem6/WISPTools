@@ -579,7 +579,7 @@
         </div>
         <div class="device-popup-actions">
           <button onclick="window.viewDeviceDetails('${device.id}')">View Details</button>
-          ${device.type === 'mikrotik' ? `<button onclick="window.configureDevice('${device.id}')">Configure</button>` : ''}
+          ${device.type === 'mikrotik' ? `<button onclick="window.configureMikrotikCredentials('${device.id}')">Configure Credentials</button>` : ''}
         </div>
       </div>
     `;

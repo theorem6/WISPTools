@@ -8,6 +8,7 @@
   import MonitoringMap from './components/MonitoringMap.svelte';
   import SNMPConfigurationPanel from './components/SNMPConfigurationPanel.svelte';
   import NetworkTopologyMap from './components/NetworkTopologyMap.svelte';
+  import MikrotikCredentialsModal from './components/MikrotikCredentialsModal.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
@@ -22,6 +23,8 @@
   let selectedDevice = null;
   let mapView = 'geographic'; // 'geographic' or 'topology'
   let loading = true;
+  let showMikrotikCredentialsModal = false;
+  let selectedMikrotikDevice: any = null;
   
   // Tenant info - use currentTenant store
   $: tenantId = $currentTenant?.id || '';

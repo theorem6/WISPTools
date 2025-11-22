@@ -482,4 +482,167 @@ router.post('/discover', async (req, res) => {
   }
 });
 
+// PUT /api/mikrotik/devices/:id/credentials - Update device credentials
+router.put('/devices/:id/credentials', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, password, port = 8728, useSSL = false } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ error: 'username is required' });
+    }
+
+    console.log(`🔐 [Mikrotik API] Updating credentials for device: ${id}`);
+
+    const device = await NetworkEquipment.findOne({
+      _id: id,
+      tenantId: req.tenantId
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Parse existing notes
+    let notes = {};
+    try {
+      notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : (device.notes || {});
+    } catch (e) {
+      notes = {};
+    }
+
+    // Update credentials (do not store password in plain text - this should be encrypted in production)
+    notes.mikrotik_api = {
+      enabled: true,
+      port: port || 8728,
+      useSSL: useSSL || false,
+      username: username,
+      // Store password (in production, encrypt this)
+      password: password || notes.mikrotik_api?.password || '',
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.tenantId // In production, use actual user ID
+    };
+
+    device.notes = JSON.stringify(notes);
+    device.updatedAt = new Date();
+    await device.save();
+
+    console.log(`✅ [Mikrotik API] Credentials updated for device: ${id}`);
+
+    res.json({
+      success: true,
+      message: 'Credentials updated successfully',
+      deviceId: id
+    });
+  } catch (error) {
+    console.error('❌ [Mikrotik API] Error updating credentials:', error);
+    res.status(500).json({ 
+      error: 'Failed to update credentials',
+      message: error.message 
+    });
+  }
+});
+
+// GET /api/mikrotik/devices/:id/credentials - Get device credentials (for SNMP agent)
+router.get('/devices/:id/credentials', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const authCode = req.query.authCode || req.headers['x-auth-code'];
+
+    console.log(`🔐 [Mikrotik API] Retrieving credentials for device: ${id}`);
+
+    const device = await NetworkEquipment.findOne({
+      _id: id,
+      tenantId: req.tenantId
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    // Parse notes
+    let notes = {};
+    try {
+      notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : (device.notes || {});
+    } catch (e) {
+      notes = {};
+    }
+
+    const credentials = notes.mikrotik_api || {};
+
+    res.json({
+      success: true,
+      credentials: {
+        ip: notes.management_ip || device.name,
+        username: credentials.username || 'admin',
+        password: credentials.password || '',
+        port: credentials.port || 8728,
+        useSSL: credentials.useSSL || false
+      }
+    });
+  } catch (error) {
+    console.error('❌ [Mikrotik API] Error retrieving credentials:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve credentials',
+      message: error.message 
+    });
+  }
+});
+
+// GET /api/mikrotik/devices/credentials - Get all device credentials (for SNMP agent to sync)
+router.get('/devices/credentials', async (req, res) => {
+  try {
+    const epcId = req.query.epcId || req.headers['x-epc-id'];
+    const authCode = req.query.authCode || req.headers['x-auth-code'];
+
+    if (!epcId || !authCode) {
+      return res.status(400).json({ error: 'epcId and authCode are required' });
+    }
+
+    console.log(`🔐 [Mikrotik API] Retrieving credentials for EPC: ${epcId}`);
+
+    // Find all Mikrotik devices for this tenant
+    const devices = await NetworkEquipment.find({
+      tenantId: req.tenantId,
+      manufacturer: 'Mikrotik',
+      status: 'active'
+    }).lean();
+
+    const credentialsMap = {};
+
+    for (const device of devices) {
+      let notes = {};
+      try {
+        notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : (device.notes || {});
+      } catch (e) {
+        continue;
+      }
+
+      const ip = notes.management_ip || device.name;
+      const apiConfig = notes.mikrotik_api || {};
+
+      if (apiConfig.username && apiConfig.password) {
+        credentialsMap[ip] = {
+          username: apiConfig.username,
+          password: apiConfig.password,
+          port: apiConfig.port || 8728,
+          useSSL: apiConfig.useSSL || false
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      credentials: credentialsMap,
+      count: Object.keys(credentialsMap).length
+    });
+  } catch (error) {
+    console.error('❌ [Mikrotik API] Error retrieving credentials:', error);
+    res.status(500).json({ 
+      error: 'Failed to retrieve credentials',
+      message: error.message 
+    });
+  }
+});
+
 module.exports = router;
