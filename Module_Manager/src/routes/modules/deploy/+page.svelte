@@ -152,18 +152,15 @@ import { isPlatformAdmin } from '$lib/services/adminService';
         
         // Separate plans by status for accurate menu counts
         draftPlans = allPlans.filter(plan => plan.status === 'draft' || plan.status === 'active');
-        readyPlans = allPlans.filter(plan => plan.status === 'ready');
+        const readyOnlyPlans = allPlans.filter(plan => plan.status === 'ready');
         approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
         deployedPlans = allPlans.filter(plan => plan.status === 'deployed');
         
         // Show all plans that can be finalized, approved, or deployed (for the plan list modal)
-        const plansForReview = allPlans.filter(plan => 
+        readyPlans = allPlans.filter(plan => 
           plan.status === 'draft' || plan.status === 'active' || plan.status === 'ready' || 
           plan.status === 'approved' || plan.status === 'authorized'
         );
-        
-        // Use plansForReview for the modal, but keep separate counts for menu
-        readyPlans = plansForReview;
         
         // Initialize visible plan IDs from plans with showOnMap = true
         visiblePlanIds = new Set(
@@ -404,12 +401,12 @@ import { isPlatformAdmin } from '$lib/services/adminService';
           class="control-btn" 
           class:active={showProjectFilters}
           on:click={() => showProjectFilters = !showProjectFilters} 
-          title="Project Filters - Approved plans"
+          title="Project Filters - Approved plans ready for deployment"
         >
           🔍 Approved ({approvedPlans.length})
         </button>
-        <button class="control-btn" on:click={openPlanApproval} title="Plan Management - All plans">
-          📋 Plans ({draftPlans.length + readyPlans.length + approvedPlans.length})
+        <button class="control-btn" on:click={openPlanApproval} title="Plan Management - Draft, Ready, and Approved plans">
+          📋 Plans ({readyPlans.length})
         </button>
         <button 
           class="control-btn" 
