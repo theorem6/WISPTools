@@ -140,14 +140,17 @@
 </script>
 
 <div class="monitoring-map" style="height: {height};">
-  <!-- Monitoring-specific controls overlay - Left Side -->
-  <div class="monitoring-controls">
-    <div class="monitoring-panel">
-      <h3>🔍 Network Monitoring</h3>
-      
-      <!-- Status Cards -->
+  <!-- Combined Monitoring Panel - Right Side -->
+  <div class="combined-controls">
+    <div class="combined-panel">
+      <!-- System Status Section - Top -->
       <div class="status-section">
-        <h4>System Status</h4>
+        <div class="section-header">
+          <h3>📊 System Status</h3>
+          <button class="refresh-btn" on:click={() => dispatch('refreshData')} title="Refresh Data">
+            🔄
+          </button>
+        </div>
         <div class="status-cards">
           <div class="status-card critical">
             <div class="status-icon">🚨</div>
@@ -181,99 +184,92 @@
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="monitoring-filters">
-        <h4>Display Options</h4>
-        <label>
-          <input type="checkbox" bind:checked={filters.showEquipment} />
-          📡 Network Equipment ({equipment.length})
-        </label>
-        <label>
-          <input type="checkbox" bind:checked={filters.showLabels} />
-          🏷️ Show Labels
-        </label>
-        <label>
-          <input type="checkbox" bind:checked={filters.showConnections} />
-          🔗 Show Connections
-        </label>
-      </div>
-      
-      <div class="device-status">
-        <h4>Device Status</h4>
-        <div class="status-items">
-          <div class="status-item online">
-            <span class="status-dot"></span>
-            Online: {equipment.filter(e => e.status === 'online').length}
-          </div>
-          <div class="status-item offline">
-            <span class="status-dot"></span>
-            Offline: {equipment.filter(e => e.status === 'offline').length}
-          </div>
-          <div class="status-item unknown">
-            <span class="status-dot"></span>
-            Unknown: {equipment.filter(e => e.status === 'unknown').length}
+        <!-- Display Options -->
+        <div class="monitoring-filters">
+          <h4>Display Options</h4>
+          <label>
+            <input type="checkbox" bind:checked={filters.showEquipment} />
+            📡 Network Equipment ({equipment.length})
+          </label>
+          <label>
+            <input type="checkbox" bind:checked={filters.showLabels} />
+            🏷️ Show Labels
+          </label>
+          <label>
+            <input type="checkbox" bind:checked={filters.showConnections} />
+            🔗 Show Connections
+          </label>
+        </div>
+
+        <!-- Device Status Summary -->
+        <div class="device-status">
+          <h4>Device Status</h4>
+          <div class="status-items">
+            <div class="status-item online">
+              <span class="status-dot"></span>
+              Online: {equipment.filter(e => e.status === 'online').length}
+            </div>
+            <div class="status-item offline">
+              <span class="status-dot"></span>
+              Offline: {equipment.filter(e => e.status === 'offline').length}
+            </div>
+            <div class="status-item unknown">
+              <span class="status-dot"></span>
+              Unknown: {equipment.filter(e => e.status === 'unknown').length}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Active Alerts Panel - Right Side -->
-  <div class="alerts-controls">
-    <div class="alerts-panel">
-      <div class="alerts-panel-header">
-        <h3>🚨 Active Alerts</h3>
-        <span class="alerts-count">{alerts.length}</span>
-      </div>
-      
-      <div class="alerts-panel-actions">
-        <button class="btn btn-sm btn-secondary" on:click={() => dispatch('refreshData')}>
-          🔄 Refresh
-        </button>
-      </div>
+      <!-- Active Alerts Section - Bottom -->
+      <div class="alerts-section">
+        <div class="section-header">
+          <h3>🚨 Active Alerts</h3>
+          <span class="alerts-count">{alerts.length}</span>
+        </div>
 
-      <div class="alerts-list">
-        {#if alerts.length > 0}
-          {#each alerts as alert, index}
-            <div 
-              class="alert-item clickable" 
-              style="border-left-color: {getAlertSeverityColor(alert.severity)}"
-              on:click={() => dispatch('alertClick', alert)}
-              on:keydown={(e) => e.key === 'Enter' && dispatch('alertClick', alert)}
-              tabindex="0"
-              role="button"
-            >
-              <div class="alert-content">
-                <div class="alert-header">
-                  <div class="alert-severity {alert.severity?.toLowerCase()}">{alert.severity}</div>
-                  <div class="alert-time">{new Date(alert.timestamp).toLocaleTimeString()}</div>
-                </div>
-                <div class="alert-message">{alert.message}</div>
-                <div class="alert-actions">
-                  <button 
-                    class="alert-action-btn details"
-                    on:click|stopPropagation={() => dispatch('showAlertDetails', alert)}
-                  >
-                    📋 Details
-                  </button>
-                  <button 
-                    class="alert-action-btn ticket"
-                    on:click|stopPropagation={() => dispatch('createTicketFromAlert', alert)}
-                  >
-                    🎫 Create Ticket
-                  </button>
+        <div class="alerts-list">
+          {#if alerts.length > 0}
+            {#each alerts as alert, index}
+              <div 
+                class="alert-item clickable" 
+                style="border-left-color: {getAlertSeverityColor(alert.severity)}"
+                on:click={() => dispatch('alertClick', alert)}
+                on:keydown={(e) => e.key === 'Enter' && dispatch('alertClick', alert)}
+                tabindex="0"
+                role="button"
+              >
+                <div class="alert-content">
+                  <div class="alert-header">
+                    <div class="alert-severity {alert.severity?.toLowerCase()}">{alert.severity}</div>
+                    <div class="alert-time">{new Date(alert.timestamp).toLocaleTimeString()}</div>
+                  </div>
+                  <div class="alert-message">{alert.message}</div>
+                  <div class="alert-actions">
+                    <button 
+                      class="alert-action-btn details"
+                      on:click|stopPropagation={() => dispatch('showAlertDetails', alert)}
+                    >
+                      📋 Details
+                    </button>
+                    <button 
+                      class="alert-action-btn ticket"
+                      on:click|stopPropagation={() => dispatch('createTicketFromAlert', alert)}
+                    >
+                      🎫 Create Ticket
+                    </button>
+                  </div>
                 </div>
               </div>
+            {/each}
+          {:else}
+            <div class="no-alerts">
+              <div class="no-alerts-icon">✅</div>
+              <div class="no-alerts-text">No active alerts</div>
             </div>
-          {/each}
-        {:else}
-          <div class="no-alerts">
-            <div class="no-alerts-icon">✅</div>
-            <div class="no-alerts-text">No active alerts</div>
-            <div class="no-alerts-subtext">All systems operating normally</div>
-          </div>
-        {/if}
+          {/if}
+        </div>
       </div>
     </div>
   </div>
@@ -313,89 +309,113 @@
     background: var(--bg-secondary, #f9fafb);
   }
   
-  .monitoring-controls {
+  .combined-controls {
     position: absolute;
-    top: 100px; /* Further below the floating header with more spacing */
-    left: 10px;
-    z-index: 1000;
-    pointer-events: none;
-  }
-
-  .alerts-controls {
-    position: absolute;
-    top: 100px; /* Further below the floating header with more spacing */
+    top: 20px; /* Same height as exit menu */
     right: 10px;
     z-index: 1000;
     pointer-events: none;
   }
   
-  .monitoring-panel {
-    background: var(--card-bg, white);
-    border-radius: 8px;
-    padding: 1rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--border-color, #e5e7eb);
+  .combined-panel {
+    background: var(--color-background-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--color-border);
     pointer-events: auto;
-    min-width: 250px;
-  }
-  
-  .monitoring-panel h3 {
-    margin: 0 0 1rem 0;
-    color: var(--text-primary, #111827);
-    font-size: 1.1rem;
-    font-weight: 600;
-  }
-  
-  .monitoring-panel h4 {
-    margin: 1rem 0 0.5rem 0;
-    color: var(--text-primary, #111827);
-    font-size: 0.9rem;
-    font-weight: 600;
+    width: 320px;
+    max-height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
   }
 
-  /* Status Cards in Monitoring Panel */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+  }
+  
+  .section-header h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  .refresh-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+    color: var(--color-text-secondary);
+  }
+
+  .refresh-btn:hover {
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+  }
+  
+  .combined-panel h4 {
+    margin: var(--spacing-md) 0 var(--spacing-sm) 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* Status Section */
   .status-section {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
   }
 
   .status-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
   }
 
   .status-card {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: var(--card-bg, white);
-    border-radius: 4px;
-    border: 1px solid var(--border-color, #e5e7eb);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: var(--color-background-primary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+  }
+
+  .status-card:hover {
+    box-shadow: var(--shadow-md);
   }
 
   .status-card.critical {
-    border-left: 3px solid #ef4444;
+    border-left: 3px solid var(--color-danger);
   }
 
   .status-card.warning {
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid var(--color-warning);
   }
 
   .status-card.success {
-    border-left: 3px solid #10b981;
+    border-left: 3px solid var(--color-success);
   }
 
   .status-card.info {
-    border-left: 3px solid #3b82f6;
+    border-left: 3px solid var(--color-info);
   }
 
   .status-icon {
-    font-size: 1rem;
+    font-size: var(--font-size-base);
     flex-shrink: 0;
   }
 
@@ -405,68 +425,81 @@
   }
 
   .status-value {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary, #111827);
-    line-height: 1;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+    line-height: var(--line-height-tight);
   }
 
   .status-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary, #6b7280);
-    font-weight: 500;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-medium);
+    margin-top: var(--spacing-xs);
   }
   
   .monitoring-filters {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
   }
   
   .monitoring-filters label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary, #6b7280);
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
     cursor: pointer;
+    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+  }
+
+  .monitoring-filters label:hover {
+    color: var(--color-text-primary);
+  }
+
+  .monitoring-filters input[type="checkbox"] {
+    accent-color: var(--color-primary);
   }
   
   .device-status {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color, #e5e7eb);
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
   }
   
   .status-items {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: var(--spacing-xs);
   }
   
   .status-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
   }
   
   .status-dot {
     width: 8px;
     height: 8px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
   }
   
   .status-item.online .status-dot {
-    background: #10b981;
+    background: var(--color-success);
   }
   
   .status-item.offline .status-dot {
-    background: #ef4444;
+    background: var(--color-danger);
   }
   
   .status-item.unknown .status-dot {
-    background: #6b7280;
+    background: var(--color-text-tertiary);
   }
   
   .map-wrapper {
@@ -495,61 +528,35 @@
     border-radius: 8px;
   }
 
-  /* Alerts Panel Styling - Mirror of monitoring panel */
-  .alerts-panel {
-    background: var(--card-bg, white);
-    border-radius: 8px;
-    padding: 1rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--border-color, #e5e7eb);
-    pointer-events: auto;
-    width: 280px;
-    max-height: calc(100vh - 140px);
-    display: flex;
-    flex-direction: column;
-  }
-
-  .alerts-panel h3 {
-    margin: 0 0 1rem 0;
-    font-size: 1rem;
-    color: var(--text-primary, #111827);
-    font-weight: 600;
-  }
-
-  .alerts-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
+  /* Alerts Section */
+  .alerts-section {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-md);
   }
 
   .alerts-count {
-    background: #ef4444;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .alerts-panel-actions {
-    margin-bottom: 0.75rem;
+    background: var(--color-danger);
+    color: var(--color-text-inverse);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
   }
 
   .alerts-list {
-    flex: 1;
+    max-height: 300px;
     overflow-y: auto;
-    margin: -0.5rem;
-    padding: 0.5rem;
+    margin: var(--spacing-sm) 0;
   }
 
   .alert-item {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border);
     border-left: 4px solid transparent;
-    transition: all 0.2s ease;
-    border-radius: 4px;
-    margin-bottom: 0.5rem;
+    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+    background: var(--color-background-primary);
   }
 
   .alert-item.clickable {
@@ -557,19 +564,20 @@
   }
 
   .alert-item.clickable:hover {
-    background: var(--bg-secondary, #f9fafb);
+    background: var(--color-background-secondary);
     border-left-width: 6px;
+    box-shadow: var(--shadow-sm);
   }
 
   .alert-item.clickable:focus {
-    outline: 2px solid var(--primary, #3b82f6);
+    outline: 2px solid var(--color-primary);
     outline-offset: -2px;
   }
 
   .alert-content {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
   }
 
   .alert-header {
@@ -579,65 +587,65 @@
   }
 
   .alert-severity {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
   }
 
   .alert-severity.critical {
-    color: #ef4444;
+    color: var(--color-danger);
   }
 
   .alert-severity.warning {
-    color: #f59e0b;
+    color: var(--color-warning);
   }
 
   .alert-severity.info {
-    color: #3b82f6;
+    color: var(--color-info);
   }
 
   .alert-message {
-    font-size: 0.875rem;
-    color: var(--text-primary, #111827);
-    line-height: 1.4;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    line-height: var(--line-height-normal);
   }
 
   .alert-time {
-    font-size: 0.75rem;
-    color: var(--text-secondary, #6b7280);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
   }
 
   .alert-actions {
     display: flex;
-    gap: 0.5rem;
-    margin-top: 0.25rem;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-xs);
   }
 
   .alert-action-btn {
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 4px;
-    background: var(--bg-primary, white);
-    color: var(--text-secondary, #6b7280);
-    font-size: 0.75rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition-duration-normal) var(--transition-timing-ease-in-out);
   }
 
   .alert-action-btn:hover {
-    background: var(--bg-secondary, #f9fafb);
-    border-color: var(--primary, #3b82f6);
-    color: var(--primary, #3b82f6);
+    background: var(--color-background-secondary);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
   }
 
   .alert-action-btn.details:hover {
-    border-color: #3b82f6;
-    color: #3b82f6;
+    border-color: var(--color-info);
+    color: var(--color-info);
   }
 
   .alert-action-btn.ticket:hover {
-    border-color: #10b981;
-    color: #10b981;
+    border-color: var(--color-success);
+    color: var(--color-success);
   }
 
   .no-alerts {
@@ -645,24 +653,20 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 2rem 1rem;
+    padding: var(--spacing-xl) var(--spacing-md);
     text-align: center;
-    color: var(--text-secondary, #6b7280);
+    color: var(--color-text-secondary);
   }
 
   .no-alerts-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--spacing-sm);
   }
 
   .no-alerts-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-  }
-
-  .no-alerts-subtext {
-    font-size: 0.75rem;
-    opacity: 0.8;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text-primary);
   }
 </style>
