@@ -1629,8 +1629,8 @@ echo "🎉 Deployment successful!";
   }
 
   .epc-deployment-modal {
-    width: 100%;
-    max-width: 100%;
+    /* Inherits width from .modal-content (800px) */
+    box-sizing: border-box;
   }
 
   .error-banner {
@@ -2114,8 +2114,7 @@ echo "🎉 Deployment successful!";
     }
     
     .epc-deployment-modal {
-      width: 100%;
-      max-width: 100%;
+      /* Inherits width from .modal-content */
     }
 
     .step-indicator {
