@@ -342,9 +342,9 @@ else
     print_success "Node.js \$(node --version) already installed"
 fi
 
-# Install SNMP tools and libraries
-print_status "Installing SNMP tools..."
-apt-get install -y snmp snmp-mibs-downloader libsnmp-dev
+# Install SNMP tools, libraries, and network scanning tools
+print_status "Installing SNMP tools and network scanning utilities..."
+apt-get install -y snmp snmp-mibs-downloader libsnmp-dev nmap iputils-ping
 
 # Create SNMP agent directory
 print_status "Setting up SNMP monitoring agent..."
@@ -369,6 +369,18 @@ const http = require('http');
 
 const execAsync = promisify(exec);
 
+// Helper to calculate network CIDR from IP and subnet mask
+function getNetworkRange(ip, netmask) {
+  const ipParts = ip.split('.').map(Number);
+  const maskParts = netmask.split('.').map(Number);
+  const networkParts = ipParts.map((part, i) => part & maskParts[i]);
+  const network = networkParts.join('.');
+  const prefixLength = maskParts.reduce((acc, octet) => {
+    return acc + octet.toString(2).split('1').length - 1;
+  }, 0);
+  return \`\${network}/\${prefixLength}\`;
+}
+
 class EPCSNMPAgent {
   constructor(config = {}) {
     this.config = {
@@ -387,6 +399,8 @@ class EPCSNMPAgent {
     this.agent = null;
     this.reportingTimer = null;
     this.healthCheckTimer = null;
+    this.networkScanTimer = null;
+    this.discoveredDevices = new Map(); // ip -> device info
     this.isRunning = false;
   }
 
@@ -403,6 +417,7 @@ class EPCSNMPAgent {
         await this.startCloudReporting();
       }
       await this.startHealthMonitoring();
+      await this.startNetworkScanning();
       this.isRunning = true;
       console.log('[EPC SNMP Agent] Initialized successfully');
       return { success: true };
@@ -472,6 +487,217 @@ class EPCSNMPAgent {
     console.log(\`[EPC SNMP Agent] Health monitoring started (interval: \${this.config.healthCheckInterval}ms)\`);
   }
 
+  async startNetworkScanning() {
+    // Initial scan after 30 seconds (give network time to stabilize)
+    setTimeout(async () => {
+      await this.scanNetwork();
+    }, 30000);
+    
+    // Periodic scans every 5 minutes
+    this.networkScanTimer = setInterval(async () => {
+      try {
+        await this.scanNetwork();
+      } catch (error) {
+        console.error('[EPC SNMP Agent] Network scan failed:', error);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    console.log('[EPC SNMP Agent] Network scanning started (interval: 5 minutes)');
+  }
+
+  async scanNetwork() {
+    try {
+      console.log('[EPC SNMP Agent] Scanning network for SNMP devices...');
+      
+      // Get local network interface and IP
+      const interfaces = os.networkInterfaces();
+      const localIPs = [];
+      
+      for (const [name, addrs] of Object.entries(interfaces)) {
+        if (name === 'lo') continue; // Skip loopback
+        
+        for (const addr of addrs) {
+          if (addr.family === 'IPv4' && !addr.internal) {
+            localIPs.push({ ip: addr.address, netmask: addr.netmask });
+          }
+        }
+      }
+
+      if (localIPs.length === 0) {
+        console.warn('[EPC SNMP Agent] No network interfaces found for scanning');
+        return;
+      }
+
+      // Use first non-loopback interface
+      const localIP = localIPs[0];
+      const networkRange = getNetworkRange(localIP.ip, localIP.netmask);
+      
+      console.log(\`[EPC SNMP Agent] Scanning network: \${networkRange}\`);
+      
+      // Scan network for hosts using nmap (ping scan)
+      let hostIPs = [];
+      try {
+        const { stdout } = await execAsync(\`nmap -sn \${networkRange} 2>/dev/null | grep -E 'Nmap scan report|for .*' | grep -A1 'scan report' | grep 'for' | awk '{print \\$5}'\`);
+        hostIPs = stdout.trim().split('\\n').filter(ip => ip && ip !== localIP.ip && ip.match(/^[0-9.]+$/));
+      } catch (error) {
+        // If nmap fails, try manual ping scan of common ranges
+        console.warn('[EPC SNMP Agent] Nmap scan failed, using alternative method:', error.message);
+        const ipParts = localIP.ip.split('.');
+        for (let i = 1; i <= 254; i++) {
+          if (i !== parseInt(ipParts[3])) {
+            hostIPs.push(\`\${ipParts[0]}.\${ipParts[1]}.\${ipParts[2]}.\${i}\`);
+          }
+        }
+      }
+      
+      console.log(\`[EPC SNMP Agent] Found \${hostIPs.length} potential hosts on network\`);
+      
+      // Test each host for SNMP (limit to first 50 for performance)
+      const testIPs = hostIPs.slice(0, 50);
+      const snmpDevices = [];
+      
+      for (const ip of testIPs) {
+        try {
+          // Quick SNMP test - try common community strings
+          const communities = ['public', 'private', 'community'];
+          let foundCommunity = null;
+          let deviceInfo = null;
+          
+          for (const community of communities) {
+            try {
+              const session = snmp.createSession(ip, community);
+              const oids = ['1.3.6.1.2.1.1.1.0']; // sysDescr
+              
+              await new Promise((resolve, reject) => {
+                session.get(oids, (error, varbinds) => {
+                  session.close();
+                  if (error || !varbinds || varbinds.length === 0) {
+                    reject(error || new Error('No response'));
+                  } else {
+                    foundCommunity = community;
+                    resolve(varbinds);
+                  }
+                });
+                
+                // Timeout after 2 seconds
+                setTimeout(() => {
+                  session.close();
+                  reject(new Error('Timeout'));
+                }, 2000);
+              });
+              
+              // Get full device info
+              deviceInfo = await this.getDeviceInfo(ip, foundCommunity);
+              break; // Found working community
+            } catch (e) {
+              // Try next community
+              continue;
+            }
+          }
+          
+          if (foundCommunity && deviceInfo) {
+            this.discoveredDevices.set(ip, {
+              ...deviceInfo,
+              community: foundCommunity,
+              lastSeen: new Date(),
+              discoveredAt: this.discoveredDevices.has(ip) ? this.discoveredDevices.get(ip).discoveredAt : new Date(),
+              status: 'online'
+            });
+            snmpDevices.push(ip);
+            console.log(\`[EPC SNMP Agent] Discovered SNMP device: \${ip} (\${deviceInfo.name || 'Unknown'})\`);
+          }
+        } catch (error) {
+          // Host doesn't have SNMP or unreachable, skip
+        }
+      }
+      
+      console.log(\`[EPC SNMP Agent] Network scan complete: \${snmpDevices.length} SNMP devices found\`);
+      
+    } catch (error) {
+      console.error('[EPC SNMP Agent] Network scan error:', error.message);
+    }
+  }
+
+  async getDeviceInfo(ip, community) {
+    return new Promise((resolve, reject) => {
+      const session = snmp.createSession(ip, community);
+      const oids = [
+        '1.3.6.1.2.1.1.1.0', // sysDescr
+        '1.3.6.1.2.1.1.3.0', // sysUpTime
+        '1.3.6.1.2.1.1.5.0'  // sysName
+      ];
+      
+      session.get(oids, (error, varbinds) => {
+        session.close();
+        if (error) {
+          return reject(error);
+        }
+        
+        const info = {
+          ip: ip,
+          description: varbinds[0]?.value?.toString() || 'Unknown',
+          uptime: varbinds[1]?.value || 0,
+          name: varbinds[2]?.value?.toString() || ip
+        };
+        
+        resolve(info);
+      });
+    });
+  }
+
+  async pollDiscoveredDevices() {
+    if (this.discoveredDevices.size === 0) {
+      return [];
+    }
+    
+    const devicesMetrics = [];
+    
+    for (const [ip, device] of this.discoveredDevices.entries()) {
+      try {
+        const session = snmp.createSession(ip, device.community);
+        const oids = [
+          '1.3.6.1.2.1.1.3.0',  // sysUpTime
+          '1.3.6.1.2.1.1.5.0'   // sysName
+        ];
+        
+        const metrics = await new Promise((resolve, reject) => {
+          session.get(oids, (error, varbinds) => {
+            session.close();
+            if (error) {
+              return reject(error);
+            }
+            
+            resolve({
+              ip: ip,
+              name: device.name,
+              description: device.description,
+              uptime: varbinds[0]?.value || 0,
+              sysName: varbinds[1]?.value?.toString() || ip,
+              timestamp: new Date().toISOString()
+            });
+          });
+          
+          // Timeout
+          setTimeout(() => {
+            session.close();
+            reject(new Error('Timeout'));
+          }, 2000);
+        });
+        
+        devicesMetrics.push(metrics);
+        device.lastPolled = new Date();
+        device.status = 'online';
+        device.lastSeen = new Date();
+      } catch (error) {
+        // Device unreachable or SNMP failed
+        device.lastPolled = new Date();
+        device.status = 'offline';
+        console.warn(\`[EPC SNMP Agent] Failed to poll device \${ip}:\`, error.message);
+      }
+    }
+    
+    return devicesMetrics;
+  }
+
   async collectMetrics() {
     try {
       const metrics = {
@@ -498,7 +724,8 @@ class EPCSNMPAgent {
         },
         epc: {
           serviceStatus: await this.getServiceStatus()
-        }
+        },
+        discoveredDevices: await this.pollDiscoveredDevices()
       };
       return metrics;
     } catch (error) {
@@ -684,6 +911,7 @@ class EPCSNMPAgent {
       this.isRunning = false;
       if (this.reportingTimer) clearInterval(this.reportingTimer);
       if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
+      if (this.networkScanTimer) clearInterval(this.networkScanTimer);
       if (this.agent) this.agent.close();
       console.log('[EPC SNMP Agent] Shutdown complete');
     } catch (error) {
