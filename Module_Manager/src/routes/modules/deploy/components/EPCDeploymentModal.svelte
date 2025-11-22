@@ -1581,12 +1581,17 @@ echo "🎉 Deployment successful!";
     background: var(--bg-primary);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
-    max-width: 800px;
-    width: 800px;
+    max-width: 800px !important;
+    width: 800px !important;
     max-height: 95vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+  
+  .modal-content.epc-deployment-modal {
+    max-width: 800px !important;
+    width: 800px !important;
   }
 
   .modal-header {
