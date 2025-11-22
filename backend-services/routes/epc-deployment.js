@@ -38,13 +38,24 @@ const HSS_PORT = appConfig.externalServices.hss.port;
  */
 router.post('/generate-epc-iso', async (req, res) => {
   try {
+    console.log('[ISO Generator] Request received:', {
+      method: req.method,
+      path: req.path,
+      body: req.body,
+      headers: Object.keys(req.headers),
+      contentType: req.headers['content-type'],
+      hasBody: !!req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : []
+    });
+    
     const { siteName, location, networkConfig, contact, hssConfig, deploymentType, snmpConfig, aptConfig } = req.body;
     
     console.log('[ISO Generator] Creating ISO for site:', siteName);
     console.log('[ISO Generator] Deployment type:', deploymentType);
     
     if (!siteName) {
-      return res.status(400).json({ error: 'siteName is required' });
+      console.error('[ISO Generator] Missing siteName in request body');
+      return res.status(400).json({ error: 'siteName is required', receivedBody: req.body });
     }
     
     // Generate unique EPC ID
