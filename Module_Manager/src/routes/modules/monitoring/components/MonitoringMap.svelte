@@ -315,7 +315,7 @@
   
   .monitoring-controls {
     position: absolute;
-    top: 10px;
+    top: 100px; /* Further below the floating header with more spacing */
     left: 10px;
     z-index: 1000;
     pointer-events: none;
@@ -323,7 +323,7 @@
 
   .alerts-controls {
     position: absolute;
-    top: 10px;
+    top: 100px; /* Further below the floating header with more spacing */
     right: 10px;
     z-index: 1000;
     pointer-events: none;
