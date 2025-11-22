@@ -9,7 +9,7 @@
 
   const dispatch = createEventDispatcher();
 
-  let activeStep: 'configure' | 'deploy' | 'download' = 'configure';
+  let activeTab: 'configure' | 'review' | 'download' = 'configure';
   let loading = false;
   let error = '';
   let success = '';
@@ -146,26 +146,12 @@
     show = false;
     error = '';
     success = '';
-    activeStep = 'configure';
+      activeTab = 'configure';
     deploymentScript = '';
     dispatch('close');
   }
 
-  function nextStep() {
-    if (activeStep === 'configure') {
-      activeStep = 'deploy';
-    } else if (activeStep === 'deploy') {
-      activeStep = 'download';
-    }
-  }
-
-  function prevStep() {
-    if (activeStep === 'download') {
-      activeStep = 'deploy';
-    } else if (activeStep === 'deploy') {
-      activeStep = 'configure';
-    }
-  }
+  // Removed step-based navigation, using tabs instead
 
   function validateConfig(): boolean {
     if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
@@ -246,7 +232,7 @@
       
       // Generate the deployment script
       deploymentScript = generateScript();
-      activeStep = 'download';
+      activeTab = 'download';
       success = 'Deployment script generated successfully';
     } catch (err: any) {
       console.error('[EPCDeployment] Failed to generate script:', err);
@@ -1078,30 +1064,14 @@ echo "🎉 Deployment successful!";
     }
   }
 
-  function getStepTitle(): string {
-    switch (activeStep) {
-      case 'configure': return 'Configure Deployment';
-      case 'deploy': return 'Deploy';
-      case 'download': return 'Download';
-      default: return 'Unknown';
-    }
-  }
-
-  function getStepDescription(): string {
-    switch (activeStep) {
-      case 'configure': return `Configure ${deploymentType === 'both' ? 'EPC and SNMP' : deploymentType.toUpperCase()} parameters and network settings`;
-      case 'deploy': return 'Review configuration and generate deployment package';
-      case 'download': return 'Download script or ISO for deployment';
-      default: return '';
-    }
-  }
+  // Removed step titles/descriptions - using tabs instead
 </script>
 
 {#if show}
   <div class="modal-overlay" on:click={handleClose}>
     <div class="modal-content epc-deployment-modal" on:click|stopPropagation>
       <div class="modal-header">
-        <h2>🚀 Ubuntu Deployment</h2>
+        <h2>🚀 Server Deployment</h2>
         <button class="close-btn" on:click={handleClose}>✕</button>
       </div>
 
@@ -1114,30 +1084,47 @@ echo "🎉 Deployment successful!";
       {/if}
 
       <div class="modal-body">
-        <!-- Progress Steps -->
-        <div class="progress-steps">
-          <div class="step" class:active={activeStep === 'configure'} class:completed={activeStep === 'deploy' || activeStep === 'download'}>
-            <div class="step-number">1</div>
-            <div class="step-title">Configure</div>
-          </div>
-          <div class="step" class:active={activeStep === 'deploy'} class:completed={activeStep === 'download'}>
-            <div class="step-number">2</div>
-            <div class="step-title">Deploy</div>
-          </div>
-          <div class="step" class:active={activeStep === 'download'}>
-            <div class="step-number">3</div>
-            <div class="step-title">Download</div>
-          </div>
+        <!-- Tabs -->
+        <div class="tabs">
+          <button 
+            class="tab-btn" 
+            class:active={activeTab === 'configure'}
+            on:click={() => activeTab = 'configure'}
+          >
+            ⚙️ Configuration
+          </button>
+          <button 
+            class="tab-btn" 
+            class:active={activeTab === 'review'}
+            on:click={() => {
+              if (validateConfig()) {
+                activeTab = 'review';
+                generateDeploymentScript();
+              } else {
+                const errors = getValidationErrors();
+                error = errors.join(', ');
+              }
+            }}
+          >
+            📋 Review
+          </button>
+          <button 
+            class="tab-btn" 
+            class:active={activeTab === 'download'}
+            disabled={!deploymentScript}
+            on:click={() => {
+              if (deploymentScript) {
+                activeTab = 'download';
+              }
+            }}
+          >
+            📥 Download
+          </button>
         </div>
 
-        <!-- Step Content -->
-        <div class="step-content">
-          <div class="step-header">
-            <h3>{getStepTitle()}</h3>
-            <p>{getStepDescription()}</p>
-          </div>
-
-          {#if activeStep === 'configure'}
+        <!-- Tab Content -->
+        <div class="tab-content">
+          {#if activeTab === 'configure'}
             <div class="config-form">
               <!-- Deployment Type Selection -->
               <div class="form-section">
@@ -1543,7 +1530,7 @@ echo "🎉 Deployment successful!";
               {/if}
             </div>
 
-          {:else if activeStep === 'deploy'}
+          {:else if activeTab === 'review'}
             <div class="deploy-review">
               <h4>📋 Configuration Review</h4>
               <div class="review-grid">
@@ -1627,7 +1614,7 @@ echo "🎉 Deployment successful!";
               </div>
             </div>
 
-          {:else if activeStep === 'download'}
+          {:else if activeTab === 'download'}
             <div class="download-content">
               <h4>📥 Download Deployment Package</h4>
               <p>Choose your deployment method:</p>
@@ -1682,36 +1669,52 @@ echo "🎉 Deployment successful!";
           {/if}
         </div>
 
-        <!-- Navigation -->
-        <div class="step-navigation">
-          {#if activeStep !== 'configure'}
-            <button class="btn-secondary" on:click={prevStep}>
-              ← Previous
+        <!-- Action Buttons -->
+        <div class="modal-actions">
+          {#if activeTab === 'configure'}
+            <button class="btn-primary" on:click={() => {
+              if (validateConfig()) {
+                activeTab = 'review';
+                generateDeploymentScript();
+              } else {
+                const errors = getValidationErrors();
+                error = errors.join(', ');
+              }
+            }} disabled={loading}>
+              {#if loading}
+                <div class="loading-spinner small"></div>
+                Generating...
+              {:else}
+                Review Configuration →
+              {/if}
             </button>
-          {/if}
-          
-          {#if activeStep === 'configure'}
-            <button class="btn-primary" on:click={handleNextClick} disabled={loading}>
-              Next →
+          {:else if activeTab === 'review'}
+            <button class="btn-secondary" on:click={() => activeTab = 'configure'}>
+              ← Back to Configuration
             </button>
-          {:else if activeStep === 'deploy'}
             <button 
               class="btn-primary" 
-              on:click={generateDeploymentScript}
-              disabled={loading}
+              on:click={() => {
+                generateDeploymentScript();
+                activeTab = 'download';
+              }}
+              disabled={loading || !deploymentScript}
             >
               {#if loading}
                 <div class="loading-spinner small"></div>
                 Generating...
               {:else}
-                Generate Script →
+                Continue to Download →
               {/if}
             </button>
-          {:else if activeStep === 'download'}
+          {:else if activeTab === 'download'}
+            <button class="btn-secondary" on:click={() => activeTab = 'review'}>
+              ← Back to Review
+            </button>
             <button class="btn-primary" on:click={downloadDeployment} disabled={loading}>
               {#if loading}
                 <div class="loading-spinner small"></div>
-                Generating...
+                {deploymentOption === 'script' ? 'Preparing Script...' : 'Generating ISO...'}
               {:else if deploymentOption === 'script'}
                 📥 Download Script
               {:else}
@@ -1812,79 +1815,45 @@ echo "🎉 Deployment successful!";
     text-align: center;
   }
 
-  .progress-steps {
+  .tabs {
     display: flex;
-    justify-content: center;
-    margin-bottom: var(--spacing-xl);
-    gap: var(--spacing-lg);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
   }
 
-  .step {
+  .tab-btn {
+    background: none;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: var(--spacing-sm);
+    font-size: 0.95rem;
+  }
+
+  .tab-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+  }
+
+  .tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+
+  .tab-btn:disabled {
     opacity: 0.5;
-    transition: all 0.3s ease;
+    cursor: not-allowed;
   }
 
-  .step.active {
-    opacity: 1;
-  }
-
-  .step.completed {
-    opacity: 1;
-  }
-
-  .step-number {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    transition: all 0.3s ease;
-  }
-
-  .step.active .step-number {
-    background: var(--primary);
-    color: white;
-  }
-
-  .step.completed .step-number {
-    background: var(--success);
-    color: white;
-  }
-
-  .step-title {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-  }
-
-  .step.active .step-title {
-    color: var(--text-primary);
-  }
-
-  .step-content {
-    margin-bottom: var(--spacing-xl);
-  }
-
-  .step-header {
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .step-header h3 {
-    margin: 0 0 var(--spacing-sm) 0;
-    color: var(--text-primary);
-  }
-
-  .step-header p {
-    margin: 0;
-    color: var(--text-secondary);
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
   }
 
   .config-form {
@@ -2168,12 +2137,18 @@ echo "🎉 Deployment successful!";
     font-size: 0.9rem;
   }
 
-  .step-navigation {
+  .modal-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding-top: var(--spacing-lg);
     border-top: 1px solid var(--border-color);
+    margin-top: var(--spacing-lg);
+    gap: var(--spacing-md);
+  }
+
+  .modal-actions .btn-secondary {
+    margin-right: auto;
   }
 
   .btn-primary, .btn-secondary {
@@ -2239,9 +2214,8 @@ echo "🎉 Deployment successful!";
       max-width: none;
     }
 
-    .progress-steps {
-      flex-direction: column;
-      gap: var(--spacing-md);
+    .tabs {
+      flex-wrap: wrap;
     }
 
     .form-row {
@@ -2252,7 +2226,7 @@ echo "🎉 Deployment successful!";
       grid-template-columns: 1fr;
     }
 
-    .step-navigation {
+    .modal-actions {
       flex-direction: column;
       gap: var(--spacing-md);
     }
