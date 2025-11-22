@@ -10,6 +10,7 @@
   
   let mapContainer;
   let map = null;
+  let deviceLayer = null;
   let deviceLayers = new Map();
   let selectedDevice = null;
   let showDeviceDetails = false;
@@ -89,121 +90,418 @@
   };
   
   onMount(async () => {
-    await initializeMap();
-    if (devices.length > 0) {
-      updateDeviceMarkers();
+    console.log('[Network Map] Component mounted with devices:', devices.length);
+    console.log('[Network Map] Map container element:', mapContainer);
+    
+    if (mapContainer) {
+      try {
+        console.log('[Network Map] Starting map initialization...');
+        await initializeMap();
+        console.log('[Network Map] Map initialization completed');
+        
+        if (devices.length > 0) {
+          console.log('[Network Map] Updating device markers...');
+          updateDeviceMarkers();
+        }
+      } catch (error) {
+        console.error('[Network Map] Initialization failed:', error);
+        // Show error state
+        mapContainer.innerHTML = `
+          <div style="
+            width: 100%; 
+            height: 100%; 
+            background: #ef4444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            text-align: center;
+          ">
+            <div>
+              <h3>❌ Map Loading Failed</h3>
+              <p>Error: ${error.message}</p>
+              <button onclick="location.reload()" style="
+                background: white;
+                color: #ef4444;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 1rem;
+              ">Retry</button>
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      console.error('[Network Map] Map container not found!');
     }
   });
   
-  // Watch for device changes
-  $: if (map && devices) {
+  // Watch for device changes (prevent infinite loop)
+  let lastDevicesLength = 0;
+  $: if (map && devices && devices.length !== lastDevicesLength) {
+    lastDevicesLength = devices.length;
+    console.log('[Network Map] Devices changed, updating markers. Count:', devices.length);
     updateDeviceMarkers();
   }
   
   async function initializeMap() {
     try {
-      // Initialize Leaflet map (using Leaflet instead of Mapbox for simplicity)
+      console.log('[Network Map] Attempting to initialize ArcGIS map...');
+      
+      // Try to load ArcGIS modules with timeout
+      const loadPromise = Promise.all([
+        import('@arcgis/core/Map.js'),
+        import('@arcgis/core/views/MapView.js'),
+        import('@arcgis/core/layers/GraphicsLayer.js'),
+        import('@arcgis/core/config.js')
+      ]);
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('ArcGIS load timeout')), 10000)
+      );
+      
+      const [
+        { default: Map },
+        { default: MapView },
+        { default: GraphicsLayer },
+        { default: esriConfig }
+      ] = await Promise.race([loadPromise, timeoutPromise]);
+
+      // Set ArcGIS API key
+      const arcgisApiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      if (arcgisApiKey) {
+        esriConfig.apiKey = arcgisApiKey;
+        console.log('[Network Map] ArcGIS API key configured');
+      }
+
+      // Check for dark mode
+      const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+      
+      // Initialize the map with appropriate basemap
+      const arcgisMap = new Map({
+        basemap: isDarkMode ? "dark-gray-vector" : "streets-vector"
+      });
+      
+      // Create the map view
+      const mapView = new MapView({
+        container: mapContainer,
+        map: arcgisMap,
+        center: mapConfig.center,
+        zoom: mapConfig.zoom,
+        ui: {
+          components: ["zoom", "compass"] // Keep essential controls
+        }
+      });
+      
+      // Initialize device layer
+      deviceLayer = new GraphicsLayer({
+        title: "Network Devices"
+      });
+      
+      arcgisMap.add(deviceLayer);
+      
+      // Wait for the view to be ready with timeout
+      await Promise.race([
+        mapView.when(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('MapView timeout')), 15000))
+      ]);
+      
+      // Store references
+      map = mapView; // Store mapView as map for compatibility
+      
+      // Add event listeners
+      mapView.on('click', handleMapClick);
+      mapView.on('zoom', handleZoomChange);
+      
+      console.log('[Network Map] ArcGIS map initialized successfully');
+    } catch (error) {
+      console.error('[Network Map] ArcGIS failed, falling back to Leaflet:', error);
+      await initializeLeafletFallback();
+    }
+  }
+  
+  async function initializeLeafletFallback() {
+    try {
+      console.log('[Network Map] Initializing Leaflet fallback...');
+      
+      // Load Leaflet CSS
+      if (!document.querySelector('link[href*="leaflet"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+        link.crossOrigin = '';
+        document.head.appendChild(link);
+        
+        await new Promise((resolve) => {
+          link.onload = resolve;
+          setTimeout(resolve, 1000);
+        });
+      }
+      
+      // Initialize Leaflet
       const L = await import('leaflet');
       
-      map = L.map(mapContainer).setView(mapConfig.center, mapConfig.zoom);
+      // Fix default markers
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      });
       
-      // Add tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+      map = L.map(mapContainer, {
+        preferCanvas: true,
+        zoomControl: true
+      }).setView(mapConfig.center, mapConfig.zoom);
+      
+      // Use ArcGIS tile layer with your API key
+      const arcgisApiKey = import.meta.env.PUBLIC_ARCGIS_API_KEY;
+      const tileUrl = arcgisApiKey 
+        ? `https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}?token=${arcgisApiKey}`
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      
+      const attribution = arcgisApiKey 
+        ? '© Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, (c) OpenStreetMap contributors, and the GIS User Community'
+        : '© OpenStreetMap contributors';
+      
+      L.tileLayer(tileUrl, {
+        attribution: attribution,
+        maxZoom: 19,
+        tileSize: 256,
+        zoomOffset: 0
       }).addTo(map);
       
-      // Add map event listeners
+      // Add event listeners
       map.on('click', handleMapClick);
       map.on('zoomend', handleZoomChange);
       
-      console.log('[Network Map] Map initialized');
+      // Force resize
+      setTimeout(() => {
+        if (map) {
+          map.invalidateSize();
+        }
+      }, 100);
+      
+      console.log('[Network Map] Leaflet fallback initialized successfully');
     } catch (error) {
-      console.error('[Network Map] Failed to initialize map:', error);
+      console.error('[Network Map] Leaflet fallback also failed:', error);
+      mapContainer.innerHTML = `
+        <div class="map-error">
+          <h3>Map Loading Failed</h3>
+          <p>Unable to load map services. Please check your internet connection and try again.</p>
+          <button onclick="location.reload()" class="retry-button">Retry</button>
+        </div>
+      `;
     }
   }
   
   async function updateDeviceMarkers() {
-    if (!map) return;
-    
-    const L = await import('leaflet');
-    
-    // Clear existing markers
-    deviceLayers.forEach(layer => {
-      map.removeLayer(layer);
-    });
-    deviceLayers.clear();
-    
-    // Filter devices based on current filters
-    const filteredDevices = devices.filter(device => {
-      if (!filters.showOnline && device.status === 'online') return false;
-      if (!filters.showOffline && device.status === 'offline') return false;
-      if (!filters.showUnknown && device.status === 'unknown') return false;
-      
-      const deviceType = getDeviceType(device);
-      if (!filters.deviceTypes[deviceType]) return false;
-      
-      if (deviceType.startsWith('mikrotik') && !filters.showMikrotik) return false;
-      if (deviceType === 'epc' && !filters.showEPCs) return false;
-      
-      return true;
+    console.log('[Network Map] updateDeviceMarkers called with:', {
+      mapExists: !!map,
+      deviceLayerExists: !!deviceLayer,
+      devicesCount: devices.length,
+      mapType: map?.declaredClass || map?.type || 'unknown'
     });
     
-    // Group devices for clustering if enabled
-    if (displayOptions.clusterDevices) {
-      const markerClusterGroup = L.markerClusterGroup({
-        iconCreateFunction: function(cluster) {
-          const childCount = cluster.getChildCount();
-          let className = 'marker-cluster-';
-          
-          if (childCount < 10) {
-            className += 'small';
-          } else if (childCount < 100) {
-            className += 'medium';
-          } else {
-            className += 'large';
-          }
-          
-          return new L.DivIcon({
-            html: '<div><span>' + childCount + '</span></div>',
-            className: 'marker-cluster ' + className,
-            iconSize: new L.Point(40, 40)
-          });
-        }
-      });
-      
-      filteredDevices.forEach(device => {
-        const marker = createDeviceMarker(device, L);
-        if (marker) {
-          markerClusterGroup.addLayer(marker);
-        }
-      });
-      
-      map.addLayer(markerClusterGroup);
-      deviceLayers.set('cluster', markerClusterGroup);
+    if (!map) {
+      console.log('[Network Map] No map available, skipping device update');
+      return;
+    }
+    
+    // Check if we're using ArcGIS or Leaflet
+    const isArcGIS = map.declaredClass === 'esri.views.MapView' || map.type === 'map-view';
+    console.log('[Network Map] Map type detected:', isArcGIS ? 'ArcGIS' : 'Leaflet');
+    
+    if (isArcGIS && deviceLayer) {
+      console.log('[Network Map] Updating ArcGIS devices...');
+      await updateArcGISDevices();
+    } else if (!isArcGIS) {
+      console.log('[Network Map] Updating Leaflet devices...');
+      await updateLeafletDevices();
     } else {
-      // Add individual markers
-      filteredDevices.forEach(device => {
-        const marker = createDeviceMarker(device, L);
-        if (marker) {
-          map.addLayer(marker);
-          deviceLayers.set(device.id, marker);
-        }
-      });
-    }
-    
-    // Draw connections if enabled
-    if (displayOptions.showConnections) {
-      drawDeviceConnections(filteredDevices, L);
-    }
-    
-    // Fit map to show all devices
-    if (filteredDevices.length > 0) {
-      const group = new L.featureGroup(Array.from(deviceLayers.values()));
-      map.fitBounds(group.getBounds().pad(0.1));
+      console.log('[Network Map] Device layer not ready, skipping update');
     }
   }
   
-  function createDeviceMarker(device, L) {
+  async function updateArcGISDevices() {
+    try {
+      console.log('[Network Map] Starting ArcGIS device update...');
+      
+      // Import ArcGIS modules
+      const [
+        { default: Point },
+        { default: Graphic }
+      ] = await Promise.all([
+        import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/Graphic.js')
+      ]);
+      
+      console.log('[Network Map] ArcGIS modules loaded successfully');
+      
+      // Clear existing graphics
+      if (deviceLayer) {
+        deviceLayer.removeAll();
+        deviceLayers.clear();
+        console.log('[Network Map] Cleared existing graphics');
+      }
+    
+      // Filter devices based on current filters
+      const filteredDevices = devices.filter(device => {
+        if (!filters.showOnline && device.status === 'online') return false;
+        if (!filters.showOffline && device.status === 'offline') return false;
+        if (!filters.showUnknown && device.status === 'unknown') return false;
+        
+        const deviceType = getDeviceType(device);
+        if (!filters.deviceTypes[deviceType]) return false;
+        
+        if (deviceType.startsWith('mikrotik') && !filters.showMikrotik) return false;
+        if (deviceType === 'epc' && !filters.showEPCs) return false;
+        
+        return true;
+      });
+      
+      console.log('[Network Map] Filtered devices:', {
+        total: devices.length,
+        filtered: filteredDevices.length,
+        filters: filters
+      });
+    
+      // Add individual device graphics (clustering not implemented for ArcGIS yet)
+      let addedDevices = 0;
+      filteredDevices.forEach(device => {
+        console.log('[Network Map] Processing device:', device.id, device.name, device.location);
+        const graphic = createDeviceGraphic(device, Point, Graphic);
+        if (graphic) {
+          deviceLayer.add(graphic);
+          deviceLayers.set(device.id, graphic);
+          addedDevices++;
+          console.log('[Network Map] Added device graphic:', device.id);
+        } else {
+          console.log('[Network Map] Failed to create graphic for device:', device.id);
+        }
+      });
+      
+      console.log('[Network Map] Added', addedDevices, 'device graphics to map');
+      
+      // Fit view to show all devices
+      if (filteredDevices.length > 0 && deviceLayer) {
+        const extent = deviceLayer.fullExtent;
+        if (extent) {
+          map.goTo(extent.expand(1.2));
+        }
+      }
+    } catch (error) {
+      console.error('[Network Map] ArcGIS device update failed:', error);
+    }
+  }
+  
+  async function updateLeafletDevices() {
+    try {
+      const L = await import('leaflet');
+      
+      // Clear existing markers
+      deviceLayers.forEach(layer => {
+        if (map.removeLayer) {
+          map.removeLayer(layer);
+        }
+      });
+      deviceLayers.clear();
+    
+      // Filter devices based on current filters
+      const filteredDevices = devices.filter(device => {
+        if (!filters.showOnline && device.status === 'online') return false;
+        if (!filters.showOffline && device.status === 'offline') return false;
+        if (!filters.showUnknown && device.status === 'unknown') return false;
+        
+        const deviceType = getDeviceType(device);
+        if (!filters.deviceTypes[deviceType]) return false;
+        
+        if (deviceType.startsWith('mikrotik') && !filters.showMikrotik) return false;
+        if (deviceType === 'epc' && !filters.showEPCs) return false;
+        
+        return true;
+      });
+      
+      // Add individual markers
+      filteredDevices.forEach(device => {
+        const marker = createLeafletMarker(device, L);
+        if (marker) {
+          marker.addTo(map);
+          deviceLayers.set(device.id, marker);
+        }
+      });
+      
+      // Fit map to show all devices
+      if (filteredDevices.length > 0) {
+        const group = L.featureGroup(Array.from(deviceLayers.values()));
+        map.fitBounds(group.getBounds(), { padding: [20, 20] });
+      }
+    } catch (error) {
+      console.error('[Network Map] Leaflet device update failed:', error);
+    }
+  }
+  
+  function createDeviceGraphic(device, Point, Graphic) {
+    console.log('[Network Map] Creating graphic for device:', device.id, device.location);
+    
+    if (!device.location || !device.location.coordinates) {
+      console.log('[Network Map] Device has no location:', device.id);
+      return null;
+    }
+    
+    const { latitude, longitude } = device.location.coordinates;
+    if (!latitude || !longitude) {
+      console.log('[Network Map] Device has invalid coordinates:', device.id, { latitude, longitude });
+      return null;
+    }
+    
+    const deviceType = getDeviceType(device);
+    const config = deviceTypeConfig[deviceType] || deviceTypeConfig.unknown;
+    
+    console.log('[Network Map] Device config:', { deviceType, config });
+    
+    // Create point geometry
+    const point = new Point({
+      longitude: longitude,
+      latitude: latitude,
+      spatialReference: { wkid: 4326 }
+    });
+    
+    // Create graphic with symbol
+    const graphic = new Graphic({
+      geometry: point,
+      symbol: {
+        type: "simple-marker",
+        color: config.color,
+        size: config.size * 2,
+        outline: {
+          color: "white",
+          width: 2
+        }
+      },
+      attributes: {
+        id: device.id,
+        name: device.name || device.id,
+        type: deviceType,
+        status: device.status,
+        ipAddress: device.ipAddress,
+        lastSeen: device.lastSeen
+      },
+      popupTemplate: {
+        title: device.name || device.id,
+        content: createDevicePopup(device)
+      }
+    });
+    
+    console.log('[Network Map] Created graphic successfully for:', device.id);
+    return graphic;
+  }
+  
+  function createLeafletMarker(device, L) {
     if (!device.location || !device.location.coordinates) {
       return null;
     }
@@ -216,9 +514,20 @@
     
     // Create custom icon
     const iconHtml = `
-      <div class="device-marker ${device.status}" style="background-color: ${config.color}">
-        <span class="device-icon">${config.icon}</span>
-        ${displayOptions.showLabels ? `<span class="device-label">${device.name || device.id}</span>` : ''}
+      <div class="device-marker ${device.status}" style="
+        background-color: ${config.color};
+        width: ${config.size * 2}px;
+        height: ${config.size * 2}px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: ${config.size}px;
+        color: white;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      ">
+        ${config.icon}
       </div>
     `;
     
@@ -276,32 +585,11 @@
     `;
   }
   
-  function drawDeviceConnections(devices, L) {
+  function drawDeviceConnections(devices) {
     // This is a simplified connection drawing - in a real implementation,
     // you would use network topology data to determine actual connections
-    
-    const epcs = devices.filter(d => getDeviceType(d) === 'epc');
-    const routers = devices.filter(d => getDeviceType(d) === 'mikrotik_router');
-    const aps = devices.filter(d => getDeviceType(d) === 'mikrotik_ap');
-    
-    // Draw connections from EPCs to nearest routers
-    epcs.forEach(epc => {
-      const nearestRouter = findNearestDevice(epc, routers);
-      if (nearestRouter) {
-        drawConnection(epc, nearestRouter, L, '#10b981', 2);
-      }
-    });
-    
-    // Draw connections from routers to APs
-    routers.forEach(router => {
-      const nearbyAPs = aps.filter(ap => 
-        calculateDistance(router.location.coordinates, ap.location.coordinates) < 50 // 50km radius
-      );
-      
-      nearbyAPs.forEach(ap => {
-        drawConnection(router, ap, L, '#3b82f6', 1);
-      });
-    });
+    // TODO: Implement ArcGIS-based connection drawing
+    console.log('[Network Map] Connection drawing not yet implemented for ArcGIS');
   }
   
   function drawConnection(device1, device2, L, color = '#6b7280', weight = 1) {
@@ -482,7 +770,14 @@
   {/if}
   
   <!-- Map Container -->
-  <div class="map" bind:this={mapContainer}></div>
+  <div class="map" bind:this={mapContainer}>
+    {#if !map}
+      <div class="map-loading">
+        <div class="loading-spinner"></div>
+        <p>Loading interactive map...</p>
+      </div>
+    {/if}
+  </div>
   
   <!-- Device Details Panel -->
   {#if showDeviceDetails && selectedDevice}
@@ -578,6 +873,82 @@
     width: 100%;
     height: 100%;
     background: var(--bg-secondary, #f9fafb);
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* ArcGIS map container styles */
+  :global(.esri-view) {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  .map-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary, #6b7280);
+    text-align: center;
+  }
+  
+  .map-error button,
+  .retry-button {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--primary, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  
+  .map-error button:hover,
+  .retry-button:hover {
+    background: var(--primary-dark, #2563eb);
+  }
+  
+  /* Leaflet compatibility styles */
+  :global(.leaflet-container) {
+    width: 100% !important;
+    height: 100% !important;
+    background: #f9fafb !important;
+  }
+  
+  :global(.leaflet-tile) {
+    max-width: none !important;
+    max-height: none !important;
+  }
+  
+  :global(.custom-device-marker) {
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  .map-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary, #6b7280);
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color, #e5e7eb);
+    border-top: 4px solid var(--primary, #3b82f6);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
   
   .map-controls {

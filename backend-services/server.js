@@ -110,6 +110,8 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
+app.use('/api/mikrotik', require('./routes/mikrotik'));
+app.use('/api/snmp', require('./routes/snmp'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
 app.use('/api/permissions', require('./routes/permissions')); // FCAPS permission management
