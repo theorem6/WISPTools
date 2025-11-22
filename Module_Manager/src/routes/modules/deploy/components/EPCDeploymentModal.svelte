@@ -1578,9 +1578,9 @@ echo "🎉 Deployment successful!";
   }
 
   .modal-content {
-    background: white;
-    border-radius: var(--border-radius-lg);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
     max-width: 90vw;
     max-height: 90vh;
     overflow: hidden;
@@ -1599,7 +1599,7 @@ echo "🎉 Deployment successful!";
 
   .modal-header h2 {
     margin: 0;
-    color: var(--color-gray-900);
+    color: var(--text-primary);
     font-size: 1.5rem;
     font-weight: 600;
   }
@@ -1609,16 +1609,16 @@ echo "🎉 Deployment successful!";
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: var(--color-gray-500);
+    color: var(--text-secondary);
     padding: var(--spacing-xs);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--radius-sm);
     transition: all 0.2s ease;
     line-height: 1;
   }
 
   .close-btn:hover {
-    background: var(--color-gray-100);
-    color: var(--color-gray-900);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   .modal-body {
@@ -1634,20 +1634,20 @@ echo "🎉 Deployment successful!";
   }
 
   .error-banner {
-    background: var(--color-danger);
+    background: var(--danger);
     color: white;
     padding: var(--spacing-md);
     margin: var(--spacing-md) 0;
-    border-radius: var(--border-radius-md);
+    border-radius: var(--radius-md);
     text-align: center;
   }
 
   .success-banner {
-    background: var(--color-success);
+    background: var(--success);
     color: white;
     padding: var(--spacing-md);
     margin: var(--spacing-md) 0;
-    border-radius: var(--border-radius-md);
+    border-radius: var(--radius-md);
     text-align: center;
   }
 
@@ -1669,39 +1669,39 @@ echo "🎉 Deployment successful!";
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: var(--color-gray-200);
-    color: var(--color-gray-600);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
     font-size: 0.875rem;
     transition: all 0.2s ease;
-    border: 2px solid var(--color-gray-300);
+    border: 2px solid var(--border-color);
   }
 
   .step-indicator-item.active .step-indicator-number {
-    background: var(--color-primary);
+    background: var(--brand-primary);
     color: white;
-    border-color: var(--color-primary);
+    border-color: var(--brand-primary);
   }
 
   .step-indicator-item.completed .step-indicator-number {
-    background: var(--color-success);
+    background: var(--success);
     color: white;
-    border-color: var(--color-success);
+    border-color: var(--success);
   }
 
   .step-indicator-line {
     width: 60px;
     height: 2px;
-    background: var(--color-gray-300);
+    background: var(--border-color);
     margin: 0 var(--spacing-sm);
     transition: all 0.2s ease;
   }
 
   .step-indicator-item.completed .step-indicator-line {
-    background: var(--color-success);
+    background: var(--success);
   }
 
   .step-indicator-line.last {
@@ -1720,13 +1720,13 @@ echo "🎉 Deployment successful!";
 
   .step-panel h3 {
     margin: 0 0 var(--spacing-sm) 0;
-    color: var(--color-gray-900);
+    color: var(--text-primary);
     font-size: 1.25rem;
     font-weight: 600;
   }
 
   .step-description {
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
     font-size: 0.875rem;
     margin: 0 0 var(--spacing-lg) 0;
   }
@@ -1738,15 +1738,16 @@ echo "🎉 Deployment successful!";
   }
 
   .form-section {
-    background: var(--color-gray-50);
+    background: var(--bg-secondary);
     padding: var(--spacing-lg);
-    border-radius: var(--border-radius-md);
-    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-lg);
   }
 
   .form-section h4 {
     margin: 0 0 var(--spacing-md) 0;
-    color: var(--color-gray-900);
+    color: var(--text-primary);
     font-size: 1.1rem;
     font-weight: 600;
   }
@@ -1768,16 +1769,16 @@ echo "🎉 Deployment successful!";
     display: flex;
     flex-direction: column;
     cursor: pointer;
-    border: 2px solid var(--color-gray-300);
-    border-radius: var(--border-radius-md);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
     padding: var(--spacing-lg);
     transition: all 0.2s ease;
-    background: var(--color-gray-50);
+    background: var(--bg-secondary);
   }
 
   .deployment-option:hover {
-    border-color: var(--color-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: var(--brand-primary);
+    box-shadow: var(--shadow-md);
   }
 
   .deployment-option input[type="radio"] {
@@ -1785,9 +1786,9 @@ echo "🎉 Deployment successful!";
   }
 
   .deployment-option:has(input[type="radio"]:checked) {
-    border-color: var(--color-primary);
-    background: rgba(59, 130, 246, 0.05);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: var(--brand-primary);
+    background: var(--bg-tertiary);
+    box-shadow: var(--shadow-md);
   }
 
   .option-content {
@@ -1808,7 +1809,7 @@ echo "🎉 Deployment successful!";
   .option-info strong {
     display: block;
     font-size: 0.9375rem;
-    color: var(--color-gray-900);
+    color: var(--text-primary);
     margin-bottom: var(--spacing-xs);
     font-weight: 600;
   }
@@ -1816,7 +1817,7 @@ echo "🎉 Deployment successful!";
   .option-info p {
     margin: 0;
     font-size: 0.8125rem;
-    color: var(--color-gray-600);
+    color: var(--text-secondary);
     line-height: 1.5;
   }
 
@@ -1831,28 +1832,28 @@ echo "🎉 Deployment successful!";
   .form-group label {
     display: block;
     margin-bottom: var(--spacing-xs);
-    color: var(--color-gray-700);
-    font-weight: 500;
+    color: var(--text-primary);
+    font-weight: 600;
     font-size: 0.875rem;
   }
 
   .form-group input,
   .form-group select {
     width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--color-gray-300);
-    border-radius: var(--border-radius-sm);
-    background: white;
-    color: var(--color-gray-900);
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.2s;
+    font-family: inherit;
   }
 
   .form-group input:focus,
   .form-group select:focus {
     outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: var(--brand-primary);
   }
 
   .form-row {
@@ -1886,20 +1887,20 @@ echo "🎉 Deployment successful!";
   }
 
   .review-item strong {
-    color: var(--color-gray-700);
+    color: var(--text-secondary);
     font-weight: 600;
     font-size: 0.875rem;
   }
 
   .review-item span {
-    color: var(--color-gray-900);
+    color: var(--text-primary);
     font-size: 0.875rem;
   }
 
   .deploy-info {
     background: var(--bg-secondary);
     padding: var(--spacing-lg);
-    border-radius: var(--border-radius-md);
+    border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
   }
 
@@ -1927,7 +1928,7 @@ echo "🎉 Deployment successful!";
   .script-preview {
     background: var(--bg-secondary);
     padding: var(--spacing-md);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border-color);
   }
 
@@ -1946,7 +1947,7 @@ echo "🎉 Deployment successful!";
   .download-instructions {
     background: var(--bg-secondary);
     padding: var(--spacing-lg);
-    border-radius: var(--border-radius-md);
+    border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
   }
 
@@ -1968,7 +1969,7 @@ echo "🎉 Deployment successful!";
   .download-instructions code {
     background: var(--bg-tertiary);
     padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--radius-sm);
     font-family: monospace;
     font-size: 0.9rem;
   }
@@ -1984,16 +1985,16 @@ echo "🎉 Deployment successful!";
     display: flex;
     flex-direction: column;
     cursor: pointer;
-    border: 2px solid var(--color-gray-300);
-    border-radius: var(--border-radius-md);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
     padding: var(--spacing-lg);
     transition: all 0.2s ease;
-    background: var(--color-gray-50);
+    background: var(--bg-secondary);
   }
 
   .download-option:hover {
-    border-color: var(--color-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: var(--brand-primary);
+    box-shadow: var(--shadow-md);
   }
 
   .download-option input[type="radio"] {
@@ -2001,19 +2002,19 @@ echo "🎉 Deployment successful!";
   }
 
   .download-option:has(input[type="radio"]:checked) {
-    border-color: var(--color-primary);
-    background: rgba(59, 130, 246, 0.05);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: var(--brand-primary);
+    background: var(--bg-tertiary);
+    box-shadow: var(--shadow-md);
   }
 
   .review-section {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
-    background: var(--color-gray-50);
+    background: var(--bg-secondary);
     padding: var(--spacing-lg);
-    border-radius: var(--border-radius-md);
-    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
   }
 
   .modal-actions {
@@ -2031,12 +2032,12 @@ echo "🎉 Deployment successful!";
   }
 
   .btn {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--border-radius-md);
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
     border: none;
     cursor: pointer;
-    font-weight: 500;
-    font-size: 0.875rem;
+    font-weight: 600;
+    font-size: 1rem;
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
@@ -2045,22 +2046,23 @@ echo "🎉 Deployment successful!";
   }
 
   .btn-primary {
-    background: var(--color-primary);
+    background: var(--brand-primary);
     color: white;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-hover);
+    background: var(--brand-primary-hover, var(--color-primary-hover));
+    transform: translateY(-1px);
   }
 
   .btn-secondary {
-    background: var(--color-gray-100);
-    color: var(--color-gray-900);
-    border: 1px solid var(--color-gray-300);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: var(--color-gray-200);
+    background: var(--bg-tertiary);
   }
 
   .btn:disabled {
@@ -2079,8 +2081,8 @@ echo "🎉 Deployment successful!";
   }
 
   .btn-secondary .spinner {
-    border: 2px solid var(--color-gray-300);
-    border-top: 2px solid var(--color-gray-600);
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--text-primary);
   }
 
   @keyframes spin {
