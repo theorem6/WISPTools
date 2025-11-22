@@ -422,119 +422,75 @@
   }
 </script>
 
-<div class="monitoring-module">
-  <TenantGuard>
-    <div class="module-container">
-      <!-- Module Header -->
-      <div class="module-header">
-        <div class="header-info">
-          <h1>🗺️ Network Monitoring</h1>
-          <p>Real-time network monitoring and device management for {tenantName}</p>
-        </div>
-        <div class="header-actions">
-          <a href="/modules" class="btn btn-outline">
-            ← Back to Modules
-          </a>
-          <button class="btn btn-secondary" on:click={() => showSNMPConfig = true}>
-            🔧 Configuration
-          </button>
-          <div class="view-toggle">
-            <button 
-              class="btn {mapView === 'geographic' ? 'btn-primary' : 'btn-secondary'}"
-              on:click={() => mapView = 'geographic'}
-            >
-              🗺️ Geographic
-            </button>
-            <button 
-              class="btn {mapView === 'topology' ? 'btn-primary' : 'btn-secondary'}"
-              on:click={() => mapView = 'topology'}
-            >
-              🕸️ Topology
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Status Header - Narrower -->
-      <div class="status-header">
-        <div class="status-cards">
-          <div class="status-card critical">
-            <div class="status-icon">🚨</div>
-            <div class="status-content">
-              <div class="status-value">{dashboardData?.summary?.critical_alerts || 0}</div>
-              <div class="status-label">Critical</div>
-            </div>
-          </div>
-          
-          <div class="status-card warning">
-            <div class="status-icon">⚠️</div>
-            <div class="status-content">
-              <div class="status-value">{dashboardData?.summary?.total_alerts || 0}</div>
-              <div class="status-label">Alerts</div>
-            </div>
-          </div>
-          
-          <div class="status-card success">
-            <div class="status-icon">✅</div>
-            <div class="status-content">
-              <div class="status-value">{networkDevices.filter(d => d.status === 'online').length}</div>
-              <div class="status-label">Online</div>
-            </div>
-          </div>
-          
-          <div class="status-card info">
-            <div class="status-icon">📊</div>
-            <div class="status-content">
-              <div class="status-value">{calculateUptime()}%</div>
-              <div class="status-label">Uptime</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-      <!-- Main Content - Map Based -->
+<TenantGuard>
+  <div class="app">
+    <!-- Full Screen Map -->
+    <div class="map-fullscreen">
       {#if loading}
         <div class="loading-container">
           <div class="loading-spinner"></div>
           <p>Loading network monitoring data...</p>
         </div>
       {:else}
-        <div class="map-container">
-          {#if mapView === 'geographic'}
-            <div class="map-wrapper">
-              <MonitoringMap 
-                devices={networkDevices}
-                alerts={activeAlerts}
-                height="calc(100vh - 280px)"
-                on:deviceSelected={handleDeviceSelected}
-                on:viewDeviceDetails={handleViewDeviceDetails}
-                on:configureDevice={handleConfigureDevice}
-                on:alertClick={handleAlertClick}
-                on:showAlertDetails={showAlertDetails}
-                on:createTicketFromAlert={createTicketFromAlert}
-                on:refreshData={loadDashboard}
-              />
-            </div>
-          {:else if mapView === 'topology'}
-            <div class="map-wrapper">
-              <NetworkTopologyMap 
-                devices={networkDevices}
-                {snmpData}
-                height="calc(100vh - 280px)"
-                on:nodeSelected={handleDeviceSelected}
-                on:viewDeviceDetails={handleViewDeviceDetails}
-                on:configureDevice={handleConfigureDevice}
-                on:refreshData={handleRefreshData}
-              />
-            </div>
-          {/if}
-        </div>
+        {#if mapView === 'geographic'}
+          <MonitoringMap 
+            devices={networkDevices}
+            alerts={activeAlerts}
+            {dashboardData}
+            {networkDevices}
+            height="100vh"
+            on:deviceSelected={handleDeviceSelected}
+            on:viewDeviceDetails={handleViewDeviceDetails}
+            on:configureDevice={handleConfigureDevice}
+            on:alertClick={handleAlertClick}
+            on:showAlertDetails={showAlertDetails}
+            on:createTicketFromAlert={createTicketFromAlert}
+            on:refreshData={loadDashboard}
+          />
+        {:else if mapView === 'topology'}
+          <NetworkTopologyMap 
+            devices={networkDevices}
+            {snmpData}
+            height="100vh"
+            on:nodeSelected={handleDeviceSelected}
+            on:viewDeviceDetails={handleViewDeviceDetails}
+            on:configureDevice={handleConfigureDevice}
+            on:refreshData={handleRefreshData}
+          />
+        {/if}
       {/if}
-
     </div>
-  </TenantGuard>
-</div>
+
+    <!-- Floating Header Overlay -->
+    <div class="header-overlay">
+      <div class="header-left">
+        <button class="back-btn" on:click={() => goto('/modules')} title="Back to Modules">
+          ←
+        </button>
+        <h1>🗺️ Monitor</h1>
+      </div>
+      <div class="header-controls">
+        <button class="control-btn" on:click={() => showSNMPConfig = true} title="Configuration">
+          🔧 Config
+        </button>
+        <button 
+          class="control-btn {mapView === 'geographic' ? 'active' : ''}"
+          on:click={() => mapView = 'geographic'}
+          title="Geographic View"
+        >
+          🗺️ Geographic
+        </button>
+        <button 
+          class="control-btn {mapView === 'topology' ? 'active' : ''}"
+          on:click={() => mapView = 'topology'}
+          title="Topology View"
+        >
+          🕸️ Topology
+        </button>
+      </div>
+    </div>
+  </div>
+</TenantGuard>
 
 <!-- SNMP Configuration Modal -->
 <SNMPConfigurationPanel 
@@ -673,57 +629,95 @@
 {/if}
 
 <style>
-  .monitoring-module {
+  /* App Container - Full Screen */
+  .app {
+    position: relative;
     width: 100%;
     height: 100vh;
     overflow: hidden;
+    background: var(--bg-primary);
   }
 
-  .module-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--bg-primary, #ffffff);
+  /* Full Screen Map */
+  .map-fullscreen {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
   }
 
-  .module-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    background: var(--card-bg, white);
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-
-  .header-info h1 {
-    margin: 0 0 0.5rem 0;
-    color: var(--text-primary, #111827);
-    font-size: 1.75rem;
-    font-weight: 700;
-  }
-
-  .header-info p {
-    margin: 0;
-    color: var(--text-secondary, #6b7280);
-  }
-
-  .header-actions {
+  /* Floating Header Overlay */
+  .header-overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: var(--gradient-success);
+    border-radius: var(--border-radius-md);
+    padding: 0.75rem 1rem;
+    box-shadow: var(--shadow-sm);
+    color: white;
+    z-index: 10;
     display: flex;
     align-items: center;
     gap: 1rem;
   }
 
-  .view-toggle {
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .back-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+  }
+
+  .back-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .header-left h1 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .header-controls {
     display: flex;
     gap: 0.5rem;
   }
 
-  .status-header {
-    padding: 1.5rem 2rem;
-    background: var(--bg-secondary, #f9fafb);
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
+  .control-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
   }
+
+  .control-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .control-btn.active {
+    background: rgba(255, 255, 255, 0.4);
+    font-weight: 600;
+  }
+
 
   .status-cards {
     display: grid;

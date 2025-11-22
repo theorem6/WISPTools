@@ -7,6 +7,8 @@
   
   export let devices = [];
   export let alerts = [];
+  export let dashboardData = null;
+  export let networkDevices = [];
   export let height = '600px';
   
   // Convert monitoring devices to network equipment for the map
@@ -123,6 +125,13 @@
       default: return '#6b7280';
     }
   }
+
+  // Calculate uptime percentage
+  function calculateUptime() {
+    if (!networkDevices || networkDevices.length === 0) return 0;
+    const onlineDevices = networkDevices.filter(d => d.status === 'online').length;
+    return Math.round((onlineDevices / networkDevices.length) * 100);
+  }
   
   // Watch for device changes
   $: if (devices) {
@@ -135,7 +144,47 @@
   <div class="monitoring-controls">
     <div class="monitoring-panel">
       <h3>🔍 Network Monitoring</h3>
+      
+      <!-- Status Cards -->
+      <div class="status-section">
+        <h4>System Status</h4>
+        <div class="status-cards">
+          <div class="status-card critical">
+            <div class="status-icon">🚨</div>
+            <div class="status-content">
+              <div class="status-value">{dashboardData?.summary?.critical_alerts || 0}</div>
+              <div class="status-label">Critical</div>
+            </div>
+          </div>
+          
+          <div class="status-card warning">
+            <div class="status-icon">⚠️</div>
+            <div class="status-content">
+              <div class="status-value">{dashboardData?.summary?.total_alerts || 0}</div>
+              <div class="status-label">Alerts</div>
+            </div>
+          </div>
+          
+          <div class="status-card success">
+            <div class="status-icon">✅</div>
+            <div class="status-content">
+              <div class="status-value">{networkDevices.filter(d => d.status === 'online').length}</div>
+              <div class="status-label">Online</div>
+            </div>
+          </div>
+          
+          <div class="status-card info">
+            <div class="status-icon">📊</div>
+            <div class="status-content">
+              <div class="status-value">{calculateUptime()}%</div>
+              <div class="status-label">Uptime</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="monitoring-filters">
+        <h4>Display Options</h4>
         <label>
           <input type="checkbox" bind:checked={filters.showEquipment} />
           📡 Network Equipment ({equipment.length})
@@ -302,6 +351,70 @@
     color: var(--text-primary, #111827);
     font-size: 0.9rem;
     font-weight: 600;
+  }
+
+  /* Status Cards in Monitoring Panel */
+  .status-section {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+  }
+
+  .status-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .status-card {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--card-bg, white);
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .status-card.critical {
+    border-left: 3px solid #ef4444;
+  }
+
+  .status-card.warning {
+    border-left: 3px solid #f59e0b;
+  }
+
+  .status-card.success {
+    border-left: 3px solid #10b981;
+  }
+
+  .status-card.info {
+    border-left: 3px solid #3b82f6;
+  }
+
+  .status-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .status-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .status-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary, #111827);
+    line-height: 1;
+  }
+
+  .status-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    font-weight: 500;
   }
   
   .monitoring-filters {
