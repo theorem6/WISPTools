@@ -1581,9 +1581,9 @@ echo "🎉 Deployment successful!";
     background: var(--bg-primary);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
-    max-width: 95vw;
-    max-height: 95vh;
+    max-width: 800px;
     width: 800px;
+    max-height: 95vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -2108,9 +2108,14 @@ echo "🎉 Deployment successful!";
 
   /* Responsive Design */
   @media (max-width: 768px) {
+    .modal-content {
+      width: 95vw;
+      max-width: 95vw;
+    }
+    
     .epc-deployment-modal {
-      width: 95%;
-      max-width: none;
+      width: 100%;
+      max-width: 100%;
     }
 
     .step-indicator {
