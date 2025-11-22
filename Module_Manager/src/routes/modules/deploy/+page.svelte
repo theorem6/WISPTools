@@ -30,13 +30,15 @@ import { isPlatformAdmin } from '$lib/services/adminService';
   // Plan approval workflow
   let showPlanApprovalModal = false;
   let readyPlans: PlanProject[] = [];
+  let draftPlans: PlanProject[] = [];
+  let approvedPlans: PlanProject[] = [];
+  let deployedPlans: PlanProject[] = [];
   let selectedPlan: PlanProject | null = null;
   let isLoadingPlans = false;
   let approvalMode: 'approve' | 'reject' | null = null;
   
   // Project filtering
   let showProjectFilters = false;
-  let approvedPlans: PlanProject[] = [];
   let visiblePlanIds: Set<string> = new Set();
   
   // PCI Planner
@@ -145,17 +147,23 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     try {
       const tenantId = $currentTenant?.id;
       if (tenantId) {
-        // Get ALL plans - we'll show draft, ready, approved, and authorized plans
+        // Get ALL plans
         const allPlans = await planService.getPlans(tenantId);
         
-        // Show all plans that can be finalized, approved, or deployed
-        readyPlans = allPlans.filter(plan => 
+        // Separate plans by status for accurate menu counts
+        draftPlans = allPlans.filter(plan => plan.status === 'draft' || plan.status === 'active');
+        readyPlans = allPlans.filter(plan => plan.status === 'ready');
+        approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
+        deployedPlans = allPlans.filter(plan => plan.status === 'deployed');
+        
+        // Show all plans that can be finalized, approved, or deployed (for the plan list modal)
+        const plansForReview = allPlans.filter(plan => 
           plan.status === 'draft' || plan.status === 'active' || plan.status === 'ready' || 
           plan.status === 'approved' || plan.status === 'authorized'
         );
         
-        // Separate approved plans for filtering (only for map display)
-        approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
+        // Use plansForReview for the modal, but keep separate counts for menu
+        readyPlans = plansForReview;
         
         // Initialize visible plan IDs from plans with showOnMap = true
         visiblePlanIds = new Set(
@@ -207,18 +215,42 @@ import { isPlatformAdmin } from '$lib/services/adminService';
       return;
     }
 
+    // Only allow deploying approved or authorized plans
+    if (plan.status !== 'approved' && plan.status !== 'authorized') {
+      deploymentMessage = 'Plan must be approved before deployment.';
+      setTimeout(() => (deploymentMessage = ''), 4000);
+      return;
+    }
+
     try {
       const { features } = await planService.getPlanFeatures(plan.id);
-      console.log('[Deploy] Preparing deployment package', {
+      console.log('[Deploy] Deploying plan', {
         planId: plan.id,
+        planName: plan.name,
         tenantId,
         featureCount: features.length
       });
-      deploymentMessage = `Deployment package for "${plan.name}" prepared (${features.length} items).`;
+      
+      // Mark plan as deployed
+      await planService.updatePlan(plan.id, { status: 'deployed' });
+      
+      // Reload plans to update counts and status
+      await loadReadyPlans();
+      
+      // Update map state if plan was active
+      if (mapState?.activePlan?.id === plan.id) {
+        // Plan is now deployed, so load a different approved plan if available
+        const nextApprovedPlan = approvedPlans.find(p => p.id !== plan.id && p.showOnMap) || approvedPlans[0];
+        if (nextApprovedPlan) {
+          await mapLayerManager.loadPlan(tenantId, nextApprovedPlan);
+        }
+      }
+      
+      deploymentMessage = `✅ Plan "${plan.name}" has been deployed (${features.length} items).`;
+      setTimeout(() => (deploymentMessage = ''), 6000);
     } catch (err: any) {
-      console.error('Failed to prepare deployment package:', err);
-      deploymentMessage = err?.message || 'Failed to prepare deployment package.';
-    } finally {
+      console.error('Failed to deploy plan:', err);
+      deploymentMessage = err?.message || 'Failed to deploy plan.';
       setTimeout(() => (deploymentMessage = ''), 6000);
     }
   }
@@ -372,12 +404,19 @@ import { isPlatformAdmin } from '$lib/services/adminService';
           class="control-btn" 
           class:active={showProjectFilters}
           on:click={() => showProjectFilters = !showProjectFilters} 
-          title="Project Filters"
+          title="Project Filters - Approved plans"
         >
-          🔍 Projects ({approvedPlans.length})
+          🔍 Approved ({approvedPlans.length})
         </button>
-        <button class="control-btn" on:click={openPlanApproval} title="Plan Approval">
-          📋 Plans ({readyPlans.length})
+        <button class="control-btn" on:click={openPlanApproval} title="Plan Management - All plans">
+          📋 Plans ({draftPlans.length + readyPlans.length + approvedPlans.length})
+        </button>
+        <button 
+          class="control-btn" 
+          on:click={() => showDeployedHardwareModal = true}
+          title="View Deployed Plans"
+        >
+          ✅ Deployed ({deployedPlans.length})
         </button>
         <button 
           class="control-btn" 
@@ -407,7 +446,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
           on:click={() => showDeployedHardwareModal = true}
           title="View and Edit Deployed Hardware"
         >
-          🔧 Deployed ({deployedCount})
+          🔧 Hardware ({deployedCount})
         </button>
         <button 
           class="control-btn deploy-btn" 
@@ -955,6 +994,16 @@ import { isPlatformAdmin } from '$lib/services/adminService';
   .status-badge.approved {
     background: rgba(59, 130, 246, 0.1);
     color: #2563eb;
+  }
+  
+  .status-badge.authorized {
+    background: rgba(139, 92, 246, 0.1);
+    color: #7c3aed;
+  }
+  
+  .status-badge.deployed {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
   }
   
   .loading,
