@@ -9,12 +9,14 @@
 
   const dispatch = createEventDispatcher();
 
-  let activeTab: 'configure' | 'review' | 'download' = 'configure';
+  let currentStep = 1;
+  let totalSteps = 7; // Will be calculated based on deployment type
+  let deploymentScript = '';
+  let deploymentOption: 'script' | 'iso' | null = null; // Set at final step
   let loading = false;
   let error = '';
   let success = '';
-  let deploymentScript = '';
-  let deploymentOption: 'script' | 'iso' = 'script';
+  // deploymentScript and deploymentOption moved above
   let deploymentType: 'epc' | 'snmp' | 'both' = 'epc'; // Deployment type selection
   type TenantContactKey = 'contactName' | 'contactEmail' | 'contactPhone';
   type TenantContactRecord = Partial<Record<TenantContactKey, string>>;
@@ -146,7 +148,8 @@
     show = false;
     error = '';
     success = '';
-      activeTab = 'configure';
+      currentStep = 1;
+      deploymentOption = null;
     deploymentScript = '';
     dispatch('close');
   }
@@ -210,12 +213,93 @@
     return errors;
   }
 
-  function handleNextClick() {
-    if (!validateConfig()) {
-      const errors = getValidationErrors();
-      error = errors.join(', ');
+  // Calculate total steps based on deployment type
+  $: {
+    let steps = 2; // Step 1: Deployment Type, Step 2: Site Info
+    if (deploymentType === 'epc' || deploymentType === 'both') {
+      steps += 2; // Network Config, HSS Config
+    }
+    if (deploymentType === 'snmp' || deploymentType === 'both') {
+      steps += 1; // SNMP Config
+    }
+    steps += 1; // APT Config
+    steps += 1; // Review
+    steps += 1; // Download (script/ISO selection)
+    totalSteps = steps;
+  }
+
+  // Helper function to get step number for each section
+  function getStepNumber(section: 'deployment' | 'site' | 'network' | 'hss' | 'snmp' | 'apt' | 'review' | 'download'): number {
+    let step = 1;
+    if (section === 'deployment') return step;
+    step++; // site
+    if (section === 'site') return step;
+    if (deploymentType === 'epc' || deploymentType === 'both') {
+      step++; // network
+      if (section === 'network') return step;
+      step++; // hss
+      if (section === 'hss') return step;
+    }
+    if (deploymentType === 'snmp' || deploymentType === 'both') {
+      step++; // snmp
+      if (section === 'snmp') return step;
+    }
+    step++; // apt
+    if (section === 'apt') return step;
+    step++; // review
+    if (section === 'review') return step;
+    step++; // download
+    if (section === 'download') return step;
+    return step;
+  }
+
+  function nextStep() {
+    // Validate current step before proceeding
+    if (currentStep === getStepNumber('deployment')) {
+      // Step 1: Deployment Type - no validation needed
+      currentStep++;
+    } else if (currentStep === getStepNumber('site')) {
+      // Site Info
+      if (!epcConfig.siteName || !epcConfig.location.address || !epcConfig.contact.name || !epcConfig.contact.email) {
+        error = 'Please fill in all required fields';
+        return;
+      }
+      currentStep++;
+    } else if (currentStep === getStepNumber('network')) {
+      // Network Config (if EPC)
+      if (!epcConfig.networkConfig.mcc || !epcConfig.networkConfig.mnc || !epcConfig.networkConfig.tac) {
+        error = 'Please fill in all network configuration fields';
+        return;
+      }
+      currentStep++;
+    } else if (currentStep === getStepNumber('hss')) {
+      // HSS Config (if EPC)
+      currentStep++;
+    } else if (currentStep === getStepNumber('snmp')) {
+      // SNMP Config (if SNMP)
+      currentStep++;
+    } else if (currentStep === getStepNumber('apt')) {
+      // APT Config
+      currentStep++;
+    } else if (currentStep === getStepNumber('review')) {
+      // Review step - generate script
+      generateDeploymentScript();
+      currentStep++;
+    } else if (currentStep === getStepNumber('download')) {
+      // Download step - handled by download button
       return;
     }
+    error = '';
+  }
+
+  function prevStep() {
+    if (currentStep > 1) {
+      currentStep--;
+      error = '';
+    }
+  }
+
+  function handleNextClick() {
     nextStep();
   }
 
@@ -232,7 +316,6 @@
       
       // Generate the deployment script
       deploymentScript = generateScript();
-      activeTab = 'download';
       success = 'Deployment script generated successfully';
     } catch (err: any) {
       console.error('[EPCDeployment] Failed to generate script:', err);
@@ -1057,6 +1140,10 @@ echo "🎉 Deployment successful!";
   }
 
   function downloadDeployment() {
+    if (!deploymentOption) {
+      error = 'Please select Script or ISO';
+      return;
+    }
     if (deploymentOption === 'script') {
       downloadScript();
     } else {
@@ -1084,456 +1171,279 @@ echo "🎉 Deployment successful!";
       {/if}
 
       <div class="modal-body">
-        <!-- Tabs -->
-        <div class="tabs">
-          <button 
-            class="tab-btn" 
-            class:active={activeTab === 'configure'}
-            on:click={() => activeTab = 'configure'}
-          >
-            ⚙️ Configuration
-          </button>
-          <button 
-            class="tab-btn" 
-            class:active={activeTab === 'review'}
-            on:click={() => {
-              if (validateConfig()) {
-                activeTab = 'review';
-                generateDeploymentScript();
-              } else {
-                const errors = getValidationErrors();
-                error = errors.join(', ');
-              }
-            }}
-          >
-            📋 Review
-          </button>
-          <button 
-            class="tab-btn" 
-            class:active={activeTab === 'download'}
-            disabled={!deploymentScript}
-            on:click={() => {
-              if (deploymentScript) {
-                activeTab = 'download';
-              }
-            }}
-          >
-            📥 Download
-          </button>
+        <!-- Step Progress Indicator -->
+        <div class="step-indicator">
+          {#each Array(totalSteps) as _, i}
+            {@const stepNum = i + 1}
+            <div class="step-indicator-item" class:active={currentStep === stepNum} class:completed={currentStep > stepNum}>
+              <div class="step-indicator-number">{stepNum}</div>
+              <div class="step-indicator-line" class:last={stepNum === totalSteps}></div>
+            </div>
+          {/each}
         </div>
 
-        <!-- Tab Content -->
-        <div class="tab-content">
-          {#if activeTab === 'configure'}
-            <div class="config-form">
-              <!-- Deployment Type Selection -->
-              <div class="form-section">
-                <h4>🚀 Deployment Type</h4>
-                <p class="section-description">Select what components to deploy on the Ubuntu machine</p>
-                <div class="deployment-type-options">
-                  <label class="deployment-option">
-                    <input 
-                      type="radio" 
-                      name="deploymentType" 
-                      value="epc" 
-                      bind:group={deploymentType}
-                    />
-                    <div class="option-content">
-                      <div class="option-icon">📡</div>
-                      <div class="option-info">
-                        <strong>EPC Core Only</strong>
-                        <p>Deploy Open5GS EPC components (MME, SGW, PGW, PCRF)</p>
-                      </div>
-                    </div>
-                  </label>
-                  
-                  <label class="deployment-option">
-                    <input 
-                      type="radio" 
-                      name="deploymentType" 
-                      value="snmp" 
-                      bind:group={deploymentType}
-                    />
-                    <div class="option-content">
-                      <div class="option-icon">📊</div>
-                      <div class="option-info">
-                        <strong>SNMP/Mikrotik Agent Only</strong>
-                        <p>Deploy SNMP agent and Mikrotik monitoring modules</p>
-                      </div>
-                    </div>
-                  </label>
-                  
-                  <label class="deployment-option">
-                    <input 
-                      type="radio" 
-                      name="deploymentType" 
-                      value="both" 
-                      bind:group={deploymentType}
-                    />
-                    <div class="option-content">
-                      <div class="option-icon">🔄</div>
-                      <div class="option-info">
-                        <strong>Both EPC + SNMP</strong>
-                        <p>Deploy both EPC Core and SNMP/Mikrotik monitoring agents</p>
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div class="form-section">
-                <h4>📍 Site Information</h4>
-                <div class="form-group">
-                  <label for="siteName">Site Name *</label>
-                  <input 
-                    id="siteName" 
-                    type="text" 
-                    bind:value={epcConfig.siteName} 
-                    placeholder="Enter site name"
-                    required
-                  />
-                </div>
-              </div>
-
-              <!-- EPC Network Configuration (when EPC is selected) -->
-              {#if deploymentType === 'epc' || deploymentType === 'both'}
-                <div class="form-section">
-                  <h4>🌐 EPC Network Configuration</h4>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="mcc">MCC *</label>
-                      <input 
-                        id="mcc" 
-                        type="text" 
-                        bind:value={epcConfig.networkConfig.mcc} 
-                        placeholder="001"
-                        required
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label for="mnc">MNC *</label>
-                      <input 
-                        id="mnc" 
-                        type="text" 
-                        bind:value={epcConfig.networkConfig.mnc} 
-                        placeholder="01"
-                        required
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label for="tac">TAC *</label>
-                      <input 
-                        id="tac" 
-                        type="text" 
-                        bind:value={epcConfig.networkConfig.tac} 
-                        placeholder="1"
-                        required
-                      />
+        <!-- Step Content -->
+        <div class="step-content">
+          <!-- Step 1: Deployment Type -->
+          {#if currentStep === 1}
+            <div class="step-panel">
+              <h3>Step 1: Select Deployment Type</h3>
+              <p class="step-description">Choose what components to deploy on the server</p>
+              <div class="deployment-type-options">
+                <label class="deployment-option">
+                  <input type="radio" name="deploymentType" value="epc" bind:group={deploymentType} />
+                  <div class="option-content">
+                    <div class="option-icon">📡</div>
+                    <div class="option-info">
+                      <strong>EPC Core Only</strong>
+                      <p>Deploy Open5GS EPC components (MME, SGW, PGW, PCRF)</p>
                     </div>
                   </div>
-                </div>
-              {/if}
+                </label>
+                <label class="deployment-option">
+                  <input type="radio" name="deploymentType" value="snmp" bind:group={deploymentType} />
+                  <div class="option-content">
+                    <div class="option-icon">📊</div>
+                    <div class="option-info">
+                      <strong>SNMP/Mikrotik Agent Only</strong>
+                      <p>Deploy SNMP agent and Mikrotik monitoring modules</p>
+                    </div>
+                  </div>
+                </label>
+                <label class="deployment-option">
+                  <input type="radio" name="deploymentType" value="both" bind:group={deploymentType} />
+                  <div class="option-content">
+                    <div class="option-icon">🔄</div>
+                    <div class="option-info">
+                      <strong>Both EPC + SNMP</strong>
+                      <p>Deploy both EPC Core and SNMP/Mikrotik monitoring agents</p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
 
+          <!-- Step 2: Site Information -->
+          {:else if currentStep === 2}
+            <div class="step-panel">
+              <h3>Step 2: Site Information</h3>
+              <p class="step-description">Enter basic site details</p>
               <div class="form-section">
-                <h4>📍 Location</h4>
+                <div class="form-group">
+                  <label for="siteName">Site Name *</label>
+                  <input id="siteName" type="text" bind:value={epcConfig.siteName} placeholder="Enter site name" required />
+                </div>
                 <div class="form-group">
                   <label for="address">Address *</label>
-                  <input 
-                    id="address" 
-                    type="text" 
-                    bind:value={epcConfig.location.address} 
-                    placeholder="Enter address"
-                    required
-                  />
+                  <input id="address" type="text" bind:value={epcConfig.location.address} placeholder="Enter address" required />
                 </div>
                 <div class="form-row">
                   <div class="form-group">
                     <label for="city">City</label>
-                    <input 
-                      id="city" 
-                      type="text" 
-                      bind:value={epcConfig.location.city} 
-                      placeholder="Enter city"
-                    />
+                    <input id="city" type="text" bind:value={epcConfig.location.city} placeholder="Enter city" />
                   </div>
                   <div class="form-group">
                     <label for="state">State</label>
-                    <input 
-                      id="state" 
-                      type="text" 
-                      bind:value={epcConfig.location.state} 
-                      placeholder="Enter state"
-                    />
+                    <input id="state" type="text" bind:value={epcConfig.location.state} placeholder="Enter state" />
                   </div>
                   <div class="form-group">
                     <label for="country">Country</label>
-                    <input 
-                      id="country" 
-                      type="text" 
-                      bind:value={epcConfig.location.country} 
-                      placeholder="Enter country"
-                    />
+                    <input id="country" type="text" bind:value={epcConfig.location.country} placeholder="Enter country" />
                   </div>
                 </div>
-              </div>
-
-              <div class="form-section">
-                <h4>📞 Contact Information</h4>
                 <div class="form-group">
                   <label for="contactName">Contact Name *</label>
-                  <input 
-                    id="contactName" 
-                    type="text" 
-                    bind:value={epcConfig.contact.name} 
-                    placeholder="Enter contact name"
-                    required
-                  />
+                  <input id="contactName" type="text" bind:value={epcConfig.contact.name} placeholder="Enter contact name" required />
                 </div>
                 <div class="form-row">
                   <div class="form-group">
                     <label for="contactEmail">Email *</label>
-                    <input 
-                      id="contactEmail" 
-                      type="email" 
-                      bind:value={epcConfig.contact.email} 
-                      placeholder="Enter email"
-                      required
-                    />
+                    <input id="contactEmail" type="email" bind:value={epcConfig.contact.email} placeholder="Enter email" required />
                   </div>
                   <div class="form-group">
                     <label for="contactPhone">Phone</label>
-                    <input 
-                      id="contactPhone" 
-                      type="tel" 
-                      bind:value={epcConfig.contact.phone} 
-                      placeholder="Enter phone"
-                    />
+                    <input id="contactPhone" type="tel" bind:value={epcConfig.contact.phone} placeholder="Enter phone" />
                   </div>
                 </div>
               </div>
+            </div>
 
-              <!-- HSS Configuration (when EPC is selected) -->
-              {#if deploymentType === 'epc' || deploymentType === 'both'}
-                <div class="form-section">
-                  <h4>🏠 HSS Configuration</h4>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="hssHost">HSS Host</label>
-                      <input 
-                        id="hssHost" 
-                        type="text" 
-                        bind:value={epcConfig.hssConfig.hssHost} 
-                        placeholder="HSS host"
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label for="hssPort">HSS Port</label>
-                      <input 
-                        id="hssPort" 
-                        type="text" 
-                        bind:value={epcConfig.hssConfig.hssPort} 
-                        placeholder="3868"
-                      />
-                    </div>
+          <!-- Step 3: EPC Network Configuration (if EPC selected) -->
+          {:else if currentStep === getStepNumber('network')}
+            <div class="step-panel">
+              <h3>Step 3: EPC Network Configuration</h3>
+              <p class="step-description">Configure network parameters for EPC</p>
+              <div class="form-section">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="mcc">MCC *</label>
+                    <input id="mcc" type="text" bind:value={epcConfig.networkConfig.mcc} placeholder="001" required />
                   </div>
                   <div class="form-group">
-                    <label for="diameterRealm">Diameter Realm</label>
-                    <input 
-                      id="diameterRealm" 
-                      type="text" 
-                      bind:value={epcConfig.hssConfig.diameterRealm} 
-                      placeholder="example.com"
-                    />
+                    <label for="mnc">MNC *</label>
+                    <input id="mnc" type="text" bind:value={epcConfig.networkConfig.mnc} placeholder="01" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="tac">TAC *</label>
+                    <input id="tac" type="text" bind:value={epcConfig.networkConfig.tac} placeholder="1" required />
                   </div>
                 </div>
-              {/if}
+              </div>
+            </div>
 
-              <!-- SNMP Configuration (when SNMP is selected) -->
-              {#if deploymentType === 'snmp' || deploymentType === 'both'}
-                <div class="form-section">
-                  <h4>📊 SNMP/Mikrotik Agent Configuration</h4>
+          <!-- Step 4: HSS Configuration (if EPC selected) -->
+          {:else if currentStep === getStepNumber('hss')}
+            <div class="step-panel">
+              <h3>Step 4: HSS Configuration</h3>
+              <p class="step-description">Configure HSS connection settings</p>
+              <div class="form-section">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="hssHost">HSS Host</label>
+                    <input id="hssHost" type="text" bind:value={epcConfig.hssConfig.hssHost} placeholder="HSS host" />
+                  </div>
+                  <div class="form-group">
+                    <label for="hssPort">HSS Port</label>
+                    <input id="hssPort" type="text" bind:value={epcConfig.hssConfig.hssPort} placeholder="3868" />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="diameterRealm">Diameter Realm</label>
+                  <input id="diameterRealm" type="text" bind:value={epcConfig.hssConfig.diameterRealm} placeholder="example.com" />
+                </div>
+              </div>
+            </div>
+
+          <!-- SNMP Configuration (if SNMP selected) -->
+          {:else if currentStep === getStepNumber('snmp')}
+            <div class="step-panel">
+              <h3>Step {currentStep}: SNMP/Mikrotik Configuration</h3>
+              <p class="step-description">Configure SNMP agent and monitoring</p>
+              <div class="form-section">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="snmpVersion">SNMP Version</label>
+                    <select id="snmpVersion" bind:value={epcConfig.snmpConfig.version}>
+                      <option value="2c">SNMPv2c (Recommended)</option>
+                      <option value="1">SNMPv1</option>
+                      <option value="3">SNMPv3 (Secure)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="snmpCommunity">Community String</label>
+                    <input id="snmpCommunity" type="text" bind:value={epcConfig.snmpConfig.community} placeholder="public" />
+                  </div>
+                  <div class="form-group">
+                    <label for="snmpPort">SNMP Port</label>
+                    <input id="snmpPort" type="number" bind:value={epcConfig.snmpConfig.port} placeholder="161" />
+                  </div>
+                </div>
+                {#if epcConfig.snmpConfig.version === '3'}
                   <div class="form-row">
                     <div class="form-group">
-                      <label for="snmpVersion">SNMP Version</label>
-                      <select id="snmpVersion" bind:value={epcConfig.snmpConfig.version}>
-                        <option value="2c">SNMPv2c (Recommended)</option>
-                        <option value="1">SNMPv1</option>
-                        <option value="3">SNMPv3 (Secure)</option>
+                      <label for="snmpUsername">SNMPv3 Username</label>
+                      <input id="snmpUsername" type="text" bind:value={epcConfig.snmpConfig.username} placeholder="Enter username" />
+                    </div>
+                    <div class="form-group">
+                      <label for="snmpAuthProtocol">Auth Protocol</label>
+                      <select id="snmpAuthProtocol" bind:value={epcConfig.snmpConfig.authProtocol}>
+                        <option value="SHA">SHA</option>
+                        <option value="MD5">MD5</option>
                       </select>
                     </div>
                     <div class="form-group">
-                      <label for="snmpCommunity">Community String</label>
-                      <input 
-                        id="snmpCommunity" 
-                        type="text" 
-                        bind:value={epcConfig.snmpConfig.community} 
-                        placeholder="public"
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label for="snmpPort">SNMP Port</label>
-                      <input 
-                        id="snmpPort" 
-                        type="number" 
-                        bind:value={epcConfig.snmpConfig.port} 
-                        placeholder="161"
-                      />
+                      <label for="snmpAuthKey">Auth Key</label>
+                      <input id="snmpAuthKey" type="password" bind:value={epcConfig.snmpConfig.authKey} placeholder="Enter auth key" />
                     </div>
                   </div>
-                  
-                  {#if epcConfig.snmpConfig.version === '3'}
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label for="snmpUsername">SNMPv3 Username</label>
-                        <input 
-                          id="snmpUsername" 
-                          type="text" 
-                          bind:value={epcConfig.snmpConfig.username} 
-                          placeholder="Enter username"
-                        />
-                      </div>
-                      <div class="form-group">
-                        <label for="snmpAuthProtocol">Auth Protocol</label>
-                        <select id="snmpAuthProtocol" bind:value={epcConfig.snmpConfig.authProtocol}>
-                          <option value="SHA">SHA</option>
-                          <option value="MD5">MD5</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label for="snmpAuthKey">Auth Key</label>
-                        <input 
-                          id="snmpAuthKey" 
-                          type="password" 
-                          bind:value={epcConfig.snmpConfig.authKey} 
-                          placeholder="Enter auth key"
-                        />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label for="snmpPrivProtocol">Privacy Protocol</label>
-                        <select id="snmpPrivProtocol" bind:value={epcConfig.snmpConfig.privProtocol}>
-                          <option value="AES">AES</option>
-                          <option value="DES">DES</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label for="snmpPrivKey">Privacy Key</label>
-                        <input 
-                          id="snmpPrivKey" 
-                          type="password" 
-                          bind:value={epcConfig.snmpConfig.privKey} 
-                          placeholder="Enter privacy key"
-                        />
-                      </div>
-                    </div>
-                  {/if}
-
                   <div class="form-row">
                     <div class="form-group">
-                      <label for="snmpReportingInterval">Reporting Interval (seconds)</label>
-                      <input 
-                        id="snmpReportingInterval" 
-                        type="number" 
-                        bind:value={epcConfig.snmpConfig.reportingInterval} 
-                        placeholder="60"
-                      />
+                      <label for="snmpPrivProtocol">Privacy Protocol</label>
+                      <select id="snmpPrivProtocol" bind:value={epcConfig.snmpConfig.privProtocol}>
+                        <option value="AES">AES</option>
+                        <option value="DES">DES</option>
+                      </select>
                     </div>
                     <div class="form-group">
-                      <label for="snmpCloudApiUrl">Cloud API URL</label>
-                      <input 
-                        id="snmpCloudApiUrl" 
-                        type="text" 
-                        bind:value={epcConfig.snmpConfig.cloudApiUrl} 
-                        placeholder="http://136.112.111.167:3003"
-                      />
-                    </div>
-                    <div class="form-group checkbox-group">
-                      <label>
-                        <input 
-                          type="checkbox" 
-                          bind:checked={epcConfig.snmpConfig.enableTraps}
-                        />
-                        Enable SNMP Traps
-                      </label>
+                      <label for="snmpPrivKey">Privacy Key</label>
+                      <input id="snmpPrivKey" type="password" bind:value={epcConfig.snmpConfig.privKey} placeholder="Enter privacy key" />
                     </div>
                   </div>
-                </div>
-              {/if}
-
-              <!-- APT Repository Configuration (for updates) -->
-              {#if deploymentType === 'epc' || deploymentType === 'snmp' || deploymentType === 'both'}
-                <div class="form-section">
-                  <h4>📦 APT Repository Configuration (Remote Updates)</h4>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label for="aptRepositoryUrl">Repository URL</label>
-                      <input 
-                        id="aptRepositoryUrl" 
-                        type="text" 
-                        bind:value={epcConfig.aptConfig.repositoryUrl} 
-                        placeholder="http://136.112.111.167:3003/apt"
-                      />
-                    </div>
-                    <div class="form-group checkbox-group">
-                      <label>
-                        <input 
-                          type="checkbox" 
-                          bind:checked={epcConfig.aptConfig.enabled}
-                        />
-                        Enable APT Repository
-                      </label>
-                    </div>
-                    <div class="form-group checkbox-group">
-                      <label>
-                        <input 
-                          type="checkbox" 
-                          bind:checked={epcConfig.aptConfig.autoUpdate}
-                        />
-                        Auto-update Enabled
-                      </label>
-                    </div>
+                {/if}
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="snmpReportingInterval">Reporting Interval (seconds)</label>
+                    <input id="snmpReportingInterval" type="number" bind:value={epcConfig.snmpConfig.reportingInterval} placeholder="60" />
                   </div>
-                  
-                  {#if epcConfig.aptConfig.autoUpdate}
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label for="aptUpdateSchedule">Update Schedule</label>
-                        <select id="aptUpdateSchedule" bind:value={epcConfig.aptConfig.updateSchedule}>
-                          <option value="hourly">Hourly</option>
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label for="aptUpdateTime">Update Time (HH:MM)</label>
-                        <input 
-                          id="aptUpdateTime" 
-                          type="text" 
-                          bind:value={epcConfig.aptConfig.updateTime} 
-                          placeholder="02:00"
-                          pattern="[0-9]{2}:[0-9]{2}"
-                        />
-                      </div>
-                      <div class="form-group checkbox-group">
-                        <label>
-                          <input 
-                            type="checkbox" 
-                            bind:checked={epcConfig.aptConfig.securityUpdatesOnly}
-                          />
-                          Security Updates Only
-                        </label>
-                      </div>
-                    </div>
-                  {/if}
+                  <div class="form-group">
+                    <label for="snmpCloudApiUrl">Cloud API URL</label>
+                    <input id="snmpCloudApiUrl" type="text" bind:value={epcConfig.snmpConfig.cloudApiUrl} placeholder="http://136.112.111.167:3003" />
+                  </div>
+                  <div class="form-group checkbox-group">
+                    <label>
+                      <input type="checkbox" bind:checked={epcConfig.snmpConfig.enableTraps} />
+                      Enable SNMP Traps
+                    </label>
+                  </div>
                 </div>
-              {/if}
+              </div>
             </div>
 
-          {:else if activeTab === 'review'}
-            <div class="deploy-review">
-              <h4>📋 Configuration Review</h4>
-              <div class="review-grid">
+          <!-- APT Repository Configuration -->
+          {:else if currentStep === getStepNumber('apt')}
+            <div class="step-panel">
+              <h3>Step {currentStep}: APT Repository Configuration</h3>
+              <p class="step-description">Configure remote updates repository</p>
+              <div class="form-section">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="aptRepositoryUrl">Repository URL</label>
+                    <input id="aptRepositoryUrl" type="text" bind:value={epcConfig.aptConfig.repositoryUrl} placeholder="http://136.112.111.167:3003/apt" />
+                  </div>
+                  <div class="form-group checkbox-group">
+                    <label>
+                      <input type="checkbox" bind:checked={epcConfig.aptConfig.enabled} />
+                      Enable APT Repository
+                    </label>
+                  </div>
+                  <div class="form-group checkbox-group">
+                    <label>
+                      <input type="checkbox" bind:checked={epcConfig.aptConfig.autoUpdate} />
+                      Auto-update Enabled
+                    </label>
+                  </div>
+                </div>
+                {#if epcConfig.aptConfig.autoUpdate}
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="aptUpdateSchedule">Update Schedule</label>
+                      <select id="aptUpdateSchedule" bind:value={epcConfig.aptConfig.updateSchedule}>
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="aptUpdateTime">Update Time (HH:MM)</label>
+                      <input id="aptUpdateTime" type="text" bind:value={epcConfig.aptConfig.updateTime} placeholder="02:00" pattern="[0-9]{2}:[0-9]{2}" />
+                    </div>
+                    <div class="form-group checkbox-group">
+                      <label>
+                        <input type="checkbox" bind:checked={epcConfig.aptConfig.securityUpdatesOnly} />
+                        Security Updates Only
+                      </label>
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+          <!-- Review Step -->
+          {:else if currentStep === getStepNumber('review')}
+            <div class="step-panel">
+              <h3>Step {currentStep}: Review Configuration</h3>
+              <p class="step-description">Review your deployment configuration</p>
+              <div class="review-section">
                 <div class="review-item">
                   <strong>Deployment Type:</strong>
                   <span>{deploymentType === 'both' ? 'EPC + SNMP' : deploymentType.toUpperCase()}</span>
@@ -1561,14 +1471,10 @@ echo "🎉 Deployment successful!";
                     <strong>SNMP Community:</strong>
                     <span>{epcConfig.snmpConfig.community}</span>
                   </div>
-                  <div class="review-item">
-                    <strong>Cloud API:</strong>
-                    <span>{epcConfig.snmpConfig.cloudApiUrl}</span>
-                  </div>
                 {/if}
                 <div class="review-item">
                   <strong>Location:</strong>
-                  <span>{epcConfig.location.address}, {epcConfig.location.city}, {epcConfig.location.state}, {epcConfig.location.country}</span>
+                  <span>{epcConfig.location.address}, {epcConfig.location.city}, {epcConfig.location.state}</span>
                 </div>
                 <div class="review-item">
                   <strong>Contact:</strong>
@@ -1579,90 +1485,41 @@ echo "🎉 Deployment successful!";
                     <strong>APT Repository:</strong>
                     <span>{epcConfig.aptConfig.repositoryUrl}</span>
                   </div>
-                  {#if epcConfig.aptConfig.autoUpdate}
-                    <div class="review-item">
-                      <strong>Auto-Update:</strong>
-                      <span>{epcConfig.aptConfig.updateSchedule} at {epcConfig.aptConfig.updateTime}</span>
-                    </div>
-                  {/if}
                 {/if}
-              </div>
-
-              <div class="deploy-info">
-                <h4>🚀 Deployment Information</h4>
-                <p>The deployment {deploymentOption === 'script' ? 'script' : 'ISO'} will:</p>
-                <ul>
-                  {#if deploymentType === 'epc' || deploymentType === 'both'}
-                    <li>Install Open5GS EPC components (MME, SGW, PGW, PCRF)</li>
-                    <li>Configure network parameters and HSS connection</li>
-                    <li>Set up systemd services for EPC components</li>
-                  {/if}
-                  {#if deploymentType === 'snmp' || deploymentType === 'both'}
-                    <li>Install SNMP agent and Mikrotik monitoring modules</li>
-                    <li>Configure SNMP for cloud reporting</li>
-                    <li>Set up SNMP cloud reporting service</li>
-                  {/if}
-                  {#if epcConfig.aptConfig.enabled}
-                    <li>Configure APT repository for remote updates</li>
-                    {#if epcConfig.aptConfig.autoUpdate}
-                      <li>Enable automatic updates ({epcConfig.aptConfig.updateSchedule})</li>
-                    {/if}
-                  {/if}
-                  <li>Create configuration files with your settings</li>
-                  <li>Start all configured services</li>
-                </ul>
               </div>
             </div>
 
-          {:else if activeTab === 'download'}
-            <div class="download-content">
-              <h4>📥 Download Deployment Package</h4>
-              <p>Choose your deployment method:</p>
-              
+          <!-- Final Step: Download (Script/ISO Selection) -->
+          {:else if currentStep === getStepNumber('download')}
+            <div class="step-panel">
+              <h3>Step {currentStep}: Download Deployment Package</h3>
+              <p class="step-description">Choose your deployment method</p>
               <div class="download-options">
-                <div class="option-item">
-                  <input type="radio" id="script-option" value="script" bind:group={deploymentOption} />
-                  <label for="script-option">
-                    <h5>📜 Deployment Script</h5>
-                    <p>Download a bash script to install and configure {deploymentType === 'both' ? 'EPC and SNMP/Mikrotik' : deploymentType === 'epc' ? 'Open5GS EPC' : 'SNMP/Mikrotik monitoring'} on an existing Ubuntu server.</p>
-                  </label>
-                </div>
-                
-                <div class="option-item">
-                  <input type="radio" id="iso-option" value="iso" bind:group={deploymentOption} />
-                  <label for="iso-option">
-                    <h5>💿 ISO Image</h5>
-                    <p>Download a pre-configured ISO image with {deploymentType === 'both' ? 'EPC and SNMP/Mikrotik' : deploymentType === 'epc' ? 'EPC Core' : 'SNMP/Mikrotik'} components ready to burn to a USB drive or DVD.</p>
-                  </label>
-                </div>
+                <label class="download-option">
+                  <input type="radio" name="deploymentOption" value="script" bind:group={deploymentOption} />
+                  <div class="option-content">
+                    <div class="option-icon">📜</div>
+                    <div class="option-info">
+                      <strong>Deployment Script</strong>
+                      <p>Download a bash script to install and configure on an existing Ubuntu server</p>
+                    </div>
+                  </div>
+                </label>
+                <label class="download-option">
+                  <input type="radio" name="deploymentOption" value="iso" bind:group={deploymentOption} />
+                  <div class="option-content">
+                    <div class="option-icon">💿</div>
+                    <div class="option-info">
+                      <strong>ISO Image</strong>
+                      <p>Download a pre-configured ISO image ready to burn to USB or DVD</p>
+                    </div>
+                  </div>
+                </label>
               </div>
-
-              {#if deploymentOption === 'script'}
+              {#if deploymentOption === 'script' && deploymentScript}
                 <div class="script-preview">
                   <h5>Script Preview:</h5>
-                  <pre><code>{deploymentScript.substring(0, 500)}...</code></pre>
-                </div>
-
-                <div class="download-instructions">
-                  <h5>📋 Instructions:</h5>
-                  <ol>
-                    <li>Download the script to your server</li>
-                    <li>Make it executable: <code>chmod +x epc-deploy-*.sh</code></li>
-                    <li>Run the script: <code>sudo ./epc-deploy-*.sh</code></li>
-                    <li>Monitor the deployment progress</li>
-                    <li>Check service status after completion</li>
-                  </ol>
-                </div>
-              {:else}
-                <div class="download-instructions">
-                  <h5>📋 ISO Instructions:</h5>
-                  <ol>
-                    <li>Download the ISO image</li>
-                    <li>Burn the ISO to a USB drive using tools like Rufus, Etcher, or dd</li>
-                    <li>Boot your server from the USB drive</li>
-                    <li>The system will automatically install with your configured settings</li>
-                    <li>After boot, verify EPC services are running</li>
-                  </ol>
+                  <pre><code>{deploymentScript.substring(0, 300)}...</code></pre>
                 </div>
               {/if}
             </div>
@@ -1671,54 +1528,32 @@ echo "🎉 Deployment successful!";
 
         <!-- Action Buttons -->
         <div class="modal-actions">
-          {#if activeTab === 'configure'}
-            <button class="btn-primary" on:click={() => {
-              if (validateConfig()) {
-                activeTab = 'review';
-                generateDeploymentScript();
-              } else {
-                const errors = getValidationErrors();
-                error = errors.join(', ');
-              }
-            }} disabled={loading}>
+          {#if currentStep > 1}
+            <button class="btn btn-secondary" on:click={prevStep}>
+              ← Previous
+            </button>
+          {/if}
+          
+          {#if currentStep < totalSteps}
+            <button class="btn btn-primary" on:click={handleNextClick} disabled={loading}>
               {#if loading}
-                <div class="loading-spinner small"></div>
+                <span class="spinner"></span>
                 Generating...
               {:else}
-                Review Configuration →
+                Next →
               {/if}
             </button>
-          {:else if activeTab === 'review'}
-            <button class="btn-secondary" on:click={() => activeTab = 'configure'}>
-              ← Back to Configuration
-            </button>
-            <button 
-              class="btn-primary" 
-              on:click={() => {
-                generateDeploymentScript();
-                activeTab = 'download';
-              }}
-              disabled={loading || !deploymentScript}
-            >
+          {:else}
+            <button class="btn btn-primary" on:click={downloadDeployment} disabled={loading || !deploymentOption}>
               {#if loading}
-                <div class="loading-spinner small"></div>
-                Generating...
-              {:else}
-                Continue to Download →
-              {/if}
-            </button>
-          {:else if activeTab === 'download'}
-            <button class="btn-secondary" on:click={() => activeTab = 'review'}>
-              ← Back to Review
-            </button>
-            <button class="btn-primary" on:click={downloadDeployment} disabled={loading}>
-              {#if loading}
-                <div class="loading-spinner small"></div>
+                <span class="spinner"></span>
                 {deploymentOption === 'script' ? 'Preparing Script...' : 'Generating ISO...'}
               {:else if deploymentOption === 'script'}
                 📥 Download Script
-              {:else}
+              {:else if deploymentOption === 'iso'}
                 💿 Download ISO
+              {:else}
+                Select Script or ISO
               {/if}
             </button>
           {/if}
@@ -1735,23 +1570,23 @@ echo "🎉 Deployment successful!";
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    backdrop-filter: blur(4px);
   }
 
   .modal-content {
-    background: var(--card-bg);
+    background: white;
     border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-xl);
-    max-width: 95vw;
-    max-height: 95vh;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    max-width: 90vw;
+    max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    width: 100%;
   }
 
   .modal-header {
@@ -1759,14 +1594,14 @@ echo "🎉 Deployment successful!";
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-lg);
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--color-gray-200);
   }
 
   .modal-header h2 {
     margin: 0;
-    color: var(--text-primary);
+    color: var(--color-gray-900);
     font-size: 1.5rem;
+    font-weight: 600;
   }
 
   .close-btn {
@@ -1774,15 +1609,16 @@ echo "🎉 Deployment successful!";
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: var(--text-secondary);
-    padding: 0.5rem;
+    color: var(--color-gray-500);
+    padding: var(--spacing-xs);
     border-radius: var(--border-radius-sm);
     transition: all 0.2s ease;
+    line-height: 1;
   }
 
   .close-btn:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: var(--color-gray-100);
+    color: var(--color-gray-900);
   }
 
   .modal-body {
@@ -1792,13 +1628,13 @@ echo "🎉 Deployment successful!";
   }
 
   .epc-deployment-modal {
-    width: 95%;
-    max-width: 800px;
-    max-height: 95vh;
+    width: 100%;
+    max-width: 700px;
+    max-height: 90vh;
   }
 
   .error-banner {
-    background: var(--danger);
+    background: var(--color-danger);
     color: white;
     padding: var(--spacing-md);
     margin: var(--spacing-md) 0;
@@ -1807,7 +1643,7 @@ echo "🎉 Deployment successful!";
   }
 
   .success-banner {
-    background: var(--success);
+    background: var(--color-success);
     color: white;
     padding: var(--spacing-md);
     margin: var(--spacing-md) 0;
@@ -1815,45 +1651,84 @@ echo "🎉 Deployment successful!";
     text-align: center;
   }
 
-  .tabs {
-    display: flex;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-lg);
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .tab-btn {
-    background: none;
-    border: none;
-    padding: var(--spacing-md) var(--spacing-lg);
-    cursor: pointer;
-    color: var(--text-secondary);
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s ease;
+  .step-indicator {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    font-size: 0.95rem;
+    justify-content: center;
+    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-md) 0;
   }
 
-  .tab-btn:hover:not(:disabled) {
-    color: var(--text-primary);
-    background: var(--bg-secondary);
+  .step-indicator-item {
+    display: flex;
+    align-items: center;
+    position: relative;
   }
 
-  .tab-btn.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
+  .step-indicator-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-gray-200);
+    color: var(--color-gray-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    border: 2px solid var(--color-gray-300);
   }
 
-  .tab-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .step-indicator-item.active .step-indicator-number {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
   }
 
-  .tab-content {
+  .step-indicator-item.completed .step-indicator-number {
+    background: var(--color-success);
+    color: white;
+    border-color: var(--color-success);
+  }
+
+  .step-indicator-line {
+    width: 60px;
+    height: 2px;
+    background: var(--color-gray-300);
+    margin: 0 var(--spacing-sm);
+    transition: all 0.2s ease;
+  }
+
+  .step-indicator-item.completed .step-indicator-line {
+    background: var(--color-success);
+  }
+
+  .step-indicator-line.last {
+    display: none;
+  }
+
+  .step-content {
     flex: 1;
     overflow-y: auto;
+    min-height: 400px;
+  }
+
+  .step-panel {
+    padding: var(--spacing-lg);
+  }
+
+  .step-panel h3 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--color-gray-900);
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .step-description {
+    color: var(--color-gray-600);
+    font-size: 0.875rem;
+    margin: 0 0 var(--spacing-lg) 0;
   }
 
   .config-form {
@@ -1863,16 +1738,17 @@ echo "🎉 Deployment successful!";
   }
 
   .form-section {
-    background: var(--bg-secondary);
+    background: var(--color-gray-50);
     padding: var(--spacing-lg);
     border-radius: var(--border-radius-md);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--color-gray-200);
   }
 
   .form-section h4 {
     margin: 0 0 var(--spacing-md) 0;
-    color: var(--text-primary);
+    color: var(--color-gray-900);
     font-size: 1.1rem;
+    font-weight: 600;
   }
 
   .section-description {
@@ -1883,7 +1759,7 @@ echo "🎉 Deployment successful!";
 
   .deployment-type-options {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--spacing-md);
     margin-top: var(--spacing-md);
   }
@@ -1892,30 +1768,25 @@ echo "🎉 Deployment successful!";
     display: flex;
     flex-direction: column;
     cursor: pointer;
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--color-gray-300);
     border-radius: var(--border-radius-md);
     padding: var(--spacing-lg);
     transition: all 0.2s ease;
-    background: var(--bg-primary);
+    background: var(--color-gray-50);
   }
 
   .deployment-option:hover {
-    border-color: var(--primary);
+    border-color: var(--color-primary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
   }
 
   .deployment-option input[type="radio"] {
     display: none;
   }
 
-  .deployment-option input[type="radio"]:checked + .option-content {
-    color: var(--primary);
-  }
-
   .deployment-option:has(input[type="radio"]:checked) {
-    border-color: var(--primary);
-    background: var(--color-primary-light, rgba(59, 130, 246, 0.05));
+    border-color: var(--color-primary);
+    background: rgba(59, 130, 246, 0.05);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -1936,16 +1807,16 @@ echo "🎉 Deployment successful!";
 
   .option-info strong {
     display: block;
-    font-size: 1rem;
-    color: var(--text-primary);
+    font-size: 0.9375rem;
+    color: var(--color-gray-900);
     margin-bottom: var(--spacing-xs);
     font-weight: 600;
   }
 
   .option-info p {
     margin: 0;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    color: var(--color-gray-600);
     line-height: 1.5;
   }
 
@@ -1960,25 +1831,28 @@ echo "🎉 Deployment successful!";
   .form-group label {
     display: block;
     margin-bottom: var(--spacing-xs);
-    color: var(--text-primary);
+    color: var(--color-gray-700);
     font-weight: 500;
+    font-size: 0.875rem;
   }
 
-  .form-group input {
+  .form-group input,
+  .form-group select {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--color-gray-300);
     border-radius: var(--border-radius-sm);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 1rem;
+    background: white;
+    color: var(--color-gray-900);
+    font-size: 0.875rem;
     transition: all 0.2s ease;
   }
 
-  .form-group input:focus {
+  .form-group input:focus,
+  .form-group select:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
   .form-row {
@@ -2000,20 +1874,26 @@ echo "🎉 Deployment successful!";
   }
 
   .review-item {
-    background: var(--bg-secondary);
-    padding: var(--spacing-md);
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--color-gray-200);
+  }
+
+  .review-item:last-child {
+    border-bottom: none;
   }
 
   .review-item strong {
-    display: block;
-    color: var(--text-primary);
-    margin-bottom: var(--spacing-xs);
+    color: var(--color-gray-700);
+    font-weight: 600;
+    font-size: 0.875rem;
   }
 
   .review-item span {
-    color: var(--text-secondary);
+    color: var(--color-gray-900);
+    font-size: 0.875rem;
   }
 
   .deploy-info {
@@ -2100,41 +1980,40 @@ echo "🎉 Deployment successful!";
     margin-bottom: var(--spacing-lg);
   }
 
-  .option-item {
+  .download-option {
     display: flex;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: var(--bg-secondary);
-    border: 2px solid var(--border-color);
+    flex-direction: column;
+    cursor: pointer;
+    border: 2px solid var(--color-gray-300);
     border-radius: var(--border-radius-md);
-    cursor: pointer;
+    padding: var(--spacing-lg);
     transition: all 0.2s ease;
+    background: var(--color-gray-50);
   }
 
-  .option-item:hover {
-    border-color: var(--primary);
-    background: var(--bg-tertiary);
+  .download-option:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
-  .option-item input[type="radio"] {
-    margin-top: 2px;
+  .download-option input[type="radio"] {
+    display: none;
   }
 
-  .option-item label {
-    flex: 1;
-    cursor: pointer;
+  .download-option:has(input[type="radio"]:checked) {
+    border-color: var(--color-primary);
+    background: rgba(59, 130, 246, 0.05);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
-  .option-item h5 {
-    margin: 0 0 var(--spacing-xs) 0;
-    color: var(--text-primary);
-    font-size: 1rem;
-  }
-
-  .option-item p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
+  .review-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    background: var(--color-gray-50);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--color-gray-200);
   }
 
   .modal-actions {
@@ -2151,55 +2030,57 @@ echo "🎉 Deployment successful!";
     margin-right: auto;
   }
 
-  .btn-primary, .btn-secondary {
-    padding: var(--spacing-md) var(--spacing-lg);
+  .btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
     border-radius: var(--border-radius-md);
     border: none;
     cursor: pointer;
     font-weight: 500;
+    font-size: 0.875rem;
     transition: all 0.2s ease;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: var(--spacing-sm);
+    text-decoration: none;
   }
 
   .btn-primary {
-    background: var(--primary);
+    background: var(--color-primary);
     color: white;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: var(--primary-dark);
+    background: var(--color-primary-hover);
   }
 
   .btn-secondary {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    background: var(--color-gray-100);
+    color: var(--color-gray-900);
+    border: 1px solid var(--color-gray-300);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: var(--bg-tertiary);
+    background: var(--color-gray-200);
   }
 
-  .btn-primary:disabled, .btn-secondary:disabled {
-    opacity: 0.6;
+  .btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
   }
 
-  .loading-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--border-color);
-    border-top: 2px solid var(--primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  .loading-spinner.small {
+  .spinner {
     width: 16px;
     height: 16px;
-    border-width: 2px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+  }
+
+  .btn-secondary .spinner {
+    border: 2px solid var(--color-gray-300);
+    border-top: 2px solid var(--color-gray-600);
   }
 
   @keyframes spin {
@@ -2214,8 +2095,13 @@ echo "🎉 Deployment successful!";
       max-width: none;
     }
 
-    .tabs {
+    .step-indicator {
       flex-wrap: wrap;
+      gap: var(--spacing-xs);
+    }
+
+    .step-indicator-line {
+      width: 30px;
     }
 
     .form-row {
