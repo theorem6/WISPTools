@@ -147,19 +147,16 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     try {
       const tenantId = $currentTenant?.id;
       if (tenantId) {
-        // Get ALL plans
-        const allPlans = await planService.getPlans(tenantId);
+        // Get ALL projects (plans)
+        const allProjects = await planService.getPlans(tenantId);
         
-        // Separate plans by status for accurate menu counts
-        draftPlans = allPlans.filter(plan => plan.status === 'draft' || plan.status === 'active');
-        approvedPlans = allPlans.filter(plan => plan.status === 'approved' || plan.status === 'authorized');
-        deployedPlans = allPlans.filter(plan => plan.status === 'deployed');
+        // Separate projects by status for accurate menu counts
+        draftPlans = allProjects.filter(project => project.status === 'draft' || project.status === 'active');
+        approvedPlans = allProjects.filter(project => project.status === 'approved' || project.status === 'authorized');
+        deployedPlans = allProjects.filter(project => project.status === 'deployed');
         
-        // Show all plans that can be finalized, approved, or deployed (for the plan list modal)
-        readyPlans = allPlans.filter(plan => 
-          plan.status === 'draft' || plan.status === 'active' || plan.status === 'ready' || 
-          plan.status === 'approved' || plan.status === 'authorized'
-        );
+        // Show ALL projects in the list (for the projects modal)
+        readyPlans = allProjects;
         
         // Initialize visible plan IDs from plans with showOnMap = true
         visiblePlanIds = new Set(
@@ -182,7 +179,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
         }
       }
     } catch (err) {
-      console.error('Failed to load ready plans:', err);
+      console.error('Failed to load projects:', err);
     } finally {
       isLoadingPlans = false;
     }
@@ -400,17 +397,17 @@ import { isPlatformAdmin } from '$lib/services/adminService';
           class="control-btn" 
           class:active={showProjectFilters}
           on:click={() => showProjectFilters = !showProjectFilters} 
-          title="Project Filters - Approved plans ready for deployment"
+          title="Project Filters - Approved projects ready for deployment"
         >
           🔍 Approved ({approvedPlans.length})
         </button>
-        <button class="control-btn" on:click={openPlanApproval} title="Plan Management - Draft, Ready, and Approved plans">
-          📋 Plans ({readyPlans.length})
+        <button class="control-btn" on:click={openPlanApproval} title="Projects - View and manage all projects">
+          📋 Projects ({readyPlans.length})
         </button>
         <button 
           class="control-btn" 
           on:click={() => showDeployedHardwareModal = true}
-          title="View Deployed Plans"
+          title="View Deployed Projects"
         >
           ✅ Deployed ({deployedPlans.length})
         </button>
@@ -537,7 +534,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     <div class="modal-overlay" on:click={closePlanApprovalModal}>
       <div class="plan-list-modal" on:click|stopPropagation>
         <div class="modal-header">
-          <h2>📋 Plans - Finalize, Approve, or Reject</h2>
+          <h2>📋 Projects - Finalize, Approve, or Reject</h2>
           <button class="close-btn" on:click={closePlanApprovalModal}>✕</button>
         </div>
         
@@ -546,8 +543,8 @@ import { isPlatformAdmin } from '$lib/services/adminService';
             <div class="loading">Loading plans...</div>
           {:else if readyPlans.length === 0}
             <div class="empty-state">
-              <p>No plans available</p>
-              <p class="hint">Create plans in the Plan module to see them here</p>
+              <p>No projects available</p>
+              <p class="hint">Create projects in the Plan module to see them here</p>
             </div>
           {:else}
             <div class="plan-list">
@@ -577,7 +574,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
                       <button 
                         class="btn-finalize" 
                         on:click={() => handleFinalizePlan(plan)}
-                        title="Finalize this plan to make it ready for approval"
+                        title="Finalize this project to make it ready for approval"
                       >
                         ✅ Finalize
                       </button>
@@ -585,7 +582,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
                       <button 
                         class="btn-action" 
                         on:click={() => selectPlanForApproval(plan)}
-                        title="Approve or reject this plan"
+                        title="Approve or reject this project"
                       >
                         📋 Review
                       </button>

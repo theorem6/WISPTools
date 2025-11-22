@@ -154,10 +154,27 @@ router.get('/sectors', async (req, res) => {
     if (technology) query.technology = technology;
     if (siteId) query.siteId = siteId;
     
-    const sectors = await UnifiedSector.find(query)
-      .populate('siteId', 'name type location')
-      .sort({ name: 1 })
-      .lean();
+    // Populate siteId if it exists and is a valid ObjectId, otherwise handle gracefully
+    let sectors;
+    try {
+      sectors = await UnifiedSector.find(query)
+        .populate({
+          path: 'siteId',
+          select: 'name type location',
+          match: { tenantId: req.tenantId } // Only populate if site belongs to same tenant
+        })
+        .sort({ name: 1 })
+        .lean();
+      
+      // Filter out sectors where populate returned null (site not found or doesn't belong to tenant)
+      sectors = sectors.filter(sector => sector.siteId !== null && sector.siteId !== undefined);
+    } catch (populateError) {
+      console.warn('[Network API] Populate failed, fetching without populate:', populateError.message);
+      // Fallback: fetch without populate if populate fails
+      sectors = await UnifiedSector.find(query)
+        .sort({ name: 1 })
+        .lean();
+    }
     
     res.json(sectors);
   } catch (error) {
