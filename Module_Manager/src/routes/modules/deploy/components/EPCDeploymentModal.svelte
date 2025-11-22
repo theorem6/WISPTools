@@ -1578,18 +1578,26 @@ echo "🎉 Deployment successful!";
   }
 
   .modal-content {
-    background: var(--bg-primary);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
+    background: var(--bg-primary) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-xl) !important;
     max-width: 800px !important;
     width: 800px !important;
-    max-height: 95vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    max-height: 95vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
   
+  /* Specific override for EPC deployment modal to ensure 800px width */
   .modal-content.epc-deployment-modal {
+    max-width: 800px !important;
+    width: 800px !important;
+    min-width: 800px !important;
+  }
+  
+  /* Override any global modal styles */
+  :global(.modal-content.epc-deployment-modal) {
     max-width: 800px !important;
     width: 800px !important;
   }
