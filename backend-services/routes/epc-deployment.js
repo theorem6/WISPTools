@@ -99,6 +99,8 @@ router.post('/generate-epc-iso', async (req, res) => {
     const timestamp = Date.now();
     const iso_filename = `wisptools-epc-${siteName.replace(/[^a-zA-Z0-9]/g, '-')}-${timestamp}.iso`;
     const iso_path = path.join(ISO_OUTPUT_DIR, iso_filename);
+    const zip_filename = `${iso_filename}.zip`;
+    const zip_path = path.join(ISO_OUTPUT_DIR, zip_filename);
     
     // Create output directory if it doesn't exist
     // Check if it's a symlink first
@@ -421,14 +423,10 @@ echo "[Build] ISO created successfully: $(du -h "$ISO_PATH" | cut -f1)"
 
 if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
-  ZIP_FILENAME="${iso_filename}.zip"
-  ZIP_PATH="${ISO_OUTPUT_DIR}/\\\${ZIP_FILENAME}"
-  # Remove old ZIP if it exists
-  rm -f "\\\$ZIP_PATH" "\\\${ZIP_PATH}.sha256" 2>/dev/null || true
   cd "${ISO_OUTPUT_DIR}"
-  zip -q "\\\$ZIP_FILENAME" "${iso_filename}" || { echo "[Build] ERROR: Failed to create ZIP"; exit 1; }
-  (cd "${ISO_OUTPUT_DIR}" && sha256sum "\\\$ZIP_FILENAME" > "\\\${ZIP_FILENAME}.sha256") || true
-  echo "[Build] ZIP created successfully: \\\$ZIP_FILENAME (\\\$(du -h "\\\$ZIP_PATH" | cut -f1))"
+  zip -q "${zip_filename}" "${iso_filename}" || { echo "[Build] ERROR: Failed to create ZIP"; exit 1; }
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "${zip_filename}" > "${zip_filename}.sha256") || true
+  echo "[Build] ZIP created successfully: ${zip_filename} ($(du -h "${zip_path}" | cut -f1))"
 fi
 `;
 
