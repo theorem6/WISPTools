@@ -152,17 +152,80 @@ INITRD_PATH="${INITRD_PATH}"
 
     # ALWAYS download fresh Ubuntu 22.04 LTS netboot kernel/initrd (Open5GS compatible)
     echo "[Build] Downloading fresh Ubuntu 22.04 LTS netboot kernel/initrd..."
-    UBUNTU_NETBOOT_BASE="http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64"
     rm -f "$KERNEL_PATH" "$INITRD_PATH" 2>/dev/null || true
-    wget -q --timeout=30 --tries=3 -O "$KERNEL_PATH" "$UBUNTU_NETBOOT_BASE/linux" || { echo "[Build] ERROR: Failed to download kernel"; exit 1; }
-    wget -q --timeout=30 --tries=3 -O "$INITRD_PATH" "$UBUNTU_NETBOOT_BASE/initrd.gz" || { echo "[Build] ERROR: Failed to download initrd"; exit 1; }
+    
+    # Try multiple Ubuntu netboot URLs (fallback if one fails)
+    UBUNTU_NETBOOT_URLS=(
+      "http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
+      "http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64"
+      "http://archive.ubuntu.com/ubuntu/dists/jammy-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
+    )
+    
+    KERNEL_DOWNLOADED=0
+    INITRD_DOWNLOADED=0
+    
+    for UBUNTU_NETBOOT_BASE in "${UBUNTU_NETBOOT_URLS[@]}"; do
+      echo "[Build] Trying URL: $UBUNTU_NETBOOT_BASE"
+      
+      # Try to download kernel
+      if [ $KERNEL_DOWNLOADED -eq 0 ]; then
+        if wget -q --timeout=30 --tries=2 -O "$KERNEL_PATH" "$UBUNTU_NETBOOT_BASE/linux" 2>/dev/null; then
+          if [ -s "$KERNEL_PATH" ]; then
+            KERNEL_DOWNLOADED=1
+            echo "[Build] Kernel downloaded successfully from $UBUNTU_NETBOOT_BASE"
+          else
+            rm -f "$KERNEL_PATH" 2>/dev/null || true
+          fi
+        fi
+      fi
+      
+      # Try to download initrd
+      if [ $INITRD_DOWNLOADED -eq 0 ]; then
+        if wget -q --timeout=30 --tries=2 -O "$INITRD_PATH" "$UBUNTU_NETBOOT_BASE/initrd.gz" 2>/dev/null; then
+          if [ -s "$INITRD_PATH" ]; then
+            INITRD_DOWNLOADED=1
+            echo "[Build] Initrd downloaded successfully from $UBUNTU_NETBOOT_BASE"
+          else
+            rm -f "$INITRD_PATH" 2>/dev/null || true
+          fi
+        fi
+      fi
+      
+      # If both downloaded, break
+      if [ $KERNEL_DOWNLOADED -eq 1 ] && [ $INITRD_DOWNLOADED -eq 1 ]; then
+        break
+      fi
+    done
 
     # Verify downloads succeeded
     if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
-      echo "[Build] ERROR: Downloaded files are empty or missing"
+      echo "[Build] ERROR: Failed to download Ubuntu netboot files from all URLs"
+      echo "[Build] Kernel file: $([ -f "$KERNEL_PATH" ] && echo "exists ($(du -h "$KERNEL_PATH" | cut -f1))" || echo "missing")"
+      echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
+      echo "[Build] Attempted URLs:"
+      for url in "${UBUNTU_NETBOOT_URLS[@]}"; do
+        echo "[Build]   - $url"
+      done
       exit 1
     fi
+    
+    # Verify file sizes are reasonable (kernel should be > 1MB, initrd should be > 5MB)
+    KERNEL_SIZE=$(wc -c < "$KERNEL_PATH" 2>/dev/null || echo "0")
+    INITRD_SIZE=$(wc -c < "$INITRD_PATH" 2>/dev/null || echo "0")
+    
+    if [ "$KERNEL_SIZE" -lt 1048576 ]; then
+      echo "[Build] ERROR: Kernel file too small ($KERNEL_SIZE bytes), download may have failed"
+      exit 1
+    fi
+    
+    if [ "$INITRD_SIZE" -lt 5242880 ]; then
+      echo "[Build] ERROR: Initrd file too small ($INITRD_SIZE bytes), download may have failed"
+      exit 1
+    fi
+    
     echo "[Build] Ubuntu 22.04 LTS netboot files downloaded successfully"
+    echo "[Build] Kernel size: $(du -h "$KERNEL_PATH" | cut -f1)"
+    echo "[Build] Initrd size: $(du -h "$INITRD_PATH" | cut -f1)"
 
     # Clean up old build directories and old autoinstall files before starting
     echo "[Build] Cleaning up old build artifacts..."
@@ -315,16 +378,40 @@ fi
 
     await fs.writeFile(buildScript, buildScriptContent);
     await fs.chmod(buildScript, 0o755);
+    
+    console.log('[ISO Generator] Executing build script:', buildScript);
     try {
-      const { stdout, stderr } = await execAsync(`sudo ${buildScript}`);
+      const { stdout, stderr } = await execAsync(`sudo ${buildScript}`, {
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large output
+        timeout: 600000 // 10 minutes timeout
+      });
       console.log('[ISO Generator] Build output:', stdout);
-      if (stderr) console.error('[ISO Generator] Build warnings:', stderr);
+      if (stderr) {
+        console.warn('[ISO Generator] Build warnings:', stderr);
+      }
     } catch (isoError) {
       console.error('[ISO Generator] ISO creation failed:', isoError);
+      console.error('[ISO Generator] Error code:', isoError.code);
+      console.error('[ISO Generator] Error signal:', isoError.signal);
+      console.error('[ISO Generator] Error stdout:', isoError.stdout);
+      console.error('[ISO Generator] Error stderr:', isoError.stderr);
+      
+      // Check if ISO file exists despite error (sometimes warnings cause non-zero exit)
+      try {
+        await fs.access(iso_path);
+        console.log('[ISO Generator] ISO file exists despite error, continuing...');
+      } catch (accessError) {
+        throw new Error(`ISO generation failed: ${isoError.message}. Build script output: ${isoError.stdout || ''} ${isoError.stderr || ''}`);
+      }
     }
     
     // Verify ISO was created
-    const stats = await fs.stat(iso_path);
+    let stats;
+    try {
+      stats = await fs.stat(iso_path);
+    } catch (statError) {
+      throw new Error(`ISO file was not created at ${iso_path}: ${statError.message}`);
+    }
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
     
     // Check for ZIP file (created by build script)
