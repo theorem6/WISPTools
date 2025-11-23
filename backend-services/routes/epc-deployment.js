@@ -208,7 +208,7 @@ INITRD_PATH="${INITRD_PATH}"
         "http://archive.ubuntu.com/ubuntu/dists/jammy-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
       )
       
-      for UBUNTU_NETBOOT_BASE in "${UBUNTU_NETBOOT_URLS[@]}"; do
+      for UBUNTU_NETBOOT_BASE in "\${UBUNTU_NETBOOT_URLS[@]}"; do
         echo "[Build] Trying URL: $UBUNTU_NETBOOT_BASE"
         
         # Try to download kernel if needed
@@ -258,8 +258,8 @@ INITRD_PATH="${INITRD_PATH}"
         echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
         echo "[Build] Expected location: $KERNEL_PATH and $INITRD_PATH"
         echo "[Build] Attempted URLs:"
-        for url in "${UBUNTU_NETBOOT_URLS[@]}"; do
-          echo "[Build]   - $url"
+        for url in "\${UBUNTU_NETBOOT_URLS[@]}"; do
+          echo "[Build]   - \$url"
         done
         exit 1
       fi
