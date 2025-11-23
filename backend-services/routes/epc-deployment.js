@@ -504,8 +504,7 @@ fi
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
     
     // Check for ZIP file (created by build script)
-    const zip_filename = `${iso_filename}.zip`;
-    const zip_path = path.join(ISO_OUTPUT_DIR, zip_filename);
+    // zip_filename and zip_path already declared at line 102
     let zipSizeMB = null;
     let zipDownloadUrl = null;
     let zipChecksumUrl = null;
