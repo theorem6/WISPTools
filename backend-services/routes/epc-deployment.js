@@ -112,7 +112,7 @@ router.post('/generate-epc-iso', async (req, res) => {
     } catch (err) {
       if (err.code === 'ENOENT') {
         // Directory doesn't exist, create it
-        await fs.mkdir(ISO_OUTPUT_DIR, { recursive: true });
+    await fs.mkdir(ISO_OUTPUT_DIR, { recursive: true });
         console.log(`[ISO Generator] Created output directory: ${ISO_OUTPUT_DIR}`);
       } else {
         throw err;
@@ -253,8 +253,8 @@ INITRD_PATH="${INITRD_PATH}"
         fi
       done
 
-      # Verify downloads succeeded
-      if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
+    # Verify downloads succeeded
+    if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
         echo "[Build] ERROR: Failed to get Ubuntu netboot files (pre-staged or downloaded)"
         echo "[Build] Kernel file: $([ -f "$KERNEL_PATH" ] && echo "exists ($(du -h "$KERNEL_PATH" | cut -f1))" || echo "missing")"
         echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
@@ -425,7 +425,8 @@ if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
   ZIP_FILENAME="${iso_filename}.zip"
   ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
-  rm -f "\$ZIP_PATH" "\$ZIP_PATH.sha256" 2>/dev/null || true
+  # Remove old ZIP if it exists
+  rm -f "\$ZIP_PATH" "\${ZIP_PATH}.sha256" 2>/dev/null || true
   cd "${ISO_OUTPUT_DIR}"
   zip -q "\$ZIP_FILENAME" "${iso_filename}" || { echo "[Build] ERROR: Failed to create ZIP"; exit 1; }
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "\$ZIP_FILENAME" > "\$ZIP_FILENAME.sha256") || true
