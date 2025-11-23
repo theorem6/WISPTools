@@ -19,8 +19,10 @@ const router = express.Router();
 
 // Configuration
 const ISO_BUILD_DIR = '/opt/epc-iso-builder';
-// Use temporary storage for ISO/ZIP files - they will be auto-deleted after 1 hour
-const ISO_OUTPUT_DIR = '/tmp/iso-downloads';
+// ISO output directory - must match nginx configuration
+// If symlink exists: /var/www/html/downloads/isos -> /tmp/iso-downloads
+// Otherwise: use /var/www/html/downloads/isos directly
+const ISO_OUTPUT_DIR = '/var/www/html/downloads/isos';
 // Minimal boot assets (holding folder). Pre-stage these once on the VM.
 // Required files:
 //  - /opt/base-images/minimal/vmlinuz
@@ -99,7 +101,21 @@ router.post('/generate-epc-iso', async (req, res) => {
     const iso_path = path.join(ISO_OUTPUT_DIR, iso_filename);
     
     // Create output directory if it doesn't exist
-    await fs.mkdir(ISO_OUTPUT_DIR, { recursive: true });
+    // Check if it's a symlink first
+    try {
+      const stats = await fs.lstat(ISO_OUTPUT_DIR);
+      if (!stats.isDirectory() && !stats.isSymbolicLink()) {
+        throw new Error(`${ISO_OUTPUT_DIR} exists but is not a directory or symlink`);
+      }
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        // Directory doesn't exist, create it
+        await fs.mkdir(ISO_OUTPUT_DIR, { recursive: true });
+        console.log(`[ISO Generator] Created output directory: ${ISO_OUTPUT_DIR}`);
+      } else {
+        throw err;
+      }
+    }
     await fs.mkdir(ISO_BUILD_DIR, { recursive: true });
     
     // Create temporary build directory
@@ -419,7 +435,18 @@ fi
     await fs.writeFile(buildScript, buildScriptContent);
     await fs.chmod(buildScript, 0o755);
     
+    // Verify script was created and is executable
+    try {
+      const scriptStats = await fs.stat(buildScript);
+      console.log(`[ISO Generator] Build script created: ${buildScript} (${scriptStats.size} bytes, mode: ${scriptStats.mode.toString(8)})`);
+    } catch (statError) {
+      throw new Error(`Failed to create build script: ${statError.message}`);
+    }
+    
     console.log('[ISO Generator] Executing build script:', buildScript);
+    console.log('[ISO Generator] Output directory:', ISO_OUTPUT_DIR);
+    console.log('[ISO Generator] ISO path:', iso_path);
+    
     try {
       const { stdout, stderr } = await execAsync(`sudo ${buildScript}`, {
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large output
@@ -437,11 +464,31 @@ fi
       console.error('[ISO Generator] Error stderr:', isoError.stderr);
       
       // Check if ISO file exists despite error (sometimes warnings cause non-zero exit)
+      let isoExists = false;
       try {
         await fs.access(iso_path);
-        console.log('[ISO Generator] ISO file exists despite error, continuing...');
+        const stats = await fs.stat(iso_path);
+        isoExists = true;
+        console.log(`[ISO Generator] ISO file exists despite error, continuing... (${(stats.size / 1024 / 1024).toFixed(2)}MB)`);
       } catch (accessError) {
-        throw new Error(`ISO generation failed: ${isoError.message}. Build script output: ${isoError.stdout || ''} ${isoError.stderr || ''}`);
+        // ISO doesn't exist, check if output directory exists
+        let outputDirExists = false;
+        try {
+          await fs.access(ISO_OUTPUT_DIR);
+          outputDirExists = true;
+        } catch (dirError) {
+          // Directory doesn't exist
+        }
+        
+        const errorDetails = [
+          `Build script exit code: ${isoError.code}`,
+          `Build script signal: ${isoError.signal || 'none'}`,
+          `Build script stdout: ${isoError.stdout || '(empty)'}`,
+          `Build script stderr: ${isoError.stderr || '(empty)'}`,
+          `Expected ISO path: ${iso_path}`,
+          `Output directory exists: ${outputDirExists ? 'yes' : 'no'}`
+        ].join('\n');
+        throw new Error(`ISO generation failed: ${isoError.message}\n${errorDetails}`);
       }
     }
     
