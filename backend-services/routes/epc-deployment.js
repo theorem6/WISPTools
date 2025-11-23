@@ -425,7 +425,6 @@ if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
   ZIP_FILENAME="${iso_filename}.zip"
   ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
-  # Remove old ZIP if it exists
   rm -f "\$ZIP_PATH" "\${ZIP_PATH}.sha256" 2>/dev/null || true
   cd "${ISO_OUTPUT_DIR}"
   zip -q "\$ZIP_FILENAME" "${iso_filename}" || { echo "[Build] ERROR: Failed to create ZIP"; exit 1; }
