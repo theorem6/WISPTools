@@ -150,82 +150,122 @@ INITRD_PATH="${INITRD_PATH}"
     MIN_DIR_FOR_KERNEL="$(dirname "$KERNEL_PATH")"
     mkdir -p "$MIN_DIR_FOR_KERNEL"
 
-    # ALWAYS download fresh Ubuntu 22.04 LTS netboot kernel/initrd (Open5GS compatible)
-    echo "[Build] Downloading fresh Ubuntu 22.04 LTS netboot kernel/initrd..."
-    rm -f "$KERNEL_PATH" "$INITRD_PATH" 2>/dev/null || true
-    
-    # Try multiple Ubuntu netboot URLs (fallback if one fails)
-    UBUNTU_NETBOOT_URLS=(
-      "http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
-      "http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64"
-      "http://archive.ubuntu.com/ubuntu/dists/jammy-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
-    )
+    # Use pre-staged Ubuntu 22.04 LTS netboot kernel/initrd from GCE server (Open5GS compatible)
+    # Files should be pre-staged at /opt/base-images/minimal/ by deployment scripts
+    echo "[Build] Checking for pre-staged Ubuntu 22.04 LTS netboot files..."
     
     KERNEL_DOWNLOADED=0
     INITRD_DOWNLOADED=0
     
-    for UBUNTU_NETBOOT_BASE in "${UBUNTU_NETBOOT_URLS[@]}"; do
-      echo "[Build] Trying URL: $UBUNTU_NETBOOT_BASE"
-      
-      # Try to download kernel
-      if [ $KERNEL_DOWNLOADED -eq 0 ]; then
-        if wget -q --timeout=30 --tries=2 -O "$KERNEL_PATH" "$UBUNTU_NETBOOT_BASE/linux" 2>/dev/null; then
-          if [ -s "$KERNEL_PATH" ]; then
-            KERNEL_DOWNLOADED=1
-            echo "[Build] Kernel downloaded successfully from $UBUNTU_NETBOOT_BASE"
-          else
-            rm -f "$KERNEL_PATH" 2>/dev/null || true
-          fi
-        fi
+    # Check if pre-staged kernel exists and is valid
+    if [ -f "$KERNEL_PATH" ] && [ -s "$KERNEL_PATH" ]; then
+      KERNEL_SIZE=$(wc -c < "$KERNEL_PATH" 2>/dev/null || echo "0")
+      if [ "$KERNEL_SIZE" -gt 1048576 ]; then
+        KERNEL_DOWNLOADED=1
+        echo "[Build] Using pre-staged kernel: $KERNEL_PATH ($(du -h "$KERNEL_PATH" | cut -f1))"
+      else
+        echo "[Build] Pre-staged kernel is too small, will re-download"
+        rm -f "$KERNEL_PATH" 2>/dev/null || true
       fi
-      
-      # Try to download initrd
-      if [ $INITRD_DOWNLOADED -eq 0 ]; then
-        if wget -q --timeout=30 --tries=2 -O "$INITRD_PATH" "$UBUNTU_NETBOOT_BASE/initrd.gz" 2>/dev/null; then
-          if [ -s "$INITRD_PATH" ]; then
-            INITRD_DOWNLOADED=1
-            echo "[Build] Initrd downloaded successfully from $UBUNTU_NETBOOT_BASE"
-          else
-            rm -f "$INITRD_PATH" 2>/dev/null || true
-          fi
-        fi
-      fi
-      
-      # If both downloaded, break
-      if [ $KERNEL_DOWNLOADED -eq 1 ] && [ $INITRD_DOWNLOADED -eq 1 ]; then
-        break
-      fi
-    done
-
-    # Verify downloads succeeded
-    if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
-      echo "[Build] ERROR: Failed to download Ubuntu netboot files from all URLs"
-      echo "[Build] Kernel file: $([ -f "$KERNEL_PATH" ] && echo "exists ($(du -h "$KERNEL_PATH" | cut -f1))" || echo "missing")"
-      echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
-      echo "[Build] Attempted URLs:"
-      for url in "${UBUNTU_NETBOOT_URLS[@]}"; do
-        echo "[Build]   - $url"
-      done
-      exit 1
     fi
     
-    # Verify file sizes are reasonable (kernel should be > 1MB, initrd should be > 5MB)
+    # Check if pre-staged initrd exists and is valid
+    if [ -f "$INITRD_PATH" ] && [ -s "$INITRD_PATH" ]; then
+      INITRD_SIZE=$(wc -c < "$INITRD_PATH" 2>/dev/null || echo "0")
+      if [ "$INITRD_SIZE" -gt 5242880 ]; then
+        INITRD_DOWNLOADED=1
+        echo "[Build] Using pre-staged initrd: $INITRD_PATH ($(du -h "$INITRD_PATH" | cut -f1))"
+      else
+        echo "[Build] Pre-staged initrd is too small, will re-download"
+        rm -f "$INITRD_PATH" 2>/dev/null || true
+      fi
+    fi
+    
+    # Only download if files are missing or invalid
+    if [ $KERNEL_DOWNLOADED -eq 0 ] || [ $INITRD_DOWNLOADED -eq 0 ]; then
+      echo "[Build] Pre-staged files not found or invalid, downloading from Ubuntu archive..."
+      
+      # Try multiple Ubuntu netboot URLs (fallback if one fails)
+      UBUNTU_NETBOOT_URLS=(
+        "http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
+        "http://archive.ubuntu.com/ubuntu/dists/jammy/main/installer-amd64/current/legacy-images/netboot/ubuntu-installer/amd64"
+        "http://archive.ubuntu.com/ubuntu/dists/jammy-updates/main/installer-amd64/current/images/netboot/ubuntu-installer/amd64"
+      )
+      
+      for UBUNTU_NETBOOT_BASE in "${UBUNTU_NETBOOT_URLS[@]}"; do
+        echo "[Build] Trying URL: $UBUNTU_NETBOOT_BASE"
+        
+        # Try to download kernel if needed
+        if [ $KERNEL_DOWNLOADED -eq 0 ]; then
+          if wget -q --timeout=30 --tries=2 -O "$KERNEL_PATH" "$UBUNTU_NETBOOT_BASE/linux" 2>/dev/null; then
+            if [ -s "$KERNEL_PATH" ]; then
+              KERNEL_SIZE=$(wc -c < "$KERNEL_PATH" 2>/dev/null || echo "0")
+              if [ "$KERNEL_SIZE" -gt 1048576 ]; then
+                KERNEL_DOWNLOADED=1
+                echo "[Build] Kernel downloaded successfully from $UBUNTU_NETBOOT_BASE"
+              else
+                rm -f "$KERNEL_PATH" 2>/dev/null || true
+              fi
+            else
+              rm -f "$KERNEL_PATH" 2>/dev/null || true
+            fi
+          fi
+        fi
+        
+        # Try to download initrd if needed
+        if [ $INITRD_DOWNLOADED -eq 0 ]; then
+          if wget -q --timeout=30 --tries=2 -O "$INITRD_PATH" "$UBUNTU_NETBOOT_BASE/initrd.gz" 2>/dev/null; then
+            if [ -s "$INITRD_PATH" ]; then
+              INITRD_SIZE=$(wc -c < "$INITRD_PATH" 2>/dev/null || echo "0")
+              if [ "$INITRD_SIZE" -gt 5242880 ]; then
+                INITRD_DOWNLOADED=1
+                echo "[Build] Initrd downloaded successfully from $UBUNTU_NETBOOT_BASE"
+              else
+                rm -f "$INITRD_PATH" 2>/dev/null || true
+              fi
+            else
+              rm -f "$INITRD_PATH" 2>/dev/null || true
+            fi
+          fi
+        fi
+        
+        # If both downloaded, break
+        if [ $KERNEL_DOWNLOADED -eq 1 ] && [ $INITRD_DOWNLOADED -eq 1 ]; then
+          break
+        fi
+      done
+
+      # Verify downloads succeeded
+      if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
+        echo "[Build] ERROR: Failed to get Ubuntu netboot files (pre-staged or downloaded)"
+        echo "[Build] Kernel file: $([ -f "$KERNEL_PATH" ] && echo "exists ($(du -h "$KERNEL_PATH" | cut -f1))" || echo "missing")"
+        echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
+        echo "[Build] Expected location: $KERNEL_PATH and $INITRD_PATH"
+        echo "[Build] Attempted URLs:"
+        for url in "${UBUNTU_NETBOOT_URLS[@]}"; do
+          echo "[Build]   - $url"
+        done
+        exit 1
+      fi
+    fi
+    
+    # Final verification of file sizes
     KERNEL_SIZE=$(wc -c < "$KERNEL_PATH" 2>/dev/null || echo "0")
     INITRD_SIZE=$(wc -c < "$INITRD_PATH" 2>/dev/null || echo "0")
     
     if [ "$KERNEL_SIZE" -lt 1048576 ]; then
-      echo "[Build] ERROR: Kernel file too small ($KERNEL_SIZE bytes), download may have failed"
+      echo "[Build] ERROR: Kernel file too small ($KERNEL_SIZE bytes)"
       exit 1
     fi
     
     if [ "$INITRD_SIZE" -lt 5242880 ]; then
-      echo "[Build] ERROR: Initrd file too small ($INITRD_SIZE bytes), download may have failed"
+      echo "[Build] ERROR: Initrd file too small ($INITRD_SIZE bytes)"
       exit 1
     fi
     
-    echo "[Build] Ubuntu 22.04 LTS netboot files downloaded successfully"
-    echo "[Build] Kernel size: $(du -h "$KERNEL_PATH" | cut -f1)"
-    echo "[Build] Initrd size: $(du -h "$INITRD_PATH" | cut -f1)"
+    echo "[Build] Ubuntu 22.04 LTS netboot files ready"
+    echo "[Build] Kernel: $KERNEL_PATH ($(du -h "$KERNEL_PATH" | cut -f1))"
+    echo "[Build] Initrd: $INITRD_PATH ($(du -h "$INITRD_PATH" | cut -f1))"
 
     # Clean up old build directories and old autoinstall files before starting
     echo "[Build] Cleaning up old build artifacts..."
