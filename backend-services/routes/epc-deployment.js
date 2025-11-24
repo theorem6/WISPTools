@@ -302,7 +302,7 @@ INITRD_PATH="${INITRD_PATH}"
     HSS_PORT="${HSS_PORT}"
     SITE_NAME="${siteName}"
     echo "[Build] Creating autoinstall config in: $AUTOINSTALL_DIR/"
-    cat > "$AUTOINSTALL_BASE/user-data" << AUTOINSTALL_EOF
+    cat > "$AUTOINSTALL_BASE/user-data" << 'AUTOINSTALL_EOF'
 #cloud-config
 autoinstall:
   version: 1
