@@ -106,8 +106,8 @@ router.post('/register-epc', async (req, res) => {
     
     console.log(`[EPC Registration] EPC registered: ${epc_id}`);
     
-    // Return generic ISO download URL
-    const genericIsoUrl = `http://${GCE_PUBLIC_IP}:${HSS_PORT}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+    // Return generic ISO download URL (served by nginx on port 80, not Node.js backend)
+    const genericIsoUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
     
     res.json({
       success: true,
@@ -321,7 +321,8 @@ router.post('/:epc_id/link-device', async (req, res) => {
  */
 router.get('/generic-iso', async (req, res) => {
   try {
-    const isoUrl = `http://${GCE_PUBLIC_IP}:${HSS_PORT}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+    // ISO is served by nginx on port 80, not Node.js backend
+    const isoUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
     const checksumUrl = `${isoUrl}.sha256`;
     
     // Check if ISO exists
