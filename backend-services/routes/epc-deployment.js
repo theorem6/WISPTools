@@ -81,6 +81,7 @@ router.post('/register-epc', async (req, res) => {
     const originHostFQDN = `${mmeUniqueId}.${tenantDomain}`;
     
     // Create EPC record in database (device_code will be added later via device configuration)
+    // Don't include device_code in the document if it's null (allows sparse unique index to work)
     const epcData = {
       epc_id,
       site_name: siteName,
@@ -89,8 +90,8 @@ router.post('/register-epc', async (req, res) => {
       api_key,
       secret_key,
       checkin_token, // Token for hardware check-in
-      device_code: null, // Will be set when user enters device code in device configuration
-      hardware_id: null, // Will be set when hardware checks in
+      // device_code omitted - will be added when user enters device code in device configuration
+      // hardware_id omitted - will be set when hardware checks in
       location: location || {},
       network_config: networkConfig || {},
       hss_config: hssConfig || {},
