@@ -17,6 +17,8 @@ const RemoteEPCSchema = new mongoose.Schema({
   auth_code: { type: String, required: true, unique: true, index: true }, // Unique code for API auth
   api_key: { type: String, required: true }, // Generated API key
   secret_key: { type: String, required: true }, // Secret for signing requests
+  checkin_token: { type: String, unique: true, sparse: true, index: true }, // Token for hardware check-in
+  hardware_id: { type: String, index: true }, // MAC address or unique hardware identifier
   
   // Location
   location: {

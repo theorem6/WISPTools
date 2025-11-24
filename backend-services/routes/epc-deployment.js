@@ -38,7 +38,252 @@ const GCE_PUBLIC_IP = appConfig.externalServices.hss.ipAddress;
 const HSS_PORT = appConfig.externalServices.hss.port;
 
 /**
- * Generate EPC ISO from frontend deployment modal
+ * Register EPC for deployment (new approach - uses generic ISO)
+ * POST /api/deploy/register-epc
+ * Creates EPC record and returns generic ISO download URL
+ */
+router.post('/register-epc', async (req, res) => {
+  try {
+    const { siteName, location, networkConfig, contact, hssConfig, deploymentType, snmpConfig, aptConfig } = req.body;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    console.log('[EPC Registration] Registering EPC for site:', siteName);
+    
+    if (!siteName) {
+      return res.status(400).json({ error: 'siteName is required' });
+    }
+    
+    // Generate unique EPC ID and credentials
+    const epc_id = `epc_${crypto.randomBytes(16).toString('hex')}`;
+    const auth_code = crypto.randomBytes(16).toString('hex');
+    const api_key = crypto.randomBytes(32).toString('hex');
+    const secret_key = crypto.randomBytes(32).toString('hex');
+    const checkin_token = crypto.randomBytes(32).toString('hex');
+    
+    // Fetch tenant domain
+    let tenantDomain = 'wisptools.io';
+    if (Tenant) {
+      try {
+        const tenant = await Tenant.findById(tenant_id);
+        if (tenant && tenant.subdomain) {
+          tenantDomain = `${tenant.subdomain}.wisptools.io`;
+        }
+      } catch (tenantError) {
+        console.warn('[EPC Registration] Could not fetch tenant domain:', tenantError.message);
+      }
+    }
+    
+    // Generate Origin-Host FQDN
+    const mmeUniqueId = `mme-${epc_id.substring(4, 12)}`;
+    const originHostFQDN = `${mmeUniqueId}.${tenantDomain}`;
+    
+    // Create EPC record in database
+    const epcData = {
+      epc_id,
+      site_name: siteName,
+      tenant_id,
+      auth_code,
+      api_key,
+      secret_key,
+      checkin_token, // Token for hardware check-in
+      hardware_id: null, // Will be set when hardware checks in
+      location: location || {},
+      network_config: networkConfig || {},
+      hss_config: hssConfig || {},
+      deployment_type: deploymentType || 'both',
+      snmp_config: snmpConfig || {},
+      apt_config: aptConfig || {},
+      status: 'registered',
+      origin_host_fqdn: originHostFQDN
+    };
+    
+    const epc = new RemoteEPC(epcData);
+    await epc.save();
+    
+    console.log(`[EPC Registration] EPC registered: ${epc_id}`);
+    
+    // Return generic ISO download URL
+    const genericIsoUrl = `http://${GCE_PUBLIC_IP}:${HSS_PORT}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+    
+    res.json({
+      success: true,
+      epc_id,
+      checkin_token, // Frontend can display this for manual entry if needed
+      iso_download_url: genericIsoUrl,
+      message: 'EPC registered. Use the generic ISO to boot hardware. Hardware will automatically check in and configure.'
+    });
+    
+  } catch (error) {
+    console.error('[EPC Registration] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to register EPC', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Hardware Check-in Endpoint
+ * POST /api/epc/checkin
+ * Called by wisptools-epc-installer package when hardware boots
+ */
+router.post('/checkin', async (req, res) => {
+  try {
+    const { hardware_id } = req.body;
+    
+    if (!hardware_id) {
+      return res.status(400).json({ error: 'hardware_id is required' });
+    }
+    
+    console.log(`[Check-in] Hardware check-in: ${hardware_id}`);
+    
+    // Find EPC by hardware_id or find unassigned EPC
+    let epc = await RemoteEPC.findOne({ hardware_id }).lean();
+    
+    if (!epc) {
+      // Find an EPC that hasn't been assigned to hardware yet
+      epc = await RemoteEPC.findOne({ 
+        hardware_id: null,
+        status: 'registered'
+      }).sort({ createdAt: -1 }).lean();
+      
+      if (epc) {
+        // Assign this hardware to the EPC
+        await RemoteEPC.updateOne(
+          { epc_id: epc.epc_id },
+          { 
+            hardware_id,
+            status: 'online',
+            last_seen: new Date(),
+            last_heartbeat: new Date()
+          }
+        );
+        epc.hardware_id = hardware_id;
+        console.log(`[Check-in] Assigned hardware ${hardware_id} to EPC ${epc.epc_id}`);
+      }
+    } else {
+      // Update heartbeat
+      await RemoteEPC.updateOne(
+        { epc_id: epc.epc_id },
+        { 
+          last_seen: new Date(),
+          last_heartbeat: new Date(),
+          status: 'online'
+        }
+      );
+    }
+    
+    if (!epc) {
+      return res.status(404).json({ 
+        error: 'No EPC configuration found for this hardware',
+        message: 'Please register an EPC first using the deployment interface'
+      });
+    }
+    
+    // Generate check-in token if not present
+    if (!epc.checkin_token) {
+      epc.checkin_token = crypto.randomBytes(32).toString('hex');
+      await RemoteEPC.updateOne(
+        { epc_id: epc.epc_id },
+        { checkin_token: epc.checkin_token }
+      );
+    }
+    
+    // Get apt repository URL
+    const aptRepoUrl = `http://${GCE_PUBLIC_IP}:${HSS_PORT}/apt-repos/main`;
+    
+    res.json({
+      epc_id: epc.epc_id,
+      checkin_token: epc.checkin_token,
+      apt_repo_url: aptRepoUrl,
+      gce_server: GCE_PUBLIC_IP,
+      hss_port: HSS_PORT,
+      origin_host_fqdn: epc.origin_host_fqdn
+    });
+    
+  } catch (error) {
+    console.error('[Check-in] Error:', error);
+    res.status(500).json({ 
+      error: 'Check-in failed', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Get EPC Deployment Script
+ * GET /api/epc/:epc_id/deploy?checkin_token=xxx
+ * Called by wisptools-epc-installer after check-in
+ */
+router.get('/:epc_id/deploy', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const { checkin_token } = req.query;
+    
+    if (!checkin_token) {
+      return res.status(401).json({ error: 'checkin_token required' });
+    }
+    
+    // Verify EPC and token
+    const epc = await RemoteEPC.findOne({
+      epc_id,
+      checkin_token,
+      enabled: true
+    }).lean();
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found or invalid token' });
+    }
+    
+    // Generate deployment script using existing helper
+    const deploymentScript = generateFullDeploymentScript(epc);
+    
+    res.setHeader('Content-Type', 'text/x-shellscript');
+    res.setHeader('Content-Disposition', `attachment; filename="deploy-${epc.site_name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.sh"`);
+    res.send(deploymentScript);
+    
+  } catch (error) {
+    console.error('[Deploy] Error:', error);
+    res.status(500).json({ error: 'Failed to generate deployment script' });
+  }
+});
+
+/**
+ * Get Generic ISO Download URL
+ * GET /api/deploy/generic-iso
+ */
+router.get('/generic-iso', async (req, res) => {
+  try {
+    const isoUrl = `http://${GCE_PUBLIC_IP}:${HSS_PORT}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+    const checksumUrl = `${isoUrl}.sha256`;
+    
+    // Check if ISO exists
+    try {
+      const isoPath = path.join(ISO_OUTPUT_DIR, 'wisptools-epc-generic-netinstall.iso');
+      const stats = await fs.stat(isoPath);
+      const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+      
+      res.json({
+        success: true,
+        iso_download_url: isoUrl,
+        iso_checksum_url: checksumUrl,
+        iso_size_mb: sizeMB,
+        message: 'Generic ISO available. Use this ISO for all EPC deployments.'
+      });
+    } catch (statError) {
+      res.status(404).json({
+        error: 'Generic ISO not found',
+        message: 'Please build the generic ISO first using build-generic-netinstall-iso.sh'
+      });
+    }
+  } catch (error) {
+    console.error('[Generic ISO] Error:', error);
+    res.status(500).json({ error: 'Failed to get generic ISO URL' });
+  }
+});
+
+/**
+ * Generate EPC ISO from frontend deployment modal (DEPRECATED - use /register-epc instead)
  * POST /api/deploy/generate-epc-iso
  */
 router.post('/generate-epc-iso', async (req, res) => {
