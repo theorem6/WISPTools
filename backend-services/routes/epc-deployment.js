@@ -60,6 +60,9 @@ router.post('/register-epc', async (req, res) => {
     const secret_key = crypto.randomBytes(32).toString('hex');
     const checkin_token = crypto.randomBytes(32).toString('hex');
     
+    // Get device_code from request (user enters it in frontend)
+    const { device_code } = req.body;
+    
     // Fetch tenant domain
     let tenantDomain = 'wisptools.io';
     if (Tenant) {
@@ -77,6 +80,23 @@ router.post('/register-epc', async (req, res) => {
     const mmeUniqueId = `mme-${epc_id.substring(4, 12)}`;
     const originHostFQDN = `${mmeUniqueId}.${tenantDomain}`;
     
+    // Validate device_code if provided
+    if (!device_code) {
+      return res.status(400).json({ 
+        error: 'device_code is required',
+        message: 'Please enter the device code displayed on the hardware'
+      });
+    }
+    
+    // Check if device_code is already registered
+    const existingEPC = await RemoteEPC.findOne({ device_code }).lean();
+    if (existingEPC) {
+      return res.status(400).json({ 
+        error: 'Device code already registered',
+        message: `Device code ${device_code} is already assigned to EPC ${existingEPC.epc_id}`
+      });
+    }
+    
     // Create EPC record in database
     const epcData = {
       epc_id,
@@ -86,6 +106,7 @@ router.post('/register-epc', async (req, res) => {
       api_key,
       secret_key,
       checkin_token, // Token for hardware check-in
+      device_code, // Unique device code for registration
       hardware_id: null, // Will be set when hardware checks in
       location: location || {},
       network_config: networkConfig || {},
@@ -108,9 +129,10 @@ router.post('/register-epc', async (req, res) => {
     res.json({
       success: true,
       epc_id,
-      checkin_token, // Frontend can display this for manual entry if needed
+      device_code,
+      checkin_token,
       iso_download_url: genericIsoUrl,
-      message: 'EPC registered. Use the generic ISO to boot hardware. Hardware will automatically check in and configure.'
+      message: `EPC registered with device code ${device_code}. Hardware will automatically check in and configure when it boots.`
     });
     
   } catch (error) {
@@ -129,56 +151,44 @@ router.post('/register-epc', async (req, res) => {
  */
 router.post('/checkin', async (req, res) => {
   try {
-    const { hardware_id } = req.body;
+    const { device_code, hardware_id } = req.body;
     
-    if (!hardware_id) {
-      return res.status(400).json({ error: 'hardware_id is required' });
+    if (!device_code) {
+      return res.status(400).json({ 
+        error: 'device_code is required',
+        message: 'Device code must be provided. It should be displayed on the device or available at http://<device-ip>/device-status.html'
+      });
     }
     
-    console.log(`[Check-in] Hardware check-in: ${hardware_id}`);
+    console.log(`[Check-in] Hardware check-in: device_code=${device_code}, hardware_id=${hardware_id}`);
     
-    // Find EPC by hardware_id or find unassigned EPC
-    let epc = await RemoteEPC.findOne({ hardware_id }).lean();
-    
-    if (!epc) {
-      // Find an EPC that hasn't been assigned to hardware yet
-      epc = await RemoteEPC.findOne({ 
-        hardware_id: null,
-        status: 'registered'
-      }).sort({ createdAt: -1 }).lean();
-      
-      if (epc) {
-        // Assign this hardware to the EPC
-        await RemoteEPC.updateOne(
-          { epc_id: epc.epc_id },
-          { 
-            hardware_id,
-            status: 'online',
-            last_seen: new Date(),
-            last_heartbeat: new Date()
-          }
-        );
-        epc.hardware_id = hardware_id;
-        console.log(`[Check-in] Assigned hardware ${hardware_id} to EPC ${epc.epc_id}`);
-      }
-    } else {
-      // Update heartbeat
-      await RemoteEPC.updateOne(
-        { epc_id: epc.epc_id },
-        { 
-          last_seen: new Date(),
-          last_heartbeat: new Date(),
-          status: 'online'
-        }
-      );
-    }
+    // Find EPC by device_code (required for matching)
+    const epc = await RemoteEPC.findOne({ 
+      device_code,
+      status: { $in: ['registered', 'online'] }
+    }).lean();
     
     if (!epc) {
       return res.status(404).json({ 
-        error: 'No EPC configuration found for this hardware',
-        message: 'Please register an EPC first using the deployment interface'
+        error: 'No EPC configuration found for this device code',
+        message: `Device code ${device_code} not found. Please register this device code in the deployment interface first.`,
+        device_code,
+        help: 'The device code should be entered when registering the EPC in the frontend.'
       });
     }
+    
+    // Update EPC with hardware information
+    await RemoteEPC.updateOne(
+      { epc_id: epc.epc_id },
+      { 
+        hardware_id: hardware_id || epc.hardware_id,
+        status: 'online',
+        last_seen: new Date(),
+        last_heartbeat: new Date()
+      }
+    );
+    
+    console.log(`[Check-in] Matched device code ${device_code} to EPC ${epc.epc_id}`);
     
     // Generate check-in token if not present
     if (!epc.checkin_token) {
