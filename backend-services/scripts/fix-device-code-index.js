@@ -27,13 +27,16 @@ if (!envLoaded) {
   console.warn('Warning: No .env file found, using environment variables from system');
 }
 
+// Load config the same way server.js does
+const appConfig = require('../config/app');
 const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 async function fixIndex() {
   try {
-    const mongoUri = process.env.MONGODB_URI;
+    // Use the same MongoDB URI loading logic as server.js
+    const mongoUri = appConfig.mongodb.uri || process.env.MONGODB_URI;
     if (!mongoUri) {
-      console.error('Error: MONGODB_URI not found in environment variables');
+      console.error('Error: MONGODB_URI not found in config or environment variables');
       process.exit(1);
     }
     
