@@ -60,8 +60,8 @@ router.post('/register-epc', async (req, res) => {
     const secret_key = crypto.randomBytes(32).toString('hex');
     const checkin_token = crypto.randomBytes(32).toString('hex');
     
-    // Get device_code from request (user enters it in frontend)
-    const { device_code } = req.body;
+    // Device code is optional - will be added later in device configuration
+    // const { device_code } = req.body; // Not required in wizard
     
     // Fetch tenant domain
     let tenantDomain = 'wisptools.io';
@@ -80,24 +80,7 @@ router.post('/register-epc', async (req, res) => {
     const mmeUniqueId = `mme-${epc_id.substring(4, 12)}`;
     const originHostFQDN = `${mmeUniqueId}.${tenantDomain}`;
     
-    // Validate device_code if provided
-    if (!device_code) {
-      return res.status(400).json({ 
-        error: 'device_code is required',
-        message: 'Please enter the device code displayed on the hardware'
-      });
-    }
-    
-    // Check if device_code is already registered
-    const existingEPC = await RemoteEPC.findOne({ device_code }).lean();
-    if (existingEPC) {
-      return res.status(400).json({ 
-        error: 'Device code already registered',
-        message: `Device code ${device_code} is already assigned to EPC ${existingEPC.epc_id}`
-      });
-    }
-    
-    // Create EPC record in database
+    // Create EPC record in database (device_code will be added later via device configuration)
     const epcData = {
       epc_id,
       site_name: siteName,
@@ -106,7 +89,7 @@ router.post('/register-epc', async (req, res) => {
       api_key,
       secret_key,
       checkin_token, // Token for hardware check-in
-      device_code, // Unique device code for registration
+      device_code: null, // Will be set when user enters device code in device configuration
       hardware_id: null, // Will be set when hardware checks in
       location: location || {},
       network_config: networkConfig || {},
@@ -129,10 +112,9 @@ router.post('/register-epc', async (req, res) => {
     res.json({
       success: true,
       epc_id,
-      device_code,
       checkin_token,
       iso_download_url: genericIsoUrl,
-      message: `EPC registered with device code ${device_code}. Hardware will automatically check in and configure when it boots.`
+      message: `EPC configuration created. Download the generic ISO and boot hardware. Enter the device code in the device configuration page to link hardware to this EPC.`
     });
     
   } catch (error) {
@@ -162,18 +144,19 @@ router.post('/checkin', async (req, res) => {
     
     console.log(`[Check-in] Hardware check-in: device_code=${device_code}, hardware_id=${hardware_id}`);
     
-    // Find EPC by device_code (required for matching)
+    // Find EPC by device_code (device code must be linked via device configuration page)
     const epc = await RemoteEPC.findOne({ 
       device_code,
       status: { $in: ['registered', 'online'] }
     }).lean();
     
     if (!epc) {
-      return res.status(404).json({ 
-        error: 'No EPC configuration found for this device code',
-        message: `Device code ${device_code} not found. Please register this device code in the deployment interface first.`,
+      // Device code not linked yet - return waiting status
+      return res.status(202).json({ 
+        status: 'waiting',
+        message: `Device code ${device_code} is not yet linked to an EPC configuration. Please enter this device code in the device configuration page to link it to an EPC.`,
         device_code,
-        help: 'The device code should be entered when registering the EPC in the frontend.'
+        help: 'Go to the EPC device configuration page and enter this device code to link the hardware to an EPC configuration.'
       });
     }
     
@@ -255,6 +238,80 @@ router.get('/:epc_id/deploy', async (req, res) => {
   } catch (error) {
     console.error('[Deploy] Error:', error);
     res.status(500).json({ error: 'Failed to generate deployment script' });
+  }
+});
+
+/**
+ * Link device code to EPC configuration
+ * POST /api/epc/:epc_id/link-device
+ * Called from device configuration page to link device code to EPC
+ */
+router.post('/:epc_id/link-device', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const { device_code } = req.body;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+    
+    // Validate device code format
+    const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
+    if (!deviceCodePattern.test(device_code.toUpperCase())) {
+      return res.status(400).json({ 
+        error: 'Invalid device code format',
+        message: 'Device code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)'
+      });
+    }
+    
+    // Find EPC
+    const epc = await RemoteEPC.findOne({ 
+      epc_id,
+      tenant_id
+    }).lean();
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Check if device code is already linked to another EPC
+    const existingEPC = await RemoteEPC.findOne({ 
+      device_code: device_code.toUpperCase(),
+      epc_id: { $ne: epc_id }
+    }).lean();
+    
+    if (existingEPC) {
+      return res.status(400).json({ 
+        error: 'Device code already linked',
+        message: `Device code ${device_code} is already linked to EPC ${existingEPC.epc_id} (${existingEPC.site_name})`
+      });
+    }
+    
+    // Link device code to EPC
+    await RemoteEPC.updateOne(
+      { epc_id },
+      { 
+        device_code: device_code.toUpperCase(),
+        status: 'registered' // Reset to registered, will become online when device checks in
+      }
+    );
+    
+    console.log(`[Link Device] Device code ${device_code} linked to EPC ${epc_id}`);
+    
+    res.json({
+      success: true,
+      epc_id,
+      device_code: device_code.toUpperCase(),
+      message: `Device code ${device_code} linked to EPC ${epc.site_name}. Hardware will automatically check in and configure when it boots.`
+    });
+    
+  } catch (error) {
+    console.error('[Link Device] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to link device code', 
+      message: error.message 
+    });
   }
 });
 

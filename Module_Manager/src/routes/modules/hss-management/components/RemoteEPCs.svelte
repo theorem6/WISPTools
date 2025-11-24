@@ -22,6 +22,8 @@
   let sites: any[] = [];
   let selectedSiteId = '';
   let loadingSites = true;
+  let deviceCodeInput = ''; // Device code input for linking hardware
+  let linkingDevice = false; // Loading state for linking device
   
   // ISO API configuration
   const HSS_IP = '136.112.111.167';
@@ -450,7 +452,68 @@ To use:
   
   function viewEPCDetails(epc: any) {
     selectedEPC = epc;
+    deviceCodeInput = epc.device_code || ''; // Pre-fill if already linked
     showDetailsModal = true;
+  }
+  
+  async function linkDeviceCode() {
+    if (!selectedEPC) return;
+    
+    if (!deviceCodeInput || !deviceCodeInput.trim()) {
+      alert('Please enter a device code');
+      return;
+    }
+    
+    // Validate format
+    const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
+    if (!deviceCodePattern.test(deviceCodeInput.toUpperCase())) {
+      alert('Device code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)');
+      return;
+    }
+    
+    linkingDevice = true;
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) {
+        alert('Please log in to link device code');
+        return;
+      }
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${HSS_API}/epc/${selectedEPC.epc_id}/link-device`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          device_code: deviceCodeInput.toUpperCase()
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`✅ Device code ${data.device_code} linked successfully!\n\n${data.message}`);
+        
+        // Refresh EPC list and update selected EPC
+        await loadEPCs();
+        const updatedEPC = epcs.find(e => e.epc_id === selectedEPC.epc_id);
+        if (updatedEPC) {
+          selectedEPC = updatedEPC;
+          deviceCodeInput = updatedEPC.device_code || '';
+        }
+      } else {
+        const error = await response.json();
+        alert(`Failed to link device code: ${error.error || error.message || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error('Error linking device code:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      linkingDevice = false;
+    }
   }
   
   function monitorEPC(epc: any) {
@@ -909,6 +972,46 @@ To use:
             </div>
             {#if selectedEPC.last_heartbeat}
               <p>Last heartbeat: {new Date(selectedEPC.last_heartbeat).toLocaleString()}</p>
+            {/if}
+          </div>
+          
+          <div class="detail-section device-config">
+            <h3>🔧 Device Configuration</h3>
+            {#if selectedEPC.device_code}
+              <div class="device-code-linked">
+                <p><strong>Device Code:</strong> <code style="font-size: 1.2em; letter-spacing: 2px;">{selectedEPC.device_code}</code></p>
+                <p style="color: #28a745; font-size: 0.9em;">✓ Hardware linked - Device will check in automatically</p>
+              </div>
+            {:else}
+              <div class="device-code-form">
+                <p style="color: #666; margin-bottom: 1rem;">
+                  Link hardware to this EPC by entering the device code displayed on the hardware.
+                </p>
+                <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                  <input 
+                    type="text" 
+                    bind:value={deviceCodeInput}
+                    placeholder="ABCD1234" 
+                    maxlength="8"
+                    style="text-transform: uppercase; font-family: monospace; font-size: 1.1em; letter-spacing: 2px; padding: 0.5rem; flex: 1;"
+                    disabled={linkingDevice}
+                  />
+                  <button 
+                    class="btn-primary" 
+                    on:click={linkDeviceCode}
+                    disabled={linkingDevice || !deviceCodeInput.trim()}
+                  >
+                    {#if linkingDevice}
+                      ⏳ Linking...
+                    {:else}
+                      🔗 Link Device
+                    {/if}
+                  </button>
+                </div>
+                <small style="color: #666; display: block; margin-top: 0.5rem;">
+                  Device code is displayed at <code>http://&lt;device-ip&gt;/device-status.html</code> or on the device console
+                </small>
+              </div>
             {/if}
           </div>
           

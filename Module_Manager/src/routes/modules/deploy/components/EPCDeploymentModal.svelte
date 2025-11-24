@@ -31,7 +31,6 @@
   // EPC Configuration
   let epcConfig = {
     siteName: '',
-    deviceCode: '', // Device code from hardware
     location: {
       address: '',
       city: '',
@@ -187,14 +186,6 @@
 
   function getValidationErrors(): string[] {
     const errors: string[] = [];
-    if (!epcConfig.deviceCode || !epcConfig.deviceCode.trim()) {
-      errors.push('Device Code is required');
-    } else {
-      const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
-      if (!deviceCodePattern.test(epcConfig.deviceCode.toUpperCase())) {
-        errors.push('Device Code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)');
-      }
-    }
     if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
       errors.push('Site Name is required');
     }
@@ -269,14 +260,8 @@
       currentStep++;
     } else if (currentStep === getStepNumber('site')) {
       // Site Info
-      if (!epcConfig.deviceCode || !epcConfig.siteName || !epcConfig.location.address || !epcConfig.contact.name || !epcConfig.contact.email) {
-        error = 'Please fill in all required fields including Device Code';
-        return;
-      }
-      // Validate device code format
-      const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
-      if (!deviceCodePattern.test(epcConfig.deviceCode.toUpperCase())) {
-        error = 'Device Code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)';
+      if (!epcConfig.siteName || !epcConfig.location.address || !epcConfig.contact.name || !epcConfig.contact.email) {
+        error = 'Please fill in all required fields';
         return;
       }
       currentStep++;
@@ -1051,18 +1036,7 @@ echo "🎉 Deployment successful!";
         throw new Error('Tenant ID is required. Please ensure you are logged in and have a tenant selected.');
       }
       
-      // Validate device code
-      if (!epcConfig.deviceCode || !epcConfig.deviceCode.trim()) {
-        throw new Error('Device code is required. Please enter the device code displayed on the hardware (e.g., ABCD1234). You can find it at http://<device-ip>/device-status.html');
-      }
-      
-      // Validate device code format (8 characters: 4 letters + 4 digits)
-      const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
-      if (!deviceCodePattern.test(epcConfig.deviceCode.toUpperCase())) {
-        throw new Error('Device code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)');
-      }
-      
-      // Use new registration endpoint
+      // Use new registration endpoint (device code not required - added later in device config)
       const relativeUrl = '/api/deploy/register-epc';
 
       const makeRequest = async (url: string) => {
@@ -1080,7 +1054,6 @@ echo "🎉 Deployment successful!";
           method: 'POST',
           headers,
           body: JSON.stringify({
-            device_code: epcConfig.deviceCode.toUpperCase(),
             siteName: epcConfig.siteName,
             location: epcConfig.location,
             networkConfig: epcConfig.networkConfig,
@@ -1144,11 +1117,10 @@ echo "🎉 Deployment successful!";
       
       if (result.success) {
         console.log('[EPCDeployment] EPC registered:', result.epc_id);
-        console.log('[EPCDeployment] Device code:', result.device_code);
         console.log('[EPCDeployment] Generic ISO URL:', result.iso_download_url);
         
         // Show success message with instructions
-        success = `EPC registered successfully!\n\nDevice Code: ${result.device_code}\nEPC ID: ${result.epc_id}\n\n${result.message}\n\nUse the generic ISO for all deployments. The device will automatically check in and configure when it boots.`;
+        success = `EPC configuration created successfully!\n\nEPC ID: ${result.epc_id}\n\n${result.message}\n\nNext steps:\n1. Download the generic ISO\n2. Boot hardware from ISO\n3. Get device code from http://<device-ip>/device-status.html\n4. Enter device code in device configuration page to link hardware to this EPC`;
         
         // Optionally open generic ISO download
         if (result.iso_download_url && confirm('Open generic ISO download URL?')) {
@@ -1256,24 +1228,8 @@ echo "🎉 Deployment successful!";
           {:else if currentStep === 2}
             <div class="step-panel">
               <h3>Step 2: Site Information</h3>
-              <p class="step-description">Enter basic site details and device code</p>
+              <p class="step-description">Enter basic site details</p>
               <div class="form-section">
-                <div class="form-group">
-                  <label for="deviceCode">Device Code *</label>
-                  <input 
-                    id="deviceCode" 
-                    type="text" 
-                    bind:value={epcConfig.deviceCode} 
-                    placeholder="ABCD1234" 
-                    maxlength="8"
-                    style="text-transform: uppercase; font-family: monospace; font-size: 1.2em; letter-spacing: 2px;"
-                    required 
-                  />
-                  <small style="color: #666; display: block; margin-top: 5px;">
-                    Enter the 8-character device code displayed on the hardware. 
-                    You can find it at <code>http://&lt;device-ip&gt;/device-status.html</code> or on the device console.
-                  </small>
-                </div>
                 <div class="form-group">
                   <label for="siteName">Site Name *</label>
                   <input id="siteName" type="text" bind:value={epcConfig.siteName} placeholder="Enter site name" required />
@@ -1494,12 +1450,12 @@ echo "🎉 Deployment successful!";
                   <span>{deploymentType === 'both' ? 'EPC + SNMP' : deploymentType.toUpperCase()}</span>
                 </div>
                 <div class="review-item">
-                  <strong>Device Code:</strong>
-                  <span style="font-family: monospace; font-size: 1.1em; letter-spacing: 2px;">{epcConfig.deviceCode.toUpperCase()}</span>
-                </div>
-                <div class="review-item">
                   <strong>Site Name:</strong>
                   <span>{epcConfig.siteName}</span>
+                </div>
+                <div class="review-item">
+                  <strong>Device Code:</strong>
+                  <span style="color: #999; font-style: italic;">Will be entered in device configuration after hardware boots</span>
                 </div>
                 {#if deploymentType === 'epc' || deploymentType === 'both'}
                   <div class="review-item">
