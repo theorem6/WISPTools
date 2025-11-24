@@ -1,13 +1,19 @@
 // Cleanup script to remove device_code: null from existing records
 // This fixes the MongoDB unique index error for sparse indexes
 
+const path = require('path');
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 async function cleanup() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      console.error('Error: MONGODB_URI not found in environment variables');
+      process.exit(1);
+    }
+    await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB');
     
     // Remove device_code field from records where it's null
