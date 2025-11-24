@@ -33,7 +33,7 @@ Subkey-Length: 4096
 Name-Real: WISPTools APT Repository
 Name-Email: apt@wisptools.io
 Expire-Date: 0
-Passphrase: 
+%no-protection
 %commit
 GPGCONF
 
