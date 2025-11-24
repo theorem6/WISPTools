@@ -426,11 +426,11 @@ if [ -f "$ISO_PATH" ]; then
   # Create ZIP file for Windows compatibility
   echo "[Build] Creating ZIP archive for Windows compatibility..."
   ZIP_FILENAME="${iso_filename}.zip"
-  ZIP_PATH="${ISO_OUTPUT_DIR}/${ZIP_FILENAME}"
+  ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
   cd "${ISO_OUTPUT_DIR}"
-  zip -q "$ZIP_FILENAME" "${iso_filename}"
-  (cd "${ISO_OUTPUT_DIR}" && sha256sum "${ZIP_FILENAME}" > "${ZIP_FILENAME}.sha256") || true
-  echo "[Build] ZIP created: $ZIP_FILENAME"
+  zip -q "\$ZIP_FILENAME" "${iso_filename}"
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "\$ZIP_FILENAME" > "\$ZIP_FILENAME.sha256") || true
+  echo "[Build] ZIP created: \$ZIP_FILENAME"
 fi
 `;
 
