@@ -303,73 +303,73 @@ INITRD_PATH="${INITRD_PATH}"
     SITE_NAME="${siteName}"
     echo "[Build] Creating autoinstall config in: $AUTOINSTALL_DIR/"
     cat > "$AUTOINSTALL_BASE/user-data" << AUTOINSTALL_EOF
-    #cloud-config
-    autoinstall:
-      version: 1
-      locale: en_US
-      keyboard:
-        layout: us
-      network:
-        network:
-          version: 2
-          ethernets:
-            any:
-              match:
-                name: "en*"
-              dhcp4: true
-      storage:
-        layout:
-          name: direct
-      packages:
-        - curl
-        - wget
-        - ca-certificates
-        - jq
-        - gnupg
-        - lsb-release
-        - openssh-server
-      user-data:
-        users:
-          - name: wisp
-            groups: [adm, sudo]
-            shell: /bin/bash
-            lock-passwd: false
-            passwd: \$6\$rounds=4096\$saltsalt\$hBHuZm7adhEYRKKp7oSfFkFq8C5L5CfLXqJ3qvQZQBfVZb9kCL3HH8wJOhZ8L5nKkTRqy8FqKLMnLmKMnLM8.
-        runcmd:
-          - mkdir -p /etc/wisptools /opt/wisptools
-          - |
-            cat > /etc/wisptools/credentials.env << 'CREDS'
-            EPC_ID=${epc_id}
-            TENANT_ID=${tenant_id}
-            EPC_AUTH_CODE=${auth_code}
-            EPC_API_KEY=${api_key}
-            EPC_SECRET_KEY=${secret_key}
-            GCE_SERVER=${GCE_PUBLIC_IP}
-            HSS_PORT=${HSS_PORT}
-            ORIGIN_HOST_FQDN=${originHostFQDN}
-            CREDS
-          - chmod 600 /etc/wisptools/credentials.env
-          - wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}
-          - chmod +x /opt/wisptools/bootstrap.sh
-          - |
-            cat > /etc/systemd/system/wisptools-bootstrap.service << 'UNIT'
-            [Unit]
-            Description=WISPTools EPC Bootstrap
-            After=network-online.target
-            Wants=network-online.target
-            ConditionPathExists=!/var/lib/wisptools/.bootstrapped
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US
+  keyboard:
+    layout: us
+  network:
+    network:
+      version: 2
+      ethernets:
+        any:
+          match:
+            name: "en*"
+          dhcp4: true
+  storage:
+    layout:
+      name: direct
+  packages:
+    - curl
+    - wget
+    - ca-certificates
+    - jq
+    - gnupg
+    - lsb-release
+    - openssh-server
+  user-data:
+    users:
+      - name: wisp
+        groups: [adm, sudo]
+        shell: /bin/bash
+        lock-passwd: false
+        passwd: \$6\$rounds=4096\$saltsalt\$hBHuZm7adhEYRKKp7oSfFkFq8C5L5CfLXqJ3qvQZQBfVZb9kCL3HH8wJOhZ8L5nKkTRqy8FqKLMnLmKMnLM8.
+    runcmd:
+      - mkdir -p /etc/wisptools /opt/wisptools
+      - |
+        cat > /etc/wisptools/credentials.env << 'CREDS'
+EPC_ID=${epc_id}
+TENANT_ID=${tenant_id}
+EPC_AUTH_CODE=${auth_code}
+EPC_API_KEY=${api_key}
+EPC_SECRET_KEY=${secret_key}
+GCE_SERVER=${GCE_PUBLIC_IP}
+HSS_PORT=${HSS_PORT}
+ORIGIN_HOST_FQDN=${originHostFQDN}
+CREDS
+      - chmod 600 /etc/wisptools/credentials.env
+      - wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}
+      - chmod +x /opt/wisptools/bootstrap.sh
+      - |
+        cat > /etc/systemd/system/wisptools-bootstrap.service << 'UNIT'
+[Unit]
+Description=WISPTools EPC Bootstrap
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/wisptools/.bootstrapped
 
-            [Service]
-            Type=oneshot
-            ExecStart=/opt/wisptools/bootstrap.sh
-            RemainAfterExit=yes
+[Service]
+Type=oneshot
+ExecStart=/opt/wisptools/bootstrap.sh
+RemainAfterExit=yes
 
-            [Install]
-            WantedBy=multi-user.target
-            UNIT
-          - systemctl enable wisptools-bootstrap.service
-      late-commands:
-        - curtin in-target --target=/target -- systemctl enable ssh
+[Install]
+WantedBy=multi-user.target
+UNIT
+      - systemctl enable wisptools-bootstrap.service
+  late-commands:
+    - curtin in-target --target=/target -- systemctl enable ssh
 AUTOINSTALL_EOF
 
     # Create meta-data file for cloud-init (Ubuntu autoinstall requirement)
