@@ -406,7 +406,7 @@ INITRD_PATH="${INITRD_PATH}"
       linux /ubuntu/vmlinuz ---
       initrd /ubuntu/initrd.gz
     }
-    GRUBCFG
+GRUBCFG
 
 
 # Remove any existing ISO with same name to avoid conflicts
