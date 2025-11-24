@@ -176,7 +176,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
         center: [-95.7129, 37.0902], // Center of US
         zoom: 4,
         navigation: {
-          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+          mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
         }
       });
 
@@ -185,6 +185,18 @@ let configStatus: ConfigStatus = getConfigStatus(null);
 
       map._view = view;
       map._graphicsLayer = graphicsLayer;
+
+      // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+      await view.when();
+      if (view.container) {
+        view.container.addEventListener('wheel', (event: WheelEvent) => {
+          const hasModifier = event.ctrlKey || event.metaKey;
+          if (!hasModifier) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }, { passive: false });
+      }
 
       // Add click handler
       view.on('click', async (event) => {

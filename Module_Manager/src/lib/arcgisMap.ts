@@ -80,7 +80,7 @@ export class PCIArcGISMapper {
         },
         browserTouchPanEnabled: true,
         momentumEnabled: true,
-        mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+        mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
       },
       // Mobile-optimized popup
       popup: {
@@ -110,6 +110,9 @@ export class PCIArcGISMapper {
     
     // Wait for the view to be ready before allowing interactions
     await this.mapView.when();
+    
+    // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+    this.setupModifierKeyZoom();
     
     // Add mobile-optimized UI controls
     await this.addMobileUIControls();
@@ -184,6 +187,29 @@ export class PCIArcGISMapper {
     } catch (err) {
       console.error('PCIArcGISMapper: Failed to add mobile UI controls:', err);
     }
+  }
+  
+  /**
+   * Setup modifier key requirement for mouse wheel zoom
+   * Prevents accidental zooming on Mac trackpads while allowing intentional zoom with Ctrl/Cmd
+   */
+  private setupModifierKeyZoom(): void {
+    if (!this.mapView || !this.mapView.container) return;
+    
+    const container = this.mapView.container;
+    
+    // Intercept wheel events and require modifier key (Ctrl on Windows/Linux, Cmd on Mac)
+    container.addEventListener('wheel', (event: WheelEvent) => {
+      // Check if modifier key is pressed (Ctrl on Windows/Linux, Cmd on Mac)
+      const hasModifier = event.ctrlKey || event.metaKey;
+      
+      if (!hasModifier) {
+        // Prevent zoom if no modifier key is pressed
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      // If modifier key is pressed, allow the default zoom behavior
+    }, { passive: false });
   }
   
   /**

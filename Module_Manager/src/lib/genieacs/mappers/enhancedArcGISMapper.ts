@@ -105,7 +105,7 @@ export class EnhancedPCIArcGISMapper {
           components: [] // Remove default UI components
         },
         navigation: {
-          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+          mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
         }
       });
 
@@ -139,6 +139,9 @@ export class EnhancedPCIArcGISMapper {
       // Wait for the view to be ready
       await this.mapView.when();
 
+      // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+      this.setupModifierKeyZoom();
+
       // Add Zoom widget
       const zoom = new Zoom({
         view: this.mapView
@@ -159,6 +162,29 @@ export class EnhancedPCIArcGISMapper {
       console.error('Enhanced PCI ArcGIS Mapper: Failed to initialize:', error);
       throw error;
     }
+  }
+
+  /**
+   * Setup modifier key requirement for mouse wheel zoom
+   * Prevents accidental zooming on Mac trackpads while allowing intentional zoom with Ctrl/Cmd
+   */
+  private setupModifierKeyZoom(): void {
+    if (!this.mapView || !this.mapView.container) return;
+    
+    const container = this.mapView.container;
+    
+    // Intercept wheel events and require modifier key (Ctrl on Windows/Linux, Cmd on Mac)
+    container.addEventListener('wheel', (event: WheelEvent) => {
+      // Check if modifier key is pressed (Ctrl on Windows/Linux, Cmd on Mac)
+      const hasModifier = event.ctrlKey || event.metaKey;
+      
+      if (!hasModifier) {
+        // Prevent zoom if no modifier key is pressed
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      // If modifier key is pressed, allow the default zoom behavior
+    }, { passive: false });
   }
 
   /**

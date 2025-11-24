@@ -194,7 +194,7 @@
         center: [-74.0060, 40.7128], // [longitude, latitude] for New York
         zoom: 10,
         navigation: {
-          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+          mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
         }
       });
 
@@ -205,6 +205,18 @@
       // Store view and layer for later use
       map._view = view;
       map._graphicsLayer = graphicsLayer;
+
+      // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+      await view.when();
+      if (view.container) {
+        view.container.addEventListener('wheel', (event: WheelEvent) => {
+          const hasModifier = event.ctrlKey || event.metaKey;
+          if (!hasModifier) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }, { passive: false });
+      }
 
       // Add click handler to the view (not individual graphics)
       view.on('click', async (event) => {

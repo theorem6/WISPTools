@@ -59,7 +59,7 @@
         center: [-98.5795, 39.8283], // Center of USA
         zoom: 4,
         navigation: {
-          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+          mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
         },
         popup: {
           dockEnabled: true,
@@ -82,6 +82,18 @@
       });
 
       view.ui.add(bgExpand, 'top-right');
+
+      // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+      await view.when();
+      if (view.container) {
+        view.container.addEventListener('wheel', (event: WheelEvent) => {
+          const hasModifier = event.ctrlKey || event.metaKey;
+          if (!hasModifier) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }, { passive: false });
+      }
 
       // Handle click on markers - navigate to monitoring page
       view.on('click', (event) => {

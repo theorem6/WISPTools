@@ -195,7 +195,7 @@
           components: ["zoom", "compass"] // Keep essential controls
         },
         navigation: {
-          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+          mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
         }
       });
       
@@ -211,6 +211,17 @@
         mapView.when(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('MapView timeout')), 15000))
       ]);
+
+      // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+      if (mapView.container) {
+        mapView.container.addEventListener('wheel', (event: WheelEvent) => {
+          const hasModifier = event.ctrlKey || event.metaKey;
+          if (!hasModifier) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }, { passive: false });
+      }
       
       // Store references
       map = mapView; // Store mapView as map for compatibility
