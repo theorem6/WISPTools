@@ -990,6 +990,84 @@ echo "🎉 Deployment successful!";
     return script;
   }
 
+  // Download ISO file programmatically through backend proxy
+  async function downloadISOFile(isoUrl: string) {
+    try {
+      console.log('[EPCDeployment] Downloading ISO through proxy:', isoUrl);
+      
+      // Extract the filename from URL
+      const filename = 'wisptools-epc-generic-netinstall.iso';
+      
+      // The isoUrl should already be a proxy URL from the backend
+      // If it's a direct URL, convert it to proxy format
+      let downloadUrl = isoUrl;
+      if (isoUrl.startsWith('http://') || isoUrl.startsWith('https://')) {
+        // Convert direct URL to proxy URL
+        downloadUrl = `/api/deploy/download-iso?url=${encodeURIComponent(isoUrl)}`;
+      }
+      
+      // Get auth token if available
+      let authToken: string | null = null;
+      try {
+        authToken = await authService.getAuthToken();
+      } catch (authErr) {
+        console.warn('[EPCDeployment] Could not get auth token:', authErr);
+      }
+      
+      // Try relative URL first (goes through Firebase hosting rewrite to isoProxy)
+      let response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/octet-stream',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+        }
+      });
+      
+      // If relative URL fails, try isoProxy Cloud Function
+      if (!response.ok) {
+        console.warn('[EPCDeployment] Relative URL failed, trying isoProxy...');
+        const isoProxyBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
+        const proxyUrl = `${isoProxyBase}/downloads/isos/${filename}`;
+        
+        response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/octet-stream',
+            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+          }
+        });
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get the blob
+      const blob = await response.blob();
+      
+      // Create download link and trigger download automatically
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up after a short delay
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+      
+      console.log('[EPCDeployment] ISO download started automatically');
+    } catch (err: any) {
+      console.error('[EPCDeployment] ISO download error:', err);
+      // Don't throw - just log the error, user can download manually
+      error = `ISO download failed: ${err.message}. You can download manually from the device configuration page.`;
+    }
+  }
+
   function downloadScript() {
     if (!deploymentScript) {
       error = 'No deployment script available';
@@ -1119,16 +1197,13 @@ echo "🎉 Deployment successful!";
         console.log('[EPCDeployment] EPC registered:', result.epc_id);
         console.log('[EPCDeployment] Generic ISO URL:', result.iso_download_url);
         
-        // Show success message with instructions
-        success = `EPC configuration created successfully!\n\nEPC ID: ${result.epc_id}\n\n${result.message}\n\nNext steps:\n1. Download the generic ISO\n2. Boot hardware from ISO\n3. Get device code from http://<device-ip>/device-status.html\n4. Enter device code in device configuration page to link hardware to this EPC`;
-        
-        // Optionally open generic ISO download
-        if (result.iso_download_url && confirm('Open generic ISO download URL?')) {
-          window.open(result.iso_download_url, '_blank');
+        // Automatically download the ISO file internally (proxied through backend)
+        if (result.iso_download_url) {
+          await downloadISOFile(result.iso_download_url);
         }
         
-        const downloadType = 'Generic ISO';
-        success = `${downloadType} generated successfully! (${result.size_mb}MB) Download started. Windows users: extract the ZIP file to get the ISO.`;
+        // Show success message with instructions
+        success = `EPC configuration created successfully!\n\nEPC ID: ${result.epc_id}\n\n${result.message}\n\nNext steps:\n1. Download the generic ISO (download started automatically)\n2. Boot hardware from ISO\n3. Get device code from http://<device-ip>/device-status.html\n4. Enter device code in device configuration page to link hardware to this EPC`;
       } else {
         throw new Error(result.error || 'Failed to generate ISO');
       }

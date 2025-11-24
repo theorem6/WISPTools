@@ -1,4 +1,4 @@
-<script lang="ts">
+n<script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { PlanMarketingAddress, PlanProject } from '$lib/services/planService';
 

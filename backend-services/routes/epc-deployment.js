@@ -107,8 +107,9 @@ router.post('/register-epc', async (req, res) => {
     
     console.log(`[EPC Registration] EPC registered: ${epc_id}`);
     
-    // Return generic ISO download URL (served by nginx on port 80, not Node.js backend)
-    const genericIsoUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+    // Return generic ISO download URL (frontend will proxy through /api/deploy/download-iso)
+    // This avoids exposing the GCE IP directly to the client
+    const genericIsoUrl = `/api/deploy/download-iso?url=${encodeURIComponent(`http://${GCE_PUBLIC_IP}/downloads/isos/wisptools-epc-generic-netinstall.iso`)}`;
     
     res.json({
       success: true,
@@ -317,14 +318,67 @@ router.post('/:epc_id/link-device', async (req, res) => {
 });
 
 /**
+ * Proxy ISO Download (internal use - frontend downloads through this)
+ * GET /api/deploy/download-iso?url=<iso-url>
+ * Proxies the ISO download to avoid exposing GCE IP directly
+ */
+router.get('/download-iso', async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({ error: 'url parameter is required' });
+    }
+    
+    // Validate URL is for our ISO file
+    const isoUrl = decodeURIComponent(url);
+    if (!isoUrl.includes('wisptools-epc-generic-netinstall.iso')) {
+      return res.status(400).json({ error: 'Invalid ISO URL' });
+    }
+    
+    // Replace with internal URL (use HTTP internally, nginx serves on port 80)
+    const internalUrl = isoUrl.replace(/https?:\/\/[^/]+/, `http://${GCE_PUBLIC_IP}`);
+    
+    console.log(`[ISO Download Proxy] Proxying download: ${internalUrl}`);
+    
+    // Fetch the file from nginx
+    const response = await fetch(internalUrl);
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch ISO file',
+        status: response.status 
+      });
+    }
+    
+    // Stream the file to the client
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'attachment; filename="wisptools-epc-generic-netinstall.iso"');
+    res.setHeader('Content-Length', response.headers.get('content-length') || '');
+    
+    // Pipe the response
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+    
+  } catch (error) {
+    console.error('[ISO Download Proxy] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to proxy ISO download',
+      details: error.message 
+    });
+  }
+});
+
+/**
  * Get Generic ISO Download URL
  * GET /api/deploy/generic-iso
  */
 router.get('/generic-iso', async (req, res) => {
   try {
-    // ISO is served by nginx on port 80, not Node.js backend
-    const isoUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
-    const checksumUrl = `${isoUrl}.sha256`;
+    // Return proxy URL instead of direct URL to avoid exposing GCE IP
+    const directIsoUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+    const isoUrl = `/api/deploy/download-iso?url=${encodeURIComponent(directIsoUrl)}`;
+    const checksumUrl = `${directIsoUrl}.sha256`; // Checksum can be direct as it's small
     
     // Check if ISO exists
     try {
