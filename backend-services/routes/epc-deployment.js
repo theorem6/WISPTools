@@ -255,16 +255,15 @@ INITRD_PATH="${INITRD_PATH}"
 
     # Verify downloads succeeded
     if [ ! -s "$KERNEL_PATH" ] || [ ! -s "$INITRD_PATH" ]; then
-        echo "[Build] ERROR: Failed to get Ubuntu netboot files (pre-staged or downloaded)"
-        echo "[Build] Kernel file: $([ -f "$KERNEL_PATH" ] && echo "exists ($(du -h "$KERNEL_PATH" | cut -f1))" || echo "missing")"
-        echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
-        echo "[Build] Expected location: $KERNEL_PATH and $INITRD_PATH"
-        echo "[Build] Attempted URLs:"
-        for url in "\${UBUNTU_NETBOOT_URLS[@]}"; do
-          echo "[Build]   - \$url"
-        done
-        exit 1
-      fi
+      echo "[Build] ERROR: Failed to get Ubuntu netboot files (pre-staged or downloaded)"
+      echo "[Build] Kernel file: $([ -f "$KERNEL_PATH" ] && echo "exists ($(du -h "$KERNEL_PATH" | cut -f1))" || echo "missing")"
+      echo "[Build] Initrd file: $([ -f "$INITRD_PATH" ] && echo "exists ($(du -h "$INITRD_PATH" | cut -f1))" || echo "missing")"
+      echo "[Build] Expected location: $KERNEL_PATH and $INITRD_PATH"
+      echo "[Build] Attempted URLs:"
+      for url in "\${UBUNTU_NETBOOT_URLS[@]}"; do
+        echo "[Build]   - \$url"
+      done
+      exit 1
     fi
     
     # Final verification of file sizes
