@@ -174,7 +174,10 @@ let configStatus: ConfigStatus = getConfigStatus(null);
         container: mapContainer,
         map: map,
         center: [-95.7129, 37.0902], // Center of US
-        zoom: 4
+        zoom: 4,
+        navigation: {
+          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+        }
       });
 
       const graphicsLayer = new GraphicsLayer();

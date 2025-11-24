@@ -193,6 +193,9 @@
         zoom: mapConfig.zoom,
         ui: {
           components: ["zoom", "compass"] // Keep essential controls
+        },
+        navigation: {
+          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
         }
       });
       

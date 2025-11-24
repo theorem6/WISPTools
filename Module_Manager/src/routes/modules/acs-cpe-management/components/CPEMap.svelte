@@ -58,6 +58,9 @@
         map: newMap,
         center: [-98.5795, 39.8283], // Center of USA
         zoom: 4,
+        navigation: {
+          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+        },
         popup: {
           dockEnabled: true,
           dockOptions: {

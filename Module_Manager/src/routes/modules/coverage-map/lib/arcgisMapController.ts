@@ -852,7 +852,8 @@ export class CoverageMapController {
           enabled: false
         },
         browserTouchPanEnabled: true,
-        momentumEnabled: true
+        momentumEnabled: true,
+        mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
       },
       popup: {
         dockEnabled: true,

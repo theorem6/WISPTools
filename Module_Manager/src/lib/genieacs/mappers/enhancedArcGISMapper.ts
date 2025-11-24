@@ -103,6 +103,9 @@ export class EnhancedPCIArcGISMapper {
         zoom: 5,
         ui: {
           components: [] // Remove default UI components
+        },
+        navigation: {
+          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
         }
       });
 

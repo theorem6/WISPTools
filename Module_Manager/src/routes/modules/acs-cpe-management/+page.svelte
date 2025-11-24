@@ -192,7 +192,10 @@
         container: mapContainer,
         map: map,
         center: [-74.0060, 40.7128], // [longitude, latitude] for New York
-        zoom: 10
+        zoom: 10,
+        navigation: {
+          mouseWheelZoomEnabled: false // Disable mouse wheel zoom to prevent accidental zooming, especially on Mac trackpads
+        }
       });
 
       // Create graphics layer for CPE devices
