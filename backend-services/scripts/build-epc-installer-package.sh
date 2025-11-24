@@ -124,27 +124,66 @@ echo "[Check-in] Device Code: \$DEVICE_CODE"
 echo "[Check-in] Hardware ID: \$HW_ID"
 echo "[Check-in] Connecting to GCE server: \${GCE_SERVER}:\${HSS_PORT}"
 
-# Check in with device code and hardware ID
-RESPONSE=\$(curl -s -X POST "\${CHECKIN_URL}" \\
-  -H "Content-Type: application/json" \\
-  -d "{\\"device_code\\": \\"\${DEVICE_CODE}\\", \\"hardware_id\\": \\"\${HW_ID}\\"}" || echo "ERROR")
+# Check in with device code and hardware ID (retry if device code not linked yet)
+MAX_CHECKIN_RETRIES=60
+CHECKIN_RETRY=0
+EPC_ID=""
+CHECKIN_TOKEN=""
 
-if [ "\$RESPONSE" = "ERROR" ] || [ -z "\$RESPONSE" ]; then
-  echo "[Check-in] ERROR: Failed to connect to GCE server"
-  exit 1
-fi
-
-# Parse response
-EPC_ID=\$(echo "\$RESPONSE" | jq -r '.epc_id // empty')
-CHECKIN_TOKEN=\$(echo "\$RESPONSE" | jq -r '.checkin_token // empty')
-APT_REPO_URL=\$(echo "\$RESPONSE" | jq -r '.apt_repo_url // empty')
+while [ \$CHECKIN_RETRY -lt \$MAX_CHECKIN_RETRIES ]; do
+  echo "[Check-in] Attempt \$((CHECKIN_RETRY + 1))/\$MAX_CHECKIN_RETRIES..."
+  
+  HTTP_CODE=\$(curl -s -o /tmp/checkin-response.json -w "%{http_code}" -X POST "\${CHECKIN_URL}" \\
+    -H "Content-Type: application/json" \\
+    -d "{\\"device_code\\": \\"\${DEVICE_CODE}\\", \\"hardware_id\\": \\"\${HW_ID}\\"}" || echo "000")
+  
+  if [ "\$HTTP_CODE" = "000" ]; then
+    echo "[Check-in] ERROR: Failed to connect to GCE server"
+    exit 1
+  fi
+  
+  RESPONSE=\$(cat /tmp/checkin-response.json 2>/dev/null || echo "{}")
+  
+  # Check if device code is linked (200 = success, 202 = waiting)
+  if [ "\$HTTP_CODE" = "200" ]; then
+    EPC_ID=\$(echo "\$RESPONSE" | jq -r '.epc_id // empty')
+    CHECKIN_TOKEN=\$(echo "\$RESPONSE" | jq -r '.checkin_token // empty')
+    
+    if [ -n "\$EPC_ID" ] && [ -n "\$CHECKIN_TOKEN" ]; then
+      echo "[Check-in] Device code linked! EPC ID: \$EPC_ID"
+      break
+    fi
+  elif [ "\$HTTP_CODE" = "202" ]; then
+    MESSAGE=\$(echo "\$RESPONSE" | jq -r '.message // "Device code not linked yet"')
+    echo "[Check-in] Waiting for device code to be linked..."
+    echo "[Check-in] \$MESSAGE"
+    echo "[Check-in] Device code: \$DEVICE_CODE"
+    echo "[Check-in] Please enter this code in the device configuration page"
+    
+    # Wait before retrying (30 seconds)
+    if [ \$CHECKIN_RETRY -lt \$((MAX_CHECKIN_RETRIES - 1)) ]; then
+      echo "[Check-in] Retrying in 30 seconds..."
+      sleep 30
+    fi
+  else
+    ERROR_MSG=\$(echo "\$RESPONSE" | jq -r '.error // .message // "Unknown error"')
+    echo "[Check-in] ERROR: HTTP \$HTTP_CODE - \$ERROR_MSG"
+    exit 1
+  fi
+  
+  CHECKIN_RETRY=\$((CHECKIN_RETRY + 1))
+done
 
 if [ -z "\$EPC_ID" ] || [ -z "\$CHECKIN_TOKEN" ]; then
-  echo "[Check-in] ERROR: Invalid response from server"
-  echo "[Check-in] Response: \$RESPONSE"
+  echo "[Check-in] ERROR: Device code not linked after \$MAX_CHECKIN_RETRIES attempts"
+  echo "[Check-in] Device code: \$DEVICE_CODE"
+  echo "[Check-in] Please enter this code in the device configuration page and the device will check in automatically"
   exit 1
 fi
 
+APT_REPO_URL=\$(echo "\$RESPONSE" | jq -r '.apt_repo_url // empty')
+
+echo "[Check-in] ✓ Device code linked successfully"
 echo "[Check-in] EPC ID: \$EPC_ID"
 echo "[Check-in] Check-in token received"
 
