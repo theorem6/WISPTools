@@ -51,7 +51,7 @@ Origin: WISPTools
 Label: WISPTools APT Repository
 Suite: stable
 Codename: stable
-Architectures: amd64 all
+Architectures: amd64
 Components: main
 Description: WISPTools EPC Installer Packages
 SignWith: apt@wisptools.io
