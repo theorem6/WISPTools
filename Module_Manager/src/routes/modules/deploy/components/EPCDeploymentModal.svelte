@@ -31,6 +31,7 @@
   // EPC Configuration
   let epcConfig = {
     siteName: '',
+    deviceCode: '', // Device code from hardware
     location: {
       address: '',
       city: '',
@@ -186,6 +187,14 @@
 
   function getValidationErrors(): string[] {
     const errors: string[] = [];
+    if (!epcConfig.deviceCode || !epcConfig.deviceCode.trim()) {
+      errors.push('Device Code is required');
+    } else {
+      const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
+      if (!deviceCodePattern.test(epcConfig.deviceCode.toUpperCase())) {
+        errors.push('Device Code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)');
+      }
+    }
     if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
       errors.push('Site Name is required');
     }
@@ -260,8 +269,14 @@
       currentStep++;
     } else if (currentStep === getStepNumber('site')) {
       // Site Info
-      if (!epcConfig.siteName || !epcConfig.location.address || !epcConfig.contact.name || !epcConfig.contact.email) {
-        error = 'Please fill in all required fields';
+      if (!epcConfig.deviceCode || !epcConfig.siteName || !epcConfig.location.address || !epcConfig.contact.name || !epcConfig.contact.email) {
+        error = 'Please fill in all required fields including Device Code';
+        return;
+      }
+      // Validate device code format
+      const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
+      if (!deviceCodePattern.test(epcConfig.deviceCode.toUpperCase())) {
+        error = 'Device Code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)';
         return;
       }
       currentStep++;
@@ -1036,8 +1051,19 @@ echo "🎉 Deployment successful!";
         throw new Error('Tenant ID is required. Please ensure you are logged in and have a tenant selected.');
       }
       
-      // Prefer Hosting rewrite; fallback to direct Cloud Function proxy if 404/HTML
-      const relativeUrl = '/api/deploy/generate-epc-iso';
+      // Validate device code
+      if (!epcConfig.deviceCode || !epcConfig.deviceCode.trim()) {
+        throw new Error('Device code is required. Please enter the device code displayed on the hardware (e.g., ABCD1234). You can find it at http://<device-ip>/device-status.html');
+      }
+      
+      // Validate device code format (8 characters: 4 letters + 4 digits)
+      const deviceCodePattern = /^[A-Z]{4}[0-9]{4}$/;
+      if (!deviceCodePattern.test(epcConfig.deviceCode.toUpperCase())) {
+        throw new Error('Device code must be 8 characters: 4 uppercase letters followed by 4 digits (e.g., ABCD1234)');
+      }
+      
+      // Use new registration endpoint
+      const relativeUrl = '/api/deploy/register-epc';
 
       const makeRequest = async (url: string) => {
         const headers: Record<string, string> = {
@@ -1054,6 +1080,7 @@ echo "🎉 Deployment successful!";
           method: 'POST',
           headers,
           body: JSON.stringify({
+            device_code: epcConfig.deviceCode.toUpperCase(),
             siteName: epcConfig.siteName,
             location: epcConfig.location,
             networkConfig: epcConfig.networkConfig,
@@ -1079,7 +1106,7 @@ echo "🎉 Deployment successful!";
         // When calling Cloud Function directly, the path should NOT include /isoProxy prefix
         // Firebase Functions 2nd gen auto-routes based on the function name in the URL
         const isoProxyBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
-        response = await makeRequest(`${isoProxyBase}/api/deploy/generate-epc-iso`);
+        response = await makeRequest(`${isoProxyBase}/api/deploy/register-epc`);
       }
 
       const finalContentType = response.headers.get('content-type') || '';
@@ -1112,21 +1139,23 @@ echo "🎉 Deployment successful!";
         throw new Error('Backend returned HTML instead of JSON. Please verify the endpoint is correct.');
       }
       
-      // Backend returns JSON with download URL
+      // Backend returns JSON with registration info
       const result = await response.json();
       
-      if (result.success && result.download_url) {
-        // Download ZIP (or ISO) from the provided URL
-        console.log('[EPCDeployment] ISO generated:', result.iso_filename);
-        console.log('[EPCDeployment] Download URL:', result.download_url);
-        if (result.zip_download_url) {
-          console.log('[EPCDeployment] ZIP available:', result.zip_filename);
+      if (result.success) {
+        console.log('[EPCDeployment] EPC registered:', result.epc_id);
+        console.log('[EPCDeployment] Device code:', result.device_code);
+        console.log('[EPCDeployment] Generic ISO URL:', result.iso_download_url);
+        
+        // Show success message with instructions
+        success = `EPC registered successfully!\n\nDevice Code: ${result.device_code}\nEPC ID: ${result.epc_id}\n\n${result.message}\n\nUse the generic ISO for all deployments. The device will automatically check in and configure when it boots.`;
+        
+        // Optionally open generic ISO download
+        if (result.iso_download_url && confirm('Open generic ISO download URL?')) {
+          window.open(result.iso_download_url, '_blank');
         }
         
-        // Open download URL in new window to trigger download
-        window.open(result.download_url, '_blank');
-        
-        const downloadType = result.zip_download_url ? 'ZIP (ISO included)' : 'ISO';
+        const downloadType = 'Generic ISO';
         success = `${downloadType} generated successfully! (${result.size_mb}MB) Download started. Windows users: extract the ZIP file to get the ISO.`;
       } else {
         throw new Error(result.error || 'Failed to generate ISO');
@@ -1227,8 +1256,24 @@ echo "🎉 Deployment successful!";
           {:else if currentStep === 2}
             <div class="step-panel">
               <h3>Step 2: Site Information</h3>
-              <p class="step-description">Enter basic site details</p>
+              <p class="step-description">Enter basic site details and device code</p>
               <div class="form-section">
+                <div class="form-group">
+                  <label for="deviceCode">Device Code *</label>
+                  <input 
+                    id="deviceCode" 
+                    type="text" 
+                    bind:value={epcConfig.deviceCode} 
+                    placeholder="ABCD1234" 
+                    maxlength="8"
+                    style="text-transform: uppercase; font-family: monospace; font-size: 1.2em; letter-spacing: 2px;"
+                    required 
+                  />
+                  <small style="color: #666; display: block; margin-top: 5px;">
+                    Enter the 8-character device code displayed on the hardware. 
+                    You can find it at <code>http://&lt;device-ip&gt;/device-status.html</code> or on the device console.
+                  </small>
+                </div>
                 <div class="form-group">
                   <label for="siteName">Site Name *</label>
                   <input id="siteName" type="text" bind:value={epcConfig.siteName} placeholder="Enter site name" required />
@@ -1449,6 +1494,10 @@ echo "🎉 Deployment successful!";
                   <span>{deploymentType === 'both' ? 'EPC + SNMP' : deploymentType.toUpperCase()}</span>
                 </div>
                 <div class="review-item">
+                  <strong>Device Code:</strong>
+                  <span style="font-family: monospace; font-size: 1.1em; letter-spacing: 2px;">{epcConfig.deviceCode.toUpperCase()}</span>
+                </div>
+                <div class="review-item">
                   <strong>Site Name:</strong>
                   <span>{epcConfig.siteName}</span>
                 </div>
@@ -1578,28 +1627,20 @@ echo "🎉 Deployment successful!";
   }
 
   .modal-content {
-    background: var(--bg-primary) !important;
-    border-radius: var(--radius-lg) !important;
-    box-shadow: var(--shadow-xl) !important;
-    max-width: 800px !important;
-    width: 800px !important;
-    max-height: 95vh !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
-  
-  /* Specific override for EPC deployment modal to ensure 800px width */
-  .modal-content.epc-deployment-modal {
-    max-width: 800px !important;
-    width: 800px !important;
-    min-width: 800px !important;
-  }
-  
-  /* Override any global modal styles */
-  :global(.modal-content.epc-deployment-modal) {
-    max-width: 800px !important;
-    width: 800px !important;
+
+  .epc-deployment-modal {
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
   }
 
   .modal-header {
