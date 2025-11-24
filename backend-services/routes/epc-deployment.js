@@ -99,8 +99,6 @@ router.post('/generate-epc-iso', async (req, res) => {
     const timestamp = Date.now();
     const iso_filename = `wisptools-epc-${siteName.replace(/[^a-zA-Z0-9]/g, '-')}-${timestamp}.iso`;
     const iso_path = path.join(ISO_OUTPUT_DIR, iso_filename);
-    const zip_filename = `${iso_filename}.zip`;
-    const zip_path = path.join(ISO_OUTPUT_DIR, zip_filename);
     
     // Create output directory if it doesn't exist
     // Check if it's a symlink first
@@ -301,75 +299,75 @@ INITRD_PATH="${INITRD_PATH}"
     HSS_PORT="${HSS_PORT}"
     SITE_NAME="${siteName}"
     echo "[Build] Creating autoinstall config in: $AUTOINSTALL_DIR/"
-    cat > "$AUTOINSTALL_BASE/user-data" << AUTOINSTALL_EOF
-#cloud-config
-autoinstall:
-  version: 1
-  locale: en_US
-  keyboard:
-    layout: us
-  network:
-    network:
-      version: 2
-      ethernets:
-        any:
-          match:
-            name: "en*"
-          dhcp4: true
-  storage:
-    layout:
-      name: direct
-  packages:
-    - curl
-    - wget
-    - ca-certificates
-    - jq
-    - gnupg
-    - lsb-release
-    - openssh-server
-  user-data:
-    users:
-      - name: wisp
-        groups: [adm, sudo]
-        shell: /bin/bash
-        lock-passwd: false
-        passwd: \$6\$rounds=4096\$saltsalt\$hBHuZm7adhEYRKKp7oSfFkFq8C5L5CfLXqJ3qvQZQBfVZb9kCL3HH8wJOhZ8L5nKkTRqy8FqKLMnLmKMnLM8.
-    runcmd:
-      - mkdir -p /etc/wisptools /opt/wisptools
-      - |
-        cat > /etc/wisptools/credentials.env << 'CREDS'
-EPC_ID=${epc_id}
-TENANT_ID=${tenant_id}
-EPC_AUTH_CODE=${auth_code}
-EPC_API_KEY=${api_key}
-EPC_SECRET_KEY=${secret_key}
-GCE_SERVER=${GCE_PUBLIC_IP}
-HSS_PORT=${HSS_PORT}
-ORIGIN_HOST_FQDN=${originHostFQDN}
-CREDS
-      - chmod 600 /etc/wisptools/credentials.env
-      - wget -O /opt/wisptools/bootstrap.sh http://${GCE_PUBLIC_IP}:${HSS_PORT}/api/epc/${epc_id}/bootstrap?auth_code=${auth_code}
-      - chmod +x /opt/wisptools/bootstrap.sh
-      - |
-        cat > /etc/systemd/system/wisptools-bootstrap.service << 'UNIT'
-[Unit]
-Description=WISPTools EPC Bootstrap
-After=network-online.target
-Wants=network-online.target
-ConditionPathExists=!/var/lib/wisptools/.bootstrapped
-
-[Service]
-Type=oneshot
-ExecStart=/opt/wisptools/bootstrap.sh
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-      - systemctl enable wisptools-bootstrap.service
-  late-commands:
-    - curtin in-target --target=/target -- systemctl enable ssh
-AUTOINSTALL_EOF
+    
+    # Write user-data file using printf to avoid heredoc issues
+    printf '#cloud-config\n' > "$AUTOINSTALL_BASE/user-data"
+    printf 'autoinstall:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  version: 1\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  locale: en_US\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  keyboard:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    layout: us\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  network:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    network:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      version: 2\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      ethernets:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        any:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '          match:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '            name: "en*"\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '          dhcp4: true\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  storage:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    layout:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      name: direct\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  packages:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - curl\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - wget\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - ca-certificates\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - jq\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - gnupg\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - lsb-release\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - openssh-server\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  user-data:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    users:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - name: wisp\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        groups: [adm, sudo]\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        shell: /bin/bash\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        lock-passwd: false\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        passwd: $6$rounds=4096$saltsalt$hBHuZm7adhEYRKKp7oSfFkFq8C5L5CfLXqJ3qvQZQBfVZb9kCL3HH8wJOhZ8L5nKkTRqy8FqKLMnLmKMnLM8.\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    runcmd:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - mkdir -p /etc/wisptools /opt/wisptools\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - |\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        cat > /etc/wisptools/credentials.env << '\''CREDS'\''\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'EPC_ID=%s\n' "${epc_id}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'TENANT_ID=%s\n' "${tenant_id}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'EPC_AUTH_CODE=%s\n' "${auth_code}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'EPC_API_KEY=%s\n' "${api_key}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'EPC_SECRET_KEY=%s\n' "${secret_key}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'GCE_SERVER=%s\n' "${GCE_PUBLIC_IP}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'HSS_PORT=%s\n' "${HSS_PORT}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'ORIGIN_HOST_FQDN=%s\n' "${originHostFQDN}" >> "$AUTOINSTALL_BASE/user-data"
+    printf 'CREDS\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - chmod 600 /etc/wisptools/credentials.env\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - wget -O /opt/wisptools/bootstrap.sh http://%s:%s/api/epc/%s/bootstrap?auth_code=%s\n' "${GCE_PUBLIC_IP}" "${HSS_PORT}" "${epc_id}" "${auth_code}" >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - chmod +x /opt/wisptools/bootstrap.sh\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - |\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '        cat > /etc/systemd/system/wisptools-bootstrap.service << '\''UNIT'\''\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '[Unit]\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'Description=WISPTools EPC Bootstrap\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'After=network-online.target\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'Wants=network-online.target\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'ConditionPathExists=!/var/lib/wisptools/.bootstrapped\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '[Service]\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'Type=oneshot\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'ExecStart=/opt/wisptools/bootstrap.sh\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'RemainAfterExit=yes\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '[Install]\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'WantedBy=multi-user.target\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf 'UNIT\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '      - systemctl enable wisptools-bootstrap.service\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '  late-commands:\n' >> "$AUTOINSTALL_BASE/user-data"
+    printf '    - curtin in-target --target=/target -- systemctl enable ssh\n' >> "$AUTOINSTALL_BASE/user-data"
 
     # Create meta-data file for cloud-init (Ubuntu autoinstall requirement)
     SITE_HOSTNAME=$(echo "${siteName}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
@@ -420,16 +418,10 @@ if [ ! -s "$ISO_PATH" ]; then
 fi
 echo "[Build] ISO created successfully: $(du -h "$ISO_PATH" | cut -f1)"
 
+# Create checksum for ISO
 if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
-  # Create ZIP file for Windows compatibility
-  echo "[Build] Creating ZIP archive for Windows compatibility..."
-  ZIP_FILENAME="${iso_filename}.zip"
-  ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
-  cd "${ISO_OUTPUT_DIR}"
-  zip -q "\$ZIP_FILENAME" "${iso_filename}"
-  (cd "${ISO_OUTPUT_DIR}" && sha256sum "\$ZIP_FILENAME" > "\$ZIP_FILENAME.sha256") || true
-  echo "[Build] ZIP created: \$ZIP_FILENAME"
+  echo "[Build] ISO checksum created: ${iso_filename}.sha256"
 fi
 `;
 
@@ -502,26 +494,11 @@ fi
     }
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
     
-    // Check for ZIP file (created by build script)
-    // zip_filename and zip_path already declared at line 102
-    let zipSizeMB = null;
-    let zipDownloadUrl = null;
-    let zipChecksumUrl = null;
-    
-    try {
-      const zipStats = await fs.stat(zip_path);
-      zipSizeMB = (zipStats.size / (1024 * 1024)).toFixed(2);
-      zipDownloadUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${zip_filename}`;
-      zipChecksumUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${zip_filename}.sha256`;
-      console.log(`[ISO Generator] ZIP ready: ${zip_filename} (${zipSizeMB}MB)`);
-    } catch (zipError) {
-      console.warn('[ISO Generator] ZIP file not found, returning ISO URL only:', zipError.message);
-    }
-    
     const isoDownloadUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}`;
     const isoChecksumUrl = `http://${GCE_PUBLIC_IP}/downloads/isos/${iso_filename}.sha256`;
     
     console.log(`[ISO Generator] ISO ready: ${iso_filename} (${sizeMB}MB)`);
+    console.log(`[ISO Generator] Download URL: ${isoDownloadUrl}`);
     
     res.json({
       success: true,
@@ -530,16 +507,11 @@ fi
       iso_download_url: isoDownloadUrl,
       iso_checksum_url: isoChecksumUrl,
       iso_size_mb: sizeMB,
-      // Prefer ZIP for Windows compatibility
-      download_url: zipDownloadUrl || isoDownloadUrl,
-      checksum_url: zipChecksumUrl || isoChecksumUrl,
-      size_mb: zipSizeMB || sizeMB,
-      zip_filename: zip_filename,
-      zip_download_url: zipDownloadUrl,
-      zip_checksum_url: zipChecksumUrl,
-      zip_size_mb: zipSizeMB,
+      download_url: isoDownloadUrl,
+      checksum_url: isoChecksumUrl,
+      size_mb: sizeMB,
       origin_host_fqdn: originHostFQDN,
-      message: 'ISO generated successfully! Windows users: download the ZIP file.'
+      message: 'ISO generated successfully!'
     });
     
   } catch (error) {
