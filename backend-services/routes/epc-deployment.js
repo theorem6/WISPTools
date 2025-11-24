@@ -370,7 +370,7 @@ INITRD_PATH="${INITRD_PATH}"
           - systemctl enable wisptools-bootstrap.service
       late-commands:
         - curtin in-target --target=/target -- systemctl enable ssh
-    AUTOINSTALL_EOF
+AUTOINSTALL_EOF
 
     # Create meta-data file for cloud-init (Ubuntu autoinstall requirement)
     SITE_HOSTNAME=$(echo "${siteName}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
