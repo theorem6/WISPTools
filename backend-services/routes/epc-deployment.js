@@ -423,14 +423,14 @@ echo "[Build] ISO created successfully: $(du -h "$ISO_PATH" | cut -f1)"
 
 if [ -f "$ISO_PATH" ]; then
   (cd "${ISO_OUTPUT_DIR}" && sha256sum "${iso_filename}" > "${iso_filename}.sha256") || true
+  # Create ZIP file for Windows compatibility
+  echo "[Build] Creating ZIP archive for Windows compatibility..."
   ZIP_FILENAME="${iso_filename}.zip"
-  ZIP_PATH="${ISO_OUTPUT_DIR}/\${ZIP_FILENAME}"
-  # Remove old ZIP if it exists
-  rm -f "\$ZIP_PATH" "\${ZIP_PATH}.sha256" 2>/dev/null || true
+  ZIP_PATH="${ISO_OUTPUT_DIR}/${ZIP_FILENAME}"
   cd "${ISO_OUTPUT_DIR}"
-  zip -q "\$ZIP_FILENAME" "${iso_filename}" || { echo "[Build] ERROR: Failed to create ZIP"; exit 1; }
-  (cd "${ISO_OUTPUT_DIR}" && sha256sum "\$ZIP_FILENAME" > "\$ZIP_FILENAME.sha256") || true
-  echo "[Build] ZIP created successfully: \$ZIP_FILENAME (\$(du -h "\$ZIP_PATH" | cut -f1))"
+  zip -q "$ZIP_FILENAME" "${iso_filename}"
+  (cd "${ISO_OUTPUT_DIR}" && sha256sum "${ZIP_FILENAME}" > "${ZIP_FILENAME}.sha256") || true
+  echo "[Build] ZIP created: $ZIP_FILENAME"
 fi
 `;
 
