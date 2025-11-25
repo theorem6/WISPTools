@@ -202,12 +202,19 @@
       </div>
       <div class="header-actions">
         <a 
+          href="/modules/customers/portal-setup" 
+          class="btn-secondary"
+          title="Setup Customer Portal"
+        >
+          🌐 Setup Portal
+        </a>
+        <a 
           href="/modules/customers/portal/login" 
           target="_blank" 
           class="btn-secondary"
           title="Open Customer Portal"
         >
-          🌐 Customer Portal
+          👁️ View Portal
         </a>
         <button class="btn-primary" on:click={handleAdd}>
           ➕ Add Customer

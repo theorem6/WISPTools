@@ -115,7 +115,9 @@ const tenantSchema = new mongoose.Schema({
       footerText: { type: String },
       customCSS: { type: String },
       enableCustomDomain: { type: Boolean, default: false },
-      customDomain: { type: String }
+      customDomain: { type: String },
+      portalSubdomain: { type: String }, // Subdomain for portal access
+      portalUrl: { type: String } // Full portal URL
     },
     
     // Features

@@ -13,12 +13,49 @@
   let isAuthenticated = false;
   
   onMount(async () => {
+    // Try to detect tenant from domain or URL params
+    let tenantId = $currentTenant?.id;
+    
+    // Check URL params for tenant ID
+    const urlParams = new URLSearchParams($page.url.search);
+    const tenantParam = urlParams.get('tenant');
+    
+    // Check domain for tenant
+    if (!tenantId && typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      
+      // Try to fetch tenant from domain
+      try {
+        const domainResponse = await fetch(`/api/portal/domain/${hostname}`);
+        if (domainResponse.ok) {
+          const domainData = await domainResponse.json();
+          tenantId = domainData.tenantId;
+        }
+      } catch (err) {
+        console.error('Error detecting tenant from domain:', err);
+      }
+    }
+    
+    // Use tenant param if available
+    if (tenantParam) {
+      tenantId = tenantParam;
+    }
+    
     // Check if customer is authenticated
     const customer = await customerAuthService.getCurrentCustomer();
     isAuthenticated = customer !== null;
     
     // Load branding
-    if ($currentTenant) {
+    if (tenantId) {
+      try {
+        branding = await brandingService.getTenantBranding(tenantId);
+        brandingService.applyBrandingToDocument(branding);
+      } catch (error) {
+        console.error('Error loading branding:', error);
+        branding = brandingService.getDefaultBranding();
+        brandingService.applyBrandingToDocument(branding);
+      }
+    } else if ($currentTenant) {
       try {
         branding = await brandingService.getTenantBranding($currentTenant.id);
         brandingService.applyBrandingToDocument(branding);
@@ -36,7 +73,10 @@
     
     // Redirect to login if not authenticated and not on login/signup pages
     if (!isAuthenticated && !$page.url.pathname.includes('/login') && !$page.url.pathname.includes('/signup')) {
-      goto('/modules/customers/portal/login');
+      const loginUrl = tenantId 
+        ? `/modules/customers/portal/login?tenant=${tenantId}`
+        : '/modules/customers/portal/login';
+      goto(loginUrl);
     }
   });
 </script>

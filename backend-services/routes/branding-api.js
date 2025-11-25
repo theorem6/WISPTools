@@ -119,6 +119,17 @@ router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
     
     if (brandingData.portal) {
       tenant.branding.portal = { ...tenant.branding.portal, ...brandingData.portal };
+      
+      // Generate portal URL based on configuration
+      if (brandingData.portal.enableCustomDomain && brandingData.portal.customDomain) {
+        tenant.branding.portal.portalUrl = `https://${brandingData.portal.customDomain}`;
+      } else if (brandingData.portal.portalSubdomain || tenant.subdomain) {
+        const subdomain = brandingData.portal.portalSubdomain || tenant.subdomain;
+        tenant.branding.portal.portalSubdomain = subdomain;
+        tenant.branding.portal.portalUrl = `https://${subdomain}.wisptools.io/portal`;
+      } else {
+        tenant.branding.portal.portalUrl = `/portal/${tenant._id}`;
+      }
     }
     
     if (brandingData.features) {

@@ -36,6 +36,8 @@ export interface TenantBranding {
     customCSS?: string;
     enableCustomDomain?: boolean;
     customDomain?: string;
+    portalSubdomain?: string;
+    portalUrl?: string;
   };
   features: {
     enableFAQ?: boolean;

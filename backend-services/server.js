@@ -128,6 +128,7 @@ app.use('/api/system', require('./routes/system'));
 app.use('/api/permissions', require('./routes/permissions')); // FCAPS permission management
 app.use('/api/branding', require('./routes/branding-api')); // Branding API for customer portal
 app.use('/api/customer-portal', require('./routes/customer-portal-api')); // Customer portal API
+app.use('/api/portal', require('./routes/portal-domain')); // Portal domain routing
 // Enable billing API (with graceful handling if PayPal not configured)
 try {
   app.use('/api/billing', require('./billing-api'));
