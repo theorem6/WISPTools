@@ -176,7 +176,7 @@ app.use((req, res) => {
     method: req.method,
     path: req.path,
     url: req.url,
-    originalUrl: (req as any).originalUrl
+    originalUrl: req.originalUrl
   });
   res.status(404).json({ 
     error: 'Route not found',
