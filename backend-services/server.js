@@ -170,13 +170,14 @@ app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
 app.use('/setup-admin', require('./routes/setup'));
 
-// 404 handler for unmatched routes (must be last)
-app.use((req, res) => {
+// 404 handler for unmatched routes (must be last, after all routes)
+app.use('*', (req, res) => {
   console.log('[404 Handler] Unmatched route:', {
     method: req.method,
     path: req.path,
     url: req.url,
-    originalUrl: req.originalUrl
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl
   });
   res.status(404).json({ 
     error: 'Route not found',

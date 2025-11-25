@@ -113,15 +113,16 @@ router.get('/:tenantId', async (req, res) => {
  * Update tenant branding (admin only)
  */
 // PUT route - update branding
-router.put('/:tenantId', async (req, res, next) => {
-  console.log('[Branding API] PUT route matched!', {
+router.put('/:tenantId', (req, res, next) => {
+  console.log('[Branding API] PUT route MATCHED!', {
     method: req.method,
     path: req.path,
     url: req.url,
     baseUrl: req.baseUrl,
     originalUrl: req.originalUrl,
     params: req.params,
-    tenantId: req.params.tenantId
+    tenantId: req.params.tenantId,
+    route: '/:tenantId'
   });
   next();
 }, requireAuth, requireAdminMiddleware, async (req, res) => {
