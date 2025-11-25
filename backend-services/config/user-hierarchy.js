@@ -127,12 +127,13 @@ function determineRoleFromEmail(email) {
  * Role hierarchy - who can create/manage which roles
  */
 const ROLE_HIERARCHY = {
-  platform_admin: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'],
-  owner: ['admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'],
-  admin: ['engineer', 'installer', 'helpdesk', 'sales', 'viewer'],
+  platform_admin: ['platform_admin', 'owner', 'admin', 'engineer', 'installer', 'helpdesk', 'support', 'sales', 'viewer'],
+  owner: ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'sales', 'viewer'],
+  admin: ['engineer', 'installer', 'helpdesk', 'support', 'sales', 'viewer'],
   engineer: ['installer', 'viewer'], // Engineers can create installer accounts
   installer: [], // Cannot create other users
   helpdesk: [], // Cannot create other users
+  support: [], // Cannot create other users
   sales: [], // Cannot create other users
   viewer: [] // Cannot create other users
 };
@@ -168,6 +169,7 @@ function getRoleDisplayName(role) {
     engineer: 'Network Engineer',
     installer: 'Field Technician',
     helpdesk: 'Customer Service',
+    support: 'Customer Support',
     sales: 'Sales/Account Manager',
     viewer: 'Read-only Viewer'
   };
@@ -185,6 +187,7 @@ function getRoleDescription(role) {
     engineer: 'Technical design, network configuration, and system troubleshooting',
     installer: 'Field installations, equipment deployment, and on-site maintenance',
     helpdesk: 'Customer support, ticket management, and service inquiries',
+    support: 'Customer portal management and support ticket handling',
     sales: 'Customer relationships, account management, and limited technical view',
     viewer: 'Read-only access for audits, reporting, and compliance'
   };

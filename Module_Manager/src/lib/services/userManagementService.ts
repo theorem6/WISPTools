@@ -180,14 +180,16 @@ export async function getAllUsers(): Promise<TenantUser[]> {
 }
 
 /**
- * Invite a new user to the tenant
+ * Add a new user to the tenant
+ * Automatically sends welcome email with login instructions
  */
 export async function inviteUser(
   tenantId: string,
   email: string,
   role: UserRole,
   customModuleAccess?: ModuleAccess,
-  sendEmail: boolean = false
+  sendEmail: boolean = true,
+  displayName?: string
 ): Promise<{ invitationId: string; userId: string | null; status: string }> {
   try {
     const headers = await getAuthHeaders(tenantId);
@@ -202,18 +204,19 @@ export async function inviteUser(
         role,
         tenantId,
         customModuleAccess,
-        sendEmail
+        sendEmail,
+        displayName
       })
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to invite user');
+      throw new Error(error.message || 'Failed to add user');
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Error inviting user:', error);
+    console.error('Error adding user:', error);
     throw error;
   }
 }

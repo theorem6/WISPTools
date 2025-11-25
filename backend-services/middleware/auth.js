@@ -31,6 +31,7 @@ const VALID_ROLES = [
   'engineer',
   'installer',
   'helpdesk',
+  'support',
   'sales',
   'viewer'
 ];
@@ -149,6 +150,25 @@ const DEFAULT_MODULE_ACCESS = {
     backendManagement: false,
     billing: false,
     tenantManagement: false
+  },
+  support: {
+    // Customer support - portal management only
+    pciResolution: false,
+    cbrsManagement: false,
+    acsManagement: false,
+    hssManagement: false,
+    coverageMap: false,
+    inventory: false,
+    workOrders: false,
+    helpDesk: true,       // Customer tickets
+    distributedEpc: false,
+    monitoring: false,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false,
+    customerPortal: true  // Portal management access
   },
   viewer: {
     pciResolution: true,   // Read-only

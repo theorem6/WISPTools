@@ -7,11 +7,12 @@
   const dispatch = createEventDispatcher();
   
   let email = '';
+  let displayName = '';
   let role: UserRole = 'viewer';
-  let sendEmail = false; // Email sending is optional - tenant admin decides
   let loading = false;
   let error = '';
   let success = false;
+  let addedUserEmail = '';
   
   const availableRoles: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'viewer'];
   
@@ -28,13 +29,16 @@
     error = '';
     
     try {
-      await inviteUser($currentTenant.id, email, role, undefined, sendEmail);
+      // Always send welcome email automatically
+      await inviteUser($currentTenant.id, email, role, undefined, true, displayName);
+      addedUserEmail = email;
       success = true;
       setTimeout(() => {
         dispatch('close');
-      }, 1500);
+        dispatch('userAdded');
+      }, 2000);
     } catch (err: any) {
-      error = err.message || 'Failed to invite user';
+      error = err.message || 'Failed to add user';
     } finally {
       loading = false;
     }
@@ -65,26 +69,25 @@
   role="dialog"
   aria-modal="true"
   tabindex="0"
-  aria-label="Invite user dialog"
+  aria-label="Add user dialog"
   on:click={handleBackdropClick}
   on:keydown={handleBackdropKeydown}
 >
   <div class="modal-content" role="document">
     <div class="modal-header">
-      <h2>Invite User</h2>
+      <h2>➕ Add Team Member</h2>
       <button class="close-btn" on:click={handleClose} disabled={loading}>✕</button>
     </div>
     
     {#if success}
       <div class="success-message">
         <span class="success-icon">✅</span>
-        <h3>User {sendEmail ? 'Invited' : 'Added'}!</h3>
+        <h3>User Added!</h3>
         <p>
-          {#if sendEmail}
-            An invitation email has been sent to {email}
-          {:else}
-            User {email} has been added. {#if !sendEmail}You can manually notify them or send an invitation email later.{/if}
-          {/if}
+          <strong>{addedUserEmail}</strong> has been added to your team.
+        </p>
+        <p class="email-note">
+          📧 A welcome email with login instructions has been sent.
         </p>
       </div>
     {:else}
@@ -106,6 +109,18 @@
             required
             disabled={loading}
           />
+          <p class="hint">They'll receive login instructions at this email</p>
+        </div>
+        
+        <div class="form-group">
+          <label for="displayName">Display Name (optional)</label>
+          <input
+            id="displayName"
+            type="text"
+            bind:value={displayName}
+            placeholder="John Smith"
+            disabled={loading}
+          />
         </div>
         
         <div class="form-group">
@@ -122,16 +137,16 @@
           {/if}
         </div>
         
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input
-              type="checkbox"
-              bind:checked={sendEmail}
-              disabled={loading}
-            />
-            <span>Send invitation email (optional - email systems may not be configured)</span>
-          </label>
-          <p class="hint">If unchecked, you can manually notify the user or send the invitation later.</p>
+        <div class="info-box">
+          <span class="info-icon">ℹ️</span>
+          <div class="info-content">
+            <p><strong>What happens next:</strong></p>
+            <ul>
+              <li>User receives a welcome email at <strong>wisptools.io</strong></li>
+              <li>They can sign in with Google or create a password</li>
+              <li>Once signed in, they'll have access to your organization</li>
+            </ul>
+          </div>
         </div>
         
         <div class="modal-actions">
@@ -141,9 +156,9 @@
           <button type="submit" class="btn btn-primary" disabled={loading}>
             {#if loading}
               <span class="spinner-sm"></span>
-              Sending...
+              Adding...
             {:else}
-              {sendEmail ? 'Send Invitation' : 'Add User'}
+              Add User
             {/if}
           </button>
         </div>
@@ -168,7 +183,7 @@
   }
   
   .modal-content {
-    background: white;
+    background: var(--card-bg, white);
     border-radius: 0.75rem;
     width: 100%;
     max-width: 500px;
@@ -189,6 +204,7 @@
     margin: 0;
     font-size: 1.5rem;
     font-weight: 600;
+    color: var(--text-primary);
   }
   
   .close-btn {
@@ -199,6 +215,7 @@
     opacity: 0.5;
     padding: 0.5rem;
     line-height: 1;
+    color: var(--text-primary);
   }
   
   .close-btn:hover:not(:disabled) {
@@ -226,12 +243,20 @@
     border: 1px solid var(--border-color);
     border-radius: 0.5rem;
     font-size: 1rem;
+    background: var(--input-bg, white);
+    color: var(--text-primary);
   }
   
   input:focus, select:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--brand-primary, #8b5cf6);
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+  }
+  
+  .hint {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
   }
   
   .role-description {
@@ -240,30 +265,35 @@
     color: var(--text-secondary);
   }
 
-  .checkbox-label {
+  .info-box {
     display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    cursor: pointer;
-    user-select: none;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
   }
 
-  .checkbox-label input[type="checkbox"] {
-    width: auto;
-    margin-top: 0.25rem;
-    cursor: pointer;
+  .info-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
   }
 
-  .checkbox-label span {
-    flex: 1;
+  .info-content p {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
     color: var(--text-primary);
   }
 
-  .hint {
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
+  .info-content ul {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-size: 0.85rem;
     color: var(--text-secondary);
-    font-style: italic;
+  }
+
+  .info-content li {
+    margin-bottom: 0.25rem;
   }
   
   .modal-actions {
@@ -292,13 +322,22 @@
   }
   
   .btn-primary {
-    background: var(--primary);
+    background: var(--brand-primary, #8b5cf6);
     color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
   }
   
   .btn-secondary {
-    background: var(--secondary);
-    color: white;
+    background: var(--bg-secondary, #6b7280);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-tertiary);
   }
   
   .alert {
@@ -311,9 +350,9 @@
   }
   
   .alert-error {
-    background: #fee;
-    border: 1px solid #fcc;
-    color: #c00;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #dc2626;
   }
   
   .success-message {
@@ -334,6 +373,16 @@
   
   .success-message p {
     color: var(--text-secondary);
+    margin: 0.5rem 0;
+  }
+
+  .email-note {
+    margin-top: 1rem !important;
+    padding: 0.75rem 1rem;
+    background: rgba(34, 197, 94, 0.1);
+    border-radius: 0.5rem;
+    color: #16a34a !important;
+    font-weight: 500;
   }
   
   .spinner-sm {
@@ -349,4 +398,3 @@
     to { transform: rotate(360deg); }
   }
 </style>
-

@@ -24,6 +24,7 @@ const {
 const { isPlatformAdminUser } = require('./role-auth-middleware');
 const { getCreatableRoles, canManageRole, determineRoleFromEmail } = require('../../config/user-hierarchy');
 const { isPlatformAdminEmail } = require('../../utils/platformAdmin');
+const emailService = require('../../services/emailService');
 
 const router = express.Router();
 
@@ -327,7 +328,8 @@ router.post('/invite', requireAdmin, async (req, res) => {
       tenantId,
       customModuleAccess,
       autoAssign = false,
-      sendEmail = false // Email sending is optional - tenant admin decides
+      sendEmail = true, // Always send welcome email by default
+      displayName = ''
     } = req.body;
     
     // Validate input
@@ -453,17 +455,43 @@ router.post('/invite', requireAdmin, async (req, res) => {
       console.log(`📧 Created invitation for ${email} (user doesn't exist yet)`);
     }
     
-    // Send invitation email only if requested by tenant admin
+    // Send welcome email with login instructions
     let emailSent = false;
     if (sendEmail) {
       try {
-        // TODO: Implement email sending via SendGrid, AWS SES, or Firebase Extensions
-        // This is optional - email systems may not be configured
-        console.log(`📧 Email sending requested for ${email} (not implemented yet)`);
-        // emailSent = await sendInvitationEmail(email, tenantId, resolvedRole);
-        emailSent = false; // Set to true when email service is implemented
+        // Get tenant name for the email
+        let tenantName = 'Your Organization';
+        try {
+          const Tenant = require('../../models/tenant');
+          const tenant = await Tenant.findById(tenantId);
+          tenantName = tenant?.displayName || tenant?.name || tenantName;
+        } catch (e) {
+          console.warn('Could not fetch tenant name for email:', e.message);
+        }
+
+        // Get inviter's name
+        let invitedByName = '';
+        try {
+          const inviterRecord = await auth.getUser(req.user.uid);
+          invitedByName = inviterRecord.displayName || inviterRecord.email?.split('@')[0] || '';
+        } catch (e) {
+          console.warn('Could not fetch inviter name:', e.message);
+        }
+
+        const emailResult = await emailService.sendWelcomeEmail({
+          email,
+          displayName: displayName || email.split('@')[0],
+          tenantName,
+          role: resolvedRole,
+          invitedByName
+        });
+        
+        emailSent = emailResult.sent;
+        if (!emailResult.sent) {
+          console.log(`📧 Welcome email not sent: ${emailResult.reason}`);
+        }
       } catch (emailError) {
-        console.error('Failed to send invitation email:', emailError);
+        console.error('Failed to send welcome email:', emailError);
         // Don't fail the request if email sending fails
       }
     }
