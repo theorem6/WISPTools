@@ -5,10 +5,12 @@
 
 const express = require('express');
 const { Tenant } = require('../models/tenant');
-const { requireAuth, requireAdmin: requireAdminMiddleware } = require('../middleware/admin-auth');
+const { requireAuth, requireAdmin } = require('../middleware/admin-auth');
 
 const router = express.Router();
-const requireAdmin = requireAdminMiddleware();
+
+// Create admin middleware with default options
+const requireAdminMiddleware = requireAdmin();
 
 /**
  * GET /api/branding/:tenantId
@@ -104,7 +106,7 @@ router.get('/:tenantId', async (req, res) => {
  * PUT /api/branding/:tenantId
  * Update tenant branding (admin only)
  */
-router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
+router.put('/:tenantId', requireAuth, requireAdminMiddleware, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const brandingData = req.body;
@@ -189,7 +191,7 @@ router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
  * POST /api/branding/:tenantId/logo
  * Upload logo (admin only)
  */
-router.post('/:tenantId/logo', requireAuth, requireAdmin, async (req, res) => {
+router.post('/:tenantId/logo', requireAuth, requireAdminMiddleware, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { logoUrl, altText } = req.body;

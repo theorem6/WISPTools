@@ -126,7 +126,14 @@ app.use('/api/snmp', require('./routes/snmp'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
 app.use('/api/system', require('./routes/system'));
 app.use('/api/permissions', require('./routes/permissions')); // FCAPS permission management
-app.use('/api/branding', require('./routes/branding-api')); // Branding API for customer portal
+// Branding API for customer portal
+try {
+  const brandingRouter = require('./routes/branding-api');
+  app.use('/api/branding', brandingRouter);
+  console.log('✅ Branding API enabled');
+} catch (error) {
+  console.error('❌ Failed to load Branding API:', error);
+}
 app.use('/api/customer-portal', require('./routes/customer-portal-api')); // Customer portal API
 app.use('/api/portal', require('./routes/portal-domain')); // Portal domain routing
 // Enable billing API (with graceful handling if PayPal not configured)
