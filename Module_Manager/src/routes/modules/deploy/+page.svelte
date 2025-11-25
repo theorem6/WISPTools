@@ -234,6 +234,56 @@ import '$lib/styles/moduleHeaderMenu.css';
     }
   }
 
+  // Deactivate plan - hide plan from map
+  async function deactivatePlan(plan: PlanProject) {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) return;
+    
+    try {
+      isLoadingPlans = true;
+      
+      // Deactivate the plan
+      await planService.updatePlan(plan.id, { showOnMap: false });
+      
+      // Remove from visible plans
+      visiblePlanIds.delete(plan.id);
+      visiblePlanIds = new Set(visiblePlanIds);
+      
+      // Reload plans to update state
+      await loadReadyPlans();
+      
+      // If this was the active plan on the map, clear it
+      if (mapState?.activePlan?.id === plan.id) {
+        // Try to load another active plan, or clear the map
+        const nextActivePlan = readyPlans.find(p => p.showOnMap && p.id !== plan.id);
+        if (nextActivePlan) {
+          await mapLayerManager.loadPlan(tenantId, nextActivePlan);
+        } else {
+          // Clear the plan from map if no other active plan
+          await mapLayerManager.loadProductionHardware(tenantId);
+        }
+      }
+      
+      deploymentMessage = `Plan "${plan.name}" has been deactivated.`;
+      setTimeout(() => (deploymentMessage = ''), 5000);
+    } catch (err: any) {
+      error = err.message || 'Failed to deactivate plan';
+      console.error('Error deactivating plan:', err);
+      setTimeout(() => (error = ''), 5000);
+    } finally {
+      isLoadingPlans = false;
+    }
+  }
+
+  // Toggle plan activation
+  async function togglePlanActivation(plan: PlanProject) {
+    if (plan.showOnMap) {
+      await deactivatePlan(plan);
+    } else {
+      await activatePlan(plan);
+    }
+  }
+
   // Take over plan - mark approved plan as deployed
   async function takeOverPlan(plan: PlanProject) {
     if (plan.status !== 'approved' && plan.status !== 'authorized') {
@@ -663,16 +713,15 @@ import '$lib/styles/moduleHeaderMenu.css';
                     </div>
                   </div>
                   <div class="plan-actions">
-                    {#if !plan.showOnMap}
-                      <button 
-                        class="btn-activate" 
-                        on:click={() => activatePlan(plan)}
-                        disabled={isLoadingPlans}
-                        title="Activate this plan to view it on the map"
-                      >
-                        📍 Activate
-                      </button>
-                    {/if}
+                    <button 
+                      class="btn-activate" 
+                      class:btn-deactivate={plan.showOnMap}
+                      on:click={() => togglePlanActivation(plan)}
+                      disabled={isLoadingPlans}
+                      title={plan.showOnMap ? "Deactivate this plan to hide it from the map" : "Activate this plan to view it on the map"}
+                    >
+                      {plan.showOnMap ? '❌ Deactivate' : '📍 Activate'}
+                    </button>
                     {#if plan.status === 'draft' || plan.status === 'active'}
                       <button 
                         class="btn-finalize" 
@@ -998,6 +1047,16 @@ import '$lib/styles/moduleHeaderMenu.css';
 
   .btn-activate:hover:not(:disabled) {
     background: var(--info-hover, #2563eb);
+    transform: translateY(-1px);
+  }
+
+  .btn-activate.btn-deactivate {
+    background: var(--danger, #ef4444);
+    color: white;
+  }
+
+  .btn-activate.btn-deactivate:hover:not(:disabled) {
+    background: var(--danger-hover, #dc2626);
     transform: translateY(-1px);
   }
 
