@@ -1,99 +1,94 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { currentTenant } from '$lib/stores/tenantStore';
   import { brandingService } from '$lib/services/brandingService';
-  import { customerAuthService } from '$lib/services/customerAuthService';
   import { goto } from '$app/navigation';
-  import type { Customer } from '$lib/services/customerService';
-  
+  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
+
   type WizardStep = 'welcome' | 'domain' | 'branding' | 'features' | 'complete';
-  
+
   let currentStep: WizardStep = 'welcome';
   let loading = false;
   let saving = false;
   let error = '';
   let success = '';
-  let customer: Customer | null = null;
   let tenantId = '';
   let tenantName = '';
-  
+
   // Domain configuration
   let customDomain = '';
   let enableCustomDomain = false;
   let portalSubdomain = '';
   let portalUrl = '';
-  
+
   // Branding
   let companyName = '';
   let logoUrl = '';
   let primaryColor = '#3b82f6';
   let supportEmail = '';
   let supportPhone = '';
-  
+
   // Features
   let enableFAQ = true;
   let enableServiceStatus = true;
   let enableLiveChat = false;
   let enableKnowledgeBase = false;
 
-  onMount(async () => {
-    // Check customer authentication
-    loading = true;
-    try {
-      customer = await customerAuthService.getCurrentCustomer();
-      
-      if (!customer) {
-        // Redirect to customer portal login
-        goto('/modules/customers/portal/login');
-        return;
+  let initializedTenantId = '';
+
+  onMount(() => {
+    const unsubscribe = currentTenant.subscribe(async (tenant) => {
+      if (tenant?.id && tenant.id !== initializedTenantId) {
+        initializedTenantId = tenant.id;
+        tenantId = tenant.id;
+        tenantName = tenant.displayName || tenant.name || '';
+        companyName = tenantName || companyName;
+        supportEmail = tenant.contactEmail || supportEmail;
+        await loadExistingConfig();
       }
-      
-      // Get tenant ID from customer
-      tenantId = customer.tenantId;
-      tenantName = customer.fullName || customer.firstName || 'Your Company';
-      
-      // Load existing configuration
-      await loadExistingConfig();
-    } catch (err: any) {
-      console.error('Error initializing:', err);
-      error = 'Failed to load portal setup. Please try again.';
-      goto('/modules/customers/portal/login');
-    } finally {
-      loading = false;
-    }
+    });
+
+    return () => unsubscribe();
   });
-  
+
   async function loadExistingConfig() {
-    if (!tenantId) return;
-    
+    if (!tenantId) {
+      error = 'No tenant selected. Please select a tenant to configure the portal.';
+      return;
+    }
+
     loading = true;
     try {
       const branding = await brandingService.getTenantBranding(tenantId);
-      
+
       // Load existing configuration
       enableCustomDomain = branding.portal?.enableCustomDomain || false;
       customDomain = branding.portal?.customDomain || '';
       // Use tenant ID (first 12 chars) as portal path
       portalSubdomain = branding.portal?.portalSubdomain || tenantId.slice(0, 12);
       portalUrl = branding.portal?.portalUrl || `https://wisptools.io/portal/${portalSubdomain}`;
-      
+
       // Get company name from tenant branding or use tenant name
-      companyName = branding.company?.name || tenantName;
+      companyName = branding.company?.name || tenantName || companyName;
       logoUrl = branding.logo?.url || '';
       primaryColor = branding.colors?.primary || '#3b82f6';
-      supportEmail = branding.company?.supportEmail || customer?.email || '';
+      supportEmail = branding.company?.supportEmail || supportEmail;
       supportPhone = branding.company?.supportPhone || '';
-      
+
       enableFAQ = branding.features?.enableFAQ !== false;
       enableServiceStatus = branding.features?.enableServiceStatus !== false;
       enableLiveChat = branding.features?.enableLiveChat || false;
       enableKnowledgeBase = branding.features?.enableKnowledgeBase || false;
-      
+
       // If already configured, show complete step
       if (branding.portal?.customDomain || branding.logo?.url) {
         currentStep = 'complete';
+      } else {
+        currentStep = 'welcome';
       }
     } catch (err: any) {
       console.error('Error loading config:', err);
+      error = err.message || 'Failed to load existing configuration.';
     } finally {
       loading = false;
     }
@@ -120,7 +115,10 @@
   }
   
   async function saveConfiguration() {
-    if (!tenantId) return;
+    if (!tenantId) {
+      error = 'No tenant selected. Please select a tenant before saving.';
+      return;
+    }
     
     saving = true;
     error = '';
@@ -182,19 +180,13 @@
   }
 </script>
 
-{#if loading}
-  <div class="loading-container">
-    <div class="spinner"></div>
-    <p>Loading portal setup...</p>
-  </div>
-{:else if !customer}
-  <div class="error-container">
-    <p>You must be logged in as a customer to access this page.</p>
-    <button class="btn-primary" on:click={() => goto('/modules/customers/portal/login')}>
-      Go to Login
-    </button>
-  </div>
-{:else}
+<TenantGuard>
+  {#if loading}
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading portal setup...</p>
+    </div>
+  {:else}
   <div class="portal-setup-page">
     <div class="setup-header">
       <h1>🌐 Customer Portal Setup Wizard</h1>
@@ -455,7 +447,8 @@
       {/if}
     </div>
   </div>
-{/if}
+  {/if}
+</TenantGuard>
 
 <style>
   .portal-setup-page {
