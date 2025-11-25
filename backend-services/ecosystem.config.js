@@ -20,7 +20,15 @@ module.exports = {
         FIREBASE_SERVICE_ACCOUNT_KEY: '/opt/lte-pci-mapper/backend-services/wisptools-production-firebase-adminsdk.json',
         ARCGIS_API_KEY: 'AAPT85fOqywZsicJupSmVSCGrjWNNjURUpnE--wnh6GZUrdoxPtDwnuleQ7w-D3IjAfeg3sWvEIvfQitmq894hp5hUN7nAsjLja-hlpzZZekEgdf3besreVsmrBJqy9c2XCRMc5EnBZyP60U1Lhf6E4ZrPWlOoxUWLIe8cCoNPI1Zh9VL1o_1wRQglmdGLTqx9vbHon7Pa_hZyTKQxvVC2stN7sZKy4quJ6kiAtW1QpqwOo.AT2_12sjSDHZ',
         ARCGIS_OAUTH_CLIENT_ID: 'lkx9ZLDmdfe5OLYA',
-        ARCGIS_OAUTH_CLIENT_SECRET: 'f544f0139944426bb3901601f2aebd4b'
+        ARCGIS_OAUTH_CLIENT_SECRET: 'f544f0139944426bb3901601f2aebd4b',
+        // Email configuration - Google Workspace SMTP Relay
+        SMTP_HOST: 'smtp.gmail.com',
+        SMTP_PORT: '587',
+        SMTP_SECURE: 'false',
+        SMTP_USER: 'noreply@wisptools.io',
+        SMTP_PASS: 'gaej lyex xydt efyp',
+        FROM_EMAIL: 'noreply@wisptools.io',
+        FROM_NAME: 'WISPTools'
       },
       error_file: '/home/david/.pm2/logs/main-api-error.log',
       out_file: '/home/david/.pm2/logs/main-api-out.log',
