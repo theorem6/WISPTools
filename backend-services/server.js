@@ -129,9 +129,16 @@ app.use('/api/permissions', require('./routes/permissions')); // FCAPS permissio
 // Branding API for customer portal
 try {
   const brandingRouter = require('./routes/branding-api');
+  console.log('[Server] Branding router loaded:', {
+    type: typeof brandingRouter,
+    isFunction: typeof brandingRouter === 'function',
+    hasStack: !!brandingRouter.stack,
+    stackLength: brandingRouter.stack ? brandingRouter.stack.length : 0
+  });
   app.use('/api/branding', brandingRouter);
   console.log('✅ Branding API enabled at /api/branding');
   console.log('   Registered routes: GET /:tenantId, PUT /:tenantId, POST /:tenantId/logo');
+  console.log('   Router stack after mount:', brandingRouter.stack ? brandingRouter.stack.map(r => `${r.route?.methods || '?'} ${r.route?.path || r.regexp}`).join(', ') : 'no stack');
 } catch (error) {
   console.error('❌ Failed to load Branding API:', error);
   console.error('   Error stack:', error.stack);

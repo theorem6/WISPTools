@@ -18,6 +18,12 @@ console.log('  GET /api/branding/:tenantId');
 console.log('  PUT /api/branding/:tenantId');
 console.log('  POST /api/branding/:tenantId/logo');
 
+// Test route to verify router is working
+router.get('/test', (req, res) => {
+  console.log('[Branding API] Test route hit!');
+  res.json({ message: 'Branding API router is working', path: req.path, url: req.url });
+});
+
 /**
  * GET /api/branding/:tenantId
  * Get tenant branding (public endpoint for customer portal)
@@ -122,7 +128,8 @@ router.put('/:tenantId', (req, res, next) => {
     originalUrl: req.originalUrl,
     params: req.params,
     tenantId: req.params.tenantId,
-    route: '/:tenantId'
+    route: '/:tenantId',
+    routerStack: router.stack ? router.stack.length : 'no stack'
   });
   next();
 }, requireAuth, requireAdminMiddleware, async (req, res) => {
