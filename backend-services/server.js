@@ -135,10 +135,29 @@ try {
     hasStack: !!brandingRouter.stack,
     stackLength: brandingRouter.stack ? brandingRouter.stack.length : 0
   });
+  // Mount the router - this should match /api/branding/* routes
   app.use('/api/branding', brandingRouter);
   console.log('✅ Branding API enabled at /api/branding');
   console.log('   Registered routes: GET /:tenantId, PUT /:tenantId, POST /:tenantId/logo');
-  console.log('   Router stack after mount:', brandingRouter.stack ? brandingRouter.stack.map(r => `${r.route?.methods || '?'} ${r.route?.path || r.regexp}`).join(', ') : 'no stack');
+  console.log('   Router stack after mount:', brandingRouter.stack ? brandingRouter.stack.map(r => {
+    const methods = r.route ? Object.keys(r.route.methods).join(',') : '?';
+    const path = r.route ? r.route.path : (r.regexp ? r.regexp.toString() : '?');
+    return `${methods} ${path}`;
+  }).join(', ') : 'no stack');
+  
+  // Add a test to verify the router is actually being used
+  app.get('/api/branding-debug', (req, res) => {
+    res.json({
+      routerType: typeof brandingRouter,
+      hasStack: !!brandingRouter.stack,
+      stackLength: brandingRouter.stack ? brandingRouter.stack.length : 0,
+      stack: brandingRouter.stack ? brandingRouter.stack.map(r => ({
+        methods: r.route ? Object.keys(r.route.methods) : [],
+        path: r.route ? r.route.path : 'unknown',
+        regexp: r.regexp ? r.regexp.toString() : 'none'
+      })) : []
+    });
+  });
 } catch (error) {
   console.error('❌ Failed to load Branding API:', error);
   console.error('   Error stack:', error.stack);
