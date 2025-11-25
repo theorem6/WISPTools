@@ -327,10 +327,10 @@ import '$lib/styles/moduleHeaderMenu.css';
 
   // Plan approval functions
   function openPlanApproval() {
+    // Always show the list first - don't auto-select a plan
+    selectedPlan = null;
+    approvalMode = null;
     showPlanApprovalModal = true;
-    if (readyPlans.length > 0 && !selectedPlan) {
-      selectedPlan = readyPlans[0];
-    }
   }
 
   function closePlanApprovalModal() {
@@ -340,6 +340,7 @@ import '$lib/styles/moduleHeaderMenu.css';
   }
 
   function selectPlanForApproval(plan: PlanProject) {
+    // Select the plan and show the approval modal
     selectedPlan = plan;
     showPlanApprovalModal = true;
   }
@@ -616,8 +617,8 @@ import '$lib/styles/moduleHeaderMenu.css';
   <!-- TODO: replace placeholder SharedMap overlay with interactive map layers -->
   <!-- TODO: integrate deploy task assignment workflow once backend endpoints are ready -->
   
-  <!-- Plan Selection Modal (if no plan selected) -->
-  {#if showPlanApprovalModal && !selectedPlan && readyPlans.length > 0}
+  <!-- Plan Selection Modal (shows list of all plans) -->
+  {#if showPlanApprovalModal && !selectedPlan}
     <div class="modal-overlay" on:click={closePlanApprovalModal}>
       <div class="plan-list-modal" on:click|stopPropagation>
         <div class="modal-header">
