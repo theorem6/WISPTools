@@ -1,7 +1,14 @@
 <script lang="ts">
   import GlobalSettings from './GlobalSettings.svelte';
+  import { page } from '$app/stores';
   
   let showSettings = false;
+  
+  // Check if we're in plan or deploy module
+  $: isPlanOrDeploy = (() => {
+    const path = $page.url.pathname;
+    return path.includes('/modules/plan') || path.includes('/modules/deploy');
+  })();
   
   function openSettings() {
     showSettings = true;
@@ -12,7 +19,12 @@
   }
 </script>
 
-<button class="settings-button" on:click={openSettings} title="Settings">
+<button 
+  class="settings-button" 
+  class:plan-deploy-mode={isPlanOrDeploy}
+  on:click={openSettings} 
+  title="Settings"
+>
   ⚙️
 </button>
 
@@ -41,6 +53,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  
+  .settings-button.plan-deploy-mode {
+    bottom: 3rem;
+    right: auto;
+    left: 2rem;
   }
   
   .settings-button:hover {

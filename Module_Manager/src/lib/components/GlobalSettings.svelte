@@ -2,10 +2,17 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { authService } from '$lib/services/authService';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   
   export let show = false;
   
   const dispatch = createEventDispatcher();
+  
+  // Check if we're in plan or deploy module
+  $: isPlanOrDeploy = (() => {
+    const path = $page.url.pathname;
+    return path.includes('/modules/plan') || path.includes('/modules/deploy');
+  })();
   
   import ImportSystem from './ImportSystem.svelte';
   import UserManagementEmbedded from './UserManagementEmbedded.svelte';
@@ -127,22 +134,14 @@
     saveError = '';
     dispatch('close');
   }
-
-  function handleExit() {
-    handleClose();
-    goto('/dashboard');
-  }
 </script>
 
 {#if show}
   <div class="settings-overlay" on:click={handleClose}>
-    <div class="settings-panel" on:click|stopPropagation>
+    <div class="settings-panel" class:plan-deploy-mode={isPlanOrDeploy} on:click|stopPropagation>
       <div class="settings-header">
         <h2>⚙️ Settings</h2>
         <div class="header-actions">
-          <button class="exit-btn" on:click={handleExit} title="Exit to Modules">
-            ← Exit to Modules
-          </button>
           <button class="close-btn" on:click={handleClose} title="Close">✕</button>
         </div>
       </div>
@@ -417,7 +416,14 @@
     overflow: hidden;
     margin-bottom: 9.5rem;
     margin-right: 2rem;
+    margin-left: auto;
     animation: slideUp 0.2s ease-out;
+  }
+  
+  .settings-panel.plan-deploy-mode {
+    margin-bottom: 4rem;
+    margin-right: auto;
+    margin-left: 2rem;
   }
 
   @keyframes slideUp {
@@ -453,23 +459,6 @@
     gap: 1rem;
   }
 
-  .exit-btn {
-    background: var(--primary, #3b82f6);
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 0.85rem;
-    transition: all 0.2s;
-  }
-
-  .exit-btn:hover {
-    background: var(--primary-dark, #2563eb);
-    transform: translateY(-1px);
-  }
-  
   .close-btn {
     background: var(--bg-hover, #e2e8f0);
     border: none;
