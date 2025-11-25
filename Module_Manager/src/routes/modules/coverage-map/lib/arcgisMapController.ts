@@ -907,7 +907,7 @@ export class CoverageMapController {
 
     const isMobile = window.innerWidth <= 768;
     
-    // Check if we're in plan mode - if so, don't show LayerList (we have custom filter panel)
+    // Check if we're in plan mode or deploy mode - if so, don't show LayerList (we have custom filter panel or it's not needed)
     const isPlanMode = (() => {
       if (typeof window === 'undefined') return false;
       const urlParams = new URLSearchParams(window.location.search);
@@ -918,14 +918,23 @@ export class CoverageMapController {
       return urlParams.get('planMode') === 'true';
     })();
 
+    const isDeployMode = (() => {
+      if (typeof window === 'undefined') return false;
+      const urlParams = new URLSearchParams(window.location.search);
+      const modeParam = urlParams.get('mode');
+      return modeParam?.toLowerCase() === 'deploy' || urlParams.get('deployMode') === 'true';
+    })();
+
+    const shouldHideLayerList = isPlanMode || isDeployMode;
+
     try {
       const imports = [
         import('@arcgis/core/widgets/Zoom.js'),
         import('@arcgis/core/widgets/Compass.js')
       ];
       
-      // Only import LayerList if not in plan mode
-      if (!isPlanMode) {
+      // Only import LayerList if not in plan mode or deploy mode
+      if (!shouldHideLayerList) {
         imports.push(import('@arcgis/core/widgets/LayerList.js'));
       }
       
@@ -935,7 +944,7 @@ export class CoverageMapController {
         ...rest
       ] = await Promise.all(imports);
       
-      const LayerList = !isPlanMode ? rest[0]?.default : null;
+      const LayerList = !shouldHideLayerList ? rest[0]?.default : null;
 
       const zoom = new Zoom({
         view: this.mapView,
@@ -947,8 +956,8 @@ export class CoverageMapController {
         index: 0
       });
 
-      // Only add LayerList widget if not in plan mode (plan mode has custom filter panel)
-      if (!isPlanMode && LayerList) {
+      // Only add LayerList widget if not in plan mode or deploy mode (plan mode has custom filter panel, deploy mode doesn't need it)
+      if (!shouldHideLayerList && LayerList) {
         const layerList = new LayerList({
           view: this.mapView,
           listItemCreatedFunction: (event) => {
