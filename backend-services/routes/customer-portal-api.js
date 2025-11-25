@@ -9,7 +9,7 @@ const { auth } = require('../config/firebase');
 const { Customer } = require('../models/customer');
 const { UserTenant } = require('../models/user');
 const { WorkOrder } = require('../models/work-order');
-const { requireAuth } = require('./middleware/admin-auth');
+const { requireAuth } = require('../middleware/admin-auth');
 
 const router = express.Router();
 

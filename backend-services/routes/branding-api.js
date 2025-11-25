@@ -5,7 +5,7 @@
 
 const express = require('express');
 const { Tenant } = require('../models/tenant');
-const { requireAuth, requireAdmin: requireAdminMiddleware } = require('./middleware/admin-auth');
+const { requireAuth, requireAdmin: requireAdminMiddleware } = require('../middleware/admin-auth');
 
 const router = express.Router();
 const requireAdmin = requireAdminMiddleware();
