@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { portalBranding } from '$lib/stores/portalBranding';
   import { brandingService, type TenantBranding } from '$lib/services/brandingService';
   import { customerAuthService } from '$lib/services/customerAuthService';
   import BrandedHeader from './components/BrandedHeader.svelte';
@@ -13,6 +14,7 @@
   let isAuthenticated = false;
   
   onMount(async () => {
+    portalBranding.set(null);
     // Try to detect tenant from domain or URL params
     let tenantId = $currentTenant?.id;
     
@@ -50,23 +52,28 @@
       try {
         branding = await brandingService.getTenantBranding(tenantId);
         brandingService.applyBrandingToDocument(branding);
+        portalBranding.set(branding);
       } catch (error) {
         console.error('Error loading branding:', error);
         branding = brandingService.getDefaultBranding();
         brandingService.applyBrandingToDocument(branding);
+        portalBranding.set(branding);
       }
     } else if ($currentTenant) {
       try {
         branding = await brandingService.getTenantBranding($currentTenant.id);
         brandingService.applyBrandingToDocument(branding);
+        portalBranding.set(branding);
       } catch (error) {
         console.error('Error loading branding:', error);
         branding = brandingService.getDefaultBranding();
         brandingService.applyBrandingToDocument(branding);
+        portalBranding.set(branding);
       }
     } else {
       branding = brandingService.getDefaultBranding();
       brandingService.applyBrandingToDocument(branding);
+      portalBranding.set(branding);
     }
     
     loading = false;

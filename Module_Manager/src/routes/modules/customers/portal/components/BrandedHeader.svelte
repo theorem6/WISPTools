@@ -2,10 +2,17 @@
   import { customerAuthService } from '$lib/services/customerAuthService';
   import { goto } from '$app/navigation';
   import type { TenantBranding } from '$lib/services/brandingService';
+  import { portalBranding } from '$lib/stores/portalBranding';
   
   export let branding: TenantBranding | null = null;
   
   let currentCustomer: any = null;
+  let featureFlags = {
+    faq: true,
+    serviceStatus: true,
+    knowledgeBase: false,
+    liveChat: false
+  };
   
   async function loadCustomer() {
     currentCustomer = await customerAuthService.getCurrentCustomer();
@@ -20,6 +27,13 @@
   $: if (branding) {
     loadCustomer();
   }
+
+  $: featureFlags = {
+    faq: $portalBranding?.features?.enableFAQ !== false,
+    serviceStatus: $portalBranding?.features?.enableServiceStatus !== false,
+    knowledgeBase: !!$portalBranding?.features?.enableKnowledgeBase,
+    liveChat: !!$portalBranding?.features?.enableLiveChat
+  };
 </script>
 
 <header class="branded-header">
@@ -38,7 +52,18 @@
       <nav class="header-nav">
         <a href="/modules/customers/portal/dashboard" class="nav-link">Dashboard</a>
         <a href="/modules/customers/portal/tickets" class="nav-link">Tickets</a>
-        <a href="/modules/customers/portal/service" class="nav-link">Service</a>
+        {#if featureFlags.serviceStatus}
+          <a href="/modules/customers/portal/service" class="nav-link">Service Status</a>
+        {/if}
+        {#if featureFlags.faq}
+          <a href="/modules/customers/portal/faq" class="nav-link">FAQ</a>
+        {/if}
+        {#if featureFlags.knowledgeBase}
+          <a href="/modules/customers/portal/knowledge" class="nav-link">Knowledge Base</a>
+        {/if}
+        {#if featureFlags.liveChat}
+          <a href="/modules/customers/portal/live-chat" class="nav-link">Live Chat</a>
+        {/if}
         <div class="user-menu">
           <span class="user-name">{currentCustomer.fullName || currentCustomer.firstName}</span>
           <button on:click={handleLogout} class="logout-btn">Logout</button>

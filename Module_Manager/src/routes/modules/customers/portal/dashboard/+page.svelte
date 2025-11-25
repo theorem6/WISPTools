@@ -4,12 +4,19 @@
   import { customerPortalService } from '$lib/services/customerPortalService';
   import { goto } from '$app/navigation';
   import type { WorkOrder } from '$lib/services/workOrderService';
+  import { portalBranding } from '$lib/stores/portalBranding';
   
   let customer: any = null;
   let tickets: WorkOrder[] = [];
   let serviceInfo: any = null;
   let loading = true;
   let error = '';
+  let featureFlags = {
+    faq: true,
+    serviceStatus: true,
+    knowledgeBase: false,
+    liveChat: false
+  };
   
   // Stats
   let stats = {
@@ -48,6 +55,13 @@
     }
   });
   
+  $: featureFlags = {
+    faq: $portalBranding?.features?.enableFAQ !== false,
+    serviceStatus: $portalBranding?.features?.enableServiceStatus !== false,
+    knowledgeBase: !!$portalBranding?.features?.enableKnowledgeBase,
+    liveChat: !!$portalBranding?.features?.enableLiveChat
+  };
+
   function getStatusColor(status: string) {
     const colors: Record<string, string> = {
       'open': '#3b82f6',
@@ -99,6 +113,39 @@
         View All Tickets
       </a>
     </div>
+    
+    {#if featureFlags.faq || featureFlags.serviceStatus || featureFlags.knowledgeBase || featureFlags.liveChat}
+      <div class="support-tools">
+        {#if featureFlags.serviceStatus}
+          <div class="support-card">
+            <h3>Service Status &amp; Outages</h3>
+            <p>Check real-time service health, scheduled maintenance, and network alerts.</p>
+            <a class="support-link" href="/modules/customers/portal/service">View Status</a>
+          </div>
+        {/if}
+        {#if featureFlags.faq}
+          <div class="support-card">
+            <h3>FAQ &amp; Help Center</h3>
+            <p>Browse answers to the most common account, billing, and technical questions.</p>
+            <a class="support-link" href="/modules/customers/portal/faq">Visit FAQ</a>
+          </div>
+        {/if}
+        {#if featureFlags.knowledgeBase}
+          <div class="support-card">
+            <h3>Knowledge Base</h3>
+            <p>Step-by-step guides and tutorials curated by { $portalBranding?.company?.displayName || 'our team' }.</p>
+            <a class="support-link" href="/modules/customers/portal/knowledge">Browse Articles</a>
+          </div>
+        {/if}
+        {#if featureFlags.liveChat}
+          <div class="support-card">
+            <h3>Live Chat Support</h3>
+            <p>Connect with a support specialist for hands-on troubleshooting.</p>
+            <a class="support-link" href="/modules/customers/portal/live-chat">Start Chat</a>
+          </div>
+        {/if}
+      </div>
+    {/if}
     
     {#if tickets.length > 0}
       <div class="recent-tickets">
@@ -208,6 +255,50 @@
     display: flex;
     gap: 1rem;
     margin-bottom: 2rem;
+  }
+
+  .support-tools {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .support-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .support-card h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--brand-text, #111827);
+  }
+
+  .support-card p {
+    margin: 0;
+    color: var(--brand-text-secondary, #6b7280);
+    line-height: 1.4;
+  }
+
+  .support-link {
+    margin-top: auto;
+    align-self: flex-start;
+    color: var(--brand-primary, #3b82f6);
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 0.1rem;
+  }
+
+  .support-link:hover {
+    border-color: currentColor;
   }
   
   .btn-primary {

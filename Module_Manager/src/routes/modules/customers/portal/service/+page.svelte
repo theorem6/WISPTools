@@ -3,16 +3,27 @@
   import { goto } from '$app/navigation';
   import { customerPortalService } from '$lib/services/customerPortalService';
   import { customerAuthService } from '$lib/services/customerAuthService';
+  import { portalBranding } from '$lib/stores/portalBranding';
   
   let serviceInfo: any = null;
   let loading = true;
   let error = '';
+  let featureEnabled = true;
+
+  $: featureEnabled = ($portalBranding?.features?.enableServiceStatus !== false);
+  $: supportEmail = $portalBranding?.company?.supportEmail || 'support@example.com';
+  $: supportPhone = $portalBranding?.company?.supportPhone || '';
   
   onMount(async () => {
     try {
       const customer = await customerAuthService.getCurrentCustomer();
       if (!customer) {
         goto('/modules/customers/portal/login');
+        return;
+      }
+      
+      if (!featureEnabled) {
+        loading = false;
         return;
       }
       
@@ -27,6 +38,20 @@
 
 {#if loading}
   <div class="loading">Loading service information...</div>
+{:else if !featureEnabled}
+  <div class="feature-disabled">
+    <h1>Service Status Unavailable</h1>
+    <p>This tenant has disabled the Service Status &amp; Outages module for customer access.</p>
+    <p class="contact">
+      Please reach out to our support team for real-time updates:
+      <br />
+      <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+      {#if supportPhone}
+        <span> • </span>
+        <a href={`tel:${supportPhone}`}>{supportPhone}</a>
+      {/if}
+    </p>
+  </div>
 {:else if error}
   <div class="error">{error}</div>
 {:else}
@@ -207,6 +232,38 @@
   
   .error {
     color: #dc2626;
+  }
+
+  .feature-disabled {
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 3rem 2rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  }
+
+  .feature-disabled h1 {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+    color: var(--brand-text, #111827);
+  }
+
+  .feature-disabled p {
+    color: var(--brand-text-secondary, #6b7280);
+    line-height: 1.6;
+  }
+
+  .feature-disabled .contact {
+    margin-top: 1rem;
+  }
+
+  .feature-disabled a {
+    color: var(--brand-primary, #3b82f6);
+    text-decoration: none;
+    font-weight: 500;
   }
   
   @media (max-width: 768px) {
