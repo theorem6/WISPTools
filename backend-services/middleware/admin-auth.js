@@ -170,8 +170,22 @@ const requireAdmin = (options = {}) => {
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
       }
+
+      let effectiveRole = req.user.role;
       
-      if (!allowedRoles.includes(req.user.role)) {
+      if (!allowedRoles.includes(effectiveRole)) {
+        const tenantId = req.headers['x-tenant-id'] || req.tenantId || req.user.tenantId;
+        if (tenantId) {
+          const tenantRoleRecord = await UserTenant.findOne({ userId: req.user.uid, tenantId }).lean();
+          if (tenantRoleRecord && allowedRoles.includes(tenantRoleRecord.role)) {
+            effectiveRole = tenantRoleRecord.role;
+            req.user.role = effectiveRole;
+            req.user.tenantId = tenantId;
+          }
+        }
+      }
+      
+      if (!allowedRoles.includes(effectiveRole)) {
         console.warn(`Unauthorized admin access attempt by ${req.user.email} (role: ${req.user.role})`);
         return res.status(403).json({ 
           error: 'Admin access required',
