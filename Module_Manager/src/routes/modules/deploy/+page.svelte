@@ -601,8 +601,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     </div>
   {/if}
   
-  <!-- Global Settings Button -->
-  <SettingsButton />
+  <!-- Global Settings Button - Hidden in deploy mode, shown in coverage-map iframe instead -->
 </TenantGuard>
 
 <style>

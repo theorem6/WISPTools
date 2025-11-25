@@ -2624,8 +2624,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     </div>
   {/if}
   
-  <!-- Global Settings Button -->
-  <SettingsButton />
+  <!-- Global Settings Button - Hidden in plan mode, shown in coverage-map iframe instead -->
 </TenantGuard>
 
 <!-- TODO: integrate MapLayerManager feature CRUD controls for staging (site/equipment) -->
