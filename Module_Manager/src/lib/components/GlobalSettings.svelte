@@ -421,7 +421,7 @@
   }
   
   .settings-panel.plan-deploy-mode {
-    margin-bottom: 4rem;
+    margin-bottom: 3rem;
     margin-right: auto;
     margin-left: 2rem;
   }

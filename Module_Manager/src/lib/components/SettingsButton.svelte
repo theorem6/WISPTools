@@ -56,7 +56,7 @@
   }
   
   .settings-button.plan-deploy-mode {
-    bottom: 3rem;
+    bottom: 2rem;
     right: auto;
     left: 2rem;
   }
