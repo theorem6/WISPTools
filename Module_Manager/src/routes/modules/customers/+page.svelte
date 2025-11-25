@@ -655,12 +655,18 @@
     font-size: 0.85rem;
     cursor: pointer;
     transition: var(--transition);
+    text-decoration: none;
+    display: inline-block;
   }
   
   .btn-secondary {
     background: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
+  }
+  
+  a.btn-secondary {
+    text-decoration: none;
   }
   
   .btn-secondary:hover {
