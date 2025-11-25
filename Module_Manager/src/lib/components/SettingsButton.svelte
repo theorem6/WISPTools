@@ -7,7 +7,18 @@
   // Check if we're in plan or deploy module
   $: isPlanOrDeploy = (() => {
     const path = $page.url.pathname;
-    return path.includes('/modules/plan') || path.includes('/modules/deploy');
+    const modeParam = $page.url.searchParams.get('mode');
+    // Check pathname for direct plan/deploy pages
+    if (path.includes('/modules/plan') || path.includes('/modules/deploy')) {
+      return true;
+    }
+    // Check URL search params for coverage-map iframe mode
+    if (modeParam) {
+      const lowerMode = modeParam.toLowerCase();
+      return lowerMode === 'plan' || lowerMode === 'deploy';
+    }
+    // Check legacy planMode parameter
+    return $page.url.searchParams.get('planMode') === 'true';
   })();
   
   function openSettings() {
