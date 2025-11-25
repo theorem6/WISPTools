@@ -20,10 +20,23 @@ router.get('/:tenantId', async (req, res) => {
     
     console.log('[Branding API] Fetching branding for tenant:', tenantId);
     
-    const tenant = await Tenant.findOne({ 
-      _id: tenantId,
-      status: 'active'
-    }).select('branding displayName contactEmail name');
+    // Try to find tenant by ID (handle both string and ObjectId)
+    const mongoose = require('mongoose');
+    let tenant;
+    
+    // Check if tenantId is a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(tenantId)) {
+      tenant = await Tenant.findOne({ 
+        _id: new mongoose.Types.ObjectId(tenantId),
+        status: 'active'
+      }).select('branding displayName contactEmail name');
+    } else {
+      // If not valid ObjectId, try as string
+      tenant = await Tenant.findOne({ 
+        _id: tenantId,
+        status: 'active'
+      }).select('branding displayName contactEmail name');
+    }
     
     if (!tenant) {
       console.log('[Branding API] Tenant not found:', tenantId);
@@ -136,12 +149,11 @@ router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
       // Generate portal URL based on configuration
       if (brandingData.portal.enableCustomDomain && brandingData.portal.customDomain) {
         tenant.branding.portal.portalUrl = `https://${brandingData.portal.customDomain}`;
-      } else if (brandingData.portal.portalSubdomain || tenant.subdomain) {
-        const subdomain = brandingData.portal.portalSubdomain || tenant.subdomain;
-        tenant.branding.portal.portalSubdomain = subdomain;
-        tenant.branding.portal.portalUrl = `https://${subdomain}.wisptools.io/portal`;
       } else {
-        tenant.branding.portal.portalUrl = `/portal/${tenant._id}`;
+        // Use tenant ID (first 12 chars) as portal path
+        const portalPath = brandingData.portal.portalSubdomain || tenant._id.toString().slice(0, 12);
+        tenant.branding.portal.portalSubdomain = portalPath;
+        tenant.branding.portal.portalUrl = `https://wisptools.io/portal/${portalPath}`;
       }
     }
     

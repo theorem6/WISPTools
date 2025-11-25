@@ -48,8 +48,9 @@
       // Load existing configuration
       enableCustomDomain = branding.portal?.enableCustomDomain || false;
       customDomain = branding.portal?.customDomain || '';
-      portalSubdomain = $currentTenant.subdomain || '';
-      portalUrl = `https://${portalSubdomain}.wisptools.io/portal`;
+      // Use tenant ID (first 12 chars) as portal path
+      portalSubdomain = branding.portal?.portalSubdomain || $currentTenant.id.slice(0, 12);
+      portalUrl = branding.portal?.portalUrl || `https://wisptools.io/portal/${portalSubdomain}`;
       
       companyName = branding.company?.name || $currentTenant.displayName || '';
       logoUrl = branding.logo?.url || '';
@@ -101,9 +102,10 @@
     success = '';
     
     try {
-      // Generate portal subdomain if not using custom domain
+      // Generate portal path if not using custom domain
       if (!enableCustomDomain && !portalSubdomain) {
-        portalSubdomain = $currentTenant.subdomain || `tenant-${$currentTenant.id.slice(0, 8)}`;
+        // Use first 12 characters of tenant ID as portal path
+        portalSubdomain = $currentTenant.id.slice(0, 12);
       }
       
       await brandingService.updateTenantBranding($currentTenant.id, {
@@ -149,10 +151,9 @@
     if (enableCustomDomain && customDomain) {
       return `https://${customDomain}`;
     }
-    if (portalSubdomain) {
-      return `https://${portalSubdomain}.wisptools.io/portal`;
-    }
-    return `https://wisptools.io/portal/${$currentTenant?.id}`;
+    // Use tenant ID or generate a short code
+    const portalPath = portalSubdomain || $currentTenant?.id?.slice(0, 12) || 'portal';
+    return `https://wisptools.io/portal/${portalPath}`;
   }
 </script>
 
@@ -246,19 +247,21 @@
               </div>
             {:else}
               <div class="form-group">
-                <label>Portal Subdomain</label>
+                <label>Portal URL</label>
                 <div class="url-preview">
-                  <span class="url-prefix">https://</span>
+                  <span class="url-prefix">https://wisptools.io/portal/</span>
                   <input 
                     type="text" 
                     bind:value={portalSubdomain} 
-                    placeholder="your-company"
+                    placeholder="auto-generated"
                     class="form-input url-input"
+                    readonly
                   />
-                  <span class="url-suffix">.wisptools.io/portal</span>
                 </div>
                 <p class="help-text">
                   Your portal will be accessible at: <strong>{getPortalUrl()}</strong>
+                  <br />
+                  <small>This unique URL can be mapped to your custom domain, or used as-is.</small>
                 </p>
               </div>
             {/if}
