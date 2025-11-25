@@ -719,13 +719,7 @@ import '$lib/styles/moduleHeaderMenu.css';
     font-weight: 600;
   }
 
-  .module-control-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-1px);
-  }
-
-  .control-btn.disabled {
+  .module-control-btn.disabled {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
     color: rgba(255, 255, 255, 0.5);
@@ -733,7 +727,7 @@ import '$lib/styles/moduleHeaderMenu.css';
     opacity: 0.6;
   }
 
-  .control-btn.disabled:hover {
+  .module-control-btn.disabled:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
     transform: none;
