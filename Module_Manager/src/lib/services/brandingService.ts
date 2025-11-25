@@ -53,15 +53,33 @@ class BrandingService {
    */
   async getTenantBranding(tenantId: string): Promise<TenantBranding> {
     try {
-      const response = await fetch(`${API_URL}/branding/${tenantId}`);
+      const url = `${API_URL}/branding/${tenantId}`;
+      console.log('[BrandingService] Fetching branding:', { url, tenantId });
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch branding: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('[BrandingService] Branding fetch failed:', { 
+          status: response.status, 
+          statusText: response.statusText,
+          errorText: errorText.substring(0, 200)
+        });
+        
+        // If 404, tenant might not have branding yet - return defaults
+        if (response.status === 404) {
+          console.log('[BrandingService] Tenant branding not found, returning defaults');
+          return this.getDefaultBranding();
+        }
+        
+        throw new Error(`Failed to fetch branding: ${response.status} ${response.statusText}`);
       }
       
-      return await response.json();
+      const branding = await response.json();
+      console.log('[BrandingService] Branding loaded:', { hasBranding: !!branding });
+      return branding;
     } catch (error: any) {
-      console.error('Error fetching branding:', error);
+      console.error('[BrandingService] Error fetching branding:', error);
       // Return default branding on error
       return this.getDefaultBranding();
     }
@@ -75,21 +93,37 @@ class BrandingService {
       const authService = await import('$lib/services/authService');
       const token = await authService.authService.getIdToken();
       
-      const response = await fetch(`${API_URL}/branding/${tenantId}`, {
+      // Get tenant ID from localStorage for X-Tenant-ID header
+      const tenantIdHeader = localStorage.getItem('selectedTenantId') || tenantId;
+      
+      const url = `${API_URL}/branding/${tenantId}`;
+      console.log('[BrandingService] Updating branding:', { url, tenantId, hasToken: !!token });
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantIdHeader
         },
         body: JSON.stringify(branding)
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update branding');
+        let errorMessage = 'Failed to update branding';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || error.error || errorMessage;
+        } catch (e) {
+          const errorText = await response.text();
+          console.error('[BrandingService] Update error response:', errorText.substring(0, 200));
+        }
+        throw new Error(errorMessage);
       }
+      
+      console.log('[BrandingService] Branding updated successfully');
     } catch (error: any) {
-      console.error('Error updating branding:', error);
+      console.error('[BrandingService] Error updating branding:', error);
       throw error;
     }
   }

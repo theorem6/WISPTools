@@ -18,14 +18,22 @@ router.get('/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
     
+    console.log('[Branding API] Fetching branding for tenant:', tenantId);
+    
     const tenant = await Tenant.findOne({ 
       _id: tenantId,
       status: 'active'
-    }).select('branding displayName contactEmail');
+    }).select('branding displayName contactEmail name');
     
     if (!tenant) {
+      console.log('[Branding API] Tenant not found:', tenantId);
       return res.status(404).json({ error: 'Tenant not found' });
     }
+    
+    console.log('[Branding API] Tenant found:', { 
+      hasBranding: !!tenant.branding, 
+      displayName: tenant.displayName 
+    });
     
     // Return branding with defaults
     const branding = tenant.branding || {};
@@ -88,6 +96,8 @@ router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
     const { tenantId } = req.params;
     const brandingData = req.body;
     
+    console.log('[Branding API] Updating branding:', { tenantId, hasData: !!brandingData });
+    
     // Extract tenantId from request (set by middleware)
     const requestTenantId = req.tenantId || tenantId;
     
@@ -97,8 +107,11 @@ router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
     });
     
     if (!tenant) {
+      console.log('[Branding API] Tenant not found for update:', requestTenantId);
       return res.status(404).json({ error: 'Tenant not found' });
     }
+    
+    console.log('[Branding API] Tenant found, updating branding');
     
     // Update branding
     if (!tenant.branding) {
