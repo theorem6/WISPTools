@@ -68,7 +68,7 @@
   
   .settings-button.plan-deploy-mode {
     bottom: 1rem;
-    right: 1rem;
+    right: calc(1rem + 5rem);
     left: auto;
   }
   
