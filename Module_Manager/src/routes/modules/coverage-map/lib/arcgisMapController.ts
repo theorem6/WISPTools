@@ -1601,7 +1601,7 @@ export class CoverageMapController {
       }
 
       if (this.filters.showSectors) {
-        const filteredSectors = this.filterSectorsByBand(this.data.sectors);
+        const filteredSectors = this.filterSectorsByBand(this.data.sectors || []);
 
         filteredSectors.forEach(async sector => {
           const sectorPolygon = createSectorCone(
@@ -2264,6 +2264,9 @@ export class CoverageMapController {
   }
 
   private filterSectorsByBand(allSectors: Sector[]): Sector[] {
+    if (!allSectors || !Array.isArray(allSectors)) return [];
+    if (!this.filters.bandFilters || !Array.isArray(this.filters.bandFilters)) return allSectors;
+    
     const activeBandFilters = this.filters.bandFilters.filter(f => f.enabled);
     if (activeBandFilters.length === 0) return allSectors;
 

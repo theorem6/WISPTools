@@ -11,9 +11,10 @@ export class MonitoringService {
   private baseUrl: string;
 
   constructor() {
-    // GCE monitoring backend on port 3003
+    // Use Firebase proxy for all API requests (HTTPS) instead of direct GCE connection
+    // This avoids mixed content errors when the page is served over HTTPS
     this.baseUrl = browser ? 
-      (import.meta.env.VITE_MONITORING_BACKEND_URL || 'http://136.112.111.167:3003') : 
+      (import.meta.env.VITE_MONITORING_BACKEND_URL || '/api') : 
       '';
   }
 
