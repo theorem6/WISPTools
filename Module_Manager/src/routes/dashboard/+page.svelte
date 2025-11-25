@@ -200,8 +200,6 @@
 
     <!-- Settings Button - Top Right -->
     <SettingsButton />
-      </div>
-    </div>
 
     <!-- Main Content -->
     <div class="main-content">
@@ -270,9 +268,6 @@
 
     </div>
   </div>
-  
-  <!-- Global Settings Button - Rendered by SettingsButton component -->
-  <SettingsButton />
 </TenantGuard>
 
 <style>
