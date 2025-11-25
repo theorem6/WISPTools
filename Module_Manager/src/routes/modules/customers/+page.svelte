@@ -321,6 +321,14 @@
                 <button class="btn-secondary btn-sm" on:click={() => goto(`/modules/customers/${customer._id || customer.customerId}`)}>
                   👁️ View
                 </button>
+                <a 
+                  href="/modules/customers/portal/login" 
+                  target="_blank" 
+                  class="btn-secondary btn-sm"
+                  title="Open Customer Portal"
+                >
+                  🌐 Portal
+                </a>
               </div>
             </div>
           {/each}

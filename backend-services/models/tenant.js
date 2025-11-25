@@ -79,6 +79,54 @@ const tenantSchema = new mongoose.Schema({
     }
   },
   
+  // Customer Portal Branding
+  branding: {
+    // Logo & Visual Identity
+    logo: {
+      url: { type: String },
+      altText: { type: String, default: 'Company Logo' },
+      favicon: { type: String }
+    },
+    
+    // Colors
+    colors: {
+      primary: { type: String, default: '#3b82f6' },
+      secondary: { type: String, default: '#64748b' },
+      accent: { type: String, default: '#10b981' },
+      background: { type: String, default: '#ffffff' },
+      text: { type: String, default: '#111827' },
+      textSecondary: { type: String, default: '#6b7280' }
+    },
+    
+    // Company Information
+    company: {
+      name: { type: String },
+      displayName: { type: String },
+      supportEmail: { type: String },
+      supportPhone: { type: String },
+      supportHours: { type: String, default: 'Mon-Fri 8am-5pm' },
+      website: { type: String },
+      address: { type: String }
+    },
+    
+    // Portal Customization
+    portal: {
+      welcomeMessage: { type: String, default: 'Welcome to our Customer Portal' },
+      footerText: { type: String },
+      customCSS: { type: String },
+      enableCustomDomain: { type: Boolean, default: false },
+      customDomain: { type: String }
+    },
+    
+    // Features
+    features: {
+      enableFAQ: { type: Boolean, default: true },
+      enableServiceStatus: { type: Boolean, default: true },
+      enableLiveChat: { type: Boolean, default: false },
+      enableKnowledgeBase: { type: Boolean, default: false }
+    }
+  },
+  
   // Audit fields
   createdBy: {
     type: String,

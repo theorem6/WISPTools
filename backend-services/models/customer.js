@@ -177,6 +177,26 @@ const CustomerSchema = new mongoose.Schema({
   referredBy: String,           // Customer ID who referred
   acquisitionChannel: String,   // "website", "referral", "door-to-door"
   
+  // Customer Portal Access
+  portalAccess: {
+    enabled: { type: Boolean, default: true },
+    firebaseUid: { 
+      type: String, 
+      unique: true, 
+      sparse: true, 
+      index: true 
+    },
+    accountCreatedAt: Date,
+    lastLoginAt: Date,
+    accountStatus: {
+      type: String,
+      enum: ['pending', 'active', 'suspended', 'locked'],
+      default: 'pending'
+    },
+    accessCode: String,        // For account linking
+    accessCodeExpires: Date
+  },
+  
   // Metadata
   createdAt: { type: Date, default: Date.now },
   createdBy: String,            // User ID

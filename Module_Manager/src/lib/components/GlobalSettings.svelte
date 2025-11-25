@@ -16,8 +16,9 @@
   
   import ImportSystem from './ImportSystem.svelte';
   import UserManagementEmbedded from './UserManagementEmbedded.svelte';
+  import BrandingManagement from './BrandingManagement.svelte';
   
-  let activeTab: 'appearance' | 'acs' | 'info' | 'import' | 'users' = 'appearance';
+  let activeTab: 'appearance' | 'acs' | 'info' | 'import' | 'users' | 'branding' = 'appearance';
   let showImportSystem = false;
   let loading = false;
   let saveSuccess = false;
@@ -181,6 +182,13 @@
           on:click={() => activeTab = 'users'}
         >
           👤 User Management
+        </button>
+        <button 
+          class="tab" 
+          class:active={activeTab === 'branding'}
+          on:click={() => activeTab = 'branding'}
+        >
+          🎨 Customer Portal Branding
         </button>
       </div>
       
