@@ -394,33 +394,48 @@
     bottom: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.3);
     display: flex;
-    align-items: stretch;
-    justify-content: flex-start;
+    align-items: flex-end;
+    justify-content: flex-end;
     z-index: 10000;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(2px);
+    padding: 1rem;
   }
   
   .settings-panel {
     background: var(--card-bg, white);
-    border-radius: 0 12px 12px 0;
-    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
-    width: 600px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    width: auto;
+    min-width: 400px;
     max-width: 90vw;
-    height: 100%;
-    max-height: 100%;
+    max-height: 85vh;
+    height: auto;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    margin-left: 0;
+    margin-bottom: 9.5rem;
+    margin-right: 2rem;
+    animation: slideUp 0.2s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   
   .settings-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem 2rem;
+    padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--border-color, #e0e0e0);
     background: var(--bg-secondary, #f8f9fa);
     flex-shrink: 0;
@@ -428,7 +443,7 @@
   
   .settings-header h2 {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: 1.25rem;
     color: var(--text-primary, #1a202c);
   }
 
@@ -442,11 +457,11 @@
     background: var(--primary, #3b82f6);
     color: white;
     border: none;
-    padding: 0.625rem 1.25rem;
+    padding: 0.5rem 1rem;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     transition: all 0.2s;
   }
 
@@ -458,14 +473,14 @@
   .close-btn {
     background: var(--bg-hover, #e2e8f0);
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     cursor: pointer;
     color: var(--text-secondary, #718096);
-    padding: 0.5rem 0.75rem;
+    padding: 0.375rem 0.625rem;
     border-radius: 6px;
     transition: all 0.2s;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -487,11 +502,11 @@
   
   .tab {
     flex: 0 0 auto;
-    padding: 1rem 1.5rem;
+    padding: 0.75rem 1rem;
     border: none;
     background: transparent;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: var(--text-secondary, #718096);
     border-bottom: 2px solid transparent;
     transition: all 0.2s;
@@ -514,6 +529,7 @@
     display: flex;
     flex-direction: column;
     padding: 0;
+    min-height: 0;
   }
 
   .tab-content.full-height {
@@ -521,35 +537,37 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 2rem;
+    padding: 1.5rem;
+    min-height: 0;
   }
   
   .tab-content {
-    padding: 2rem;
+    padding: 1.5rem;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
   }
 
   .tab-content.full-height {
-    padding: 2rem;
+    padding: 1.5rem;
   }
-
+  
   .tab-content h3 {
     margin: 0 0 0.5rem 0;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     color: var(--text-primary, #1a202c);
   }
   
   .description {
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 1rem 0;
     color: var(--text-secondary, #718096);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
   
   .theme-options {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    gap: 0.75rem;
   }
   
   .theme-option {
@@ -557,7 +575,7 @@
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.75rem;
     border: 2px solid var(--border-color, #e0e0e0);
     border-radius: 8px;
     background: var(--card-bg, white);
@@ -576,33 +594,33 @@
   }
   
   .theme-option .icon {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   
   .theme-option .label {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--text-primary, #1a202c);
     font-weight: 500;
   }
   
   .form-group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
   }
   
   .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.375rem;
     font-weight: 500;
     color: var(--text-primary, #1a202c);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
   
   .form-group input {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.625rem;
     border: 1px solid var(--border-color, #e0e0e0);
     border-radius: 6px;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     background: var(--input-bg, white);
     color: var(--text-primary, #1a202c);
     transition: border-color 0.2s;
@@ -617,21 +635,21 @@
   .form-row {
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
-    gap: 1rem;
+    gap: 0.75rem;
   }
   
   .btn-save {
     width: 100%;
-    padding: 0.875rem;
+    padding: 0.75rem;
     background: var(--primary, #3b82f6);
     color: white;
     border: none;
     border-radius: 6px;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    margin-top: 1rem;
+    margin-top: 0.75rem;
   }
   
   .btn-save:hover:not(:disabled) {
@@ -666,29 +684,30 @@
   }
   
   .import-info {
-    margin-bottom: 1.5rem;
-    padding: 1.5rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
     background: var(--bg-secondary, #f8f9fa);
     border-radius: 8px;
     border: 1px solid var(--border-color, #e0e0e0);
   }
   
   .import-info p {
-    margin: 0 0 1rem;
+    margin: 0 0 0.75rem;
     color: var(--text-primary, #1a202c);
     font-weight: 500;
+    font-size: 0.9rem;
   }
   
   .import-info ul {
     margin: 0;
-    padding-left: 1.5rem;
+    padding-left: 1.25rem;
     list-style: none;
   }
   
   .import-info li {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.375rem;
     color: var(--text-secondary, #718096);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
   }
 </style>
 
