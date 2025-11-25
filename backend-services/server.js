@@ -137,6 +137,8 @@ try {
 }
 app.use('/api/customer-portal', require('./routes/customer-portal-api')); // Customer portal API
 app.use('/api/portal', require('./routes/portal-domain')); // Portal domain routing
+app.use('/api/portal-content', require('./routes/portal-content')); // Portal content management (alerts, FAQ, KB, chat)
+console.log('✅ Portal Content API enabled');
 // Enable billing API (with graceful handling if PayPal not configured)
 try {
   app.use('/api/billing', require('./billing-api'));
