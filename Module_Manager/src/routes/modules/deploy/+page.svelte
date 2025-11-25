@@ -6,7 +6,7 @@
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject } from '$lib/services/planService';
-  import SettingsButton from '$lib/components/SettingsButton.svelte';
+  // SettingsButton removed - now only on dashboard
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';

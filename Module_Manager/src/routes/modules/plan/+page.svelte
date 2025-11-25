@@ -10,7 +10,7 @@
 import PlanMarketingModal from './components/PlanMarketingModal.svelte';
 import PlanMarketingResultsPopup from './components/PlanMarketingResultsPopup.svelte';
 import PlanLayerFilterPanel, { type PlanLayerFilters } from './components/PlanLayerFilterPanel.svelte';
-import SettingsButton from '$lib/components/SettingsButton.svelte';
+// SettingsButton removed - now only on dashboard
 import { mapLayerManager } from '$lib/map/MapLayerManager';
 import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
 import SharedMap from '$lib/map/SharedMap.svelte';

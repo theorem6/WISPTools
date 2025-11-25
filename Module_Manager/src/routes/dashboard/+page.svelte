@@ -198,6 +198,11 @@
       </div>
     </div>
 
+    <!-- Settings Button - Top Right -->
+    <SettingsButton />
+      </div>
+    </div>
+
     <!-- Main Content -->
     <div class="main-content">
       <!-- Core Modules -->
@@ -266,7 +271,7 @@
     </div>
   </div>
   
-  <!-- Global Settings Button -->
+  <!-- Global Settings Button - Rendered by SettingsButton component -->
   <SettingsButton />
 </TenantGuard>
 

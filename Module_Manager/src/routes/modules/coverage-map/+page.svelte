@@ -14,7 +14,7 @@
   import AddVehicleModal from './components/AddVehicleModal.svelte';
   import AddRMAModal from './components/AddRMAModal.svelte';
   import AddSectorModal from './components/AddSectorModal.svelte';
-  import SettingsButton from '$lib/components/SettingsButton.svelte';
+  // SettingsButton removed - now only on dashboard
   import AddCPEModal from './components/AddCPEModal.svelte';
   import AddBackhaulLinkModal from './components/AddBackhaulLinkModal.svelte';
   import AddInventoryModal from './components/AddInventoryModal.svelte';
@@ -1503,8 +1503,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   }}
 />
 
-<!-- Global Settings Button -->
-<SettingsButton />
+<!-- Global Settings Button - Removed from modules -->
 </TenantGuard>
 
 <style>

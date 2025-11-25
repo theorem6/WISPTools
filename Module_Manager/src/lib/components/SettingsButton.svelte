@@ -4,22 +4,17 @@
   
   let showSettings = false;
   
-  // Check if we're in plan or deploy module
-  $: isPlanOrDeploy = (() => {
+  // Check if we're on the dashboard
+  $: isDashboard = $page.url.pathname === '/dashboard' || $page.url.pathname === '/';
+  
+  // Check if we're in a module (hide settings button in modules)
+  $: isModule = (() => {
     const path = $page.url.pathname;
-    const modeParam = $page.url.searchParams.get('mode');
-    // Check pathname for direct plan/deploy pages
-    if (path.includes('/modules/plan') || path.includes('/modules/deploy')) {
-      return true;
-    }
-    // Check URL search params for coverage-map iframe mode
-    if (modeParam) {
-      const lowerMode = modeParam.toLowerCase();
-      return lowerMode === 'plan' || lowerMode === 'deploy';
-    }
-    // Check legacy planMode parameter
-    return $page.url.searchParams.get('planMode') === 'true';
+    return path.includes('/modules/') && path !== '/modules';
   })();
+  
+  // Only show on dashboard
+  $: shouldShow = isDashboard && !isModule;
   
   function openSettings() {
     showSettings = true;
@@ -30,14 +25,16 @@
   }
 </script>
 
-<button 
-  class="settings-button" 
-  class:plan-deploy-mode={isPlanOrDeploy}
-  on:click={openSettings} 
-  title="Settings"
->
-  ⚙️
-</button>
+{#if shouldShow}
+  <button 
+    class="settings-button" 
+    class:dashboard-mode={isDashboard}
+    on:click={openSettings} 
+    title="Settings"
+  >
+    ⚙️
+  </button>
+{/if}
 
 <GlobalSettings 
   bind:show={showSettings}
@@ -66,10 +63,30 @@
     justify-content: center;
   }
   
-  .settings-button.plan-deploy-mode {
-    bottom: 1rem;
-    right: calc(1rem + 5rem);
-    left: auto;
+  /* Dashboard mode - top right, matching page colors */
+  .settings-button.dashboard-mode {
+    top: 1.5rem;
+    right: 2rem;
+    bottom: auto;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    border: 2px solid rgba(0, 217, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.4),
+                0 0 20px rgba(0, 242, 254, 0.2);
+    font-size: 1.3rem;
+  }
+  
+  .settings-button.dashboard-mode:hover {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    transform: translateY(-2px) rotate(90deg);
+    box-shadow: 0 6px 25px rgba(0, 217, 255, 0.5),
+                0 0 30px rgba(0, 242, 254, 0.3);
+    border-color: #00d9ff;
+  }
+  
+  .settings-button.dashboard-mode:active {
+    transform: translateY(0) rotate(90deg);
   }
   
   .settings-button:hover {

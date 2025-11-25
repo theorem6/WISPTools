@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import SettingsButton from '$lib/components/SettingsButton.svelte';
+  // SettingsButton removed - now only on dashboard
   
   export let showFilters = false;
   export let showMainMenu = false;
@@ -101,8 +101,7 @@
     Import from CBRS
   </button>
   
-  <!-- Settings -->
-  <SettingsButton />
+  <!-- Settings - Removed from modules -->
 </div>
 
 <style>
