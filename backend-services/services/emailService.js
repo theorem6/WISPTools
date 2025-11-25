@@ -3,6 +3,7 @@
  * Sends welcome emails and notifications to users
  * 
  * Uses nodemailer with SMTP or can be configured for SendGrid/AWS SES
+ * Falls back to console logging if SMTP is not configured
  */
 
 const nodemailer = require('nodemailer');
@@ -25,8 +26,10 @@ const FROM_NAME = process.env.FROM_NAME || 'WISPTools';
 let transporter = null;
 
 function getTransporter() {
-  if (!transporter && EMAIL_CONFIG.auth.user && EMAIL_CONFIG.auth.pass) {
+  if (!transporter && EMAIL_CONFIG.auth.user && EMAIL_CONFIG.auth.pass && 
+      EMAIL_CONFIG.auth.user !== 'placeholder' && EMAIL_CONFIG.auth.pass !== 'placeholder') {
     transporter = nodemailer.createTransport(EMAIL_CONFIG);
+    console.log('📧 [Email] SMTP transporter initialized');
   }
   return transporter;
 }
@@ -35,7 +38,8 @@ function getTransporter() {
  * Check if email service is configured
  */
 function isConfigured() {
-  return !!(EMAIL_CONFIG.auth.user && EMAIL_CONFIG.auth.pass);
+  return !!(EMAIL_CONFIG.auth.user && EMAIL_CONFIG.auth.pass && 
+            EMAIL_CONFIG.auth.user !== 'placeholder' && EMAIL_CONFIG.auth.pass !== 'placeholder');
 }
 
 /**
@@ -53,8 +57,21 @@ async function sendWelcomeEmail(options) {
   const transport = getTransporter();
   
   if (!transport) {
-    console.log(`📧 [Email] Would send welcome email to ${email} (email not configured)`);
-    return { sent: false, reason: 'Email service not configured' };
+    // Log the email details so admin can manually send if needed
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`📧 [Email] WELCOME EMAIL - SMTP not configured`);
+    console.log(`${'='.repeat(60)}`);
+    console.log(`TO: ${email}`);
+    console.log(`SUBJECT: Welcome to ${tenantName} - WISPTools`);
+    console.log(`ROLE: ${getRoleName(role)}`);
+    console.log(`INVITED BY: ${invitedByName || 'Admin'}`);
+    console.log(`\nINSTRUCTIONS FOR USER:`);
+    console.log(`1. Go to https://wisptools.io/login`);
+    console.log(`2. Sign in with Google or create account with email: ${email}`);
+    console.log(`3. You'll have access to ${tenantName} as ${getRoleName(role)}`);
+    console.log(`${'='.repeat(60)}\n`);
+    
+    return { sent: false, reason: 'Email service not configured - see server logs for details' };
   }
 
   const firstName = displayName?.split(' ')[0] || email.split('@')[0];
