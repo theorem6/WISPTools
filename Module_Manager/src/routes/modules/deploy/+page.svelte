@@ -159,13 +159,14 @@ import '$lib/styles/moduleHeaderMenu.css';
         // Show ALL projects in the list (for the projects modal)
         readyPlans = allProjects;
         
-        // Initialize visible plan IDs from plans with showOnMap = true
+        // Initialize visible plan IDs from ALL plans with showOnMap = true (not just approved)
         visiblePlanIds = new Set(
-          approvedPlans.filter(p => p.showOnMap).map(p => p.id)
+          allProjects.filter(p => p.showOnMap).map(p => p.id)
         );
         
         await mapLayerManager.loadProductionHardware(tenantId);
-        const planToLoad = approvedPlans.find(p => p.showOnMap) || approvedPlans[0];
+        // Load first activated plan (any status) or first approved plan
+        const planToLoad = allProjects.find(p => p.showOnMap) || approvedPlans[0];
         if (planToLoad) {
           await mapLayerManager.loadPlan(tenantId, planToLoad);
         }
