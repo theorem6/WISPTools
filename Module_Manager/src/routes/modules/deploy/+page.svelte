@@ -395,25 +395,28 @@ import '$lib/styles/moduleHeaderMenu.css';
       </div>
       <div class="module-header-controls">
         <button 
-          class="module-control-btn simple" 
+          class="module-control-btn" 
           class:active={showProjectFilters}
           on:click={() => showProjectFilters = !showProjectFilters} 
           title="Project Filters - Approved projects ready for deployment"
         >
-          🔍 Approved ({approvedPlans.length})
+          <span class="control-icon">🔍</span>
+          <span class="control-label">Approved ({approvedPlans.length})</span>
         </button>
-        <button class="module-control-btn simple" on:click={openPlanApproval} title="Projects - View and manage all projects">
-          📋 Projects ({readyPlans.length})
+        <button class="module-control-btn" on:click={openPlanApproval} title="Projects - View and manage all projects">
+          <span class="control-icon">📋</span>
+          <span class="control-label">Projects ({readyPlans.length})</span>
         </button>
         <button 
-          class="module-control-btn simple" 
+          class="module-control-btn" 
           on:click={() => showDeployedHardwareModal = true}
           title="View Deployed Projects"
         >
-          ✅ Deployed ({deployedPlans.length})
+          <span class="control-icon">✅</span>
+          <span class="control-label">Deployed ({deployedPlans.length})</span>
         </button>
         <button 
-          class="module-control-btn simple" 
+          class="module-control-btn" 
           class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] PCI button clicked');
@@ -421,11 +424,12 @@ import '$lib/styles/moduleHeaderMenu.css';
           }} 
           title={isAdmin ? "PCI Planner (Admin)" : ($currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)")}
         >
-          📊 PCI
+          <span class="control-icon">📊</span>
+          <span class="control-label">PCI</span>
         </button>
 
         <button 
-          class="module-control-btn simple" 
+          class="module-control-btn" 
           class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] Frequency button clicked');
@@ -433,23 +437,26 @@ import '$lib/styles/moduleHeaderMenu.css';
           }} 
           title={isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)")}
         >
-          📡 Frequency
+          <span class="control-icon">📡</span>
+          <span class="control-label">Frequency</span>
         </button>
         <button 
-          class="module-control-btn simple" 
+          class="module-control-btn" 
           on:click={() => showDeployedHardwareModal = true}
           title="View and Edit Deployed Hardware"
         >
-          🔧 Hardware ({deployedCount})
+          <span class="control-icon">🔧</span>
+          <span class="control-label">Hardware ({deployedCount})</span>
         </button>
         <button 
-          class="module-control-btn simple deploy-btn" 
+          class="module-control-btn deploy-btn" 
           class:disabled={!mapState?.activePlan}
           disabled={!mapState?.activePlan}
           on:click={pushActivePlanToField}
           title={mapState?.activePlan ? `Push ${mapState.activePlan.name} to field teams` : 'Select a plan to deploy'}
         >
-          🚀 Deploy Plan
+          <span class="control-icon">🚀</span>
+          <span class="control-label">Deploy Plan</span>
         </button>
       </div>
     </div>

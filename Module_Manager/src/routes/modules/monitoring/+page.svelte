@@ -455,22 +455,25 @@
         <h1>🗺️ Monitor</h1>
       </div>
       <div class="module-header-controls">
-        <button class="module-control-btn simple" on:click={() => showSNMPConfig = true} title="Configuration">
-          🔧 Config
+        <button class="module-control-btn" on:click={() => showSNMPConfig = true} title="Configuration">
+          <span class="control-icon">🔧</span>
+          <span class="control-label">Config</span>
         </button>
         <button 
-          class="module-control-btn simple {mapView === 'geographic' ? 'active' : ''}"
+          class="module-control-btn {mapView === 'geographic' ? 'active' : ''}"
           on:click={() => mapView = 'geographic'}
           title="Geographic View"
         >
-          🗺️ Geographic
+          <span class="control-icon">🗺️</span>
+          <span class="control-label">Geographic</span>
         </button>
         <button 
-          class="module-control-btn simple {mapView === 'topology' ? 'active' : ''}"
+          class="module-control-btn {mapView === 'topology' ? 'active' : ''}"
           on:click={() => mapView = 'topology'}
           title="Topology View"
         >
-          🕸️ Topology
+          <span class="control-icon">🕸️</span>
+          <span class="control-label">Topology</span>
         </button>
       </div>
     </div>
