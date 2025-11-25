@@ -170,6 +170,22 @@ app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
 app.use('/setup-admin', require('./routes/setup'));
 
+// 404 handler for unmatched routes (must be last)
+app.use((req, res) => {
+  console.log('[404 Handler] Unmatched route:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    originalUrl: (req as any).originalUrl
+  });
+  res.status(404).json({ 
+    error: 'Route not found',
+    method: req.method,
+    path: req.path,
+    url: req.url
+  });
+});
+
 // Start server with error handling
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 User Management System API running on port ${PORT}`);
