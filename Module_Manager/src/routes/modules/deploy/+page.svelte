@@ -189,9 +189,84 @@ import '$lib/styles/moduleHeaderMenu.css';
   async function focusPlanOnMap(planId: string | null) {
     const tenantId = $currentTenant?.id;
     if (!tenantId || !planId) return;
-    const plan = approvedPlans.find(p => p.id === planId);
+    // Find plan in any status (not just approved)
+    const plan = readyPlans.find(p => p.id === planId);
     if (plan) {
       await mapLayerManager.loadPlan(tenantId, plan);
+    }
+  }
+
+  // Activate plan - show any plan on the map
+  async function activatePlan(plan: PlanProject) {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) return;
+    
+    try {
+      isLoadingPlans = true;
+      // Set showOnMap to true
+      await planService.updatePlan(plan.id, { showOnMap: true });
+      
+      // Load the plan on the map (works for any plan status)
+      await mapLayerManager.loadPlan(tenantId, plan);
+      
+      // Add to visible plans
+      visiblePlanIds.add(plan.id);
+      visiblePlanIds = new Set(visiblePlanIds);
+      
+      // Reload plans to update state
+      await loadReadyPlans();
+      
+      deploymentMessage = `✅ Plan "${plan.name}" is now active and visible on the map.`;
+      setTimeout(() => (deploymentMessage = ''), 5000);
+    } catch (err: any) {
+      error = err.message || 'Failed to activate plan';
+      console.error('Error activating plan:', err);
+      setTimeout(() => (error = ''), 5000);
+    } finally {
+      isLoadingPlans = false;
+    }
+  }
+
+  // Take over plan - mark approved plan as deployed
+  async function takeOverPlan(plan: PlanProject) {
+    if (plan.status !== 'approved' && plan.status !== 'authorized') {
+      error = 'Only approved or authorized plans can be taken over.';
+      setTimeout(() => (error = ''), 5000);
+      return;
+    }
+
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) return;
+
+    try {
+      isLoadingPlans = true;
+      
+      // Get plan features
+      const { features } = await planService.getPlanFeatures(plan.id);
+      
+      // Mark plan as deployed (take over)
+      await planService.updatePlan(plan.id, { status: 'deployed' });
+      
+      // Reload plans to update counts and status
+      await loadReadyPlans();
+      
+      // Update map state if plan was active
+      if (mapState?.activePlan?.id === plan.id) {
+        // Plan is now deployed, so load a different approved plan if available
+        const nextApprovedPlan = approvedPlans.find(p => p.id !== plan.id && p.showOnMap) || approvedPlans[0];
+        if (nextApprovedPlan) {
+          await mapLayerManager.loadPlan(tenantId, nextApprovedPlan);
+        }
+      }
+      
+      deploymentMessage = `✅ Plan "${plan.name}" has been taken over and marked as deployed (${features.length} items).`;
+      setTimeout(() => (deploymentMessage = ''), 6000);
+    } catch (err: any) {
+      error = err.message || 'Failed to take over plan';
+      console.error('Error taking over plan:', err);
+      setTimeout(() => (error = ''), 5000);
+    } finally {
+      isLoadingPlans = false;
     }
   }
 
@@ -275,17 +350,20 @@ import '$lib/styles/moduleHeaderMenu.css';
       const updatedPlan = readyPlans.find(p => p.id === selectedPlan?.id);
       if (updatedPlan) {
         selectedPlan = updatedPlan;
-        // Automatically show approved plan on map
-        if (updatedPlan.status === 'approved') {
-          await planService.updatePlan(updatedPlan.id, { showOnMap: true });
-          visiblePlanIds.add(updatedPlan.id);
-          visiblePlanIds = new Set(visiblePlanIds);
-          await focusPlanOnMap(updatedPlan.id);
-        } else if (updatedPlan.status === 'authorized') {
-          visiblePlanIds.delete(updatedPlan.id);
-          visiblePlanIds = new Set(visiblePlanIds);
-          const nextPlanId = [...visiblePlanIds][0] || null;
-          await focusPlanOnMap(nextPlanId);
+        // Automatically show approved plan on map if it was already activated
+        if (updatedPlan.status === 'approved' || updatedPlan.status === 'authorized') {
+          // If plan was already activated (showOnMap), keep it visible
+          if (updatedPlan.showOnMap) {
+            visiblePlanIds.add(updatedPlan.id);
+            visiblePlanIds = new Set(visiblePlanIds);
+            await focusPlanOnMap(updatedPlan.id);
+          } else {
+            // Auto-activate approved plans
+            await planService.updatePlan(updatedPlan.id, { showOnMap: true });
+            visiblePlanIds.add(updatedPlan.id);
+            visiblePlanIds = new Set(visiblePlanIds);
+            await focusPlanOnMap(updatedPlan.id);
+          }
         }
       }
     }
@@ -542,7 +620,7 @@ import '$lib/styles/moduleHeaderMenu.css';
     <div class="modal-overlay" on:click={closePlanApprovalModal}>
       <div class="plan-list-modal" on:click|stopPropagation>
         <div class="modal-header">
-          <h2>📋 Projects - Finalize, Approve, or Reject</h2>
+          <h2>📋 All Plans - Activate, Approve, or Take Over</h2>
           <button class="close-btn" on:click={closePlanApprovalModal}>✕</button>
         </div>
         
@@ -558,14 +636,13 @@ import '$lib/styles/moduleHeaderMenu.css';
             <div class="plan-list">
               {#each readyPlans as plan}
                 <div class="plan-item">
-                  <div class="plan-content" on:click={() => {
-                    if (plan.status !== 'draft' && plan.status !== 'active') {
-                      selectPlanForApproval(plan);
-                    }
-                  }}>
+                  <div class="plan-content">
                     <div class="plan-header">
                       <h3>{plan.name}</h3>
                       <span class="status-badge {plan.status}">{plan.status}</span>
+                      {#if plan.showOnMap}
+                        <span class="active-badge">📍 Active</span>
+                      {/if}
                     </div>
                     {#if plan.description}
                       <p class="plan-description">{plan.description}</p>
@@ -578,21 +655,43 @@ import '$lib/styles/moduleHeaderMenu.css';
                     </div>
                   </div>
                   <div class="plan-actions">
+                    {#if !plan.showOnMap}
+                      <button 
+                        class="btn-activate" 
+                        on:click={() => activatePlan(plan)}
+                        disabled={isLoadingPlans}
+                        title="Activate this plan to view it on the map"
+                      >
+                        📍 Activate
+                      </button>
+                    {/if}
                     {#if plan.status === 'draft' || plan.status === 'active'}
                       <button 
                         class="btn-finalize" 
                         on:click={() => handleFinalizePlan(plan)}
+                        disabled={isLoadingPlans}
                         title="Finalize this project to make it ready for approval"
                       >
                         ✅ Finalize
                       </button>
-                    {:else if plan.status === 'ready' || plan.status === 'approved'}
+                    {:else if plan.status === 'ready' || plan.status === 'approved' || plan.status === 'authorized'}
                       <button 
                         class="btn-action" 
                         on:click={() => selectPlanForApproval(plan)}
+                        disabled={isLoadingPlans}
                         title="Approve or reject this project"
                       >
-                        📋 Review
+                        📋 {plan.status === 'approved' || plan.status === 'authorized' ? 'Review' : 'Approve'}
+                      </button>
+                    {/if}
+                    {#if (plan.status === 'approved' || plan.status === 'authorized') && plan.showOnMap}
+                      <button 
+                        class="btn-takeover" 
+                        on:click={() => takeOverPlan(plan)}
+                        disabled={isLoadingPlans}
+                        title="Take over this plan and mark it as deployed"
+                      >
+                        🚀 Take Over
                       </button>
                     {/if}
                   </div>
@@ -846,24 +945,70 @@ import '$lib/styles/moduleHeaderMenu.css';
     flex-shrink: 0;
   }
   
+  .plan-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .plan-header h3 {
+    margin: 0;
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+  }
+
+  .active-badge {
+    padding: 0.25rem 0.5rem;
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
   .btn-finalize,
-  .btn-action {
+  .btn-action,
+  .btn-activate,
+  .btn-takeover {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: var(--border-radius-sm);
     font-weight: 600;
-    font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
+    font-size: 0.875rem;
     white-space: nowrap;
   }
-  
+
+  .btn-activate {
+    background: var(--info, #3b82f6);
+    color: white;
+  }
+
+  .btn-activate:hover:not(:disabled) {
+    background: var(--info-hover, #2563eb);
+    transform: translateY(-1px);
+  }
+
+  .btn-takeover {
+    background: var(--success, #22c55e);
+    color: white;
+  }
+
+  .btn-takeover:hover:not(:disabled) {
+    background: var(--success-hover, #16a34a);
+    transform: translateY(-1px);
+  }
+
   .btn-finalize {
     background: var(--success);
     color: white;
   }
   
-  .btn-finalize:hover {
+  .btn-finalize:hover:not(:disabled) {
     background: var(--success-hover);
     transform: translateY(-1px);
   }
@@ -873,22 +1018,17 @@ import '$lib/styles/moduleHeaderMenu.css';
     color: white;
   }
   
-  .btn-action:hover {
+  .btn-action:hover:not(:disabled) {
     background: var(--brand-primary-hover);
     transform: translateY(-1px);
   }
-  
-  .plan-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  
-  .plan-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-    font-weight: 600;
+
+  .btn-activate:disabled,
+  .btn-takeover:disabled,
+  .btn-finalize:disabled,
+  .btn-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
   
   .plan-description {
