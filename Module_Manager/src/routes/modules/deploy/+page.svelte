@@ -19,6 +19,7 @@ import type { MapModuleMode } from '$lib/map/MapCapabilities';
 import type { ModuleContext } from '$lib/services/objectStateManager';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
 import { isPlatformAdmin } from '$lib/services/adminService';
+import '$lib/styles/moduleHeaderMenu.css';
 
   let currentUser: any = null;
   let mapContainer: HTMLDivElement;
@@ -382,9 +383,9 @@ import { isPlatformAdmin } from '$lib/services/adminService';
 
     <!-- Minimal Header Overlay -->
     <!-- Deploy Header Overlay -->
-    <div class="header-overlay">
-      <div class="header-left">
-        <button class="back-btn" on:click={() => {
+    <div class="module-header-overlay" style="background: var(--gradient-success);">
+      <div class="module-header-left">
+        <button class="module-back-btn" on:click={() => {
           console.log('[Deploy] Back to Dashboard clicked');
           goto('/dashboard');
         }} title="Back to Dashboard">
@@ -392,27 +393,27 @@ import { isPlatformAdmin } from '$lib/services/adminService';
         </button>
         <h1>🚀 Deploy</h1>
       </div>
-      <div class="header-controls">
+      <div class="module-header-controls">
         <button 
-          class="control-btn" 
+          class="module-control-btn simple" 
           class:active={showProjectFilters}
           on:click={() => showProjectFilters = !showProjectFilters} 
           title="Project Filters - Approved projects ready for deployment"
         >
           🔍 Approved ({approvedPlans.length})
         </button>
-        <button class="control-btn" on:click={openPlanApproval} title="Projects - View and manage all projects">
+        <button class="module-control-btn simple" on:click={openPlanApproval} title="Projects - View and manage all projects">
           📋 Projects ({readyPlans.length})
         </button>
         <button 
-          class="control-btn" 
+          class="module-control-btn simple" 
           on:click={() => showDeployedHardwareModal = true}
           title="View Deployed Projects"
         >
           ✅ Deployed ({deployedPlans.length})
         </button>
         <button 
-          class="control-btn" 
+          class="module-control-btn simple" 
           class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] PCI button clicked');
@@ -424,7 +425,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
         </button>
 
         <button 
-          class="control-btn" 
+          class="module-control-btn simple" 
           class:disabled={buttonsDisabled}
           on:click={() => {
             console.log('[Deploy] Frequency button clicked');
@@ -435,14 +436,14 @@ import { isPlatformAdmin } from '$lib/services/adminService';
           📡 Frequency
         </button>
         <button 
-          class="control-btn" 
+          class="module-control-btn simple" 
           on:click={() => showDeployedHardwareModal = true}
           title="View and Edit Deployed Hardware"
         >
           🔧 Hardware ({deployedCount})
         </button>
         <button 
-          class="control-btn deploy-btn" 
+          class="module-control-btn simple deploy-btn" 
           class:disabled={!mapState?.activePlan}
           disabled={!mapState?.activePlan}
           on:click={pushActivePlanToField}
@@ -621,55 +622,8 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     z-index: 0;
   }
 
-  /* Left Horizontal Menu */
-  .header-overlay {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background: var(--gradient-success);
-    border-radius: var(--border-radius-md);
-    padding: 0.75rem 1rem;
-    box-shadow: var(--shadow-sm);
-    color: white;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .back-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-    padding: 0.5rem;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: white;
-    transition: all 0.2s;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .back-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateX(-2px);
-  }
-
-  .header-overlay h1 {
-    font-size: 1.2rem;
-    margin: 0;
-    font-weight: 600;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
+  /* Left Horizontal Menu - Using common styles from moduleHeaderMenu.css */
+  /* Additional module-specific overrides can go here */
 
 
   .btn-primary, .btn-secondary {
@@ -702,29 +656,18 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     background: var(--bg-tertiary);
   }
 
-  /* Control Button Styles */
-  .control-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
-  }
-
-  .control-btn.deploy-btn {
+  /* Control Button Styles - Using common styles from moduleHeaderMenu.css */
+  /* Additional module-specific overrides */
+  .module-control-btn.deploy-btn {
     background: rgba(59, 130, 246, 0.25);
   }
 
-  .control-btn.deploy-btn:hover {
+  .module-control-btn.deploy-btn:hover {
     background: rgba(59, 130, 246, 0.35);
   }
 
-  .control-btn.deploy-btn.disabled,
-  .control-btn.deploy-btn:disabled {
+  .module-control-btn.deploy-btn.disabled,
+  .module-control-btn.deploy-btn:disabled {
     background: rgba(148, 163, 184, 0.25);
   }
 
@@ -776,7 +719,7 @@ import { isPlatformAdmin } from '$lib/services/adminService';
     font-weight: 600;
   }
 
-  .control-btn:hover {
+  .module-control-btn:hover {
     background: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
     transform: translateY(-1px);

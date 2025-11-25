@@ -12,6 +12,7 @@
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
+  import '$lib/styles/moduleHeaderMenu.css';
   
   // Use real backend data now that devices are created
   // Temporarily enable mock data to ensure devices show while debugging backend
@@ -446,26 +447,26 @@
     </div>
 
     <!-- Floating Header Overlay -->
-    <div class="header-overlay">
-      <div class="header-left">
-        <button class="back-btn" on:click={() => goto('/modules')} title="Back to Modules">
+    <div class="module-header-overlay" style="background: var(--gradient-success);">
+      <div class="module-header-left">
+        <button class="module-back-btn" on:click={() => goto('/modules')} title="Back to Modules">
           ←
         </button>
         <h1>🗺️ Monitor</h1>
       </div>
-      <div class="header-controls">
-        <button class="control-btn" on:click={() => showSNMPConfig = true} title="Configuration">
+      <div class="module-header-controls">
+        <button class="module-control-btn simple" on:click={() => showSNMPConfig = true} title="Configuration">
           🔧 Config
         </button>
         <button 
-          class="control-btn {mapView === 'geographic' ? 'active' : ''}"
+          class="module-control-btn simple {mapView === 'geographic' ? 'active' : ''}"
           on:click={() => mapView = 'geographic'}
           title="Geographic View"
         >
           🗺️ Geographic
         </button>
         <button 
-          class="control-btn {mapView === 'topology' ? 'active' : ''}"
+          class="module-control-btn simple {mapView === 'topology' ? 'active' : ''}"
           on:click={() => mapView = 'topology'}
           title="Topology View"
         >
@@ -644,77 +645,8 @@
   }
 
   /* Floating Header Overlay */
-  .header-overlay {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background: var(--gradient-success);
-    border-radius: var(--border-radius-md);
-    padding: 0.75rem 1rem;
-    box-shadow: var(--shadow-sm);
-    color: white;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .back-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: var(--transition);
-  }
-
-  .back-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-  }
-
-  .header-left h1 {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-  }
-
-  .header-controls {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .control-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--border-radius-sm);
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: var(--transition);
-    white-space: nowrap;
-  }
-
-  .control-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-  }
-
-  .control-btn.active {
-    background: rgba(255, 255, 255, 0.4);
-    font-weight: 600;
-  }
+  /* Header Overlay - Using common styles from moduleHeaderMenu.css */
+  /* Additional module-specific overrides can go here */
 
   /* Global Button Styles */
   .btn {

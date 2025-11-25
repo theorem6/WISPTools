@@ -1,0 +1,111 @@
+/* Common Module Header Menu Styles
+ * Used by Plan, Deploy, and Monitor modules
+ */
+
+/* Header Overlay Container */
+.module-header-overlay {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  border-radius: 12px; /* Rounded corners like the rest of the UI */
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-sm);
+  color: white;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.module-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.module-back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px; /* Rounded corners */
+  padding: 0.5rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.module-back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateX(-2px);
+}
+
+.module-header-overlay h1 {
+  font-size: 1.2rem; /* Standardized font size */
+  margin: 0;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.module-header-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.module-control-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px; /* Rounded corners */
+  padding: 0.55rem 0.75rem;
+  min-width: 72px;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+  font-size: 0.875rem; /* Standardized font size */
+}
+
+.module-control-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.module-control-btn .control-icon {
+  font-size: 1.2rem; /* Standardized icon size */
+  line-height: 1;
+}
+
+.module-control-btn .control-label {
+  font-size: 0.65rem; /* Standardized label size */
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.module-control-btn.active {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* For simple text buttons (like Monitor) */
+.module-control-btn.simple {
+  flex-direction: row;
+  gap: 0.5rem;
+  font-size: 0.875rem; /* Standardized font size */
+}
+
+.module-control-btn.simple.active {
+  background: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+}
+

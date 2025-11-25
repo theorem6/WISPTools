@@ -17,6 +17,7 @@ import SharedMap from '$lib/map/SharedMap.svelte';
 import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from '$lib/map/MapCapabilities';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
 import type { ModuleContext } from '$lib/services/objectStateManager';
+import '$lib/styles/moduleHeaderMenu.css';
 
 interface MapViewExtentPayload {
   center?: { lat: number; lon: number };
@@ -1814,24 +1815,24 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     </div>
 
     <!-- Enhanced Header Overlay -->
-    <div class="header-overlay">
-      <div class="header-left">
-        <button class="back-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+    <div class="module-header-overlay" style="background: var(--gradient-primary);">
+      <div class="module-header-left">
+        <button class="module-back-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
           ←
         </button>
         <h1>📋 Plan</h1>
       </div>
-      <div class="header-controls">
-        <button class="control-btn" on:click={openHardwareView} title="View All Hardware">
+      <div class="module-header-controls">
+        <button class="module-control-btn" on:click={openHardwareView} title="View All Hardware">
           <span class="control-icon">🔧</span>
           <span class="control-label">Hardware</span>
         </button>
-        <button class="control-btn" on:click={openProjectList} title="Project List">
+        <button class="module-control-btn" on:click={openProjectList} title="Project List">
           <span class="control-icon">📁</span>
           <span class="control-label">Projects</span>
         </button>
         <button
-          class="control-btn marketing-btn"
+          class="module-control-btn marketing-btn"
           class:drawing={isDrawingRectangle}
           type="button"
           on:click={() => openMarketingTools()}
@@ -1842,7 +1843,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <span class="control-label">{isDrawingRectangle ? "Drawing..." : "Find Addresses"}</span>
         </button>
         <button 
-          class="control-btn filter-btn" 
+          class="module-control-btn filter-btn" 
           class:active={showFilterPanel}
           type="button"
           on:click={(e) => {
@@ -2646,102 +2647,10 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     z-index: 0;
   }
 
-  /* Left Horizontal Menu */
-  .header-overlay {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background: var(--gradient-primary);
-    border-radius: var(--border-radius-md);
-    padding: 0.75rem 1rem;
-    box-shadow: var(--shadow-sm);
-    color: white;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
+  /* Left Horizontal Menu - Using common styles from moduleHeaderMenu.css */
+  /* Additional module-specific overrides can go here */
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .back-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 6px;
-    padding: 0.5rem;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: white;
-    transition: all 0.2s;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .back-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateX(-2px);
-  }
-
-  .header-overlay h1 {
-    font-size: 1.2rem;
-    margin: 0;
-    font-weight: 600;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
-
-  .header-controls {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .control-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    padding: 0.55rem 0.75rem;
-    min-width: 72px;
-    cursor: pointer;
-    color: white;
-    transition: all 0.2s;
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    text-align: center;
-  }
-
-  .control-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-1px);
-  }
-
-  .control-btn .control-icon {
-    font-size: 1.2rem;
-    line-height: 1;
-  }
-
-  .control-btn .control-label {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-  }
-
-  .control-btn.active {
-    background: rgba(59, 130, 246, 0.3);
-    border-color: rgba(59, 130, 246, 0.5);
-  }
-
-  .control-btn.active:hover {
+  .module-control-btn.active:hover {
     background: rgba(59, 130, 246, 0.4);
   }
 
@@ -2768,12 +2677,12 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     border-radius: 8px;
   }
 
-  .control-btn.delete-btn {
+  .module-control-btn.delete-btn {
     background: rgba(239, 68, 68, 0.18);
     border-color: rgba(239, 68, 68, 0.35);
   }
 
-  .control-btn.delete-btn:hover {
+  .module-control-btn.delete-btn:hover {
     background: rgba(239, 68, 68, 0.28);
     border-color: rgba(239, 68, 68, 0.55);
   }
@@ -3755,22 +3664,22 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     border-color: rgba(239, 68, 68, 0.6);
   }
 
-  .control-btn.resume-btn {
+  .module-control-btn.resume-btn {
     background: rgba(59, 130, 246, 0.18);
     border-color: rgba(59, 130, 246, 0.35);
   }
 
-  .control-btn.resume-btn:hover {
+  .module-control-btn.resume-btn:hover {
     background: rgba(59, 130, 246, 0.3);
     border-color: rgba(59, 130, 246, 0.55);
   }
 
-  .control-btn.reopen-btn {
+  .module-control-btn.reopen-btn {
     background: rgba(250, 204, 21, 0.18);
     border-color: rgba(250, 204, 21, 0.35);
   }
 
-  .control-btn.reopen-btn:hover {
+  .module-control-btn.reopen-btn:hover {
     background: rgba(250, 204, 21, 0.28);
     border-color: rgba(250, 204, 21, 0.55);
   }
