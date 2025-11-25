@@ -8,7 +8,7 @@
 
 const nodemailer = require('nodemailer');
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@wisptools.io';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@hss.wisptools.io';
 const FROM_NAME = process.env.FROM_NAME || 'WISPTools';
 
 // Check if we should use SMTP or sendmail
