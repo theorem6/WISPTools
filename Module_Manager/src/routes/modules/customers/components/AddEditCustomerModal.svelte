@@ -292,7 +292,26 @@
       handleClose();
     } catch (err: any) {
       console.error('Error saving customer:', err);
-      error = err.message || 'Failed to save customer';
+      
+      // Parse error message to show user-friendly message
+      let errorMessage = err.message || 'Failed to save customer';
+      
+      // Check if it's a duplicate error
+      if (errorMessage.includes('already exists') || errorMessage.includes('Duplicate')) {
+        error = errorMessage;
+      } else if (errorMessage.includes('Validation')) {
+        error = errorMessage;
+      } else {
+        error = `Failed to save customer: ${errorMessage}`;
+      }
+      
+      // Scroll error into view
+      setTimeout(() => {
+        const errorBanner = document.querySelector('.error-banner');
+        if (errorBanner) {
+          errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
     } finally {
       isSaving = false;
     }

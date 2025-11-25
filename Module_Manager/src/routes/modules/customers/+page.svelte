@@ -34,13 +34,18 @@
   
   $: tenantId = $currentTenant?.id || '';
   
+  let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+  
   onMount(() => {
     if (tenantId) {
       loadCustomers();
     }
   });
   
-  $: if (tenantId) {
+  // Only reload when tenantId changes, not on every render
+  let lastTenantId = '';
+  $: if (tenantId && tenantId !== lastTenantId) {
+    lastTenantId = tenantId;
     loadCustomers();
   }
   
@@ -50,6 +55,7 @@
     try {
       isLoading = true;
       error = '';
+      success = ''; // Clear success message when loading
       
       const filters: any = {
         limit: 1000
@@ -74,8 +80,12 @@
       calculateStats();
       
     } catch (err: any) {
+      console.error('Error loading customers:', err);
       error = err.message || 'Failed to load customers';
       customers = [];
+      setTimeout(() => {
+        error = '';
+      }, 5000);
     } finally {
       isLoading = false;
     }
@@ -111,8 +121,13 @@
     try {
       if (!customer._id) {
         error = 'Customer ID not found';
+        setTimeout(() => { error = ''; }, 5000);
         return;
       }
+      
+      isLoading = true;
+      error = '';
+      success = '';
       
       await customerService.deleteCustomer(customer._id);
       success = `Customer ${customer.fullName || customer.customerId} deleted successfully`;
@@ -123,10 +138,13 @@
       
       await loadCustomers();
     } catch (err: any) {
+      console.error('Error deleting customer:', err);
       error = err.message || 'Failed to delete customer';
       setTimeout(() => {
         error = '';
       }, 5000);
+    } finally {
+      isLoading = false;
     }
   }
   
@@ -136,13 +154,15 @@
     selectedCustomer = null;
   }
   
-  function handleCustomerSaved() {
+  async function handleCustomerSaved() {
     handleModalClose();
-    loadCustomers();
     success = selectedCustomer ? 'Customer updated successfully' : 'Customer created successfully';
     setTimeout(() => {
       success = '';
     }, 3000);
+    // Reload customers after a brief delay to ensure backend has processed
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await loadCustomers();
   }
   
   function formatPhone(phone: string): string {
@@ -217,7 +237,13 @@
           bind:value={searchQuery}
           placeholder="Search by name, phone, email, or customer ID..."
           class="search-input"
-          on:input={() => loadCustomers()}
+          on:input={() => {
+            // Debounce search to prevent excessive API calls
+            if (loadTimeout) clearTimeout(loadTimeout);
+            loadTimeout = setTimeout(() => {
+              loadCustomers();
+            }, 300);
+          }}
         />
       </div>
       

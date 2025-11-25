@@ -106,8 +106,27 @@ class CustomerService {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || `Request failed: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+      
+      // Handle duplicate customer error (409) with better messaging
+      if (response.status === 409 && errorData.duplicateField) {
+        const fieldName = errorData.duplicateField === 'customerId' 
+          ? 'Customer ID' 
+          : errorData.duplicateField === 'email'
+          ? 'Email address'
+          : errorData.duplicateField === 'primaryPhone'
+          ? 'Phone number'
+          : errorData.duplicateField;
+        throw new Error(`A customer with this ${fieldName.toLowerCase()} already exists. ${errorData.message || ''}`);
+      }
+      
+      // Handle validation errors (400) with detailed messages
+      if (response.status === 400 && errorData.errors) {
+        const errorMessages = Object.values(errorData.errors).map((e: any) => e.message || e).join(', ');
+        throw new Error(errorMessages || errorData.message || 'Validation failed');
+      }
+      
+      throw new Error(errorData.error || errorData.message || `Request failed: ${response.statusText}`);
     }
 
     return await response.json();
