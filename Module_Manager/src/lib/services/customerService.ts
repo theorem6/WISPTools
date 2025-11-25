@@ -94,16 +94,24 @@ class CustomerService {
     // Get API URL - uses relative URL, works for all domains via Firebase Hosting rewrites
     const apiPath = getApiUrl() || '/api';
     const fullUrl = `${apiPath}/customers${endpoint}`;
-    console.log('[CustomerService] API call:', { apiPath, fullUrl, hostname: typeof window !== 'undefined' ? window.location.hostname : 'server' });
-    const response = await fetch(fullUrl, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'X-Tenant-ID': tenantId,
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
-    });
+    console.log('[CustomerService] API call:', { apiPath, fullUrl, hostname: typeof window !== 'undefined' ? window.location.hostname : 'server', tenantId, method: options.method || 'GET' });
+    
+    let response;
+    try {
+      response = await fetch(fullUrl, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+      console.log('[CustomerService] Response received:', { status: response.status, statusText: response.statusText, ok: response.ok });
+    } catch (fetchError: any) {
+      console.error('[CustomerService] Fetch error:', fetchError);
+      throw new Error(`Network error: ${fetchError.message || 'Failed to connect to server'}`);
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
@@ -129,7 +137,9 @@ class CustomerService {
       throw new Error(errorData.error || errorData.message || `Request failed: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log('[CustomerService] Response data:', { dataLength: Array.isArray(data) ? data.length : 'not array', hasData: !!data });
+    return data;
   }
 
   /**

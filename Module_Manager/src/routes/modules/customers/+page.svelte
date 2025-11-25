@@ -69,7 +69,9 @@
         filters.status = selectedStatus;
       }
       
+      console.log('[CustomerPage] Calling searchCustomers with filters:', filters);
       customers = await customerService.searchCustomers(filters);
+      console.log('[CustomerPage] Customers loaded:', { count: customers.length, customers });
       
       // Filter out inactive if needed
       if (!showInactive) {
@@ -78,9 +80,10 @@
       
       // Calculate stats
       calculateStats();
+      console.log('[CustomerPage] Stats calculated:', stats);
       
     } catch (err: any) {
-      console.error('Error loading customers:', err);
+      console.error('[CustomerPage] Error loading customers:', err);
       error = err.message || 'Failed to load customers';
       customers = [];
       setTimeout(() => {
@@ -88,6 +91,7 @@
       }, 5000);
     } finally {
       isLoading = false;
+      console.log('[CustomerPage] Loading complete, isLoading:', isLoading);
     }
   }
   
