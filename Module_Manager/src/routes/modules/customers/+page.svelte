@@ -200,9 +200,19 @@
         </div>
         <p class="subtitle">Manage your tenant's customers and subscribers</p>
       </div>
-      <button class="btn-primary" on:click={handleAdd}>
-        ➕ Add Customer
-      </button>
+      <div class="header-actions">
+        <a 
+          href="/modules/customers/portal/login" 
+          target="_blank" 
+          class="btn-secondary"
+          title="Open Customer Portal"
+        >
+          🌐 Customer Portal
+        </a>
+        <button class="btn-primary" on:click={handleAdd}>
+          ➕ Add Customer
+        </button>
+      </div>
     </div>
     
     {#if error}
@@ -697,6 +707,10 @@
   
   a.btn-secondary {
     text-decoration: none;
+  }
+  
+  .header-actions .btn-secondary {
+    padding: 0.75rem 1.5rem;
   }
   
   .btn-secondary:hover {

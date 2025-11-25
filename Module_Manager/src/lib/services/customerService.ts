@@ -117,15 +117,24 @@ class CustomerService {
       const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
       
       // Handle duplicate customer error (409) with better messaging
-      if (response.status === 409 && errorData.duplicateField) {
-        const fieldName = errorData.duplicateField === 'customerId' 
-          ? 'Customer ID' 
-          : errorData.duplicateField === 'email'
-          ? 'Email address'
-          : errorData.duplicateField === 'primaryPhone'
-          ? 'Phone number'
-          : errorData.duplicateField;
-        throw new Error(`A customer with this ${fieldName.toLowerCase()} already exists. ${errorData.message || ''}`);
+      if (response.status === 409) {
+        if (errorData.duplicateField) {
+          const fieldName = errorData.duplicateField === 'customerId' 
+            ? 'Customer ID' 
+            : errorData.duplicateField === 'email'
+            ? 'Email address'
+            : errorData.duplicateField === 'primaryPhone'
+            ? 'Phone number'
+            : errorData.duplicateField === 'tenantId'
+            ? 'Tenant'
+            : errorData.duplicateField;
+          throw new Error(`A customer with this ${fieldName.toLowerCase()} already exists.`);
+        } else if (errorData.message) {
+          // Use backend message if no duplicateField specified
+          throw new Error(errorData.message);
+        } else {
+          throw new Error('A customer with this information already exists. Please check the customer ID, email, or phone number.');
+        }
       }
       
       // Handle validation errors (400) with detailed messages
