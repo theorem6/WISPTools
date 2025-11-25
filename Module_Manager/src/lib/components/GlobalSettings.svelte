@@ -366,6 +366,10 @@
           <div class="tab-content full-height">
             <UserManagementEmbedded />
           </div>
+        {:else if activeTab === 'branding'}
+          <div class="tab-content">
+            <BrandingManagement />
+          </div>
         {/if}
         
         {#if saveSuccess}
