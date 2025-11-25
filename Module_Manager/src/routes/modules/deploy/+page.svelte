@@ -14,7 +14,7 @@
   import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
   import SharedMap from '$lib/map/SharedMap.svelte';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
-  import { mapContext, type MapLayerState } from '$lib/map/mapContext';
+  import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
 import type { MapModuleMode } from '$lib/map/MapCapabilities';
 import type { ModuleContext } from '$lib/services/objectStateManager';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
@@ -234,7 +234,7 @@ import '$lib/styles/moduleHeaderMenu.css';
     }
   }
 
-  // Deactivate plan - hide plan from map
+  // Deactivate plan - hide plan from map and clear planned objects
   async function deactivatePlan(plan: PlanProject) {
     const tenantId = $currentTenant?.id;
     if (!tenantId) return;
@@ -249,22 +249,30 @@ import '$lib/styles/moduleHeaderMenu.css';
       visiblePlanIds.delete(plan.id);
       visiblePlanIds = new Set(visiblePlanIds);
       
-      // Reload plans to update state
-      await loadReadyPlans();
-      
-      // If this was the active plan on the map, clear it
+      // If this was the active plan on the map, clear planned objects
       if (mapState?.activePlan?.id === plan.id) {
-        // Try to load another active plan, or clear the map
+        // Clear the plan and staged features from the map (planned objects)
+        // Keep production hardware (deployed objects) visible
+        setMapData({
+          activePlan: null,
+          stagedFeatures: [],
+          stagedSummary: { total: 0, byType: {}, byStatus: {} }
+        });
+        
+        // Try to load another active plan, or just show production hardware
         const nextActivePlan = readyPlans.find(p => p.showOnMap && p.id !== plan.id);
         if (nextActivePlan) {
           await mapLayerManager.loadPlan(tenantId, nextActivePlan);
         } else {
-          // Clear the plan from map if no other active plan
+          // Ensure production hardware is loaded (deployed objects persist)
           await mapLayerManager.loadProductionHardware(tenantId);
         }
       }
       
-      deploymentMessage = `Plan "${plan.name}" has been deactivated.`;
+      // Reload plans to update state
+      await loadReadyPlans();
+      
+      deploymentMessage = `Plan "${plan.name}" has been deactivated. Planned objects removed from map.`;
       setTimeout(() => (deploymentMessage = ''), 5000);
     } catch (err: any) {
       error = err.message || 'Failed to deactivate plan';
