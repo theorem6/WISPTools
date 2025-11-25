@@ -4,6 +4,77 @@
  */
 
 const { admin, firestore: firestoreDB } = require('../config/firebase');
+const { User, UserTenant } = require('../models/user');
+const { Tenant } = require('../models/tenant');
+
+/**
+ * Auto-provision a user record when missing from Firestore/Mongo.
+ * This ensures tenant owners (contact email) are treated as owners/admins.
+ */
+async function autoProvisionUser(decodedToken) {
+  try {
+    const uid = decodedToken.uid;
+    const email = (decodedToken.email || '').toLowerCase();
+    let fallbackTenantId = null;
+    let fallbackRole = 'viewer';
+    let userTenantRecord = await UserTenant.findOne({ userId: uid }).lean();
+
+    // If no tenant association exists, attempt to link via tenant contact email
+    if (!userTenantRecord && email) {
+      const tenant = await Tenant.findOne({ contactEmail: email }).lean();
+      if (tenant) {
+        const tenantId = tenant._id.toString();
+        const now = new Date();
+        userTenantRecord = await UserTenant.create({
+          userId: uid,
+          tenantId,
+          role: 'owner',
+          status: 'active',
+          invitedBy: uid,
+          invitedAt: now,
+          acceptedAt: now,
+          addedAt: now
+        });
+        fallbackTenantId = tenantId;
+        fallbackRole = 'owner';
+      }
+    }
+
+    if (userTenantRecord) {
+      fallbackTenantId = userTenantRecord.tenantId;
+      fallbackRole = userTenantRecord.role || fallbackRole;
+    }
+
+    const userData = {
+      uid,
+      email,
+      displayName: decodedToken.name || decodedToken.email || '',
+      role: fallbackRole,
+      tenantId: fallbackTenantId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await firestoreDB.collection('users').doc(uid).set(userData, { merge: true });
+
+    await User.findOneAndUpdate(
+      { uid },
+      {
+        email: userData.email,
+        displayName: userData.displayName,
+        role: fallbackRole,
+        tenantId: fallbackTenantId,
+        updatedAt: new Date()
+      },
+      { upsert: true, setDefaultsOnInsert: true }
+    );
+
+    return userData;
+  } catch (error) {
+    console.error('[AdminAuth] Failed to auto-provision user record:', error);
+    return null;
+  }
+}
 
 /**
  * Middleware to require authentication
@@ -30,13 +101,18 @@ const requireAuth = async (req, res, next) => {
     const decodedToken = await admin.auth().verifyIdToken(token);
     
     // Get user data from Firestore
-    const userDoc = await firestoreDB.collection('users').doc(decodedToken.uid).get();
+    let userDoc = await firestoreDB.collection('users').doc(decodedToken.uid).get();
+    let userData;
     
     if (!userDoc.exists) {
-      return res.status(401).json({ error: 'User not found in database' });
+      console.warn(`[AdminAuth] User ${decodedToken.email} missing from Firestore. Attempting auto-provision...`);
+      userData = await autoProvisionUser(decodedToken);
+      if (!userData) {
+        return res.status(401).json({ error: 'User not found in database' });
+      }
+    } else {
+      userData = userDoc.data();
     }
-    
-    const userData = userDoc.data();
     
     // Add user info to request object
     req.user = {
