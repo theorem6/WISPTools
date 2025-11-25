@@ -2,34 +2,44 @@
  * Email Service
  * Sends welcome emails and notifications to users
  * 
- * Uses nodemailer with SMTP or can be configured for SendGrid/AWS SES
- * Falls back to console logging if SMTP is not configured
+ * Uses nodemailer with sendmail (local) or SMTP
+ * Falls back to console logging if email sending fails
  */
 
 const nodemailer = require('nodemailer');
 
-// Email configuration from environment
-const EMAIL_CONFIG = {
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-};
-
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@wisptools.io';
 const FROM_NAME = process.env.FROM_NAME || 'WISPTools';
+
+// Check if we should use SMTP or sendmail
+const USE_SMTP = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
 
 // Create transporter (lazy initialization)
 let transporter = null;
 
 function getTransporter() {
-  if (!transporter && EMAIL_CONFIG.auth.user && EMAIL_CONFIG.auth.pass && 
-      EMAIL_CONFIG.auth.user !== 'placeholder' && EMAIL_CONFIG.auth.pass !== 'placeholder') {
-    transporter = nodemailer.createTransport(EMAIL_CONFIG);
-    console.log('📧 [Email] SMTP transporter initialized');
+  if (!transporter) {
+    if (USE_SMTP) {
+      // Use SMTP configuration
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+      console.log('📧 [Email] SMTP transporter initialized');
+    } else {
+      // Use sendmail (local mail transport)
+      transporter = nodemailer.createTransport({
+        sendmail: true,
+        newline: 'unix',
+        path: '/usr/sbin/sendmail'
+      });
+      console.log('📧 [Email] Sendmail transporter initialized');
+    }
   }
   return transporter;
 }
@@ -38,8 +48,7 @@ function getTransporter() {
  * Check if email service is configured
  */
 function isConfigured() {
-  return !!(EMAIL_CONFIG.auth.user && EMAIL_CONFIG.auth.pass && 
-            EMAIL_CONFIG.auth.user !== 'placeholder' && EMAIL_CONFIG.auth.pass !== 'placeholder');
+  return true; // Always configured - uses sendmail as fallback
 }
 
 /**
@@ -55,24 +64,6 @@ async function sendWelcomeEmail(options) {
   } = options;
 
   const transport = getTransporter();
-  
-  if (!transport) {
-    // Log the email details so admin can manually send if needed
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`📧 [Email] WELCOME EMAIL - SMTP not configured`);
-    console.log(`${'='.repeat(60)}`);
-    console.log(`TO: ${email}`);
-    console.log(`SUBJECT: Welcome to ${tenantName} - WISPTools`);
-    console.log(`ROLE: ${getRoleName(role)}`);
-    console.log(`INVITED BY: ${invitedByName || 'Admin'}`);
-    console.log(`\nINSTRUCTIONS FOR USER:`);
-    console.log(`1. Go to https://wisptools.io/login`);
-    console.log(`2. Sign in with Google or create account with email: ${email}`);
-    console.log(`3. You'll have access to ${tenantName} as ${getRoleName(role)}`);
-    console.log(`${'='.repeat(60)}\n`);
-    
-    return { sent: false, reason: 'Email service not configured - see server logs for details' };
-  }
 
   const firstName = displayName?.split(' ')[0] || email.split('@')[0];
   const roleName = getRoleName(role);
