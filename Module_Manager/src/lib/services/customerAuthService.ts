@@ -22,8 +22,8 @@ class CustomerAuthService {
    */
   async login(identifier: string, password: string): Promise<CustomerAuthResult> {
     try {
-      // First, sign in with Firebase Auth
-      const authResult = await authService.signInWithEmailAndPassword(identifier, password);
+      // First, sign in with Firebase Auth using the correct method name
+      const authResult = await authService.signIn(identifier, password);
       
       if (!authResult.success || !authResult.data) {
         return {
@@ -32,8 +32,8 @@ class CustomerAuthService {
         };
       }
       
-      // Get ID token
-      const idToken = await authResult.data.getIdToken();
+      // Get ID token from the current user
+      const idToken = await authService.getIdToken();
       
       // Call customer portal API to link/verify customer
       const response = await fetch(`${API_URL}/customer-portal/auth/login`, {
@@ -76,8 +76,8 @@ class CustomerAuthService {
    */
   async signUp(customerId: string, phone: string, email: string, password: string): Promise<CustomerAuthResult> {
     try {
-      // Create Firebase Auth account
-      const authResult = await authService.createUserWithEmailAndPassword(email, password);
+      // Create Firebase Auth account using the correct method name
+      const authResult = await authService.signUp(email, password);
       
       if (!authResult.success || !authResult.data) {
         return {
@@ -86,8 +86,8 @@ class CustomerAuthService {
         };
       }
       
-      // Get ID token
-      const idToken = await authResult.data.getIdToken();
+      // Get ID token from the current user
+      const idToken = await authService.getIdToken();
       
       // Call customer portal API to link customer
       const response = await fetch(`${API_URL}/customer-portal/auth/signup`, {

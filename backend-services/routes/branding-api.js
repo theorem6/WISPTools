@@ -130,27 +130,39 @@ function registerBrandingRoutes(app) {
   /**
    * GET /api/branding/:tenantId
    * Get tenant branding (public endpoint for customer portal)
+   * Supports both full MongoDB ObjectId (24 chars) and short portal subdomain (12 chars)
    */
   app.get('/api/branding/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
     
-    console.log('[Branding API] Fetching branding for tenant:', tenantId);
+    console.log('[Branding API] Fetching branding for tenant:', tenantId, 'length:', tenantId.length);
     
     // Try to find tenant by ID (handle both string and ObjectId)
     const mongoose = require('mongoose');
     let tenant;
     
-    // Check if tenantId is a valid ObjectId
-    if (mongoose.Types.ObjectId.isValid(tenantId)) {
+    // Check if tenantId is a valid full ObjectId (24 chars)
+    if (mongoose.Types.ObjectId.isValid(tenantId) && tenantId.length === 24) {
       tenant = await Tenant.findOne({ 
         _id: new mongoose.Types.ObjectId(tenantId),
         status: 'active'
       }).select('branding displayName contactEmail name');
-    } else {
-      // If not valid ObjectId, try as string
-      tenant = await Tenant.findOne({ 
-        _id: tenantId,
+    }
+    
+    // If not found, try portal subdomain lookup
+    if (!tenant) {
+      tenant = await Tenant.findOne({
+        'branding.portal.portalSubdomain': tenantId,
+        status: 'active'
+      }).select('branding displayName contactEmail name');
+    }
+    
+    // If still not found and it's 12 chars, try matching start of _id
+    if (!tenant && tenantId.length === 12) {
+      console.log('[Branding API] Trying regex match for short ID:', tenantId);
+      tenant = await Tenant.findOne({
+        _id: { $regex: `^${tenantId}` },
         status: 'active'
       }).select('branding displayName contactEmail name');
     }
