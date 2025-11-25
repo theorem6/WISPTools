@@ -112,12 +112,28 @@ router.get('/:tenantId', async (req, res) => {
  * PUT /api/branding/:tenantId
  * Update tenant branding (admin only)
  */
-router.put('/:tenantId', requireAuth, requireAdminMiddleware, async (req, res) => {
+router.put('/:tenantId', (req, res, next) => {
+  console.log('[Branding API] PUT route middleware - BEFORE requireAuth:', {
+    method: req.method,
+    path: req.path,
+    url: req.url,
+    params: req.params,
+    tenantId: req.params.tenantId
+  });
+  next();
+}, requireAuth, (req, res, next) => {
+  console.log('[Branding API] PUT route middleware - AFTER requireAuth, BEFORE requireAdmin:', {
+    method: req.method,
+    path: req.path,
+    user: req.user ? { email: req.user.email, role: req.user.role } : 'no user'
+  });
+  next();
+}, requireAdminMiddleware, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const brandingData = req.body;
     
-    console.log('[Branding API] PUT /:tenantId called:', { tenantId, hasData: !!brandingData, method: req.method, path: req.path });
+    console.log('[Branding API] PUT /:tenantId handler called:', { tenantId, hasData: !!brandingData, method: req.method, path: req.path });
     
     // Extract tenantId from request (set by middleware)
     const requestTenantId = req.tenantId || tenantId;
