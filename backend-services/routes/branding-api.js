@@ -4,7 +4,9 @@
  */
 
 const { Tenant } = require('../models/tenant');
+const { Customer } = require('../models/customer');
 const { requireAuth, requireAdmin } = require('../middleware/admin-auth');
+const { auth } = require('../config/firebase');
 
 /**
  * Registers branding API routes directly on the main Express app.
@@ -12,6 +14,82 @@ const { requireAuth, requireAdmin } = require('../middleware/admin-auth');
  */
 function registerBrandingRoutes(app) {
   const requireAdminMiddleware = requireAdmin();
+
+  /**
+   * Middleware: Allow admin OR customer to update branding
+   * Customers can only update their own tenant's branding
+   */
+  const requireAdminOrCustomer = async (req, res, next) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'No token provided' });
+      }
+      
+      const token = authHeader.split('Bearer ')[1];
+      const decodedToken = await auth.verifyIdToken(token);
+      const uid = decodedToken.uid;
+      
+      // Try to find customer first
+      const customer = await Customer.findOne({ 
+        'portalAccess.firebaseUid': uid,
+        'portalAccess.enabled': true,
+        'portalAccess.accountStatus': 'active'
+      });
+      
+      if (customer) {
+        // Customer authentication - verify they belong to the tenant being updated
+        const { tenantId } = req.params;
+        if (customer.tenantId !== tenantId) {
+          return res.status(403).json({ 
+            error: 'Forbidden', 
+            message: 'You can only update branding for your own tenant' 
+          });
+        }
+        
+        // Attach customer to request
+        req.customer = customer;
+        req.isCustomer = true;
+        return next();
+      }
+      
+      // Not a customer, try admin authentication
+      // First verify auth
+      const { requireAuth: verifyAuth } = require('../middleware/admin-auth');
+      let authError = null;
+      await new Promise((resolve) => {
+        verifyAuth(req, res, (err) => {
+          authError = err;
+          resolve();
+        });
+      });
+      
+      if (authError) {
+        return res.status(401).json({ error: 'Unauthorized', message: 'Invalid token' });
+      }
+      
+      // Check if admin
+      const { requireAdmin: checkAdmin } = require('../middleware/admin-auth');
+      const adminMiddleware = checkAdmin();
+      let adminError = null;
+      await new Promise((resolve) => {
+        adminMiddleware(req, res, (err) => {
+          adminError = err;
+          resolve();
+        });
+      });
+      
+      if (adminError) {
+        return res.status(403).json({ error: 'Forbidden', message: 'Admin access required' });
+      }
+      
+      req.isCustomer = false;
+      next();
+    } catch (error) {
+      console.error('Admin or customer auth error:', error);
+      res.status(401).json({ error: 'Unauthorized', message: 'Invalid token or insufficient permissions' });
+    }
+  };
 
   console.log('[Branding API] Registering routes on application instance:');
   console.log('  GET /api/branding/:tenantId');
@@ -110,9 +188,9 @@ function registerBrandingRoutes(app) {
 
   /**
    * PUT /api/branding/:tenantId
-   * Update tenant branding (admin only)
+   * Update tenant branding (admin or customer - customer can only update their own tenant)
    */
-  app.put('/api/branding/:tenantId', requireAuth, requireAdminMiddleware, async (req, res) => {
+  app.put('/api/branding/:tenantId', requireAdminOrCustomer, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const brandingData = req.body;

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { currentTenant } from '$lib/stores/tenantStore';
   import { brandingService } from '$lib/services/brandingService';
+  import { customerAuthService } from '$lib/services/customerAuthService';
   import { goto } from '$app/navigation';
-  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
+  import type { Customer } from '$lib/services/customerService';
   
   type WizardStep = 'welcome' | 'domain' | 'branding' | 'features' | 'complete';
   
@@ -12,6 +12,9 @@
   let saving = false;
   let error = '';
   let success = '';
+  let customer: Customer | null = null;
+  let tenantId = '';
+  let tenantName = '';
   
   // Domain configuration
   let customDomain = '';
@@ -25,44 +28,59 @@
   let primaryColor = '#3b82f6';
   let supportEmail = '';
   let supportPhone = '';
-let tenantCompanyName = '';
   
   // Features
   let enableFAQ = true;
   let enableServiceStatus = true;
   let enableLiveChat = false;
   let enableKnowledgeBase = false;
-  
-$: tenantCompanyName = $currentTenant?.displayName || $currentTenant?.name || '';
-$: if (tenantCompanyName && tenantCompanyName !== companyName) {
-  companyName = tenantCompanyName;
-}
 
   onMount(async () => {
-    if ($currentTenant) {
+    // Check customer authentication
+    loading = true;
+    try {
+      customer = await customerAuthService.getCurrentCustomer();
+      
+      if (!customer) {
+        // Redirect to customer portal login
+        goto('/modules/customers/portal/login');
+        return;
+      }
+      
+      // Get tenant ID from customer
+      tenantId = customer.tenantId;
+      tenantName = customer.fullName || customer.firstName || 'Your Company';
+      
+      // Load existing configuration
       await loadExistingConfig();
+    } catch (err: any) {
+      console.error('Error initializing:', err);
+      error = 'Failed to load portal setup. Please try again.';
+      goto('/modules/customers/portal/login');
+    } finally {
+      loading = false;
     }
   });
   
   async function loadExistingConfig() {
-    if (!$currentTenant) return;
+    if (!tenantId) return;
     
     loading = true;
     try {
-      const branding = await brandingService.getTenantBranding($currentTenant.id);
+      const branding = await brandingService.getTenantBranding(tenantId);
       
       // Load existing configuration
       enableCustomDomain = branding.portal?.enableCustomDomain || false;
       customDomain = branding.portal?.customDomain || '';
       // Use tenant ID (first 12 chars) as portal path
-      portalSubdomain = branding.portal?.portalSubdomain || $currentTenant.id.slice(0, 12);
+      portalSubdomain = branding.portal?.portalSubdomain || tenantId.slice(0, 12);
       portalUrl = branding.portal?.portalUrl || `https://wisptools.io/portal/${portalSubdomain}`;
       
-      const tenantDisplayName = $currentTenant?.displayName || $currentTenant?.name || '';
-      companyName = tenantDisplayName || branding.company?.name || '';
+      // Get company name from tenant branding or use tenant name
+      companyName = branding.company?.name || tenantName;
       logoUrl = branding.logo?.url || '';
       primaryColor = branding.colors?.primary || '#3b82f6';
-      supportEmail = branding.company?.supportEmail || $currentTenant.contactEmail || '';
+      supportEmail = branding.company?.supportEmail || customer?.email || '';
       supportPhone = branding.company?.supportPhone || '';
       
       enableFAQ = branding.features?.enableFAQ !== false;
@@ -102,7 +120,7 @@ $: if (tenantCompanyName && tenantCompanyName !== companyName) {
   }
   
   async function saveConfiguration() {
-    if (!$currentTenant) return;
+    if (!tenantId) return;
     
     saving = true;
     error = '';
@@ -112,10 +130,10 @@ $: if (tenantCompanyName && tenantCompanyName !== companyName) {
       // Generate portal path if not using custom domain
       if (!enableCustomDomain && !portalSubdomain) {
         // Use first 12 characters of tenant ID as portal path
-        portalSubdomain = $currentTenant.id.slice(0, 12);
+        portalSubdomain = tenantId.slice(0, 12);
       }
       
-      await brandingService.updateTenantBranding($currentTenant.id, {
+      await brandingService.updateTenantBranding(tenantId, {
         logo: {
           url: logoUrl,
           altText: companyName || 'Company Logo'
@@ -159,12 +177,24 @@ $: if (tenantCompanyName && tenantCompanyName !== companyName) {
       return `https://${customDomain}`;
     }
     // Use tenant ID or generate a short code
-    const portalPath = portalSubdomain || $currentTenant?.id?.slice(0, 12) || 'portal';
+    const portalPath = portalSubdomain || tenantId?.slice(0, 12) || 'portal';
     return `https://wisptools.io/portal/${portalPath}`;
   }
 </script>
 
-<TenantGuard>
+{#if loading}
+  <div class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading portal setup...</p>
+  </div>
+{:else if !customer}
+  <div class="error-container">
+    <p>You must be logged in as a customer to access this page.</p>
+    <button class="btn-primary" on:click={() => goto('/modules/customers/portal/login')}>
+      Go to Login
+    </button>
+  </div>
+{:else}
   <div class="portal-setup-page">
     <div class="setup-header">
       <h1>🌐 Customer Portal Setup Wizard</h1>
@@ -425,7 +455,7 @@ $: if (tenantCompanyName && tenantCompanyName !== companyName) {
       {/if}
     </div>
   </div>
-</TenantGuard>
+{/if}
 
 <style>
   .portal-setup-page {
@@ -762,6 +792,33 @@ $: if (tenantCompanyName && tenantCompanyName !== companyName) {
     background: var(--success-light);
     color: var(--success);
     border: 1px solid var(--success);
+  }
+  
+  .loading-container,
+  .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 1rem;
+  }
+  
+  .loading-container p {
+    color: var(--text-secondary);
+  }
+  
+  .readonly-value {
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  
+  .form-group.readonly {
+    opacity: 0.8;
   }
 </style>
 
