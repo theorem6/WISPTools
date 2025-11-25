@@ -25,6 +25,7 @@
   let primaryColor = '#3b82f6';
   let supportEmail = '';
   let supportPhone = '';
+let tenantCompanyName = '';
   
   // Features
   let enableFAQ = true;
@@ -32,6 +33,11 @@
   let enableLiveChat = false;
   let enableKnowledgeBase = false;
   
+$: tenantCompanyName = $currentTenant?.displayName || $currentTenant?.name || '';
+$: if (tenantCompanyName && tenantCompanyName !== companyName) {
+  companyName = tenantCompanyName;
+}
+
   onMount(async () => {
     if ($currentTenant) {
       await loadExistingConfig();
@@ -52,7 +58,8 @@
       portalSubdomain = branding.portal?.portalSubdomain || $currentTenant.id.slice(0, 12);
       portalUrl = branding.portal?.portalUrl || `https://wisptools.io/portal/${portalSubdomain}`;
       
-      companyName = branding.company?.name || $currentTenant.displayName || '';
+      const tenantDisplayName = $currentTenant?.displayName || $currentTenant?.name || '';
+      companyName = tenantDisplayName || branding.company?.name || '';
       logoUrl = branding.logo?.url || '';
       primaryColor = branding.colors?.primary || '#3b82f6';
       supportEmail = branding.company?.supportEmail || $currentTenant.contactEmail || '';
@@ -280,15 +287,12 @@
           <p>Make the portal look like your company.</p>
           
           <div class="form-section">
-            <div class="form-group">
-              <label>Company Name *</label>
-              <input 
-                type="text" 
-                bind:value={companyName} 
-                placeholder="Your Company Name"
-                class="form-input"
-                required
-              />
+            <div class="form-group readonly">
+              <label>Company Name (managed by tenant)</label>
+              <div class="readonly-value">
+                {companyName || 'No tenant selected'}
+              </div>
+              <p class="help-text">Update the tenant profile to change this name.</p>
             </div>
             
             <div class="form-group">
@@ -569,6 +573,16 @@
     font-size: 1rem;
   }
   
+.form-group.readonly .readonly-value {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
   .form-input:focus {
     outline: none;
     border-color: var(--brand-primary);
