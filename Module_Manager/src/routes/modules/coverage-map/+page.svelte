@@ -1152,7 +1152,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     </button>
   </div>
 
-  {#if displayPlanSummary && (isPlanMode || sharedMapMode === 'plan' || sharedMapMode === 'deploy')}
+  {#if displayPlanSummary && (() => {
+    // In deploy mode, only show if a plan is being worked on (has objects)
+    if (isDeployMode || sharedMapMode === 'deploy') {
+      return displayPlanSummary.total > 0;
+    }
+    // In plan mode, always show
+    return isPlanMode || sharedMapMode === 'plan';
+  })()}
     <div class="plan-summary-card">
       <div class="plan-summary-header">
         <span>Plan Drafts</span>
@@ -1797,7 +1804,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   .plan-summary-card {
     position: absolute;
-    bottom: 2.5rem;
+    bottom: 5.5rem;
     right: 1rem;
     padding: 1rem;
     background: rgba(15, 23, 42, 0.88);
@@ -1807,6 +1814,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     min-width: 220px;
     backdrop-filter: blur(12px);
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+    z-index: 10001;
   }
 
   .plan-summary-header {

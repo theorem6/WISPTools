@@ -24,7 +24,7 @@
 <style>
   .settings-button {
     position: fixed;
-    bottom: 2rem;
+    bottom: 8.5rem;
     right: 2rem;
     width: 56px;
     height: 56px;
@@ -37,7 +37,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 
                 0 8px 24px rgba(59, 130, 246, 0.3);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 9999;
+    z-index: 10002;
     display: flex;
     align-items: center;
     justify-content: center;

@@ -397,22 +397,23 @@
     background: rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: stretch;
-    justify-content: stretch;
+    justify-content: flex-start;
     z-index: 10000;
     backdrop-filter: blur(4px);
   }
   
   .settings-panel {
     background: var(--card-bg, white);
-    border-radius: 0;
-    box-shadow: none;
-    width: 100%;
+    border-radius: 0 12px 12px 0;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.3);
+    width: 600px;
+    max-width: 90vw;
     height: 100%;
-    max-width: 100%;
     max-height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin-left: 0;
   }
   
   .settings-header {
