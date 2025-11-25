@@ -108,7 +108,16 @@ const requireAuth = async (req, res, next) => {
       console.warn(`[AdminAuth] User ${decodedToken.email} missing from Firestore. Attempting auto-provision...`);
       userData = await autoProvisionUser(decodedToken);
       if (!userData) {
-        return res.status(401).json({ error: 'User not found in database' });
+        console.warn('[AdminAuth] Auto-provision failed; falling back to decoded token info');
+        userData = {
+          uid: decodedToken.uid,
+          email: (decodedToken.email || '').toLowerCase(),
+          displayName: decodedToken.name || decodedToken.email || '',
+          role: 'viewer',
+          tenantId: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
       }
     } else {
       userData = userDoc.data();
