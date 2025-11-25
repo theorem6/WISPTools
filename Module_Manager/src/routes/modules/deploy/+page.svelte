@@ -197,22 +197,28 @@ import '$lib/styles/moduleHeaderMenu.css';
     }
   }
 
-  // Activate plan - show any plan on the map
+  // Activate plan - show any plan on the map (only one active at a time)
   async function activatePlan(plan: PlanProject) {
     const tenantId = $currentTenant?.id;
     if (!tenantId) return;
     
     try {
       isLoadingPlans = true;
-      // Set showOnMap to true
+      
+      // First, deactivate all other plans (set showOnMap to false)
+      const otherPlans = readyPlans.filter(p => p.id !== plan.id && p.showOnMap);
+      for (const otherPlan of otherPlans) {
+        await planService.updatePlan(otherPlan.id, { showOnMap: false });
+      }
+      
+      // Then activate the selected plan
       await planService.updatePlan(plan.id, { showOnMap: true });
       
       // Load the plan on the map (works for any plan status)
       await mapLayerManager.loadPlan(tenantId, plan);
       
-      // Add to visible plans
-      visiblePlanIds.add(plan.id);
-      visiblePlanIds = new Set(visiblePlanIds);
+      // Update visible plan IDs - only the activated plan
+      visiblePlanIds = new Set([plan.id]);
       
       // Reload plans to update state
       await loadReadyPlans();
