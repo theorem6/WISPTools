@@ -12,6 +12,12 @@ const router = express.Router();
 // Create admin middleware with default options
 const requireAdminMiddleware = requireAdmin();
 
+// Log route registration
+console.log('[Branding API] Routes registered:');
+console.log('  GET /api/branding/:tenantId');
+console.log('  PUT /api/branding/:tenantId');
+console.log('  POST /api/branding/:tenantId/logo');
+
 /**
  * GET /api/branding/:tenantId
  * Get tenant branding (public endpoint for customer portal)
@@ -111,7 +117,7 @@ router.put('/:tenantId', requireAuth, requireAdminMiddleware, async (req, res) =
     const { tenantId } = req.params;
     const brandingData = req.body;
     
-    console.log('[Branding API] Updating branding:', { tenantId, hasData: !!brandingData });
+    console.log('[Branding API] PUT /:tenantId called:', { tenantId, hasData: !!brandingData, method: req.method, path: req.path });
     
     // Extract tenantId from request (set by middleware)
     const requestTenantId = req.tenantId || tenantId;

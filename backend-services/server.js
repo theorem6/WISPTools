@@ -130,9 +130,11 @@ app.use('/api/permissions', require('./routes/permissions')); // FCAPS permissio
 try {
   const brandingRouter = require('./routes/branding-api');
   app.use('/api/branding', brandingRouter);
-  console.log('✅ Branding API enabled');
+  console.log('✅ Branding API enabled at /api/branding');
+  console.log('   Registered routes: GET /:tenantId, PUT /:tenantId, POST /:tenantId/logo');
 } catch (error) {
   console.error('❌ Failed to load Branding API:', error);
+  console.error('   Error stack:', error.stack);
 }
 app.use('/api/customer-portal', require('./routes/customer-portal-api')); // Customer portal API
 app.use('/api/portal', require('./routes/portal-domain')); // Portal domain routing
