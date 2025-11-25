@@ -7,7 +7,8 @@ const express = require('express');
 const { Tenant } = require('../models/tenant');
 const { requireAuth, requireAdmin } = require('../middleware/admin-auth');
 
-const router = express.Router();
+// Create router with mergeParams to handle path parameters correctly
+const router = express.Router({ mergeParams: true, strict: false });
 
 // Create admin middleware with default options
 const requireAdminMiddleware = requireAdmin();
@@ -17,12 +18,6 @@ console.log('[Branding API] Routes registered:');
 console.log('  GET /api/branding/:tenantId');
 console.log('  PUT /api/branding/:tenantId');
 console.log('  POST /api/branding/:tenantId/logo');
-
-// Test route to verify router is working
-router.get('/test', (req, res) => {
-  console.log('[Branding API] Test route hit!');
-  res.json({ message: 'Branding API router is working', path: req.path, url: req.url });
-});
 
 /**
  * GET /api/branding/:tenantId
