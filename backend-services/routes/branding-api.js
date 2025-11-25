@@ -5,8 +5,9 @@
 
 const { Tenant } = require('../models/tenant');
 const { Customer } = require('../models/customer');
+const { UserTenant } = require('../models/user');
 const { requireAuth, requireAdmin } = require('../middleware/admin-auth');
-const { auth } = require('../config/firebase');
+const { admin, firestore: firestoreDB } = require('../config/firebase');
 
 /**
  * Registers branding API routes directly on the main Express app.
@@ -16,10 +17,10 @@ function registerBrandingRoutes(app) {
   const requireAdminMiddleware = requireAdmin();
 
   /**
-   * Middleware: Allow admin OR customer to update branding
-   * Customers can only update their own tenant's branding
+   * Middleware: Allow tenant owner/admin to update branding
+   * This uses a simplified approach that doesn't re-invoke requireAuth
    */
-  const requireAdminOrCustomer = async (req, res, next) => {
+  const requireTenantAdmin = async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -27,67 +28,97 @@ function registerBrandingRoutes(app) {
       }
       
       const token = authHeader.split('Bearer ')[1];
-      const decodedToken = await auth.verifyIdToken(token);
+      
+      // Verify Firebase token
+      const decodedToken = await admin.auth().verifyIdToken(token);
       const uid = decodedToken.uid;
+      const email = (decodedToken.email || '').toLowerCase();
+      const { tenantId } = req.params;
       
-      // Try to find customer first
-      const customer = await Customer.findOne({ 
-        'portalAccess.firebaseUid': uid,
-        'portalAccess.enabled': true,
-        'portalAccess.accountStatus': 'active'
-      });
+      console.log('[Branding API] Auth check for user:', email, 'tenant:', tenantId);
       
-      if (customer) {
-        // Customer authentication - verify they belong to the tenant being updated
-        const { tenantId } = req.params;
-        if (customer.tenantId !== tenantId) {
-          return res.status(403).json({ 
-            error: 'Forbidden', 
-            message: 'You can only update branding for your own tenant' 
-          });
-        }
-        
-        // Attach customer to request
-        req.customer = customer;
-        req.isCustomer = true;
+      // Check 1: Is user an owner/admin for this specific tenant via UserTenant?
+      const userTenantRecord = await UserTenant.findOne({ 
+        userId: uid, 
+        tenantId: tenantId 
+      }).lean();
+      
+      if (userTenantRecord && ['owner', 'admin', 'platform_admin'].includes(userTenantRecord.role)) {
+        console.log('[Branding API] User authorized via UserTenant record, role:', userTenantRecord.role);
+        req.user = {
+          uid,
+          email,
+          role: userTenantRecord.role,
+          tenantId
+        };
         return next();
       }
       
-      // Not a customer, try admin authentication
-      // First verify auth
-      const { requireAuth: verifyAuth } = require('../middleware/admin-auth');
-      let authError = null;
-      await new Promise((resolve) => {
-        verifyAuth(req, res, (err) => {
-          authError = err;
-          resolve();
-        });
-      });
-      
-      if (authError) {
-        return res.status(401).json({ error: 'Unauthorized', message: 'Invalid token' });
+      // Check 2: Is user the tenant's contact email (owner)?
+      const mongoose = require('mongoose');
+      let tenant;
+      if (mongoose.Types.ObjectId.isValid(tenantId)) {
+        tenant = await Tenant.findById(tenantId).lean();
       }
       
-      // Check if admin
-      const { requireAdmin: checkAdmin } = require('../middleware/admin-auth');
-      const adminMiddleware = checkAdmin();
-      let adminError = null;
-      await new Promise((resolve) => {
-        adminMiddleware(req, res, (err) => {
-          adminError = err;
-          resolve();
-        });
-      });
-      
-      if (adminError) {
-        return res.status(403).json({ error: 'Forbidden', message: 'Admin access required' });
+      if (tenant && tenant.contactEmail && tenant.contactEmail.toLowerCase() === email) {
+        console.log('[Branding API] User is tenant contact email, granting owner access');
+        
+        // Auto-create UserTenant record for future logins
+        try {
+          await UserTenant.findOneAndUpdate(
+            { userId: uid, tenantId },
+            { 
+              userId: uid, 
+              tenantId, 
+              role: 'owner', 
+              status: 'active',
+              addedAt: new Date()
+            },
+            { upsert: true }
+          );
+          console.log('[Branding API] Created UserTenant record for tenant owner');
+        } catch (e) {
+          console.warn('[Branding API] Could not create UserTenant record:', e.message);
+        }
+        
+        req.user = {
+          uid,
+          email,
+          role: 'owner',
+          tenantId
+        };
+        return next();
       }
       
-      req.isCustomer = false;
-      next();
+      // Check 3: Is user a platform admin (in Firestore)?
+      try {
+        const userDoc = await firestoreDB.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          if (userData.role === 'platform_admin') {
+            console.log('[Branding API] User is platform admin');
+            req.user = {
+              uid,
+              email,
+              role: 'platform_admin',
+              tenantId
+            };
+            return next();
+          }
+        }
+      } catch (e) {
+        console.warn('[Branding API] Could not check Firestore user:', e.message);
+      }
+      
+      console.log('[Branding API] User not authorized for tenant:', tenantId);
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        message: 'You must be a tenant owner or admin to update branding' 
+      });
     } catch (error) {
-      console.error('Admin or customer auth error:', error);
-      res.status(401).json({ error: 'Unauthorized', message: 'Invalid token or insufficient permissions' });
+      console.error('[Branding API] Auth error:', error);
+      res.status(401).json({ error: 'Unauthorized', message: error.message || 'Authentication failed' });
     }
   };
 
@@ -188,9 +219,9 @@ function registerBrandingRoutes(app) {
 
   /**
    * PUT /api/branding/:tenantId
-   * Update tenant branding (admin or customer - customer can only update their own tenant)
+   * Update tenant branding (tenant owner/admin only)
    */
-  app.put('/api/branding/:tenantId', requireAdminOrCustomer, async (req, res) => {
+  app.put('/api/branding/:tenantId', requireTenantAdmin, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const brandingData = req.body;
