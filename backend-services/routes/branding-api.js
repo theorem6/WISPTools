@@ -3,27 +3,26 @@
  * Manages tenant branding for customer portal
  */
 
-const express = require('express');
 const { Tenant } = require('../models/tenant');
 const { requireAuth, requireAdmin } = require('../middleware/admin-auth');
 
-// Create router with mergeParams to handle path parameters correctly
-const router = express.Router({ mergeParams: true, strict: false });
-
-// Create admin middleware with default options
-const requireAdminMiddleware = requireAdmin();
-
-// Log route registration
-console.log('[Branding API] Routes registered:');
-console.log('  GET /api/branding/:tenantId');
-console.log('  PUT /api/branding/:tenantId');
-console.log('  POST /api/branding/:tenantId/logo');
-
 /**
- * GET /api/branding/:tenantId
- * Get tenant branding (public endpoint for customer portal)
+ * Registers branding API routes directly on the main Express app.
+ * Using direct app routes avoids router mount issues we observed in production.
  */
-router.get('/:tenantId', async (req, res) => {
+function registerBrandingRoutes(app) {
+  const requireAdminMiddleware = requireAdmin();
+
+  console.log('[Branding API] Registering routes on application instance:');
+  console.log('  GET /api/branding/:tenantId');
+  console.log('  PUT /api/branding/:tenantId');
+  console.log('  POST /api/branding/:tenantId/logo');
+
+  /**
+   * GET /api/branding/:tenantId
+   * Get tenant branding (public endpoint for customer portal)
+   */
+  app.get('/api/branding/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
     
@@ -107,27 +106,13 @@ router.get('/:tenantId', async (req, res) => {
     console.error('Error fetching branding:', error);
     res.status(500).json({ error: 'Failed to fetch branding' });
   }
-});
-
-/**
- * PUT /api/branding/:tenantId
- * Update tenant branding (admin only)
- */
-// PUT route - update branding
-router.put('/:tenantId', (req, res, next) => {
-  console.log('[Branding API] PUT route MATCHED!', {
-    method: req.method,
-    path: req.path,
-    url: req.url,
-    baseUrl: req.baseUrl,
-    originalUrl: req.originalUrl,
-    params: req.params,
-    tenantId: req.params.tenantId,
-    route: '/:tenantId',
-    routerStack: router.stack ? router.stack.length : 'no stack'
   });
-  next();
-}, requireAuth, requireAdminMiddleware, async (req, res) => {
+
+  /**
+   * PUT /api/branding/:tenantId
+   * Update tenant branding (admin only)
+   */
+  app.put('/api/branding/:tenantId', requireAuth, requireAdminMiddleware, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const brandingData = req.body;
@@ -206,13 +191,13 @@ router.put('/:tenantId', (req, res, next) => {
     console.error('Error updating branding:', error);
     res.status(500).json({ error: 'Failed to update branding' });
   }
-});
+  });
 
-/**
- * POST /api/branding/:tenantId/logo
- * Upload logo (admin only)
- */
-router.post('/:tenantId/logo', requireAuth, requireAdminMiddleware, async (req, res) => {
+  /**
+   * POST /api/branding/:tenantId/logo
+   * Upload logo (admin only)
+   */
+  app.post('/api/branding/:tenantId/logo', requireAuth, requireAdminMiddleware, async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { logoUrl, altText } = req.body;
@@ -252,7 +237,8 @@ router.post('/:tenantId/logo', requireAuth, requireAdminMiddleware, async (req, 
     console.error('Error uploading logo:', error);
     res.status(500).json({ error: 'Failed to upload logo' });
   }
-});
+  });
+}
 
-module.exports = router;
+module.exports = registerBrandingRoutes;
 
