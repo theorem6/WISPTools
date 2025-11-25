@@ -38,9 +38,11 @@
     const params = new URLSearchParams();
 
     if (mode === 'plan') {
+      params.set('mode', 'plan');
       params.set('hideStats', 'true');
       params.set('planMode', 'true');
     } else if (mode === 'deploy') {
+      params.set('mode', 'deploy');
       params.set('deployMode', 'true');
     } else {
       params.set('hideStats', 'true');
