@@ -39,7 +39,7 @@
   let editingModule: string | null = null;
   let editingPermissions: ModulePermission | null = null;
 
-  const ROLES = ['admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'];
+  const ROLES = ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'sales', 'viewer'];
 
   // Reactive statement to update tenantId when currentTenant changes
   $: {

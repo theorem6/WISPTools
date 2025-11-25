@@ -19,7 +19,7 @@
   let error = '';
   let showDeleteConfirm = false;
   
-  const availableRoles: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
+  const availableRoles: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'viewer'];
   const isOwner = user.role === 'owner';
   
   async function handleUpdateRole() {

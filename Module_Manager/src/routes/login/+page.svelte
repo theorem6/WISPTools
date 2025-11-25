@@ -130,12 +130,18 @@
         await new Promise(resolve => setTimeout(resolve, 800));
         
         // Robust tenant connection for ALL logins (signin and signup)
-        await ensureTenantConnection(user, email, mode === 'signup');
+        const userRole = await ensureTenantConnection(user, email, mode === 'signup');
         
-        console.log('[Login Page] Redirecting to dashboard');
+        console.log('[Login Page] User role:', userRole);
         
-        // Redirect to dashboard
-        await goto('/dashboard', { replaceState: true });
+        // Redirect based on user role
+        if (userRole === 'support') {
+          console.log('[Login Page] Redirecting support user to support dashboard');
+          await goto('/support-dashboard', { replaceState: true });
+        } else {
+          console.log('[Login Page] Redirecting to dashboard');
+          await goto('/dashboard', { replaceState: true });
+        }
       } else {
         error = result.error || 'Authentication failed';
         console.error('[Login Page] Authentication failed:', error);
@@ -152,8 +158,9 @@
   /**
    * Robust tenant connection after login
    * Ensures tenant is loaded, set, and available for all services
+   * Returns the user's role in their primary tenant
    */
-  async function ensureTenantConnection(user: User, email: string, isNewUser: boolean = false): Promise<void> {
+  async function ensureTenantConnection(user: User, email: string, isNewUser: boolean = false): Promise<string | null> {
     try {
       console.log('[Login Page] Ensuring tenant connection...', { userId: user.uid, email, isNewUser });
       
@@ -218,22 +225,29 @@
       
       // Ensure tenantId is in localStorage for services
       const finalTenant = get(tenantStore).currentTenant;
+      let userRole: string | null = null;
+      
       if (finalTenant) {
         localStorage.setItem('selectedTenantId', finalTenant.id);
         localStorage.setItem('selectedTenantName', finalTenant.displayName);
-        console.log('[Login Page] Tenant connection complete:', finalTenant.displayName);
+        // Get user's role in this tenant
+        userRole = finalTenant.userRole || null;
+        console.log('[Login Page] Tenant connection complete:', finalTenant.displayName, 'Role:', userRole);
       } else {
         console.warn('[Login Page] No tenant available after connection attempt');
         // Clear any stale tenant data
         localStorage.removeItem('selectedTenantId');
         localStorage.removeItem('selectedTenantName');
       }
+      
+      return userRole;
     } catch (error: any) {
       console.error('[Login Page] Error ensuring tenant connection:', error);
       // Don't block login - tenant can be set later
       // Clear any stale tenant data
       localStorage.removeItem('selectedTenantId');
       localStorage.removeItem('selectedTenantName');
+      return null;
     }
   }
 

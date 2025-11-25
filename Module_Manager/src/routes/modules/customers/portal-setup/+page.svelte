@@ -582,6 +582,11 @@
   {:else}
   <div class="portal-admin-page">
     <div class="page-header">
+      <div class="header-left">
+        <button class="back-btn" on:click={() => goto('/modules')} title="Back to Modules">
+          ← Exit to Modules
+        </button>
+      </div>
       <div class="header-content">
         <h1>🌐 Customer Portal Management</h1>
         <p class="subtitle">Configure your customer-facing portal, content, and support features</p>
@@ -1126,6 +1131,36 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 2rem;
+    gap: 1rem;
+  }
+  
+  .header-left {
+    flex-shrink: 0;
+  }
+  
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .back-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--brand-primary);
+    color: var(--brand-primary);
+  }
+  
+  .header-content {
+    flex: 1;
+    text-align: center;
   }
   
   .page-header h1 {

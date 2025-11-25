@@ -13,7 +13,7 @@
   let error = '';
   let success = false;
   
-  const availableRoles: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
+  const availableRoles: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'viewer'];
   
   async function handleSubmit() {
     if (!$currentTenant) return;

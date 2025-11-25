@@ -25,7 +25,7 @@
   ];
 
   // Available roles (excluding platform_admin and owner as they have full access)
-  const EDITABLE_ROLES: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'sales', 'viewer'];
+  const EDITABLE_ROLES: UserRole[] = ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'sales', 'viewer'];
   
   // Role permissions data
   let rolePermissionsData: { [role: string]: RolePermissions } = {};
@@ -242,7 +242,7 @@
           style="border-color: {selectedRole === role ? getRoleColor(role) : 'transparent'}"
           on:click={() => { selectedRole = role; handleRoleChange(); }}
         >
-          <span class="role-icon">{role === 'admin' ? '👑' : role === 'engineer' ? '⚙️' : role === 'installer' ? '🔧' : role === 'helpdesk' ? '🎧' : role === 'sales' ? '💼' : '👁️'}</span>
+          <span class="role-icon">{role === 'admin' ? '👑' : role === 'engineer' ? '⚙️' : role === 'installer' ? '🔧' : role === 'helpdesk' ? '🎧' : role === 'support' ? '🎧' : role === 'sales' ? '💼' : '👁️'}</span>
           <span class="role-name">{ROLE_NAMES[role]}</span>
         </button>
       {/each}

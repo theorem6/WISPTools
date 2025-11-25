@@ -21,6 +21,7 @@ export type UserRole =
   | 'engineer'        // Network engineer - technical modules
   | 'installer'       // Field technician - field ops only
   | 'helpdesk'        // Support staff - tickets and customer service
+  | 'support'         // Customer support - portal management only
   | 'viewer';         // Read-only access
 
 /**
@@ -33,6 +34,7 @@ export const ROLE_NAMES: Record<UserRole, string> = {
   engineer: 'Engineer',
   installer: 'Field Technician',
   helpdesk: 'Help Desk',
+  support: 'Customer Support',
   viewer: 'Viewer'
 };
 
@@ -46,6 +48,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   engineer: 'Network engineer with access to technical modules',
   installer: 'Field technician with mobile app and field operations access',
   helpdesk: 'Support staff with ticketing and customer service access',
+  support: 'Customer support agent with portal management access only',
   viewer: 'Read-only access to reports and dashboards'
 };
 
@@ -208,6 +211,25 @@ export const DEFAULT_MODULE_ACCESS: Record<UserRole, ModuleAccess> = {
     tenantManagement: false
   },
   
+  support: {
+    // Customer portal support only - goes directly to support dashboard
+    pciResolution: false,
+    cbrsManagement: false,
+    acsManagement: false,
+    hssManagement: false,
+    coverageMap: false,
+    inventory: false,
+    workOrders: false,
+    helpDesk: true,          // Customer tickets
+    distributedEpc: false,
+    monitoring: false,
+    userManagement: false,
+    tenantSettings: false,
+    backendManagement: false,
+    billing: false,
+    tenantManagement: false
+  },
+  
   viewer: {
     // Read-only everything
     pciResolution: true,
@@ -314,6 +336,17 @@ export const DEFAULT_WORK_ORDER_PERMISSIONS: Record<UserRole, WorkOrderPermissio
     canClose: true,
     canDelete: false,
     canEscalate: true
+  },
+  
+  support: {
+    canViewAll: true,
+    canViewAssigned: true,
+    canCreate: true,
+    canAssign: false,
+    canReassign: false,
+    canClose: true,
+    canDelete: false,
+    canEscalate: false
   },
   
   viewer: {
@@ -509,7 +542,7 @@ export function getWorkOrderPermissions(role: UserRole): WorkOrderPermissions {
  * Get all roles that can be assigned (excluding platform_admin)
  */
 export function getAssignableRoles(): UserRole[] {
-  return ['owner', 'admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
+  return ['owner', 'admin', 'engineer', 'installer', 'helpdesk', 'support', 'viewer'];
 }
 
 /**
@@ -518,10 +551,10 @@ export function getAssignableRoles(): UserRole[] {
 export function getCreatableRoles(role: UserRole): UserRole[] {
   switch (role) {
     case 'platform_admin':
-      return ['owner', 'admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
+      return ['owner', 'admin', 'engineer', 'installer', 'helpdesk', 'support', 'viewer'];
     case 'owner':
     case 'admin':
-      return ['admin', 'engineer', 'installer', 'helpdesk', 'viewer'];
+      return ['admin', 'engineer', 'installer', 'helpdesk', 'support', 'viewer'];
     default:
       return [];
   }
