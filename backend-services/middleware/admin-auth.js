@@ -118,6 +118,22 @@ const requireAuth = async (req, res, next) => {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        try {
+          await firestoreDB.collection('users').doc(decodedToken.uid).set(userData, { merge: true });
+          await User.findOneAndUpdate(
+            { uid: decodedToken.uid },
+            {
+              email: userData.email,
+              displayName: userData.displayName,
+              role: userData.role,
+              tenantId: null,
+              updatedAt: new Date()
+            },
+            { upsert: true, setDefaultsOnInsert: true }
+          );
+        } catch (fallbackError) {
+          console.error('[AdminAuth] Failed to persist fallback user data:', fallbackError);
+        }
       }
     } else {
       userData = userDoc.data();
@@ -194,8 +210,8 @@ const requireAdmin = (options = {}) => {
         }
       }
       
-      if (!allowedRoles.includes(effectiveRole)) {
-        console.warn(`Unauthorized admin access attempt by ${req.user.email} (role: ${req.user.role})`);
+    if (!allowedRoles.includes(effectiveRole)) {
+      console.warn(`[AdminAuth] Unauthorized admin access by ${req.user.email} (role: ${req.user.role}) for tenant ${req.headers['x-tenant-id'] || req.user.tenantId}`);
         return res.status(403).json({ 
           error: 'Admin access required',
           message: `Only ${allowedRoles.join(', ')} can access this resource`,
@@ -205,8 +221,8 @@ const requireAdmin = (options = {}) => {
       }
       
       next();
-    } catch (error) {
-      console.error('Admin check error:', error);
+  } catch (error) {
+    console.error('Admin check error:', error);
       res.status(403).json({ error: 'Admin access verification failed' });
     }
   };
