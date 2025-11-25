@@ -57,8 +57,8 @@
   
   .settings-button.plan-deploy-mode {
     bottom: 2rem;
-    right: auto;
-    left: 2rem;
+    right: calc(1rem + 220px + 1.25rem);
+    left: auto;
   }
   
   .settings-button:hover {
