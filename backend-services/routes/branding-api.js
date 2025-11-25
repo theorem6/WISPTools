@@ -114,10 +114,21 @@ router.put('/:tenantId', requireAuth, requireAdmin, async (req, res) => {
     // Extract tenantId from request (set by middleware)
     const requestTenantId = req.tenantId || tenantId;
     
-    const tenant = await Tenant.findOne({ 
-      _id: requestTenantId,
-      status: 'active'
-    });
+    // Handle both ObjectId and string
+    const mongoose = require('mongoose');
+    let tenant;
+    
+    if (mongoose.Types.ObjectId.isValid(requestTenantId)) {
+      tenant = await Tenant.findOne({ 
+        _id: new mongoose.Types.ObjectId(requestTenantId),
+        status: 'active'
+      });
+    } else {
+      tenant = await Tenant.findOne({ 
+        _id: requestTenantId,
+        status: 'active'
+      });
+    }
     
     if (!tenant) {
       console.log('[Branding API] Tenant not found for update:', requestTenantId);

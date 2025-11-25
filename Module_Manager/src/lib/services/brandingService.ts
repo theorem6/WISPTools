@@ -111,12 +111,27 @@ class BrandingService {
       
       if (!response.ok) {
         let errorMessage = 'Failed to update branding';
+        // Clone response before reading to allow multiple reads
+        const responseClone = response.clone();
+        
         try {
-          const error = await response.json();
+          const error = await responseClone.json();
           errorMessage = error.message || error.error || errorMessage;
         } catch (e) {
-          const errorText = await response.text();
-          console.error('[BrandingService] Update error response:', errorText.substring(0, 200));
+          // If JSON parsing fails, try to read as text
+          try {
+            const textClone = response.clone();
+            const errorText = await textClone.text();
+            console.error('[BrandingService] Update error response:', errorText.substring(0, 200));
+            // Try to extract error message from HTML if it's an error page
+            if (errorText.includes('<!DOCTYPE')) {
+              errorMessage = `Server error (${response.status}): ${response.statusText}`;
+            } else {
+              errorMessage = errorText.substring(0, 200) || errorMessage;
+            }
+          } catch (textError) {
+            errorMessage = `Server error (${response.status}): ${response.statusText}`;
+          }
         }
         throw new Error(errorMessage);
       }
