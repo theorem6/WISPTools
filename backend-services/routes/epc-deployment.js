@@ -321,6 +321,9 @@ router.post('/:epc_id/link-device', async (req, res) => {
  * Proxy ISO Download (internal use - frontend downloads through this)
  * GET /api/deploy/download-iso?url=<iso-url>
  * Proxies the ISO download to avoid exposing GCE IP directly
+ * 
+ * For large files (ISOs), we serve directly from the filesystem instead of proxying
+ * through HTTP to avoid memory issues and timeouts.
  */
 router.get('/download-iso', async (req, res) => {
   try {
@@ -336,34 +339,44 @@ router.get('/download-iso', async (req, res) => {
       return res.status(400).json({ error: 'Invalid ISO URL' });
     }
     
-    // Replace with internal URL (use HTTP internally, nginx serves on port 80)
-    const internalUrl = isoUrl.replace(/https?:\/\/[^/]+/, `http://${GCE_PUBLIC_IP}`);
+    // Serve directly from filesystem (much more efficient than proxying)
+    const isoPath = '/var/www/html/downloads/isos/wisptools-epc-generic-netinstall.iso';
     
-    console.log(`[ISO Download Proxy] Proxying download: ${internalUrl}`);
+    console.log(`[ISO Download Proxy] Serving file directly: ${isoPath}`);
     
-    // Fetch the file from nginx
-    const response = await fetch(internalUrl);
-    
-    if (!response.ok) {
-      return res.status(response.status).json({ 
-        error: 'Failed to fetch ISO file',
-        status: response.status 
+    try {
+      const stats = await fs.stat(isoPath);
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="wisptools-epc-generic-netinstall.iso"');
+      res.setHeader('Content-Length', stats.size);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      
+      // Stream the file directly
+      const { createReadStream } = require('fs');
+      const fileStream = createReadStream(isoPath);
+      
+      fileStream.on('error', (err) => {
+        console.error('[ISO Download Proxy] Stream error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to stream ISO file' });
+        }
+      });
+      
+      fileStream.pipe(res);
+      
+    } catch (statError) {
+      console.error('[ISO Download Proxy] File not found:', statError);
+      return res.status(404).json({ 
+        error: 'ISO file not found',
+        message: 'Please build the generic ISO first'
       });
     }
-    
-    // Stream the file to the client
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', 'attachment; filename="wisptools-epc-generic-netinstall.iso"');
-    res.setHeader('Content-Length', response.headers.get('content-length') || '');
-    
-    // Pipe the response
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
     
   } catch (error) {
     console.error('[ISO Download Proxy] Error:', error);
     res.status(500).json({ 
-      error: 'Failed to proxy ISO download',
+      error: 'Failed to serve ISO download',
       details: error.message 
     });
   }
