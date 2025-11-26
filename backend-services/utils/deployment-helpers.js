@@ -7,20 +7,56 @@
 /**
  * Generate full EPC deployment script with Open5GS installation
  * This installs all EPC components and dependencies automatically
+ * 
+ * @param {Object} epc - Full EPC configuration object from database
+ * @param {string} epc.epc_id - Unique EPC identifier
+ * @param {string} epc.deployment_type - 'epc', 'snmp', or 'both'
+ * @param {Object} epc.hss_config - HSS configuration (mcc, mnc, tac, etc.)
+ * @param {Object} epc.snmp_config - SNMP configuration
  */
-function generateFullDeploymentScript(epc_id, gce_ip, hss_port) {
-  // Default network config (can be fetched from database later)
-  const defaultMcc = '001';
-  const defaultMnc = '01';
-  const defaultTac = '1';
-  const defaultApn = 'internet';
-  const defaultDnsPrimary = '8.8.8.8';
-  const defaultDnsSecondary = '8.8.4.4';
+function generateFullDeploymentScript(epc) {
+  // Handle both old (3 args) and new (1 object arg) call signatures
+  let epc_id, gce_ip, hss_port, deploymentType, hssConfig, snmpConfig, siteName;
+  
+  if (typeof epc === 'object' && epc !== null) {
+    // New signature: single EPC object
+    epc_id = epc.epc_id;
+    gce_ip = '136.112.111.167'; // GCE public IP
+    hss_port = '3001';
+    deploymentType = epc.deployment_type || 'both';
+    hssConfig = epc.hss_config || {};
+    snmpConfig = epc.snmp_config || {};
+    siteName = epc.site_name || 'WISPTools EPC';
+  } else {
+    // Legacy signature: (epc_id, gce_ip, hss_port)
+    epc_id = arguments[0];
+    gce_ip = arguments[1] || '136.112.111.167';
+    hss_port = arguments[2] || '3001';
+    deploymentType = 'both';
+    hssConfig = {};
+    snmpConfig = {};
+    siteName = 'WISPTools EPC';
+  }
+  
+  // Determine what to install
+  const installEPC = deploymentType === 'epc' || deploymentType === 'both';
+  const installSNMP = deploymentType === 'snmp' || deploymentType === 'both';
+  
+  // Network config from HSS config or defaults
+  const mcc = hssConfig.mcc || '001';
+  const mnc = hssConfig.mnc || '01';
+  const tac = hssConfig.tac || '1';
+  const apn = hssConfig.apnName || 'internet';
+  const dnsPrimary = hssConfig.dnsPrimary || '8.8.8.8';
+  const dnsSecondary = hssConfig.dnsSecondary || '8.8.4.4';
   
   return `#!/bin/bash
-# WISPTools.io Full EPC Deployment Script
-# EPC: ${epc_id}
-# This script automatically installs and configures Open5GS EPC
+# WISPTools.io Deployment Script
+# Site: ${siteName}
+# EPC ID: ${epc_id}
+# Deployment Type: ${deploymentType}
+# Install EPC: ${installEPC ? 'YES' : 'NO'}
+# Install SNMP Agent: ${installSNMP ? 'YES' : 'NO'}
 
 set -e
 
@@ -121,15 +157,19 @@ else
 fi
 
 # Network configuration
-MCC="${defaultMcc}"
-MNC="${defaultMnc}"
-TAC="${defaultTac}"
-APN_NAME="${defaultApn}"
+MCC="${mcc}"
+MNC="${mnc}"
+TAC="${tac}"
+APN_NAME="${apn}"
 APN_POOL="10.45.0.0/16"
-DNS_PRIMARY="${defaultDnsPrimary}"
-DNS_SECONDARY="${defaultDnsSecondary}"
+DNS_PRIMARY="${dnsPrimary}"
+DNS_SECONDARY="${dnsSecondary}"
 HSS_ADDR="${gce_ip}"
 HSS_PORT="${hss_port}"
+
+# Deployment type flags
+INSTALL_EPC=${installEPC ? '1' : '0'}
+INSTALL_SNMP=${installSNMP ? '1' : '0'}
 
 print_header "Installing Dependencies"
 print_status "Updating package lists..."
@@ -164,6 +204,9 @@ fi
 
 print_status "Installing monitoring tools..."
 apt-get install -y sysstat net-tools iftop vnstat htop
+
+# EPC Installation (conditional based on deployment type)
+if [ "\$INSTALL_EPC" = "1" ]; then
 
 print_header "Installing Open5GS"
 print_status "Adding Open5GS repository..."
@@ -328,6 +371,13 @@ No_SCTP;
 EOF
 
 print_success "FreeDiameter configured to connect to Cloud HSS at \$HSS_ADDR:\$HSS_PORT"
+
+else
+  print_status "Skipping EPC installation (deployment type: ${deploymentType})"
+fi  # End of INSTALL_EPC section
+
+# SNMP Installation (conditional based on deployment type)
+if [ "\$INSTALL_SNMP" = "1" ]; then
 
 print_header "Installing SNMP Monitoring Agent"
 print_status "Installing Node.js and SNMP dependencies..."
@@ -1247,69 +1297,100 @@ systemctl enable epc-snmp-agent
 
 print_success "SNMP monitoring agent installed and configured"
 
-print_header "Starting Open5GS Services"
-print_status "Enabling and starting all EPC components..."
-
-systemctl enable open5gs-mmed
-systemctl enable open5gs-sgwcd
-systemctl enable open5gs-sgwud
-systemctl enable open5gs-smfd
-systemctl enable open5gs-upfd
-systemctl enable open5gs-pcrfd
-systemctl enable epc-snmp-agent
-
-systemctl start open5gs-mmed
-systemctl start open5gs-sgwcd
-systemctl start open5gs-sgwud
-systemctl start open5gs-smfd
-systemctl start open5gs-upfd
-systemctl start open5gs-pcrfd
-
-sleep 3
-
-# Start SNMP agent after EPC services are running
-print_status "Starting SNMP monitoring agent..."
-systemctl start epc-snmp-agent
-sleep 2
-
-# Check service status
-print_status "Checking service status..."
-if systemctl is-active --quiet open5gs-mmed && \\
-   systemctl is-active --quiet open5gs-sgwcd && \\
-   systemctl is-active --quiet open5gs-sgwud && \\
-   systemctl is-active --quiet open5gs-smfd && \\
-   systemctl is-active --quiet open5gs-upfd && \\
-   systemctl is-active --quiet open5gs-pcrfd; then
-    print_success "All Open5GS services are running"
 else
-    print_error "Some services failed to start. Check logs: journalctl -u open5gs-*"
+  print_status "Skipping SNMP agent installation (deployment type: ${deploymentType})"
+fi  # End of INSTALL_SNMP section
+
+print_header "Starting Services"
+
+# Start EPC services if installed
+if [ "\$INSTALL_EPC" = "1" ]; then
+  print_status "Enabling and starting EPC components..."
+  
+  systemctl enable open5gs-mmed
+  systemctl enable open5gs-sgwcd
+  systemctl enable open5gs-sgwud
+  systemctl enable open5gs-smfd
+  systemctl enable open5gs-upfd
+  systemctl enable open5gs-pcrfd
+  
+  systemctl start open5gs-mmed
+  systemctl start open5gs-sgwcd
+  systemctl start open5gs-sgwud
+  systemctl start open5gs-smfd
+  systemctl start open5gs-upfd
+  systemctl start open5gs-pcrfd
+  
+  sleep 3
+  
+  # Check EPC service status
+  print_status "Checking EPC service status..."
+  if systemctl is-active --quiet open5gs-mmed && \\
+     systemctl is-active --quiet open5gs-sgwcd && \\
+     systemctl is-active --quiet open5gs-sgwud && \\
+     systemctl is-active --quiet open5gs-smfd && \\
+     systemctl is-active --quiet open5gs-upfd && \\
+     systemctl is-active --quiet open5gs-pcrfd; then
+      print_success "All Open5GS EPC services are running"
+  else
+      print_error "Some EPC services failed to start. Check logs: journalctl -u open5gs-*"
+  fi
 fi
 
-# Check SNMP agent status
-if systemctl is-active --quiet epc-snmp-agent; then
-    print_success "SNMP monitoring agent is running"
-else
-    print_error "SNMP agent failed to start. Check logs: journalctl -u epc-snmp-agent"
+# Start SNMP agent if installed
+if [ "\$INSTALL_SNMP" = "1" ]; then
+  print_status "Starting SNMP monitoring agent..."
+  systemctl enable epc-snmp-agent
+  systemctl start epc-snmp-agent
+  sleep 2
+  
+  # Check SNMP agent status
+  if systemctl is-active --quiet epc-snmp-agent; then
+      print_success "SNMP monitoring agent is running"
+  else
+      print_error "SNMP agent failed to start. Check logs: journalctl -u epc-snmp-agent"
+  fi
 fi
 
 print_header "Deployment Complete"
-print_success "EPC \$EPC_ID has been deployed successfully!"
+print_success "Deployment completed successfully!"
 echo ""
-echo "Configuration Summary:"
-echo "  MME IP: \$MME_IP"
-echo "  Cloud HSS: \$HSS_ADDR:\$HSS_PORT"
-echo "  MCC/MNC: \${MCC}/\${MNC}"
-echo "  TAC: \${TAC}"
-echo "  APN: \$APN_NAME"
+echo "Site: ${siteName}"
+echo "EPC ID: \$EPC_ID"
+echo "Deployment Type: ${deploymentType}"
 echo ""
+
+if [ "\$INSTALL_EPC" = "1" ]; then
+  echo "EPC Configuration:"
+  echo "  MME IP: \$MME_IP"
+  echo "  Cloud HSS: \$HSS_ADDR:\$HSS_PORT"
+  echo "  MCC/MNC: \${MCC}/\${MNC}"
+  echo "  TAC: \${TAC}"
+  echo "  APN: \$APN_NAME"
+  echo ""
+fi
+
 echo "Services running:"
-systemctl list-units --type=service --state=running | grep -E "open5gs|epc-snmp-agent" || true
+if [ "\$INSTALL_EPC" = "1" ]; then
+  systemctl list-units --type=service --state=running | grep "open5gs" || echo "  (EPC services check failed)"
+fi
+if [ "\$INSTALL_SNMP" = "1" ]; then
+  systemctl list-units --type=service --state=running | grep "epc-snmp-agent" || echo "  (SNMP agent check failed)"
+fi
 echo ""
-echo "Monitoring:"
-echo "  SNMP Agent: Collecting metrics every 60 seconds"
-echo "  Reporting to: http://\$HSS_ADDR:\$HSS_PORT/api/epc/metrics"
-echo ""
-print_success "EPC is ready to accept connections!"
+
+if [ "\$INSTALL_SNMP" = "1" ]; then
+  echo "Monitoring:"
+  echo "  SNMP Agent: Collecting metrics every 60 seconds"
+  echo "  Reporting to: http://\$HSS_ADDR:\$HSS_PORT/api/epc/metrics"
+  echo ""
+fi
+
+if [ "\$INSTALL_EPC" = "1" ]; then
+  print_success "EPC is ready to accept connections!"
+elif [ "\$INSTALL_SNMP" = "1" ]; then
+  print_success "SNMP monitoring agent is running and reporting!"
+fi
 echo ""
 
 exit 0
