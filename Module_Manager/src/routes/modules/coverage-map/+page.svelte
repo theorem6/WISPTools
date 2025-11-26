@@ -310,13 +310,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     };
   }
 
-  function handlePlanDraftMenuAction(action: 'edit-site' | 'add-sector' | 'add-backhaul' | 'add-inventory') {
+  function handlePlanDraftMenuAction(action: 'edit-site' | 'add-sector' | 'add-backhaul' | 'add-inventory' | 'deploy-epc' | 'deploy-hardware') {
     if (!selectedPlanDraft) {
       return;
     }
 
     const activePlan = getActivePlanIdForActions();
-    if (!activePlan) {
+    if (!activePlan && action !== 'deploy-epc' && action !== 'deploy-hardware') {
       error = 'Select a plan to stage assets.';
       setTimeout(() => (error = ''), 4000);
       showPlanDraftMenu = false;
@@ -347,6 +347,17 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       case 'add-inventory': {
         selectedSiteForInventory = draftSite;
         showAddInventoryModal = true;
+        break;
+      }
+      case 'deploy-epc': {
+        // Open EPC deployment modal with site pre-selected
+        selectedTowerForEPC = draftSite;
+        showEPCDeploymentModal = true;
+        break;
+      }
+      case 'deploy-hardware': {
+        // Navigate to hardware deployment page with site context
+        goto(`/modules/deploy?site=${encodeURIComponent(draftSite.name || draftSite.id)}&lat=${draftSite.location.latitude}&lon=${draftSite.location.longitude}`);
         break;
       }
     }
@@ -1125,6 +1136,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       <button class="menu-item" onclick={() => handlePlanDraftMenuAction('add-inventory')}>
         📦 Add Equipment
       </button>
+      <div class="menu-divider"></div>
+      <button class="menu-item deploy-hardware" onclick={() => handlePlanDraftMenuAction('deploy-epc')}>
+        📡 Deploy EPC/SNMP Server
+      </button>
+      <button class="menu-item" onclick={() => handlePlanDraftMenuAction('deploy-hardware')}>
+        🔧 Deploy Other Hardware
+      </button>
+      <div class="menu-divider"></div>
       <button class="menu-item danger" onclick={removePlanDraft}>
         🗑️ Remove From Plan
       </button>
@@ -1914,6 +1933,21 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   .plan-draft-menu .menu-item.danger:hover {
     background: rgba(239, 68, 68, 0.18);
+  }
+  
+  .plan-draft-menu .menu-item.deploy-hardware {
+    color: #86efac;
+    font-weight: 500;
+  }
+  
+  .plan-draft-menu .menu-item.deploy-hardware:hover {
+    background: rgba(34, 197, 94, 0.18);
+  }
+  
+  .plan-draft-menu .menu-divider {
+    height: 1px;
+    background: rgba(148, 163, 184, 0.2);
+    margin: 0.25rem 0;
   }
 
   .plan-summary-item {
