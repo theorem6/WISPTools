@@ -53,7 +53,7 @@
       phone: ''
     },
     hssConfig: {
-      hssHost: '136.112.111.167',
+      hssHost: 'hss.wisptools.io',
       hssPort: '3001',
       diameterRealm: 'wisptools.io'
     },
@@ -70,7 +70,7 @@
       privProtocol: 'AES',
       privKey: '',
       // Cloud reporting
-      cloudApiUrl: 'http://136.112.111.167:3003',
+      cloudApiUrl: 'https://hss.wisptools.io:3003',
       reportingInterval: 60,
       enableTraps: true,
       trapPort: 162
@@ -78,7 +78,7 @@
     // APT Repository Configuration
     aptConfig: {
       enabled: true,
-      repositoryUrl: 'http://136.112.111.167:3003/apt',
+      repositoryUrl: 'https://hss.wisptools.io/apt',
       autoUpdate: false,
       updateSchedule: 'daily', // 'hourly', 'daily', 'weekly'
       updateTime: '02:00',
@@ -487,7 +487,7 @@ sudo tee /opt/wisptools/snmp-agent/agent.js > /dev/null <<SNMPAGENT
 const snmp = require('net-snmp');
 const http = require('http');
 
-const CLOUD_API_URL = "${epcConfig.snmpConfig.cloudApiUrl || 'http://136.112.111.167:3003'}";
+const CLOUD_API_URL = "${epcConfig.snmpConfig.cloudApiUrl || 'https://hss.wisptools.io:3003'}";
 const REPORTING_INTERVAL = ${epcConfig.snmpConfig.reportingInterval || 60} * 1000;
 const SITE_NAME = "${epcConfig.siteName}";
 
@@ -995,10 +995,8 @@ echo "🎉 Deployment successful!";
     try {
       console.log('[EPCDeployment] Starting ISO download:', isoUrl);
       
-      // The ISO is hosted on the GCE nginx server
-      // For now, use HTTP directly since the ISO is public data
-      // TODO: Switch to proper domain with SSL once configured
-      const directUrl = 'http://136.112.111.167/downloads/isos/wisptools-epc-generic-netinstall.iso';
+      // The ISO is hosted on the GCE nginx server with SSL via hss.wisptools.io
+      const directUrl = 'https://hss.wisptools.io/downloads/isos/wisptools-epc-generic-netinstall.iso';
       
       console.log('[EPCDeployment] Using direct download URL:', directUrl);
       
@@ -1015,7 +1013,7 @@ echo "🎉 Deployment successful!";
       console.log('[EPCDeployment] ISO download initiated');
     } catch (err: any) {
       console.error('[EPCDeployment] ISO download error:', err);
-      error = `ISO download failed: ${err.message}. Try downloading directly from: http://136.112.111.167/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+      error = `ISO download failed: ${err.message}. Try downloading directly from: https://hss.wisptools.io/downloads/isos/wisptools-epc-generic-netinstall.iso`;
     }
   }
 
@@ -1404,7 +1402,7 @@ echo "🎉 Deployment successful!";
                   </div>
                   <div class="form-group">
                     <label for="snmpCloudApiUrl">Cloud API URL</label>
-                    <input id="snmpCloudApiUrl" type="text" bind:value={epcConfig.snmpConfig.cloudApiUrl} placeholder="http://136.112.111.167:3003" />
+                    <input id="snmpCloudApiUrl" type="text" bind:value={epcConfig.snmpConfig.cloudApiUrl} placeholder="https://hss.wisptools.io:3003" />
                   </div>
                   <div class="form-group checkbox-group">
                     <label>
@@ -1425,7 +1423,7 @@ echo "🎉 Deployment successful!";
                 <div class="form-row">
                   <div class="form-group">
                     <label for="aptRepositoryUrl">Repository URL</label>
-                    <input id="aptRepositoryUrl" type="text" bind:value={epcConfig.aptConfig.repositoryUrl} placeholder="http://136.112.111.167:3003/apt" />
+                    <input id="aptRepositoryUrl" type="text" bind:value={epcConfig.aptConfig.repositoryUrl} placeholder="https://hss.wisptools.io/apt" />
                   </div>
                   <div class="form-group checkbox-group">
                     <label>

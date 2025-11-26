@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { inventoryService } from '$lib/services/inventoryService';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { TowerSite, NetworkEquipment } from '../lib/models';
   
@@ -234,55 +234,84 @@
 
         dispatch('saved', { message: 'Hardware staged in plan.' });
       } else {
-        const equipmentData: Omit<NetworkEquipment, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'> = {
-          siteId: site.id,
-          name: `${finalEquipmentType} - ${formData.serialNumber}`,
-          type: resolveEquipmentType(formData.category),
-          locationType: 'tower',
+        // Create inventory item using the inventory API (InventoryItem model)
+        const inventoryData = {
+          // Classification
+          category: formData.category,
+          equipmentType: finalEquipmentType,
+          
+          // Manufacturer
           manufacturer: formData.manufacturer || '',
           model: formData.model || '',
           serialNumber: formData.serialNumber,
-          status: formData.status,
-          quantity: formData.quantity || 1,
-          location: {
-            latitude: site.location.latitude,
-            longitude: site.location.longitude,
-            address: site.location.address,
-            city: site.location.city,
-            state: site.location.state,
-            zipCode: site.location.zipCode
+          partNumber: formData.partNumber || undefined,
+          macAddress: formData.macAddress || undefined,
+          
+          // Software/Firmware
+          firmwareVersion: formData.firmwareVersion || undefined,
+          hardwareVersion: formData.hardwareVersion || undefined,
+          
+          // Status
+          status: formData.status === 'deployed' ? 'deployed' : formData.status === 'inventory' ? 'available' : formData.status,
+          condition: formData.condition,
+          
+          // Current Location
+          currentLocation: {
+            type: 'tower' as const,
+            siteId: site.id,
+            siteName: site.name,
+            tower: {
+              rack: formData.rackLocation || undefined,
+              rackUnit: formData.rackUnit || undefined
+            },
+            address: {
+              latitude: site.location.latitude,
+              longitude: site.location.longitude,
+              street: site.location.address,
+              city: site.location.city,
+              state: site.location.state,
+              zipCode: site.location.zipCode
+            }
           },
-          installDate: formData.installDate ? new Date(formData.installDate) : undefined,
-          purchaseDate: formData.purchaseDate ? new Date(formData.purchaseDate) : undefined,
-          notes: JSON.stringify({
-            category: formData.category,
-            equipmentType: finalEquipmentType,
-            partNumber: formData.partNumber,
-            firmwareVersion: formData.firmwareVersion,
-            hardwareVersion: formData.hardwareVersion,
-            warrantyExpiration: formData.warrantyExpiration,
-            purchase: {
-              date: formData.purchaseDate,
-              orderNumber: formData.purchaseOrderNumber,
-              vendor: formData.vendor,
-              price: formData.purchasePrice
-            },
-            condition: formData.condition,
-            location: {
-              rack: formData.rackLocation,
-              rackUnit: formData.rackUnit
-            },
-            technical: {
-              powerRequirements: formData.powerRequirements,
-              ipAddress: formData.ipAddress,
-              macAddress: formData.macAddress,
-              managementUrl: formData.managementUrl
-            },
-            additionalNotes: formData.notes
-          })
+          
+          // Purchase Info
+          purchaseInfo: formData.purchaseDate || formData.vendor || formData.purchaseOrderNumber || formData.purchasePrice ? {
+            vendor: formData.vendor || undefined,
+            purchaseDate: formData.purchaseDate || undefined,
+            purchasePrice: formData.purchasePrice || undefined,
+            purchaseOrderNumber: formData.purchaseOrderNumber || undefined
+          } : undefined,
+          
+          // Warranty
+          warranty: formData.warrantyExpiration ? {
+            endDate: formData.warrantyExpiration
+          } : undefined,
+          
+          // Technical Specs
+          technicalSpecs: {
+            powerRequirements: formData.powerRequirements || undefined,
+            ipAddress: formData.ipAddress || undefined,
+            managementUrl: formData.managementUrl || undefined
+          },
+          
+          // Deployment Info
+          deploymentInfo: formData.installDate ? {
+            deployedDate: formData.installDate
+          } : undefined,
+          
+          // Module Integration - link to coverage map
+          modules: {
+            coverageMap: {
+              siteId: site.id,
+              siteName: site.name,
+              addedToSiteDate: new Date().toISOString()
+            }
+          },
+          
+          notes: formData.notes || undefined
         };
 
-        await coverageMapService.createEquipment(tenantId, equipmentData);
+        await inventoryService.createItem(inventoryData);
         dispatch('saved', { message: 'Hardware added to inventory.' });
       }
 

@@ -39,8 +39,8 @@ export const API_CONFIG = {
   
   // Backend services (GCE VM)
   BACKEND_SERVICES: {
-    HSS_MANAGEMENT: 'https://136.112.111.167:3001/api/hss',
-    DEFAULT: 'https://136.112.111.167:3001/api'
+    HSS_MANAGEMENT: 'https://hss.wisptools.io:3001/api/hss',
+    DEFAULT: 'https://hss.wisptools.io:3001/api'
   }
 } as const;
 
