@@ -74,7 +74,7 @@
               <input 
                 type="checkbox" 
                 checked={visiblePlanIds.has(plan.id)}
-                on:change={() => togglePlanVisibility(plan)}
+                onchange={() => togglePlanVisibility(plan)}
               />
               <span class="slider"></span>
             </label>

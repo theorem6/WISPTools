@@ -76,7 +76,7 @@
   <select
     class="control-select"
     bind:value={currentBasemap}
-    on:change={(event) => changeBasemap((event.currentTarget as HTMLSelectElement).value)}
+    onchange={(event) => changeBasemap((event.currentTarget as HTMLSelectElement).value)}
   >
     <option value="topo-vector">Topographic</option>
     <option value="satellite">Satellite</option>

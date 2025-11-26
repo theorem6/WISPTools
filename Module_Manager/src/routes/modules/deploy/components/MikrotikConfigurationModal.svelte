@@ -762,7 +762,7 @@
                     bind:value={mikrotikConfig.monitoringConfig.netwatchHosts} 
                     rows="3" 
                     placeholder="8.8.8.8&#10;1.1.1.1&#10;google.com"
-                    on:input={(e) => {
+                    oninput={(e) => {
                       mikrotikConfig.monitoringConfig.netwatchHosts = e.target.value.split('\n').filter(h => h.trim());
                     }}
                   ></textarea>
@@ -825,7 +825,7 @@
                   bind:value={mikrotikConfig.securityConfig.allowedNetworks} 
                   rows="3" 
                   placeholder="192.168.0.0/16&#10;10.0.0.0/8&#10;172.16.0.0/12"
-                  on:input={(e) => {
+                  oninput={(e) => {
                     mikrotikConfig.securityConfig.allowedNetworks = e.target.value.split('\n').filter(n => n.trim());
                   }}
                 ></textarea>

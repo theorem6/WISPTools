@@ -194,7 +194,7 @@
           
           <div class="form-group">
             <label>Technology *</label>
-            <select bind:value={formData.technology} on:change={handleTechnologyChange}>
+            <select bind:value={formData.technology} onchange={handleTechnologyChange}>
               <option value="LTE">LTE</option>
               <option value="CBRS">CBRS</option>
               <option value="FWA">Fixed Wireless (FWA)</option>

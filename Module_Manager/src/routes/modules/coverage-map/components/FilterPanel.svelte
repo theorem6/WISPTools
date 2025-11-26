@@ -117,7 +117,7 @@
         <input 
           type="checkbox" 
           checked={filters.showTowers}
-          on:change={() => toggleAssetType('towers')}
+          onchange={() => toggleAssetType('towers')}
         />
         <span class="filter-icon">📡</span>
         <span>Tower Sites</span>
@@ -127,7 +127,7 @@
         <input 
           type="checkbox" 
           checked={filters.showSectors}
-          on:change={() => toggleAssetType('sectors')}
+          onchange={() => toggleAssetType('sectors')}
         />
         <span class="filter-icon">📶</span>
         <span>Sectors</span>
@@ -137,7 +137,7 @@
         <input 
           type="checkbox" 
           checked={filters.showCPE}
-          on:change={() => toggleAssetType('cpe')}
+          onchange={() => toggleAssetType('cpe')}
         />
         <span class="filter-icon">📱</span>
         <span>CPE Devices</span>
@@ -147,7 +147,7 @@
         <input 
           type="checkbox" 
           checked={filters.showMarketing}
-          on:change={() => toggleAssetType('marketing')}
+          onchange={() => toggleAssetType('marketing')}
         />
         <span class="filter-icon">📍</span>
         <span>Marketing Leads</span>
@@ -157,7 +157,7 @@
         <input 
           type="checkbox" 
           checked={filters.showEquipment}
-          on:change={() => toggleAssetType('equipment')}
+          onchange={() => toggleAssetType('equipment')}
         />
         <span class="filter-icon">🔧</span>
         <span>Equipment</span>
@@ -167,7 +167,7 @@
         <input 
           type="checkbox" 
           checked={filters.showBackhaul}
-          on:change={() => toggleAssetType('backhaul')}
+          onchange={() => toggleAssetType('backhaul')}
         />
         <span class="filter-icon">🔗</span>
         <span>Backhaul Links</span>
@@ -193,7 +193,7 @@
           <input 
             type="checkbox" 
             checked={filters.showFiber}
-            on:change={() => {
+            onchange={() => {
               filters.showFiber = !filters.showFiber;
               dispatch('change', filters);
             }}
@@ -206,7 +206,7 @@
           <input 
             type="checkbox" 
             checked={filters.showWirelessLicensed}
-            on:change={() => {
+            onchange={() => {
               filters.showWirelessLicensed = !filters.showWirelessLicensed;
               dispatch('change', filters);
             }}
@@ -219,7 +219,7 @@
           <input 
             type="checkbox" 
             checked={filters.showWirelessUnlicensed}
-            on:change={() => {
+            onchange={() => {
               filters.showWirelessUnlicensed = !filters.showWirelessUnlicensed;
               dispatch('change', filters);
             }}
@@ -263,7 +263,7 @@
           <input 
             type="checkbox" 
             checked={isBandEnabled(band.id)}
-            on:change={() => toggleBandFilter(band.id)}
+            onchange={() => toggleBandFilter(band.id)}
           />
           <span class="band-indicator" style="background-color: {band.color}"></span>
           <span>{band.name}</span>
@@ -296,7 +296,7 @@
         <input 
           type="checkbox" 
           checked={filters.statusFilter.includes('active')}
-          on:change={(e) => {
+          onchange={(e) => {
             if (e.currentTarget.checked) {
               filters.statusFilter = [...filters.statusFilter, 'active'];
             } else {
@@ -313,7 +313,7 @@
         <input 
           type="checkbox" 
           checked={filters.statusFilter.includes('inactive')}
-          on:change={(e) => {
+          onchange={(e) => {
             if (e.currentTarget.checked) {
               filters.statusFilter = [...filters.statusFilter, 'inactive'];
             } else {
@@ -330,7 +330,7 @@
         <input 
           type="checkbox" 
           checked={filters.statusFilter.includes('maintenance')}
-          on:change={(e) => {
+          onchange={(e) => {
             if (e.currentTarget.checked) {
               filters.statusFilter = [...filters.statusFilter, 'maintenance'];
             } else {

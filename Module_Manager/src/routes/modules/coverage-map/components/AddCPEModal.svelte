@@ -182,7 +182,7 @@
             type="text"
             bind:value={searchAddress}
             placeholder="Enter customer address..."
-            on:keydown={(e) => e.key === 'Enter' && handleSearchAddress()}
+            onkeydown={(e) => e.key === 'Enter' && handleSearchAddress()}
           />
           <button class="btn-secondary" onclick={handleSearchAddress} disabled={isSearching}>
             {isSearching ? '...' : 'Search'}
