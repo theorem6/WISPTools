@@ -22,13 +22,13 @@ export let disabled = false;
   }
 </script>
 
-<svelte:window on:click={handleClickOutside} />
+<svelte:window onclick={handleClickOutside} />
 
 {#if show && !disabled}
 <div 
   class="context-menu" 
   style="left: {x}px; top: {y}px"
-  on:click|stopPropagation
+  onclick={(e) => e.stopPropagation()}
 >
   <div class="menu-header">
     <span class="coords">
@@ -45,22 +45,22 @@ export let disabled = false;
     <div class="section-label">
       {planMode ? 'Add Site to Plan' : 'Create Site'}
     </div>
-    <button class="menu-item" on:click={() => handleAction('create-site-tower')}>
+    <button class="menu-item" onclick={() => handleAction('create-site-tower')}>
       <span class="menu-icon">📡</span>
       <span>Add Tower Site{planMode ? ' to Plan' : ''}</span>
     </button>
     
-    <button class="menu-item" on:click={() => handleAction('create-site-noc')}>
+    <button class="menu-item" onclick={() => handleAction('create-site-noc')}>
       <span class="menu-icon">🖥️</span>
       <span>Add NOC{planMode ? ' to Plan' : ''}</span>
     </button>
     
-    <button class="menu-item" on:click={() => handleAction('create-site-warehouse')}>
+    <button class="menu-item" onclick={() => handleAction('create-site-warehouse')}>
       <span class="menu-icon">🏭</span>
       <span>Add Warehouse{planMode ? ' to Plan' : ''}</span>
     </button>
     
-    <button class="menu-item" on:click={() => handleAction('create-site-other')}>
+    <button class="menu-item" onclick={() => handleAction('create-site-other')}>
       <span class="menu-icon">📍</span>
       <span>Add Other Site{planMode ? ' to Plan' : ''}</span>
     </button>
@@ -71,12 +71,12 @@ export let disabled = false;
   
   <div class="menu-section">
     <div class="section-label">Add Equipment to Plan</div>
-    <button class="menu-item" on:click={() => handleAction('create-sector')}>
+    <button class="menu-item" onclick={() => handleAction('create-sector')}>
       <span class="menu-icon">📶</span>
       <span>Add Sector to Plan</span>
     </button>
     
-    <button class="menu-item" on:click={() => handleAction('create-cpe')}>
+    <button class="menu-item" onclick={() => handleAction('create-cpe')}>
       <span class="menu-icon">📱</span>
       <span>Add CPE Device to Plan</span>
     </button>
@@ -85,7 +85,7 @@ export let disabled = false;
   
   <div class="menu-divider"></div>
   
-  <button class="menu-item" on:click={() => handleAction('copy-coords')}>
+  <button class="menu-item" onclick={() => handleAction('copy-coords')}>
     <span class="menu-icon">📋</span>
     <span>Copy Coordinates</span>
   </button>

@@ -301,14 +301,14 @@
 </script>
 
 {#if show && site}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content" on:click|stopPropagation>
+<div class="modal-overlay" onclick={handleClose}>
+  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <div>
         <h2>📦 Add Equipment Inventory</h2>
         <p class="site-name">📡 {site.name}</p>
       </div>
-      <button class="close-btn" on:click={handleClose}>✕</button>
+      <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
     {#if error}
@@ -509,8 +509,8 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" on:click={handleClose}>Cancel</button>
-      <button class="btn-primary" on:click={handleSave} disabled={isSaving}>
+      <button class="btn-secondary" onclick={handleClose}>Cancel</button>
+      <button class="btn-primary" onclick={handleSave} disabled={isSaving}>
         {isSaving ? 'Saving...' : '✅ Add to Inventory'}
       </button>
     </div>

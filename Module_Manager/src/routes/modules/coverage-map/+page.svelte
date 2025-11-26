@@ -1068,7 +1068,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   }
 </script>
 
-<svelte:window on:click={() => showPlanDraftMenu && closePlanDraftMenu()} />
+<svelte:window onclick={() => showPlanDraftMenu && closePlanDraftMenu()} />
 
 <TenantGuard>
 <div class="fullscreen-map">
@@ -1098,8 +1098,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <div
       class="plan-draft-menu"
       style="left: {planDraftMenuX}px; top: {planDraftMenuY}px"
-      on:click|stopPropagation
-      on:contextmenu|preventDefault
+      onclick={(e) => e.stopPropagation()}
+      oncontextmenu={(e) => e.preventDefault()}
     >
       <div class="menu-header">
         <strong>{selectedPlanDraft.properties?.name ?? selectedPlanDraft.featureType ?? 'Draft Object'}</strong>
@@ -1113,22 +1113,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           {selectedPlanDraftCoords.longitude !== null ? selectedPlanDraftCoords.longitude.toFixed(7) : '—'}
         </p>
       </div>
-      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('edit-site')}>
+      <button class="menu-item" onclick={() => handlePlanDraftMenuAction('edit-site')}>
         ✏️ Edit Draft Details
       </button>
-      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('add-sector')}>
+      <button class="menu-item" onclick={() => handlePlanDraftMenuAction('add-sector')}>
         📶 Add Sector
       </button>
-      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('add-backhaul')}>
+      <button class="menu-item" onclick={() => handlePlanDraftMenuAction('add-backhaul')}>
         🔗 Add Backhaul Link
       </button>
-      <button class="menu-item" on:click={() => handlePlanDraftMenuAction('add-inventory')}>
+      <button class="menu-item" onclick={() => handlePlanDraftMenuAction('add-inventory')}>
         📦 Add Equipment
       </button>
-      <button class="menu-item danger" on:click={removePlanDraft}>
+      <button class="menu-item danger" onclick={removePlanDraft}>
         🗑️ Remove From Plan
       </button>
-      <button class="menu-item" on:click={closePlanDraftMenu}>
+      <button class="menu-item" onclick={closePlanDraftMenu}>
         ✕ Close
       </button>
     </div>
@@ -1136,18 +1136,18 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   <!-- Floating Control Panel -->
   <div class="floating-controls">
-    <button class="control-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+    <button class="control-btn" onclick={() => goto('/dashboard')} title="Back to Dashboard">
       ←
     </button>
     {#if !isDeployMode}
-      <button class="control-btn" on:click={() => showFilters = !showFilters} title="Toggle Filters">
+      <button class="control-btn" onclick={() => showFilters = !showFilters} title="Toggle Filters">
         🔍
       </button>
     {/if}
-    <button class="control-btn" on:click={() => showStats = !showStats} title="Toggle Statistics">
+    <button class="control-btn" onclick={() => showStats = !showStats} title="Toggle Statistics">
       📊
     </button>
-    <button class="control-btn main-menu-btn" on:click={() => showMainMenu = !showMainMenu} title="Main Menu">
+    <button class="control-btn main-menu-btn" onclick={() => showMainMenu = !showMainMenu} title="Main Menu">
       ☰
     </button>
   </div>
@@ -1182,11 +1182,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   <!-- Main Menu Modal -->
   {#if showMainMenu}
-  <div class="modal-overlay" on:click={() => showMainMenu = false}>
-    <div class="modal-content main-menu-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={() => showMainMenu = false}>
+    <div class="modal-content main-menu-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h3>🗺️ Coverage Map Controls</h3>
-        <button class="close-btn" on:click={() => showMainMenu = false}>✕</button>
+        <button class="close-btn" onclick={() => showMainMenu = false}>✕</button>
       </div>
       
       <div class="modal-body">
@@ -1197,21 +1197,21 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             <button 
               class="basemap-btn" 
               class:active={currentBasemap === 'streets-vector'}
-              on:click={() => changeBasemap('streets-vector')}
+              onclick={() => changeBasemap('streets-vector')}
             >
               🛣️ Streets
             </button>
             <button 
               class="basemap-btn" 
               class:active={currentBasemap === 'hybrid'}
-              on:click={() => changeBasemap('hybrid')}
+              onclick={() => changeBasemap('hybrid')}
             >
               🛰️ Satellite
             </button>
             <button 
               class="basemap-btn" 
               class:active={currentBasemap === 'topo-vector'}
-              on:click={() => changeBasemap('topo-vector')}
+              onclick={() => changeBasemap('topo-vector')}
             >
               🗺️ Topographic
             </button>
@@ -1222,22 +1222,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         <div class="menu-section">
           <h4>➕ Add Equipment</h4>
           <div class="action-grid">
-            <button class="action-btn" on:click={handleAddSite}>
+            <button class="action-btn" onclick={handleAddSite}>
               📡 Tower Site
             </button>
-            <button class="action-btn" on:click={() => handleAddSector(null)}>
+            <button class="action-btn" onclick={() => handleAddSector(null)}>
               📶 Sector
             </button>
-            <button class="action-btn" on:click={handleAddCPE}>
+            <button class="action-btn" onclick={handleAddCPE}>
               📱 CPE Device
             </button>
-            <button class="action-btn" on:click={() => showAddNOCModal = true}>
+            <button class="action-btn" onclick={() => showAddNOCModal = true}>
               🏢 NOC
             </button>
-            <button class="action-btn" on:click={() => showAddWarehouseModal = true}>
+            <button class="action-btn" onclick={() => showAddWarehouseModal = true}>
               🏭 Warehouse
             </button>
-            <button class="action-btn" on:click={() => showAddVehicleModal = true}>
+            <button class="action-btn" onclick={() => showAddVehicleModal = true}>
               🚛 Vehicle
             </button>
           </div>
@@ -1247,16 +1247,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         <div class="menu-section">
           <h4>📥 Import & Export</h4>
           <div class="action-grid">
-            <button class="action-btn" on:click={handleImportFromCBRS}>
+            <button class="action-btn" onclick={handleImportFromCBRS}>
               📡 Import from CBRS
             </button>
-            <button class="action-btn" on:click={handleImportFromACS}>
+            <button class="action-btn" onclick={handleImportFromACS}>
               📱 Import from ACS
             </button>
-            <button class="action-btn" on:click={handleExportCSV}>
+            <button class="action-btn" onclick={handleExportCSV}>
               📊 Export CSV
             </button>
-            <button class="action-btn" on:click={handleExportPDF}>
+            <button class="action-btn" onclick={handleExportPDF}>
               🖨️ Print PDF
             </button>
           </div>
@@ -1268,11 +1268,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   <!-- Filters Modal -->
   {#if showFilters && !isDeployMode}
-  <div class="modal-overlay" on:click={() => showFilters = false}>
-    <div class="modal-content filters-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={() => showFilters = false}>
+    <div class="modal-content filters-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h3>🔍 Map Filters</h3>
-        <button class="close-btn" on:click={() => showFilters = false}>✕</button>
+        <button class="close-btn" onclick={() => showFilters = false}>✕</button>
       </div>
       <div class="modal-body">
         <FilterPanel {filters} on:change={handleFiltersChange} />
@@ -1283,11 +1283,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   <!-- Statistics Modal -->
   {#if showStats && !hideStats}
-  <div class="modal-overlay" on:click={() => showStats = false}>
-    <div class="modal-content stats-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={() => showStats = false}>
+    <div class="modal-content stats-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h3>📊 Network Statistics</h3>
-        <button class="close-btn" on:click={() => showStats = false}>✕</button>
+        <button class="close-btn" onclick={() => showStats = false}>✕</button>
       </div>
       <div class="modal-body">
         <div class="stats-grid">
@@ -1333,7 +1333,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <div class="message-banner error">
       <span>⚠️</span>
       <span>{error}</span>
-      <button class="dismiss-btn" on:click={() => error = ''}>✕</button>
+      <button class="dismiss-btn" onclick={() => error = ''}>✕</button>
     </div>
   {/if}
   
@@ -1341,7 +1341,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <div class="message-banner success">
       <span>✅</span>
       <span>{success}</span>
-      <button class="dismiss-btn" on:click={() => success = ''}>✕</button>
+      <button class="dismiss-btn" onclick={() => success = ''}>✕</button>
     </div>
   {/if}
 </div>

@@ -167,11 +167,11 @@
 </script>
 
 {#if show}
-  <div class="modal-overlay" on:click={handleClose}>
-    <div class="modal-content hss-registration-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={handleClose}>
+    <div class="modal-content hss-registration-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>🏠 Register Site with HSS</h2>
-        <button class="close-btn" on:click={handleClose}>✕</button>
+        <button class="close-btn" onclick={handleClose}>✕</button>
       </div>
 
       {#if error}
@@ -394,12 +394,12 @@
 
       <!-- Navigation -->
       <div class="modal-footer">
-        <button class="btn-secondary" on:click={handleClose}>
+        <button class="btn-secondary" onclick={handleClose}>
           Cancel
         </button>
         <button 
           class="btn-primary" 
-          on:click={registerWithHSS}
+          onclick={registerWithHSS}
           disabled={loading || !validateConfig()}
         >
           {#if loading}

@@ -98,11 +98,11 @@ export let planId: string | null = null;
 </script>
 
 {#if show}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content" on:click|stopPropagation>
+<div class="modal-overlay" onclick={handleClose}>
+  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>🚚 Add Service Vehicle</h2>
-      <button class="close-btn" on:click={handleClose}>✕</button>
+      <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
     {#if error}<div class="error-banner">{error}</div>{/if}
@@ -149,8 +149,8 @@ export let planId: string | null = null;
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" on:click={handleClose}>Cancel</button>
-      <button class="btn-primary" on:click={handleSave} disabled={isSaving}>
+      <button class="btn-secondary" onclick={handleClose}>Cancel</button>
+      <button class="btn-primary" onclick={handleSave} disabled={isSaving}>
         {isSaving ? 'Saving...' : '✅ Add Vehicle'}
       </button>
     </div>

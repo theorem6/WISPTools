@@ -299,11 +299,11 @@
 </script>
 
 {#if show}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content" on:click|stopPropagation>
+<div class="modal-overlay" onclick={handleClose}>
+  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>🔗 Add Backhaul Link</h2>
-      <button class="close-btn" on:click={handleClose}>✕</button>
+      <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
     {#if error}
@@ -665,8 +665,8 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" on:click={handleClose}>Cancel</button>
-      <button class="btn-primary" on:click={handleSave} disabled={isSaving || !canCreateBackhaul}>
+      <button class="btn-secondary" onclick={handleClose}>Cancel</button>
+      <button class="btn-primary" onclick={handleSave} disabled={isSaving || !canCreateBackhaul}>
         {isSaving ? 'Saving...' : '✅ Create Backhaul Link'}
       </button>
     </div>

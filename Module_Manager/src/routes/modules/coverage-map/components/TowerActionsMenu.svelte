@@ -123,13 +123,13 @@
   }
 </script>
 
-<svelte:window on:click={handleClickOutside} />
+<svelte:window onclick={handleClickOutside} />
 
 {#if show && tower}
 <div 
   class="tower-menu" 
   style="left: {x}px; top: {y}px"
-  on:click|stopPropagation
+  onclick={(e) => e.stopPropagation()}
 >
   <div class="menu-header">
     <span class="tower-name">📡 {tower?.name || 'Unknown Site'}</span>
@@ -142,7 +142,7 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('edit-site')}
-    on:click={() => handleAction('edit-site')}
+    onclick={() => handleAction('edit-site')}
   >
     <span class="menu-icon">✏️</span>
     <span>Edit Tower Site</span>
@@ -151,7 +151,7 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('add-sector')}
-    on:click={() => handleAction('add-sector')}
+    onclick={() => handleAction('add-sector')}
   >
     <span class="menu-icon">📶</span>
     <span>Add Sector</span>
@@ -160,7 +160,7 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('add-backhaul')}
-    on:click={() => handleAction('add-backhaul')}
+    onclick={() => handleAction('add-backhaul')}
   >
     <span class="menu-icon">🔗</span>
     <span>Add Backhaul Link</span>
@@ -169,13 +169,13 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('add-inventory')}
-    on:click={() => handleAction('add-inventory')}
+    onclick={() => handleAction('add-inventory')}
   >
     <span class="menu-icon">📦</span>
     <span>Add Equipment Inventory</span>
   </button>
   
-  <button class="menu-item" on:click={() => handleAction('view-inventory')}>
+  <button class="menu-item" onclick={() => handleAction('view-inventory')}>
     <span class="menu-icon">📋</span>
     <span>View All Equipment</span>
   </button>
@@ -186,7 +186,7 @@
   <button 
     class="menu-item epc-option" 
     class:disabled={isActionDisabled('deploy-hardware')}
-    on:click={() => handleAction('deploy-hardware')}
+    onclick={() => handleAction('deploy-hardware')}
   >
     <span class="menu-icon">🔧</span>
     <span>Deploy Hardware</span>
@@ -195,7 +195,7 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('change-site-type')}
-    on:click={() => handleAction('change-site-type')}
+    onclick={() => handleAction('change-site-type')}
   >
     <span class="menu-icon">🔄</span>
     <span>Change Site Type</span>
@@ -203,7 +203,7 @@
   
   <div class="menu-divider"></div>
   
-  <button class="menu-item" on:click={() => handleAction('view-details')}>
+  <button class="menu-item" onclick={() => handleAction('view-details')}>
     <span class="menu-icon">ℹ️</span>
     <span>View Details</span>
   </button>
@@ -211,7 +211,7 @@
   <button 
     class="menu-item danger" 
     class:disabled={isActionDisabled('delete-site')}
-    on:click={() => handleAction('delete-site')}
+    onclick={() => handleAction('delete-site')}
   >
     <span class="menu-icon">🗑️</span>
     <span>Delete Site</span>

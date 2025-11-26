@@ -45,7 +45,7 @@
 <!-- Map Controls -->
 <div class="map-controls">
   <!-- Filter Toggle -->
-  <button type="button" class="control-btn" on:click={toggleFilters} class:active={showFilters}>
+  <button type="button" class="control-btn" onclick={toggleFilters} class:active={showFilters}>
     <span aria-hidden="true">🎛️</span>
     {#if showFilters}
       Hide
@@ -56,13 +56,13 @@
   </button>
   
   <!-- Main Menu Toggle -->
-  <button type="button" class="control-btn" on:click={toggleMainMenu} class:active={showMainMenu}>
+  <button type="button" class="control-btn" onclick={toggleMainMenu} class:active={showMainMenu}>
     <span aria-hidden="true">📋</span>
     Menu
   </button>
   
   <!-- Stats Toggle -->
-  <button type="button" class="control-btn" on:click={toggleStats} class:active={showStats}>
+  <button type="button" class="control-btn" onclick={toggleStats} class:active={showStats}>
     <span aria-hidden="true">📊</span>
     {#if showStats}
       Hide
@@ -85,18 +85,18 @@
   </select>
   
   <!-- Export Buttons -->
-  <button type="button" class="control-btn" on:click={exportCSV}>
+  <button type="button" class="control-btn" onclick={exportCSV}>
     <span aria-hidden="true">💾</span>
     Export CSV
   </button>
   
-  <button type="button" class="control-btn" on:click={exportPDF}>
+  <button type="button" class="control-btn" onclick={exportPDF}>
     <span aria-hidden="true">📄</span>
     Print PDF
   </button>
   
   <!-- Import -->
-  <button type="button" class="control-btn" on:click={importFromCBRS}>
+  <button type="button" class="control-btn" onclick={importFromCBRS}>
     <span aria-hidden="true">📥</span>
     Import from CBRS
   </button>

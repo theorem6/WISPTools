@@ -105,7 +105,7 @@
     <button 
       class="section-header" 
       class:collapsible={isMobile}
-      on:click={() => toggleSection('assetTypes')}
+      onclick={() => toggleSection('assetTypes')}
     >
       <h4>Asset Types</h4>
       {#if isMobile}
@@ -181,7 +181,7 @@
       <button 
         class="section-header" 
         class:collapsible={isMobile}
-        on:click={() => toggleSection('backhaulTypes')}
+        onclick={() => toggleSection('backhaulTypes')}
       >
         <h4>Backhaul Types</h4>
         {#if isMobile}
@@ -236,14 +236,14 @@
     <button 
       class="section-header" 
       class:collapsible={isMobile}
-      on:click={() => toggleSection('bands')}
+      onclick={() => toggleSection('bands')}
     >
       <div class="filter-header">
         <h4>Bands / Technology</h4>
         {#if !isMobile}
           <div class="filter-actions">
-            <button class="btn-link" on:click={showAllBands}>All</button>
-            <button class="btn-link" on:click={clearAllBandFilters}>None</button>
+            <button class="btn-link" onclick={showAllBands}>All</button>
+            <button class="btn-link" onclick={clearAllBandFilters}>None</button>
           </div>
         {/if}
       </div>
@@ -254,8 +254,8 @@
     <div class="filter-options" class:collapsed={isMobile && !expandedSections.bands}>
       {#if isMobile}
         <div class="filter-actions mobile-actions">
-          <button class="btn-link" on:click={showAllBands}>All</button>
-          <button class="btn-link" on:click={clearAllBandFilters}>None</button>
+          <button class="btn-link" onclick={showAllBands}>All</button>
+          <button class="btn-link" onclick={clearAllBandFilters}>None</button>
         </div>
       {/if}
       {#each availableBands as band}
@@ -284,7 +284,7 @@
     <button 
       class="section-header" 
       class:collapsible={isMobile}
-      on:click={() => toggleSection('status')}
+      onclick={() => toggleSection('status')}
     >
       <h4>Status</h4>
       {#if isMobile}

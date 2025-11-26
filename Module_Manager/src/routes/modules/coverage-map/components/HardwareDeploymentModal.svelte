@@ -121,11 +121,11 @@
 </script>
 
 {#if show && tower}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal" on:click|stopPropagation>
+<div class="modal-overlay" onclick={handleClose}>
+  <div class="modal" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>🔧 Deploy Hardware to {tower?.name || 'Selected Site'}</h2>
-      <button class="close-btn" on:click={handleClose}>✕</button>
+      <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
     <div class="modal-content">
@@ -156,15 +156,15 @@
       {/if}
 
       <div class="button-group">
-        <button class="btn btn-primary" on:click={handleEPCDeployment}>
+        <button class="btn btn-primary" onclick={handleEPCDeployment}>
           🚀 Deploy EPC to Site
         </button>
         
-        <button class="btn btn-primary" on:click={handleDeploy}>
+        <button class="btn btn-primary" onclick={handleDeploy}>
           📦 Select Hardware from Inventory
         </button>
         
-        <button class="btn btn-secondary" on:click={handleInventory}>
+        <button class="btn btn-secondary" onclick={handleInventory}>
           📋 View Current Inventory
         </button>
       </div>
@@ -184,7 +184,7 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn btn-secondary" on:click={handleClose}>Cancel</button>
+      <button class="btn btn-secondary" onclick={handleClose}>Cancel</button>
     </div>
   </div>
 </div>
