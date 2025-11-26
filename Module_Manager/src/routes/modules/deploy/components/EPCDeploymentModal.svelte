@@ -999,9 +999,9 @@ echo "🎉 Deployment successful!";
       
       // For large files like ISOs, we MUST use direct download from nginx
       // Cloud Functions have size limits that can't handle 136MB files
-      // The GCE server serves ISOs directly on port 80 via nginx
+      // The GCE server serves ISOs directly via nginx with HTTPS
       const GCE_IP = '136.112.111.167';
-      const directDownloadUrl = `http://${GCE_IP}/downloads/isos/${filename}`;
+      const directDownloadUrl = `https://${GCE_IP}/downloads/isos/${filename}`;
       
       console.log('[EPCDeployment] Using direct nginx download:', directDownloadUrl);
       
@@ -1023,7 +1023,7 @@ echo "🎉 Deployment successful!";
     } catch (err: any) {
       console.error('[EPCDeployment] ISO download error:', err);
       // Provide manual download link as fallback
-      error = `ISO download failed: ${err.message}. Download manually: http://136.112.111.167/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+      error = `ISO download failed: ${err.message}. Download manually: https://136.112.111.167/downloads/isos/wisptools-epc-generic-netinstall.iso`;
     }
   }
 
