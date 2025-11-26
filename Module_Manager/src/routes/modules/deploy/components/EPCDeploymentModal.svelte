@@ -990,81 +990,40 @@ echo "🎉 Deployment successful!";
     return script;
   }
 
-  // Download ISO file programmatically through backend proxy
+  // Download ISO file - use direct nginx download to avoid Cloud Function size limits
   async function downloadISOFile(isoUrl: string) {
     try {
-      console.log('[EPCDeployment] Downloading ISO through proxy:', isoUrl);
+      console.log('[EPCDeployment] Starting ISO download:', isoUrl);
       
-      // Extract the filename from URL
       const filename = 'wisptools-epc-generic-netinstall.iso';
       
-      // The isoUrl should already be a proxy URL from the backend
-      // If it's a direct URL, convert it to proxy format
-      let downloadUrl = isoUrl;
-      if (isoUrl.startsWith('http://') || isoUrl.startsWith('https://')) {
-        // Convert direct URL to proxy URL
-        downloadUrl = `/api/deploy/download-iso?url=${encodeURIComponent(isoUrl)}`;
-      }
+      // For large files like ISOs, we MUST use direct download from nginx
+      // Cloud Functions have size limits that can't handle 136MB files
+      // The GCE server serves ISOs directly on port 80 via nginx
+      const GCE_IP = '136.112.111.167';
+      const directDownloadUrl = `http://${GCE_IP}/downloads/isos/${filename}`;
       
-      // Get auth token if available
-      let authToken: string | null = null;
-      try {
-        authToken = await authService.getAuthToken();
-      } catch (authErr) {
-        console.warn('[EPCDeployment] Could not get auth token:', authErr);
-      }
+      console.log('[EPCDeployment] Using direct nginx download:', directDownloadUrl);
       
-      // Try relative URL first (goes through Firebase hosting rewrite to isoProxy)
-      let response = await fetch(downloadUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/octet-stream',
-          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-        }
-      });
-      
-      // If relative URL fails, try isoProxy Cloud Function
-      if (!response.ok) {
-        console.warn('[EPCDeployment] Relative URL failed, trying isoProxy...');
-        const isoProxyBase = 'https://us-central1-lte-pci-mapper-65450042-bbf71.cloudfunctions.net/isoProxy';
-        const proxyUrl = `${isoProxyBase}/downloads/isos/${filename}`;
-        
-        response = await fetch(proxyUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/octet-stream',
-            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-          }
-        });
-      }
-      
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-      }
-      
-      // Get the blob
-      const blob = await response.blob();
-      
-      // Create download link and trigger download automatically
-      const url = URL.createObjectURL(blob);
+      // Create a direct download link - no fetch/blob needed for large files
       const a = document.createElement('a');
-      a.href = url;
+      a.href = directDownloadUrl;
       a.download = filename;
       a.style.display = 'none';
+      a.target = '_blank'; // Open in new tab if browser blocks direct download
       document.body.appendChild(a);
       a.click();
       
       // Clean up after a short delay
       setTimeout(() => {
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
       }, 100);
       
-      console.log('[EPCDeployment] ISO download started automatically');
+      console.log('[EPCDeployment] ISO download started via direct nginx link');
     } catch (err: any) {
       console.error('[EPCDeployment] ISO download error:', err);
-      // Don't throw - just log the error, user can download manually
-      error = `ISO download failed: ${err.message}. You can download manually from the device configuration page.`;
+      // Provide manual download link as fallback
+      error = `ISO download failed: ${err.message}. Download manually: http://136.112.111.167/downloads/isos/wisptools-epc-generic-netinstall.iso`;
     }
   }
 
