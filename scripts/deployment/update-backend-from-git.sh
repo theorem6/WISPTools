@@ -61,6 +61,38 @@ if [ -f "package.json" ]; then
 fi
 
 echo ""
+echo "🔧 Checking nginx configuration for ISO downloads..."
+
+# Check if SSL cert exists and nginx needs updating
+if [ -f /etc/letsencrypt/live/hss.wisptools.io/fullchain.pem ]; then
+  echo "  - SSL certificate found"
+  
+  # Check if nginx config has /downloads/ location properly configured
+  if ! grep -q "location /downloads/" /etc/nginx/sites-enabled/* 2>/dev/null; then
+    echo "  - Updating nginx config for ISO downloads..."
+    
+    # Run the fix script if it exists
+    if [ -f "$BACKEND_DIR/scripts/fix-nginx-ssl.sh" ]; then
+      bash "$BACKEND_DIR/scripts/fix-nginx-ssl.sh" || echo "⚠️  nginx config update had issues, continuing..."
+    else
+      echo "  - Fix script not found, manually checking config..."
+      # Check if the proper config exists
+      if [ -f "$BACKEND_DIR/scripts/nginx-ssl-config.conf" ]; then
+        cp "$BACKEND_DIR/scripts/nginx-ssl-config.conf" /etc/nginx/sites-available/hss.wisptools.io
+        rm -f /etc/nginx/sites-enabled/default 2>/dev/null
+        ln -sf /etc/nginx/sites-available/hss.wisptools.io /etc/nginx/sites-enabled/
+        nginx -t && systemctl reload nginx
+        echo "  ✅ nginx config updated"
+      fi
+    fi
+  else
+    echo "  ✅ nginx already configured for downloads"
+  fi
+else
+  echo "  ⚠️  SSL certificate not found - ISO downloads may not work over HTTPS"
+fi
+
+echo ""
 echo "🔄 Restarting backend services..."
 
 # Restart EPC API (port 3002)
