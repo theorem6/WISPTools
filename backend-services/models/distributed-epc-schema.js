@@ -10,8 +10,16 @@ const mongoose = require('mongoose');
 const RemoteEPCSchema = new mongoose.Schema({
   // Identification
   epc_id: { type: String, required: true, unique: true, index: true },
+  site_id: { type: String, index: true }, // Reference to Firestore site document
   site_name: { type: String, required: true },
   tenant_id: { type: String, required: true, index: true },
+  
+  // Deployment Type - what software to install
+  deployment_type: { 
+    type: String, 
+    enum: ['epc', 'snmp', 'both'],
+    default: 'both'
+  },
   
   // Authentication
   auth_code: { type: String, required: true, unique: true, index: true }, // Unique code for API auth
@@ -20,6 +28,7 @@ const RemoteEPCSchema = new mongoose.Schema({
   checkin_token: { type: String, unique: true, sparse: true, index: true }, // Token for hardware check-in
   hardware_id: { type: String, index: true }, // MAC address or unique hardware identifier
   device_code: { type: String, unique: true, sparse: true, index: true }, // Unique alphanumeric code displayed on device for registration
+  origin_host_fqdn: { type: String }, // Unique FQDN for Diameter S6a identity
   
   // Location
   location: {
@@ -33,12 +42,42 @@ const RemoteEPCSchema = new mongoose.Schema({
     }
   },
   
-  // Network Configuration
+  // Network Configuration (legacy - use hss_config for new deployments)
   network_config: {
     mcc: String, // Mobile Country Code
     mnc: String, // Mobile Network Code
     tac: String, // Tracking Area Code
     plmn_id: String
+  },
+  
+  // HSS/EPC Configuration
+  hss_config: {
+    mcc: { type: String, default: '001' },
+    mnc: { type: String, default: '01' },
+    tac: { type: String, default: '1' },
+    apnName: { type: String, default: 'internet' },
+    dnsPrimary: { type: String, default: '8.8.8.8' },
+    dnsSecondary: { type: String, default: '8.8.4.4' },
+    uePoolCidr: { type: String, default: '10.45.0.0/16' }
+  },
+  
+  // SNMP Configuration
+  snmp_config: {
+    enabled: { type: Boolean, default: true },
+    community: { type: String, default: 'public' },
+    version: { type: String, enum: ['1', '2c', '3'], default: '2c' },
+    port: { type: Number, default: 161 },
+    pollingInterval: { type: Number, default: 60 }, // seconds
+    targets: [String], // List of IPs/networks to scan
+    trapReceiver: String, // Where to send SNMP traps
+    autoDiscovery: { type: Boolean, default: true }
+  },
+  
+  // APT Repository Configuration (for package updates)
+  apt_config: {
+    customRepoUrl: String,
+    gpgKeyUrl: String,
+    updateSchedule: { type: String, default: 'daily' }
   },
   
   // Connection Status

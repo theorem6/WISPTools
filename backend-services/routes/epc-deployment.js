@@ -318,6 +318,89 @@ router.post('/:epc_id/link-device', async (req, res) => {
 });
 
 /**
+ * Update EPC Device Configuration
+ * PUT /api/epc/:epc_id
+ * Updates deployment_type, hss_config, snmp_config, and network_config
+ */
+router.put('/:epc_id', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const { deployment_type, hss_config, snmp_config, network_config } = req.body;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    console.log(`[Update EPC] Updating EPC ${epc_id} for tenant ${tenant_id}`);
+    
+    // Find the EPC
+    const epc = await RemoteEPC.findOne({ 
+      epc_id,
+      tenant_id
+    });
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Build update object
+    const updateFields = {
+      updated_at: new Date()
+    };
+    
+    if (deployment_type) {
+      if (!['epc', 'snmp', 'both'].includes(deployment_type)) {
+        return res.status(400).json({ error: 'Invalid deployment_type. Must be epc, snmp, or both' });
+      }
+      updateFields.deployment_type = deployment_type;
+    }
+    
+    if (hss_config) {
+      updateFields.hss_config = {
+        ...epc.hss_config,
+        ...hss_config
+      };
+    }
+    
+    if (snmp_config) {
+      updateFields.snmp_config = {
+        ...epc.snmp_config,
+        ...snmp_config
+      };
+    }
+    
+    if (network_config) {
+      updateFields.network_config = {
+        ...epc.network_config,
+        ...network_config
+      };
+    }
+    
+    // Update the EPC
+    await RemoteEPC.updateOne(
+      { epc_id, tenant_id },
+      { $set: updateFields }
+    );
+    
+    console.log(`[Update EPC] Updated EPC ${epc_id}`);
+    
+    // Fetch updated record
+    const updatedEPC = await RemoteEPC.findOne({ epc_id, tenant_id }).lean();
+    
+    res.json({
+      success: true,
+      epc_id,
+      message: 'EPC configuration updated successfully',
+      epc: updatedEPC
+    });
+    
+  } catch (error) {
+    console.error('[Update EPC] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to update EPC', 
+      message: error.message 
+    });
+  }
+});
+
+/**
  * Proxy ISO Download (internal use - frontend downloads through this)
  * GET /api/deploy/download-iso?url=<iso-url>
  * Proxies the ISO download to avoid exposing GCE IP directly

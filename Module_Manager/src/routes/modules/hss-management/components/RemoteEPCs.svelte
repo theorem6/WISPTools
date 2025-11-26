@@ -4,6 +4,7 @@
   import { auth, db } from '$lib/firebase';
   import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
   import EPCMonitor from './EPCMonitor.svelte';
+  import SiteDevicesModal from './SiteDevicesModal.svelte';
   
   export let tenantId: string;
   export let HSS_API: string;
@@ -24,6 +25,8 @@
   let loadingSites = true;
   let deviceCodeInput = ''; // Device code input for linking hardware
   let linkingDevice = false; // Loading state for linking device
+  let showSiteDevicesModal = false; // Show site devices management modal
+  let selectedSiteForDevices: any = null; // Site selected for device management
   
   // ISO API configuration
   const HSS_IP = '136.112.111.167';
@@ -597,6 +600,11 @@ To use:
     return badges[status] || badges['offline'];
   }
   
+  function openSiteDevices(site: any) {
+    selectedSiteForDevices = site;
+    showSiteDevicesModal = true;
+  }
+  
   $: filteredEPCs = statusFilter === 'all' 
     ? epcs 
     : epcs.filter(e => e.status === statusFilter);
@@ -649,6 +657,39 @@ To use:
     </div>
   </div>
   
+  <!-- Sites Overview -->
+  {#if sites.length > 0}
+    <div class="sites-section">
+      <h3>🏢 Sites Overview</h3>
+      <div class="sites-grid">
+        {#each sites as site}
+          {@const siteDevices = epcs.filter(e => e.site_name === site.name)}
+          <div class="site-card" on:click={() => openSiteDevices(site)}>
+            <div class="site-name">{site.name || 'Unnamed Site'}</div>
+            <div class="site-location">
+              {#if site.location?.city}
+                📍 {site.location.city}, {site.location.state || ''}
+              {:else}
+                📍 Location not set
+              {/if}
+            </div>
+            <div class="site-devices">
+              📦 {siteDevices.length} device(s)
+              {#if siteDevices.some(d => d.status === 'online')}
+                <span class="online-indicator">🟢</span>
+              {:else if siteDevices.length > 0}
+                <span class="offline-indicator">🔴</span>
+              {/if}
+            </div>
+            <button class="manage-btn" on:click|stopPropagation={() => openSiteDevices(site)}>
+              ⚙️ Manage Devices
+            </button>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   <!-- Filters -->
   <div class="filters">
     <label>
@@ -1048,11 +1089,66 @@ To use:
           </div>
           
           <div class="detail-section">
-            <h3>Network Config</h3>
-            <p><strong>MCC:</strong> {selectedEPC.network_config?.mcc || 'N/A'}</p>
-            <p><strong>MNC:</strong> {selectedEPC.network_config?.mnc || 'N/A'}</p>
-            <p><strong>TAC:</strong> {selectedEPC.network_config?.tac || 'N/A'}</p>
+            <h3>📦 Deployment Type</h3>
+            <div class="deployment-type-badge" class:epc-only={selectedEPC.deployment_type === 'epc'} class:snmp-only={selectedEPC.deployment_type === 'snmp'} class:both-types={selectedEPC.deployment_type === 'both' || !selectedEPC.deployment_type}>
+              {#if selectedEPC.deployment_type === 'epc'}
+                📡 EPC Only
+              {:else if selectedEPC.deployment_type === 'snmp'}
+                📊 SNMP Agent Only
+              {:else}
+                📡📊 EPC + SNMP Agent
+              {/if}
+            </div>
+            {#if selectedEPC.hardware_id}
+              <p style="margin-top: 0.5rem;"><strong>Hardware ID:</strong> <code>{selectedEPC.hardware_id}</code></p>
+            {/if}
           </div>
+          
+          <div class="detail-section">
+            <h3>📡 Network Config (EPC)</h3>
+            <p><strong>MCC:</strong> {selectedEPC.network_config?.mcc || selectedEPC.hss_config?.mcc || 'N/A'}</p>
+            <p><strong>MNC:</strong> {selectedEPC.network_config?.mnc || selectedEPC.hss_config?.mnc || 'N/A'}</p>
+            <p><strong>TAC:</strong> {selectedEPC.network_config?.tac || selectedEPC.hss_config?.tac || 'N/A'}</p>
+            {#if selectedEPC.hss_config?.apnName}
+              <p><strong>APN:</strong> {selectedEPC.hss_config.apnName}</p>
+            {/if}
+            {#if selectedEPC.hss_config?.dnsPrimary}
+              <p><strong>DNS:</strong> {selectedEPC.hss_config.dnsPrimary}{selectedEPC.hss_config?.dnsSecondary ? `, ${selectedEPC.hss_config.dnsSecondary}` : ''}</p>
+            {/if}
+            {#if selectedEPC.origin_host_fqdn}
+              <p><strong>Origin-Host:</strong> <code style="font-size: 0.75rem;">{selectedEPC.origin_host_fqdn}</code></p>
+            {/if}
+          </div>
+          
+          {#if selectedEPC.deployment_type === 'snmp' || selectedEPC.deployment_type === 'both' || selectedEPC.snmp_config?.enabled}
+            <div class="detail-section snmp-config">
+              <h3>📊 SNMP Configuration</h3>
+              <p><strong>Enabled:</strong> {selectedEPC.snmp_config?.enabled !== false ? '✓ Yes' : '✗ No'}</p>
+              {#if selectedEPC.snmp_config?.community}
+                <p><strong>Community:</strong> <code>{selectedEPC.snmp_config.community}</code></p>
+              {:else}
+                <p><strong>Community:</strong> <code>public</code> (default)</p>
+              {/if}
+              {#if selectedEPC.snmp_config?.version}
+                <p><strong>Version:</strong> SNMPv{selectedEPC.snmp_config.version}</p>
+              {/if}
+              {#if selectedEPC.snmp_config?.pollingInterval}
+                <p><strong>Polling Interval:</strong> {selectedEPC.snmp_config.pollingInterval}s</p>
+              {:else}
+                <p><strong>Polling Interval:</strong> 60s (default)</p>
+              {/if}
+              {#if selectedEPC.snmp_config?.targets && selectedEPC.snmp_config.targets.length > 0}
+                <p><strong>Targets:</strong></p>
+                <ul class="snmp-targets">
+                  {#each selectedEPC.snmp_config.targets as target}
+                    <li><code>{target}</code></li>
+                  {/each}
+                </ul>
+              {:else}
+                <p><strong>Targets:</strong> <em>Auto-discover on local network</em></p>
+              {/if}
+            </div>
+          {/if}
           
           {#if selectedEPC.version}
             <div class="detail-section">
@@ -1080,6 +1176,19 @@ To use:
     </div>
   </div>
 {/if}
+
+<!-- Site Devices Modal -->
+<SiteDevicesModal
+  bind:show={showSiteDevicesModal}
+  site={selectedSiteForDevices}
+  {tenantId}
+  {HSS_API}
+  on:close={() => {
+    showSiteDevicesModal = false;
+    selectedSiteForDevices = null;
+    loadEPCs(); // Refresh list
+  }}
+/>
 
 <style>
   .remote-epcs {
@@ -1564,6 +1673,79 @@ To use:
     word-break: break-all;
   }
   
+  /* Sites Section Styles */
+  .sites-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f0f9ff;
+    border-radius: 8px;
+    border: 1px solid #bae6fd;
+  }
+  
+  .sites-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #0369a1;
+  }
+  
+  .sites-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+  
+  .site-card {
+    background: white;
+    border: 1px solid #e0f2fe;
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .site-card:hover {
+    border-color: #0ea5e9;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  
+  .site-name {
+    font-weight: 600;
+    color: #0c4a6e;
+    margin-bottom: 0.5rem;
+  }
+  
+  .site-location {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+  }
+  
+  .site-devices {
+    font-size: 0.85rem;
+    color: #475569;
+    margin-bottom: 0.75rem;
+  }
+  
+  .online-indicator, .offline-indicator {
+    margin-left: 0.25rem;
+  }
+  
+  .manage-btn {
+    width: 100%;
+    padding: 0.5rem;
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+  
+  .manage-btn:hover {
+    background: #0284c7;
+  }
+
   @media (max-width: 768px) {
     .epc-grid {
       grid-template-columns: 1fr;
@@ -1571,6 +1753,10 @@ To use:
     
     .summary-grid {
       grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .sites-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>
