@@ -658,9 +658,15 @@ To use:
   </div>
   
   <!-- Sites Overview -->
-  {#if sites.length > 0}
-    <div class="sites-section">
-      <h3>🏢 Sites Overview</h3>
+  <div class="sites-section">
+    <h3>🏢 Sites with Deployed Devices</h3>
+    {#if loadingSites}
+      <p class="loading-text">Loading sites...</p>
+    {:else if sites.length === 0}
+      <div class="no-sites-message">
+        <p>No sites found. Create a site in the Coverage Map module or register a new EPC below to create one.</p>
+      </div>
+    {:else}
       <div class="sites-grid">
         {#each sites as site}
           {@const siteDevices = epcs.filter(e => e.site_name === site.name)}
@@ -687,8 +693,8 @@ To use:
           </div>
         {/each}
       </div>
-    </div>
-  {/if}
+    {/if}
+  </div>
 
   <!-- Filters -->
   <div class="filters">
@@ -1686,6 +1692,19 @@ To use:
     margin: 0 0 1rem 0;
     font-size: 1rem;
     color: #0369a1;
+  }
+  
+  .no-sites-message {
+    padding: 1rem;
+    background: white;
+    border-radius: 6px;
+    text-align: center;
+    color: #64748b;
+  }
+  
+  .loading-text {
+    color: #64748b;
+    text-align: center;
   }
   
   .sites-grid {
