@@ -990,40 +990,35 @@ echo "🎉 Deployment successful!";
     return script;
   }
 
-  // Download ISO file - use direct nginx download to avoid Cloud Function size limits
+  // Download ISO file - use proxy URL through API
   async function downloadISOFile(isoUrl: string) {
     try {
       console.log('[EPCDeployment] Starting ISO download:', isoUrl);
       
       const filename = 'wisptools-epc-generic-netinstall.iso';
       
-      // For large files like ISOs, we MUST use direct download from nginx
-      // Cloud Functions have size limits that can't handle 136MB files
-      // The GCE server serves ISOs directly via nginx with HTTPS
-      const GCE_IP = '136.112.111.167';
-      const directDownloadUrl = `https://${GCE_IP}/downloads/isos/${filename}`;
+      // Use the API proxy endpoint for ISO download
+      // This goes through Firebase hosting -> isoProxy cloud function -> GCE nginx
+      // The isoUrl from backend is already a proxy URL: /api/deploy/download-iso?url=...
+      let downloadUrl = isoUrl;
       
-      console.log('[EPCDeployment] Using direct nginx download:', directDownloadUrl);
+      // If the URL is a direct GCE URL (shouldn't happen, but fallback)
+      if (isoUrl.includes('136.112.111.167') || isoUrl.includes('/downloads/isos/')) {
+        // Convert to proxy URL
+        downloadUrl = `/api/deploy/download-iso?url=${encodeURIComponent(isoUrl)}`;
+      }
       
-      // Create a direct download link - no fetch/blob needed for large files
-      const a = document.createElement('a');
-      a.href = directDownloadUrl;
-      a.download = filename;
-      a.style.display = 'none';
-      a.target = '_blank'; // Open in new tab if browser blocks direct download
-      document.body.appendChild(a);
-      a.click();
+      console.log('[EPCDeployment] Using proxy download URL:', downloadUrl);
       
-      // Clean up after a short delay
-      setTimeout(() => {
-        document.body.removeChild(a);
-      }, 100);
+      // Open the download URL - browser will handle the download
+      // Using window.open instead of anchor click for better cross-browser support
+      window.open(downloadUrl, '_blank');
       
-      console.log('[EPCDeployment] ISO download started via direct nginx link');
+      console.log('[EPCDeployment] ISO download initiated');
     } catch (err: any) {
       console.error('[EPCDeployment] ISO download error:', err);
-      // Provide manual download link as fallback
-      error = `ISO download failed: ${err.message}. Download manually: https://136.112.111.167/downloads/isos/wisptools-epc-generic-netinstall.iso`;
+      // Provide proxy URL as fallback
+      error = `ISO download failed: ${err.message}. Try downloading from: /api/deploy/download-iso`;
     }
   }
 
