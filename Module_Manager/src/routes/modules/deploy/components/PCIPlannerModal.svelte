@@ -211,11 +211,11 @@
 </script>
 
 {#if show}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content pci-planner-modal" on:click|stopPropagation>
+<div class="modal-overlay" onclick={handleClose}>
+  <div class="modal-content pci-planner-modal" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>📊 PCI Planner</h2>
-      <button class="close-btn" on:click={handleClose}>✕</button>
+      <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
     {#if error}
@@ -238,21 +238,21 @@
           <button 
             class="tab-btn" 
             class:active={activeTab === 'analysis'} 
-            on:click={() => activeTab = 'analysis'}
+            onclick={() => activeTab = 'analysis'}
           >
             📊 Analysis
           </button>
           <button 
             class="tab-btn" 
             class:active={activeTab === 'conflicts'} 
-            on:click={() => activeTab = 'conflicts'}
+            onclick={() => activeTab = 'conflicts'}
           >
             ⚠️ Conflicts ({conflicts.length})
           </button>
           <button 
             class="tab-btn" 
             class:active={activeTab === 'optimization'} 
-            on:click={() => activeTab = 'optimization'}
+            onclick={() => activeTab = 'optimization'}
           >
             🔧 Optimization
           </button>
@@ -281,7 +281,7 @@
             <div class="action-buttons">
               <button 
                 class="btn-primary" 
-                on:click={performAnalysis}
+                onclick={performAnalysis}
                 disabled={isAnalyzing || cells.length === 0}
               >
                 {#if isAnalyzing}
@@ -293,7 +293,7 @@
               
               <button 
                 class="btn-secondary" 
-                on:click={() => showAdvancedOptions = !showAdvancedOptions}
+                onclick={() => showAdvancedOptions = !showAdvancedOptions}
               >
                 ⚙️ Advanced Options
               </button>
@@ -385,7 +385,7 @@
               <div class="action-buttons">
                 <button 
                   class="btn-primary" 
-                  on:click={optimizePCIs}
+                  onclick={optimizePCIs}
                   disabled={isOptimizing}
                 >
                   {#if isOptimizing}
@@ -441,10 +441,10 @@
               {/if}
               
               <div class="action-buttons">
-                <button class="btn-secondary" on:click={exportResults}>
+                <button class="btn-secondary" onclick={exportResults}>
                   📥 Export Results
                 </button>
-                <button class="btn-primary" on:click={performAnalysis}>
+                <button class="btn-primary" onclick={performAnalysis}>
                   🔍 Re-analyze
                 </button>
               </div>

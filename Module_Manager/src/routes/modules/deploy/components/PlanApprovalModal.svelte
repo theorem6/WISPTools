@@ -92,11 +92,11 @@
 </script>
 
 {#if show && plan}
-  <div class="modal-overlay" on:click={handleClose}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={handleClose}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>📋 Plan Approval: {plan.name}</h2>
-        <button class="close-btn" on:click={handleClose}>✕</button>
+        <button class="close-btn" onclick={handleClose}>✕</button>
       </div>
       
       <div class="modal-body">
@@ -159,7 +159,7 @@
           </div>
           <button 
             class="btn-approve" 
-            on:click={handleApprove} 
+            onclick={handleApprove} 
             disabled={isProcessing}
           >
             {isProcessing ? 'Processing...' : '✅ Approve Plan'}
@@ -190,7 +190,7 @@
           </div>
           <button 
             class="btn-reject" 
-            on:click={handleReject} 
+            onclick={handleReject} 
             disabled={isProcessing || !rejectionReason}
           >
             {isProcessing ? 'Processing...' : '❌ Reject Plan'}
@@ -207,7 +207,7 @@
       </div>
       
       <div class="modal-footer">
-        <button class="btn-secondary" on:click={handleClose}>Cancel</button>
+        <button class="btn-secondary" onclick={handleClose}>Cancel</button>
       </div>
     </div>
   </div>

@@ -145,7 +145,7 @@
           ⚙️ EPC Deployment Configuration
         {/if}
       </h2>
-      <button class="close-btn" on:click={handleCancel}>✕</button>
+      <button class="close-btn" onclick={handleCancel}>✕</button>
     </div>
     
     <div class="modal-body">
@@ -153,19 +153,19 @@
       <div class="tabs">
         <button 
           class="tab {activeTab === 'snmp' ? 'active' : ''}"
-          on:click={() => activeTab = 'snmp'}
+          onclick={() => activeTab = 'snmp'}
         >
           📊 SNMP Monitoring
         </button>
         <button 
           class="tab {activeTab === 'apt' ? 'active' : ''}"
-          on:click={() => activeTab = 'apt'}
+          onclick={() => activeTab = 'apt'}
         >
           📦 Updates & Packages
         </button>
         <button 
           class="tab {activeTab === 'network' ? 'active' : ''}"
-          on:click={() => activeTab = 'network'}
+          onclick={() => activeTab = 'network'}
         >
           🌐 Network Settings
         </button>
@@ -246,7 +246,7 @@
                     </div>
                   </div>
                   
-                  <button type="button" class="btn btn-secondary" on:click={generateRandomKeys}>
+                  <button type="button" class="btn btn-secondary" onclick={generateRandomKeys}>
                     🔑 Generate Random Keys
                   </button>
                 </div>
@@ -285,13 +285,13 @@
                     <input type="text" bind:value={oid.oid} placeholder="1.3.6.1.4.1...." />
                     <input type="text" bind:value={oid.name} placeholder="Metric name" />
                     <input type="text" bind:value={oid.description} placeholder="Description" />
-                    <button type="button" class="btn btn-danger btn-sm" on:click={() => removeCustomOid(index)}>
+                    <button type="button" class="btn btn-danger btn-sm" onclick={() => removeCustomOid(index)}>
                       Remove
                     </button>
                   </div>
                 {/each}
                 
-                <button type="button" class="btn btn-secondary" on:click={addCustomOid}>
+                <button type="button" class="btn btn-secondary" onclick={addCustomOid}>
                   + Add Custom OID
                 </button>
               </div>
@@ -357,14 +357,14 @@
                   <div class="package-row">
                     <input type="text" bind:value={aptConfig.allowedPackages[index]} placeholder="package-name" />
                     <button type="button" class="btn btn-danger btn-sm" 
-                            on:click={() => aptConfig.allowedPackages = aptConfig.allowedPackages.filter((_, i) => i !== index)}>
+                            onclick={() => aptConfig.allowedPackages = aptConfig.allowedPackages.filter((_, i) => i !== index)}>
                       Remove
                     </button>
                   </div>
                 {/each}
                 
                 <button type="button" class="btn btn-secondary" 
-                        on:click={() => aptConfig.allowedPackages = [...aptConfig.allowedPackages, '']}>
+                        onclick={() => aptConfig.allowedPackages = [...aptConfig.allowedPackages, '']}>
                   + Add Package
                 </button>
               </div>
@@ -424,7 +424,7 @@
             
             {#if networkConfig.staticIP && networkConfig.ipAddress}
               <div class="connection-test">
-                <button type="button" class="btn btn-secondary" on:click={testSNMPConnection} disabled={testingConnection}>
+                <button type="button" class="btn btn-secondary" onclick={testSNMPConnection} disabled={testingConnection}>
                   {#if testingConnection}
                     🔄 Testing...
                   {:else}
@@ -455,10 +455,10 @@
     </div>
     
     <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" on:click={handleCancel}>
+      <button type="button" class="btn btn-secondary" onclick={handleCancel}>
         Cancel
       </button>
-      <button type="button" class="btn btn-primary" on:click={handleSave}>
+      <button type="button" class="btn btn-primary" onclick={handleSave}>
         {#if deploymentType === 'snmp-only'}
           Generate SNMP ISO
         {:else}

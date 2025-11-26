@@ -225,11 +225,11 @@
 </script>
 
 {#if show}
-  <div class="modal-overlay" on:click={handleClose}>
-    <div class="modal-content frequency-planner-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={handleClose}>
+    <div class="modal-content frequency-planner-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>📡 Frequency Planner</h2>
-        <button class="close-btn" on:click={handleClose}>✕</button>
+        <button class="close-btn" onclick={handleClose}>✕</button>
       </div>
 
       {#if error}
@@ -252,14 +252,14 @@
             <button 
               class="tab-btn" 
               class:active={activeTab === 'analysis'}
-              on:click={() => activeTab = 'analysis'}
+              onclick={() => activeTab = 'analysis'}
             >
               📊 Analysis
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'conflicts'}
-              on:click={() => activeTab = 'conflicts'}
+              onclick={() => activeTab = 'conflicts'}
             >
               ⚠️ Conflicts
               {#if conflicts.length > 0}
@@ -269,7 +269,7 @@
             <button 
               class="tab-btn" 
               class:active={activeTab === 'optimization'}
-              on:click={() => activeTab = 'optimization'}
+              onclick={() => activeTab = 'optimization'}
             >
               🔧 Optimization
             </button>
@@ -305,7 +305,7 @@
               <div class="analysis-actions">
                 <button 
                   class="btn-primary" 
-                  on:click={performAnalysis}
+                  onclick={performAnalysis}
                   disabled={isAnalyzing || !sectors.length}
                 >
                   {#if isAnalyzing}
@@ -318,7 +318,7 @@
 
                 <button 
                   class="btn-secondary" 
-                  on:click={generateOptimizations}
+                  onclick={generateOptimizations}
                   disabled={isOptimizing || !conflicts.length}
                 >
                   {#if isOptimizing}
@@ -330,7 +330,7 @@
                 </button>
 
                 {#if plan}
-                  <button class="btn-secondary" on:click={exportResults}>
+                  <button class="btn-secondary" onclick={exportResults}>
                     📥 Export Plan
                   </button>
                 {/if}

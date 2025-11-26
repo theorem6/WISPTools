@@ -45,7 +45,7 @@
 <div class="project-filter-panel">
   <div class="panel-header">
     <h3>📋 Project Filters</h3>
-    <button class="toggle-btn" on:click={() => filterExpanded = !filterExpanded} title={filterExpanded ? 'Collapse' : 'Expand'}>
+    <button class="toggle-btn" onclick={() => filterExpanded = !filterExpanded} title={filterExpanded ? 'Collapse' : 'Expand'}>
       {filterExpanded ? '−' : '+'}
     </button>
   </div>

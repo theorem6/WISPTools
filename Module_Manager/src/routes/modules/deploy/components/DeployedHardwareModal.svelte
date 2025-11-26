@@ -124,11 +124,11 @@
 </script>
 
 {#if show}
-<div class="modal-overlay" on:click={closeModal}>
-  <div class="modal-content" on:click|stopPropagation>
+<div class="modal-overlay" onclick={closeModal}>
+  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>🔧 Deployed Hardware</h2>
-      <button class="close-btn" on:click={closeModal}>✕</button>
+      <button class="close-btn" onclick={closeModal}>✕</button>
     </div>
     
     {#if error}
@@ -153,8 +153,8 @@
                   <span class="deployment-status {deployment.status}">{deployment.status}</span>
                 </div>
                 <div class="deployment-actions">
-                  <button class="btn-edit" on:click={() => openEdit(deployment)}>✏️ Edit</button>
-                  <button class="btn-delete" on:click={() => deleteDeployment(deployment)}>🗑️ Delete</button>
+                  <button class="btn-edit" onclick={() => openEdit(deployment)}>✏️ Edit</button>
+                  <button class="btn-delete" onclick={() => deleteDeployment(deployment)}>🗑️ Delete</button>
                 </div>
               </div>
               
@@ -179,18 +179,18 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" on:click={closeModal}>Close</button>
+      <button class="btn-secondary" onclick={closeModal}>Close</button>
     </div>
   </div>
 </div>
 
 <!-- Edit Modal -->
 {#if showEditModal && selectedDeployment}
-<div class="modal-overlay" on:click={() => showEditModal = false}>
-  <div class="modal-content edit-modal" on:click|stopPropagation>
+<div class="modal-overlay" onclick={() => showEditModal = false}>
+  <div class="modal-content edit-modal" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>✏️ Edit Deployment</h2>
-      <button class="close-btn" on:click={() => showEditModal = false}>✕</button>
+      <button class="close-btn" onclick={() => showEditModal = false}>✕</button>
     </div>
     
     <div class="modal-body">
@@ -227,8 +227,8 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" on:click={() => showEditModal = false}>Cancel</button>
-      <button class="btn-primary" on:click={saveEdit} disabled={isSaving}>
+      <button class="btn-secondary" onclick={() => showEditModal = false}>Cancel</button>
+      <button class="btn-primary" onclick={saveEdit} disabled={isSaving}>
         {isSaving ? 'Saving...' : 'Save'}
       </button>
     </div>

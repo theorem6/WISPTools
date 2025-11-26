@@ -529,7 +529,7 @@ import '$lib/styles/moduleHeaderMenu.css';
     <!-- Deploy Header Overlay -->
     <div class="module-header-overlay" style="background: var(--gradient-success);">
       <div class="module-header-left">
-        <button class="module-back-btn" on:click={() => {
+        <button class="module-back-btn" onclick={() => {
           console.log('[Deploy] Back to Dashboard clicked');
           goto('/dashboard');
         }} title="Back to Dashboard">
@@ -541,19 +541,19 @@ import '$lib/styles/moduleHeaderMenu.css';
         <button 
           class="module-control-btn" 
           class:active={showProjectFilters}
-          on:click={() => showProjectFilters = !showProjectFilters} 
+          onclick={() => showProjectFilters = !showProjectFilters} 
           title="Project Filters - Approved projects ready for deployment"
         >
           <span class="control-icon">🔍</span>
           <span class="control-label">Approved ({approvedPlans.length})</span>
         </button>
-        <button class="module-control-btn" on:click={openPlanApproval} title="Projects - View and manage all projects">
+        <button class="module-control-btn" onclick={openPlanApproval} title="Projects - View and manage all projects">
           <span class="control-icon">📋</span>
           <span class="control-label">Projects ({readyPlans.length})</span>
         </button>
         <button 
           class="module-control-btn" 
-          on:click={() => showDeployedHardwareModal = true}
+          onclick={() => showDeployedHardwareModal = true}
           title="View Deployed Projects"
         >
           <span class="control-icon">✅</span>
@@ -562,7 +562,7 @@ import '$lib/styles/moduleHeaderMenu.css';
         <button 
           class="module-control-btn" 
           class:disabled={buttonsDisabled}
-          on:click={() => {
+          onclick={() => {
             console.log('[Deploy] PCI button clicked');
             openPCIPlanner();
           }} 
@@ -575,7 +575,7 @@ import '$lib/styles/moduleHeaderMenu.css';
         <button 
           class="module-control-btn" 
           class:disabled={buttonsDisabled}
-          on:click={() => {
+          onclick={() => {
             console.log('[Deploy] Frequency button clicked');
             openFrequencyPlanner();
           }} 
@@ -586,7 +586,7 @@ import '$lib/styles/moduleHeaderMenu.css';
         </button>
         <button 
           class="module-control-btn" 
-          on:click={() => showDeployedHardwareModal = true}
+          onclick={() => showDeployedHardwareModal = true}
           title="View and Edit Deployed Hardware"
         >
           <span class="control-icon">🔧</span>
@@ -596,7 +596,7 @@ import '$lib/styles/moduleHeaderMenu.css';
           class="module-control-btn deploy-btn" 
           class:disabled={!mapState?.activePlan}
           disabled={!mapState?.activePlan}
-          on:click={pushActivePlanToField}
+          onclick={pushActivePlanToField}
           title={mapState?.activePlan ? `Push ${mapState.activePlan.name} to field teams` : 'Select a plan to deploy'}
         >
           <span class="control-icon">🚀</span>
@@ -683,11 +683,11 @@ import '$lib/styles/moduleHeaderMenu.css';
   
   <!-- Plan Selection Modal (shows list of all plans) -->
   {#if showPlanApprovalModal && !selectedPlan}
-    <div class="modal-overlay" on:click={closePlanApprovalModal}>
-      <div class="plan-list-modal" on:click|stopPropagation>
+    <div class="modal-overlay" onclick={closePlanApprovalModal}>
+      <div class="plan-list-modal" onclick={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h2>📋 All Plans - Activate, Approve, or Take Over</h2>
-          <button class="close-btn" on:click={closePlanApprovalModal}>✕</button>
+          <button class="close-btn" onclick={closePlanApprovalModal}>✕</button>
         </div>
         
         <div class="modal-body">
@@ -724,7 +724,7 @@ import '$lib/styles/moduleHeaderMenu.css';
                     <button 
                       class="btn-activate" 
                       class:btn-deactivate={plan.showOnMap}
-                      on:click={() => togglePlanActivation(plan)}
+                      onclick={() => togglePlanActivation(plan)}
                       disabled={isLoadingPlans}
                       title={plan.showOnMap ? "Deactivate this plan to hide it from the map" : "Activate this plan to view it on the map"}
                     >
@@ -733,7 +733,7 @@ import '$lib/styles/moduleHeaderMenu.css';
                     {#if plan.status === 'draft' || plan.status === 'active'}
                       <button 
                         class="btn-finalize" 
-                        on:click={() => handleFinalizePlan(plan)}
+                        onclick={() => handleFinalizePlan(plan)}
                         disabled={isLoadingPlans}
                         title="Finalize this project to make it ready for approval"
                       >
@@ -742,7 +742,7 @@ import '$lib/styles/moduleHeaderMenu.css';
                     {:else if plan.status === 'ready' || plan.status === 'approved' || plan.status === 'authorized'}
                       <button 
                         class="btn-action" 
-                        on:click={() => selectPlanForApproval(plan)}
+                        onclick={() => selectPlanForApproval(plan)}
                         disabled={isLoadingPlans}
                         title="Approve or reject this project"
                       >
@@ -752,7 +752,7 @@ import '$lib/styles/moduleHeaderMenu.css';
                     {#if (plan.status === 'approved' || plan.status === 'authorized') && plan.showOnMap}
                       <button 
                         class="btn-takeover" 
-                        on:click={() => takeOverPlan(plan)}
+                        onclick={() => takeOverPlan(plan)}
                         disabled={isLoadingPlans}
                         title="Take over this plan and mark it as deployed"
                       >
@@ -767,7 +767,7 @@ import '$lib/styles/moduleHeaderMenu.css';
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closePlanApprovalModal}>Close</button>
+          <button class="btn-secondary" onclick={closePlanApprovalModal}>Close</button>
         </div>
       </div>
     </div>

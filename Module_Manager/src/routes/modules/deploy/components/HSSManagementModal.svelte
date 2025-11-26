@@ -195,15 +195,15 @@
 </script>
 
 {#if show}
-  <div class="modal-overlay" on:click={handleClose}>
-    <div class="modal-content hss-management-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={handleClose}>
+    <div class="modal-content hss-management-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>🏠 HSS Management</h2>
         <div class="header-actions">
-          <button class="refresh-btn" on:click={refreshData} title="Refresh Data">
+          <button class="refresh-btn" onclick={refreshData} title="Refresh Data">
             🔄
           </button>
-          <button class="close-btn" on:click={handleClose}>✕</button>
+          <button class="close-btn" onclick={handleClose}>✕</button>
         </div>
       </div>
 
@@ -223,49 +223,49 @@
             <button 
               class="tab-btn" 
               class:active={activeTab === 'dashboard'}
-              on:click={() => activeTab = 'dashboard'}
+              onclick={() => activeTab = 'dashboard'}
             >
               {getTabIcon('dashboard')} Dashboard
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'subscribers'}
-              on:click={() => activeTab = 'subscribers'}
+              onclick={() => activeTab = 'subscribers'}
             >
               {getTabIcon('subscribers')} Subscribers
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'groups'}
-              on:click={() => activeTab = 'groups'}
+              onclick={() => activeTab = 'groups'}
             >
               {getTabIcon('groups')} Groups
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'plans'}
-              on:click={() => activeTab = 'plans'}
+              onclick={() => activeTab = 'plans'}
             >
               {getTabIcon('plans')} Plans
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'epcs'}
-              on:click={() => activeTab = 'epcs'}
+              onclick={() => activeTab = 'epcs'}
             >
               {getTabIcon('epcs')} EPCs
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'import'}
-              on:click={() => activeTab = 'import'}
+              onclick={() => activeTab = 'import'}
             >
               {getTabIcon('import')} Import
             </button>
             <button 
               class="tab-btn" 
               class:active={activeTab === 'connections'}
-              on:click={() => activeTab = 'connections'}
+              onclick={() => activeTab = 'connections'}
             >
               {getTabIcon('connections')} Connections
             </button>

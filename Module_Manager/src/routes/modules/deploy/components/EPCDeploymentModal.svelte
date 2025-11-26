@@ -1231,11 +1231,11 @@ echo "🎉 Deployment successful!";
 </script>
 
 {#if show}
-  <div class="modal-overlay" on:click={handleClose}>
-    <div class="modal-content epc-deployment-modal" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={handleClose}>
+    <div class="modal-content epc-deployment-modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>🚀 Server Deployment</h2>
-        <button class="close-btn" on:click={handleClose}>✕</button>
+        <button class="close-btn" onclick={handleClose}>✕</button>
       </div>
 
       {#if error}
@@ -1609,13 +1609,13 @@ echo "🎉 Deployment successful!";
         <!-- Action Buttons -->
         <div class="modal-actions">
           {#if currentStep > 1}
-            <button class="btn btn-secondary" on:click={prevStep}>
+            <button class="btn btn-secondary" onclick={prevStep}>
               ← Previous
             </button>
           {/if}
           
           {#if currentStep < totalSteps}
-            <button class="btn btn-primary" on:click={handleNextClick} disabled={loading}>
+            <button class="btn btn-primary" onclick={handleNextClick} disabled={loading}>
               {#if loading}
                 <span class="spinner"></span>
                 Generating...
@@ -1624,7 +1624,7 @@ echo "🎉 Deployment successful!";
               {/if}
             </button>
           {:else}
-            <button class="btn btn-primary" on:click={downloadDeployment} disabled={loading || !deploymentOption}>
+            <button class="btn btn-primary" onclick={downloadDeployment} disabled={loading || !deploymentOption}>
               {#if loading}
                 <span class="spinner"></span>
                 {deploymentOption === 'script' ? 'Preparing Script...' : 'Generating ISO...'}

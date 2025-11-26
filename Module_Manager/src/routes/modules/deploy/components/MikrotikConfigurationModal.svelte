@@ -338,7 +338,7 @@
   <div class="modal-content">
     <div class="modal-header">
       <h2>🔧 Mikrotik RouterOS Configuration</h2>
-      <button class="close-btn" on:click={handleCancel}>✕</button>
+      <button class="close-btn" onclick={handleCancel}>✕</button>
     </div>
     
     <div class="modal-body">
@@ -346,39 +346,39 @@
       <div class="tabs">
         <button 
           class="tab {activeTab === 'basic' ? 'active' : ''}"
-          on:click={() => activeTab = 'basic'}
+          onclick={() => activeTab = 'basic'}
         >
           ⚙️ Basic Settings
         </button>
         <button 
           class="tab {activeTab === 'wireless' ? 'active' : ''}"
-          on:click={() => activeTab = 'wireless'}
+          onclick={() => activeTab = 'wireless'}
           disabled={mikrotikConfig.deviceType !== 'ap' && mikrotikConfig.deviceType !== 'cpe'}
         >
           📡 Wireless
         </button>
         <button 
           class="tab {activeTab === 'lte' ? 'active' : ''}"
-          on:click={() => activeTab = 'lte'}
+          onclick={() => activeTab = 'lte'}
           disabled={mikrotikConfig.deviceType !== 'lte'}
         >
           📱 LTE
         </button>
         <button 
           class="tab {activeTab === 'monitoring' ? 'active' : ''}"
-          on:click={() => activeTab = 'monitoring'}
+          onclick={() => activeTab = 'monitoring'}
         >
           📊 Monitoring
         </button>
         <button 
           class="tab {activeTab === 'security' ? 'active' : ''}"
-          on:click={() => activeTab = 'security'}
+          onclick={() => activeTab = 'security'}
         >
           🔒 Security
         </button>
         <button 
           class="tab {activeTab === 'script' ? 'active' : ''}"
-          on:click={() => activeTab = 'script'}
+          onclick={() => activeTab = 'script'}
         >
           📝 Script
         </button>
@@ -433,7 +433,7 @@
                     <label for="password">Password</label>
                     <div class="password-input">
                       <input type="password" id="password" bind:value={mikrotikConfig.password} />
-                      <button type="button" class="btn btn-sm" on:click={generateRandomPassword}>
+                      <button type="button" class="btn btn-sm" onclick={generateRandomPassword}>
                         🎲 Generate
                       </button>
                     </div>
@@ -447,7 +447,7 @@
                   </label>
                 </div>
                 
-                <button type="button" class="btn btn-secondary" on:click={testConnection} disabled={testingConnection}>
+                <button type="button" class="btn btn-secondary" onclick={testConnection} disabled={testingConnection}>
                   {#if testingConnection}
                     🔄 Testing...
                   {:else}
@@ -627,7 +627,7 @@
                   <label for="passphrase">Passphrase</label>
                   <div class="password-input">
                     <input type="password" id="passphrase" bind:value={mikrotikConfig.wirelessConfig.passphrase} />
-                    <button type="button" class="btn btn-sm" on:click={generateWirelessPassword}>
+                    <button type="button" class="btn btn-sm" onclick={generateWirelessPassword}>
                       🎲 Generate
                     </button>
                   </div>
@@ -849,7 +849,7 @@
           <div class="form-section">
             <h3>Configuration Script</h3>
             
-            <button type="button" class="btn btn-primary" on:click={generateConfigurationScript} disabled={generatingConfig}>
+            <button type="button" class="btn btn-primary" onclick={generateConfigurationScript} disabled={generatingConfig}>
               {#if generatingConfig}
                 🔄 Generating...
               {:else}
@@ -861,7 +861,7 @@
               <div class="script-container">
                 <div class="script-header">
                   <span>RouterOS Configuration Script</span>
-                  <button type="button" class="btn btn-secondary btn-sm" on:click={downloadScript}>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick={downloadScript}>
                     💾 Download
                   </button>
                 </div>
@@ -874,10 +874,10 @@
     </div>
     
     <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" on:click={handleCancel}>
+      <button type="button" class="btn btn-secondary" onclick={handleCancel}>
         Cancel
       </button>
-      <button type="button" class="btn btn-primary" on:click={handleSave}>
+      <button type="button" class="btn btn-primary" onclick={handleSave}>
         Save Configuration
       </button>
     </div>
