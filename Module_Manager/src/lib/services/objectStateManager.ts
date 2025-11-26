@@ -161,28 +161,41 @@ export class ObjectStateManager {
 
   /**
    * Apply Deploy module rules
-   * Rule 2: All objects in the deploy stage should be in a similar state, but once deployed move to read-only on the Plan map.
+   * Deploy module allows managing production hardware and editing existing sites
    */
   private applyDeployModuleRules(state: ObjectState, context: ModuleContext): void {
-    state.allowedActions = ['view', 'select'];
+    state.allowedActions = ['view', 'select', 'view-details'];
     
-    // Objects in deploy stage can be managed
-    if (state.status === 'planning' && state.projectId === context.projectId) {
-      state.allowedActions.push('deploy', 'configure', 'test');
+    const role = context.userRole?.toLowerCase();
+    const isPrivilegedRole = !role || role === 'admin' || role === 'owner' || role === 'operator';
+    
+    if (isPrivilegedRole) {
+      // Allow editing of all sites in deploy mode for site management
+      state.allowedActions.push(
+        'edit',
+        'edit-site',
+        'add-sector',
+        'add-backhaul',
+        'add-equipment',
+        'add-inventory',
+        'view-inventory',
+        'deploy-hardware',
+        'deploy',
+        'configure',
+        'test'
+      );
       state.isReadOnly = false;
-    } else if (state.status === 'deployed') {
-      // Deployed objects become read-only
-      state.isReadOnly = true;
-      state.restrictedActions = ['edit', 'move', 'delete'];
+      
+      // Only admin and owner can delete
+      if (!role || role === 'admin' || role === 'owner') {
+        state.allowedActions.push('delete', 'change-site-type');
+      } else {
+        state.restrictedActions = ['delete', 'change-site-type'];
+      }
     } else {
+      // Read-only for viewers
       state.isReadOnly = true;
-      state.restrictedActions = ['edit', 'move', 'delete', 'deploy'];
-    }
-
-    // ACS objects have special restrictions
-    if (state.source === 'acs') {
-      state.allowedActions = ['view', 'edit-gps', 'edit-customer'];
-      state.restrictedActions = ['delete', 'move', 'edit-technical'];
+      state.restrictedActions = ['edit', 'edit-site', 'move', 'delete', 'deploy'];
     }
   }
 
@@ -354,16 +367,19 @@ export class ObjectStateManager {
 
   /**
    * Apply Coverage Map module rules
+   * Coverage Map is the main editing interface - be permissive with edit actions
    */
   private applyCoverageMapRules(state: ObjectState, context: ModuleContext): void {
-    state.allowedActions = ['view', 'select'];
+    state.allowedActions = ['view', 'select', 'view-details'];
     
-    // Allow admin, owner, and undefined userRole to have full permissions
-    if (context.userRole === 'admin' || context.userRole === 'owner' || !context.userRole) {
+    // Coverage map is the primary editing interface
+    // Allow edit actions for admin, owner, operator, or when role is undefined/unknown
+    const role = context.userRole?.toLowerCase();
+    const isPrivilegedRole = !role || role === 'admin' || role === 'owner' || role === 'operator';
+    
+    if (isPrivilegedRole) {
       state.allowedActions.push(
         'edit',
-        'delete',
-        'view-details',
         'edit-site',
         'add-sector',
         'add-backhaul',
@@ -374,19 +390,15 @@ export class ObjectStateManager {
         'change-site-type'
       );
       state.isReadOnly = false;
-    } else if (context.userRole === 'operator') {
-      state.allowedActions.push(
-        'view-details',
-        'edit-site',
-        'add-sector',
-        'add-backhaul',
-        'add-equipment',
-        'add-inventory',
-        'view-inventory'
-      );
-      state.restrictedActions = ['delete', 'change-site-type', 'deploy-hardware'];
-      state.isReadOnly = false;
-    } else {
+      
+      // Only admin and owner can delete
+      if (!role || role === 'admin' || role === 'owner') {
+        state.allowedActions.push('delete');
+      } else {
+        state.restrictedActions = ['delete'];
+      }
+    } else if (role === 'viewer') {
+      // Viewers can still view details but not edit
       state.isReadOnly = true;
       state.restrictedActions = [
         'edit',
@@ -399,6 +411,18 @@ export class ObjectStateManager {
         'deploy-hardware',
         'change-site-type'
       ];
+    } else {
+      // Unknown roles - allow basic editing to prevent lockouts
+      console.warn(`[ObjectStateManager] Unknown role '${context.userRole}' in coverage-map - allowing basic edit`);
+      state.allowedActions.push(
+        'edit',
+        'edit-site',
+        'add-sector',
+        'add-inventory',
+        'view-inventory'
+      );
+      state.isReadOnly = false;
+      state.restrictedActions = ['delete', 'change-site-type', 'deploy-hardware'];
     }
   }
 }
