@@ -14,6 +14,7 @@
   import ScanModal from '../inventory/components/ScanModal.svelte';
   import { auth } from '$lib/firebase';
   import { API_CONFIG } from '$lib/config/api';
+  import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   
   const HSS_API = API_CONFIG.PATHS.HSS;
   
@@ -23,6 +24,10 @@
   let isLoading = true;
   let error = '';
   let success = '';
+  
+  // UI State
+  let showAddMenu = false;
+  let showEPCWizard = false;
   
   // Tab for hardware type
   let activeHardwareTab: 'all' | 'inventory' | 'epc' = 'all';
@@ -376,9 +381,32 @@
       <button class="btn-secondary" on:click={() => goto('/modules/inventory/reports')}>
         📊 Reports
       </button>
-      <button class="btn-primary" on:click={() => goto('/modules/inventory/add')}>
-        ➕ Add Hardware
-      </button>
+      
+      <!-- Add Hardware Dropdown -->
+      <div class="dropdown-container">
+        <button class="btn-primary dropdown-toggle" on:click={() => showAddMenu = !showAddMenu}>
+          ➕ Add Hardware ▼
+        </button>
+        {#if showAddMenu}
+          <div class="dropdown-menu" on:click={() => showAddMenu = false}>
+            <button class="dropdown-item" on:click={() => { showEPCWizard = true; showAddMenu = false; }}>
+              📡 EPC/SNMP Server
+            </button>
+            <button class="dropdown-item" on:click={() => { goto('/modules/inventory/add?type=sector'); showAddMenu = false; }}>
+              📶 Sector/Antenna
+            </button>
+            <button class="dropdown-item" on:click={() => { goto('/modules/inventory/add?type=radio'); showAddMenu = false; }}>
+              📻 Radio/eNB
+            </button>
+            <button class="dropdown-item" on:click={() => { goto('/modules/inventory/add?type=router'); showAddMenu = false; }}>
+              🌐 Router/Switch
+            </button>
+            <button class="dropdown-item" on:click={() => { goto('/modules/inventory/add'); showAddMenu = false; }}>
+              🔧 Other Hardware
+            </button>
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
   
@@ -787,6 +815,15 @@
       showScanModal = false;
       loadData();
     }}
+  />
+{/if}
+
+<!-- EPC Deployment Wizard -->
+{#if showEPCWizard}
+  <EPCDeploymentModal
+    show={showEPCWizard}
+    tenantId={$currentTenant?.id || ''}
+    on:close={() => { showEPCWizard = false; loadEPCDevices(); }}
   />
 {/if}
 
@@ -1613,6 +1650,55 @@
   .btn-link:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  
+  /* Dropdown Menu */
+  .dropdown-container {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .dropdown-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: var(--card-bg, white);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    z-index: 100;
+    overflow: hidden;
+  }
+  
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary, #1a202c);
+    transition: background 0.15s;
+  }
+  
+  .dropdown-item:hover {
+    background: var(--bg-hover, #f1f5f9);
+  }
+  
+  .dropdown-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
   }
 </style>
 

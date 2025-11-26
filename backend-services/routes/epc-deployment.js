@@ -10,6 +10,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Tenant } = require('../models/tenant');
 const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { InventoryItem } = require('../models/inventory');
 const { generateCloudInitConfig } = require('../utils/iso-helpers');
 const { generateBootstrapScript } = require('../utils/bootstrap-helpers');
 const { generateFullDeploymentScript } = require('../utils/deployment-helpers');
@@ -106,6 +107,40 @@ router.post('/register-epc', async (req, res) => {
     await epc.save();
     
     console.log(`[EPC Registration] EPC registered: ${epc_id}`);
+    
+    // Also create an inventory item for this device
+    try {
+      const inventoryItem = new InventoryItem({
+        tenantId: tenant_id,
+        category: 'EPC Equipment',
+        subcategory: deploymentType === 'epc' ? 'LTE Core' : (deploymentType === 'snmp' ? 'SNMP Agent' : 'LTE Core + SNMP'),
+        equipmentType: 'EPC/SNMP Server',
+        status: 'reserved', // Reserved until deployed
+        condition: 'new',
+        currentLocation: {
+          type: 'warehouse',
+          siteName: siteName,
+          address: location?.address || ''
+        },
+        notes: JSON.stringify({
+          epc_id: epc_id,
+          deployment_type: deploymentType,
+          site_name: siteName
+        }),
+        // Link to EPC module
+        modules: {
+          hss: {
+            epcId: epc_id,
+            lastSync: new Date()
+          }
+        }
+      });
+      await inventoryItem.save();
+      console.log(`[EPC Registration] Inventory item created for EPC: ${epc_id}`);
+    } catch (invError) {
+      console.warn(`[EPC Registration] Could not create inventory item:`, invError.message);
+      // Don't fail the registration if inventory creation fails
+    }
     
     // Return generic ISO download URL (frontend will proxy through /api/deploy/download-iso)
     // This avoids exposing the GCE IP directly to the client

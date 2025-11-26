@@ -20,8 +20,11 @@ import type { ModuleContext } from '$lib/services/objectStateManager';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
 import { isPlatformAdmin } from '$lib/services/adminService';
 import '$lib/styles/moduleHeaderMenu.css';
+import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
   let currentUser: any = null;
+  let showEPCDeploymentModal = false;
+  let showAddHardwareMenu = false;
   let mapContainer: HTMLDivElement;
   let mapState: MapLayerState | undefined;
   let mapMode: MapModuleMode = 'deploy';
@@ -592,6 +595,38 @@ import '$lib/styles/moduleHeaderMenu.css';
           <span class="control-icon">🔧</span>
           <span class="control-label">Hardware ({deployedCount})</span>
         </button>
+        
+        <!-- Add Hardware Dropdown -->
+        <div class="dropdown-container">
+          <button 
+            class="module-control-btn add-hardware-btn" 
+            onclick={() => showAddHardwareMenu = !showAddHardwareMenu}
+            title="Deploy New Hardware"
+          >
+            <span class="control-icon">➕</span>
+            <span class="control-label">Add Hardware</span>
+          </button>
+          {#if showAddHardwareMenu}
+            <div class="dropdown-menu" onclick={() => showAddHardwareMenu = false}>
+              <button class="dropdown-item" onclick={() => { showEPCDeploymentModal = true; showAddHardwareMenu = false; }}>
+                📡 EPC/SNMP Server
+              </button>
+              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add?type=sector'); showAddHardwareMenu = false; }}>
+                📶 Sector/Antenna
+              </button>
+              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add?type=radio'); showAddHardwareMenu = false; }}>
+                📻 Radio/eNB
+              </button>
+              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add?type=router'); showAddHardwareMenu = false; }}>
+                🌐 Router/Switch
+              </button>
+              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add'); showAddHardwareMenu = false; }}>
+                🔧 Other Hardware
+              </button>
+            </div>
+          {/if}
+        </div>
+        
         <button 
           class="module-control-btn deploy-btn" 
           class:disabled={!mapState?.activePlan}
@@ -659,6 +694,15 @@ import '$lib/styles/moduleHeaderMenu.css';
     tenantId={$currentTenant?.id || ''}
     on:close={() => showDeployedHardwareModal = false}
   />
+  
+  <!-- EPC Deployment Modal -->
+  {#if showEPCDeploymentModal}
+    <EPCDeploymentModal
+      show={showEPCDeploymentModal}
+      tenantId={$currentTenant?.id || ''}
+      on:close={() => showEPCDeploymentModal = false}
+    />
+  {/if}
   
   <!-- Project Filter Panel -->
   <ProjectFilterPanel
@@ -1162,5 +1206,55 @@ import '$lib/styles/moduleHeaderMenu.css';
     text-align: center;
     padding: 2rem;
     color: var(--text-secondary);
+  }
+  
+  /* Add Hardware Dropdown */
+  .dropdown-container {
+    position: relative;
+  }
+  
+  .add-hardware-btn {
+    background: var(--success, #22c55e) !important;
+  }
+  
+  .add-hardware-btn:hover {
+    background: var(--success-hover, #16a34a) !important;
+  }
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: var(--card-bg, white);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    z-index: 1000;
+    overflow: hidden;
+  }
+  
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    transition: background 0.15s;
+  }
+  
+  .dropdown-item:hover {
+    background: var(--bg-hover, #f1f5f9);
+  }
+  
+  .dropdown-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
   }
 </style>
