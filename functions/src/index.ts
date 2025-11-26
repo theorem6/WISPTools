@@ -525,13 +525,15 @@ export const isoProxy = onRequest({
   // The route is registered in backend-services/routes/epc-deployment.js on port 3001
   const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3001`;  // Main API server port
   
-  // Extract path from request - SIMPLIFIED APPROACH
+  // Extract path and query string from request
   // Firebase Functions 2nd gen with Hosting rewrites:
-  // - Hosting rewrite: req.url = /api/deploy/generate-epc-iso (full path preserved)
-  // - Direct call: req.url = /isoProxy/api/deploy/generate-epc-iso
+  // - Hosting rewrite: req.url = /api/deploy/download-iso?url=... (full URL preserved)
+  // - Direct call: req.url = /isoProxy/api/deploy/download-iso?url=...
   
-  // Try multiple sources, prefer req.url (most reliable for Functions 2nd gen)
-  let path = (req.url || (req as any).originalUrl || (req as any).path || '').split('?')[0];
+  const fullUrl = req.url || (req as any).originalUrl || (req as any).path || '';
+  const queryIndex = fullUrl.indexOf('?');
+  let path = queryIndex >= 0 ? fullUrl.substring(0, queryIndex) : fullUrl;
+  const queryString = queryIndex >= 0 ? fullUrl.substring(queryIndex) : '';
   
   // Remove /isoProxy prefix if present (direct Cloud Function calls)
   if (path.startsWith('/isoProxy')) {
@@ -540,36 +542,39 @@ export const isoProxy = onRequest({
   
   // Ensure path starts with /
   if (!path || path === '/') {
-    // Default to /api/deploy if no path (shouldn't happen but handle gracefully)
     path = '/api/deploy';
     console.warn('[isoProxy] No path in request, using default:', path);
   } else if (!path.startsWith('/')) {
     path = '/' + path;
   }
   
-  // CRITICAL: For Firebase Hosting rewrites, the path should already be /api/deploy/...
-  // For direct calls, it might be /isoProxy/api/deploy/... which we've already stripped
-  // If somehow we get just /generate-epc-iso, we need to add the prefix
+  // For Firebase Hosting rewrites, the path should already be /api/deploy/...
+  // For direct calls or downloads paths, add the prefix if needed
   if (!path.startsWith('/api/deploy') && !path.startsWith('/api/epc')) {
-    if (path.startsWith('/generate-epc-iso')) {
-      // Missing /api/deploy prefix
+    if (path.startsWith('/generate-epc-iso') || path.startsWith('/download-iso')) {
       path = '/api/deploy' + path;
       console.log('[isoProxy] Restored /api/deploy prefix, new path:', path);
+    } else if (path.startsWith('/downloads/')) {
+      // Static file download request - don't add /api/deploy prefix
+      console.log('[isoProxy] Static file download request, keeping path:', path);
     } else {
-      // Unknown path, assume it needs /api/deploy
       path = '/api/deploy' + path;
       console.log('[isoProxy] Added /api/deploy prefix for unknown path, new path:', path);
     }
   }
   
+  // Reconstruct full URL with query string
+  const urlWithQuery = path + queryString;
+  
   // Final validation log
   console.log('[isoProxy] Extracted path:', {
     originalReqUrl: req.url,
     finalPath: path,
-    willCallBackend: `${backendUrl}${path}`
+    queryString: queryString,
+    willCallBackend: `${backendUrl}${urlWithQuery}`
   });
   
-  const url = `${backendUrl}${path}`;
+  const url = `${backendUrl}${urlWithQuery}`;
   
   // Debug logging - log ALL request details to understand path extraction
   console.log('[isoProxy] Request details:', {
@@ -578,6 +583,7 @@ export const isoProxy = onRequest({
     reqPath: (req as any).path,
     originalUrl: (req as any).originalUrl,
     extractedPath: path,
+    queryString: queryString,
     finalBackendUrl: url
   });
   
