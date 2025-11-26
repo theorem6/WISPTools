@@ -3,14 +3,14 @@
 
 const mongoose = require('mongoose');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const appConfig = require('../config/app');
 
 const { InventoryItem } = require('../models/inventory');
 
 async function main() {
   try {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(appConfig.mongodb.uri);
     console.log('Connected!');
     
     // Check all inventory items
