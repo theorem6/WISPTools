@@ -788,24 +788,57 @@ GCE_DOMAIN=hss.wisptools.io
 HSS_PORT=3001
 CONFEOF
 
-# Systemd service for startup
+# Systemd service for startup - runs early in boot, before login
 cat > "$BUILD_DIR/chroot/etc/systemd/system/wisptools-startup.service" << 'EOF'
 [Unit]
-Description=WISPTools EPC Startup
-After=network-online.target
-Wants=network-online.target
+Description=WISPTools EPC Startup and Installation
+# Run early, just after basic system is up
+After=local-fs.target systemd-remount-fs.service
+Before=getty@tty1.service display-manager.service
+# Don't wait for network - we need to install first
+DefaultDependencies=no
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/opt/wisptools/startup.sh
-Restart=on-failure
-RestartSec=10
+StandardOutput=journal+console
+StandardError=journal+console
+# Give it time to complete installation
+TimeoutStartSec=600
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=sysinit.target
 EOF
 
 chroot "$BUILD_DIR/chroot" systemctl enable wisptools-startup.service
+
+# ALSO add fallback: run from .bashrc on auto-login (belt and suspenders)
+cat >> "$BUILD_DIR/chroot/home/wisp/.bashrc" << 'BASHRCEOF'
+
+# WISPTools auto-start on login (fallback if systemd service doesn't run)
+if [ -d /run/live ] && [ ! -f /var/lib/wisptools/.installed ]; then
+    echo ""
+    echo "Starting WISPTools installation..."
+    echo ""
+    sudo /opt/wisptools/startup.sh
+fi
+BASHRCEOF
+
+# Also add to .profile for login shells
+cat >> "$BUILD_DIR/chroot/home/wisp/.profile" << 'PROFILEEOF'
+
+# WISPTools auto-start on login (fallback)
+if [ -d /run/live ] && [ ! -f /var/lib/wisptools/.installed ]; then
+    echo ""
+    echo "Starting WISPTools installation..."
+    echo ""
+    sudo /opt/wisptools/startup.sh
+fi
+PROFILEEOF
+
+# Ensure wisp owns the files
+chroot "$BUILD_DIR/chroot" chown wisp:wisp /home/wisp/.bashrc /home/wisp/.profile
 
 # Clean up chroot
 chroot "$BUILD_DIR/chroot" apt-get clean
