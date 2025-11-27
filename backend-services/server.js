@@ -171,6 +171,47 @@ app.use('/admin', require('./routes/admin/general'));
 app.use('/admin/tenants', require('./routes/admin/tenants'));
 app.use('/setup-admin', require('./routes/setup'));
 
+// Direct EPC delete route (bypassing router issues)
+const { RemoteEPC } = require('./models/distributed-epc-schema');
+const { InventoryItem } = require('./models/inventory');
+app.delete('/api/deploy/delete-epc/:epc_id', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    console.log(`[Delete EPC] Deleting EPC ${epc_id} for tenant ${tenant_id}`);
+    
+    const epc = await RemoteEPC.findOneAndDelete({
+      $or: [{ epc_id: epc_id }, { _id: epc_id }],
+      tenant_id: tenant_id
+    });
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    await InventoryItem.deleteMany({
+      $or: [
+        { 'epcConfig.epc_id': epc_id },
+        { 'epcConfig.device_code': epc.device_code },
+        { serialNumber: epc_id }
+      ],
+      tenantId: tenant_id
+    });
+    
+    console.log(`[Delete EPC] Successfully deleted EPC ${epc_id} (${epc.site_name})`);
+    
+    res.json({
+      success: true,
+      message: `EPC "${epc.site_name || epc_id}" deleted successfully`,
+      deleted_epc_id: epc_id
+    });
+  } catch (error) {
+    console.error('[Delete EPC] Error:', error);
+    res.status(500).json({ error: 'Failed to delete EPC', message: error.message });
+  }
+});
+
 // 404 handler for unmatched routes (must be last, after all routes)
 app.use('*', (req, res) => {
   console.log('[404 Handler] Unmatched route:', {
