@@ -6,7 +6,7 @@
 const mongoose = require('mongoose');
 const { HardwareDeployment } = require('../models/network');
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://theorem6:LuXKwmxMt0FVdMG6@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
 
 async function cleanup() {
   try {
