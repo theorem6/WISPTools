@@ -78,17 +78,22 @@ cat > "$BUILD_DIR/chroot/etc/apt/sources.list.d/open5gs.list" << 'EOF'
 deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./
 EOF
 
-# Update and install Open5GS (includes FreeDiameter)
-chroot "$BUILD_DIR/chroot" apt-get update -qq 2>/dev/null || true
-chroot "$BUILD_DIR/chroot" apt-get install -y --no-install-recommends open5gs 2>/dev/null || {
-    print_status "Open5GS not available, will be installed on first boot"
-}
+# Update and install Open5GS
+chroot "$BUILD_DIR/chroot" apt-get update -qq
+if ! chroot "$BUILD_DIR/chroot" apt-get install -y --no-install-recommends open5gs; then
+    print_status "Open5GS install failed, will retry on first boot"
+fi
+
+# Disable local HSS - we use central HSS at hss.wisptools.io
+# Remote EPCs only run: MME, SGW-C, SGW-U, SMF, UPF
+chroot "$BUILD_DIR/chroot" systemctl disable open5gs-hssd 2>/dev/null || true
+chroot "$BUILD_DIR/chroot" systemctl mask open5gs-hssd 2>/dev/null || true
 
 # Clean up apt cache to reduce image size
 chroot "$BUILD_DIR/chroot" apt-get clean
 chroot "$BUILD_DIR/chroot" rm -rf /var/lib/apt/lists/*
 
-print_success "EPC packages configured"
+print_success "EPC packages configured (HSS disabled - uses central HSS)"
 
 # ============================================================================
 # Configure the live system
@@ -648,54 +653,104 @@ CONFIG_DIR="/etc/open5gs"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [EPC] $1" | tee -a "$LOG"; }
 
-log "Configuring Open5GS EPC..."
+log "Configuring Open5GS EPC (Distributed Mode)..."
 
-# Load configuration
+# Central HSS configuration
+CENTRAL_HSS="hss.wisptools.io"
+HSS_DIAMETER_PORT=3868
+
+# Load configuration from registration
 source /etc/wisptools/config.env 2>/dev/null || true
 REG_DATA=$(cat /etc/wisptools/registration.json 2>/dev/null)
 
-MCC="${MCC:-001}"
-MNC="${MNC:-01}"
-TAC="${TAC:-1}"
+# Get EPC ID and configuration from registration
+EPC_ID=$(echo "$REG_DATA" | jq -r '.epc_id // empty' 2>/dev/null)
+DEVICE_CODE=$(cat /etc/wisptools/device_code 2>/dev/null || echo "UNKNOWN")
+MCC=$(echo "$REG_DATA" | jq -r '.config.hss_config.mcc // .config.network_config.mcc // "001"' 2>/dev/null)
+MNC=$(echo "$REG_DATA" | jq -r '.config.hss_config.mnc // .config.network_config.mnc // "01"' 2>/dev/null)
+TAC=$(echo "$REG_DATA" | jq -r '.config.network_config.tac // "1"' 2>/dev/null)
+REALM=$(echo "$REG_DATA" | jq -r '.config.hss_config.diameter_realm // "wisptools.io"' 2>/dev/null)
+
 MME_IP=$(hostname -I | awk '{print $1}')
+
+log "EPC ID: ${EPC_ID:-not registered}"
+log "Device Code: $DEVICE_CODE"
+log "Central HSS: $CENTRAL_HSS"
+log "MCC/MNC: $MCC/$MNC, TAC: $TAC"
 
 # Check if Open5GS is installed
 if ! command -v open5gs-mmed &>/dev/null; then
     log "Installing Open5GS packages..."
-    # Use trusted=yes as Open5GS GPG key frequently expires
     echo "deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
     apt-get update -qq
-    apt-get install -y open5gs
+    apt-get install -y --no-install-recommends open5gs
 fi
 
-# Configure MME
+# Configure MME to connect to central HSS
 if [ -f "$CONFIG_DIR/mme.yaml" ]; then
-    log "Configuring MME..."
+    log "Configuring MME for central HSS..."
+    
+    # Set PLMN identity
     sed -i "s/mcc:.*/mcc: $MCC/" "$CONFIG_DIR/mme.yaml"
     sed -i "s/mnc:.*/mnc: $MNC/" "$CONFIG_DIR/mme.yaml"
     sed -i "s/tac:.*/tac: $TAC/" "$CONFIG_DIR/mme.yaml"
+    
+    # Set MME identity using EPC ID
+    if [ -n "$EPC_ID" ]; then
+        sed -i "s/mme_gid:.*/mme_gid: 1/" "$CONFIG_DIR/mme.yaml"
+        sed -i "s/mme_code:.*/mme_code: 1/" "$CONFIG_DIR/mme.yaml"
+    fi
 fi
 
-# Configure HSS (subscriber database)
-if [ -f "$CONFIG_DIR/hss.yaml" ]; then
-    log "Configuring HSS..."
+# Configure FreeDiameter for MME to connect to central HSS
+DIAMETER_CONF="/etc/freeDiameter/mme.conf"
+if [ -f "$DIAMETER_CONF" ] || [ -d "/etc/freeDiameter" ]; then
+    log "Configuring Diameter connection to central HSS..."
+    mkdir -p /etc/freeDiameter
+    
+    # Set MME as Diameter client connecting to central HSS
+    cat > "$DIAMETER_CONF" << DIAMEOF
+# FreeDiameter configuration for distributed EPC
+# EPC ID: ${EPC_ID:-$DEVICE_CODE}
+# Connects to central HSS at $CENTRAL_HSS
+
+Identity = "mme-${DEVICE_CODE}.${REALM}";
+Realm = "${REALM}";
+
+# Central HSS peer
+ConnectPeer = "hss.${REALM}" { ConnectTo = "${CENTRAL_HSS}"; Port = ${HSS_DIAMETER_PORT}; };
+DIAMEOF
 fi
 
-# Enable and start services
-for svc in open5gs-mmed open5gs-hssd open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd; do
+# IMPORTANT: Disable local HSS - we use central HSS
+log "Disabling local HSS (using central HSS at $CENTRAL_HSS)..."
+systemctl stop open5gs-hssd 2>/dev/null || true
+systemctl disable open5gs-hssd 2>/dev/null || true
+systemctl mask open5gs-hssd 2>/dev/null || true
+
+# Enable and start EPC services (NOT HSS)
+log "Starting EPC services..."
+for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd; do
     systemctl enable $svc 2>/dev/null || true
     systemctl start $svc 2>/dev/null || true
 done
 
-log "EPC configuration complete"
+log "EPC configuration complete (Central HSS: $CENTRAL_HSS)"
 
 # Show status
 echo ""
-echo "Open5GS EPC Status:"
-for svc in open5gs-mmed open5gs-hssd open5gs-sgwcd open5gs-smfd; do
+echo "Open5GS EPC Status (Distributed Mode):"
+echo "  Central HSS: $CENTRAL_HSS"
+echo "  EPC ID: ${EPC_ID:-not registered}"
+echo "  Device Code: $DEVICE_CODE"
+echo ""
+echo "Services:"
+for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     STATUS=$(systemctl is-active $svc 2>/dev/null || echo "not installed")
-    echo "  $svc: $STATUS"
+    printf "  %-20s %s\n" "$svc:" "$STATUS"
 done
+echo ""
+echo "  open5gs-hssd:        DISABLED (using central HSS)"
 EPCEOF
 chmod +x "$BUILD_DIR/chroot/opt/wisptools/configure-epc.sh"
 
