@@ -78,58 +78,53 @@ get_service_status() {
     echo "{\"status\":\"$status\",\"uptime_seconds\":$uptime_sec,\"memory_mb\":$memory_mb}"
 }
 
-# Get system metrics
+# Get system metrics - using jq for proper JSON
 get_system_metrics() {
     local cpu_percent=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8}' | cut -d. -f1 2>/dev/null || echo 0)
-    local memory_info=$(free -m | awk 'NR==2{printf "{\"total\":%d,\"used\":%d,\"percent\":%.0f}", $2, $3, $3*100/$2}')
-    local disk_info=$(df -m / | awk 'NR==2{printf "{\"total\":%.1f,\"used\":%.1f,\"percent\":%d}", $2/1024, $3/1024, $5}')
-    local uptime_sec=$(cat /proc/uptime | awk '{print int($1)}')
-    local load_avg=$(cat /proc/loadavg | awk '{print "["$1","$2","$3"]"}')
+    local mem_total=$(free -m | awk 'NR==2{print $2}')
+    local mem_used=$(free -m | awk 'NR==2{print $3}')
+    local mem_percent=$((mem_used * 100 / mem_total))
+    local disk_info=$(df -m / | awk 'NR==2{print $2" "$3" "$5}' | tr -d '%')
+    local disk_total=$(echo "$disk_info" | awk '{printf "%.1f", $1/1024}')
+    local disk_used=$(echo "$disk_info" | awk '{printf "%.1f", $2/1024}')
+    local disk_percent=$(echo "$disk_info" | awk '{print $3}')
+    local uptime_sec=$(awk '{print int($1)}' /proc/uptime)
+    local load1=$(awk '{print $1}' /proc/loadavg)
+    local load5=$(awk '{print $2}' /proc/loadavg)
+    local load15=$(awk '{print $3}' /proc/loadavg)
     
-    cat << EOF
-{
-    "uptime_seconds": $uptime_sec,
-    "load_average": $load_avg,
-    "cpu_percent": $cpu_percent,
-    "memory_percent": $(echo "$memory_info" | jq -r '.percent'),
-    "memory_total_mb": $(echo "$memory_info" | jq -r '.total'),
-    "memory_used_mb": $(echo "$memory_info" | jq -r '.used'),
-    "disk_percent": $(echo "$disk_info" | jq -r '.percent'),
-    "disk_total_gb": $(echo "$disk_info" | jq -r '.total'),
-    "disk_used_gb": $(echo "$disk_info" | jq -r '.used')
-}
-EOF
+    jq -n \
+        --argjson uptime "$uptime_sec" \
+        --argjson load1 "$load1" \
+        --argjson load5 "$load5" \
+        --argjson load15 "$load15" \
+        --argjson cpu "$cpu_percent" \
+        --argjson mem_pct "$mem_percent" \
+        --argjson mem_total "$mem_total" \
+        --argjson mem_used "$mem_used" \
+        --argjson disk_pct "$disk_percent" \
+        --argjson disk_total "$disk_total" \
+        --argjson disk_used "$disk_used" \
+        '{uptime_seconds: $uptime, load_average: [$load1, $load5, $load15], cpu_percent: $cpu, memory_percent: $mem_pct, memory_total_mb: $mem_total, memory_used_mb: $mem_used, disk_percent: $disk_pct, disk_total_gb: $disk_total, disk_used_gb: $disk_used}'
 }
 
-# Get network info
+# Get network info - using jq for proper JSON
 get_network_info() {
     local ip=$(get_ip_address)
-    local interfaces="[]"
+    local interfaces=$(ip -j addr show 2>/dev/null | jq '[.[] | select(.ifname != "lo") | {name: .ifname, ip: ((.addr_info // [])[] | select(.family == "inet") | .local) // null, mac: .address, status: .operstate}]' 2>/dev/null || echo "[]")
     
-    # Get interface details
-    interfaces=$(ip -j addr show 2>/dev/null | jq '[.[] | select(.ifname != "lo") | {name: .ifname, ip: (.addr_info[] | select(.family == "inet") | .local) // null, mac: .address, status: .operstate}]' 2>/dev/null || echo "[]")
-    
-    cat << EOF
-{
-    "ip_address": "$ip",
-    "interfaces": $interfaces
-}
-EOF
+    jq -n --arg ip "$ip" --argjson ifaces "$interfaces" '{ip_address: $ip, interfaces: $ifaces}'
 }
 
-# Get version info
+# Get version info - using jq for proper JSON
 get_versions() {
-    local os_info=$(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2 || echo "Unknown")
+    local os_info=$(grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d'"' -f2 || echo "Unknown")
     local kernel=$(uname -r)
-    local open5gs_version=$(dpkg -l 2>/dev/null | grep open5gs-mme | awk '{print $3}' | head -1 || echo "unknown")
+    local open5gs_version=$(dpkg -l 2>/dev/null | grep open5gs-mme | awk '{print $3}' | head -1)
+    [ -z "$open5gs_version" ] && open5gs_version="not installed"
     
-    cat << EOF
-{
-    "os": "$os_info",
-    "kernel": "$kernel",
-    "open5gs": "$open5gs_version"
-}
-EOF
+    jq -n --arg os "$os_info" --arg kernel "$kernel" --arg o5gs "$open5gs_version" \
+        '{os: $os, kernel: $kernel, open5gs: $o5gs}'
 }
 
 # Execute a command
@@ -278,38 +273,29 @@ do_checkin() {
     
     log "Checking in as $device_code from $ip_address"
     
-    # Collect service status
-    local services_json="{"
-    local first=true
+    # Collect service status using jq
+    local services_json="{}"
     for svc in $REQUIRED_SERVICES; do
         local status=$(get_service_status "$svc")
-        if [ "$first" = true ]; then
-            first=false
-        else
-            services_json+=","
-        fi
-        services_json+="\"$svc\":$status"
+        services_json=$(echo "$services_json" | jq --arg svc "$svc" --argjson stat "$status" '. + {($svc): $stat}')
     done
-    services_json+="}"
     
     # Collect system metrics
     local system_json=$(get_system_metrics)
     local network_json=$(get_network_info)
     local versions_json=$(get_versions)
     
-    # Build check-in payload
-    local payload=$(cat << EOF
-{
-    "device_code": "$device_code",
-    "hardware_id": "$hardware_id",
-    "ip_address": "$ip_address",
-    "services": $services_json,
-    "system": $system_json,
-    "network": $network_json,
-    "versions": $versions_json
-}
-EOF
-)
+    # Build check-in payload using jq for proper escaping
+    local payload=$(jq -n \
+        --arg dc "$device_code" \
+        --arg hw "$hardware_id" \
+        --arg ip "$ip_address" \
+        --argjson svcs "$services_json" \
+        --argjson sys "$system_json" \
+        --argjson net "$network_json" \
+        --argjson ver "$versions_json" \
+        '{device_code: $dc, hardware_id: $hw, ip_address: $ip, services: $svcs, system: $sys, network: $net, versions: $ver}'
+    )
     
     # Send check-in
     local response=$(curl -s -X POST "${API_URL}/checkin" \
