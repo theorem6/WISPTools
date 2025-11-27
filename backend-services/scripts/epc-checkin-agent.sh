@@ -45,35 +45,43 @@ get_ip_address() {
     hostname -I | awk '{print $1}'
 }
 
-# Get service status
+# Get service status - sanitize all output
 get_service_status() {
     local svc=$1
-    local status
+    local status="unknown"
     local uptime_sec=0
     local memory_mb=0
     
-    if ! systemctl list-unit-files | grep -q "^${svc}"; then
-        echo '{"status":"not-found"}'
+    if ! systemctl list-unit-files 2>/dev/null | grep -q "^${svc}"; then
+        echo '{"status":"not-found","uptime_seconds":0,"memory_mb":0}'
         return
     fi
     
-    status=$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")
+    status=$(systemctl is-active "$svc" 2>/dev/null | tr -d '\n\r' || echo "inactive")
+    [ -z "$status" ] && status="inactive"
     
     if [ "$status" = "active" ]; then
-        # Get uptime
-        local start_time=$(systemctl show "$svc" --property=ActiveEnterTimestamp --value 2>/dev/null)
+        # Get uptime - with error handling
+        local start_time=$(systemctl show "$svc" --property=ActiveEnterTimestamp --value 2>/dev/null | tr -d '\n\r')
         if [ -n "$start_time" ] && [ "$start_time" != "" ]; then
-            local start_epoch=$(date -d "$start_time" +%s 2>/dev/null || echo 0)
-            local now_epoch=$(date +%s)
-            uptime_sec=$((now_epoch - start_epoch))
+            local start_epoch=$(date -d "$start_time" +%s 2>/dev/null)
+            local now_epoch=$(date +%s 2>/dev/null)
+            if [ -n "$start_epoch" ] && [ -n "$now_epoch" ]; then
+                uptime_sec=$((now_epoch - start_epoch)) 2>/dev/null || uptime_sec=0
+            fi
         fi
         
         # Get memory usage
-        local pid=$(systemctl show "$svc" --property=MainPID --value 2>/dev/null)
+        local pid=$(systemctl show "$svc" --property=MainPID --value 2>/dev/null | tr -d '\n\r')
         if [ -n "$pid" ] && [ "$pid" != "0" ]; then
-            memory_mb=$(ps -o rss= -p "$pid" 2>/dev/null | awk '{printf "%.0f", $1/1024}' || echo 0)
+            memory_mb=$(ps -o rss= -p "$pid" 2>/dev/null | awk '{printf "%.0f", $1/1024}') || memory_mb=0
+            [ -z "$memory_mb" ] && memory_mb=0
         fi
     fi
+    
+    # Ensure numeric values
+    [ -z "$uptime_sec" ] && uptime_sec=0
+    [ -z "$memory_mb" ] && memory_mb=0
     
     echo "{\"status\":\"$status\",\"uptime_seconds\":$uptime_sec,\"memory_mb\":$memory_mb}"
 }
@@ -114,11 +122,13 @@ get_network_info() {
     echo "{\"ip_address\":\"$ip\",\"interfaces\":[]}"
 }
 
-# Get version info - simple JSON
+# Get version info - simple JSON with sanitization
 get_versions() {
-    local os_info=$(grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d'"' -f2 | sed 's/"/\\"/g' || echo "Unknown")
-    local kernel=$(uname -r 2>/dev/null || echo "unknown")
-    local open5gs_version=$(dpkg -l 2>/dev/null | grep open5gs-mme | awk '{print $3}' | head -1)
+    local os_info=$(grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d'"' -f2 | tr -d '\n\r' | sed 's/["\\\t]//g' || echo "Unknown")
+    [ -z "$os_info" ] && os_info="Unknown"
+    local kernel=$(uname -r 2>/dev/null | tr -d '\n\r' || echo "unknown")
+    [ -z "$kernel" ] && kernel="unknown"
+    local open5gs_version=$(dpkg -l 2>/dev/null | grep open5gs-mme | awk '{print $3}' | head -1 | tr -d '\n\r')
     [ -z "$open5gs_version" ] && open5gs_version="not installed"
     
     echo "{\"os\":\"$os_info\",\"kernel\":\"$kernel\",\"open5gs\":\"$open5gs_version\"}"
