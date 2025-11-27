@@ -58,7 +58,7 @@
       const token = await user.getIdToken();
       const epcId = epc.epc_id || epc.epcId;
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/epc/${epcId}/status`, {
+      const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/status`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': $currentTenant?.id || ''
@@ -83,7 +83,7 @@
       const token = await user.getIdToken();
       const epcId = epc.epc_id || epc.epcId;
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/epc/${epcId}/status/history?hours=6&limit=50`, {
+      const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/status/history?hours=6&limit=50`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': $currentTenant?.id || ''
@@ -133,7 +133,7 @@
       const token = await user.getIdToken();
       const epcId = epc.epc_id || epc.epcId;
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/epc/${epcId}/commands/history?limit=10`, {
+      const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/commands/history?limit=10`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': $currentTenant?.id || ''
@@ -273,7 +273,7 @@
       const token = await user.getIdToken();
       const epcId = epc.epc_id || epc.epcId;
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/epc/${epcId}/service/${action}`, {
+      const response = await fetch(`${API_CONFIG.BASE}/epc/${epcId}/service/${action}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -314,7 +314,7 @@
       const token = await user.getIdToken();
       const epcId = epc.epc_id || epc.epcId;
       
-      const response = await fetch(`${API_CONFIG.BASE_URL}/epc/commands`, {
+      const response = await fetch(`${API_CONFIG.BASE}/epc/commands`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

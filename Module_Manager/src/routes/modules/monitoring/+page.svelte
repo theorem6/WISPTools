@@ -10,6 +10,7 @@
   import NetworkTopologyMap from './components/NetworkTopologyMap.svelte';
   import MikrotikCredentialsModal from './components/MikrotikCredentialsModal.svelte';
   import EPCMonitoringPanel from '$lib/components/EPCMonitoringPanel.svelte';
+  import SNMPGraphsPanel from '$lib/components/SNMPGraphsPanel.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
@@ -81,7 +82,7 @@
       if (!user) return;
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.BASE_URL}/hss/epc/remote/list`, {
+      const response = await fetch(`${API_CONFIG.PATHS.HSS}/epc/remote/list`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': tenantId
@@ -529,9 +530,24 @@
           <span class="control-icon">📡</span>
           <span class="control-label">EPC ({epcDevices.length})</span>
         </button>
+        <button 
+          class="module-control-btn {mapView === 'graphs' ? 'active' : ''}"
+          on:click={() => mapView = 'graphs'}
+          title="SNMP Graphs"
+        >
+          <span class="control-icon">📈</span>
+          <span class="control-label">Graphs</span>
+        </button>
       </div>
     </div>
   </div>
+  
+  <!-- SNMP Graphs View -->
+  {#if mapView === 'graphs'}
+    <div class="graphs-overlay">
+      <SNMPGraphsPanel />
+    </div>
+  {/if}
   
   <!-- EPC Devices View -->
   {#if mapView === 'epc'}
@@ -771,6 +787,16 @@
     position: absolute;
     inset: 0;
     z-index: 0;
+  }
+  
+  /* SNMP Graphs View */
+  .graphs-overlay {
+    position: absolute;
+    top: 80px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
   }
   
   /* EPC Devices View */
@@ -1429,4 +1455,5 @@
       max-height: 90vh;
     }
   }
+</style>
 </style>

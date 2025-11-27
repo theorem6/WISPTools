@@ -434,41 +434,14 @@ const EPCServiceStatusSchema = new mongoose.Schema({
   tenant_id: { type: String, required: true, index: true },
   timestamp: { type: Date, default: Date.now, index: true },
   
-  // Service Status
+  // Service Status - accepts all systemd states
   services: {
-    'open5gs-mmed': { 
-      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+    type: Map,
+    of: {
+      status: { type: String }, // Any systemd status: active, inactive, failed, activating, deactivating, etc.
       uptime_seconds: Number,
       memory_mb: Number,
       cpu_percent: Number
-    },
-    'open5gs-sgwcd': {
-      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
-      uptime_seconds: Number,
-      memory_mb: Number,
-      cpu_percent: Number
-    },
-    'open5gs-sgwud': {
-      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
-      uptime_seconds: Number,
-      memory_mb: Number,
-      cpu_percent: Number
-    },
-    'open5gs-smfd': {
-      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
-      uptime_seconds: Number,
-      memory_mb: Number,
-      cpu_percent: Number
-    },
-    'open5gs-upfd': {
-      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
-      uptime_seconds: Number,
-      memory_mb: Number,
-      cpu_percent: Number
-    },
-    'snmpd': {
-      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
-      uptime_seconds: Number
     }
   },
   
