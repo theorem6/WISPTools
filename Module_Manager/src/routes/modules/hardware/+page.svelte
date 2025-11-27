@@ -604,12 +604,12 @@
                 </tr>
               </thead>
               <tbody>
-                {#each epcDevices as device (device.epc_id)}
+                {#each epcDevices as device (device.epc_id || device.epcId || device.id)}
                   <tr>
                     <td class="hardware-cell">
                       <div class="hardware-info">
-                        <div class="hardware-name">{device.site_name || 'Unnamed'}</div>
-                        <div class="hardware-manufacturer">ID: {device.epc_id.substring(0, 8)}...</div>
+                        <div class="hardware-name">{device.site_name || device.name || 'Unnamed'}</div>
+                        <div class="hardware-manufacturer">ID: {(device.epc_id || device.epcId || device.id || 'unknown').substring(0, 12)}...</div>
                       </div>
                     </td>
                     <td>
