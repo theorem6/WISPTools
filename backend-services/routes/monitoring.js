@@ -38,17 +38,18 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
     updatedAt: device.updatedAt
   };
 
-  // Add device-specific fields
+  // Add device-specific fields - NO FAKE DATA, use real metrics from device or null
   if (type === 'epc') {
+    const config = device.config || (device.notes ? JSON.parse(device.notes) : {});
     return {
       ...baseDevice,
       epcId: device._id.toString(),
-      ipAddress: device.config?.management_ip || '10.0.1.10',
-      metrics: {
-        cpuUsage: Math.floor(Math.random() * 100),
-        memoryUsage: Math.floor(Math.random() * 100),
-        activeUsers: Math.floor(Math.random() * 200),
-        uptime: 99.9
+      ipAddress: config.management_ip || device.ip_address || null,
+      metrics: device.metrics || {
+        cpuUsage: null,
+        memoryUsage: null,
+        activeUsers: null,
+        uptime: null
       }
     };
   }
@@ -58,15 +59,15 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
     return {
       ...baseDevice,
       deviceType: deviceType || device.type,
-      ipAddress: config.management_ip || '192.168.1.1',
+      ipAddress: config.management_ip || null,
       manufacturer: device.manufacturer || 'Mikrotik',
       model: device.model || 'Unknown',
       serialNumber: device.serialNumber,
-      metrics: {
-        cpuUsage: Math.floor(Math.random() * 100),
-        memoryUsage: Math.floor(Math.random() * 100),
-        throughput: Math.floor(Math.random() * 1000),
-        temperature: Math.floor(Math.random() * 20) + 30
+      metrics: device.metrics || {
+        cpuUsage: null,
+        memoryUsage: null,
+        throughput: null,
+        temperature: null
       }
     };
   }
@@ -76,16 +77,16 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
     return {
       ...baseDevice,
       deviceType: deviceType || device.type,
-      ipAddress: config.management_ip || '192.168.1.10',
+      ipAddress: config.management_ip || null,
       manufacturer: device.manufacturer || 'Generic',
       model: device.model || 'Unknown',
       snmpVersion: config.snmp_version || 'v2c',
       community: config.snmp_community || 'public',
-      metrics: {
-        cpuUsage: Math.floor(Math.random() * 100),
-        memoryUsage: Math.floor(Math.random() * 100),
-        portUtilization: Math.floor(Math.random() * 100),
-        temperature: Math.floor(Math.random() * 20) + 30
+      metrics: device.metrics || {
+        cpuUsage: null,
+        memoryUsage: null,
+        portUtilization: null,
+        temperature: null
       }
     };
   }
