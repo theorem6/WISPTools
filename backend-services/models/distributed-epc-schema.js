@@ -355,18 +355,176 @@ const EPCAlertSchema = new mongoose.Schema({
 EPCAlertSchema.index({ tenant_id: 1, resolved: 1, timestamp: -1 });
 EPCAlertSchema.index({ epc_id: 1, resolved: 1 });
 
+/**
+ * EPC Command Schema
+ * Queue commands for remote EPCs to execute on next check-in
+ */
+const EPCCommandSchema = new mongoose.Schema({
+  epc_id: { type: String, required: true, index: true },
+  tenant_id: { type: String, required: true, index: true },
+  
+  // Command Details
+  command_type: {
+    type: String,
+    enum: ['service_control', 'reboot', 'update', 'script', 'config_update'],
+    required: true
+  },
+  
+  // For service_control: start, stop, restart, status
+  action: {
+    type: String,
+    enum: ['start', 'stop', 'restart', 'status', 'enable', 'disable']
+  },
+  
+  // Target service(s) for service_control
+  target_services: [{
+    type: String,
+    enum: ['open5gs-mmed', 'open5gs-sgwcd', 'open5gs-sgwud', 'open5gs-smfd', 'open5gs-upfd', 'snmpd', 'all']
+  }],
+  
+  // For script commands - inline script or URL
+  script_content: String,
+  script_url: String,
+  
+  // For config_update - JSON config to apply
+  config_data: mongoose.Schema.Types.Mixed,
+  
+  // Status
+  status: {
+    type: String,
+    enum: ['pending', 'sent', 'acknowledged', 'executing', 'completed', 'failed', 'expired'],
+    default: 'pending',
+    index: true
+  },
+  
+  // Priority (0 = highest)
+  priority: { type: Number, default: 5 },
+  
+  // Timestamps
+  created_at: { type: Date, default: Date.now },
+  sent_at: Date,
+  acknowledged_at: Date,
+  completed_at: Date,
+  expires_at: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) }, // 24 hour default
+  
+  // Result
+  result: {
+    success: Boolean,
+    output: String,
+    error: String,
+    exit_code: Number
+  },
+  
+  // Metadata
+  created_by: String, // User ID who created the command
+  notes: String
+}, {
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+
+EPCCommandSchema.index({ epc_id: 1, status: 1, priority: 1 });
+EPCCommandSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 }); // Auto-delete expired commands
+
+/**
+ * EPC Service Status Schema
+ * Track service status reported during check-ins
+ */
+const EPCServiceStatusSchema = new mongoose.Schema({
+  epc_id: { type: String, required: true, index: true },
+  tenant_id: { type: String, required: true, index: true },
+  timestamp: { type: Date, default: Date.now, index: true },
+  
+  // Service Status
+  services: {
+    'open5gs-mmed': { 
+      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+      uptime_seconds: Number,
+      memory_mb: Number,
+      cpu_percent: Number
+    },
+    'open5gs-sgwcd': {
+      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+      uptime_seconds: Number,
+      memory_mb: Number,
+      cpu_percent: Number
+    },
+    'open5gs-sgwud': {
+      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+      uptime_seconds: Number,
+      memory_mb: Number,
+      cpu_percent: Number
+    },
+    'open5gs-smfd': {
+      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+      uptime_seconds: Number,
+      memory_mb: Number,
+      cpu_percent: Number
+    },
+    'open5gs-upfd': {
+      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+      uptime_seconds: Number,
+      memory_mb: Number,
+      cpu_percent: Number
+    },
+    'snmpd': {
+      status: { type: String, enum: ['active', 'inactive', 'failed', 'not-found'] },
+      uptime_seconds: Number
+    }
+  },
+  
+  // System Status
+  system: {
+    uptime_seconds: Number,
+    load_average: [Number],
+    cpu_percent: Number,
+    memory_percent: Number,
+    memory_total_mb: Number,
+    memory_used_mb: Number,
+    disk_percent: Number,
+    disk_total_gb: Number,
+    disk_used_gb: Number
+  },
+  
+  // Network
+  network: {
+    ip_address: String,
+    interfaces: [{
+      name: String,
+      ip: String,
+      mac: String,
+      status: String
+    }]
+  },
+  
+  // Versions
+  versions: {
+    os: String,
+    kernel: String,
+    open5gs: String
+  }
+}, {
+  timestamps: { createdAt: 'timestamp', updatedAt: false }
+});
+
+EPCServiceStatusSchema.index({ epc_id: 1, timestamp: -1 });
+EPCServiceStatusSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 }); // Keep 7 days
+
 // Models
 const RemoteEPC = mongoose.model('RemoteEPC', RemoteEPCSchema);
 const EPCMetrics = mongoose.model('EPCMetrics', EPCMetricsSchema);
 const SubscriberSession = mongoose.model('SubscriberSession', SubscriberSessionSchema);
 const AttachDetachEvent = mongoose.model('AttachDetachEvent', AttachDetachEventSchema);
 const EPCAlert = mongoose.model('EPCAlert', EPCAlertSchema);
+const EPCCommand = mongoose.model('EPCCommand', EPCCommandSchema);
+const EPCServiceStatus = mongoose.model('EPCServiceStatus', EPCServiceStatusSchema);
 
 module.exports = {
   RemoteEPC,
   EPCMetrics,
   SubscriberSession,
   AttachDetachEvent,
-  EPCAlert
+  EPCAlert,
+  EPCCommand,
+  EPCServiceStatus
 };
 

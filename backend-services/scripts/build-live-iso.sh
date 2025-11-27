@@ -778,6 +778,14 @@ echo ""
 echo "Central Services (at $CENTRAL_HSS):"
 echo "  open5gs-hssd:        CENTRAL (subscriber database)"
 echo "  open5gs-pcrfd:       CENTRAL (policy/charging)"
+
+# Install and start check-in agent
+log "Installing check-in agent..."
+curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh -o /opt/wisptools/epc-checkin-agent.sh
+chmod +x /opt/wisptools/epc-checkin-agent.sh
+/opt/wisptools/epc-checkin-agent.sh install
+
+log "EPC configuration complete. Check-in agent running."
 EPCEOF
 chmod +x "$BUILD_DIR/chroot/opt/wisptools/configure-epc.sh"
 

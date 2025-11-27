@@ -121,6 +121,7 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
+app.use('/api/epc', require('./routes/epc-commands')); // Remote command management
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));
 // EPC delete route using POST (workaround for DELETE routing issues)
