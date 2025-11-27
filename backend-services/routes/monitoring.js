@@ -266,18 +266,6 @@ router.get('/snmp/metrics/latest', async (req, res) => {
   try {
     console.log(`🔍 Fetching latest SNMP metrics for tenant: ${req.tenantId}`);
     
-    // Get all SNMP-enabled devices
-    const snmpDevicesResponse = await router.handle({
-      method: 'GET',
-      url: '/snmp/devices',
-      headers: { 'x-tenant-id': req.tenantId },
-      tenantId: req.tenantId
-    });
-    
-    // For now, generate mock metrics data based on real devices
-    // In a real implementation, this would query a time-series database
-    const mockMetrics = [];
-    
     // Get device list from database
     const allEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
@@ -289,44 +277,47 @@ router.get('/snmp/metrics/latest', async (req, res) => {
       status: 'active'
     }).lean();
     
-    // Generate metrics for equipment
+    // Return real metrics (null if not available) - NO FAKE DATA
+    const metrics = [];
+    
+    // Get metrics for equipment
     allEquipment.forEach(device => {
       const config = device.notes ? JSON.parse(device.notes) : {};
       if (config.snmp_enabled || config.snmp_community || config.management_ip) {
-        mockMetrics.push({
+        metrics.push({
           deviceId: device._id.toString(),
           deviceName: device.name,
-          timestamp: new Date().toISOString(),
-          metrics: {
-            'cpu-usage': Math.floor(Math.random() * 100),
-            'memory-usage': Math.floor(Math.random() * 100),
-            'interface-1-in-octets': Math.floor(Math.random() * 10000000),
-            'interface-1-out-octets': Math.floor(Math.random() * 10000000),
-            'uptime': Math.floor(Math.random() * 31536000), // Up to 1 year in seconds
-            'temperature': Math.floor(Math.random() * 20) + 30
+          timestamp: device.updatedAt || new Date().toISOString(),
+          metrics: device.metrics || {
+            'cpu-usage': null,
+            'memory-usage': null,
+            'interface-1-in-octets': null,
+            'interface-1-out-octets': null,
+            'uptime': null,
+            'temperature': null
           }
         });
       }
     });
     
-    // Generate metrics for CPE
+    // Get metrics for CPE
     allCPE.forEach(device => {
-      mockMetrics.push({
+      metrics.push({
         deviceId: device._id.toString(),
         deviceName: device.name,
-        timestamp: new Date().toISOString(),
-        metrics: {
-          'signal-strength': Math.floor(Math.random() * 30) - 90, // -90 to -60 dBm
-          'throughput-down': Math.floor(Math.random() * 100),
-          'throughput-up': Math.floor(Math.random() * 50),
-          'uptime': Math.floor(Math.random() * 31536000)
+        timestamp: device.updatedAt || new Date().toISOString(),
+        metrics: device.metrics || {
+          'signal-strength': null,
+          'throughput-down': null,
+          'throughput-up': null,
+          'uptime': null
         }
       });
     });
     
-    console.log(`📊 Generated ${mockMetrics.length} SNMP metrics for tenant ${req.tenantId}`);
+    console.log(`📊 Found ${metrics.length} SNMP metrics for tenant ${req.tenantId}`);
     
-    res.json(mockMetrics);
+    res.json(metrics);
   } catch (error) {
     console.error('Error fetching SNMP metrics:', error);
     res.status(500).json({ error: 'Failed to fetch SNMP metrics', message: error.message });
