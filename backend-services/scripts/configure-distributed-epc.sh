@@ -25,7 +25,15 @@ log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [EPC] $1" | tee -a "$LOG"; }
 
 # Load registration data
 REG_DATA=$(cat /etc/wisptools/registration.json 2>/dev/null || echo "{}")
-DEVICE_CODE=$(cat /etc/wisptools/device_code 2>/dev/null || hostname | md5sum | cut -c1-8 | tr '[:lower:]' '[:upper:]')
+
+# Get device code from the correct location
+if [ -f /etc/wisptools/device-code.env ]; then
+    source /etc/wisptools/device-code.env
+elif [ -f /etc/wisptools/device_code ]; then
+    DEVICE_CODE=$(cat /etc/wisptools/device_code)
+else
+    DEVICE_CODE=$(hostname | md5sum | cut -c1-8 | tr '[:lower:]' '[:upper:]')
+fi
 
 # Get configuration from registration or use defaults
 EPC_ID=$(echo "$REG_DATA" | jq -r '.epc_id // empty' 2>/dev/null)

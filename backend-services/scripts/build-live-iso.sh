@@ -665,7 +665,14 @@ REG_DATA=$(cat /etc/wisptools/registration.json 2>/dev/null)
 
 # Get EPC ID and configuration from registration
 EPC_ID=$(echo "$REG_DATA" | jq -r '.epc_id // empty' 2>/dev/null)
-DEVICE_CODE=$(cat /etc/wisptools/device_code 2>/dev/null || echo "UNKNOWN")
+# Get device code from correct location
+if [ -f /etc/wisptools/device-code.env ]; then
+    source /etc/wisptools/device-code.env
+elif [ -f /etc/wisptools/device_code ]; then
+    DEVICE_CODE=$(cat /etc/wisptools/device_code)
+else
+    DEVICE_CODE="UNKNOWN"
+fi
 MCC=$(echo "$REG_DATA" | jq -r '.config.hss_config.mcc // .config.network_config.mcc // "001"' 2>/dev/null)
 MNC=$(echo "$REG_DATA" | jq -r '.config.hss_config.mnc // .config.network_config.mnc // "01"' 2>/dev/null)
 TAC=$(echo "$REG_DATA" | jq -r '.config.network_config.tac // "1"' 2>/dev/null)
