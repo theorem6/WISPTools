@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
+const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -94,54 +95,79 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
 
 // ========== EPC ENDPOINTS ==========
 
-// GET /api/epc/list - List all EPC devices
+// GET /api/monitoring/epc/list - List all EPC devices for monitoring
 router.get('/epc/list', async (req, res) => {
   try {
-    console.log(`🔍 Fetching EPC devices for tenant: ${req.tenantId}`);
+    console.log(`🔍 [Monitoring] Fetching EPC devices for tenant: ${req.tenantId}`);
     
-    // Get EPC hardware deployments
+    const epcs = [];
+    const seenIds = new Set();
+    
+    // PRIMARY SOURCE: Get EPCs from RemoteEPC collection (devices linked via device code)
+    const remoteEPCs = await RemoteEPC.find({ tenant_id: req.tenantId }).lean();
+    console.log(`📡 [Monitoring] Found ${remoteEPCs.length} RemoteEPCs`);
+    
+    remoteEPCs.forEach(epc => {
+      const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
+      const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+      
+      epcs.push({
+        id: epc._id?.toString() || epc.epc_id,
+        epcId: epc.epc_id,
+        name: epc.site_name,
+        type: 'epc',
+        status: epc.status === 'online' || isOnline ? 'online' : 
+                epc.status === 'registered' ? 'pending' : 'offline',
+        device_code: epc.device_code,
+        hardware_id: epc.hardware_id,
+        ipAddress: epc.ip_address || null,
+        deployment_type: epc.deployment_type,
+        location: {
+          coordinates: {
+            latitude: epc.location?.coordinates?.latitude || epc.location?.latitude || 0,
+            longitude: epc.location?.coordinates?.longitude || epc.location?.longitude || 0
+          },
+          address: epc.location?.address || 'Unknown Location'
+        },
+        metrics: epc.metrics || {
+          cpuUsage: null,
+          memoryUsage: null,
+          activeUsers: null,
+          uptime: null
+        },
+        last_seen: lastSeen,
+        createdAt: epc.created_at,
+        updatedAt: epc.updated_at
+      });
+      seenIds.add(epc.epc_id);
+    });
+    
+    // SECONDARY: Get EPC hardware deployments (legacy)
     const epcDeployments = await HardwareDeployment.find({
       tenantId: req.tenantId,
       hardware_type: 'epc',
       status: 'deployed'
     }).populate('siteId', 'name location').lean();
     
-    // Also get network equipment marked as EPC-related
-    const epcEquipment = await NetworkEquipment.find({
-      tenantId: req.tenantId,
-      $or: [
-        { name: /epc/i },
-        { name: /core/i },
-        { type: 'other', name: /server/i }
-      ],
-      status: 'active'
-    }).lean();
-    
-    const epcs = [];
-    
-    // Add EPC deployments
     epcDeployments.forEach(deployment => {
-      epcs.push(formatDeviceForMonitoring({
-        _id: deployment._id,
-        name: deployment.name,
-        status: deployment.status,
-        location: deployment.siteId?.location || {},
-        config: deployment.config || {},
-        createdAt: deployment.createdAt,
-        updatedAt: deployment.updatedAt
-      }, 'epc'));
+      if (!seenIds.has(deployment._id.toString())) {
+        epcs.push(formatDeviceForMonitoring({
+          _id: deployment._id,
+          name: deployment.name,
+          status: deployment.status,
+          location: deployment.siteId?.location || {},
+          config: deployment.config || {},
+          createdAt: deployment.createdAt,
+          updatedAt: deployment.updatedAt
+        }, 'epc'));
+      }
     });
     
-    // Add EPC equipment
-    epcEquipment.forEach(equipment => {
-      epcs.push(formatDeviceForMonitoring(equipment, 'epc'));
-    });
+    console.log(`📊 [Monitoring] Total ${epcs.length} EPC devices for tenant ${req.tenantId}`);
     
-    console.log(`📊 Found ${epcs.length} EPC devices for tenant ${req.tenantId}`);
-    
-    res.json({ epcs });
+    res.json({ epcs, total: epcs.length });
   } catch (error) {
-    console.error('Error fetching EPC devices:', error);
+    console.error('[Monitoring] Error fetching EPC devices:', error);
     res.status(500).json({ error: 'Failed to fetch EPC devices', message: error.message });
   }
 });

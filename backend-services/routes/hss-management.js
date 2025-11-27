@@ -9,6 +9,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
+const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 console.log('🔗 HSS Management: Using MongoDB Atlas connection via mongoose');
 
@@ -651,7 +652,55 @@ router.delete('/bandwidth-plans/:id', async (req, res) => {
   }
 });
 
-// EPCs endpoints
+// Remote EPC devices endpoint (for Hardware page)
+// GET /api/hss/epc/remote/list - Lists EPCs linked via device code
+router.get('/epc/remote/list', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    console.log(`[HSS/EPC] Fetching remote EPCs for tenant: ${tenantId}`);
+
+    // Get EPCs from RemoteEPC collection (devices linked via device code)
+    const remoteEPCs = await RemoteEPC.find({ tenant_id: tenantId }).lean();
+    
+    console.log(`[HSS/EPC] Found ${remoteEPCs.length} remote EPCs`);
+
+    // Format for frontend
+    const epcs = remoteEPCs.map(epc => {
+      const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
+      const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+      
+      return {
+        id: epc._id?.toString() || epc.epc_id,
+        epcId: epc.epc_id,
+        name: epc.site_name,
+        status: epc.status === 'online' || isOnline ? 'online' : 
+                epc.status === 'registered' ? 'pending' : 'offline',
+        device_code: epc.device_code,
+        hardware_id: epc.hardware_id,
+        ip_address: epc.ip_address,
+        deployment_type: epc.deployment_type,
+        location: epc.location || {},
+        network_config: epc.network_config || {},
+        snmp_config: epc.snmp_config || {},
+        last_seen: lastSeen,
+        last_heartbeat: epc.last_heartbeat,
+        created_at: epc.created_at,
+        updated_at: epc.updated_at
+      };
+    });
+
+    res.json({ epcs, total: epcs.length, tenant: tenantId });
+  } catch (error) {
+    console.error('[HSS/EPC] Error fetching remote EPCs:', error);
+    res.status(500).json({ error: 'Failed to fetch remote EPCs', message: error.message });
+  }
+});
+
+// EPCs endpoints (legacy - uses epcs collection)
 router.get('/epcs', async (req, res) => {
   try {
     const tenantId = req.headers['x-tenant-id'];
