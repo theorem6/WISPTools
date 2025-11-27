@@ -368,11 +368,13 @@
       if (!user) throw new Error('Not authenticated');
       
       const token = await user.getIdToken();
-      const response = await fetch(`${HSS_API}/epc/${deviceId}`, {
+      // Use /api/deploy endpoint for delete (more reliable routing)
+      const response = await fetch(`/api/deploy/epc/${deviceId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
         }
       });
       

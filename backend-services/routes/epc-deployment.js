@@ -469,6 +469,53 @@ router.post('/link-device', async (req, res) => {
 });
 
 /**
+ * Delete an EPC device
+ * DELETE /api/deploy/epc/:epc_id
+ */
+router.delete('/epc/:epc_id', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    console.log(`[Delete EPC] Deleting EPC ${epc_id} for tenant ${tenant_id}`);
+    
+    // Find and delete the RemoteEPC
+    const epc = await RemoteEPC.findOneAndDelete({
+      $or: [
+        { epc_id: epc_id },
+        { _id: epc_id }
+      ],
+      tenant_id: tenant_id
+    });
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Also delete associated inventory item if exists
+    await InventoryItem.deleteMany({
+      $or: [
+        { 'epcConfig.epc_id': epc_id },
+        { 'epcConfig.device_code': epc.device_code },
+        { serialNumber: epc_id }
+      ],
+      tenantId: tenant_id
+    });
+    
+    console.log(`[Delete EPC] Successfully deleted EPC ${epc_id} (${epc.site_name})`);
+    
+    res.json({
+      success: true,
+      message: `EPC "${epc.site_name || epc_id}" deleted successfully`,
+      deleted_epc_id: epc_id
+    });
+  } catch (error) {
+    console.error('[Delete EPC] Error:', error);
+    res.status(500).json({ error: 'Failed to delete EPC', message: error.message });
+  }
+});
+
+/**
  * Link device code to existing EPC configuration
  * POST /api/epc/:epc_id/link-device
  * Called from device configuration page to link device code to EPC
