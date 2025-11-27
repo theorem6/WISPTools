@@ -88,8 +88,8 @@ cat > "$BUILD_DIR/chroot/etc/apt/sources.list.d/open5gs.list" << 'EOF'
 deb [signed-by=/usr/share/keyrings/open5gs-archive-keyring.gpg] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./
 EOF
 
-# Download and add Open5GS GPG key
-chroot "$BUILD_DIR/chroot" bash -c 'curl -fsSL https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/Release.key | gpg --dearmor -o /usr/share/keyrings/open5gs-archive-keyring.gpg' 2>/dev/null || true
+# Download and add Open5GS GPG key (--yes to overwrite if expired)
+chroot "$BUILD_DIR/chroot" bash -c 'curl -fsSL https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/Release.key | gpg --dearmor --yes -o /usr/share/keyrings/open5gs-archive-keyring.gpg' 2>/dev/null || true
 
 # Update and install Open5GS
 chroot "$BUILD_DIR/chroot" apt-get update -qq 2>/dev/null || true
@@ -671,17 +671,17 @@ MNC="${MNC:-01}"
 TAC="${TAC:-1}"
 MME_IP=$(hostname -I | awk '{print $1}')
 
+# Always refresh the Open5GS GPG key (in case it expired)
+log "Refreshing Open5GS repository key..."
+curl -fsSL https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/Release.key | gpg --dearmor --yes -o /usr/share/keyrings/open5gs-archive-keyring.gpg 2>/dev/null || true
+
 # Check if Open5GS is installed
 if ! command -v open5gs-mmed &>/dev/null; then
     log "Installing Open5GS packages..."
+    # Ensure repository is configured
+    echo "deb [signed-by=/usr/share/keyrings/open5gs-archive-keyring.gpg] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
     apt-get update -qq
-    apt-get install -y open5gs 2>/dev/null || {
-        log "Adding Open5GS repository..."
-        curl -fsSL https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/Release.key | gpg --dearmor -o /usr/share/keyrings/open5gs-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/open5gs-archive-keyring.gpg] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
-        apt-get update -qq
-        apt-get install -y open5gs
-    }
+    apt-get install -y open5gs
 fi
 
 # Configure MME
