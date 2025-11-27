@@ -54,13 +54,40 @@ log "  TAC: $TAC"
 log "  MME IP: $MME_IP"
 echo ""
 
-# Step 1: Ensure Open5GS is installed
-echo "[1/5] Checking Open5GS installation..."
+# Step 1: Ensure Open5GS EPC components are installed (NOT HSS/PCRF)
+echo "[1/6] Checking Open5GS installation..."
 if ! command -v open5gs-mmed &>/dev/null; then
-    log "Installing Open5GS..."
-    echo "deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
+    log "Installing Open5GS EPC components..."
+    
+    # Detect OS for correct repository
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "$ID" in
+            ubuntu)
+                case "$VERSION_CODENAME" in
+                    noble|mantic) REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_24.04/" ;;
+                    jammy) REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_22.04/" ;;
+                    *) REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_22.04/" ;;
+                esac
+                ;;
+            *)
+                REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/"
+                ;;
+        esac
+    else
+        REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/"
+    fi
+    
+    echo "deb [trusted=yes] $REPO_URL ./" > /etc/apt/sources.list.d/open5gs.list
     apt-get update -qq
-    apt-get install -y --no-install-recommends open5gs
+    
+    # Install ONLY the EPC components needed - NOT HSS or PCRF
+    apt-get install -y --no-install-recommends \
+        open5gs-mme \
+        open5gs-sgwc \
+        open5gs-sgwu \
+        open5gs-smf \
+        open5gs-upf
 else
     log "Open5GS already installed"
 fi

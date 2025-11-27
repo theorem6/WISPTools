@@ -78,19 +78,19 @@ cat > "$BUILD_DIR/chroot/etc/apt/sources.list.d/open5gs.list" << 'EOF'
 deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./
 EOF
 
-# Update and install Open5GS
+# Install ONLY the Open5GS EPC components needed for remote operation
+# NOT HSS or PCRF - those run on the central server (hss.wisptools.io)
 chroot "$BUILD_DIR/chroot" apt-get update -qq
-if ! chroot "$BUILD_DIR/chroot" apt-get install -y --no-install-recommends open5gs; then
+if ! chroot "$BUILD_DIR/chroot" apt-get install -y --no-install-recommends \
+    open5gs-mme \
+    open5gs-sgwc \
+    open5gs-sgwu \
+    open5gs-smf \
+    open5gs-upf; then
     print_status "Open5GS install failed, will retry on first boot"
 fi
 
-# Disable services that run centrally at hss.wisptools.io
-# Remote EPCs only run: MME, SGW-C, SGW-U, SMF, UPF
-# HSS (subscriber database) and PCRF (policy/charging) are centralized
-for svc in open5gs-hssd open5gs-pcrfd; do
-    chroot "$BUILD_DIR/chroot" systemctl disable $svc 2>/dev/null || true
-    chroot "$BUILD_DIR/chroot" systemctl mask $svc 2>/dev/null || true
-done
+print_status "Remote EPC mode - HSS and PCRF run on central server (hss.wisptools.io)"
 
 # Clean up apt cache to reduce image size
 chroot "$BUILD_DIR/chroot" apt-get clean
@@ -690,10 +690,16 @@ log "MCC/MNC: $MCC/$MNC, TAC: $TAC"
 
 # Check if Open5GS is installed
 if ! command -v open5gs-mmed &>/dev/null; then
-    log "Installing Open5GS packages..."
+    log "Installing Open5GS EPC packages (NOT HSS/PCRF - those are central)..."
     echo "deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
     apt-get update -qq
-    apt-get install -y --no-install-recommends open5gs
+    # Install ONLY the EPC components - NOT HSS or PCRF
+    apt-get install -y --no-install-recommends \
+        open5gs-mme \
+        open5gs-sgwc \
+        open5gs-sgwu \
+        open5gs-smf \
+        open5gs-upf
 fi
 
 # Configure MME to connect to central HSS
@@ -825,10 +831,10 @@ disk /var 10%
 # Load monitoring
 load 12 10 5
 
-# Process monitoring
+# Process monitoring (remote EPC - no HSS)
 proc sshd
 proc open5gs-mmed 1 1
-proc open5gs-hssd 1 1
+proc open5gs-smfd 1 1
 
 # Extend scripts for custom OIDs
 extend epc-status /opt/wisptools/snmp-epc-status.sh
@@ -845,8 +851,8 @@ SNMPCONFEOF
 # Create EPC status script for SNMP
 cat > /opt/wisptools/snmp-epc-status.sh << 'STATUSEOF'
 #!/bin/bash
-# Check Open5GS services status
-SERVICES="open5gs-mmed open5gs-hssd open5gs-sgwcd open5gs-smfd"
+# Check Open5GS services status (remote EPC - no HSS/PCRF)
+SERVICES="open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd"
 STATUS="OK"
 for svc in $SERVICES; do
     if ! systemctl is-active --quiet $svc 2>/dev/null; then
