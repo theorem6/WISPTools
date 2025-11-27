@@ -279,7 +279,100 @@ router.get('/:epc_id/deploy', async (req, res) => {
 });
 
 /**
- * Link device code to EPC configuration
+ * Link device code to new EPC configuration (from wizard)
+ * POST /api/epc/link-device
+ * Called from the deployment wizard when user enters a device code
+ * Creates new EPC and links device code in one step
+ */
+router.post('/link-device', async (req, res) => {
+  try {
+    const { device_code, tenant_id, config } = req.body;
+    
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+    
+    // Validate device code format (8 alphanumeric characters)
+    const deviceCodePattern = /^[A-Z0-9]{8}$/;
+    if (!deviceCodePattern.test(device_code.toUpperCase())) {
+      return res.status(400).json({ 
+        error: 'Invalid device code format',
+        message: 'Device code must be 8 alphanumeric characters'
+      });
+    }
+    
+    // Check if device code is already linked to another EPC
+    const existingEPC = await RemoteEPC.findOne({ 
+      device_code: device_code.toUpperCase()
+    }).lean();
+    
+    if (existingEPC) {
+      // Device already linked - return success with existing info
+      console.log(`[Link Device] Device code ${device_code} already linked to EPC ${existingEPC.epc_id}`);
+      return res.json({
+        success: true,
+        already_linked: true,
+        epc_id: existingEPC.epc_id,
+        site_name: existingEPC.site_name,
+        device_code: device_code.toUpperCase(),
+        message: `Device code ${device_code} is already linked to EPC ${existingEPC.site_name}`
+      });
+    }
+    
+    // Generate new EPC ID
+    const epc_id = `EPC-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const checkin_token = crypto.randomBytes(32).toString('hex');
+    
+    // Create new EPC record with device code
+    const newEPC = new RemoteEPC({
+      epc_id,
+      tenant_id: tenant_id || 'unknown',
+      device_code: device_code.toUpperCase(),
+      site_name: config?.site_name || 'New EPC Device',
+      status: 'registered',
+      deployment_type: config?.deployment_type || 'both',
+      checkin_token,
+      hss_config: config?.hss_config || {
+        hss_host: 'hss.wisptools.io',
+        hss_port: 3001,
+        diameter_realm: 'wisptools.io'
+      },
+      snmp_config: config?.enable_snmp ? {
+        enabled: true,
+        version: config?.snmp_config?.version || '2c',
+        community: config?.snmp_config?.community || 'public',
+        port: config?.snmp_config?.port || 161
+      } : { enabled: false },
+      network_config: config?.network_config || {},
+      location: config?.location || {},
+      contact: config?.contact || {},
+      apt_config: config?.apt_config || { enabled: true },
+      created_at: new Date()
+    });
+    
+    await newEPC.save();
+    
+    console.log(`[Link Device] Created EPC ${epc_id} and linked device code ${device_code}`);
+    
+    res.json({
+      success: true,
+      epc_id,
+      site_name: newEPC.site_name,
+      device_code: device_code.toUpperCase(),
+      message: `Device code ${device_code} linked successfully! The device will configure automatically.`
+    });
+    
+  } catch (error) {
+    console.error('[Link Device] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to link device code', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Link device code to existing EPC configuration
  * POST /api/epc/:epc_id/link-device
  * Called from device configuration page to link device code to EPC
  */

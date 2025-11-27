@@ -400,11 +400,57 @@ if [ ! -f "$DEVICE_CODE_FILE" ]; then
 fi
 source "$DEVICE_CODE_FILE"
 
-# Wait for network
-sleep 5
-IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
-HARDWARE_ID=$(ip link show 2>/dev/null | grep -A1 "state UP" | grep ether | head -1 | awk '{print $2}')
-[ -z "$HARDWARE_ID" ] && HARDWARE_ID=$(cat /sys/class/net/*/address 2>/dev/null | grep -v 00:00:00:00:00:00 | head -1)
+# Wait for network and get IP address with retry
+log "Waiting for network and DHCP..."
+IP_ADDR=""
+for i in {1..30}; do
+    # Try multiple methods to get IP
+    # Method 1: hostname -I (most reliable when DHCP is working)
+    IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}' | grep -v '^$')
+    
+    # Method 2: ip addr (look for non-loopback, non-link-local addresses)
+    if [ -z "$IP_ADDR" ]; then
+        IP_ADDR=$(ip -4 addr show scope global 2>/dev/null | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+' | head -1)
+    fi
+    
+    # Method 3: Check each interface directly
+    if [ -z "$IP_ADDR" ]; then
+        for iface in $(ls /sys/class/net/ | grep -v lo); do
+            IFACE_IP=$(ip -4 addr show dev "$iface" 2>/dev/null | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+' | head -1)
+            if [ -n "$IFACE_IP" ] && [[ ! "$IFACE_IP" =~ ^169\.254\. ]]; then
+                IP_ADDR="$IFACE_IP"
+                break
+            fi
+        done
+    fi
+    
+    if [ -n "$IP_ADDR" ] && [[ ! "$IP_ADDR" =~ ^169\.254\. ]]; then
+        log "Got IP address: $IP_ADDR"
+        break
+    fi
+    
+    log "Waiting for DHCP... attempt $i/30"
+    sleep 2
+done
+
+if [ -z "$IP_ADDR" ] || [[ "$IP_ADDR" =~ ^169\.254\. ]]; then
+    IP_ADDR="(awaiting DHCP)"
+    log "WARNING: Could not get valid IP address"
+fi
+
+# Get hardware ID (MAC address)
+HARDWARE_ID=""
+for iface in $(ls /sys/class/net/ | grep -v lo); do
+    MAC=$(cat /sys/class/net/$iface/address 2>/dev/null)
+    if [ -n "$MAC" ] && [ "$MAC" != "00:00:00:00:00:00" ]; then
+        HARDWARE_ID="$MAC"
+        break
+    fi
+done
+[ -z "$HARDWARE_ID" ] && HARDWARE_ID=$(ip link show 2>/dev/null | grep -A1 "state UP" | grep ether | head -1 | awk '{print $2}')
+[ -z "$HARDWARE_ID" ] && HARDWARE_ID="unknown"
+
+log "Hardware ID: $HARDWARE_ID"
 
 # Start nginx for status page
 mkdir -p /var/www/html
@@ -420,6 +466,7 @@ if [ -f "$CONFIGURED_FILE" ]; then
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>WISPTools EPC - Running</title>
     <meta http-equiv="refresh" content="30">
     <style>
@@ -473,6 +520,7 @@ cat > /var/www/html/index.html << HTMLEOF
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>WISPTools EPC</title>
     <meta http-equiv="refresh" content="30">
     <style>

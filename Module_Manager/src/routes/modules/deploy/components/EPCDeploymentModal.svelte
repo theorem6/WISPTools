@@ -12,12 +12,17 @@
   let currentStep = 1;
   let totalSteps = 7; // Will be calculated based on deployment type
   let deploymentScript = '';
-  let deploymentOption: 'script' | 'iso' | null = null; // Set at final step
+  let deploymentOption: 'script' | 'iso' | 'link' | null = null; // Set at final step
   let loading = false;
   let error = '';
   let success = '';
   // deploymentScript and deploymentOption moved above
   let deploymentType: 'epc' | 'snmp' | 'both' = 'epc'; // Deployment type selection
+  
+  // Device code linking
+  let deviceCode = '';
+  let linkingDevice = false;
+  let linkedDeviceInfo: any = null;
   type TenantContactKey = 'contactName' | 'contactEmail' | 'contactPhone';
   type TenantContactRecord = Partial<Record<TenantContactKey, string>>;
 
@@ -990,6 +995,60 @@ echo "🎉 Deployment successful!";
     return script;
   }
 
+  // Link device by entering device code
+  async function linkDeviceByCode() {
+    if (!deviceCode || deviceCode.length !== 8) {
+      error = 'Please enter a valid 8-character device code';
+      return;
+    }
+    
+    linkingDevice = true;
+    error = '';
+    
+    try {
+      console.log('[EPCDeployment] Linking device with code:', deviceCode);
+      
+      // Call the backend API to link the device
+      const response = await fetch(`https://hss.wisptools.io:3001/api/epc/link-device`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          device_code: deviceCode.toUpperCase(),
+          tenant_id: tenantId,
+          config: {
+            site_name: epcConfig.siteName,
+            deployment_type: deploymentType,
+            enable_epc: deploymentType === 'epc' || deploymentType === 'both',
+            enable_snmp: deploymentType === 'snmp' || deploymentType === 'both',
+            network_config: epcConfig.networkConfig,
+            hss_config: epcConfig.hssConfig,
+            snmp_config: epcConfig.snmpConfig,
+            apt_config: epcConfig.aptConfig,
+            location: epcConfig.location,
+            contact: epcConfig.contact
+          }
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        linkedDeviceInfo = result;
+        success = `Device ${deviceCode} linked successfully! The device will configure automatically.`;
+        console.log('[EPCDeployment] Device linked:', result);
+      } else {
+        error = result.error || result.message || 'Failed to link device. Please check the device code and try again.';
+      }
+    } catch (err: any) {
+      console.error('[EPCDeployment] Failed to link device:', err);
+      error = `Failed to link device: ${err.message || 'Network error'}`;
+    } finally {
+      linkingDevice = false;
+    }
+  }
+
   // Download ISO file - direct download from GCE nginx server
   async function downloadISOFile(isoUrl: string) {
     try {
@@ -1521,30 +1580,68 @@ echo "🎉 Deployment successful!";
           <!-- Final Step: Download (Script/ISO Selection) -->
           {:else if currentStep === getStepNumber('download')}
             <div class="step-panel">
-              <h3>Step {currentStep}: Download Deployment Package</h3>
+              <h3>Step {currentStep}: Deploy Hardware</h3>
               <p class="step-description">Choose your deployment method</p>
               <div class="download-options">
-                <label class="download-option">
-                  <input type="radio" name="deploymentOption" value="script" bind:group={deploymentOption} />
+                <label class="download-option" class:selected={deploymentOption === 'link'}>
+                  <input type="radio" name="deploymentOption" value="link" bind:group={deploymentOption} />
                   <div class="option-content">
-                    <div class="option-icon">📜</div>
+                    <div class="option-icon">🔗</div>
                     <div class="option-info">
-                      <strong>Deployment Script</strong>
-                      <p>Download a bash script to install and configure on an existing Ubuntu server</p>
+                      <strong>Link Existing Device</strong>
+                      <p>Enter the 8-character device code shown on your hardware's screen</p>
                     </div>
                   </div>
                 </label>
-                <label class="download-option">
+                <label class="download-option" class:selected={deploymentOption === 'iso'}>
                   <input type="radio" name="deploymentOption" value="iso" bind:group={deploymentOption} />
                   <div class="option-content">
                     <div class="option-icon">💿</div>
                     <div class="option-info">
-                      <strong>ISO Image</strong>
-                      <p>Download a pre-configured ISO image ready to burn to USB or DVD</p>
+                      <strong>Download ISO Image</strong>
+                      <p>Download a bootable ISO to install on new hardware</p>
+                    </div>
+                  </div>
+                </label>
+                <label class="download-option" class:selected={deploymentOption === 'script'}>
+                  <input type="radio" name="deploymentOption" value="script" bind:group={deploymentOption} />
+                  <div class="option-content">
+                    <div class="option-icon">📜</div>
+                    <div class="option-info">
+                      <strong>Download Script</strong>
+                      <p>Download a bash script to run on an existing Ubuntu server</p>
                     </div>
                   </div>
                 </label>
               </div>
+              
+              {#if deploymentOption === 'link'}
+                <div class="device-code-entry">
+                  <h4>Enter Device Code</h4>
+                  <p class="hint">The device code is displayed on the hardware's screen after booting from the ISO.</p>
+                  <div class="code-input-group">
+                    <input 
+                      type="text" 
+                      bind:value={deviceCode}
+                      placeholder="e.g., AB12CD34"
+                      maxlength="8"
+                      class="device-code-input"
+                      style="text-transform: uppercase; font-family: monospace; font-size: 24px; letter-spacing: 4px; text-align: center;"
+                    />
+                  </div>
+                  {#if linkedDeviceInfo}
+                    <div class="link-success">
+                      <span class="success-icon">✅</span>
+                      <div>
+                        <strong>Device Linked Successfully!</strong>
+                        <p>EPC ID: {linkedDeviceInfo.epc_id}</p>
+                        <p>The device will automatically configure itself.</p>
+                      </div>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+              
               {#if deploymentOption === 'script' && deploymentScript}
                 <div class="script-preview">
                   <h5>Script Preview:</h5>
@@ -1573,18 +1670,31 @@ echo "🎉 Deployment successful!";
               {/if}
             </button>
           {:else}
-            <button class="btn btn-primary" onclick={downloadDeployment} disabled={loading || !deploymentOption}>
-              {#if loading}
-                <span class="spinner"></span>
-                {deploymentOption === 'script' ? 'Preparing Script...' : 'Generating ISO...'}
-              {:else if deploymentOption === 'script'}
-                📥 Download Script
-              {:else if deploymentOption === 'iso'}
-                💿 Download ISO
-              {:else}
-                Select Script or ISO
-              {/if}
-            </button>
+            {#if deploymentOption === 'link'}
+              <button class="btn btn-primary" onclick={linkDeviceByCode} disabled={linkingDevice || !deviceCode || deviceCode.length !== 8 || linkedDeviceInfo}>
+                {#if linkingDevice}
+                  <span class="spinner"></span>
+                  Linking Device...
+                {:else if linkedDeviceInfo}
+                  ✅ Device Linked
+                {:else}
+                  🔗 Link Device
+                {/if}
+              </button>
+            {:else}
+              <button class="btn btn-primary" onclick={downloadDeployment} disabled={loading || !deploymentOption}>
+                {#if loading}
+                  <span class="spinner"></span>
+                  {deploymentOption === 'script' ? 'Preparing Script...' : 'Downloading ISO...'}
+                {:else if deploymentOption === 'script'}
+                  📥 Download Script
+                {:else if deploymentOption === 'iso'}
+                  💿 Download ISO
+                {:else}
+                  Select an Option
+                {/if}
+              </button>
+            {/if}
           {/if}
         </div>
       </div>
@@ -2172,5 +2282,90 @@ echo "🎉 Deployment successful!";
       flex-direction: column;
       gap: var(--spacing-md);
     }
+  }
+
+  /* Device Code Entry Styles */
+  .device-code-entry {
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-xl);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--border-color);
+    text-align: center;
+  }
+
+  .device-code-entry h4 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+  }
+
+  .device-code-entry .hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .code-input-group {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .device-code-input {
+    width: 280px;
+    padding: var(--spacing-lg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 24px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    letter-spacing: 6px;
+    text-align: center;
+    text-transform: uppercase;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .device-code-input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.2);
+  }
+
+  .device-code-input::placeholder {
+    color: var(--text-tertiary);
+    letter-spacing: 4px;
+  }
+
+  .link-success {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-md);
+    text-align: left;
+  }
+
+  .link-success .success-icon {
+    font-size: 2rem;
+  }
+
+  .link-success strong {
+    display: block;
+    color: var(--success);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .link-success p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .download-option.selected {
+    border-color: var(--brand-primary);
+    background: var(--bg-tertiary);
   }
 </style>
