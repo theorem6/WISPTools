@@ -97,6 +97,7 @@ sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' "$BUILD_DIR/chr
 chroot "$BUILD_DIR/chroot" systemctl enable ssh
 
 # Network - DHCP on all interfaces
+mkdir -p "$BUILD_DIR/chroot/etc/network"
 cat > "$BUILD_DIR/chroot/etc/network/interfaces" << 'EOF'
 auto lo
 iface lo inet loopback
