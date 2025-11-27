@@ -369,8 +369,9 @@ install_agent() {
     mkdir -p /opt/wisptools
     mkdir -p "$CONFIG_DIR"
     
-    # Copy this script
-    cp "$0" /opt/wisptools/epc-checkin-agent.sh
+    # Download the script (handles piped install)
+    echo "Downloading check-in agent..."
+    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
     chmod +x /opt/wisptools/epc-checkin-agent.sh
     
     # Create systemd service
