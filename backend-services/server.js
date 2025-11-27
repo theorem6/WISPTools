@@ -123,13 +123,17 @@ app.use('/api/monitoring', require('./routes/monitoring'));
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));
-// Direct EPC delete route - must be BEFORE router mount to work
+// EPC delete route using POST (workaround for DELETE routing issues)
 const { RemoteEPC: RemoteEPCModel } = require('./models/distributed-epc-schema');
 const { InventoryItem: InventoryItemModel } = require('./models/inventory');
-app.delete('/api/deploy/delete-epc/:epc_id', async (req, res) => {
+app.post('/api/epc-management/delete', async (req, res) => {
   try {
-    const { epc_id } = req.params;
+    const { epc_id } = req.body;
     const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    if (!epc_id) {
+      return res.status(400).json({ error: 'epc_id is required in body' });
+    }
     
     console.log(`[Delete EPC] Deleting EPC ${epc_id} for tenant ${tenant_id}`);
     

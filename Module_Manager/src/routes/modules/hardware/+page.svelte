@@ -368,14 +368,15 @@
       if (!user) throw new Error('Not authenticated');
       
       const token = await user.getIdToken();
-      // Use /api/deploy endpoint for delete (more reliable routing)
-      const response = await fetch(`/api/deploy/delete-epc/${deviceId}`, {
-        method: 'DELETE',
+      // Use POST for delete (workaround for DELETE routing issues)
+      const response = await fetch(`/api/epc-management/delete`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': tenantId,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ epc_id: deviceId })
       });
       
       if (!response.ok) {
