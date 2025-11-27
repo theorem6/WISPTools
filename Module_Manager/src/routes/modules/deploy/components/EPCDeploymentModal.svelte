@@ -1008,11 +1008,16 @@ echo "🎉 Deployment successful!";
     try {
       console.log('[EPCDeployment] Linking device with code:', deviceCode);
       
-      // Call the backend API to link the device
-      const response = await fetch(`https://hss.wisptools.io:3001/api/epc/link-device`, {
+      // Get auth token for API call
+      const token = await authService.getIdToken();
+      
+      // Call the backend API to link the device (relative URL goes through Firebase rewrite)
+      const response = await fetch(`/api/deploy/link-device`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
         },
         body: JSON.stringify({
           device_code: deviceCode.toUpperCase(),
