@@ -25,9 +25,36 @@ echo "  Server IP: $CENTRAL_IP"
 echo "  Realm: $REALM"
 echo ""
 
-# Step 1: Add Open5GS repository
+# Step 1: Add Open5GS repository (detect OS)
 echo "[1/5] Adding Open5GS repository..."
-echo "deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
+
+# Detect OS and use correct repository
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [[ "$ID" == "ubuntu" ]]; then
+        # Ubuntu - use Ubuntu repository
+        case "$VERSION_CODENAME" in
+            noble|mantic)
+                REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_24.04/"
+                ;;
+            jammy)
+                REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_22.04/"
+                ;;
+            *)
+                REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/xUbuntu_22.04/"
+                ;;
+        esac
+        echo "Detected Ubuntu $VERSION_CODENAME"
+    else
+        # Debian
+        REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/"
+        echo "Detected Debian"
+    fi
+else
+    REPO_URL="https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/"
+fi
+
+echo "deb [trusted=yes] $REPO_URL ./" > /etc/apt/sources.list.d/open5gs.list
 apt-get update -qq
 
 # Step 2: Install Open5GS (only HSS and PCRF components)
