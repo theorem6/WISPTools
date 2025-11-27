@@ -700,6 +700,53 @@ router.get('/epc/remote/list', async (req, res) => {
   }
 });
 
+// Delete a RemoteEPC device
+// DELETE /api/hss/epc/:epc_id
+router.delete('/epc/:epc_id', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    const { epc_id } = req.params;
+    console.log(`[HSS/EPC] Deleting EPC ${epc_id} for tenant ${tenantId}`);
+
+    // Find and delete the RemoteEPC
+    const epc = await RemoteEPC.findOneAndDelete({
+      $or: [
+        { epc_id: epc_id },
+        { _id: epc_id }
+      ],
+      tenant_id: tenantId
+    });
+
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+
+    // Also delete associated inventory item if exists
+    const { InventoryItem } = require('../models/inventory');
+    await InventoryItem.deleteMany({
+      $or: [
+        { 'epcConfig.epc_id': epc_id },
+        { serialNumber: epc_id }
+      ],
+      tenantId: tenantId
+    });
+
+    console.log(`[HSS/EPC] Successfully deleted EPC ${epc_id}`);
+    res.json({ 
+      success: true, 
+      message: `EPC ${epc.site_name || epc_id} deleted successfully`,
+      deleted_epc_id: epc_id
+    });
+  } catch (error) {
+    console.error('[HSS/EPC] Error deleting EPC:', error);
+    res.status(500).json({ error: 'Failed to delete EPC', message: error.message });
+  }
+});
+
 // EPCs endpoints (legacy - uses epcs collection)
 router.get('/epcs', async (req, res) => {
   try {

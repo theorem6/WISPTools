@@ -351,6 +351,44 @@
       isSavingEPC = false;
     }
   }
+  
+  async function deleteEPCDevice(device: any) {
+    const deviceName = device.site_name || device.name || 'this device';
+    const deviceId = device.epc_id || device.epcId || device.id;
+    
+    if (!confirm(`Are you sure you want to delete "${deviceName}"?\n\nThis will permanently remove the EPC configuration. Any linked hardware will need to be re-registered.`)) {
+      return;
+    }
+    
+    try {
+      const tenantId = $currentTenant?.id;
+      if (!tenantId) throw new Error('No tenant selected');
+      
+      const user = auth().currentUser;
+      if (!user) throw new Error('Not authenticated');
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${HSS_API}/epc/${deviceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete device');
+      }
+      
+      success = `EPC device "${deviceName}" deleted successfully!`;
+      setTimeout(() => success = '', 3000);
+      await loadEPCDevices();
+    } catch (err: any) {
+      error = err.message || 'Failed to delete EPC device';
+      setTimeout(() => error = '', 5000);
+    }
+  }
 </script>
 
 <TenantGuard>
@@ -661,6 +699,9 @@
                       <div class="action-buttons">
                         <button class="btn-icon" on:click={() => editEPCDevice(device)} title="Edit">
                           ✏️
+                        </button>
+                        <button class="btn-icon btn-danger" on:click={() => deleteEPCDevice(device)} title="Delete">
+                          🗑️
                         </button>
                       </div>
                     </td>
