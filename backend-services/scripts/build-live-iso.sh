@@ -55,25 +55,14 @@ mkdir -p "$BUILD_DIR/chroot" "$BUILD_DIR/iso"/{live,boot/grub,isolinux,EFI/BOOT}
 # ============================================================================
 print_status "Building filesystem with EPC/SNMP packages (this takes 10-15 minutes)..."
 
-# Base install with more packages
+# Minimal package list for EPC/SNMP server (command-line only)
+# Core: boot, systemd, networking, ssh, disk tools, snmp
 debootstrap --arch=amd64 --include=\
-linux-image-amd64,live-boot,systemd,systemd-sysv,\
-openssh-server,curl,wget,ca-certificates,jq,gnupg,\
-python3,python3-pip,sudo,net-tools,iproute2,iputils-ping,\
-pciutils,usbutils,parted,gdisk,dosfstools,e2fsprogs,grub-pc,grub-efi-amd64,\
-vim,less,locales,console-setup,dbus,udev,rsync,\
-snmpd,snmp,libsnmp-dev,snmp-mibs-downloader,\
-mongodb-org-shell,nginx,iptables,nftables,\
-build-essential,cmake,git \
-    bookworm "$BUILD_DIR/chroot" http://deb.debian.org/debian || \
-debootstrap --arch=amd64 --include=\
-linux-image-amd64,live-boot,systemd,systemd-sysv,\
-openssh-server,curl,wget,ca-certificates,jq,gnupg,\
-python3,python3-pip,sudo,net-tools,iproute2,iputils-ping,\
-pciutils,usbutils,parted,gdisk,dosfstools,e2fsprogs,grub-pc,grub-efi-amd64,\
-vim,less,locales,console-setup,dbus,udev,rsync,\
-snmpd,snmp,\
-nginx,iptables \
+linux-image-amd64,live-boot,systemd,systemd-sysv,dbus,udev,\
+openssh-server,curl,wget,ca-certificates,gnupg,sudo,\
+net-tools,iproute2,iputils-ping,iptables,\
+parted,gdisk,dosfstools,e2fsprogs,grub-pc,grub-efi-amd64,rsync,\
+snmpd,snmp,cron \
     bookworm "$BUILD_DIR/chroot" http://deb.debian.org/debian
 
 print_success "Base system installed"
@@ -89,14 +78,15 @@ cat > "$BUILD_DIR/chroot/etc/apt/sources.list.d/open5gs.list" << 'EOF'
 deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./
 EOF
 
-# Update and install Open5GS
+# Update and install Open5GS (includes FreeDiameter)
 chroot "$BUILD_DIR/chroot" apt-get update -qq 2>/dev/null || true
-chroot "$BUILD_DIR/chroot" apt-get install -y open5gs 2>/dev/null || {
+chroot "$BUILD_DIR/chroot" apt-get install -y --no-install-recommends open5gs 2>/dev/null || {
     print_status "Open5GS not available, will be installed on first boot"
 }
 
-# Install FreeDiameter for HSS
-chroot "$BUILD_DIR/chroot" apt-get install -y freediameter freediameter-dictionary-rfc4005 2>/dev/null || true
+# Clean up apt cache to reduce image size
+chroot "$BUILD_DIR/chroot" apt-get clean
+chroot "$BUILD_DIR/chroot" rm -rf /var/lib/apt/lists/*
 
 print_success "EPC packages configured"
 
