@@ -319,9 +319,12 @@ router.post('/link-device', async (req, res) => {
       });
     }
     
-    // Generate new EPC ID
+    // Generate new EPC ID and authentication credentials
     const epc_id = `EPC-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     const checkin_token = crypto.randomBytes(32).toString('hex');
+    const auth_code = crypto.randomBytes(8).toString('hex').toUpperCase();
+    const api_key = crypto.randomBytes(16).toString('hex');
+    const secret_key = crypto.randomBytes(32).toString('hex');
     
     // Create new EPC record with device code
     const newEPC = new RemoteEPC({
@@ -332,6 +335,9 @@ router.post('/link-device', async (req, res) => {
       status: 'registered',
       deployment_type: config?.deployment_type || 'both',
       checkin_token,
+      auth_code,
+      api_key,
+      secret_key,
       hss_config: config?.hss_config || {
         hss_host: 'hss.wisptools.io',
         hss_port: 3001,
