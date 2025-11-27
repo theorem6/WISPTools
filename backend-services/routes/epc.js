@@ -6,6 +6,8 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, NetworkEquipment, HardwareDeployment } = require('../models/network');
+const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { InventoryItem } = require('../models/inventory');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -25,40 +27,53 @@ const formatEPCDevice = (device, source = 'equipment') => {
     (typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes) : 
     (device.config || {});
 
+  // Calculate uptime based on last_seen
+  const lastSeen = device.last_seen || device.last_heartbeat || device.updatedAt;
+  const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000; // 5 min threshold
+  
   return {
-    id: device._id.toString(),
-    epcId: device._id.toString(),
-    name: device.name,
-    status: device.status === 'active' || device.status === 'deployed' ? 'online' : 'offline',
+    id: device._id?.toString() || device.epc_id,
+    epcId: device.epc_id || device._id?.toString(),
+    name: device.name || device.site_name,
+    status: device.status === 'online' || (device.status === 'active' && isOnline) || device.status === 'deployed' ? 'online' : 
+            device.status === 'registered' ? 'pending' : 'offline',
     type: 'epc',
+    device_code: device.device_code,
+    hardware_id: device.hardware_id,
     location: {
       coordinates: {
-        latitude: device.location?.latitude || (device.siteId?.location?.latitude) || 0,
-        longitude: device.location?.longitude || (device.siteId?.location?.longitude) || 0
+        latitude: device.location?.latitude || device.location?.coordinates?.latitude || (device.siteId?.location?.latitude) || 0,
+        longitude: device.location?.longitude || device.location?.coordinates?.longitude || (device.siteId?.location?.longitude) || 0
       },
       address: device.location?.address || (device.siteId?.location?.address) || 'Unknown Location'
     },
-    ipAddress: config.management_ip || '10.0.1.10',
-    manufacturer: device.manufacturer || 'Generic',
+    ipAddress: device.ip_address || config.management_ip || null,
+    manufacturer: device.manufacturer || 'WISPTools',
     model: device.model || 'EPC Server',
-    serialNumber: device.serialNumber || device._id.toString(),
-    services: config.services || ['MME', 'SGW', 'PGW', 'HSS'],
+    serialNumber: device.serialNumber || device.epc_id || device._id?.toString(),
+    deployment_type: device.deployment_type,
+    services: device.deployment_type === 'snmp' ? ['SNMP'] : 
+              device.deployment_type === 'both' ? ['MME', 'SGW', 'PGW', 'HSS', 'SNMP'] : 
+              config.services || ['MME', 'SGW', 'PGW', 'HSS'],
     monitoring: config.monitoring || {
       cpu_threshold: 80,
       memory_threshold: 85,
       disk_threshold: 90
     },
-    metrics: {
-      cpuUsage: Math.floor(Math.random() * 100),
-      memoryUsage: Math.floor(Math.random() * 100),
-      diskUsage: Math.floor(Math.random() * 100),
-      activeUsers: Math.floor(Math.random() * 500),
-      uptime: 99.9,
-      throughput: Math.floor(Math.random() * 1000) + 500
+    // Real metrics - will be populated by device heartbeat
+    metrics: device.metrics || {
+      cpuUsage: null,
+      memoryUsage: null,
+      diskUsage: null,
+      activeUsers: null,
+      uptime: null,
+      throughput: null
     },
-    createdAt: device.createdAt,
-    updatedAt: device.updatedAt,
-    deployedAt: device.deployedAt || device.createdAt
+    last_seen: lastSeen,
+    last_heartbeat: device.last_heartbeat,
+    createdAt: device.createdAt || device.created_at,
+    updatedAt: device.updatedAt || device.updated_at,
+    deployedAt: device.deployedAt || device.createdAt || device.created_at
   };
 };
 
@@ -68,8 +83,22 @@ router.get('/list', async (req, res) => {
     console.log(`🔍 [EPC API] Fetching EPC devices for tenant: ${req.tenantId}`);
     
     const epcs = [];
+    const seenIds = new Set();
     
-    // Get EPC hardware deployments
+    // PRIMARY SOURCE: Get EPCs from RemoteEPC collection (devices linked via device code)
+    const remoteEPCs = await RemoteEPC.find({
+      tenant_id: req.tenantId
+    }).lean();
+    
+    console.log(`📡 Found ${remoteEPCs.length} RemoteEPCs`);
+    
+    remoteEPCs.forEach(epc => {
+      const formatted = formatEPCDevice(epc, 'remote');
+      epcs.push(formatted);
+      seenIds.add(epc.epc_id);
+    });
+    
+    // SECONDARY: Get EPC hardware deployments
     const epcDeployments = await HardwareDeployment.find({
       tenantId: req.tenantId,
       hardware_type: 'epc',
@@ -78,21 +107,24 @@ router.get('/list', async (req, res) => {
     
     console.log(`📦 Found ${epcDeployments.length} EPC deployments`);
     
-    // Add EPC deployments
+    // Add EPC deployments (skip if already in RemoteEPCs)
     epcDeployments.forEach(deployment => {
-      epcs.push(formatEPCDevice({
-        _id: deployment._id,
-        name: deployment.name,
-        status: deployment.status,
-        location: deployment.siteId?.location || {},
-        config: deployment.config || {},
-        createdAt: deployment.createdAt,
-        updatedAt: deployment.updatedAt,
-        deployedAt: deployment.deployedAt
-      }, 'deployment'));
+      if (!seenIds.has(deployment._id.toString())) {
+        epcs.push(formatEPCDevice({
+          _id: deployment._id,
+          name: deployment.name,
+          status: deployment.status,
+          location: deployment.siteId?.location || {},
+          config: deployment.config || {},
+          createdAt: deployment.createdAt,
+          updatedAt: deployment.updatedAt,
+          deployedAt: deployment.deployedAt
+        }, 'deployment'));
+        seenIds.add(deployment._id.toString());
+      }
     });
     
-    // Get network equipment that could be EPC servers
+    // TERTIARY: Get network equipment that could be EPC servers (legacy)
     const epcEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       $or: [

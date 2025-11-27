@@ -197,18 +197,49 @@ router.post('/checkin', async (req, res) => {
       });
     }
     
+    // Get IP address from request body or headers
+    const ip_address = req.body.ip_address || req.ip || req.connection?.remoteAddress;
+    
     // Update EPC with hardware information
     await RemoteEPC.updateOne(
       { epc_id: epc.epc_id },
       { 
         hardware_id: hardware_id || epc.hardware_id,
+        ip_address: ip_address,
         status: 'online',
         last_seen: new Date(),
         last_heartbeat: new Date()
       }
     );
     
-    console.log(`[Check-in] Matched device code ${device_code} to EPC ${epc.epc_id}`);
+    console.log(`[Check-in] Matched device code ${device_code} to EPC ${epc.epc_id}, IP: ${ip_address}`);
+    
+    // Update inventory item if it exists
+    try {
+      const inventoryUpdate = await InventoryItem.findOneAndUpdate(
+        { 
+          $or: [
+            { 'epcConfig.device_code': device_code.toUpperCase() },
+            { 'epcConfig.epc_id': epc.epc_id },
+            { serialNumber: epc.epc_id }
+          ]
+        },
+        {
+          status: 'deployed',
+          condition: 'good',
+          'networkConfig.management_ip': ip_address,
+          'networkConfig.hardware_id': hardware_id,
+          notes: `Device online. Last seen: ${new Date().toISOString()}. IP: ${ip_address}`,
+          updatedAt: new Date()
+        },
+        { new: true }
+      );
+      if (inventoryUpdate) {
+        console.log(`[Check-in] Updated inventory item ${inventoryUpdate._id} for EPC ${epc.epc_id}`);
+      }
+    } catch (invError) {
+      console.warn(`[Check-in] Could not update inventory:`, invError.message);
+    }
     
     // Generate check-in token if not present
     if (!epc.checkin_token) {
@@ -360,12 +391,72 @@ router.post('/link-device', async (req, res) => {
     
     console.log(`[Link Device] Created EPC ${epc_id} and linked device code ${device_code}`);
     
+    // Also create an inventory item for this device so it appears in inventory
+    const inventoryItem = new InventoryItem({
+      tenantId: tenant_id || 'unknown',
+      assetTag: `EPC-${device_code.toUpperCase()}`,
+      category: 'Network Equipment',
+      subcategory: 'EPC Server',
+      equipmentType: config?.deployment_type === 'snmp' ? 'SNMP Monitoring Server' : 
+                     config?.deployment_type === 'both' ? 'EPC + SNMP Server' : 'EPC Core Server',
+      manufacturer: 'WISPTools',
+      model: 'EPC-Generic',
+      serialNumber: epc_id,
+      physicalDescription: `WISPTools EPC Device - ${config?.site_name || 'New Device'}`,
+      status: 'pending_deployment',
+      condition: 'new',
+      currentLocation: {
+        type: 'datacenter',
+        address: {
+          street: config?.location?.address || '',
+          city: config?.location?.city || '',
+          state: config?.location?.state || '',
+          country: config?.location?.country || 'USA'
+        },
+        latitude: config?.location?.coordinates?.latitude || 0,
+        longitude: config?.location?.coordinates?.longitude || 0
+      },
+      ownership: 'owned',
+      networkConfig: {
+        management_ip: null, // Will be updated on first check-in
+        snmp_enabled: config?.enable_snmp || config?.deployment_type === 'snmp' || config?.deployment_type === 'both',
+        snmp_community: config?.snmp_config?.community || 'public',
+        snmp_version: config?.snmp_config?.version || '2c'
+      },
+      epcConfig: {
+        epc_id: epc_id,
+        device_code: device_code.toUpperCase(),
+        deployment_type: config?.deployment_type || 'both',
+        mcc: config?.network_config?.mcc || '001',
+        mnc: config?.network_config?.mnc || '01',
+        tac: config?.network_config?.tac || '1'
+      },
+      notes: `Linked via device code ${device_code}. Waiting for device to check in.`,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    try {
+      await inventoryItem.save();
+      console.log(`[Link Device] Created inventory item for EPC ${epc_id}`);
+    } catch (invError) {
+      console.warn(`[Link Device] Could not create inventory item:`, invError.message);
+      // Continue even if inventory creation fails
+    }
+    
     res.json({
       success: true,
       epc_id,
       site_name: newEPC.site_name,
       device_code: device_code.toUpperCase(),
-      message: `Device code ${device_code} linked successfully! The device will configure automatically.`
+      inventory_id: inventoryItem?._id?.toString() || null,
+      status: 'registered',
+      message: `Device code ${device_code} linked successfully! The device will configure automatically when it checks in.`,
+      next_steps: [
+        'Device will check in automatically every 60 seconds',
+        'Once connected, device status will change to "online"',
+        'Device will appear in Hardware Inventory and Monitoring'
+      ]
     });
     
   } catch (error) {
