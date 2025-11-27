@@ -139,10 +139,19 @@ app.post('/api/epc-management/delete', async (req, res) => {
     
     console.log(`[Delete EPC] Deleting EPC ${epc_id} for tenant ${tenant_id}`);
     
-    const epc = await RemoteEPCModel.findOneAndDelete({
-      $or: [{ epc_id: epc_id }, { _id: epc_id }],
+    // Try to find by epc_id first (string match)
+    let epc = await RemoteEPCModel.findOneAndDelete({
+      epc_id: epc_id,
       tenant_id: tenant_id
     });
+    
+    // If not found and epc_id looks like a valid ObjectId, try matching by _id
+    if (!epc && /^[a-f\d]{24}$/i.test(epc_id)) {
+      epc = await RemoteEPCModel.findOneAndDelete({
+        _id: epc_id,
+        tenant_id: tenant_id
+      });
+    }
     
     if (!epc) {
       return res.status(404).json({ error: 'EPC not found' });
