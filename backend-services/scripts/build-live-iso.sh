@@ -84,10 +84,13 @@ if ! chroot "$BUILD_DIR/chroot" apt-get install -y --no-install-recommends open5
     print_status "Open5GS install failed, will retry on first boot"
 fi
 
-# Disable local HSS - we use central HSS at hss.wisptools.io
+# Disable services that run centrally at hss.wisptools.io
 # Remote EPCs only run: MME, SGW-C, SGW-U, SMF, UPF
-chroot "$BUILD_DIR/chroot" systemctl disable open5gs-hssd 2>/dev/null || true
-chroot "$BUILD_DIR/chroot" systemctl mask open5gs-hssd 2>/dev/null || true
+# HSS (subscriber database) and PCRF (policy/charging) are centralized
+for svc in open5gs-hssd open5gs-pcrfd; do
+    chroot "$BUILD_DIR/chroot" systemctl disable $svc 2>/dev/null || true
+    chroot "$BUILD_DIR/chroot" systemctl mask $svc 2>/dev/null || true
+done
 
 # Clean up apt cache to reduce image size
 chroot "$BUILD_DIR/chroot" apt-get clean
@@ -729,15 +732,24 @@ ConnectPeer = "hss.${REALM}" { ConnectTo = "${CENTRAL_HSS}"; Port = ${HSS_DIAMET
 DIAMEOF
 fi
 
-# IMPORTANT: Disable local HSS - we use central HSS
-log "Disabling local HSS (using central HSS at $CENTRAL_HSS)..."
-systemctl stop open5gs-hssd 2>/dev/null || true
-systemctl disable open5gs-hssd 2>/dev/null || true
-systemctl mask open5gs-hssd 2>/dev/null || true
+# IMPORTANT: Disable local HSS and PCRF - they run centrally at hss.wisptools.io
+log "Disabling local HSS and PCRF (using central services at $CENTRAL_HSS)..."
+for svc in open5gs-hssd open5gs-pcrfd; do
+    systemctl stop $svc 2>/dev/null || true
+    systemctl disable $svc 2>/dev/null || true
+    systemctl mask $svc 2>/dev/null || true
+done
 
-# Enable and start EPC services (NOT HSS)
+# Configure SMF to connect to central PCRF
+if [ -f "$CONFIG_DIR/smf.yaml" ]; then
+    log "Configuring SMF for central PCRF..."
+    # Update PCRF peer address to central server
+    sed -i "s/127.0.0.7/${CENTRAL_HSS}/g" "$CONFIG_DIR/smf.yaml" 2>/dev/null || true
+fi
+
+# Enable and start EPC services (NOT HSS or PCRF)
 log "Starting EPC services..."
-for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd; do
+for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     systemctl enable $svc 2>/dev/null || true
     systemctl start $svc 2>/dev/null || true
 done
@@ -747,17 +759,19 @@ log "EPC configuration complete (Central HSS: $CENTRAL_HSS)"
 # Show status
 echo ""
 echo "Open5GS EPC Status (Distributed Mode):"
-echo "  Central HSS: $CENTRAL_HSS"
+echo "  Central HSS/PCRF: $CENTRAL_HSS"
 echo "  EPC ID: ${EPC_ID:-not registered}"
 echo "  Device Code: $DEVICE_CODE"
 echo ""
-echo "Services:"
+echo "Local Services (running on this EPC):"
 for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     STATUS=$(systemctl is-active $svc 2>/dev/null || echo "not installed")
     printf "  %-20s %s\n" "$svc:" "$STATUS"
 done
 echo ""
-echo "  open5gs-hssd:        DISABLED (using central HSS)"
+echo "Central Services (at $CENTRAL_HSS):"
+echo "  open5gs-hssd:        CENTRAL (subscriber database)"
+echo "  open5gs-pcrfd:       CENTRAL (policy/charging)"
 EPCEOF
 chmod +x "$BUILD_DIR/chroot/opt/wisptools/configure-epc.sh"
 

@@ -97,16 +97,26 @@ DIAMEOF
 
 log "Diameter configured to connect to $CENTRAL_HSS"
 
-# Step 4: Disable local HSS
-echo "[4/5] Disabling local HSS (using central HSS)..."
-systemctl stop open5gs-hssd 2>/dev/null || true
-systemctl disable open5gs-hssd 2>/dev/null || true
-systemctl mask open5gs-hssd 2>/dev/null || true
-log "Local HSS disabled"
+# Step 4: Disable local HSS and PCRF (they run centrally)
+echo "[4/6] Disabling local HSS and PCRF (using central services)..."
+for svc in open5gs-hssd open5gs-pcrfd; do
+    systemctl stop $svc 2>/dev/null || true
+    systemctl disable $svc 2>/dev/null || true
+    systemctl mask $svc 2>/dev/null || true
+done
+log "Local HSS and PCRF disabled"
 
-# Step 5: Start EPC services
-echo "[5/5] Starting EPC services..."
-for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd open5gs-pcrfd; do
+# Step 5: Configure SMF to connect to central PCRF
+echo "[5/6] Configuring SMF for central PCRF..."
+if [ -f "$CONFIG_DIR/smf.yaml" ]; then
+    # Update PCRF peer address to central server
+    sed -i "s/127.0.0.7/${CENTRAL_HSS}/g" "$CONFIG_DIR/smf.yaml" 2>/dev/null || true
+    log "SMF configured for central PCRF at $CENTRAL_HSS"
+fi
+
+# Step 6: Start EPC services (NOT HSS or PCRF)
+echo "[6/6] Starting EPC services..."
+for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     systemctl enable $svc 2>/dev/null || true
     systemctl restart $svc 2>/dev/null || true
 done
@@ -118,17 +128,19 @@ echo "======================================"
 echo "EPC Configuration Complete"
 echo "======================================"
 echo ""
-echo "Central HSS: $CENTRAL_HSS"
+echo "Central HSS/PCRF: $CENTRAL_HSS"
 echo "EPC ID: ${EPC_ID:-not registered yet}"
 echo "Device Code: $DEVICE_CODE"
 echo ""
-echo "Service Status:"
+echo "Local Services (running on this EPC):"
 for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     STATUS=$(systemctl is-active $svc 2>/dev/null || echo "failed")
     printf "  %-20s %s\n" "$svc:" "$STATUS"
 done
 echo ""
-echo "  open5gs-hssd:        DISABLED (using central HSS)"
+echo "Central Services (at $CENTRAL_HSS):"
+echo "  open5gs-hssd:        CENTRAL (subscriber database)"
+echo "  open5gs-pcrfd:       CENTRAL (policy/charging)"
 echo ""
 echo "======================================"
 
