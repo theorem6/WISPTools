@@ -125,7 +125,7 @@ DIAMEOF
 log "Diameter configured to connect to $CENTRAL_HSS"
 
 # Step 4: Disable local HSS and PCRF (they run centrally)
-echo "[4/6] Disabling local HSS and PCRF (using central services)..."
+echo "[4/7] Disabling local HSS and PCRF (using central services)..."
 for svc in open5gs-hssd open5gs-pcrfd; do
     systemctl stop $svc 2>/dev/null || true
     systemctl disable $svc 2>/dev/null || true
@@ -134,7 +134,7 @@ done
 log "Local HSS and PCRF disabled"
 
 # Step 5: Configure SMF to connect to central PCRF
-echo "[5/6] Configuring SMF for central PCRF..."
+echo "[5/7] Configuring SMF for central PCRF..."
 if [ -f "$CONFIG_DIR/smf.yaml" ]; then
     # Update PCRF peer address to central server
     sed -i "s/127.0.0.7/${CENTRAL_HSS}/g" "$CONFIG_DIR/smf.yaml" 2>/dev/null || true
@@ -142,12 +142,19 @@ if [ -f "$CONFIG_DIR/smf.yaml" ]; then
 fi
 
 # Step 6: Start EPC services (NOT HSS or PCRF)
-echo "[6/6] Starting EPC services..."
+echo "[6/7] Starting EPC services..."
 for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     systemctl enable $svc 2>/dev/null || true
     systemctl restart $svc 2>/dev/null || true
 done
 log "EPC services started"
+
+# Step 7: Install/update check-in agent for remote management
+echo "[7/7] Installing check-in agent..."
+curl -fsSL "https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
+chmod +x /opt/wisptools/epc-checkin-agent.sh
+/opt/wisptools/epc-checkin-agent.sh install
+log "Check-in agent installed and running"
 
 # Show final status
 echo ""
