@@ -244,44 +244,46 @@
       }
       
       // Use standard monitoring service API calls
-      const devices = [];
+      const devices: any[] = [];
+      const seenIds = new Set<string>();
+      
+      // Helper to add device with deduplication
+      const addDevice = (device: any, type: string) => {
+        const deviceId = device.epcId || device.id || device._id;
+        if (deviceId && !seenIds.has(deviceId)) {
+          seenIds.add(deviceId);
+          devices.push({
+            ...device,
+            type,
+            id: deviceId,
+            status: device.status || 'unknown'
+          });
+        }
+      };
       
       try {
         const epcResult = await monitoringService.getEPCDevices();
         if (epcResult.success && epcResult.data?.epcs) {
-          devices.push(...epcResult.data.epcs.map((epc: any) => ({
-            ...epc,
-            type: 'epc',
-            id: epc.epcId || epc.id,
-            status: epc.status || 'unknown'
-          })));
+          epcResult.data.epcs.forEach((epc: any) => addDevice(epc, 'epc'));
         }
       } catch (e) { console.log('EPC API not available:', e); }
       
       try {
         const mikrotikResult = await monitoringService.getMikrotikDevices();
         if (mikrotikResult.success && mikrotikResult.data?.devices) {
-          devices.push(...mikrotikResult.data.devices.map((device: any) => ({
-            ...device,
-            type: 'mikrotik',
-            status: device.status || 'unknown'
-          })));
+          mikrotikResult.data.devices.forEach((device: any) => addDevice(device, 'mikrotik'));
         }
       } catch (e) { console.log('Mikrotik API not available:', e); }
       
       try {
         const snmpResult = await monitoringService.getSNMPDevices();
         if (snmpResult.success && snmpResult.data?.devices) {
-          devices.push(...snmpResult.data.devices.map((device: any) => ({
-            ...device,
-            type: 'snmp',
-            status: device.status || 'unknown'
-          })));
+          snmpResult.data.devices.forEach((device: any) => addDevice(device, 'snmp'));
         }
       } catch (e) { console.log('SNMP API not available:', e); }
       
       networkDevices = devices;
-      console.log('[Network Monitoring] Loaded network devices:', devices.length);
+      console.log('[Network Monitoring] Loaded network devices:', devices.length, '(deduped)');
     } catch (error) {
       console.error('[Network Monitoring] Failed to load network devices:', error);
       networkDevices = [];
