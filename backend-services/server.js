@@ -120,6 +120,122 @@ app.use('/api/network', require('./routes/network'));
 app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
+
+// EPC Check-in endpoints - MUST be defined BEFORE /api/epc routes (no tenant ID required)
+const { RemoteEPC: RemoteEPCCheckin, EPCCommand, EPCServiceStatus, EPCAlert } = require('./models/distributed-epc-schema');
+
+app.post('/api/epc/checkin', async (req, res) => {
+  try {
+    const { device_code, hardware_id, ip_address, services, system, network, versions } = req.body;
+    
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+    
+    console.log(`[EPC Check-in] Device ${device_code} checking in from ${ip_address}`);
+    
+    const epc = await RemoteEPCCheckin.findOne({ device_code: device_code.toUpperCase() });
+    
+    if (!epc) {
+      return res.status(202).json({
+        status: 'unregistered',
+        message: `Device ${device_code} is not registered. Enter this code in the management portal.`,
+        device_code: device_code.toUpperCase()
+      });
+    }
+    
+    await RemoteEPCCheckin.updateOne(
+      { epc_id: epc.epc_id },
+      {
+        status: 'online',
+        last_seen: new Date(),
+        last_heartbeat: new Date(),
+        ip_address,
+        hardware_id: hardware_id || epc.hardware_id,
+        'version.os': versions?.os,
+        'version.open5gs': versions?.open5gs
+      }
+    );
+    
+    if (services) {
+      await new EPCServiceStatus({
+        epc_id: epc.epc_id,
+        tenant_id: epc.tenant_id,
+        services, system, network, versions
+      }).save();
+      
+      const REQUIRED_SERVICES = ['open5gs-mmed', 'open5gs-sgwcd', 'open5gs-sgwud', 'open5gs-smfd', 'open5gs-upfd', 'snmpd'];
+      for (const svc of REQUIRED_SERVICES) {
+        const status = services[svc]?.status;
+        if (status && status !== 'active' && status !== 'not-found') {
+          const existingAlert = await EPCAlert.findOne({
+            epc_id: epc.epc_id, alert_type: 'component_down', resolved: false, 'details.service': svc
+          });
+          if (!existingAlert) {
+            await new EPCAlert({
+              tenant_id: epc.tenant_id, epc_id: epc.epc_id,
+              severity: svc.includes('mme') || svc.includes('upf') ? 'critical' : 'error',
+              alert_type: 'component_down',
+              message: `Service ${svc} is ${status} on ${epc.site_name}`,
+              details: { service: svc, status }
+            }).save();
+          }
+        } else if (status === 'active') {
+          await EPCAlert.updateMany(
+            { epc_id: epc.epc_id, alert_type: 'component_down', 'details.service': svc, resolved: false },
+            { resolved: true, resolved_at: new Date(), resolved_by: 'auto' }
+          );
+        }
+      }
+    }
+    
+    const commands = await EPCCommand.find({
+      epc_id: epc.epc_id, status: 'pending', expires_at: { $gt: new Date() }
+    }).sort({ priority: 1, created_at: 1 }).lean();
+    
+    if (commands.length > 0) {
+      await EPCCommand.updateMany(
+        { _id: { $in: commands.map(c => c._id) } },
+        { status: 'sent', sent_at: new Date() }
+      );
+    }
+    
+    res.json({
+      status: 'ok',
+      epc_id: epc.epc_id,
+      site_name: epc.site_name,
+      checkin_interval: epc.metrics_config?.update_interval_seconds || 60,
+      commands: commands.map(c => ({
+        id: c._id.toString(), type: c.command_type, action: c.action,
+        target_services: c.target_services, script_content: c.script_content,
+        script_url: c.script_url, config_data: c.config_data
+      })),
+      config: { central_hss: 'hss.wisptools.io', hss_port: 3868, snmp_enabled: epc.snmp_config?.enabled !== false }
+    });
+  } catch (error) {
+    console.error('[EPC Check-in] Error:', error);
+    res.status(500).json({ error: 'Check-in failed', message: error.message });
+  }
+});
+
+app.post('/api/epc/checkin/commands/:command_id/result', async (req, res) => {
+  try {
+    const { command_id } = req.params;
+    const { success, output, error, exit_code } = req.body;
+    const command = await EPCCommand.findByIdAndUpdate(command_id,
+      { status: success ? 'completed' : 'failed', completed_at: new Date(), result: { success, output, error, exit_code } },
+      { new: true }
+    );
+    if (!command) return res.status(404).json({ error: 'Command not found' });
+    console.log(`[EPC Command] Command ${command_id} completed: ${success ? 'SUCCESS' : 'FAILED'}`);
+    res.json({ success: true, message: 'Command result recorded' });
+  } catch (error) {
+    console.error('[EPC Command Result] Error:', error);
+    res.status(500).json({ error: 'Failed to record result', message: error.message });
+  }
+});
+
+// EPC routes with tenant requirement
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/epc', require('./routes/epc-commands')); // Remote command management
 app.use('/api/mikrotik', require('./routes/mikrotik'));
@@ -180,156 +296,6 @@ app.post('/api/epc-management/delete', async (req, res) => {
   }
 });
 app.use('/api/deploy', require('./routes/epc-deployment'));
-
-// EPC Check-in endpoint - NO tenant ID required (tenant determined by device_code)
-const { RemoteEPC, EPCCommand, EPCServiceStatus, EPCAlert } = require('./models/distributed-epc-schema');
-app.post('/api/epc/checkin', async (req, res) => {
-  try {
-    const { device_code, hardware_id, ip_address, services, system, network, versions } = req.body;
-    
-    if (!device_code) {
-      return res.status(400).json({ error: 'device_code is required' });
-    }
-    
-    console.log(`[EPC Check-in] Device ${device_code} checking in from ${ip_address}`);
-    
-    // Find EPC by device code
-    const epc = await RemoteEPC.findOne({ device_code: device_code.toUpperCase() });
-    
-    if (!epc) {
-      return res.status(202).json({
-        status: 'unregistered',
-        message: `Device ${device_code} is not registered. Enter this code in the management portal.`,
-        device_code: device_code.toUpperCase()
-      });
-    }
-    
-    // Update EPC status
-    await RemoteEPC.updateOne(
-      { epc_id: epc.epc_id },
-      {
-        status: 'online',
-        last_seen: new Date(),
-        last_heartbeat: new Date(),
-        ip_address,
-        hardware_id: hardware_id || epc.hardware_id,
-        'version.os': versions?.os,
-        'version.open5gs': versions?.open5gs
-      }
-    );
-    
-    // Record service status if provided
-    if (services) {
-      const serviceStatus = new EPCServiceStatus({
-        epc_id: epc.epc_id,
-        tenant_id: epc.tenant_id,
-        services,
-        system,
-        network,
-        versions
-      });
-      await serviceStatus.save();
-      
-      // Check for service issues and create alerts
-      const REQUIRED_SERVICES = ['open5gs-mmed', 'open5gs-sgwcd', 'open5gs-sgwud', 'open5gs-smfd', 'open5gs-upfd', 'snmpd'];
-      for (const svc of REQUIRED_SERVICES) {
-        const status = services[svc]?.status;
-        if (status && status !== 'active' && status !== 'not-found') {
-          const existingAlert = await EPCAlert.findOne({
-            epc_id: epc.epc_id, alert_type: 'component_down', resolved: false, 'details.service': svc
-          });
-          if (!existingAlert) {
-            await new EPCAlert({
-              tenant_id: epc.tenant_id,
-              epc_id: epc.epc_id,
-              severity: svc.includes('mme') || svc.includes('upf') ? 'critical' : 'error',
-              alert_type: 'component_down',
-              message: `Service ${svc} is ${status} on ${epc.site_name}`,
-              details: { service: svc, status }
-            }).save();
-          }
-        } else if (status === 'active') {
-          await EPCAlert.updateMany(
-            { epc_id: epc.epc_id, alert_type: 'component_down', 'details.service': svc, resolved: false },
-            { resolved: true, resolved_at: new Date(), resolved_by: 'auto' }
-          );
-        }
-      }
-    }
-    
-    // Get pending commands
-    const commands = await EPCCommand.find({
-      epc_id: epc.epc_id,
-      status: 'pending',
-      expires_at: { $gt: new Date() }
-    }).sort({ priority: 1, created_at: 1 }).lean();
-    
-    // Mark commands as sent
-    if (commands.length > 0) {
-      await EPCCommand.updateMany(
-        { _id: { $in: commands.map(c => c._id) } },
-        { status: 'sent', sent_at: new Date() }
-      );
-    }
-    
-    const checkin_interval = epc.metrics_config?.update_interval_seconds || 60;
-    
-    res.json({
-      status: 'ok',
-      epc_id: epc.epc_id,
-      site_name: epc.site_name,
-      checkin_interval,
-      commands: commands.map(c => ({
-        id: c._id.toString(),
-        type: c.command_type,
-        action: c.action,
-        target_services: c.target_services,
-        script_content: c.script_content,
-        script_url: c.script_url,
-        config_data: c.config_data
-      })),
-      config: {
-        central_hss: 'hss.wisptools.io',
-        hss_port: 3868,
-        snmp_enabled: epc.snmp_config?.enabled !== false
-      }
-    });
-    
-  } catch (error) {
-    console.error('[EPC Check-in] Error:', error);
-    res.status(500).json({ error: 'Check-in failed', message: error.message });
-  }
-});
-
-// EPC Command result endpoint - NO tenant ID required
-app.post('/api/epc/checkin/commands/:command_id/result', async (req, res) => {
-  try {
-    const { command_id } = req.params;
-    const { success, output, error, exit_code } = req.body;
-    
-    const command = await EPCCommand.findByIdAndUpdate(
-      command_id,
-      {
-        status: success ? 'completed' : 'failed',
-        completed_at: new Date(),
-        result: { success, output, error, exit_code }
-      },
-      { new: true }
-    );
-    
-    if (!command) {
-      return res.status(404).json({ error: 'Command not found' });
-    }
-    
-    console.log(`[EPC Command] Command ${command_id} completed: ${success ? 'SUCCESS' : 'FAILED'}`);
-    res.json({ success: true, message: 'Command result recorded' });
-    
-  } catch (error) {
-    console.error('[EPC Command Result] Error:', error);
-    res.status(500).json({ error: 'Failed to record result', message: error.message });
-  }
-});
-
 app.use('/api/system', require('./routes/system'));
 app.use('/api/permissions', require('./routes/permissions')); // FCAPS permission management
 // Branding API for customer portal
