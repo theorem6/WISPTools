@@ -12,6 +12,7 @@
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
+  import { formatInTenantTimezone } from '$lib/utils/timezone';
   import '$lib/styles/moduleHeaderMenu.css';
   
   // Use real backend data now that devices are created
@@ -526,7 +527,7 @@
             </div>
             <div class="detail-item">
               <label>Timestamp:</label>
-              <span>{new Date(selectedAlert.timestamp).toLocaleString()}</span>
+              <span>{formatInTenantTimezone(selectedAlert.timestamp)}</span>
             </div>
             <div class="detail-item">
               <label>Message:</label>
@@ -617,7 +618,7 @@
             <textarea 
               class="form-textarea"
               rows="4"
-              placeholder="Alert Details:&#10;Severity: {selectedAlert.severity}&#10;Time: {new Date(selectedAlert.timestamp).toLocaleString()}&#10;Message: {selectedAlert.message}"
+              placeholder="Alert Details:&#10;Severity: {selectedAlert.severity}&#10;Time: {formatInTenantTimezone(selectedAlert.timestamp)}&#10;Message: {selectedAlert.message}"
               required
             ></textarea>
           </div>

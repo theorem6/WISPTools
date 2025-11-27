@@ -51,6 +51,9 @@ export interface TenantSettings {
   // Data Retention
   dataRetentionDays: number; // How long to keep historical data
   
+  // Timezone Settings
+  timezone: string; // IANA timezone identifier (e.g., 'America/New_York', 'America/Denver')
+  
   // Custom Fields
   customFields?: Record<string, any>;
 }
@@ -169,7 +172,8 @@ export const DEFAULT_TENANT_SETTINGS: TenantSettings = {
   enablePerformanceMonitoring: true,
   emailNotifications: true,
   notificationEmails: [],
-  dataRetentionDays: 90
+  dataRetentionDays: 90,
+  timezone: 'America/Denver' // Default to Mountain Time
 };
 
 // Helper to generate random password

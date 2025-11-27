@@ -7,6 +7,7 @@ import { tenantService } from '$lib/services/tenantService';
   import { isPlatformAdmin } from '$lib/services/adminService';
 import type { Tenant, TenantSettings, TenantLimits } from '$lib/models/tenant';
 import { DEFAULT_TENANT_SETTINGS, DEFAULT_TENANT_LIMITS } from '$lib/models/tenant';
+import { US_TIMEZONES, formatInTenantTimezone } from '$lib/utils/timezone';
 
   let isLoading = true;
   let tenant: Tenant | null = null;
@@ -100,6 +101,7 @@ const dataRetentionFieldId = 'tenant-data-retention';
         displayName: displayName,
         contactEmail: contactEmail,
         contactPhone: contactPhone || null,
+        'settings.timezone': settings.timezone || 'America/Denver',
         updatedAt: serverTimestamp()
       });
       
@@ -270,13 +272,23 @@ const dataRetentionFieldId = 'tenant-data-retention';
           </div>
 
           <div class="form-group">
+            <label for="tenant-timezone">Timezone</label>
+            <select id="tenant-timezone" bind:value={settings.timezone}>
+              {#each US_TIMEZONES as tz}
+                <option value={tz.value}>{tz.label}</option>
+              {/each}
+            </select>
+            <p class="help-text">All device times will be displayed in this timezone</p>
+          </div>
+
+          <div class="form-group">
             <div class="field-label">Status</div>
             <div class="status-badge status-{tenant.status}">{tenant.status}</div>
           </div>
 
           <div class="form-group">
             <div class="field-label">Created</div>
-            <p class="read-only">{new Date(tenant.createdAt).toLocaleString()}</p>
+            <p class="read-only">{formatInTenantTimezone(tenant.createdAt)}</p>
           </div>
 
           <button class="btn-primary" on:click={saveGeneralSettings} disabled={isSaving}>

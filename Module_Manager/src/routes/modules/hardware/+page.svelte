@@ -15,6 +15,7 @@
   import { auth } from '$lib/firebase';
   import { API_CONFIG } from '$lib/config/api';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
+  import { formatInTenantTimezone } from '$lib/utils/timezone';
   
   const HSS_API = API_CONFIG.PATHS.HSS;
   
@@ -693,7 +694,7 @@
                     </td>
                     <td class="date-cell">
                       {#if device.last_seen}
-                        {new Date(device.last_seen).toLocaleString()}
+                        {formatInTenantTimezone(device.last_seen)}
                       {:else}
                         <span class="text-muted">Never</span>
                       {/if}
