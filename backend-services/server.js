@@ -128,11 +128,13 @@ const { RemoteEPC: RemoteEPCModel } = require('./models/distributed-epc-schema')
 const { InventoryItem: InventoryItemModel } = require('./models/inventory');
 app.post('/api/epc-management/delete', async (req, res) => {
   try {
-    const { epc_id } = req.body;
+    console.log('[Delete EPC] Request body:', req.body);
+    console.log('[Delete EPC] Request body type:', typeof req.body);
+    const { epc_id } = req.body || {};
     const tenant_id = req.headers['x-tenant-id'] || 'unknown';
     
     if (!epc_id) {
-      return res.status(400).json({ error: 'epc_id is required in body' });
+      return res.status(400).json({ error: 'epc_id is required in body', received: req.body });
     }
     
     console.log(`[Delete EPC] Deleting EPC ${epc_id} for tenant ${tenant_id}`);
