@@ -3,7 +3,7 @@
   import { Chart, registerables } from 'chart.js';
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { API_CONFIG } from '$lib/config';
+  import { API_CONFIG } from '$lib/config/api';
   
   Chart.register(...registerables);
   
