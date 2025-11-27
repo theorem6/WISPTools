@@ -470,9 +470,9 @@ router.post('/link-device', async (req, res) => {
 
 /**
  * Delete an EPC device
- * DELETE /api/deploy/epc/:epc_id
+ * DELETE /api/deploy/delete-epc/:epc_id
  */
-router.delete('/epc/:epc_id', async (req, res) => {
+router.delete('/delete-epc/:epc_id', async (req, res) => {
   try {
     const { epc_id } = req.params;
     const tenant_id = req.headers['x-tenant-id'] || 'unknown';

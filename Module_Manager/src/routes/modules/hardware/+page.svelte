@@ -369,7 +369,7 @@
       
       const token = await user.getIdToken();
       // Use /api/deploy endpoint for delete (more reliable routing)
-      const response = await fetch(`/api/deploy/epc/${deviceId}`, {
+      const response = await fetch(`/api/deploy/delete-epc/${deviceId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
