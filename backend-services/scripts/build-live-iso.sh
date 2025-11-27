@@ -197,20 +197,79 @@ if [ -d /run/live ] && [ ! -f "$INSTALLED_FILE" ]; then
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
     
-    # Find target disk (first disk that's >= 20GB and not the live boot device)
-    LIVE_DEV=$(findmnt -n -o SOURCE / 2>/dev/null | sed 's/[0-9]*$//' | sed 's/p$//')
+    # Find target disk - exclude USB boot device and removable media
+    # Method 1: Find the boot device from kernel command line
+    BOOT_DEV=""
+    for param in $(cat /proc/cmdline); do
+        case "$param" in
+            root=*) 
+                BOOT_DEV="${param#root=}"
+                ;;
+            boot=*)
+                BOOT_DEV="${param#boot=}"
+                ;;
+        esac
+    done
+    
+    # Method 2: Find the device where /run/live is mounted (live-boot)
+    LIVE_DEV=$(findmnt -n -o SOURCE /run/live/medium 2>/dev/null | sed 's/[0-9]*$//' | sed 's/p$//')
+    [ -z "$LIVE_DEV" ] && LIVE_DEV=$(findmnt -n -o SOURCE /lib/live/mount/medium 2>/dev/null | sed 's/[0-9]*$//' | sed 's/p$//')
+    
+    # Method 3: Find USB/removable devices to exclude
+    USB_DEVICES=""
+    for disk in /sys/block/sd*; do
+        [ -d "$disk" ] || continue
+        DISK_NAME=$(basename "$disk")
+        # Check if removable (USB drives usually are)
+        if [ "$(cat "$disk/removable" 2>/dev/null)" = "1" ]; then
+            USB_DEVICES="$USB_DEVICES /dev/$DISK_NAME"
+            log "Detected removable/USB device: /dev/$DISK_NAME"
+        fi
+        # Also check transport type
+        if readlink -f "$disk/device" 2>/dev/null | grep -q usb; then
+            USB_DEVICES="$USB_DEVICES /dev/$DISK_NAME"
+            log "Detected USB transport device: /dev/$DISK_NAME"
+        fi
+    done
+    
+    log "Boot device: $BOOT_DEV"
+    log "Live media device: $LIVE_DEV"
+    log "USB/Removable devices: $USB_DEVICES"
+    
     TARGET_DISK=""
     
-    for disk in /dev/sda /dev/vda /dev/nvme0n1 /dev/sdb /dev/vdb; do
+    # Get all block devices dynamically
+    for disk in /dev/sda /dev/sdb /dev/sdc /dev/sdd /dev/vda /dev/vdb /dev/nvme0n1 /dev/nvme1n1 /dev/mmcblk0; do
         [ -b "$disk" ] || continue
+        
+        DISK_NAME=$(basename "$disk")
+        
         # Skip if this is the live media
-        [[ "$LIVE_DEV" == *"$disk"* ]] && continue
+        [[ "$LIVE_DEV" == *"$disk"* ]] && { log "Skipping $disk (live media)"; continue; }
+        
+        # Skip if this is a known USB/removable device
+        [[ "$USB_DEVICES" == *"$disk"* ]] && { log "Skipping $disk (USB/removable)"; continue; }
+        
+        # Skip if removable flag is set (double-check)
+        if [ -f "/sys/block/$DISK_NAME/removable" ]; then
+            [ "$(cat "/sys/block/$DISK_NAME/removable" 2>/dev/null)" = "1" ] && { log "Skipping $disk (removable flag)"; continue; }
+        fi
+        
+        # Skip if connected via USB transport
+        if readlink -f "/sys/block/$DISK_NAME/device" 2>/dev/null | grep -q usb; then
+            log "Skipping $disk (USB transport)"
+            continue
+        fi
         
         SIZE=$(blockdev --getsize64 "$disk" 2>/dev/null || echo 0)
+        SIZE_GB=$((SIZE / 1024 / 1024 / 1024))
+        
         if [ "$SIZE" -gt 20000000000 ]; then  # > 20GB
             TARGET_DISK="$disk"
-            log "Found target disk: $TARGET_DISK ($(($SIZE / 1024 / 1024 / 1024))GB)"
+            log "Found target disk: $TARGET_DISK (${SIZE_GB}GB)"
             break
+        else
+            log "Skipping $disk (too small: ${SIZE_GB}GB, need >= 20GB)"
         fi
     done
     

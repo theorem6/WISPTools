@@ -537,6 +537,102 @@ router.get('/generic-iso', async (req, res) => {
 });
 
 /**
+ * Rebuild Generic Live ISO
+ * POST /api/deploy/rebuild-generic-iso
+ * Triggers rebuild of the generic live ISO using build-live-iso.sh
+ */
+router.post('/rebuild-generic-iso', async (req, res) => {
+  try {
+    console.log('[ISO Rebuild] Starting generic live ISO rebuild...');
+    
+    const buildScript = '/opt/lte-pci-mapper/backend-services/scripts/build-live-iso.sh';
+    
+    // Check if script exists
+    try {
+      await fs.access(buildScript);
+    } catch (err) {
+      return res.status(404).json({
+        error: 'Build script not found',
+        details: `Script not found at: ${buildScript}`
+      });
+    }
+    
+    // Start the build in the background (it takes several minutes)
+    const buildLogFile = '/var/log/iso-rebuild.log';
+    
+    // Run build script in background
+    exec(`sudo bash ${buildScript} > ${buildLogFile} 2>&1 &`, (error) => {
+      if (error) {
+        console.error('[ISO Rebuild] Failed to start build:', error);
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: 'ISO rebuild started in background. This will take 10-15 minutes.',
+      log_file: buildLogFile,
+      check_status_url: '/api/deploy/rebuild-status'
+    });
+    
+  } catch (error) {
+    console.error('[ISO Rebuild] Error:', error);
+    res.status(500).json({ error: 'Failed to start ISO rebuild', details: error.message });
+  }
+});
+
+/**
+ * Get ISO Rebuild Status
+ * GET /api/deploy/rebuild-status
+ */
+router.get('/rebuild-status', async (req, res) => {
+  try {
+    const buildLogFile = '/var/log/iso-rebuild.log';
+    const isoPath = path.join(ISO_OUTPUT_DIR, 'wisptools-epc-generic-netinstall.iso');
+    
+    // Check if build is running
+    let isBuilding = false;
+    try {
+      const { stdout } = await execAsync('pgrep -f "build-live-iso.sh" || true');
+      isBuilding = stdout.trim().length > 0;
+    } catch (e) {
+      // pgrep returns non-zero if no process found
+    }
+    
+    // Get last 50 lines of log
+    let logTail = '';
+    try {
+      const { stdout } = await execAsync(`tail -50 ${buildLogFile} 2>/dev/null || echo "No log file yet"`);
+      logTail = stdout;
+    } catch (e) {
+      logTail = 'Log file not available';
+    }
+    
+    // Check ISO info
+    let isoInfo = null;
+    try {
+      const stats = await fs.stat(isoPath);
+      isoInfo = {
+        exists: true,
+        size_mb: (stats.size / (1024 * 1024)).toFixed(2),
+        modified: stats.mtime.toISOString()
+      };
+    } catch (e) {
+      isoInfo = { exists: false };
+    }
+    
+    res.json({
+      building: isBuilding,
+      iso: isoInfo,
+      log_tail: logTail
+    });
+    
+  } catch (error) {
+    console.error('[ISO Rebuild Status] Error:', error);
+    res.status(500).json({ error: 'Failed to get rebuild status', details: error.message });
+  }
+});
+
+/**
  * Generate EPC ISO from frontend deployment modal (DEPRECATED - use /register-epc instead)
  * POST /api/deploy/generate-epc-iso
  */
