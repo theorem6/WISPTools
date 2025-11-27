@@ -173,6 +173,7 @@ router.post('/:epc_id/commands/:command_id/result', async (req, res) => {
 /**
  * POST /api/epc/checkin
  * Full check-in endpoint: report status, get commands
+ * NOTE: This endpoint does NOT require X-Tenant-ID - tenant is determined by device_code
  */
 router.post('/checkin', async (req, res) => {
   try {
@@ -384,6 +385,51 @@ router.get('/:epc_id/status', async (req, res) => {
   } catch (error) {
     console.error('[EPC Status] Error:', error);
     res.status(500).json({ error: 'Failed to get status', message: error.message });
+  }
+});
+
+/**
+ * GET /api/epc/:epc_id/status/history
+ * Get service status history for graphs
+ */
+router.get('/:epc_id/status/history', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const { hours = 24, limit = 100 } = req.query;
+    
+    const since = new Date(Date.now() - parseInt(hours) * 60 * 60 * 1000);
+    
+    const history = await EPCServiceStatus.find({ 
+      epc_id,
+      timestamp: { $gte: since }
+    })
+    .sort({ timestamp: 1 })
+    .limit(parseInt(limit))
+    .lean();
+    
+    // Format for charts
+    const chartData = history.map(h => ({
+      timestamp: h.timestamp,
+      cpu: h.system?.cpu_percent ?? null,
+      memory: h.system?.memory_percent ?? null,
+      disk: parseFloat(h.system?.disk_percent) || null,
+      uptime: h.system?.uptime_seconds ?? null,
+      load: h.system?.load_average?.[0] ?? null,
+      services: Object.fromEntries(
+        Object.entries(h.services || {}).map(([k, v]) => [k, v?.status])
+      )
+    }));
+    
+    res.json({
+      epc_id,
+      period_hours: parseInt(hours),
+      data_points: chartData.length,
+      history: chartData
+    });
+    
+  } catch (error) {
+    console.error('[EPC Status History] Error:', error);
+    res.status(500).json({ error: 'Failed to get status history', message: error.message });
   }
 });
 
