@@ -13,11 +13,14 @@ const { SNMPMetrics } = require('../models/snmp-metrics-schema');
  * POST /api/epc/snmp/discovered
  * Receive SNMP discovered devices from remote EPC
  * Called by epc-snmp-discovery.sh script
+ * NOTE: No tenant ID required - uses device_code to find tenant
  */
 router.post('/discovered', async (req, res) => {
   try {
     const device_code = req.body.device_code || req.headers['x-device-code'];
     const { discovered_devices } = req.body;
+    
+    console.log(`[SNMP Discovery] Received request from device_code: ${device_code}`);
     
     if (!device_code) {
       return res.status(400).json({ error: 'device_code is required' });

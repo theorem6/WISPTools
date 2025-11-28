@@ -83,6 +83,13 @@ scan_network() {
     
     log "Starting SNMP discovery scan on subnet: $subnet"
     
+    # Check if snmpget is available
+    if ! command -v snmpget &> /dev/null; then
+        log "ERROR: snmpget command not found. Install net-snmp package: sudo apt install snmp"
+        echo "[]"
+        return 1
+    fi
+    
     # Extract network and CIDR
     local network=$(echo "$subnet" | cut -d'/' -f1)
     local cidr=$(echo "$subnet" | cut -d'/' -f2)
@@ -131,6 +138,11 @@ scan_network() {
     discovered_devices="${discovered_devices}]"
     
     log "Discovery complete. Found $count SNMP devices"
+    
+    if [ "$count" -eq 0 ]; then
+        log "No SNMP devices found. This is normal if no SNMP-enabled devices are on the network."
+    fi
+    
     echo "$discovered_devices"
 }
 
@@ -144,25 +156,41 @@ report_discovered_devices() {
         return 1
     fi
     
+    # Always report, even if empty (so server knows discovery ran)
     if [ -z "$discovered_devices" ] || [ "$discovered_devices" = "[]" ]; then
-        log "No devices to report"
-        return 0
+        log "No SNMP devices discovered - reporting empty result"
+        discovered_devices="[]"
     fi
     
-    log "Reporting discovered devices to server..."
+    local device_count=$(echo "$discovered_devices" | jq -r 'length // 0' 2>/dev/null || echo "0")
+    log "Reporting $device_count discovered devices to server..."
     
     local payload="{\"device_code\":\"$device_code\",\"discovered_devices\":$discovered_devices}"
     
     local response=$(curl -s -X POST "${API_URL}/snmp/discovered" \
         -H "Content-Type: application/json" \
         -H "X-Device-Code: $device_code" \
+        -w "\nHTTP_CODE:%{http_code}" \
         -d "$payload" 2>&1)
     
-    if [ $? -eq 0 ]; then
-        log "Successfully reported discovered devices"
-        echo "$response"
+    local http_code=$(echo "$response" | grep -o "HTTP_CODE:[0-9]*" | cut -d: -f2)
+    local response_body=$(echo "$response" | sed '/HTTP_CODE:/d')
+    
+    if [ -n "$http_code" ] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+        local success=$(echo "$response_body" | jq -r '.success // false' 2>/dev/null)
+        if [ "$success" = "true" ]; then
+            local processed=$(echo "$response_body" | jq -r '.processed // 0' 2>/dev/null)
+            log "Successfully reported discovery: $processed devices processed"
+            echo "$response_body"
+            return 0
+        else
+            local error_msg=$(echo "$response_body" | jq -r '.error // .message // "Unknown error"' 2>/dev/null)
+            log "ERROR: Server rejected discovery report: $error_msg"
+            echo "$response_body"
+            return 1
+        fi
     else
-        log "ERROR: Failed to report discovered devices: $response"
+        log "ERROR: Failed to report discovered devices (HTTP $http_code): $response_body"
         return 1
     fi
 }

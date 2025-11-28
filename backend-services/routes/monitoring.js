@@ -6,7 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
-const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { RemoteEPC, EPCServiceStatus } = require('../models/distributed-epc-schema');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -94,6 +94,26 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
   return baseDevice;
 };
 
+// Helper function to format uptime
+function formatUptime(seconds) {
+  if (!seconds || seconds < 0) return null;
+  
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  } else {
+    return `${secs}s`;
+  }
+}
+
 // ========== EPC ENDPOINTS ==========
 
 // GET /api/monitoring/epc/list - List all EPC devices for monitoring
@@ -108,9 +128,51 @@ router.get('/epc/list', async (req, res) => {
     const remoteEPCs = await RemoteEPC.find({ tenant_id: req.tenantId }).lean();
     console.log(`📡 [Monitoring] Found ${remoteEPCs.length} RemoteEPCs`);
     
+    // Get latest service status for all EPCs to populate metrics
+    const epcIds = remoteEPCs.map(epc => epc.epc_id);
+    const latestStatuses = await EPCServiceStatus.find({
+      epc_id: { $in: epcIds },
+      tenant_id: req.tenantId
+    })
+      .sort({ timestamp: -1 })
+      .lean();
+    
+    // Create a map of epc_id -> latest status
+    const statusMap = new Map();
+    latestStatuses.forEach(status => {
+      if (!statusMap.has(status.epc_id) || new Date(status.timestamp) > new Date(statusMap.get(status.epc_id).timestamp)) {
+        statusMap.set(status.epc_id, status);
+      }
+    });
+    
     remoteEPCs.forEach(epc => {
       const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
       const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+      
+      // Get latest service status for this EPC
+      const latestStatus = statusMap.get(epc.epc_id);
+      
+      // Format metrics from latest service status
+      const metrics = latestStatus?.system ? {
+        cpuUsage: latestStatus.system.cpu_percent ?? null,
+        memoryUsage: latestStatus.system.memory_percent ?? null,
+        uptime: latestStatus.system.uptime_seconds 
+          ? formatUptime(latestStatus.system.uptime_seconds)
+          : (epc.metrics?.system_uptime_seconds 
+              ? formatUptime(epc.metrics.system_uptime_seconds)
+              : null),
+        activeUsers: null
+      } : (epc.metrics?.system_uptime_seconds ? {
+        cpuUsage: null,
+        memoryUsage: null,
+        uptime: formatUptime(epc.metrics.system_uptime_seconds),
+        activeUsers: null
+      } : {
+        cpuUsage: null,
+        memoryUsage: null,
+        activeUsers: null,
+        uptime: null
+      });
       
       epcs.push({
         id: epc._id?.toString() || epc.epc_id,
@@ -130,12 +192,7 @@ router.get('/epc/list', async (req, res) => {
           },
           address: epc.location?.address || 'Unknown Location'
         },
-        metrics: epc.metrics || {
-          cpuUsage: null,
-          memoryUsage: null,
-          activeUsers: null,
-          uptime: null
-        },
+        metrics: metrics,
         last_seen: lastSeen,
         createdAt: epc.created_at,
         updatedAt: epc.updated_at

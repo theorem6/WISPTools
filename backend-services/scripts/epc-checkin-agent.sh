@@ -383,7 +383,8 @@ do_checkin() {
             
             if [ "$should_discover" = true ]; then
                 log "Starting SNMP discovery in background..."
-                /opt/wisptools/epc-snmp-discovery.sh >/dev/null 2>&1 &
+                # Run discovery and log output to check-in log
+                /opt/wisptools/epc-snmp-discovery.sh >> "$LOG_FILE" 2>&1 &
                 echo "$(date +%s)" > "$last_discovery_file"
             fi
         fi
