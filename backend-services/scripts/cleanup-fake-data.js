@@ -6,6 +6,7 @@
 const mongoose = require('mongoose');
 const { HardwareDeployment, NetworkEquipment, UnifiedSite, UnifiedSector, UnifiedCPE } = require('../models/network');
 const { InventoryItem } = require('../models/inventory');
+const { RemoteEPC } = require('../models/distributed-epc-schema');
 
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
 
@@ -52,10 +53,35 @@ async function cleanup() {
     // Check inventory items
     console.log('\n=== Inventory Items ===');
     const allInventory = await InventoryItem.find({}).lean();
-    const fakeInventory = allInventory.filter(i => i.model && isFake(i.model));
+    const fakeInventory = allInventory.filter(i => 
+      (i.name && isFake(i.name)) || 
+      (i.model && isFake(i.model)) || 
+      (i.manufacturer && isFake(i.manufacturer)) ||
+      (i.physicalDescription && isFake(i.physicalDescription))
+    );
     console.log(`Found ${fakeInventory.length} fake inventory items`);
     if (fakeInventory.length > 0) {
-      fakeInventory.forEach(i => console.log(`  - ${i.model} (${i._id})`));
+      fakeInventory.forEach(i => console.log(`  - ${i.name || i.model || 'Unknown'} (${i._id})`));
+      const deleteInv = await InventoryItem.deleteMany({
+        _id: { $in: fakeInventory.map(i => i._id) }
+      });
+      console.log(`Deleted ${deleteInv.deletedCount} fake inventory items`);
+    }
+
+    // Check RemoteEPC devices
+    console.log('\n=== Remote EPC Devices ===');
+    const allRemoteEPCs = await RemoteEPC.find({}).lean();
+    const fakeRemoteEPCs = allRemoteEPCs.filter(epc => 
+      (epc.site_name && isFake(epc.site_name)) || 
+      (epc.epc_id && isFake(epc.epc_id))
+    );
+    console.log(`Found ${fakeRemoteEPCs.length} fake RemoteEPC devices`);
+    if (fakeRemoteEPCs.length > 0) {
+      fakeRemoteEPCs.forEach(epc => console.log(`  - ${epc.site_name || epc.epc_id} (${epc._id})`));
+      const deleteEPC = await RemoteEPC.deleteMany({
+        _id: { $in: fakeRemoteEPCs.map(epc => epc._id) }
+      });
+      console.log(`Deleted ${deleteEPC.deletedCount} fake RemoteEPC devices`);
     }
 
     // Summary
@@ -63,6 +89,7 @@ async function cleanup() {
     console.log(`Hardware Deployments: ${await HardwareDeployment.countDocuments()}`);
     console.log(`Network Equipment: ${await NetworkEquipment.countDocuments()}`);
     console.log(`Inventory Items: ${await InventoryItem.countDocuments()}`);
+    console.log(`RemoteEPC Devices: ${await RemoteEPC.countDocuments()}`);
     console.log(`Sites: ${await UnifiedSite.countDocuments()}`);
     console.log(`Sectors: ${await UnifiedSector.countDocuments()}`);
     console.log(`CPE: ${await UnifiedCPE.countDocuments()}`);

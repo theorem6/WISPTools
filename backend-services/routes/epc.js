@@ -219,47 +219,54 @@ router.get('/metrics/:id', async (req, res) => {
     const { id } = req.params;
     console.log(`📊 [EPC API] Fetching metrics for EPC device ${id}`);
     
-    // In a real implementation, this would query a time-series database
-    // For now, generate realistic mock metrics
+    // Try to get real metrics from RemoteEPC
+    const remoteEPC = await RemoteEPC.findOne({
+      $or: [
+        { epc_id: id },
+        { _id: id }
+      ],
+      tenant_id: req.tenantId
+    }).lean();
+    
+    // Return real metrics from device check-in or null if not available
     const metrics = {
       deviceId: id,
       timestamp: new Date().toISOString(),
       system: {
-        cpuUsage: Math.floor(Math.random() * 100),
-        memoryUsage: Math.floor(Math.random() * 100),
-        diskUsage: Math.floor(Math.random() * 100),
-        networkIn: Math.floor(Math.random() * 1000000),
-        networkOut: Math.floor(Math.random() * 1000000),
-        uptime: Math.floor(Math.random() * 31536000) // Up to 1 year in seconds
+        cpuUsage: remoteEPC?.metrics?.cpu_percent ?? null,
+        memoryUsage: remoteEPC?.metrics?.memory_percent ?? null,
+        diskUsage: remoteEPC?.metrics?.disk_percent ?? null,
+        networkIn: remoteEPC?.metrics?.network_in_bytes ?? null,
+        networkOut: remoteEPC?.metrics?.network_out_bytes ?? null,
+        uptime: remoteEPC?.metrics?.uptime_seconds ?? null
       },
       lte: {
-        activeUsers: Math.floor(Math.random() * 500),
-        attachedDevices: Math.floor(Math.random() * 1000),
-        throughputDown: Math.floor(Math.random() * 1000),
-        throughputUp: Math.floor(Math.random() * 500),
-        bearerSetupSuccess: Math.random() * 100,
-        handoverSuccess: Math.random() * 100
+        activeUsers: null,
+        attachedDevices: null,
+        throughputDown: null,
+        throughputUp: null,
+        bearerSetupSuccess: null,
+        handoverSuccess: null
       },
       services: {
         mme: {
-          status: 'running',
-          connections: Math.floor(Math.random() * 100),
-          responseTime: Math.floor(Math.random() * 50) + 10
+          status: remoteEPC?.last_status?.services?.['open5gs-mmed']?.status ?? null,
+          connections: null,
+          responseTime: null
         },
         sgw: {
-          status: 'running',
-          tunnels: Math.floor(Math.random() * 200),
-          throughput: Math.floor(Math.random() * 800)
+          status: remoteEPC?.last_status?.services?.['open5gs-sgwcd']?.status ?? null,
+          tunnels: null,
+          throughput: null
         },
-        pgw: {
-          status: 'running',
-          sessions: Math.floor(Math.random() * 300),
-          dataUsage: Math.floor(Math.random() * 10000)
+        smf: {
+          status: remoteEPC?.last_status?.services?.['open5gs-smfd']?.status ?? null,
+          sessions: null,
+          dataUsage: null
         },
-        hss: {
-          status: 'running',
-          subscribers: Math.floor(Math.random() * 1000),
-          authRequests: Math.floor(Math.random() * 50)
+        upf: {
+          status: remoteEPC?.last_status?.services?.['open5gs-upfd']?.status ?? null,
+          throughput: null
         }
       }
     };
@@ -297,29 +304,53 @@ router.get('/status', async (req, res) => {
     
     const totalEPCs = deployedCount + equipmentCount;
     
+    // Get real counts from RemoteEPC collection
+    const remoteEPCCount = await RemoteEPC.countDocuments({ tenant_id: req.tenantId });
+    const onlineCount = await RemoteEPC.countDocuments({
+      tenant_id: req.tenantId,
+      status: 'online'
+    });
+    const offlineCount = remoteEPCCount - onlineCount;
+    
+    // Calculate real performance metrics from RemoteEPC data
+    const onlineEPCs = await RemoteEPC.find({
+      tenant_id: req.tenantId,
+      status: 'online'
+    }).select('metrics').lean();
+    
+    const cpuValues = onlineEPCs.map(epc => epc.metrics?.cpu_percent).filter(v => v !== null && v !== undefined);
+    const memoryValues = onlineEPCs.map(epc => epc.metrics?.memory_percent).filter(v => v !== null && v !== undefined);
+    
+    const avg_cpu = cpuValues.length > 0 
+      ? Math.round(cpuValues.reduce((a, b) => a + b, 0) / cpuValues.length)
+      : null;
+    const avg_memory = memoryValues.length > 0
+      ? Math.round(memoryValues.reduce((a, b) => a + b, 0) / memoryValues.length)
+      : null;
+    
     const status = {
       summary: {
-        total_epcs: totalEPCs,
-        online: Math.floor(totalEPCs * 0.9), // 90% online
-        offline: Math.floor(totalEPCs * 0.1), // 10% offline
+        total_epcs: remoteEPCCount,
+        online: onlineCount,
+        offline: offlineCount,
         maintenance: 0
       },
       services: {
-        mme: { status: 'healthy', instances: totalEPCs },
-        sgw: { status: 'healthy', instances: totalEPCs },
-        pgw: { status: 'healthy', instances: totalEPCs },
-        hss: { status: 'healthy', instances: Math.max(1, Math.floor(totalEPCs / 2)) }
+        mme: { status: 'unknown', instances: remoteEPCCount },
+        sgw: { status: 'unknown', instances: remoteEPCCount },
+        smf: { status: 'unknown', instances: remoteEPCCount },
+        upf: { status: 'unknown', instances: remoteEPCCount }
       },
       performance: {
-        avg_cpu: Math.floor(Math.random() * 50) + 25,
-        avg_memory: Math.floor(Math.random() * 50) + 30,
-        total_users: Math.floor(Math.random() * 1000) + 500,
-        total_throughput: Math.floor(Math.random() * 5000) + 2000
+        avg_cpu,
+        avg_memory,
+        total_users: null,
+        total_throughput: null
       },
       alerts: {
         critical: 0,
-        warning: Math.floor(Math.random() * 3),
-        info: Math.floor(Math.random() * 5)
+        warning: 0,
+        info: 0
       }
     };
     

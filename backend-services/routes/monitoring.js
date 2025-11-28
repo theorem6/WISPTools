@@ -354,25 +354,26 @@ router.get('/monitoring/dashboard', async (req, res) => {
       status: 'active'
     });
     
-    // Generate mock alerts based on real devices
-    const activeAlerts = [
-      {
-        id: 'alert-cpu-high',
-        severity: 'warning',
-        message: 'High CPU usage detected on Core Router',
-        timestamp: new Date(Date.now() - 300000).toISOString(),
-        deviceId: 'core-router',
-        deviceName: 'Core Router MT-RB5009'
-      },
-      {
-        id: 'alert-new-device',
-        severity: 'info',
-        message: 'New CPE device connected',
-        timestamp: new Date(Date.now() - 600000).toISOString(),
-        deviceId: 'new-cpe',
-        deviceName: 'Customer B LTE CPE'
-      }
-    ];
+    // Get real alerts from database (if EPCAlert model exists)
+    let activeAlerts = [];
+    try {
+      const { EPCAlert } = require('../models/distributed-epc-schema');
+      const recentAlerts = await EPCAlert.find({
+        tenant_id: req.tenantId,
+        status: { $in: ['active', 'unacknowledged'] }
+      }).sort({ created_at: -1 }).limit(10).lean();
+      
+      activeAlerts = recentAlerts.map(alert => ({
+        id: alert._id.toString(),
+        severity: alert.severity || 'info',
+        message: alert.message || alert.description || 'Alert',
+        timestamp: alert.created_at?.toISOString() || new Date().toISOString(),
+        deviceId: alert.epc_id || null,
+        deviceName: alert.epc_id || 'Unknown Device'
+      }));
+    } catch (err) {
+      console.log('EPCAlert model not available or no alerts:', err.message);
+    }
     
     const dashboardData = {
       summary: {
@@ -383,9 +384,9 @@ router.get('/monitoring/dashboard', async (req, res) => {
         services_down: 0
       },
       metrics: {
-        uptime: 99.8,
-        latency: Math.floor(Math.random() * 50) + 20,
-        throughput: Math.floor(Math.random() * 1000) + 500
+        uptime: null,
+        latency: null,
+        throughput: null
       },
       service_health: [
         { name: 'SNMP Collector', status: 'healthy' },

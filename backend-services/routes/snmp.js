@@ -303,20 +303,26 @@ router.post('/poll/:deviceId', async (req, res) => {
     const { deviceId } = req.params;
     console.log(`🔄 [SNMP API] Manually polling device ${deviceId}`);
     
-    // In a real implementation, this would trigger an immediate SNMP poll
-    // For now, return mock poll result
+    // TODO: This should trigger an immediate SNMP poll via the SNMP collector service
+    // For now, return the latest metrics from database if available
+    const SNMPMetrics = require('../models/snmp-metrics-schema').SNMPMetrics;
+    const latestMetric = await SNMPMetrics.findOne({
+      device_id: deviceId,
+      tenant_id: req.tenantId
+    }).sort({ timestamp: -1 }).lean();
+    
     const pollResult = {
       deviceId,
       timestamp: new Date().toISOString(),
-      success: true,
-      responseTime: Math.floor(Math.random() * 1000) + 100, // 100-1100ms
-      metrics: {
-        'system.sysUpTime': Math.floor(Math.random() * 31536000),
-        'hrProcessor.hrProcessorLoad': Math.floor(Math.random() * 100),
-        'hrStorage.hrStorageUsed': Math.floor(Math.random() * 100),
-        'ifTable.ifInOctets.1': Math.floor(Math.random() * 1000000000),
-        'ifTable.ifOutOctets.1': Math.floor(Math.random() * 1000000000)
-      }
+      success: latestMetric !== null,
+      responseTime: null,
+      metrics: latestMetric ? {
+        'system.sysUpTime': latestMetric.system?.uptime_seconds ?? null,
+        'hrProcessor.hrProcessorLoad': latestMetric.resources?.cpu_percent ?? null,
+        'hrStorage.hrStorageUsed': latestMetric.resources?.disk_percent ?? null,
+        'ifTable.ifInOctets.1': latestMetric.network?.interface_in_octets ?? null,
+        'ifTable.ifOutOctets.1': latestMetric.network?.interface_out_octets ?? null
+      } : null
     };
     
     res.json(pollResult);
@@ -355,28 +361,44 @@ router.get('/status', async (req, res) => {
     
     const totalDevices = equipmentCount + cpeCount;
     
+    // Get real online/offline counts based on recent metrics
+    const SNMPMetrics = require('../models/snmp-metrics-schema').SNMPMetrics;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentMetrics = await SNMPMetrics.distinct('device_id', {
+      tenant_id: req.tenantId,
+      timestamp: { $gte: fiveMinutesAgo }
+    });
+    
+    const onlineCount = recentMetrics.length;
+    const offlineCount = Math.max(0, totalDevices - onlineCount);
+    
+    // Get last poll time from most recent metric
+    const lastMetric = await SNMPMetrics.findOne({
+      tenant_id: req.tenantId
+    }).sort({ timestamp: -1 }).select('timestamp').lean();
+    
     const status = {
       summary: {
         total_devices: totalDevices,
-        online: Math.floor(totalDevices * 0.92), // 92% online
-        offline: Math.floor(totalDevices * 0.05), // 5% offline
-        unreachable: Math.floor(totalDevices * 0.03) // 3% unreachable
+        online: onlineCount,
+        offline: offlineCount,
+        unreachable: 0
       },
       polling: {
         interval: '5 minutes',
-        last_poll: new Date(Date.now() - 300000).toISOString(),
-        next_poll: new Date(Date.now() + 300000).toISOString(),
-        success_rate: 95.2
+        last_poll: lastMetric?.timestamp?.toISOString() ?? null,
+        next_poll: null,
+        success_rate: totalDevices > 0 ? Math.round((onlineCount / totalDevices) * 100 * 10) / 10 : null
       },
       performance: {
-        avg_response_time: Math.floor(Math.random() * 500) + 200,
-        total_oids_collected: Math.floor(Math.random() * 10000) + 5000,
-        data_points_per_hour: Math.floor(Math.random() * 1000) + 500
+        avg_response_time: null,
+        total_oids_collected: null,
+        data_points_per_hour: null
       },
       alerts: {
-        critical: Math.floor(Math.random() * 2),
-        warning: Math.floor(Math.random() * 5),
-        info: Math.floor(Math.random() * 10)
+        critical: 0,
+        warning: 0,
+        info: 0
       }
     };
     
