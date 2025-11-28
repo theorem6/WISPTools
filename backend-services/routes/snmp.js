@@ -208,20 +208,6 @@ router.get('/metrics/latest', async (req, res) => {
     });
     
     console.log(`📊 Found ${metrics.length} devices with metrics`);
-        metrics: {
-          'system.sysUpTime': Math.floor(Math.random() * 31536000),
-          'system.sysDescr': `${device.manufacturer} ${device.model}`,
-          'lte.signalStrength': Math.floor(Math.random() * 30) - 90,
-          'lte.throughputDown': Math.floor(Math.random() * 100),
-          'lte.throughputUp': Math.floor(Math.random() * 50),
-          'lte.dataUsage': Math.floor(Math.random() * 10000),
-          'system.cpuUsage': Math.floor(Math.random() * 100),
-          'system.memoryUsage': Math.floor(Math.random() * 100)
-        }
-      });
-    });
-    
-    console.log(`📊 Generated ${metrics.length} SNMP metrics for tenant ${req.tenantId}`);
     
     res.json(metrics);
   } catch (error) {
