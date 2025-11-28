@@ -449,6 +449,35 @@ do_checkin() {
             CHECKIN_INTERVAL=$new_interval
         fi
         
+        # Check for configuration changes
+        local received_config=$(echo "$response" | jq -c '.config // {}')
+        local stored_config_file="/etc/wisptools/last-config.json"
+        
+        if [ -n "$received_config" ] && [ "$received_config" != "null" ] && [ "$received_config" != "{}" ]; then
+            local config_changed=false
+            local stored_config="{}"
+            
+            if [ -f "$stored_config_file" ]; then
+                stored_config=$(cat "$stored_config_file" 2>/dev/null || echo "{}")
+            fi
+            
+            # Compare configs (simple string comparison for now)
+            local received_hash=$(echo "$received_config" | md5sum | awk '{print $1}')
+            local stored_hash=$(echo "$stored_config" | md5sum | awk '{print $1}')
+            
+            if [ "$received_hash" != "$stored_hash" ]; then
+                config_changed=true
+                log "Configuration changed detected - updating stored configuration"
+                
+                # Store new config
+                echo "$received_config" > "$stored_config_file" 2>/dev/null || true
+                
+                # Log config details
+                local site_name=$(echo "$received_config" | jq -r '.site_name // "unknown"')
+                log "New site_name: $site_name"
+            fi
+        fi
+        
         # Run SNMP discovery every 15 minutes (separate from regular check-in)
         # Prefer Node.js version, fallback to bash script
         local last_discovery_file="/tmp/last-snmp-discovery"

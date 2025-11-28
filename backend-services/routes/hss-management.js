@@ -920,6 +920,12 @@ router.put('/epc/:epc_id', async (req, res) => {
       };
     }
 
+    // Check if any configuration changed (before update)
+    const configChanged = !!(site_id !== undefined || site_name !== undefined || 
+                             deployment_type !== undefined || hss_config !== undefined || 
+                             snmp_config !== undefined || network_config !== undefined ||
+                             status !== undefined || device_code !== undefined);
+    
     // Update the EPC
     await RemoteEPC.updateOne(
       { $or: [{ epc_id: epc_id }, { _id: epc_id }], tenant_id: tenantId },
@@ -932,13 +938,58 @@ router.put('/epc/:epc_id', async (req, res) => {
       $or: [{ epc_id: final_epc_id }, { _id: final_epc_id }],
       tenant_id: tenantId
     }).lean();
+    
+    // If configuration changed, queue a config_update command so EPC applies changes on next check-in
+    if (configChanged && updatedEPC) {
+      try {
+        const { EPCCommand } = require('../models/distributed-epc-schema');
+        
+        // Check if config_update command already exists and is pending
+        const existingConfigUpdate = await EPCCommand.findOne({
+          epc_id: final_epc_id,
+          command_type: 'config_update',
+          status: { $in: ['pending', 'sent'] }
+        });
+        
+        if (!existingConfigUpdate) {
+          // Queue config_update command with full configuration
+          const configUpdateCmd = new EPCCommand({
+            epc_id: final_epc_id,
+            tenant_id: tenantId,
+            command_type: 'config_update',
+            config_data: {
+              site_name: updatedEPC.site_name,
+              site_id: updatedEPC.site_id,
+              deployment_type: updatedEPC.deployment_type,
+              hss_config: updatedEPC.hss_config,
+              snmp_config: updatedEPC.snmp_config,
+              network_config: updatedEPC.network_config
+            },
+            status: 'pending',
+            priority: 3, // Higher priority than script updates
+            created_at: new Date(),
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+            description: 'Configuration update from management portal'
+          });
+          
+          await configUpdateCmd.save();
+          console.log(`[HSS/EPC] Queued config_update command for EPC ${final_epc_id}`);
+        } else {
+          console.log(`[HSS/EPC] Config update already queued for EPC ${final_epc_id}`);
+        }
+      } catch (cmdError) {
+        console.warn(`[HSS/EPC] Failed to queue config_update command:`, cmdError.message);
+        // Don't fail the update if command queueing fails
+      }
+    }
 
     console.log(`[HSS/EPC] Successfully updated EPC ${epc_id}${new_epc_id_value && new_epc_id_value !== epc_id ? ` to ${new_epc_id_value}` : ''}`);
     res.json({
       success: true,
       epc_id: updatedEPC?.epc_id || final_epc_id,
       message: 'EPC configuration updated successfully',
-      epc: updatedEPC
+      epc: updatedEPC,
+      config_update_queued: configChanged
     });
   } catch (error) {
     console.error('[HSS/EPC] Error updating EPC:', error);

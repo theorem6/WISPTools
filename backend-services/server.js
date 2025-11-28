@@ -335,6 +335,18 @@ app.post('/api/epc/checkin', async (req, res) => {
       );
     }
     
+    // Include full configuration in check-in response
+    const fullConfig = {
+      site_name: epc.site_name,
+      site_id: epc.site_id,
+      central_hss: 'hss.wisptools.io',
+      hss_port: 3868,
+      hss_config: epc.hss_config || {},
+      snmp_config: epc.snmp_config || {},
+      network_config: epc.network_config || {},
+      deployment_type: epc.deployment_type || 'both'
+    };
+    
     res.json({
       status: 'ok',
       epc_id: epc.epc_id,
@@ -346,7 +358,7 @@ app.post('/api/epc/checkin', async (req, res) => {
         target_services: c.target_services, script_content: c.script_content,
         script_url: c.script_url, config_data: c.config_data
       })),
-      config: { central_hss: 'hss.wisptools.io', hss_port: 3868, snmp_enabled: epc.snmp_config?.enabled !== false }
+      config: fullConfig
     });
   } catch (error) {
     console.error('[EPC Check-in] Error:', error);
