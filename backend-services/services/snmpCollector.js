@@ -5,6 +5,7 @@
 
 const snmp = require('net-snmp');
 const EventEmitter = require('events');
+const { SNMPMetrics } = require('../models/snmp-metrics-schema');
 
 class SNMPCollectorService extends EventEmitter {
   constructor() {
@@ -162,6 +163,13 @@ class SNMPCollectorService extends EventEmitter {
         device.lastPoll = new Date();
         device.metrics = metrics;
 
+        // Save metrics to database
+        try {
+          await this.saveMetrics(deviceId, device.tenantId, metrics, device.lastPoll);
+        } catch (saveError) {
+          console.error(`[SNMP Collector] Failed to save metrics for ${deviceId}:`, saveError);
+        }
+        
         // Emit metrics event for processing
         this.emit('metrics', {
           deviceId,
@@ -254,6 +262,112 @@ class SNMPCollectorService extends EventEmitter {
         reject(error);
       }
     });
+  }
+
+  /**
+   * Save metrics to database
+   */
+  async saveMetrics(deviceId, tenantId, metricsData, timestamp) {
+    try {
+      // Parse OID values into structured format
+      const parsedMetrics = this.parseSNMPMetrics(metricsData);
+      
+      const metricDoc = new SNMPMetrics({
+        device_id: deviceId,
+        tenant_id: tenantId,
+        timestamp: timestamp || new Date(),
+        system: parsedMetrics.system,
+        resources: parsedMetrics.resources,
+        network: parsedMetrics.network,
+        temperature: parsedMetrics.temperature,
+        raw_oids: metricsData, // Store raw OID data for reference
+        collection_method: 'poll'
+      });
+      
+      await metricDoc.save();
+      console.log(`[SNMP Collector] Saved metrics for device ${deviceId}`);
+    } catch (error) {
+      console.error(`[SNMP Collector] Failed to save metrics:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Parse SNMP OID values into structured metrics
+   */
+  parseSNMPMetrics(oidData) {
+    const parsed = {
+      system: {},
+      resources: {},
+      network: {},
+      temperature: null
+    };
+    
+    // Parse common SNMP OIDs
+    // System Uptime: 1.3.6.1.2.1.1.3.0 (sysUpTime)
+    if (oidData['sysUpTime']?.value) {
+      parsed.system.uptime_seconds = Math.floor(oidData['sysUpTime'].value / 100); // Convert from centiseconds
+    }
+    
+    // System Description: 1.3.6.1.2.1.1.1.0
+    if (oidData['sysDescr']?.value) {
+      parsed.system.sys_descr = String(oidData['sysDescr'].value);
+    }
+    
+    // System Contact: 1.3.6.1.2.1.1.4.0
+    if (oidData['sysContact']?.value) {
+      parsed.system.sys_contact = String(oidData['sysContact'].value);
+    }
+    
+    // System Location: 1.3.6.1.2.1.1.6.0
+    if (oidData['sysLocation']?.value) {
+      parsed.system.sys_location = String(oidData['sysLocation'].value);
+    }
+    
+    // Host Resources CPU Load: 1.3.6.1.2.1.25.3.3.1.2.1
+    if (oidData['hrProcessorLoad']?.value !== undefined) {
+      parsed.resources.cpu_percent = parseInt(oidData['hrProcessorLoad'].value) || 0;
+    }
+    
+    // Host Resources Memory: 1.3.6.1.2.1.25.2.3.1.6.1 (used) and 1.3.6.1.2.1.25.2.3.1.5.1 (total)
+    if (oidData['hrStorageUsed']?.value !== undefined && oidData['hrStorageSize']?.value !== undefined) {
+      const used = parseInt(oidData['hrStorageUsed'].value) || 0;
+      const total = parseInt(oidData['hrStorageSize'].value) || 1;
+      // Assuming units are in KB (typical for hrStorage)
+      parsed.resources.memory_used_mb = Math.floor(used / 1024);
+      parsed.resources.memory_total_mb = Math.floor(total / 1024);
+      parsed.resources.memory_free_mb = Math.floor((total - used) / 1024);
+      parsed.resources.memory_percent = total > 0 ? Math.round((used / total) * 100) : 0;
+    }
+    
+    // Interface Octets: 1.3.6.1.2.1.2.2.1.10.1 (ifInOctets) and 1.3.6.1.2.1.2.2.1.16.1 (ifOutOctets)
+    if (oidData['ifInOctets']?.value !== undefined) {
+      parsed.network.interface_in_octets = parseInt(oidData['ifInOctets'].value) || 0;
+    }
+    if (oidData['ifOutOctets']?.value !== undefined) {
+      parsed.network.interface_out_octets = parseInt(oidData['ifOutOctets'].value) || 0;
+    }
+    
+    // Interface Errors: 1.3.6.1.2.1.2.2.1.14.1 (ifInErrors) and 1.3.6.1.2.1.2.2.1.20.1 (ifOutErrors)
+    if (oidData['ifInErrors']?.value !== undefined) {
+      parsed.network.interface_in_errors = parseInt(oidData['ifInErrors'].value) || 0;
+    }
+    if (oidData['ifOutErrors']?.value !== undefined) {
+      parsed.network.interface_out_errors = parseInt(oidData['ifOutErrors'].value) || 0;
+    }
+    
+    // Interface Status: 1.3.6.1.2.1.2.2.1.8.1 (ifOperStatus)
+    if (oidData['ifOperStatus']?.value !== undefined) {
+      const status = parseInt(oidData['ifOperStatus'].value);
+      parsed.network.interface_status = status === 1 ? 'up' : 'down';
+    }
+    
+    // Temperature (device-specific OID, common on network equipment)
+    if (oidData['temperature']?.value !== undefined) {
+      parsed.temperature = parseFloat(oidData['temperature'].value) || null;
+    }
+    
+    return parsed;
   }
 
   /**

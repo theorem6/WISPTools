@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const { SNMPMetrics } = require('../models/snmp-metrics-schema');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -50,14 +51,8 @@ const formatSNMPDevice = (device, source = 'equipment') => {
       retries: config.snmp_retries || 3
     },
     ipAddress: config.management_ip || '192.168.1.10',
-    lastPolled: new Date().toISOString(),
-    metrics: {
-      cpuUsage: Math.floor(Math.random() * 100),
-      memoryUsage: Math.floor(Math.random() * 100),
-      temperature: Math.floor(Math.random() * 20) + 30,
-      uptime: Math.floor(Math.random() * 31536000),
-      interfaceCount: Math.floor(Math.random() * 24) + 1
-    },
+    lastPolled: device.updatedAt || device.lastPolled || new Date().toISOString(),
+    metrics: device.metrics || null, // Real metrics if available, null otherwise
     createdAt: device.createdAt,
     updatedAt: device.updatedAt
   };
@@ -174,54 +169,45 @@ router.get('/metrics/latest', async (req, res) => {
   try {
     console.log(`📊 [SNMP API] Fetching latest SNMP metrics for tenant: ${req.tenantId}`);
     
-    const metrics = [];
-    
-    // Get all SNMP-enabled equipment
-    const allEquipment = await NetworkEquipment.find({
-      tenantId: req.tenantId,
-      status: 'active'
-    }).lean();
-    
-    const allCPE = await UnifiedCPE.find({
-      tenantId: req.tenantId,
-      status: 'active'
-    }).lean();
-    
-    // Generate metrics for equipment
-    allEquipment.forEach(device => {
-      const config = device.notes ? JSON.parse(device.notes) : {};
-      if (config.snmp_enabled || config.snmp_community || config.management_ip) {
-        metrics.push({
-          deviceId: device._id.toString(),
-          deviceName: device.name,
-          deviceType: device.type,
-          timestamp: new Date().toISOString(),
-          metrics: {
-            'system.sysUpTime': Math.floor(Math.random() * 31536000),
-            'system.sysDescr': `${device.manufacturer} ${device.model}`,
-            'system.sysContact': 'admin@wisptools.io',
-            'system.sysLocation': device.location?.address || 'Unknown',
-            'hrSystem.hrSystemUptime': Math.floor(Math.random() * 31536000),
-            'hrSystem.hrSystemProcesses': Math.floor(Math.random() * 100) + 50,
-            'hrProcessor.hrProcessorLoad': Math.floor(Math.random() * 100),
-            'hrStorage.hrStorageUsed': Math.floor(Math.random() * 100),
-            'ifTable.ifInOctets.1': Math.floor(Math.random() * 1000000000),
-            'ifTable.ifOutOctets.1': Math.floor(Math.random() * 1000000000),
-            'ifTable.ifInErrors.1': Math.floor(Math.random() * 100),
-            'ifTable.ifOutErrors.1': Math.floor(Math.random() * 100),
-            'temperature': Math.floor(Math.random() * 20) + 30
-          }
-        });
+    // Get latest metrics from database for each device
+    const latestMetrics = await SNMPMetrics.aggregate([
+      {
+        $match: {
+          tenant_id: req.tenantId,
+          timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+        }
+      },
+      {
+        $sort: { device_id: 1, timestamp: -1 }
+      },
+      {
+        $group: {
+          _id: '$device_id',
+          latest: { $first: '$$ROOT' }
+        }
       }
+    ]);
+    
+    // Format for frontend
+    const metrics = latestMetrics.map(item => {
+      const m = item.latest;
+      return {
+        deviceId: m.device_id,
+        deviceName: m.system?.hostname || m.device_id,
+        timestamp: m.timestamp,
+        metrics: {
+          cpuUsage: m.resources?.cpu_percent ?? null,
+          memoryUsage: m.resources?.memory_percent ?? null,
+          temperature: m.temperature ?? null,
+          uptime: m.system?.uptime_seconds ?? null,
+          interfaceInOctets: m.network?.interface_in_octets ?? null,
+          interfaceOutOctets: m.network?.interface_out_octets ?? null,
+          diskUsage: m.resources?.disk_percent ?? null
+        }
+      };
     });
     
-    // Generate metrics for CPE
-    allCPE.forEach(device => {
-      metrics.push({
-        deviceId: device._id.toString(),
-        deviceName: device.name,
-        deviceType: 'cpe',
-        timestamp: new Date().toISOString(),
+    console.log(`📊 Found ${metrics.length} devices with metrics`);
         metrics: {
           'system.sysUpTime': Math.floor(Math.random() * 31536000),
           'system.sysDescr': `${device.manufacturer} ${device.model}`,
@@ -256,33 +242,65 @@ router.get('/metrics/:deviceId', async (req, res) => {
     
     console.log(`📊 [SNMP API] Fetching metrics for device ${deviceId}, timeRange: ${timeRange}`);
     
-    // In a real implementation, this would query a time-series database
-    // For now, generate mock historical data
+    // Calculate time range
     const now = new Date();
-    const dataPoints = [];
-    const intervalMinutes = timeRange === '1h' ? 5 : timeRange === '24h' ? 60 : 300;
-    const totalPoints = timeRange === '1h' ? 12 : timeRange === '24h' ? 24 : 48;
+    let startTime;
+    let limit = 100; // Default limit
     
-    for (let i = totalPoints; i >= 0; i--) {
-      const timestamp = new Date(now.getTime() - (i * intervalMinutes * 60 * 1000));
-      dataPoints.push({
-        timestamp: timestamp.toISOString(),
-        metrics: {
-          cpuUsage: Math.floor(Math.random() * 100),
-          memoryUsage: Math.floor(Math.random() * 100),
-          temperature: Math.floor(Math.random() * 20) + 30,
-          interfaceInOctets: Math.floor(Math.random() * 1000000),
-          interfaceOutOctets: Math.floor(Math.random() * 1000000),
-          uptime: Math.floor(Math.random() * 31536000)
-        }
-      });
+    switch (timeRange) {
+      case '1h':
+        startTime = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour
+        limit = 60; // 1 point per minute
+        break;
+      case '24h':
+        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours
+        limit = 96; // 1 point per 15 minutes
+        break;
+      case '7d':
+        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7 days
+        limit = 168; // 1 point per hour
+        break;
+      default:
+        startTime = new Date(now.getTime() - 60 * 60 * 1000);
+    }
+    
+    // Query real metrics from database
+    const metrics = await SNMPMetrics.find({
+      device_id: deviceId,
+      tenant_id: req.tenantId,
+      timestamp: { $gte: startTime }
+    })
+    .sort({ timestamp: 1 })
+    .limit(limit)
+    .lean();
+    
+    // Format data points for frontend
+    const dataPoints = metrics.map(m => ({
+      timestamp: m.timestamp,
+      metrics: {
+        cpuUsage: m.resources?.cpu_percent ?? null,
+        memoryUsage: m.resources?.memory_percent ?? null,
+        temperature: m.temperature ?? null,
+        interfaceInOctets: m.network?.interface_in_octets ?? null,
+        interfaceOutOctets: m.network?.interface_out_octets ?? null,
+        uptime: m.system?.uptime_seconds ?? null,
+        diskUsage: m.resources?.disk_percent ?? null,
+        loadAverage: m.resources?.load_average?.[0] ?? null
+      }
+    }));
+    
+    // If no data, return empty array (don't generate fake data)
+    if (dataPoints.length === 0) {
+      console.log(`⚠️ [SNMP API] No metrics found for device ${deviceId} in time range ${timeRange}`);
     }
     
     res.json({
       deviceId,
       timeRange,
       dataPoints,
-      total: dataPoints.length
+      total: dataPoints.length,
+      startTime: startTime.toISOString(),
+      endTime: now.toISOString()
     });
   } catch (error) {
     console.error('❌ [SNMP API] Error fetching device metrics:', error);
