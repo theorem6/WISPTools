@@ -74,15 +74,62 @@ log "IP Address: $IP_ADDR"
 # ============================================================================
 log "Step 2: Checking registration with central server..."
 
-RESPONSE=$(curl -s -X POST "https://${CENTRAL_HSS}:${HSS_PORT}/api/epc/checkin" \
-    -H "Content-Type: application/json" \
-    -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>/dev/null) || true
+# Check if we have existing registration data first
+if [ -f "$CONFIG_DIR/registration.json" ]; then
+    log "Found existing registration data, loading..."
+    EXISTING_RESPONSE=$(cat "$CONFIG_DIR/registration.json")
+    EXISTING_EPC_ID=$(echo "$EXISTING_RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
+    
+    if [ -n "$EXISTING_EPC_ID" ] && [ "$EXISTING_EPC_ID" != "null" ]; then
+        log "Found existing EPC ID in registration data: $EXISTING_EPC_ID"
+        RESPONSE="$EXISTING_RESPONSE"
+    fi
+fi
 
+# Attempt check-in with central server
+if [ -z "$RESPONSE" ] || [ -z "$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)" ]; then
+    log "Attempting check-in with central server..."
+    RESPONSE=$(curl -s -X POST "https://${CENTRAL_HSS}:${HSS_PORT}/api/epc/checkin" \
+        -H "Content-Type: application/json" \
+        -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>&1) || true
+    
+    # Check for curl errors
+    if echo "$RESPONSE" | grep -q "curl:"; then
+        log "⚠️  Error connecting to server: $RESPONSE"
+        RESPONSE="{}"
+    fi
+fi
+
+# Parse response
 EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
 STATUS=$(echo "$RESPONSE" | jq -r '.status // empty' 2>/dev/null)
 CHECKIN_TOKEN=$(echo "$RESPONSE" | jq -r '.checkin_token // empty' 2>/dev/null)
 CONFIG=$(echo "$RESPONSE" | jq -r '.config // {}' 2>/dev/null)
+ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error // .message // empty' 2>/dev/null)
 
+# Debug: Show response if not successful
+if [ -z "$EPC_ID" ] || [ "$EPC_ID" = "null" ] || [ "$STATUS" != "ok" ]; then
+    log "Check-in response: $RESPONSE"
+    
+    if [ -n "$ERROR_MSG" ]; then
+        log "Error from server: $ERROR_MSG"
+    fi
+    
+    if [ "$STATUS" = "unregistered" ]; then
+        log "⚠️  Device code not found in database"
+        log "   Device Code: $DEVICE_CODE"
+        log "   Please register this device in the WISPTools Portal:"
+        log "   1. Go to HSS Management → Remote EPCs"
+        log "   2. Click 'Add EPC' or find existing EPC"
+        log "   3. Enter device code: $DEVICE_CODE"
+    else
+        log "⚠️  Device not registered on server yet"
+        log "   Status: ${STATUS:-unknown}"
+        log "   Device Code: $DEVICE_CODE"
+    fi
+fi
+
+# Check if device is registered
 if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ] && [ "$STATUS" = "ok" ]; then
     log "✅ Device is registered (EPC ID: $EPC_ID)"
     
@@ -91,26 +138,47 @@ if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ] && [ "$STATUS" = "ok" ]; then
     echo "$RESPONSE" > "$CONFIG_DIR/registration.json"
     chmod 600 "$CONFIG_DIR/registration.json"
     
-    # Extract configuration
+    # Extract configuration - try multiple paths
     ENABLE_EPC=$(echo "$CONFIG" | jq -r '.enable_epc // false' 2>/dev/null)
-    ENABLE_SNMP=$(echo "$CONFIG" | jq -r '.enable_snmp // false' 2>/dev/null)
+    ENABLE_SNMP=$(echo "$CONFIG" | jq -r '.enable_snmp // .snmp_enabled // false' 2>/dev/null)
     
-    # Get network configuration
-    MCC=$(echo "$CONFIG" | jq -r '.hss_config.mcc // .network_config.mcc // "001"' 2>/dev/null)
-    MNC=$(echo "$CONFIG" | jq -r '.hss_config.mnc // .network_config.mnc // "01"' 2>/dev/null)
-    TAC=$(echo "$CONFIG" | jq -r '.network_config.tac // "1"' 2>/dev/null)
-    REALM=$(echo "$CONFIG" | jq -r '.hss_config.diameter_realm // "wisptools.io"' 2>/dev/null)
+    # Get network configuration - try multiple paths in response
+    MCC=$(echo "$RESPONSE" | jq -r '.config.hss_config.mcc // .config.network_config.mcc // .hss_config.mcc // .network_config.mcc // "001"' 2>/dev/null)
+    MNC=$(echo "$RESPONSE" | jq -r '.config.hss_config.mnc // .config.network_config.mnc // .hss_config.mnc // .network_config.mnc // "01"' 2>/dev/null)
+    TAC=$(echo "$RESPONSE" | jq -r '.config.network_config.tac // .network_config.tac // "1"' 2>/dev/null)
+    REALM=$(echo "$RESPONSE" | jq -r '.config.hss_config.diameter_realm // .hss_config.diameter_realm // "wisptools.io"' 2>/dev/null)
+    
+    # If still no config, try reading from existing config files
+    if [ "$MCC" = "001" ] && [ "$MNC" = "01" ] && [ -f "$CONFIG_DIR/config.env" ]; then
+        source "$CONFIG_DIR/config.env" 2>/dev/null || true
+        MCC="${MCC:-001}"
+        MNC="${MNC:-01}"
+        TAC="${TAC:-1}"
+        REALM="${REALM:-wisptools.io}"
+    fi
+    
+    log "Configuration: MCC=$MCC, MNC=$MNC, TAC=$TAC, EPC=$ENABLE_EPC, SNMP=$ENABLE_SNMP"
 else
-    log "⚠️  Device not registered on server yet"
-    log "   Please register this device in the WISPTools Portal first"
-    log "   Device Code: $DEVICE_CODE"
+    log "⚠️  Device not registered - will continue with minimal setup"
     
-    ENABLE_EPC=false
-    ENABLE_SNMP=false
-    MCC="001"
-    MNC="01"
-    TAC="1"
-    REALM="wisptools.io"
+    # Try to use existing config if available
+    if [ -f "$CONFIG_DIR/config.env" ]; then
+        source "$CONFIG_DIR/config.env" 2>/dev/null || true
+        ENABLE_EPC="${ENABLE_EPC:-false}"
+        ENABLE_SNMP="${ENABLE_SNMP:-false}"
+        MCC="${MCC:-001}"
+        MNC="${MNC:-01}"
+        TAC="${TAC:-1}"
+        REALM="${REALM:-wisptools.io}"
+        log "Using existing configuration from config.env"
+    else
+        ENABLE_EPC=false
+        ENABLE_SNMP=false
+        MCC="001"
+        MNC="01"
+        TAC="1"
+        REALM="wisptools.io"
+    fi
 fi
 
 # ============================================================================
@@ -416,15 +484,40 @@ echo "╔═══════════════════════�
 echo "║                    Device Information                           ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
+
+# Try to get EPC ID from multiple sources if not already set
+if [ -z "$EPC_ID" ] || [ "$EPC_ID" = "null" ]; then
+    # Try from registration.json
+    if [ -f "$CONFIG_DIR/registration.json" ]; then
+        EPC_ID=$(jq -r '.epc_id // empty' "$CONFIG_DIR/registration.json" 2>/dev/null)
+    fi
+    
+    # Try from check-in agent cache
+    if [ -z "$EPC_ID" ] || [ "$EPC_ID" = "null" ]; then
+        if [ -f /tmp/epc-tenant-id ] && [ -f /tmp/epc-id ]; then
+            EPC_ID=$(cat /tmp/epc-id 2>/dev/null)
+        fi
+    fi
+fi
+
 echo "Device Code:     $DEVICE_CODE"
-echo "EPC ID:          ${EPC_ID:-not registered}"
-echo "IP Address:      $IP_ADDR"
-echo "Central HSS:     $CENTRAL_HSS"
-if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ]; then
+if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ] && [ "$EPC_ID" != "" ]; then
+    echo "EPC ID:          $EPC_ID"
     echo "Registration:    ✅ Registered"
 else
-    echo "Registration:    ⚠️  Not registered - register in portal"
+    echo "EPC ID:          (not found in database)"
+    echo "Registration:    ⚠️  Not registered"
+    echo ""
+    echo "To register this device:"
+    echo "  1. Go to https://wisptools-production.web.app"
+    echo "  2. Navigate to: HSS Management → Remote EPCs"
+    echo "  3. Click 'Add EPC' or find existing EPC"
+    echo "  4. Enter Device Code: $DEVICE_CODE"
+    echo ""
+    echo "The device will automatically configure after registration."
 fi
+echo "IP Address:      $IP_ADDR"
+echo "Central HSS:     $CENTRAL_HSS"
 echo ""
 
 # ============================================================================
