@@ -676,36 +676,193 @@ function createPingOnlyDevice(ip) {
 }
 
 /**
- * Scan network for SNMP devices (two-phase: ping first, then SNMP)
+ * Phase 1: Discover devices via CDP/LLDP neighbor tables
+ * Queries CDP/LLDP neighbor tables from common gateway/router IPs first
+ * This discovers devices even if they don't respond to ping or SNMP
  */
-async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
-  log(`Starting two-phase network discovery on subnet: ${subnet}`);
+async function discoverCDPLLDP(subnet) {
+  log(`Phase 1: CDP/LLDP discovery - querying neighbor tables...`);
   const startTime = Date.now();
+  const discoveredIPs = new Set();
+  const discoveredNeighbors = [];
   
-  // Phase 1: Ping sweep
-  const respondingIPs = await pingSweep(subnet);
-  
-  if (respondingIPs.length === 0) {
-    log(`No responding hosts found on subnet ${subnet}`);
-    return [];
+  try {
+    // Extract base network from subnet (e.g., "192.168.1.0/24" -> "192.168.1")
+    const [baseIP] = subnet.split('/');
+    const baseParts = baseIP.split('.').slice(0, 3).join('.');
+    
+    // Common router/gateway IPs to try first for CDP/LLDP queries
+    const commonGateways = [
+      `${baseParts}.1`,   // Common gateway
+      `${baseParts}.254`, // Alternative gateway
+      `${baseParts}.253`  // Another common gateway
+    ];
+    
+    // Also try to get actual gateway from routing table
+    try {
+      const { stdout: gatewayOutput } = await execAsync("ip route | grep default | awk '{print $3}' | head -1").catch(() => ({ stdout: '' }));
+      const gateway = gatewayOutput.trim();
+      if (gateway && !commonGateways.includes(gateway)) {
+        commonGateways.unshift(gateway);
+      }
+    } catch (e) {
+      // Ignore
+    }
+    
+    log(`  Querying CDP/LLDP neighbor tables from ${commonGateways.length} potential gateway/router IP(s)...`);
+    
+    // Try to query CDP/LLDP neighbor tables from common gateway IPs
+    // This works even if the gateway doesn't have full SNMP access
+    for (const gatewayIP of commonGateways) {
+      try {
+        for (const community of SNMP_COMMUNITIES) {
+          try {
+            // Try LLDP first
+            const neighbors = await getNeighborsWithSystemSNMP(gatewayIP, community);
+            if (neighbors && neighbors.length > 0) {
+              log(`  Found ${neighbors.length} neighbor(s) via LLDP from ${gatewayIP}`);
+              neighbors.forEach(neighbor => {
+                discoveredNeighbors.push({ ...neighbor, source_ip: gatewayIP });
+                if (neighbor.ip_address) {
+                  discoveredIPs.add(neighbor.ip_address);
+                }
+              });
+              break; // Found neighbors, move to next gateway
+            }
+          } catch (e) {
+            // Continue to next community
+          }
+        }
+      } catch (e) {
+        // Continue to next gateway
+      }
+    }
+    
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    log(`CDP/LLDP discovery complete: Found ${discoveredIPs.size} device(s) via neighbor tables in ${elapsed}s`);
+    
+  } catch (error) {
+    log(`WARNING: CDP/LLDP discovery failed: ${error.message}`);
   }
   
-  log(`Step 2: SNMP discovery - checking ${respondingIPs.length} responding hosts for SNMP...`);
+  return { discoveredIPs: Array.from(discoveredIPs), neighbors: discoveredNeighbors };
+}
+
+/**
+ * Query CDP/LLDP neighbor tables from all responding IPs (even without full SNMP)
+ */
+async function queryCDPLLDPNeighbors(ips, communities = SNMP_COMMUNITIES) {
+  log(`  Querying CDP/LLDP neighbor tables from ${ips.length} host(s)...`);
+  const neighbors = [];
+  
+  const neighborPromises = [];
+  for (const ip of ips) {
+    const neighborPromise = (async () => {
+      try {
+        // Try to query LLDP/CDP neighbor tables directly, even if device doesn't support full SNMP
+        for (const community of communities) {
+          try {
+            // Try LLDP first
+            const lldpNeighbors = await getNeighborsWithSystemSNMP(ip, community);
+            if (lldpNeighbors && lldpNeighbors.length > 0) {
+              neighbors.push(...lldpNeighbors.map(n => ({ ...n, source_ip: ip })));
+              log(`  Found ${lldpNeighbors.length} LLDP neighbor(s) from ${ip}`);
+              return;
+            }
+          } catch (e) {
+            // Continue to next method
+          }
+        }
+      } catch (error) {
+        // Ignore errors - device might not support neighbor discovery
+      }
+    })();
+    
+    neighborPromises.push(neighborPromise);
+    
+    // Limit concurrency
+    if (neighborPromises.length >= MAX_PARALLEL_SNMP) {
+      await Promise.all(neighborPromises);
+      neighborPromises.length = 0;
+    }
+  }
+  
+  if (neighborPromises.length > 0) {
+    await Promise.all(neighborPromises);
+  }
+  
+  return neighbors;
+}
+
+/**
+ * Scan network for devices (three-phase: CDP/LLDP first, then ping, then SNMP)
+ */
+async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
+  log(`Starting three-phase network discovery on subnet: ${subnet}`);
+  const startTime = Date.now();
+  
+  const allDiscoveredIPs = new Set();
+  const allDiscoveredNeighbors = [];
+  
+  // Phase 1: CDP/LLDP discovery - query neighbor tables from gateways/routers
+  const { discoveredIPs: cdpLldpIPs, neighbors: cdpLldpNeighbors } = await discoverCDPLLDP(subnet);
+  cdpLldpIPs.forEach(ip => allDiscoveredIPs.add(ip));
+  allDiscoveredNeighbors.push(...cdpLldpNeighbors);
+  
+  // Phase 2: Ping sweep
+  log(`Phase 2: Ping sweep - finding responding hosts on subnet: ${subnet}`);
+  const respondingIPs = await pingSweep(subnet);
+  
+  // Add ping-responding IPs to discovered set
+  respondingIPs.forEach(ip => allDiscoveredIPs.add(ip));
+  
+  // Query CDP/LLDP neighbor tables from ping-responding hosts
+  // This discovers additional devices even if they don't respond to ping
+  if (respondingIPs.length > 0) {
+    log(`  Querying CDP/LLDP neighbor tables from ${respondingIPs.length} ping-responding host(s)...`);
+    for (const ip of respondingIPs) {
+      try {
+        for (const community of communities) {
+          try {
+            const neighbors = await getNeighborsWithSystemSNMP(ip, community);
+            if (neighbors && neighbors.length > 0) {
+              neighbors.forEach(neighbor => {
+                allDiscoveredNeighbors.push({ ...neighbor, source_ip: ip });
+                if (neighbor.ip_address) {
+                  allDiscoveredIPs.add(neighbor.ip_address);
+                }
+              });
+              break; // Found neighbors from this IP
+            }
+          } catch (e) {
+            // Continue to next community
+          }
+        }
+      } catch (e) {
+        // Continue to next IP
+      }
+    }
+  }
+  
+  log(`Phase 3: SNMP discovery - checking ${allDiscoveredIPs.size} discovered host(s) for SNMP...`);
   
   const devices = [];
   const pingOnlyDevices = [];
+  const discoveredIPs = Array.from(allDiscoveredIPs);
   
-  // Phase 2: SNMP scan on responding hosts
+  // Phase 3: SNMP scan on all discovered hosts
   const snmpPromises = [];
   let processed = 0;
   
-  for (const ip of respondingIPs) {
+  for (const ip of discoveredIPs) {
     const snmpPromise = (async () => {
       try {
         // Try each community string
+        let foundSNMP = false;
         for (const community of communities) {
           try {
             const deviceInfo = await getDeviceInfo(ip, community);
+            foundSNMP = true;
             
             // Get Mikrotik-specific info if it's a Mikrotik device
             if (deviceInfo.device_type === 'mikrotik') {
@@ -718,6 +875,17 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
                 deviceInfo.neighbors = mikrotikInfo.neighbors;
                 log(`  Found ${mikrotikInfo.neighbors.length} neighbor(s) for ${ip}`);
               }
+            } else {
+              // Query CDP/LLDP neighbors for non-Mikrotik devices too
+              try {
+                const neighbors = await getNeighborsWithSystemSNMP(ip, community);
+                if (neighbors && neighbors.length > 0) {
+                  deviceInfo.neighbors = neighbors;
+                  log(`  Found ${neighbors.length} neighbor(s) for ${ip}`);
+                }
+              } catch (e) {
+                // No neighbors found
+              }
             }
             
             devices.push(deviceInfo);
@@ -729,15 +897,38 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
           }
         }
         
-        // No SNMP found, but host responded to ping
-        pingOnlyDevices.push(createPingOnlyDevice(ip));
+        // No SNMP found, but host was discovered (via ping or CDP/LLDP)
+        if (!foundSNMP) {
+          // Still try to query neighbors even without SNMP access
+          try {
+            for (const community of communities) {
+              try {
+                const neighbors = await getNeighborsWithSystemSNMP(ip, community);
+                if (neighbors && neighbors.length > 0) {
+                  // Create device entry with neighbor info
+                  const device = createPingOnlyDevice(ip);
+                  device.neighbors = neighbors;
+                  pingOnlyDevices.push(device);
+                  log(`  Found ${neighbors.length} neighbor(s) for ${ip} (no SNMP access)`);
+                  return;
+                }
+              } catch (e) {
+                continue;
+              }
+            }
+          } catch (e) {
+            // Ignore
+          }
+          
+          pingOnlyDevices.push(createPingOnlyDevice(ip));
+        }
       } catch (error) {
         // Host doesn't have SNMP
         pingOnlyDevices.push(createPingOnlyDevice(ip));
       } finally {
         processed++;
-        if (processed % 10 === 0 || processed === respondingIPs.length) {
-          log(`  SNMP progress: ${processed}/${respondingIPs.length} hosts (${devices.length} SNMP device(s) found)...`);
+        if (processed % 10 === 0 || processed === discoveredIPs.length) {
+          log(`  SNMP progress: ${processed}/${discoveredIPs.length} hosts (${devices.length} SNMP device(s) found)...`);
         }
       }
     })();
