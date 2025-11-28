@@ -452,12 +452,23 @@ log "Hardware ID: $HARDWARE_ID"
 mkdir -p /var/www/html
 systemctl start nginx 2>/dev/null || python3 -m http.server 80 -d /var/www/html &>/dev/null &
 
-# Check if already configured
+# Check if already configured - verify with server if configured file exists
 if [ -f "$CONFIGURED_FILE" ]; then
-    log "Device already configured"
-    source /etc/wisptools/config.env 2>/dev/null || true
+    log "Configuration file found, verifying with server..."
     
-    # Create running status page
+    # Verify device is still registered on server
+    RESPONSE=$(curl -s -X POST "https://$GCE_DOMAIN:$HSS_PORT/api/epc/checkin" \
+        -H "Content-Type: application/json" \
+        -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>/dev/null) || true
+    
+    EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
+    STATUS=$(echo "$RESPONSE" | jq -r '.status // empty' 2>/dev/null)
+    
+    if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ] && [ "$STATUS" = "ok" ]; then
+        log "Device already configured and registered on server - skipping deployment"
+        source /etc/wisptools/config.env 2>/dev/null || true
+        
+        # Create running status page
     cat > /var/www/html/index.html << HTMLEOF
 <!DOCTYPE html>
 <html>
@@ -506,12 +517,100 @@ HTMLEOF
     echo "║                                                                  ║"
     echo "║     SSH: ssh wisp@$IP_ADDR  (password: wisp123)"
     echo "║                                                                  ║"
+    # Disable startup service so it doesn't run on next reboot
+    log "Disabling startup service - device is already configured"
+    systemctl disable wisptools-startup.service 2>/dev/null || true
+    
+    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo ""
+    exit 0
+    else
+        log "Device not registered on server, re-entering deployment mode"
+        rm -f "$CONFIGURED_FILE"
+    fi
+fi
+
+# Before showing waiting page, check if device is already registered on server
+log "Checking if device is already registered on server..."
+RESPONSE=$(curl -s -X POST "https://$GCE_DOMAIN:$HSS_PORT/api/epc/checkin" \
+    -H "Content-Type: application/json" \
+    -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>/dev/null) || true
+
+EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
+STATUS=$(echo "$RESPONSE" | jq -r '.status // empty' 2>/dev/null)
+
+if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ] && [ "$STATUS" = "ok" ]; then
+    log "Device is already registered on server - marking as configured"
+    
+    # Device is registered, mark as configured and skip waiting page
+    mkdir -p /etc/wisptools
+    source /etc/wisptools/config.env 2>/dev/null || true
+    
+    # Save registration info if available
+    echo "$RESPONSE" > /etc/wisptools/registration.json 2>/dev/null || true
+    
+    # Create the configured file
+    touch "$CONFIGURED_FILE"
+    
+    # Disable startup service so it doesn't run on next reboot
+    log "Disabling startup service - device is already configured"
+    systemctl disable wisptools-startup.service 2>/dev/null || true
+    
+    # Create running status page (skip waiting)
+    cat > /var/www/html/index.html << HTMLEOF
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WISPTools EPC - Running</title>
+    <meta http-equiv="refresh" content="30">
+    <style>
+        body { font-family: 'Segoe UI', Arial; text-align: center; padding: 40px; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: #fff; min-height: 100vh; margin: 0; }
+        h1 { color: #4caf50; }
+        .code { font-size: 48px; font-weight: bold; color: #00ff88; font-family: monospace; }
+        .info { color: #aaa; margin: 10px 0; }
+        .box { background: rgba(255,255,255,0.1); padding: 25px; border-radius: 15px; margin: 20px auto; max-width: 600px; text-align: left; }
+        .status { padding: 12px 30px; background: #4caf50; color: #fff; font-weight: bold; border-radius: 25px; display: inline-block; }
+        .service { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .running { color: #4caf50; }
+        .stopped { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>✅ WISPTools EPC Device</h1>
+    <div class="status">System Running</div>
+    <div class="code">$DEVICE_CODE</div>
+    <div class="box">
+        <h3>📊 Services Status:</h3>
+        <div class="service"><span>Open5GS MME</span><span id="mme">Checking...</span></div>
+        <div class="service"><span>Open5GS SGW-C</span><span id="sgwc">Checking...</span></div>
+        <div class="service"><span>Open5GS SGW-U</span><span id="sgwu">Checking...</span></div>
+        <div class="service"><span>Open5GS SMF</span><span id="smf">Checking...</span></div>
+        <div class="service"><span>Open5GS UPF</span><span id="upf">Checking...</span></div>
+        <div class="service"><span>SNMP Agent</span><span id="snmp">Checking...</span></div>
+    </div>
+    <p class="info">IP: $IP_ADDR | MAC: $HARDWARE_ID</p>
+</body>
+</html>
+HTMLEOF
+    
+    clear
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                  ║"
+    echo "║     WISPTools EPC Device - Running                               ║"
+    echo "║                                                                  ║"
+    echo "║     Device Code: $DEVICE_CODE                                 ║"
+    echo "║     IP Address:  $IP_ADDR"
+    echo "║                                                                  ║"
+    echo "║     SSH: ssh wisp@$IP_ADDR  (password: wisp123)"
+    echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
     exit 0
 fi
 
-# Create waiting status page
+# Create waiting status page (only shown if device is NOT registered)
 cat > /var/www/html/index.html << HTMLEOF
 <!DOCTYPE html>
 <html>
@@ -624,6 +723,10 @@ while true; do
         
         touch "$CONFIGURED_FILE"
         
+        # Disable startup service so deployment doesn't run on next reboot
+        log "Disabling startup service - deployment complete"
+        systemctl disable wisptools-startup.service 2>/dev/null || true
+        
         # Update status page
         sed -i 's/Waiting for Configuration/✅ Connected \& Configured/' /var/www/html/index.html
         sed -i 's/#ff9800/#4caf50/' /var/www/html/index.html
@@ -632,6 +735,7 @@ while true; do
         echo "╔══════════════════════════════════════════════════════════════════╗"
         echo "║                                                                  ║"
         echo "║     ✅ Device Configured Successfully!                           ║"
+        echo "║     Startup service disabled - reboots will skip deployment     ║"
         echo "║                                                                  ║"
         echo "╚══════════════════════════════════════════════════════════════════╝"
         echo ""
