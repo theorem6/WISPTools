@@ -412,6 +412,19 @@
           <span class="stat-value">{epc?.ip_address || epc?.ipAddress || 'Unknown'}</span>
         </div>
         <div class="stat-card">
+          <span class="stat-label">CPU Usage</span>
+          <span class="stat-value">{serviceStatus?.system?.cpu_percent ?? 'N/A'}%</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Memory Usage</span>
+          <span class="stat-value">
+            {serviceStatus?.system?.memory_percent ?? 'N/A'}%
+            {#if serviceStatus?.system?.memory_used_mb && serviceStatus?.system?.memory_total_mb}
+              ({serviceStatus.system.memory_used_mb}MB / {serviceStatus.system.memory_total_mb}MB)
+            {/if}
+          </span>
+        </div>
+        <div class="stat-card">
           <span class="stat-label">System Uptime</span>
           <span class="stat-value">{formatUptime(serviceStatus?.system?.uptime_seconds)}</span>
         </div>

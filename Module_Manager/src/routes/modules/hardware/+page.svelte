@@ -238,6 +238,7 @@
   let showEPCEditModal = false;
   let selectedEPCDevice: any = null;
   let epcEditForm = {
+    site_name: '',
     deployment_type: 'both',
     device_code: '',
     hss_config: { mcc: '001', mnc: '01', tac: '1', apnName: 'internet', dnsPrimary: '8.8.8.8', dnsSecondary: '8.8.4.4' },
@@ -248,6 +249,7 @@
   function editEPCDevice(device: any) {
     selectedEPCDevice = device;
     epcEditForm = {
+      site_name: device.site_name || device.name || '',
       deployment_type: device.deployment_type || 'both',
       device_code: device.device_code || '',
       hss_config: {
@@ -291,6 +293,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          site_name: epcEditForm.site_name,
           deployment_type: epcEditForm.deployment_type,
           hss_config: epcEditForm.hss_config,
           snmp_config: epcEditForm.snmp_config
@@ -883,8 +886,16 @@
       
       <div class="modal-body">
         <div class="device-info-banner">
-          <strong>Site:</strong> {selectedEPCDevice.site_name}<br>
           <strong>ID:</strong> <code>{selectedEPCDevice.epc_id}</code>
+        </div>
+        
+        <!-- Site Name Section -->
+        <div class="config-section">
+          <h4>📍 Site Information</h4>
+          <div class="form-group">
+            <label>Site Name</label>
+            <input type="text" bind:value={epcEditForm.site_name} placeholder="Enter site name" />
+          </div>
         </div>
         
         <!-- Device Code Section -->

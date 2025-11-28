@@ -700,6 +700,96 @@ router.get('/epc/remote/list', async (req, res) => {
   }
 });
 
+// Update a RemoteEPC device
+// PUT /api/hss/epc/:epc_id
+router.put('/epc/:epc_id', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    const { epc_id } = req.params;
+    const { site_name, deployment_type, hss_config, snmp_config, network_config } = req.body;
+    
+    console.log(`[HSS/EPC] Updating EPC ${epc_id} for tenant ${tenantId}`);
+
+    // Find the EPC
+    const epc = await RemoteEPC.findOne({
+      $or: [
+        { epc_id: epc_id },
+        { _id: epc_id }
+      ],
+      tenant_id: tenantId
+    });
+
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+
+    // Build update object
+    const updateFields = {
+      updated_at: new Date()
+    };
+
+    // Allow updating site_name
+    if (site_name !== undefined) {
+      updateFields.site_name = site_name;
+    }
+
+    if (deployment_type) {
+      if (!['epc', 'snmp', 'both'].includes(deployment_type)) {
+        return res.status(400).json({ error: 'Invalid deployment_type. Must be epc, snmp, or both' });
+      }
+      updateFields.deployment_type = deployment_type;
+    }
+
+    if (hss_config) {
+      updateFields.hss_config = {
+        ...epc.hss_config,
+        ...hss_config
+      };
+    }
+
+    if (snmp_config) {
+      updateFields.snmp_config = {
+        ...epc.snmp_config,
+        ...snmp_config
+      };
+    }
+
+    if (network_config) {
+      updateFields.network_config = {
+        ...epc.network_config,
+        ...network_config
+      };
+    }
+
+    // Update the EPC
+    await RemoteEPC.updateOne(
+      { $or: [{ epc_id: epc_id }, { _id: epc_id }], tenant_id: tenantId },
+      { $set: updateFields }
+    );
+
+    // Fetch updated record
+    const updatedEPC = await RemoteEPC.findOne({
+      $or: [{ epc_id: epc_id }, { _id: epc_id }],
+      tenant_id: tenantId
+    }).lean();
+
+    console.log(`[HSS/EPC] Successfully updated EPC ${epc_id}`);
+    res.json({
+      success: true,
+      epc_id,
+      message: 'EPC configuration updated successfully',
+      epc: updatedEPC
+    });
+  } catch (error) {
+    console.error('[HSS/EPC] Error updating EPC:', error);
+    res.status(500).json({ error: 'Failed to update EPC', message: error.message });
+  }
+});
+
 // Delete a RemoteEPC device
 // DELETE /api/hss/epc/:epc_id
 router.delete('/epc/:epc_id', async (req, res) => {

@@ -597,7 +597,7 @@ router.post('/:epc_id/link-device', async (req, res) => {
 router.put('/:epc_id', async (req, res) => {
   try {
     const { epc_id } = req.params;
-    const { deployment_type, hss_config, snmp_config, network_config } = req.body;
+    const { site_name, deployment_type, hss_config, snmp_config, network_config } = req.body;
     const tenant_id = req.headers['x-tenant-id'] || 'unknown';
     
     console.log(`[Update EPC] Updating EPC ${epc_id} for tenant ${tenant_id}`);
@@ -616,6 +616,11 @@ router.put('/:epc_id', async (req, res) => {
     const updateFields = {
       updated_at: new Date()
     };
+    
+    // Allow updating site_name
+    if (site_name) {
+      updateFields.site_name = site_name;
+    }
     
     if (deployment_type) {
       if (!['epc', 'snmp', 'both'].includes(deployment_type)) {
