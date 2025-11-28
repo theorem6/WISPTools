@@ -594,6 +594,9 @@ do_checkin() {
                 local cmd_json_file="/tmp/wisptools-cmd-$cmd_id.json"
                 echo "$cmd" > "$cmd_json_file"
                 
+                # Log command details for debugging
+                log "Command details - ID: $cmd_id, Type: $cmd_type, Has config_data: $(echo "$cmd" | jq -r 'if .config_data then "yes" else "no" end')"
+                
                 execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url" "$cmd_json_file"
             done
         fi
