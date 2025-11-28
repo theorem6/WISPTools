@@ -1,99 +1,65 @@
-# Deployment Status - Fake Data Fixes
+# Deployment Status - EPC Data Flow Fix
 
-## ✅ Frontend Deployed
-**Status:** Successfully deployed to Firebase Hosting  
-**URL:** https://wisptools-production.web.app  
-**Changes:** 
-- Removed fake data generation from graphs
-- Updated SNMP graphs to show real data or empty state
+## ✅ Completed
 
-## ⏳ Backend Deployment Needed
+### Backend Changes (Deployed)
+1. **Check-in always saves service status** - Now saves even if only system metrics are provided
+2. **Metrics always returned** - Monitoring endpoint returns metrics with fallbacks (service status → RemoteEPC.metrics → null)
+3. **Debug logging added** - Check-in now logs what data is being saved
+4. **SNMP discovery improved** - Better error handling and always reports results
 
-The backend fixes have been committed to GitHub but need to be deployed to the GCE server.
+### Frontend Changes (Deployed)
+1. **Fixed logs endpoint path** - Changed from `/api/hss/epc/${epcId}/logs` to `/api/epc/${epcId}/logs`
+2. **Monitoring page ready** - Already configured to display metrics from backend
 
-### Quick Deploy Commands
+## 🔄 What Happens Next
 
-**SSH to GCE server:**
-```bash
-gcloud compute ssh acs-hss-server --zone=us-central1-a --tunnel-through-iap
-```
+1. **Remote EPC checks in** (every 60 seconds)
+   - Sends system metrics (CPU, memory, uptime)
+   - Sends service status
+   - Sends logs
+   - Sends SNMP discovery results (every 15 minutes)
 
-**Once on the server, run:**
+2. **Backend saves data**
+   - Creates `EPCServiceStatus` document with system metrics
+   - Updates `RemoteEPC` with latest IP and status
+   - Stores logs in `EPCLog` collection
+   - Stores SNMP devices in `NetworkEquipment` collection
+
+3. **Frontend displays data**
+   - Monitoring page fetches from `/api/hss/epc/remote/list`
+   - Gets latest service status and formats metrics
+   - Shows CPU, MEM, UPTIME in EPC cards
+   - Logs tab fetches from `/api/epc/:epc_id/logs`
+
+## 📋 Verification Steps
+
+After the EPC checks in (within 60 seconds):
+
+1. **Check Monitoring Page**
+   - EPC should show real CPU, MEM, UPTIME values (not N/A)
+   - Device name should be the site name (not "Remote EPC Device")
+   - IP address should be shown
+
+2. **Check EPC Management Page**
+   - Click on EPC → View Details → Logs tab
+   - Should show check-in logs
+   - Should show system logs
+
+3. **Check SNMP Discovery**
+   - Wait 15 minutes after EPC update
+   - Check `/var/log/wisptools-checkin.log` on EPC for discovery messages
+   - Check monitoring page for discovered devices
+
+## 🔧 If Still Not Working
+
+Run diagnostic script on GCE:
 ```bash
 cd /opt/lte-pci-mapper
-git fetch origin
-git reset --hard origin/main
-
-cd backend-services
-npm install --production
-
-# Restart PM2 services
-pm2 restart main-api
-pm2 restart epc-api
-pm2 restart hss-api
-pm2 save
-
-# Run cleanup script to remove fake data
-cd /opt/lte-pci-mapper/backend-services/scripts
-node cleanup-fake-data.js
-
-# Verify services
-pm2 status
+node backend-services/scripts/debug-epc-data.js YALNTFQC 690abdc14a6f067977986db3
 ```
 
-### What Was Fixed
-
-1. ✅ **Backend API Routes** - Removed all `Math.random()` fake data generation
-   - `/api/epc/metrics/:id` - Now returns real metrics or null
-   - `/api/snmp/devices` - Filters out fake devices
-   - `/api/snmp/metrics/:deviceId` - Returns real database metrics
-   - `/api/monitoring/health` - Uses real alerts from database
-
-2. ✅ **SNMP Device Filtering** - Fake devices are filtered out:
-   - Core Router MT-RB5009
-   - Core Switch CRS328
-   - EPC Core Server
-   - Backhaul Router RB4011
-   - Customer A/B LTE CPE
-
-3. ✅ **Cleanup Script** - Enhanced to remove:
-   - Fake NetworkEquipment records
-   - Fake UnifiedCPE records
-   - Fake InventoryItem records
-   - Fake RemoteEPC records
-   - Fake SNMPMetrics data
-
-4. ✅ **Frontend** - Graphs show real data or "No data available"
-
-### Verification Steps
-
-After backend deployment:
-
-1. **Check SNMP Devices:**
-   - Go to Monitoring > Graphs tab
-   - Should show empty list or only real devices
-   - No fake devices (Core Router, Core Switch, Customer A/B CPE)
-
-2. **Check Hardware Inventory:**
-   - Go to Hardware module
-   - Should show only real EPC devices
-
-3. **Check Graphs:**
-   - Select a real device (if available)
-   - Graphs should show real data or "No data available"
-   - No fake/unrealistic data patterns
-
-### If You Still See Fake Data
-
-Run the cleanup script again:
-```bash
-cd /opt/lte-pci-mapper/backend-services/scripts
-node cleanup-fake-data.js
-```
-
-Then restart backend services:
-```bash
-pm2 restart main-api
-pm2 restart epc-api
-pm2 restart hss-api
-```
+This will show:
+- Whether service status is being saved
+- What metrics are in the database
+- Whether logs are being stored
