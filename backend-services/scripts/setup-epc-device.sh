@@ -408,6 +408,40 @@ log "Step 6: Installing SNMP discovery scripts..."
 
 mkdir -p /opt/wisptools
 
+# Install Node.js and npm if not installed (needed for CDP/LLDP discovery)
+if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
+    log "Installing Node.js and npm for SNMP discovery (required for CDP/LLDP support)..."
+    
+    # Detect OS for correct Node.js installation
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "$ID" in
+            ubuntu|debian)
+                # Install Node.js 18.x LTS
+                curl -fsSL https://deb.nodesource.com/setup_18.x | bash - 2>/dev/null || {
+                    log "WARNING: Failed to install Node.js from NodeSource, trying system package..."
+                    apt-get update -qq
+                    apt-get install -y nodejs npm 2>/dev/null || log "WARNING: Could not install Node.js"
+                }
+                apt-get install -y nodejs 2>/dev/null || log "WARNING: Node.js installation may have failed"
+                ;;
+            *)
+                log "WARNING: Unsupported OS for automatic Node.js installation"
+                log "   Please install Node.js manually if you need CDP/LLDP discovery"
+                ;;
+        esac
+    fi
+    
+    # Verify installation
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        log "✅ Node.js $(node --version) and npm $(npm --version) installed"
+    else
+        log "⚠️  Node.js/npm not installed - SNMP discovery will use bash fallback (no CDP/LLDP)"
+    fi
+else
+    log "Node.js $(node --version) and npm $(npm --version) already installed"
+fi
+
 # Download Node.js SNMP discovery script
 curl -fsSL "https://${CENTRAL_HSS}/downloads/scripts/epc-snmp-discovery.js" -o /opt/wisptools/epc-snmp-discovery.js
 chmod +x /opt/wisptools/epc-snmp-discovery.js 2>/dev/null || true
@@ -419,6 +453,28 @@ chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
 # Download npm package installer
 curl -fsSL "https://${CENTRAL_HSS}/downloads/scripts/install-epc-npm-packages.sh" -o /opt/wisptools/install-epc-npm-packages.sh
 chmod +x /opt/wisptools/install-epc-npm-packages.sh 2>/dev/null || true
+
+# Install npm packages if Node.js is available
+if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1 && [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+    log "Installing npm packages for SNMP discovery (ping-scanner, net-snmp)..."
+    cd /opt/wisptools
+    
+    # Initialize package.json if needed
+    if [ ! -f "package.json" ]; then
+        npm init -y >/dev/null 2>&1 || true
+    fi
+    
+    # Install required packages
+    npm install --no-save ping-scanner net-snmp >/dev/null 2>&1 || {
+        log "⚠️  Failed to install npm packages - CDP/LLDP discovery may not work"
+        log "   Running installer script manually..."
+        bash /opt/wisptools/install-epc-npm-packages.sh || true
+    }
+    
+    log "✅ npm packages installed (CDP/LLDP discovery enabled)"
+else
+    log "⚠️  Node.js/npm not available - using bash fallback (limited functionality)"
+fi
 
 log "✅ SNMP discovery scripts installed"
 
