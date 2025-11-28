@@ -73,6 +73,13 @@ const RemoteEPCSchema = new mongoose.Schema({
     autoDiscovery: { type: Boolean, default: true }
   },
   
+  // Installable Components Configuration
+  installed_components: {
+    nodejs_npm: { type: Boolean, default: false }, // Node.js and npm for CDP/LLDP discovery
+    snmp_discovery_enhanced: { type: Boolean, default: false }, // Enhanced SNMP discovery with CDP/LLDP
+    mikrotik_discovery: { type: Boolean, default: true } // Mikrotik-specific discovery
+  },
+  
   // APT Repository Configuration (for package updates)
   apt_config: {
     customRepoUrl: String,

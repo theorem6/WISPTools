@@ -88,6 +88,12 @@
       updateSchedule: 'daily', // 'hourly', 'daily', 'weekly'
       updateTime: '02:00',
       securityUpdatesOnly: false
+    },
+    // Installable Components
+    installedComponents: {
+      nodejs_npm: false, // Node.js/npm for CDP/LLDP discovery
+      snmp_discovery_enhanced: false, // Enhanced SNMP discovery
+      mikrotik_discovery: true // Mikrotik discovery (default enabled)
     }
   };
 

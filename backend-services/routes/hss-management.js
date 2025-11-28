@@ -918,6 +918,154 @@ router.put('/epc/:epc_id', async (req, res) => {
   }
 });
 
+// Install/Uninstall Component on Remote EPC
+// POST /api/hss/epc/:epc_id/install-component
+router.post('/epc/:epc_id/install-component', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    const { epc_id } = req.params;
+    const { component } = req.body; // 'nodejs_npm', 'snmp_discovery_enhanced', etc.
+
+    if (!component) {
+      return res.status(400).json({ error: 'Component name is required' });
+    }
+
+    console.log(`[HSS/EPC] Installing component ${component} on EPC ${epc_id}`);
+
+    const epc = await RemoteEPC.findOne({
+      $or: [{ epc_id: epc_id }, { _id: epc_id }],
+      tenant_id: tenantId
+    });
+
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+
+    // Queue install command
+    const { EPCCommand } = require('../models/distributed-epc-schema');
+    const crypto = require('crypto');
+    
+    // Determine script URL based on component
+    let scriptUrl = '';
+    if (component === 'nodejs_npm') {
+      scriptUrl = 'https://hss.wisptools.io/downloads/scripts/install-nodejs-npm.sh';
+    } else {
+      return res.status(400).json({ error: `Unknown component: ${component}` });
+    }
+
+    // Create install command
+    const installCmd = new EPCCommand({
+      epc_id: epc.epc_id,
+      tenant_id: tenantId,
+      command_type: 'script_execution',
+      action: 'install_component',
+      target_services: [],
+      script_url: scriptUrl,
+      config_data: { component },
+      description: `Install ${component}`,
+      status: 'pending',
+      priority: 5,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      created_at: new Date()
+    });
+
+    await installCmd.save();
+
+    // Update installed_components flag
+    if (!epc.installed_components) {
+      epc.installed_components = {};
+    }
+    epc.installed_components[component] = true;
+    await epc.save();
+
+    console.log(`[HSS/EPC] Queued install command for ${component} on EPC ${epc_id}`);
+    res.json({
+      success: true,
+      message: `Install command queued for ${component}`,
+      command_id: installCmd._id
+    });
+  } catch (error) {
+    console.error('[HSS/EPC] Error queuing install command:', error);
+    res.status(500).json({ error: 'Failed to queue install command', message: error.message });
+  }
+});
+
+// POST /api/hss/epc/:epc_id/uninstall-component
+router.post('/epc/:epc_id/uninstall-component', async (req, res) => {
+  try {
+    const tenantId = req.headers['x-tenant-id'];
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    const { epc_id } = req.params;
+    const { component } = req.body;
+
+    if (!component) {
+      return res.status(400).json({ error: 'Component name is required' });
+    }
+
+    console.log(`[HSS/EPC] Uninstalling component ${component} on EPC ${epc_id}`);
+
+    const epc = await RemoteEPC.findOne({
+      $or: [{ epc_id: epc_id }, { _id: epc_id }],
+      tenant_id: tenantId
+    });
+
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+
+    // Queue uninstall command
+    const { EPCCommand } = require('../models/distributed-epc-schema');
+    
+    let scriptUrl = '';
+    if (component === 'nodejs_npm') {
+      scriptUrl = 'https://hss.wisptools.io/downloads/scripts/uninstall-nodejs-npm.sh';
+    } else {
+      return res.status(400).json({ error: `Unknown component: ${component}` });
+    }
+
+    const uninstallCmd = new EPCCommand({
+      epc_id: epc.epc_id,
+      tenant_id: tenantId,
+      command_type: 'script_execution',
+      action: 'uninstall_component',
+      target_services: [],
+      script_url: scriptUrl,
+      config_data: { component },
+      description: `Uninstall ${component}`,
+      status: 'pending',
+      priority: 5,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      created_at: new Date()
+    });
+
+    await uninstallCmd.save();
+
+    // Update installed_components flag
+    if (!epc.installed_components) {
+      epc.installed_components = {};
+    }
+    epc.installed_components[component] = false;
+    await epc.save();
+
+    console.log(`[HSS/EPC] Queued uninstall command for ${component} on EPC ${epc_id}`);
+    res.json({
+      success: true,
+      message: `Uninstall command queued for ${component}`,
+      command_id: uninstallCmd._id
+    });
+  } catch (error) {
+    console.error('[HSS/EPC] Error queuing uninstall command:', error);
+    res.status(500).json({ error: 'Failed to queue uninstall command', message: error.message });
+  }
+});
+
 // Delete a RemoteEPC device
 // DELETE /api/hss/epc/:epc_id
 router.delete('/epc/:epc_id', async (req, res) => {
