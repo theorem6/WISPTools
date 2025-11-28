@@ -4,12 +4,13 @@
  */
 
 const { RemoteEPC } = require('../models/distributed-epc-schema');
+const mongoose = require('mongoose');
 
 /**
  * Generate site name with suffix based on site_id
- * Format: {site_id}:1, {site_id}:2, etc.
+ * Format: {SiteName}:1, {SiteName}:2, etc.
  * 
- * @param {string} site_id - The site identifier
+ * @param {string} site_id - The site identifier (ObjectId or string)
  * @param {string} tenant_id - Tenant ID
  * @returns {Promise<string>} Site name with appropriate suffix
  */
@@ -20,35 +21,60 @@ async function generateSiteNameWithSuffix(site_id, tenant_id) {
   }
   
   try {
+    // First, try to look up the actual site name from UnifiedSite collection
+    let baseSiteName = null;
+    try {
+      const db = mongoose.connection.db;
+      const UnifiedSite = db.collection('unifiedsites');
+      
+      // Try to find the site by _id
+      const siteObjId = mongoose.Types.ObjectId.isValid(site_id) 
+        ? new mongoose.Types.ObjectId(site_id) 
+        : site_id;
+      
+      const site = await UnifiedSite.findOne({
+        _id: siteObjId,
+        tenantId: tenant_id
+      });
+      
+      if (site && site.name) {
+        baseSiteName = site.name;
+      }
+    } catch (siteLookupError) {
+      console.warn('[Site Naming] Could not lookup site name from UnifiedSite:', siteLookupError.message);
+    }
+    
+    // If we couldn't find the site name, use site_id as fallback
+    if (!baseSiteName) {
+      baseSiteName = site_id;
+    }
+    
     // Find all EPCs at this site for this tenant
-    // Match by site_id OR by site_name starting with site_id (handles both cases)
-    const escapedSiteId = site_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match by site_id
     const existingEPCs = await RemoteEPC.find({
-      $or: [
-        { site_id: site_id, tenant_id: tenant_id },
-        { site_name: { $regex: `^${escapedSiteId}(:\\d+)?$` }, tenant_id: tenant_id },
-        { site_name: site_id, tenant_id: tenant_id }
-      ]
+      site_id: site_id,
+      tenant_id: tenant_id
     })
     .select('site_name epc_id site_id')
     .lean();
     
     // Extract existing suffixes from site names
+    // Look for patterns like "SiteName:1", "SiteName:2", etc.
+    const escapedBaseName = baseSiteName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const suffixes = existingEPCs
       .map(epc => {
-        // Extract suffix from site_name format: "site_id:N"
-        const match = epc.site_name?.match(/^([^:]+):(\d+)$/);
+        if (!epc.site_name) return null;
+        
+        // Extract suffix from site_name format: "BaseName:N" or "BaseName"
+        const match = epc.site_name.match(/^(.+?)(?::(\d+))?$/);
         if (match) {
-          const baseName = match[1];
-          const suffix = parseInt(match[2], 10);
-          // Only count if base matches our site_id
-          if (baseName === site_id || epc.site_id === site_id) {
-            return suffix;
+          const namePart = match[1];
+          const suffixPart = match[2] ? parseInt(match[2], 10) : 1;
+          
+          // If the name part matches our base name (or the site_id matches), use the suffix
+          if (namePart === baseSiteName || namePart === site_id || epc.site_id === site_id) {
+            return suffixPart;
           }
-        }
-        // If site_name equals site_id exactly, it's the first one (no suffix = 1)
-        if (epc.site_name === site_id || epc.site_id === site_id) {
-          return 1;
         }
         return null;
       })
@@ -68,9 +94,12 @@ async function generateSiteNameWithSuffix(site_id, tenant_id) {
       }
     }
     
-    // If nextSuffix is 1, use site_id directly (no suffix)
-    // Otherwise use site_id:nextSuffix
-    return nextSuffix === 1 ? site_id : `${site_id}:${nextSuffix}`;
+    // Return format: "SiteName:1", "SiteName:2", etc.
+    // If nextSuffix is 1 and it's the first EPC, we can omit the suffix or include it
+    // For consistency, always include the suffix
+    return nextSuffix === 1 && suffixes.length === 0 
+      ? baseSiteName 
+      : `${baseSiteName}:${nextSuffix}`;
     
   } catch (error) {
     console.error('[Site Naming] Error generating site name:', error);
