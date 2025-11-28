@@ -1,0 +1,14 @@
+========================================
+COMPLETE EPC UPDATE - ONE COMMAND
+========================================
+
+Copy and paste this entire command on your EPC:
+
+sudo bash -c 'mkdir -p /opt/wisptools /etc/wisptools && curl -fsSL https://hss.wisptools.io/downloads/scripts/epc-checkin-agent.sh -o /opt/wisptools/epc-checkin-agent.sh && chmod +x /opt/wisptools/epc-checkin-agent.sh && curl -fsSL https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.sh -o /opt/wisptools/epc-snmp-discovery.sh && chmod +x /opt/wisptools/epc-snmp-discovery.sh && systemctl daemon-reload && systemctl restart wisptools-checkin && sleep 3 && systemctl status wisptools-checkin --no-pager | head -10 && echo "" && echo "✅ Update complete! Scripts:" && ls -lh /opt/wisptools/*.sh'
+
+Then trigger a check-in to test:
+
+sudo /opt/wisptools/epc-checkin-agent.sh once
+
+========================================
+

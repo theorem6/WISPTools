@@ -1,0 +1,18 @@
+========================================
+CORRECT CHECK-IN COMMAND
+========================================
+
+The correct command is:
+
+sudo /opt/wisptools/epc-checkin-agent.sh once
+
+Or if you want to see the output directly:
+
+sudo bash /opt/wisptools/epc-checkin-agent.sh once
+
+Or just watch the log file:
+
+tail -f /var/log/wisptools-checkin.log
+
+========================================
+

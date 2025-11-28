@@ -1,0 +1,27 @@
+========================================
+COMPLETE EPC UPDATE - FULL COMMAND
+========================================
+
+Run this on your EPC device to download and update everything:
+
+sudo bash -c '
+mkdir -p /opt/wisptools /etc/wisptools
+curl -fsSL https://hss.wisptools.io/downloads/scripts/epc-checkin-agent.sh -o /opt/wisptools/epc-checkin-agent.sh
+chmod +x /opt/wisptools/epc-checkin-agent.sh
+curl -fsSL https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.sh -o /opt/wisptools/epc-snmp-discovery.sh
+chmod +x /opt/wisptools/epc-snmp-discovery.sh
+systemctl daemon-reload
+systemctl restart wisptools-checkin
+sleep 2
+echo "✅ Update complete!"
+echo "Scripts installed:"
+ls -lh /opt/wisptools/*.sh
+'
+
+Then test with:
+
+sudo /opt/wisptools/epc-checkin-agent.sh once
+tail -f /var/log/wisptools-checkin.log
+
+========================================
+
