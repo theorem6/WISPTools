@@ -1037,6 +1037,7 @@ echo "🎉 Deployment successful!";
             hss_config: epcConfig.hssConfig,
             snmp_config: epcConfig.snmpConfig,
             apt_config: epcConfig.aptConfig,
+            installedComponents: epcConfig.installedComponents,
             location: epcConfig.location,
             contact: epcConfig.contact
           }
@@ -1159,7 +1160,8 @@ echo "🎉 Deployment successful!";
             // Deployment configuration
             deploymentType: deploymentType,
             snmpConfig: epcConfig.snmpConfig,
-            aptConfig: epcConfig.aptConfig
+            aptConfig: epcConfig.aptConfig,
+            installedComponents: epcConfig.installedComponents
           })
         });
       };
@@ -1478,6 +1480,43 @@ echo "🎉 Deployment successful!";
                     <label>
                       <input type="checkbox" bind:checked={epcConfig.snmpConfig.enableTraps} />
                       Enable SNMP Traps
+                    </label>
+                  </div>
+                </div>
+                
+                <!-- Installable Components -->
+                <div class="form-section" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #ddd;">
+                  <h4 style="margin-bottom: 1rem; font-size: 1.1rem;">📦 Installable Components</h4>
+                  <p class="step-description" style="margin-bottom: 1rem; color: #666;">
+                    Select additional components to install on the remote EPC device
+                  </p>
+                  <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <label class="checkbox-label" style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: #f9fafb; border-radius: 6px;">
+                      <input type="checkbox" bind:checked={epcConfig.installedComponents.nodejs_npm} style="margin-top: 0.25rem;" />
+                      <div style="flex: 1;">
+                        <strong style="display: block; margin-bottom: 0.25rem;">Node.js & npm</strong>
+                        <span style="display: block; font-size: 0.875rem; color: #666;">
+                          Required for CDP/LLDP discovery and enhanced SNMP functionality
+                        </span>
+                      </div>
+                    </label>
+                    <label class="checkbox-label" style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: #f9fafb; border-radius: 6px;">
+                      <input type="checkbox" bind:checked={epcConfig.installedComponents.snmp_discovery_enhanced} style="margin-top: 0.25rem;" />
+                      <div style="flex: 1;">
+                        <strong style="display: block; margin-bottom: 0.25rem;">Enhanced SNMP Discovery</strong>
+                        <span style="display: block; font-size: 0.875rem; color: #666;">
+                          Advanced network topology discovery using CDP/LLDP protocols
+                        </span>
+                      </div>
+                    </label>
+                    <label class="checkbox-label" style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: #f9fafb; border-radius: 6px;">
+                      <input type="checkbox" bind:checked={epcConfig.installedComponents.mikrotik_discovery} style="margin-top: 0.25rem;" />
+                      <div style="flex: 1;">
+                        <strong style="display: block; margin-bottom: 0.25rem;">Mikrotik Discovery</strong>
+                        <span style="display: block; font-size: 0.875rem; color: #666;">
+                          Mikrotik-specific device discovery and monitoring
+                        </span>
+                      </div>
                     </label>
                   </div>
                 </div>

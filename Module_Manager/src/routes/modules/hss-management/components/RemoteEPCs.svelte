@@ -612,6 +612,76 @@ To use:
     }
   }
   
+  async function installComponent(epc: any, component: string) {
+    if (!confirm(`Install ${component} on ${epc.site_name}?`)) {
+      return;
+    }
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/install-component`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ component })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        alert(`Install command queued for ${component}. The device will install it on next check-in.`);
+        await loadEPCs();
+      } else {
+        alert(`Failed to queue install: ${result.error || result.message || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error('Error installing component:', err);
+      alert('Failed to install component: ' + err.message);
+    }
+  }
+  
+  async function uninstallComponent(epc: any, component: string) {
+    if (!confirm(`Uninstall ${component} from ${epc.site_name}?`)) {
+      return;
+    }
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      
+      const response = await fetch(`${HSS_API}/epc/${epc.epc_id}/uninstall-component`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ component })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        alert(`Uninstall command queued for ${component}. The device will uninstall it on next check-in.`);
+        await loadEPCs();
+      } else {
+        alert(`Failed to queue uninstall: ${result.error || result.message || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      console.error('Error uninstalling component:', err);
+      alert('Failed to uninstall component: ' + err.message);
+    }
+  }
+  
   function resetForm() {
     formData = {
       site_name: '',
@@ -839,6 +909,36 @@ To use:
             <button class="btn-danger" on:click={() => deleteEPC(epc)}>
               🗑️
             </button>
+          </div>
+          
+          <!-- Installable Components Actions -->
+          <div class="epc-components" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #ddd;">
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem; color: #666;">📦 Components:</div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              {#if epc.installed_components?.nodejs_npm}
+                <span class="component-badge installed" title="Node.js & npm installed">
+                  ✅ Node.js/npm
+                </span>
+                <button 
+                  class="btn-small btn-danger" 
+                  on:click={() => uninstallComponent(epc, 'nodejs_npm')}
+                  title="Uninstall Node.js and npm"
+                >
+                  🗑️
+                </button>
+              {:else}
+                <span class="component-badge not-installed" title="Node.js & npm not installed">
+                  ❌ Node.js/npm
+                </span>
+                <button 
+                  class="btn-small btn-primary" 
+                  on:click={() => installComponent(epc, 'nodejs_npm')}
+                  title="Install Node.js and npm for CDP/LLDP discovery"
+                >
+                  ➕ Install
+                </button>
+              {/if}
+            </div>
           </div>
         </div>
       {/each}
@@ -1516,6 +1616,35 @@ To use:
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+  }
+  
+  .epc-components {
+    font-size: 0.875rem;
+  }
+  
+  .component-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .component-badge.installed {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .component-badge.not-installed {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
   }
   
   .epc-actions button {

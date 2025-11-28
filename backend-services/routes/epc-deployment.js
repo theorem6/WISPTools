@@ -105,6 +105,11 @@ router.post('/register-epc', async (req, res) => {
       deployment_type: deploymentType || 'both',
       snmp_config: snmpConfig || {},
       apt_config: aptConfig || {},
+      installed_components: installedComponents || {
+        nodejs_npm: false,
+        snmp_discovery_enhanced: false,
+        mikrotik_discovery: true
+      },
       status: 'registered',
       origin_host_fqdn: originHostFQDN
     };
@@ -400,6 +405,11 @@ router.post('/link-device', async (req, res) => {
       location: config?.location || {},
       contact: config?.contact || {},
       apt_config: config?.apt_config || { enabled: true },
+      installed_components: config?.installedComponents || {
+        nodejs_npm: false,
+        snmp_discovery_enhanced: false,
+        mikrotik_discovery: true
+      },
       created_at: new Date()
     });
     
