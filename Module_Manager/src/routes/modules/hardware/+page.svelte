@@ -16,6 +16,7 @@
   import { API_CONFIG } from '$lib/config/api';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import { formatInTenantTimezone } from '$lib/utils/timezone';
+  import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
   
   const HSS_API = API_CONFIG.PATHS.HSS;
   
@@ -237,6 +238,8 @@
   // EPC Device Edit
   let showEPCEditModal = false;
   let selectedEPCDevice: any = null;
+  let availableSites: any[] = [];
+  let loadingSites = false;
   let epcEditForm = {
     epc_id: '',
     new_epc_id: '',
@@ -249,8 +252,28 @@
   };
   let isSavingEPC = false;
   
-  function editEPCDevice(device: any) {
+  async function loadAvailableSites() {
+    if (!$currentTenant?.id || loadingSites) return;
+    
+    loadingSites = true;
+    try {
+      availableSites = await coverageMapService.getTowerSites($currentTenant.id);
+    } catch (err: any) {
+      console.error('Error loading sites:', err);
+      availableSites = [];
+    } finally {
+      loadingSites = false;
+    }
+  }
+  
+  async function editEPCDevice(device: any) {
     selectedEPCDevice = device;
+    
+    // Load available sites if not already loaded
+    if (availableSites.length === 0) {
+      await loadAvailableSites();
+    }
+    
     epcEditForm = {
       epc_id: device.epc_id || device.epcId || '',
       new_epc_id: device.epc_id || device.epcId || '',
@@ -275,6 +298,21 @@
       }
     };
     showEPCEditModal = true;
+  }
+  
+  function handleSiteSelect(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    const siteId = target.value;
+    epcEditForm.site_id = siteId;
+    
+    if (siteId) {
+      const site = availableSites.find(s => (s.id || s._id) === siteId);
+      if (site) {
+        epcEditForm.site_name = site.name || site.siteName || '';
+      }
+    } else {
+      epcEditForm.site_name = '';
+    }
   }
   
   async function saveEPCDevice() {
@@ -305,11 +343,13 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          new_epc_id: epcEditForm.new_epc_id || undefined,
           site_name: epcEditForm.site_name,
+          site_id: epcEditForm.site_id || undefined,
           deployment_type: epcEditForm.deployment_type,
           hss_config: epcEditForm.hss_config,
-          snmp_config: epcEditForm.snmp_config
+          snmp_config: epcEditForm.snmp_config,
+          device_code: selectedEPCDevice.device_code || epcEditForm.device_code || undefined,
+          status: selectedEPCDevice.device_code || epcEditForm.device_code ? 'registered' : undefined
         })
       });
       
@@ -913,8 +953,8 @@
           <h4>🆔 EPC Identification</h4>
           <div class="form-group">
             <label>EPC ID</label>
-            <input type="text" bind:value={epcEditForm.epc_id} placeholder="EPC-XXXX" />
-            <small class="hint">Change the EPC ID (must be unique)</small>
+            <input type="text" value={epcEditForm.epc_id} readonly disabled placeholder="EPC-XXXX" style="background-color: #f5f5f5; cursor: not-allowed;" />
+            <small class="hint">EPC ID is auto-generated and cannot be changed</small>
           </div>
         </div>
         
@@ -922,13 +962,25 @@
         <div class="config-section">
           <h4>📍 Site Information</h4>
           <div class="form-group">
-            <label>Site ID (for multiple EPCs: will auto-generate Site:1, Site:2, etc.)</label>
-            <input type="text" bind:value={epcEditForm.site_id} placeholder="Enter site ID" />
-            <small class="hint">Leave blank to use site name as-is</small>
+            <label>Site</label>
+            {#if loadingSites}
+              <select disabled>
+                <option>Loading sites...</option>
+              </select>
+            {:else}
+              <select on:change={handleSiteSelect} value={epcEditForm.site_id}>
+                <option value="">-- Select a site --</option>
+                {#each availableSites as site}
+                  <option value={site.id || site._id}>{site.name || site.siteName || 'Unnamed Site'}</option>
+                {/each}
+              </select>
+            {/if}
+            <small class="hint">Select a deployed site from the list</small>
           </div>
           <div class="form-group">
             <label>Site Name</label>
-            <input type="text" bind:value={epcEditForm.site_name} placeholder="Enter site name" />
+            <input type="text" bind:value={epcEditForm.site_name} placeholder="Site name (auto-filled from selected site)" />
+            <small class="hint">Will be auto-generated with suffix if multiple EPCs on same site</small>
           </div>
         </div>
         

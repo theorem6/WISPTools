@@ -801,7 +801,7 @@ router.put('/epc/:epc_id', async (req, res) => {
     }
 
     const { epc_id } = req.params;
-    const { epc_id: new_epc_id_from_body, new_epc_id, site_name, deployment_type, hss_config, snmp_config, network_config } = req.body;
+    const { epc_id: new_epc_id_from_body, new_epc_id, site_id, site_name, deployment_type, hss_config, snmp_config, network_config, device_code, status } = req.body;
     
     // Support both 'epc_id' and 'new_epc_id' in body for backward compatibility
     const new_epc_id_value = new_epc_id || new_epc_id_from_body;
@@ -859,9 +859,37 @@ router.put('/epc/:epc_id', async (req, res) => {
       updateFields.epc_id = new_epc_id_value;
     }
 
-    // Allow updating site_name
-    if (site_name !== undefined) {
+    // Allow updating site_id
+    if (site_id !== undefined) {
+      updateFields.site_id = site_id || null;
+      
+      // If site_id is set, regenerate site_name with proper suffix
+      if (site_id) {
+        const { generateSiteNameWithSuffix } = require('../utils/site-naming');
+        const newSiteName = await generateSiteNameWithSuffix(site_id, tenantId);
+        updateFields.site_name = newSiteName;
+      }
+    }
+    
+    // Allow updating site_name (only if site_id not provided, otherwise it's auto-generated)
+    if (site_name !== undefined && site_id === undefined) {
       updateFields.site_name = site_name;
+    }
+    
+    // Allow updating device_code (for linking)
+    if (device_code !== undefined && device_code) {
+      updateFields.device_code = device_code;
+      
+      // If device_code is being set, ensure status is at least 'registered' (linked)
+      // Don't downgrade if already online
+      if (!status && (!epc.status || epc.status === 'offline' || epc.status === 'error')) {
+        updateFields.status = 'registered';
+      }
+    }
+    
+    // Allow updating status explicitly (e.g., set to 'registered' when linked)
+    if (status !== undefined && ['registered', 'online', 'offline', 'error'].includes(status)) {
+      updateFields.status = status;
     }
 
     if (deployment_type) {
