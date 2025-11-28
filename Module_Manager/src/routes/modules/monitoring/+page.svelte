@@ -371,12 +371,24 @@
         const deviceId = device.epcId || device.id || device._id;
         if (deviceId && !seenIds.has(deviceId)) {
           seenIds.add(deviceId);
-          devices.push({
+          // Ensure location structure is preserved for map display
+          const deviceData: any = {
             ...device,
             type,
             id: deviceId,
             status: device.status || 'unknown'
-          });
+          };
+          // Ensure location has coordinates structure for map
+          if (!deviceData.location?.coordinates && deviceData.location) {
+            deviceData.location = {
+              coordinates: {
+                latitude: deviceData.location.latitude || deviceData.location.coordinates?.latitude || 0,
+                longitude: deviceData.location.longitude || deviceData.location.coordinates?.longitude || 0
+              },
+              address: deviceData.location.address || 'Unknown Location'
+            };
+          }
+          devices.push(deviceData);
         }
       };
       

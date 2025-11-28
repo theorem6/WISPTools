@@ -482,7 +482,11 @@ To use:
       if (!user) return;
       
       const token = await user.getIdToken();
-      const response = await fetch(`${HSS_API.replace('/api/hss', '/api/epc')}/${epcId}/logs?limit=200`, {
+      // Build correct API URL for logs endpoint
+      const logsApiUrl = HSS_API.includes('/api/hss') 
+        ? HSS_API.replace('/api/hss', '/api/epc')
+        : `${HSS_API}/api/epc`;
+      const response = await fetch(`${logsApiUrl}/${epcId}/logs?limit=200`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': tenantId

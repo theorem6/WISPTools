@@ -86,10 +86,72 @@ get_service_status() {
     echo "{\"status\":\"$status\",\"uptime_seconds\":$uptime_sec,\"memory_mb\":$memory_mb}"
 }
 
-# Get system metrics - using jq for proper JSON
+# Get system metrics - using proper CPU calculation that accounts for multi-core systems
 get_system_metrics() {
-    local cpu_percent=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8}' | cut -d. -f1 2>/dev/null)
+    # Calculate CPU usage from /proc/stat (most accurate, accounts for all cores, fast)
+    local cpu_percent=0
+    local stat_file="/tmp/cpu_stat_prev"
+    
+    if [ -f /proc/stat ]; then
+        # Read current CPU stats
+        local cpu_line=$(head -n 1 /proc/stat)
+        local user=$(echo "$cpu_line" | awk '{print $2}')
+        local nice=$(echo "$cpu_line" | awk '{print $3}')
+        local system=$(echo "$cpu_line" | awk '{print $4}')
+        local idle=$(echo "$cpu_line" | awk '{print $5}')
+        local iowait=$(echo "$cpu_line" | awk '{print $6}')
+        local irq=$(echo "$cpu_line" | awk '{print $7}')
+        local softirq=$(echo "$cpu_line" | awk '{print $8}')
+        
+        local total=$((user + nice + system + idle + iowait + irq + softirq))
+        local idle_total=$((idle + iowait))
+        
+        # Get previous stats if available
+        if [ -f "$stat_file" ]; then
+            local prev_line=$(cat "$stat_file")
+            local prev_user=$(echo "$prev_line" | awk '{print $2}')
+            local prev_nice=$(echo "$prev_line" | awk '{print $3}')
+            local prev_system=$(echo "$prev_line" | awk '{print $4}')
+            local prev_idle=$(echo "$prev_line" | awk '{print $5}')
+            local prev_iowait=$(echo "$prev_line" | awk '{print $6}')
+            local prev_irq=$(echo "$prev_line" | awk '{print $7}')
+            local prev_softirq=$(echo "$prev_line" | awk '{print $8}')
+            
+            local prev_total=$((prev_user + prev_nice + prev_system + prev_idle + prev_iowait + prev_irq + prev_softirq))
+            local prev_idle_total=$((prev_idle + prev_iowait))
+            
+            local total_delta=$((total - prev_total))
+            local idle_delta=$((idle_total - prev_idle_total))
+            
+            if [ "$total_delta" -gt 0 ]; then
+                local used=$((total_delta - idle_delta))
+                cpu_percent=$((used * 100 / total_delta))
+            fi
+        fi
+        
+        # Save current stats for next call
+        echo "$cpu_line" > "$stat_file" 2>/dev/null || true
+    fi
+    
+    # Fallback to top if /proc/stat method didn't work or no previous data
+    if [ -z "$cpu_percent" ] || [ "$cpu_percent" -lt 0 ] || [ "$cpu_percent" -gt 100 ]; then
+        # Use top - the %Cpu(s) line shows aggregate across all cores
+        local cpu_line=$(top -bn1 | grep "^%Cpu" 2>/dev/null | head -1)
+        if [ -n "$cpu_line" ]; then
+            # Extract all CPU percentages and calculate used
+            local us=$(echo "$cpu_line" | grep -oE '[0-9.]+%us' | grep -oE '[0-9.]+' || echo "0")
+            local sy=$(echo "$cpu_line" | grep -oE '[0-9.]+%sy' | grep -oE '[0-9.]+' || echo "0")
+            local ni=$(echo "$cpu_line" | grep -oE '[0-9.]+%ni' | grep -oE '[0-9.]+' || echo "0")
+            local id=$(echo "$cpu_line" | grep -oE '[0-9.]+%id' | grep -oE '[0-9.]+' || echo "100")
+            # Calculate used percentage
+            cpu_percent=$(awk "BEGIN {printf \"%.0f\", $us + $sy + $ni}" 2>/dev/null || echo "0")
+        fi
+    fi
+    
     [ -z "$cpu_percent" ] && cpu_percent=0
+    # Ensure value is between 0 and 100
+    [ "$cpu_percent" -lt 0 ] && cpu_percent=0
+    [ "$cpu_percent" -gt 100 ] && cpu_percent=100
     local mem_total=$(free -m | awk 'NR==2{print $2}' 2>/dev/null)
     [ -z "$mem_total" ] && mem_total=1
     local mem_used=$(free -m | awk 'NR==2{print $3}' 2>/dev/null)
