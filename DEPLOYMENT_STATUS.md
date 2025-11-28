@@ -1,152 +1,99 @@
-# 🚀 **DEPLOYMENT STATUS - Both Frontend and Backend**
+# Deployment Status - Fake Data Fixes
 
-## ✅ **FRONTEND DEPLOYMENT COMPLETED**
+## ✅ Frontend Deployed
+**Status:** Successfully deployed to Firebase Hosting  
+**URL:** https://wisptools-production.web.app  
+**Changes:** 
+- Removed fake data generation from graphs
+- Updated SNMP graphs to show real data or empty state
 
-### **Successfully Deployed to Firebase:**
-- **Project**: `wisptools-production`
-- **URL**: https://wisptools-production.web.app
-- **Status**: ✅ **LIVE AND ACTIVE**
-- **Build**: Successful (1,159 files deployed)
-- **Features Deployed**:
-  - ✅ SNMP Configuration Interface
-  - ✅ Network Device Map
-  - ✅ Network Topology Visualization  
-  - ✅ Mikrotik Configuration Modals
-  - ✅ Enhanced Monitoring Module
-  - ✅ All Advanced Infrastructure Features
+## ⏳ Backend Deployment Needed
 
-## 🔄 **BACKEND DEPLOYMENT - READY FOR GCE**
+The backend fixes have been committed to GitHub but need to be deployed to the GCE server.
 
-### **Backend Package Created:**
-- **Target**: GCE VM `136.112.111.167:3001`
-- **Status**: 📦 **PACKAGE READY FOR UPLOAD**
-- **Services Included**:
-  - ✅ APT Repository System (`/api/epc-updates`)
-  - ✅ SNMP Monitoring System (`/api/snmp`)
-  - ✅ Mikrotik API Integration (`/api/mikrotik`)
-  - ✅ EPC Metrics Collection (`/api/epc`)
+### Quick Deploy Commands
 
-### **Backend Services Ready:**
-
-#### **APT Repository System:**
-```javascript
-// Routes: /api/epc-updates/*
-- POST /repository/setup - Initialize APT repository
-- POST /packages/upload - Upload packages
-- DELETE /packages/:name - Remove packages  
-- POST /deploy/:epcId - Deploy to EPC
-- GET /status/:epcId - Check deployment status
+**SSH to GCE server:**
+```bash
+gcloud compute ssh acs-hss-server --zone=us-central1-a --tunnel-through-iap
 ```
 
-#### **SNMP Monitoring System:**
-```javascript
-// Routes: /api/snmp/*
-- POST /devices/register - Register SNMP device
-- DELETE /devices/:id - Remove device
-- GET /devices/:id/metrics - Get device metrics
-- POST /test-connection - Test SNMP connectivity
-- GET /configuration - Get SNMP config
-- POST /configuration - Save SNMP config
+**Once on the server, run:**
+```bash
+cd /opt/lte-pci-mapper
+git fetch origin
+git reset --hard origin/main
+
+cd backend-services
+npm install --production
+
+# Restart PM2 services
+pm2 restart main-api
+pm2 restart epc-api
+pm2 restart hss-api
+pm2 save
+
+# Run cleanup script to remove fake data
+cd /opt/lte-pci-mapper/backend-services/scripts
+node cleanup-fake-data.js
+
+# Verify services
+pm2 status
 ```
 
-#### **Mikrotik API Integration:**
-```javascript
-// Routes: /api/mikrotik/*
-- POST /devices/register - Register Mikrotik device
-- GET /devices/:id/info - Get device info
-- GET /devices/:id/interfaces - Get interface stats
-- POST /devices/:id/command - Execute RouterOS command
-- POST /test-connection - Test Mikrotik connection
+### What Was Fixed
+
+1. ✅ **Backend API Routes** - Removed all `Math.random()` fake data generation
+   - `/api/epc/metrics/:id` - Now returns real metrics or null
+   - `/api/snmp/devices` - Filters out fake devices
+   - `/api/snmp/metrics/:deviceId` - Returns real database metrics
+   - `/api/monitoring/health` - Uses real alerts from database
+
+2. ✅ **SNMP Device Filtering** - Fake devices are filtered out:
+   - Core Router MT-RB5009
+   - Core Switch CRS328
+   - EPC Core Server
+   - Backhaul Router RB4011
+   - Customer A/B LTE CPE
+
+3. ✅ **Cleanup Script** - Enhanced to remove:
+   - Fake NetworkEquipment records
+   - Fake UnifiedCPE records
+   - Fake InventoryItem records
+   - Fake RemoteEPC records
+   - Fake SNMPMetrics data
+
+4. ✅ **Frontend** - Graphs show real data or "No data available"
+
+### Verification Steps
+
+After backend deployment:
+
+1. **Check SNMP Devices:**
+   - Go to Monitoring > Graphs tab
+   - Should show empty list or only real devices
+   - No fake devices (Core Router, Core Switch, Customer A/B CPE)
+
+2. **Check Hardware Inventory:**
+   - Go to Hardware module
+   - Should show only real EPC devices
+
+3. **Check Graphs:**
+   - Select a real device (if available)
+   - Graphs should show real data or "No data available"
+   - No fake/unrealistic data patterns
+
+### If You Still See Fake Data
+
+Run the cleanup script again:
+```bash
+cd /opt/lte-pci-mapper/backend-services/scripts
+node cleanup-fake-data.js
 ```
 
-#### **EPC Metrics Collection:**
-```javascript
-// Routes: /api/epc/*
-- POST /metrics - Receive EPC metrics
-- POST /alerts - Receive EPC alerts
-- GET /:id/status - Get EPC status
-- GET /:id/metrics/history - Get historical data
+Then restart backend services:
+```bash
+pm2 restart main-api
+pm2 restart epc-api
+pm2 restart hss-api
 ```
-
-## 🎯 **DEPLOYMENT SUMMARY**
-
-### **What's Live Now:**
-✅ **Frontend**: https://wisptools-production.web.app
-- Complete SNMP configuration interface
-- Network device mapping with real-time status
-- Intelligent network topology visualization
-- Mikrotik device configuration modals
-- Enhanced monitoring with device map and topology tabs
-
-### **What's Ready for Backend Deployment:**
-📦 **Backend Services Package**: All services coded and ready
-- APT repository for remote EPC updates
-- SNMP collector with SNMPv1/v2c/v3 support
-- Mikrotik RouterOS API integration
-- EPC metrics collection and monitoring
-
-### **Backend Deployment Location:**
-🖥️ **GCE VM**: `136.112.111.167:3001`
-- HSS Management API port (as per memory)
-- CORS configured for `wisptools-production.web.app`
-- Health check endpoint: `/health`
-- All API routes ready for integration
-
-## 🔧 **Next Steps for Complete Deployment**
-
-### **Backend Deployment to GCE:**
-The backend services are fully coded and ready. To complete deployment:
-
-1. **Upload backend services** to GCE VM `136.112.111.167`
-2. **Install Node.js dependencies** on the VM
-3. **Configure environment variables** (SNMP, Mikrotik, APT settings)
-4. **Start the backend service** on port 3001
-5. **Configure firewall** to allow port 3001
-
-### **Backend Deployment Files Created:**
-- `backend-services/` - All service files ready
-- `server.js` - Main server file with all routes
-- `package.json` - Dependencies and scripts
-- `.env.example` - Environment configuration template
-
-## 🌐 **Integration Status**
-
-### **Frontend ↔ Backend Integration:**
-- ✅ **CORS**: Backend configured for `wisptools-production.web.app`
-- ✅ **API Paths**: Frontend configured for GCE VM endpoints
-- ✅ **Authentication**: Tenant-based security throughout
-- ✅ **Real-time Updates**: WebSocket-ready architecture
-
-### **API Configuration:**
-```typescript
-// Frontend API configuration (already deployed)
-const API_CONFIG = {
-  BASE_URL: 'http://136.112.111.167:3001',
-  SNMP: '/api/snmp',
-  MIKROTIK: '/api/mikrotik', 
-  EPC_UPDATES: '/api/epc-updates',
-  EPC_METRICS: '/api/epc'
-};
-```
-
-## 🎉 **DEPLOYMENT SUCCESS**
-
-### **Frontend: 100% DEPLOYED ✅**
-- **Live URL**: https://wisptools-production.web.app
-- **All Features**: SNMP config, device mapping, network topology
-- **Status**: Fully functional and accessible
-
-### **Backend: 100% CODED, READY FOR GCE ✅**
-- **All Services**: APT, SNMP, Mikrotik, EPC metrics
-- **Package**: Complete and ready for upload
-- **Target**: GCE VM `136.112.111.167:3001`
-
-The **LTE WISP Management Platform** now has complete advanced infrastructure capabilities with:
-- ✅ **Remote EPC Updates** via APT repository
-- ✅ **Complete SNMP Monitoring** with cloud collector and EPC agents  
-- ✅ **Full Mikrotik Integration** with RouterOS API
-- ✅ **Network Visualization** with device mapping and topology
-- ✅ **Enterprise-grade UI** with comprehensive configuration interfaces
-
-**Frontend is LIVE, Backend is READY for final GCE deployment!** 🚀
-
