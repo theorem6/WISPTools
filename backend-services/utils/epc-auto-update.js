@@ -32,7 +32,8 @@ async function getFileHash(filePath) {
 async function checkForUpdates(epc_id, currentVersions = {}) {
   const scripts = [
     'epc-checkin-agent.sh',
-    'epc-snmp-discovery.sh'
+    'epc-snmp-discovery.sh',
+    'epc-snmp-discovery.js'  // Node.js version
   ];
   
   const updates = {};
@@ -95,6 +96,7 @@ function generateUpdateCommand(updateInfo) {
   
   // Create update script
   const updateScript = Object.entries(updateInfo.scripts).map(([scriptName, info]) => {
+    const scriptExt = scriptName.endsWith('.js') ? 'js' : 'sh';
     return `
 # Update ${scriptName}
 log "Updating ${scriptName}..."
