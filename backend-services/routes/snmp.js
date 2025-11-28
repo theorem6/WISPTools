@@ -58,6 +58,31 @@ const formatSNMPDevice = (device, source = 'equipment') => {
   };
 };
 
+// Helper function to filter out fake/demo devices
+const FAKE_DEVICE_NAMES = [
+  'Core Router MT-RB5009',
+  'Core Switch CRS328',
+  'EPC Core Server',
+  'Backhaul Router RB4011',
+  'Customer A CPE',
+  'Customer B CPE',
+  'Customer A LTE CPE',
+  'Customer B LTE CPE'
+];
+
+const FAKE_PATTERNS = [
+  /Customer.*CPE/i,
+  /Customer.*LTE/i,
+  /Customer A/i,
+  /Customer B/i
+];
+
+function isFakeDevice(name) {
+  if (!name) return false;
+  if (FAKE_DEVICE_NAMES.some(fake => name.includes(fake))) return true;
+  return FAKE_PATTERNS.some(pattern => pattern.test(name));
+}
+
 // GET /api/snmp/devices - List all SNMP-enabled devices for tenant
 router.get('/devices', async (req, res) => {
   try {
@@ -78,9 +103,13 @@ router.get('/devices', async (req, res) => {
     
     console.log(`🖥️ Found ${snmpEquipment.length} SNMP equipment items`);
     
-    // Add SNMP equipment
+    // Add SNMP equipment (filter out fake devices)
     snmpEquipment.forEach(equipment => {
-      devices.push(formatSNMPDevice(equipment, 'equipment'));
+      if (!isFakeDevice(equipment.name)) {
+        devices.push(formatSNMPDevice(equipment, 'equipment'));
+      } else {
+        console.log(`  ⚠️ Filtering out fake device: ${equipment.name}`);
+      }
     });
     
     // Get CPE devices with SNMP/ACS modules enabled
@@ -95,9 +124,13 @@ router.get('/devices', async (req, res) => {
     
     console.log(`📱 Found ${snmpCPE.length} SNMP CPE devices`);
     
-    // Add SNMP CPE
+    // Add SNMP CPE (filter out fake devices)
     snmpCPE.forEach(cpe => {
-      devices.push(formatSNMPDevice(cpe, 'cpe'));
+      if (!isFakeDevice(cpe.name)) {
+        devices.push(formatSNMPDevice(cpe, 'cpe'));
+      } else {
+        console.log(`  ⚠️ Filtering out fake device: ${cpe.name}`);
+      }
     });
     
     console.log(`📊 Total SNMP devices for tenant ${req.tenantId}: ${devices.length}`);
