@@ -539,29 +539,38 @@ router.get('/discovered', async (req, res) => {
     console.log(`🔍 [SNMP API] Fetching discovered SNMP devices for tenant: ${req.tenantId}`);
     
     // Get devices that were discovered by EPC agents
-    // Notes is stored as JSON string, so we need to search the string content
+    // Notes can be stored as JSON string or object, and we need to search for discovery metadata
     const allEquipment = await NetworkEquipment.find({
-      tenantId: req.tenantId
+      tenantId: req.tenantId,
+      status: 'active'
     }).lean();
     
     // Filter devices that have discovery metadata in notes
     const discoveredEquipment = allEquipment.filter(equipment => {
       if (!equipment.notes) return false;
       
-      let notes = {};
+      // Try to parse as JSON first
+      let notes = null;
       try {
         notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
       } catch (e) {
-        // If notes is not JSON, check as string
+        // If not JSON, check as plain string
         const notesStr = String(equipment.notes).toLowerCase();
         return notesStr.includes('discovered_by_epc') || 
                notesStr.includes('discovery_source') || 
-               notesStr.includes('discovered_at');
+               notesStr.includes('discovered_at') ||
+               notesStr.includes('epc_snmp_agent');
       }
       
-      return notes.discovered_by_epc || 
-             notes.discovery_source === 'epc_snmp_agent' ||
-             notes.discovered_at;
+      // Check if it's an object with discovery metadata
+      if (notes && typeof notes === 'object') {
+        return notes.discovered_by_epc || 
+               notes.discovery_source === 'epc_snmp_agent' ||
+               notes.discovered_at ||
+               notes.last_discovered;
+      }
+      
+      return false;
     });
     
     console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
