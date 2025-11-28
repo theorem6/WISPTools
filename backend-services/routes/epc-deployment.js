@@ -32,6 +32,7 @@ const MINIMAL_DIR = '/opt/base-images/minimal';
 const KERNEL_PATH = `${MINIMAL_DIR}/vmlinuz`;
 const INITRD_PATH = `${MINIMAL_DIR}/initrd`;
 const appConfig = require('../config/app');
+const { generateSiteNameWithSuffix, renumberSiteEPCs } = require('../utils/site-naming');
 
 // Hosted on GCE server (136.112.111.167)
 // Use centralized configuration
@@ -81,11 +82,16 @@ router.post('/register-epc', async (req, res) => {
     const mmeUniqueId = `mme-${epc_id.substring(4, 12)}`;
     const originHostFQDN = `${mmeUniqueId}.${tenantDomain}`;
     
+    // Generate site_name with suffix if needed (based on siteName or epc_id)
+    const siteBase = siteName || epc_id;
+    const finalSiteName = await generateSiteNameWithSuffix(siteBase, tenant_id);
+    
     // Create EPC record in database (device_code will be added later via device configuration)
     // Don't include device_code in the document if it's null (allows sparse unique index to work)
     const epcData = {
       epc_id,
-      site_name: siteName,
+      site_name: finalSiteName,
+      site_id: siteBase, // Store base site identifier
       tenant_id,
       auth_code,
       api_key,
@@ -357,12 +363,22 @@ router.post('/link-device', async (req, res) => {
     const api_key = crypto.randomBytes(16).toString('hex');
     const secret_key = crypto.randomBytes(32).toString('hex');
     
+    // Generate site name with suffix based on site_id
+    const site_id = config?.site_id || config?.site_name;
+    let site_name = config?.site_name || 'New EPC Device';
+    
+    if (site_id) {
+      // Use site_id as base and generate name with suffix
+      site_name = await generateSiteNameWithSuffix(site_id, tenant_id || 'unknown');
+    }
+    
     // Create new EPC record with device code
     const newEPC = new RemoteEPC({
       epc_id,
       tenant_id: tenant_id || 'unknown',
+      site_id: site_id || null,
       device_code: device_code.toUpperCase(),
-      site_name: config?.site_name || 'New EPC Device',
+      site_name: site_name,
       status: 'registered',
       deployment_type: config?.deployment_type || 'both',
       checkin_token,

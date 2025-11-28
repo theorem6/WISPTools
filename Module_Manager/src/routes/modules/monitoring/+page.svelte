@@ -52,50 +52,124 @@
   // Watch for tenant changes and reload data
   $: if (browser && tenantId) {
     console.log('[Network Monitoring] Tenant loaded:', tenantId);
-    loadDashboard();
+    if (tenantId) {
+      // Clear previous data when tenant changes
+      epcDevices = [];
+      networkDevices = [];
+      dashboardData = null;
+      // Load new tenant data
+      loadDashboard();
+      loadNetworkDevices();
+      loadSNMPData();
+      loadEPCDevices();
+    }
   }
   
   onMount(async () => {
     if (tenantId) {
-      await loadDashboard();
-      await loadNetworkDevices();
-      await loadSNMPData();
-      await loadEPCDevices();
+      // Initialize with empty arrays to prevent undefined errors
+      epcDevices = [];
+      networkDevices = [];
+      
+      // Load data sequentially to avoid race conditions
+      try {
+        await Promise.allSettled([
+          loadDashboard(),
+          loadNetworkDevices(),
+          loadSNMPData(),
+          loadEPCDevices()
+        ]);
+      } catch (err) {
+        console.error('[Monitoring] Error loading initial data:', err);
+      }
     }
     
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds - use Promise.allSettled to prevent one failure from blocking others
     refreshInterval = setInterval(() => {
       if (tenantId) {
-        loadDashboard();
-        loadNetworkDevices();
-        loadSNMPData();
-        loadEPCDevices();
+        Promise.allSettled([
+          loadDashboard(),
+          loadNetworkDevices(),
+          loadSNMPData(),
+          loadEPCDevices()
+        ]).catch(err => console.error('[Monitoring] Auto-refresh error:', err));
       }
     }, 30000);
   });
   
+  let loadingEPCDevices = false;
+  let epcLoadError: string | null = null;
+  
   async function loadEPCDevices() {
-    if (!tenantId) return;
+    if (!tenantId) {
+      epcDevices = [];
+      epcLoadError = null;
+      return;
+    }
+    
+    // Prevent concurrent loads
+    if (loadingEPCDevices) {
+      console.log('[Monitoring] EPC load already in progress, skipping');
+      return;
+    }
+    
+    loadingEPCDevices = true;
+    epcLoadError = null;
     
     try {
       const user = auth().currentUser;
-      if (!user) return;
+      if (!user) {
+        epcDevices = [];
+        epcLoadError = 'Not authenticated';
+        return;
+      }
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.HSS}/epc/remote/list`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
-        }
-      });
       
-      if (response.ok) {
-        const data = await response.json();
-        epcDevices = data.epcs || [];
-        console.log('[Monitoring] Loaded', epcDevices.length, 'EPC devices');
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      try {
+        const response = await fetch(`${API_CONFIG.PATHS.HSS}/epc/remote/list`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          epcDevices = Array.isArray(data.epcs) ? data.epcs : [];
+          epcLoadError = null;
+          console.log('[Monitoring] Loaded', epcDevices.length, 'EPC devices');
+        } else {
+          const errorText = await response.text();
+          console.error('[Monitoring] Failed to load EPC devices:', response.status, errorText);
+          epcLoadError = `Failed to load: ${response.status}`;
+          // Don't clear existing devices on HTTP error, just log it
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        throw fetchError;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Monitoring] Failed to load EPC devices:', err);
+      if (err.name === 'AbortError') {
+        epcLoadError = 'Request timeout';
+        console.warn('[Monitoring] Request timed out, keeping existing EPC device list');
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        epcLoadError = 'Network error';
+        console.warn('[Monitoring] Network error, keeping existing EPC device list');
+      } else {
+        epcLoadError = err.message || 'Unknown error';
+        // For other errors, keep existing data
+      }
+    } finally {
+      loadingEPCDevices = false;
     }
   }
   
@@ -553,13 +627,22 @@
   {#if mapView === 'epc'}
     <div class="epc-devices-overlay">
       <div class="epc-devices-grid">
-        {#if epcDevices.length === 0}
+        {#if loadingEPCDevices}
+          <div class="no-devices">
+            <p>⏳ Loading EPC devices...</p>
+          </div>
+        {:else if epcLoadError}
+          <div class="no-devices">
+            <p>⚠️ Error loading EPC devices: {epcLoadError}</p>
+            <button on:click={loadEPCDevices} class="btn btn-primary">Retry</button>
+          </div>
+        {:else if !epcDevices || epcDevices.length === 0}
           <div class="no-devices">
             <p>📡 No EPC devices found</p>
             <p class="hint">Link EPC devices via the Deploy module</p>
           </div>
         {:else}
-          {#each epcDevices as device}
+          {#each epcDevices as device (device.epc_id || device.epcId || device.id)}
             <div class="epc-device-card" on:click={() => openEpcMonitoring(device)}>
               <div class="device-header">
                 <span class="device-status status-{device.status}">

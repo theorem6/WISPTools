@@ -328,6 +328,27 @@ do_checkin() {
             CHECKIN_INTERVAL=$new_interval
         fi
         
+        # Run SNMP discovery every 15 minutes (separate from regular check-in)
+        if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+            # Check if last discovery was more than 15 minutes ago
+            local last_discovery_file="/tmp/last-snmp-discovery"
+            local should_discover=true
+            if [ -f "$last_discovery_file" ]; then
+                local last_discovery=$(cat "$last_discovery_file" 2>/dev/null || echo "0")
+                local now=$(date +%s)
+                local elapsed=$((now - last_discovery))
+                if [ $elapsed -lt 900 ]; then
+                    should_discover=false
+                fi
+            fi
+            
+            if [ "$should_discover" = true ]; then
+                log "Starting SNMP discovery in background..."
+                /opt/wisptools/epc-snmp-discovery.sh >/dev/null 2>&1 &
+                echo "$(date +%s)" > "$last_discovery_file"
+            fi
+        fi
+        
         # Execute commands
         if [ "$cmd_count" -gt 0 ]; then
             echo "$response" | jq -c '.commands[]' | while read -r cmd; do
@@ -364,6 +385,11 @@ install_agent() {
     echo "Downloading check-in agent..."
     curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
     chmod +x /opt/wisptools/epc-checkin-agent.sh
+    
+    # Download SNMP discovery script
+    echo "Downloading SNMP discovery script..."
+    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.sh" -o /opt/wisptools/epc-snmp-discovery.sh
+    chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
     
     # Create systemd service
     cat > /etc/systemd/system/wisptools-checkin.service << 'SVCEOF'

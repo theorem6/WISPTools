@@ -785,7 +785,12 @@ curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh -o /opt
 chmod +x /opt/wisptools/epc-checkin-agent.sh
 /opt/wisptools/epc-checkin-agent.sh install
 
-log "EPC configuration complete. Check-in agent running."
+# Download SNMP discovery script
+log "Installing SNMP discovery script..."
+curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-snmp-discovery.sh -o /opt/wisptools/epc-snmp-discovery.sh
+chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+
+log "EPC configuration complete. Check-in agent and SNMP discovery installed."
 EPCEOF
 chmod +x "$BUILD_DIR/chroot/opt/wisptools/configure-epc.sh"
 

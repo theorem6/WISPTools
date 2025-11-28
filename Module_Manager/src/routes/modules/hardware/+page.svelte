@@ -238,6 +238,9 @@
   let showEPCEditModal = false;
   let selectedEPCDevice: any = null;
   let epcEditForm = {
+    epc_id: '',
+    new_epc_id: '',
+    site_id: '',
     site_name: '',
     deployment_type: 'both',
     device_code: '',
@@ -249,6 +252,9 @@
   function editEPCDevice(device: any) {
     selectedEPCDevice = device;
     epcEditForm = {
+      epc_id: device.epc_id || device.epcId || '',
+      new_epc_id: device.epc_id || device.epcId || '',
+      site_id: device.site_id || '',
       site_name: device.site_name || device.name || '',
       deployment_type: device.deployment_type || 'both',
       device_code: device.device_code || '',
@@ -293,6 +299,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          new_epc_id: epcEditForm.new_epc_id || undefined,
           site_name: epcEditForm.site_name,
           deployment_type: epcEditForm.deployment_type,
           hss_config: epcEditForm.hss_config,
@@ -886,12 +893,27 @@
       
       <div class="modal-body">
         <div class="device-info-banner">
-          <strong>ID:</strong> <code>{selectedEPCDevice.epc_id}</code>
+          <strong>Current EPC ID:</strong> <code>{selectedEPCDevice.epc_id || selectedEPCDevice.epcId}</code>
+        </div>
+        
+        <!-- EPC ID Section -->
+        <div class="config-section">
+          <h4>🆔 EPC Identification</h4>
+          <div class="form-group">
+            <label>EPC ID</label>
+            <input type="text" bind:value={epcEditForm.epc_id} placeholder="EPC-XXXX" />
+            <small class="hint">Change the EPC ID (must be unique)</small>
+          </div>
         </div>
         
         <!-- Site Name Section -->
         <div class="config-section">
           <h4>📍 Site Information</h4>
+          <div class="form-group">
+            <label>Site ID (for multiple EPCs: will auto-generate Site:1, Site:2, etc.)</label>
+            <input type="text" bind:value={epcEditForm.site_id} placeholder="Enter site ID" />
+            <small class="hint">Leave blank to use site name as-is</small>
+          </div>
           <div class="form-group">
             <label>Site Name</label>
             <input type="text" bind:value={epcEditForm.site_name} placeholder="Enter site name" />

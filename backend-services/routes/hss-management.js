@@ -710,7 +710,10 @@ router.put('/epc/:epc_id', async (req, res) => {
     }
 
     const { epc_id } = req.params;
-    const { site_name, deployment_type, hss_config, snmp_config, network_config } = req.body;
+    const { epc_id: new_epc_id_from_body, new_epc_id, site_name, deployment_type, hss_config, snmp_config, network_config } = req.body;
+    
+    // Support both 'epc_id' and 'new_epc_id' in body for backward compatibility
+    const new_epc_id_value = new_epc_id || new_epc_id_from_body;
     
     console.log(`[HSS/EPC] Updating EPC ${epc_id} for tenant ${tenantId}`);
 
@@ -731,6 +734,39 @@ router.put('/epc/:epc_id', async (req, res) => {
     const updateFields = {
       updated_at: new Date()
     };
+
+    // Allow updating epc_id (requires validation for uniqueness)
+    if (new_epc_id_value && new_epc_id_value !== epc_id) {
+      // Check if new EPC ID already exists
+      const existingEPCWithNewId = await RemoteEPC.findOne({
+        epc_id: new_epc_id_value,
+        tenant_id: tenantId
+      });
+      
+      // Only error if it's a different EPC (not the current one)
+      if (existingEPCWithNewId && existingEPCWithNewId._id.toString() !== epc._id.toString()) {
+        return res.status(400).json({ 
+          error: 'EPC ID already exists', 
+          message: `EPC ID ${new_epc_id_value} is already in use by another device` 
+        });
+      }
+      
+      // Also need to update related collections (EPCCommand, EPCServiceStatus, etc.)
+      const { EPCCommand, EPCServiceStatus } = require('../models/distributed-epc-schema');
+      const { InventoryItem } = require('../models/inventory');
+      
+      // Update related records
+      await EPCCommand.updateMany({ epc_id: epc.epc_id }, { $set: { epc_id: new_epc_id } });
+      await EPCServiceStatus.updateMany({ epc_id: epc.epc_id }, { $set: { epc_id: new_epc_id } });
+      
+      // Update inventory items that reference this EPC
+      await InventoryItem.updateMany(
+        { 'epcConfig.epc_id': epc.epc_id },
+        { $set: { 'epcConfig.epc_id': new_epc_id } }
+      );
+      
+      updateFields.epc_id = new_epc_id_value;
+    }
 
     // Allow updating site_name
     if (site_name !== undefined) {
@@ -771,16 +807,17 @@ router.put('/epc/:epc_id', async (req, res) => {
       { $set: updateFields }
     );
 
-    // Fetch updated record
+    // Fetch updated record (use new_epc_id if it was changed)
+    const final_epc_id = new_epc_id_value || epc_id;
     const updatedEPC = await RemoteEPC.findOne({
-      $or: [{ epc_id: epc_id }, { _id: epc_id }],
+      $or: [{ epc_id: final_epc_id }, { _id: final_epc_id }],
       tenant_id: tenantId
     }).lean();
 
-    console.log(`[HSS/EPC] Successfully updated EPC ${epc_id}`);
+    console.log(`[HSS/EPC] Successfully updated EPC ${epc_id}${new_epc_id_value && new_epc_id_value !== epc_id ? ` to ${new_epc_id_value}` : ''}`);
     res.json({
       success: true,
-      epc_id,
+      epc_id: updatedEPC?.epc_id || final_epc_id,
       message: 'EPC configuration updated successfully',
       epc: updatedEPC
     });

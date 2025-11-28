@@ -238,6 +238,7 @@ app.post('/api/epc/checkin/commands/:command_id/result', async (req, res) => {
 // EPC routes with tenant requirement
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/epc', require('./routes/epc-commands')); // Remote command management
+app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));
 // EPC delete route using POST (workaround for DELETE routing issues)
