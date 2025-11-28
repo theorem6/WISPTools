@@ -707,14 +707,24 @@ router.get('/epc/remote/list', async (req, res) => {
       const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
       const latestStatus = statusMap.get(epc.epc_id);
       
-      // Format metrics for frontend
+      // Format metrics for frontend - always return metrics object, even if null
       const metrics = latestStatus?.system ? {
         cpuUsage: latestStatus.system.cpu_percent ?? null,
         memoryUsage: latestStatus.system.memory_percent ?? null,
         uptime: latestStatus.system.uptime_seconds 
           ? formatUptime(latestStatus.system.uptime_seconds)
-          : null
-      } : null;
+          : (epc.metrics?.system_uptime_seconds 
+              ? formatUptime(epc.metrics.system_uptime_seconds)
+              : null)
+      } : (epc.metrics?.system_uptime_seconds ? {
+        cpuUsage: null,
+        memoryUsage: null,
+        uptime: formatUptime(epc.metrics.system_uptime_seconds)
+      } : {
+        cpuUsage: null,
+        memoryUsage: null,
+        uptime: null
+      });
       
       return {
         id: epc._id?.toString() || epc.epc_id,

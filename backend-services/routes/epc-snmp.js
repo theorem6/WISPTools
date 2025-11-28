@@ -139,11 +139,12 @@ router.post('/discovered', async (req, res) => {
       }
     }
     
-    console.log(`[SNMP Discovery] Processed ${processedDevices.length} devices for EPC ${epc.epc_id}`);
+    console.log(`[SNMP Discovery] Processed ${processedDevices.length} devices for EPC ${epc.epc_id} (tenant: ${epc.tenant_id})`);
     
     res.json({
       success: true,
       epc_id: epc.epc_id,
+      tenant_id: epc.tenant_id,
       processed: processedDevices.length,
       devices: processedDevices,
       message: `Successfully processed ${processedDevices.length} discovered devices`

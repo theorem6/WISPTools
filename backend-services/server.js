@@ -222,12 +222,26 @@ app.post('/api/epc/checkin', async (req, res) => {
       }
     }
     
-    if (services) {
+    // Always save service status if we have any data (services, system, network, or versions)
+    if (services || system || network || versions) {
       await new EPCServiceStatus({
         epc_id: epc.epc_id,
         tenant_id: epc.tenant_id,
-        services, system, network, versions
+        services: services || {},
+        system: system || {},
+        network: network || {},
+        versions: versions || {}
       }).save();
+      
+      console.log(`[EPC Check-in] Saved service status for ${epc.epc_id}`, {
+        hasServices: !!services,
+        hasSystem: !!system,
+        hasNetwork: !!network,
+        hasVersions: !!versions,
+        systemUptime: system?.uptime_seconds,
+        cpuPercent: system?.cpu_percent,
+        memoryPercent: system?.memory_percent
+      });
       
       const REQUIRED_SERVICES = ['open5gs-mmed', 'open5gs-sgwcd', 'open5gs-sgwud', 'open5gs-smfd', 'open5gs-upfd', 'snmpd'];
       for (const svc of REQUIRED_SERVICES) {
