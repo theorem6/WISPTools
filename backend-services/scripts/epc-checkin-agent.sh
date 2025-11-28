@@ -252,13 +252,6 @@ execute_command() {
     local result_error=""
     local exit_code=0
     
-    # Extract config_data from command JSON file if it exists and command type is config_update
-    local config_data=""
-    if [ "$cmd_type" = "config_update" ] && [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
-        config_data=$(cat "$cmd_json_file" | jq -c '.config_data // {}')
-        log "Extracted config_data from command JSON: ${config_data:0:100}..."  # Log first 100 chars
-    fi
-    
     case "$cmd_type" in
         service_control)
             if [ "$target_services" = "all" ] || [ -z "$target_services" ]; then
@@ -342,13 +335,21 @@ execute_command() {
         config_update)
             log "  -> Applying configuration update"
             
-            # Use config_data extracted at function start (from cmd_json_file)
+            # Extract config_data from command JSON file
+            local config_data=""
+            if [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
+                config_data=$(cat "$cmd_json_file" | jq -c '.config_data // {}' 2>/dev/null || echo "{}")
+                log "  -> Extracted config_data from JSON file (length: ${#config_data} chars)"
+            else
+                log "ERROR: Command JSON file not found: ${cmd_json_file:-none}"
+            fi
+            
             if [ -z "$config_data" ] || [ "$config_data" = "null" ] || [ "$config_data" = "{}" ]; then
                 result_success=false
                 result_error="No config_data provided in command"
-                log "ERROR: Config data empty or missing - cmd_json_file: ${cmd_json_file:-none}, config_data length: ${#config_data}"
+                log "ERROR: Config data is empty or invalid"
                 if [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
-                    log "Command JSON file contents: $(cat "$cmd_json_file" | head -c 500)"
+                    log "Command JSON file exists. Full contents: $(cat "$cmd_json_file")"
                 fi
                 exit_code=1
             else
