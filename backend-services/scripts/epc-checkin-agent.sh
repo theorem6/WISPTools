@@ -122,6 +122,24 @@ get_network_info() {
     echo "{\"ip_address\":\"$ip\",\"interfaces\":[]}"
 }
 
+# Get file hash (SHA256) if sha256sum is available, otherwise use md5sum
+get_file_hash() {
+    local file_path=$1
+    if [ ! -f "$file_path" ]; then
+        echo "missing"
+        return
+    fi
+    
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$file_path" 2>/dev/null | cut -d' ' -f1 | tr -d '\n\r' || echo "unknown"
+    elif command -v md5sum >/dev/null 2>&1; then
+        md5sum "$file_path" 2>/dev/null | cut -d' ' -f1 | tr -d '\n\r' || echo "unknown"
+    else
+        # Fallback: use stat for modification time
+        stat -c %Y "$file_path" 2>/dev/null | tr -d '\n\r' || echo "unknown"
+    fi
+}
+
 # Get version info - simple JSON with sanitization
 get_versions() {
     local os_info=$(grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d'"' -f2 | tr -d '\n\r' | sed 's/["\\\t]//g' || echo "Unknown")
@@ -131,7 +149,14 @@ get_versions() {
     local open5gs_version=$(dpkg -l 2>/dev/null | grep open5gs-mme | awk '{print $3}' | head -1 | tr -d '\n\r')
     [ -z "$open5gs_version" ] && open5gs_version="not installed"
     
-    echo "{\"os\":\"$os_info\",\"kernel\":\"$kernel\",\"open5gs\":\"$open5gs_version\"}"
+    # Get script versions/hashes
+    local agent_hash=$(get_file_hash "/opt/wisptools/epc-checkin-agent.sh")
+    local snmp_hash=$(get_file_hash "/opt/wisptools/epc-snmp-discovery.sh")
+    
+    # Build scripts object
+    local scripts_json="\"scripts\":{\"epc-checkin-agent.sh\":{\"hash\":\"$agent_hash\"},\"epc-snmp-discovery.sh\":{\"hash\":\"$snmp_hash\"}}"
+    
+    echo "{\"os\":\"$os_info\",\"kernel\":\"$kernel\",\"open5gs\":\"$open5gs_version\",$scripts_json}"
 }
 
 # Execute a command
@@ -198,7 +223,7 @@ execute_command() {
             fi
             ;;
             
-        script)
+        script|script_execution)
             log "  -> Executing script"
             local script_file="/tmp/wisptools-cmd-$cmd_id.sh"
             
@@ -218,6 +243,7 @@ execute_command() {
             
             if [ "$result_success" = true ] && [ -f "$script_file" ]; then
                 chmod +x "$script_file"
+                # Capture both stdout and stderr
                 if output=$("$script_file" 2>&1); then
                     result_output="$output"
                 else

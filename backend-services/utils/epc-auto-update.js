@@ -46,20 +46,34 @@ async function checkForUpdates(epc_id, currentVersions = {}) {
       
       // Get current hash
       const currentHash = await getFileHash(scriptPath);
-      const currentVersion = currentVersions[scriptName];
+      if (!currentHash) {
+        console.warn(`[EPC Auto-Update] Failed to hash ${scriptPath}, skipping`);
+        continue;
+      }
+      
+      // Get current version from EPC (if provided)
+      const currentVersion = currentVersions?.[scriptName] || 
+                            (currentVersions?.scripts && currentVersions.scripts[scriptName]) ||
+                            null;
       
       // If version doesn't match or doesn't exist, mark for update
-      if (!currentVersion || currentVersion.hash !== currentHash) {
+      const epcHash = currentVersion?.hash || null;
+      
+      // Always check for updates - if no hash reported or hash differs, update
+      if (!epcHash || epcHash !== currentHash) {
         updates[scriptName] = {
           url: `https://${CENTRAL_SERVER}/downloads/scripts/${scriptName}`,
           hash: currentHash,
           size: (await fs.stat(scriptPath)).size,
           updated: true
         };
+        console.log(`[EPC Auto-Update] ${scriptName} needs update. EPC: ${epcHash || 'none'}, Server: ${currentHash}`);
+      } else {
+        console.log(`[EPC Auto-Update] ${scriptName} is up to date (${currentHash.substring(0, 8)}...)`);
       }
     } catch (error) {
       // Script doesn't exist, skip
-      console.warn(`[EPC Auto-Update] Script ${scriptName} not found at ${scriptPath}`);
+      console.warn(`[EPC Auto-Update] Script ${scriptName} not found at ${scriptPath}:`, error.message);
     }
   }
   
@@ -119,7 +133,7 @@ log "Auto-update complete"
     command_type: 'script_execution',
     action: 'update_scripts',
     script_content: fullScript,
-    priority: 10, // High priority but not urgent
+    priority: 5, // Higher priority for updates (lower number = higher priority)
     expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
   };
 }

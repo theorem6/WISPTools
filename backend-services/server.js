@@ -251,14 +251,22 @@ app.post('/api/epc/checkin', async (req, res) => {
       // Check for script updates and queue update command if needed
       try {
         const { checkForUpdates, generateUpdateCommand } = require('./utils/epc-auto-update');
-        const updateInfo = await checkForUpdates(epc.epc_id, versions?.scripts || {});
+        
+        // Extract script versions from versions object
+        // versions structure: { os: "...", kernel: "...", scripts: { "epc-checkin-agent.sh": { hash: "..." }, ... } }
+        const scriptVersions = versions?.scripts || {};
+        const updateInfo = await checkForUpdates(epc.epc_id, scriptVersions);
         
         if (updateInfo.has_updates) {
-          // Check if update command already exists and is pending
+          // Check if update command already exists and is pending or was sent recently (within last hour)
+          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
           const existingUpdate = await EPCCommand.findOne({
             epc_id: epc.epc_id,
             action: 'update_scripts',
-            status: { $in: ['pending', 'sent'] }
+            $or: [
+              { status: { $in: ['pending', 'sent'] } },
+              { status: 'completed', created_at: { $gte: oneHourAgo } }
+            ]
           });
           
           if (!existingUpdate) {
@@ -271,11 +279,13 @@ app.post('/api/epc/checkin', async (req, res) => {
                 tenant_id: epc.tenant_id,
                 status: 'pending',
                 created_at: new Date(),
-                description: 'Automatic script update'
+                description: `Automatic script update: ${Object.keys(updateInfo.scripts).join(', ')}`
               });
               await autoUpdateCmd.save();
-              console.log(`[EPC Check-in] Queued auto-update command for ${epc.epc_id}`);
+              console.log(`[EPC Check-in] Queued auto-update command for ${epc.epc_id}: ${Object.keys(updateInfo.scripts).join(', ')}`);
             }
+          } else {
+            console.log(`[EPC Check-in] Update already queued for ${epc.epc_id}`);
           }
         }
       } catch (updateError) {
