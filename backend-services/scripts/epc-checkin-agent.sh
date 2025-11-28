@@ -213,10 +213,24 @@ get_versions() {
     
     # Get script versions/hashes
     local agent_hash=$(get_file_hash "/opt/wisptools/epc-checkin-agent.sh")
-    local snmp_hash=$(get_file_hash "/opt/wisptools/epc-snmp-discovery.sh")
+    local snmp_hash=""
+    local snmp_js_hash=""
+    
+    # Get hash for bash version (if exists)
+    if [ -f "/opt/wisptools/epc-snmp-discovery.sh" ]; then
+        snmp_hash=$(get_file_hash "/opt/wisptools/epc-snmp-discovery.sh")
+    fi
+    
+    # Get hash for Node.js version (if exists)
+    if [ -f "/opt/wisptools/epc-snmp-discovery.js" ]; then
+        snmp_js_hash=$(get_file_hash "/opt/wisptools/epc-snmp-discovery.js")
+    fi
     
     # Build scripts object
-    local scripts_json="\"scripts\":{\"epc-checkin-agent.sh\":{\"hash\":\"$agent_hash\"},\"epc-snmp-discovery.sh\":{\"hash\":\"$snmp_hash\"}}"
+    local scripts_json="\"scripts\":{\"epc-checkin-agent.sh\":{\"hash\":\"$agent_hash\"}"
+    [ -n "$snmp_hash" ] && scripts_json="${scripts_json},\"epc-snmp-discovery.sh\":{\"hash\":\"$snmp_hash\"}"
+    [ -n "$snmp_js_hash" ] && scripts_json="${scripts_json},\"epc-snmp-discovery.js\":{\"hash\":\"$snmp_js_hash\"}"
+    scripts_json="${scripts_json}}"
     
     echo "{\"os\":\"$os_info\",\"kernel\":\"$kernel\",\"open5gs\":\"$open5gs_version\",$scripts_json}"
 }
@@ -436,25 +450,31 @@ do_checkin() {
         fi
         
         # Run SNMP discovery every 15 minutes (separate from regular check-in)
-        if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
-            # Check if last discovery was more than 15 minutes ago
-            local last_discovery_file="/tmp/last-snmp-discovery"
-            local should_discover=true
-            if [ -f "$last_discovery_file" ]; then
-                local last_discovery=$(cat "$last_discovery_file" 2>/dev/null || echo "0")
-                local now=$(date +%s)
-                local elapsed=$((now - last_discovery))
-                if [ $elapsed -lt 900 ]; then
-                    should_discover=false
-                fi
+        # Prefer Node.js version, fallback to bash script
+        local last_discovery_file="/tmp/last-snmp-discovery"
+        local should_discover=true
+        if [ -f "$last_discovery_file" ]; then
+            local last_discovery=$(cat "$last_discovery_file" 2>/dev/null || echo "0")
+            local now=$(date +%s)
+            local elapsed=$((now - last_discovery))
+            if [ $elapsed -lt 900 ]; then
+                should_discover=false
+            fi
+        fi
+        
+        if [ "$should_discover" = true ]; then
+            log "Starting SNMP discovery in background..."
+            
+            # Try Node.js version first, fallback to bash script
+            if command -v node >/dev/null 2>&1 && [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+                node /opt/wisptools/epc-snmp-discovery.js >> "$LOG_FILE" 2>&1 &
+            elif [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+                /opt/wisptools/epc-snmp-discovery.sh >> "$LOG_FILE" 2>&1 &
+            else
+                log "WARNING: SNMP discovery script not found"
             fi
             
-            if [ "$should_discover" = true ]; then
-                log "Starting SNMP discovery in background..."
-                # Run discovery and log output to check-in log
-                /opt/wisptools/epc-snmp-discovery.sh >> "$LOG_FILE" 2>&1 &
-                echo "$(date +%s)" > "$last_discovery_file"
-            fi
+            echo "$(date +%s)" > "$last_discovery_file"
         fi
         
         # Execute commands
@@ -494,10 +514,30 @@ install_agent() {
     curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
     chmod +x /opt/wisptools/epc-checkin-agent.sh
     
-    # Download SNMP discovery script
-    echo "Downloading SNMP discovery script..."
-    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.sh" -o /opt/wisptools/epc-snmp-discovery.sh
-    chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+    # Download SNMP discovery scripts (Node.js preferred, bash as fallback)
+    echo "Downloading SNMP discovery scripts..."
+    
+    # Node.js version
+    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.js" -o /opt/wisptools/epc-snmp-discovery.js 2>/dev/null || true
+    if [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+        chmod +x /opt/wisptools/epc-snmp-discovery.js
+        echo "Node.js SNMP discovery script downloaded"
+        
+        # Install npm packages if Node.js is available
+        if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+            echo "Installing npm packages for SNMP discovery..."
+            cd /opt/wisptools
+            npm init -y >/dev/null 2>&1 || true
+            npm install --no-save ping-scanner net-snmp >/dev/null 2>&1 || echo "Warning: Failed to install npm packages, will use fallback methods"
+        fi
+    fi
+    
+    # Bash version (fallback)
+    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.sh" -o /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+    if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+        chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+        echo "Bash SNMP discovery script downloaded (fallback)"
+    fi
     
     # Create systemd service
     cat > /etc/systemd/system/wisptools-checkin.service << 'SVCEOF'

@@ -889,10 +889,28 @@ curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh -o /opt
 chmod +x /opt/wisptools/epc-checkin-agent.sh
 /opt/wisptools/epc-checkin-agent.sh install
 
-# Download SNMP discovery script
-log "Installing SNMP discovery script..."
-curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-snmp-discovery.sh -o /opt/wisptools/epc-snmp-discovery.sh
-chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+# Download SNMP discovery scripts (Node.js preferred, bash as fallback)
+log "Installing SNMP discovery scripts..."
+curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-snmp-discovery.js -o /opt/wisptools/epc-snmp-discovery.js 2>/dev/null || true
+if [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+    chmod +x /opt/wisptools/epc-snmp-discovery.js
+    log "Node.js SNMP discovery script installed"
+    
+    # Install npm packages if Node.js is available
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+        log "Installing npm packages for SNMP discovery..."
+        cd /opt/wisptools
+        npm init -y >/dev/null 2>&1 || true
+        npm install --no-save ping-scanner net-snmp >/dev/null 2>&1 || log "Warning: Failed to install npm packages, will use fallback methods"
+    fi
+fi
+
+# Bash version (fallback)
+curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-snmp-discovery.sh -o /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+    chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+    log "Bash SNMP discovery script installed (fallback)"
+fi
 
 log "EPC configuration complete. Check-in agent and SNMP discovery installed."
 EPCEOF
