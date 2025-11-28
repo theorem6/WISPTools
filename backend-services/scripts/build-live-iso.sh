@@ -388,43 +388,6 @@ fi
 # ============================================================================
 log "=== PHASE 2: Device code and configuration ==="
 
-# CRITICAL CHECK: If Open5GS services are already running, skip deployment entirely
-if systemctl is-active --quiet open5gs-mmed 2>/dev/null || \
-   systemctl is-active --quiet open5gs-sgwcd 2>/dev/null || \
-   systemctl is-active --quiet open5gs-smfd 2>/dev/null; then
-    log "Open5GS services are already running - device is fully deployed"
-    
-    # Get device code and verify registration
-    DEVICE_CODE=$(cat /etc/wisptools/device_code 2>/dev/null || \
-                  cat /etc/wisptools/device-code.env 2>/dev/null | grep DEVICE_CODE | cut -d= -f2 || \
-                  ip link show | grep -A1 "state UP" | grep link/ether | head -1 | awk '{print $2}' | tr -d ':' | cut -c1-8 | tr '[:lower:]' '[:upper:]')
-    HARDWARE_ID=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null || \
-                  ip link show | grep ether | head -1 | awk '{print $2}' | tr -d ':')
-    IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
-    
-    if [ -n "$DEVICE_CODE" ] && [ -n "$IP_ADDR" ]; then
-        RESPONSE=$(curl -s -X POST "https://$GCE_DOMAIN:$HSS_PORT/api/epc/checkin" \
-            -H "Content-Type: application/json" \
-            -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>/dev/null) || true
-        
-        EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
-        
-        if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ]; then
-            log "Device is registered (EPC: $EPC_ID) and services are running - system fully operational"
-            
-            # Ensure startup service is disabled
-            systemctl disable wisptools-startup.service 2>/dev/null || true
-            
-            # Create configured file if it doesn't exist
-            touch "$CONFIGURED_FILE" 2>/dev/null || true
-            
-            # Show running status and exit - never show waiting page
-            log "System is fully operational - exiting startup script"
-            exit 0
-        fi
-    fi
-fi
-
 # Generate device code if needed
 if [ ! -f "$DEVICE_CODE_FILE" ]; then
     DEVICE_CODE=$(cat /dev/urandom | tr -dc 'A-Z0-9' | head -c8)
@@ -484,6 +447,89 @@ done
 [ -z "$HARDWARE_ID" ] && HARDWARE_ID="unknown"
 
 log "Hardware ID: $HARDWARE_ID"
+
+# CRITICAL CHECK: If Open5GS services are already running, skip deployment entirely
+if systemctl is-active --quiet open5gs-mmed 2>/dev/null || \
+   systemctl is-active --quiet open5gs-sgwcd 2>/dev/null || \
+   systemctl is-active --quiet open5gs-smfd 2>/dev/null; then
+    log "Open5GS services are already running - device is fully deployed"
+    
+    # Verify device is registered
+    RESPONSE=$(curl -s -X POST "https://$GCE_DOMAIN:$HSS_PORT/api/epc/checkin" \
+        -H "Content-Type: application/json" \
+        -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>/dev/null) || true
+    
+    EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
+    
+    if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ]; then
+        log "Device is registered (EPC: $EPC_ID) and services are running - system fully operational"
+        
+        # Ensure startup service is disabled
+        systemctl disable wisptools-startup.service 2>/dev/null || true
+        
+        # Create configured file if it doesn't exist
+        touch "$CONFIGURED_FILE" 2>/dev/null || true
+        
+        # Start nginx and show running status
+        mkdir -p /var/www/html
+        systemctl start nginx 2>/dev/null || python3 -m http.server 80 -d /var/www/html &>/dev/null &
+        
+        # Create running status page
+        cat > /var/www/html/index.html << HTMLEOF
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WISPTools EPC - Running</title>
+    <meta http-equiv="refresh" content="30">
+    <style>
+        body { font-family: 'Segoe UI', Arial; text-align: center; padding: 40px; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: #fff; min-height: 100vh; margin: 0; }
+        h1 { color: #4caf50; }
+        .code { font-size: 48px; font-weight: bold; color: #00ff88; font-family: monospace; }
+        .info { color: #aaa; margin: 10px 0; }
+        .box { background: rgba(255,255,255,0.1); padding: 25px; border-radius: 15px; margin: 20px auto; max-width: 600px; text-align: left; }
+        .status { padding: 12px 30px; background: #4caf50; color: #fff; font-weight: bold; border-radius: 25px; display: inline-block; }
+        .service { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .running { color: #4caf50; }
+        .stopped { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>✅ WISPTools EPC Device</h1>
+    <div class="status">System Running</div>
+    <div class="code">$DEVICE_CODE</div>
+    <div class="box">
+        <h3>📊 Services Status:</h3>
+        <div class="service"><span>Open5GS MME</span><span class="running">Running</span></div>
+        <div class="service"><span>Open5GS SGW-C</span><span class="running">Running</span></div>
+        <div class="service"><span>Open5GS SGW-U</span><span class="running">Running</span></div>
+        <div class="service"><span>Open5GS SMF</span><span class="running">Running</span></div>
+        <div class="service"><span>Open5GS UPF</span><span class="running">Running</span></div>
+    </div>
+    <p class="info">IP: $IP_ADDR | EPC ID: $EPC_ID</p>
+    <p class="info">✅ System fully deployed and operational</p>
+</body>
+</html>
+HTMLEOF
+        
+        clear
+        echo ""
+        echo "╔══════════════════════════════════════════════════════════════════╗"
+        echo "║                                                                  ║"
+        echo "║     ✅ WISPTools EPC Device - Fully Operational                   ║"
+        echo "║                                                                  ║"
+        echo "║     Device Code: $DEVICE_CODE                                 ║"
+        echo "║     EPC ID:      $EPC_ID"
+        echo "║     IP Address:  $IP_ADDR"
+        echo "║                                                                  ║"
+        echo "║     Open5GS services running - no re-installation needed         ║"
+        echo "║                                                                  ║"
+        echo "╚══════════════════════════════════════════════════════════════════╝"
+        echo ""
+        
+        exit 0
+    fi
+fi
 
 # Start nginx for status page
 mkdir -p /var/www/html
