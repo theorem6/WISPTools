@@ -280,6 +280,12 @@
   async function saveEPCDevice() {
     if (!selectedEPCDevice) return;
     
+    const epcId = selectedEPCDevice.epc_id || selectedEPCDevice.epcId || epcEditForm.epc_id;
+    if (!epcId) {
+      error = 'EPC ID is required';
+      return;
+    }
+    
     isSavingEPC = true;
     error = '';
     
@@ -291,7 +297,7 @@
       if (!user) throw new Error('Not authenticated');
       
       const token = await user.getIdToken();
-      const response = await fetch(`${HSS_API}/epc/${selectedEPCDevice.epc_id}`, {
+      const response = await fetch(`${HSS_API}/epc/${epcId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -327,6 +333,12 @@
   async function linkDeviceCode() {
     if (!selectedEPCDevice || !epcEditForm.device_code) return;
     
+    const epcId = selectedEPCDevice.epc_id || selectedEPCDevice.epcId || epcEditForm.epc_id;
+    if (!epcId) {
+      error = 'EPC ID is required to link device';
+      return;
+    }
+    
     isSavingEPC = true;
     error = '';
     
@@ -338,7 +350,7 @@
       if (!user) throw new Error('Not authenticated');
       
       const token = await user.getIdToken();
-      const response = await fetch(`${HSS_API}/epc/${selectedEPCDevice.epc_id}/link-device`, {
+      const response = await fetch(`${HSS_API}/epc/${epcId}/link-device`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
