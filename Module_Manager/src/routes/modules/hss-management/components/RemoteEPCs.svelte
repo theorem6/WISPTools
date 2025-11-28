@@ -1273,49 +1273,15 @@ To use:
             </div>
           {/if}
         </div>
+        {/if}
       </div>
       
-      {#if detailsModalTab === 'logs'}
-        <div class="logs-viewer">
-          <div class="logs-header">
-            <button class="btn-secondary" on:click={loadEPCLogs} disabled={loadingLogs}>
-              {loadingLogs ? '⏳ Loading...' : '🔄 Refresh'}
-            </button>
-          </div>
-          
-          {#if loadingLogs && epcLogs.length === 0}
-            <div class="loading">Loading logs...</div>
-          {:else if logsError}
-            <div class="error">{logsError}</div>
-          {:else if epcLogs.length === 0}
-            <div class="empty-state">
-              <p>No logs available yet. Logs will appear here after the device checks in.</p>
-            </div>
-          {:else}
-            <div class="logs-container">
-              {#each epcLogs as log (log.id)}
-                <div class="log-entry log-level-{log.level}">
-                  <div class="log-header">
-                    <span class="log-timestamp">{new Date(log.timestamp).toLocaleString()}</span>
-                    <span class="log-level-badge level-{log.level}">{log.level.toUpperCase()}</span>
-                    <span class="log-source">{log.source || 'unknown'}</span>
-                  </div>
-                  <div class="log-message">{log.message}</div>
-                  {#if log.details && Object.keys(log.details).length > 0}
-                    <details class="log-details">
-                      <summary>Details</summary>
-                      <pre>{JSON.stringify(log.details, null, 2)}</pre>
-                    </details>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      {/if}
-      
-      {#if detailsModalTab === 'details'}
-        <div class="details-grid">
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={() => showDetailsModal = false}>Close</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- Site Devices Modal -->
 <SiteDevicesModal
