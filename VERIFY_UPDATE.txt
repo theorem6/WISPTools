@@ -1,0 +1,27 @@
+========================================
+VERIFY EPC UPDATE WORKED
+========================================
+
+1. Trigger a manual check-in to test:
+
+   sudo /opt/wisptools/epc-checkin-agent.sh once
+
+2. Watch the logs to see if it works:
+
+   tail -f /var/log/wisptools-checkin.log
+
+3. Check the service status:
+
+   systemctl status wisptools-checkin
+
+========================================
+Expected Output:
+========================================
+
+In the logs you should see:
+- [CHECKIN] Checking in as YALNTFQC from 192.168.2.234
+- [CHECKIN] Check-in successful. EPC: EPC-CB4C5042, Commands: X
+- Script versions being reported (if update worked)
+
+========================================
+

@@ -1,0 +1,15 @@
+========================================
+QUICK MANUAL EPC UPDATE COMMAND
+========================================
+
+Copy and paste this command on your EPC device:
+
+sudo bash -c 'curl -fsSL https://hss.wisptools.io/downloads/scripts/epc-checkin-agent.sh -o /opt/wisptools/epc-checkin-agent.sh && chmod +x /opt/wisptools/epc-checkin-agent.sh && curl -fsSL https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.sh -o /opt/wisptools/epc-snmp-discovery.sh && chmod +x /opt/wisptools/epc-snmp-discovery.sh && systemctl restart wisptools-checkin && echo "✅ Updated and restarted"'
+
+Then verify it worked:
+
+sudo /opt/wisptools/epc-checkin-agent.sh once
+tail -f /var/log/wisptools-checkin.log
+
+========================================
+
