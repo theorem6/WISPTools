@@ -54,6 +54,27 @@ const MIKROTIK_OIDS = {
   uptime: '1.3.6.1.2.1.1.3.0'
 };
 
+// LLDP (Link Layer Discovery Protocol) OIDs - Standard neighbor discovery
+const LLDP_OIDS = {
+  lldpLocChassisId: '1.0.8802.1.1.2.1.3.2.0', // Local chassis ID
+  lldpRemTable: '1.0.8802.1.1.2.1.4.1', // Remote neighbor table
+  lldpRemChassisId: '1.0.8802.1.1.2.1.4.1.1.5', // Remote chassis ID
+  lldpRemSysName: '1.0.8802.1.1.2.1.4.1.1.9', // Remote system name
+  lldpRemSysDesc: '1.0.8802.1.1.2.1.4.1.1.10', // Remote system description
+  lldpRemManAddr: '1.0.8802.1.1.2.1.4.2.1.4', // Remote management address
+  lldpRemLocalPortNum: '1.0.8802.1.1.2.1.4.1.1.7' // Local port number
+};
+
+// CDP (Cisco Discovery Protocol) OIDs
+const CDP_OIDS = {
+  cdpGlobalRun: '1.3.6.1.4.1.9.9.23.1.3.1.0', // CDP enabled
+  cdpCacheTable: '1.3.6.1.4.1.9.9.23.1.2.1', // CDP cache table
+  cdpCacheDeviceId: '1.3.6.1.4.1.9.9.23.1.2.1.1.6', // Device ID
+  cdpCacheDevicePort: '1.3.6.1.4.1.9.9.23.1.2.1.1.7', // Device port
+  cdpCachePlatform: '1.3.6.1.4.1.9.9.23.1.2.1.1.8', // Platform
+  cdpCacheAddress: '1.3.6.1.4.1.9.9.23.1.2.1.1.4' // IP address
+};
+
 // Standard SNMP OIDs
 const STD_OIDS = {
   sysDescr: '1.3.6.1.2.1.1.1.0',
@@ -349,6 +370,196 @@ async function getDeviceInfoWithSystemSNMP(ip, community) {
 }
 
 /**
+ * Get Mikrotik neighbors via LLDP or CDP
+ */
+async function getMikrotikNeighbors(ip, community) {
+  const neighbors = [];
+  
+  try {
+    if (snmp) {
+      // Use net-snmp package to walk LLDP table
+      return new Promise((resolve) => {
+        const session = snmp.createSession(ip, community, {
+          port: 161,
+          retries: 1,
+          timeout: SNMP_TIMEOUT,
+          transport: 'udp4'
+        });
+        
+        // Try LLDP first (standard protocol)
+        session.subtree(LLDP_OIDS.lldpRemTable, (error, varbinds) => {
+          if (error || !varbinds || varbinds.length === 0) {
+            session.close();
+            // Try CDP as fallback
+            resolve(getCDPNeighbors(session, ip, community));
+            return;
+          }
+          
+          // Parse LLDP neighbors
+          const neighborMap = {};
+          varbinds.forEach((vb) => {
+            const oid = vb.oid.toString();
+            const value = vb.value?.toString() || '';
+            
+            // Extract neighbor index from OID
+            // Format: 1.0.8802.1.1.2.1.4.1.1.X.timeMark.timeMarkIndex.lldpRemLocalPortNum.lldpRemIndex
+            const match = oid.match(/\.(\d+)\.(\d+)\.(\d+)$/);
+            if (match) {
+              const [, portNum, index] = match;
+              const neighborKey = `${portNum}.${index}`;
+              
+              if (!neighborMap[neighborKey]) {
+                neighborMap[neighborKey] = {
+                  local_port: parseInt(portNum),
+                  index: parseInt(index),
+                  discovered_via: 'lldp'
+                };
+              }
+              
+              // Map OID to field
+              if (oid.includes('1.0.8802.1.1.2.1.4.1.1.5')) {
+                neighborMap[neighborKey].chassis_id = value;
+              } else if (oid.includes('1.0.8802.1.1.2.1.4.1.1.9')) {
+                neighborMap[neighborKey].system_name = value;
+              } else if (oid.includes('1.0.8802.1.1.2.1.4.1.1.10')) {
+                neighborMap[neighborKey].system_description = value;
+              }
+            }
+          });
+          
+          session.close();
+          resolve(Object.values(neighborMap));
+        });
+      });
+    } else {
+      // Fallback to system snmpwalk
+      return await getNeighborsWithSystemSNMP(ip, community);
+    }
+  } catch (error) {
+    log(`WARNING: Failed to discover neighbors for ${ip}: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Get CDP neighbors (Cisco Discovery Protocol)
+ */
+async function getCDPNeighbors(session, ip, community) {
+  return new Promise((resolve) => {
+    if (!session) {
+      session = snmp.createSession(ip, community, {
+        port: 161,
+        retries: 1,
+        timeout: SNMP_TIMEOUT,
+        transport: 'udp4'
+      });
+    }
+    
+    session.subtree(CDP_OIDS.cdpCacheTable, (error, varbinds) => {
+      if (session && session !== snmp) {
+        session.close();
+      }
+      
+      if (error || !varbinds || varbinds.length === 0) {
+        resolve([]);
+        return;
+      }
+      
+      // Parse CDP neighbors
+      const neighborMap = {};
+      varbinds.forEach((vb) => {
+        const oid = vb.oid.toString();
+        const value = vb.value?.toString() || '';
+        
+        // Extract CDP index from OID
+        const match = oid.match(/\.(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+        if (match) {
+          const [, ifIndex, cdpIndex] = match;
+          const neighborKey = `${ifIndex}.${cdpIndex}`;
+          
+          if (!neighborMap[neighborKey]) {
+            neighborMap[neighborKey] = {
+              local_interface: parseInt(ifIndex),
+              index: parseInt(cdpIndex),
+              discovered_via: 'cdp'
+            };
+          }
+          
+          // Map OID to field
+          if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.6')) {
+            neighborMap[neighborKey].device_id = value;
+          } else if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.7')) {
+            neighborMap[neighborKey].remote_port = value;
+          } else if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.8')) {
+            neighborMap[neighborKey].platform = value;
+          } else if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.4')) {
+            neighborMap[neighborKey].ip_address = value;
+          }
+        }
+      });
+      
+      resolve(Object.values(neighborMap));
+    });
+  });
+}
+
+/**
+ * Get neighbors using system snmpwalk (fallback)
+ */
+async function getNeighborsWithSystemSNMP(ip, community) {
+  const neighbors = [];
+  
+  try {
+    // Try LLDP first
+    const lldpOutput = await execAsync(`timeout 3 snmpwalk -v2c -c "${community}" "${ip}" ${LLDP_OIDS.lldpRemSysName} 2>/dev/null`).catch(() => ({ stdout: '' }));
+    
+    if (lldpOutput.stdout && lldpOutput.stdout.trim()) {
+      // Parse LLDP output
+      const lines = lldpOutput.stdout.split('\n');
+      lines.forEach((line) => {
+        const match = line.match(/\.(\d+)\.(\d+)\.(\d+)\.(\d+)\.(\d+)\.(\d+)\s+=\s+(.+)/);
+        if (match) {
+          const sysName = match[7]?.replace(/STRING:\s*"?([^"]+)"?/, '$1').trim();
+          if (sysName && sysName !== '""') {
+            neighbors.push({
+              system_name: sysName,
+              discovered_via: 'lldp',
+              source_ip: ip
+            });
+          }
+        }
+      });
+    }
+    
+    // Try CDP if LLDP didn't find anything
+    if (neighbors.length === 0) {
+      const cdpOutput = await execAsync(`timeout 3 snmpwalk -v2c -c "${community}" "${ip}" ${CDP_OIDS.cdpCacheDeviceId} 2>/dev/null`).catch(() => ({ stdout: '' }));
+      
+      if (cdpOutput.stdout && cdpOutput.stdout.trim()) {
+        const lines = cdpOutput.stdout.split('\n');
+        lines.forEach((line) => {
+          const match = line.match(/\.(\d+)\.(\d+)\.(\d+)\.(\d+)\s+=\s+(.+)/);
+          if (match) {
+            const deviceId = match[5]?.replace(/STRING:\s*"?([^"]+)"?/, '$1').trim();
+            if (deviceId && deviceId !== '""') {
+              neighbors.push({
+                device_id: deviceId,
+                discovered_via: 'cdp',
+                source_ip: ip
+              });
+            }
+          }
+        });
+      }
+    }
+  } catch (error) {
+    // Ignore errors
+  }
+  
+  return neighbors;
+}
+
+/**
  * Get Mikrotik-specific information
  */
 async function getMikrotikInfo(ip, community) {
@@ -359,7 +570,8 @@ async function getMikrotikInfo(ip, community) {
     board_name: null,
     cpu_load_percent: null,
     temperature_celsius: null,
-    uptime_ticks: null
+    uptime_ticks: null,
+    neighbors: []
   };
   
   if (snmp) {
@@ -382,9 +594,7 @@ async function getMikrotikInfo(ip, community) {
         MIKROTIK_OIDS.uptime
       ];
       
-      session.get(oids, (error, varbinds) => {
-        session.close();
-        
+      session.get(oids, async (error, varbinds) => {
         if (!error && varbinds) {
           mikrotikInfo.identity = varbinds[0]?.value?.toString().substring(0, 100) || null;
           mikrotikInfo.routerOS_version = varbinds[1]?.value?.toString().substring(0, 50) || null;
@@ -399,6 +609,16 @@ async function getMikrotikInfo(ip, community) {
           
           const uptime = varbinds[6]?.value;
           mikrotikInfo.uptime_ticks = (uptime && typeof uptime === 'number' && uptime > 0) ? uptime : null;
+        }
+        
+        session.close();
+        
+        // Discover neighbors for Mikrotik devices
+        try {
+          mikrotikInfo.neighbors = await getMikrotikNeighbors(ip, community);
+        } catch (err) {
+          log(`WARNING: Failed to discover neighbors for ${ip}: ${err.message}`);
+          mikrotikInfo.neighbors = [];
         }
         
         resolve(mikrotikInfo);
@@ -492,6 +712,12 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
               log(`  Detected Mikrotik device at ${ip}, gathering additional information...`);
               const mikrotikInfo = await getMikrotikInfo(ip, community);
               deviceInfo.mikrotik = mikrotikInfo;
+              
+              // Neighbors are already included in mikrotikInfo.neighbors from getMikrotikInfo
+              if (mikrotikInfo.neighbors && mikrotikInfo.neighbors.length > 0) {
+                deviceInfo.neighbors = mikrotikInfo.neighbors;
+                log(`  Found ${mikrotikInfo.neighbors.length} neighbor(s) for ${ip}`);
+              }
             }
             
             devices.push(deviceInfo);
