@@ -117,6 +117,42 @@ get_device_info() {
     fi
 }
 
+# Scan a single IP address
+scan_single_ip() {
+    local test_ip=$1
+    local communities=$2
+    local results_file=$3
+    local our_ip=$(hostname -I | awk '{print $1}')
+    
+    # Skip our own IP
+    if [ "$test_ip" = "$our_ip" ]; then
+        return 0
+    fi
+    
+    # Try each community string
+    for community in $(echo "$communities" | tr ',' ' '); do
+        if test_snmp_device "$test_ip" "$community"; then
+            log "Found SNMP device: $test_ip (community: $community)"
+            
+            local device_info=$(get_device_info "$test_ip" "$community")
+            
+            # Validate and write to results file
+            if command -v jq &> /dev/null; then
+                if echo "$device_info" | jq empty 2>/dev/null; then
+                    echo "$device_info" >> "$results_file"
+                    return 0
+                fi
+            else
+                # Fallback: write raw JSON
+                echo "$device_info" >> "$results_file"
+                return 0
+            fi
+        fi
+    done
+    
+    return 1
+}
+
 # Scan network for SNMP devices
 scan_network() {
     local subnet=$1
@@ -137,65 +173,107 @@ scan_network() {
     
     # Calculate IP range (simple /24 scan for now)
     local base_ip=$(echo "$network" | cut -d'.' -f1-3)
-    local devices_array="[]"
-    local count=0
-    local temp_file=$(mktemp)
+    local results_file=$(mktemp)
+    local pids=()
+    local max_parallel=20  # Scan 20 IPs in parallel
+    local scanned=0
+    local found=0
+    local start_time=$(date +%s)
+    
+    log "Scanning 254 IPs with up to $max_parallel parallel connections..."
+    log "Using timeout: 2s per IP, communities: $communities"
     
     # Use jq to build array properly
     if ! command -v jq &> /dev/null; then
         log "WARNING: jq not found, JSON may have issues. Installing jq is recommended."
     fi
     
-    # Scan first 254 IPs (limit to avoid long scans)
+    # Scan IPs with parallel processing
     for i in $(seq 1 254); do
         local test_ip="${base_ip}.${i}"
+        scanned=$((scanned + 1))
         
-        # Skip our own IP
-        if [ "$test_ip" = "$(hostname -I | awk '{print $1}')" ]; then
-            continue
+        # Show progress every 25 IPs
+        if [ $((scanned % 25)) -eq 0 ]; then
+            local elapsed=$(($(date +%s) - start_time))
+            log "Progress: Scanned $scanned/254 IPs (${elapsed}s elapsed, $found device(s) found so far)..."
         fi
         
-        # Try each community string
-        for community in $(echo "$communities" | tr ',' ' '); do
-            if test_snmp_device "$test_ip" "$community"; then
-                log "Found SNMP device: $test_ip (community: $community)"
-                
-                local device_info=$(get_device_info "$test_ip" "$community")
-                
-                # Validate device_info JSON before adding
-                if command -v jq &> /dev/null; then
-                    if echo "$device_info" | jq empty 2>/dev/null; then
-                        devices_array=$(echo "$devices_array" | jq --argjson device "$device_info" '. + [$device]' 2>/dev/null || echo "$devices_array")
-                        count=$((count + 1))
-                    else
-                        log "WARNING: Invalid JSON for device $test_ip, skipping"
-                    fi
-                else
-                    # Fallback: manual array building (less safe)
-                    if [ "$devices_array" = "[]" ]; then
-                        devices_array="[$device_info]"
-                    else
-                        devices_array="${devices_array},${device_info}"
-                        devices_array="[${devices_array}]"
-                    fi
-                    count=$((count + 1))
+        # Wait for available slot if we have too many parallel scans
+        while [ ${#pids[@]} -ge $max_parallel ]; do
+            for pid_idx in "${!pids[@]}"; do
+                if ! kill -0 "${pids[$pid_idx]}" 2>/dev/null; then
+                    wait "${pids[$pid_idx]}" 2>/dev/null
+                    unset pids[$pid_idx]
                 fi
-                
-                break  # Found working community, move to next IP
-            fi
+            done
+            # Rebuild array without gaps
+            pids=("${pids[@]}")
+            sleep 0.1
         done
         
+        # Start scan in background
+        (scan_single_ip "$test_ip" "$communities" "$results_file" && found=$((found + 1))) &
+        pids+=($!)
+        
         # Limit total devices discovered per scan
-        if [ $count -ge 50 ]; then
+        if [ $found -ge 50 ]; then
             log "Reached discovery limit (50 devices), stopping scan"
             break
         fi
     done
     
-    # Clean up temp file
-    rm -f "$temp_file"
+    # Wait for all remaining background jobs
+    log "Waiting for all scans to complete..."
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null
+    done
     
-    log "Discovery complete. Found $count SNMP devices"
+    # Collect results
+    local devices_array="[]"
+    local count=0
+    
+    if [ -s "$results_file" ]; then
+        if command -v jq &> /dev/null; then
+            # Read all results and build JSON array
+            devices_array="["
+            local first=true
+            while IFS= read -r device_json; do
+                if [ -n "$device_json" ] && echo "$device_json" | jq empty 2>/dev/null; then
+                    if [ "$first" = true ]; then
+                        first=false
+                    else
+                        devices_array="${devices_array},"
+                    fi
+                    devices_array="${devices_array}${device_json}"
+                    count=$((count + 1))
+                fi
+            done < "$results_file"
+            devices_array="${devices_array}]"
+        else
+            # Fallback: manual array building
+            devices_array="["
+            local first=true
+            while IFS= read -r device_json; do
+                if [ -n "$device_json" ]; then
+                    if [ "$first" = true ]; then
+                        first=false
+                    else
+                        devices_array="${devices_array},"
+                    fi
+                    devices_array="${devices_array}${device_json}"
+                    count=$((count + 1))
+                fi
+            done < "$results_file"
+            devices_array="${devices_array}]"
+        fi
+    fi
+    
+    # Clean up
+    rm -f "$results_file"
+    
+    local elapsed=$(($(date +%s) - start_time))
+    log "Discovery complete. Found $count SNMP devices in ${elapsed} seconds"
     
     if [ "$count" -eq 0 ]; then
         log "No SNMP devices found. This is normal if no SNMP-enabled devices are on the network."
