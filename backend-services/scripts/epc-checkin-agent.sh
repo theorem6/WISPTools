@@ -299,8 +299,21 @@ do_checkin() {
     local network_json=$(get_network_info)
     local versions_json=$(get_versions)
     
-    # Build check-in payload - simple string concatenation
-    local payload="{\"device_code\":\"$device_code\",\"hardware_id\":\"$hardware_id\",\"ip_address\":\"$ip_address\",\"services\":$services_json,\"system\":$system_json,\"network\":$network_json,\"versions\":$versions_json}"
+    # Collect recent logs (last 50 lines from check-in log, max 5000 chars)
+    local recent_logs=""
+    if [ -f "$LOG_FILE" ]; then
+        recent_logs=$(tail -n 50 "$LOG_FILE" 2>/dev/null | head -c 5000 | sed 's/"/\\"/g' | tr '\n' '|' || echo "")
+    fi
+    
+    # Build logs JSON
+    local logs_json="[]"
+    if [ -n "$recent_logs" ]; then
+        # Create array of log entries (simple format for now)
+        logs_json="[{\"source\":\"checkin-agent\",\"level\":\"info\",\"message\":\"$recent_logs\"}]"
+    fi
+    
+    # Build check-in payload - include logs
+    local payload="{\"device_code\":\"$device_code\",\"hardware_id\":\"$hardware_id\",\"ip_address\":\"$ip_address\",\"services\":$services_json,\"system\":$system_json,\"network\":$network_json,\"versions\":$versions_json,\"logs\":$logs_json}"
     
     # Send check-in
     local response=$(curl -s -X POST "${API_URL}/checkin" \

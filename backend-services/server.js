@@ -122,11 +122,11 @@ app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
 
 // EPC Check-in endpoints - MUST be defined BEFORE /api/epc routes (no tenant ID required)
-const { RemoteEPC: RemoteEPCCheckin, EPCCommand, EPCServiceStatus, EPCAlert } = require('./models/distributed-epc-schema');
+const { RemoteEPC: RemoteEPCCheckin, EPCCommand, EPCServiceStatus, EPCAlert, EPCLog } = require('./models/distributed-epc-schema');
 
 app.post('/api/epc/checkin', async (req, res) => {
   try {
-    const { device_code, hardware_id, ip_address, services, system, network, versions } = req.body;
+    const { device_code, hardware_id, ip_address, services, system, network, versions, logs } = req.body;
     
     if (!device_code) {
       return res.status(400).json({ error: 'device_code is required' });
@@ -144,18 +144,78 @@ app.post('/api/epc/checkin', async (req, res) => {
       });
     }
     
+    // Update EPC with latest status and uptime
+    const updateData = {
+      status: 'online',
+      last_seen: new Date(),
+      last_heartbeat: new Date(),
+      ip_address,
+      hardware_id: hardware_id || epc.hardware_id,
+      'version.os': versions?.os,
+      'version.open5gs': versions?.open5gs
+    };
+    
+    // Update system uptime if provided
+    if (system?.uptime_seconds !== undefined && system?.uptime_seconds !== null) {
+      updateData['metrics.system_uptime_seconds'] = system.uptime_seconds;
+    }
+    
     await RemoteEPCCheckin.updateOne(
       { epc_id: epc.epc_id },
-      {
-        status: 'online',
-        last_seen: new Date(),
-        last_heartbeat: new Date(),
-        ip_address,
-        hardware_id: hardware_id || epc.hardware_id,
-        'version.os': versions?.os,
-        'version.open5gs': versions?.open5gs
-      }
+      { $set: updateData }
     );
+    
+    // Store logs if provided
+    if (logs && Array.isArray(logs) && logs.length > 0) {
+      try {
+        for (const logEntry of logs) {
+          // Parse log message if it's a pipe-separated string
+          if (logEntry.message && typeof logEntry.message === 'string' && logEntry.message.includes('|')) {
+            const logLines = logEntry.message.split('|').filter(l => l && l.trim());
+            for (const line of logLines) {
+              if (line.trim()) {
+                // Extract timestamp and message from log line format: "YYYY-MM-DD HH:MM:SS [SOURCE] MESSAGE"
+                const logMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[([^\]]+)\]\s*(.+)$/);
+                if (logMatch) {
+                  await new EPCLog({
+                    epc_id: epc.epc_id,
+                    tenant_id: epc.tenant_id,
+                    log_type: 'checkin',
+                    source: logMatch[2] || 'epc-checkin-agent',
+                    level: line.toLowerCase().includes('error') ? 'error' : line.toLowerCase().includes('warn') ? 'warning' : 'info',
+                    message: logMatch[3] || line.trim(),
+                    details: { ip_address, device_code, timestamp: logMatch[1] }
+                  }).save();
+                } else {
+                  await new EPCLog({
+                    epc_id: epc.epc_id,
+                    tenant_id: epc.tenant_id,
+                    log_type: 'checkin',
+                    source: logEntry.source || 'epc-checkin-agent',
+                    level: logEntry.level || 'info',
+                    message: line.trim(),
+                    details: { ip_address, device_code }
+                  }).save();
+                }
+              }
+            }
+          } else if (logEntry.message) {
+            await new EPCLog({
+              epc_id: epc.epc_id,
+              tenant_id: epc.tenant_id,
+              log_type: logEntry.log_type || 'checkin',
+              source: logEntry.source || 'epc-checkin-agent',
+              level: logEntry.level || 'info',
+              message: typeof logEntry.message === 'string' ? logEntry.message : JSON.stringify(logEntry.message),
+              details: { ip_address, device_code, ...logEntry.details }
+            }).save();
+          }
+        }
+      } catch (logError) {
+        console.warn(`[EPC Check-in] Error storing logs:`, logError.message);
+        // Don't fail check-in if log storage fails
+      }
+    }
     
     if (services) {
       await new EPCServiceStatus({
@@ -273,6 +333,7 @@ app.post('/api/epc/checkin/commands/:command_id/result', async (req, res) => {
 // EPC routes with tenant requirement
 app.use('/api/epc', require('./routes/epc'));
 app.use('/api/epc', require('./routes/epc-commands')); // Remote command management
+app.use('/api/epc', require('./routes/epc-logs')); // EPC logs
 app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));

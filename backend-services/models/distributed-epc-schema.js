@@ -482,6 +482,27 @@ const EPCServiceStatusSchema = new mongoose.Schema({
 EPCServiceStatusSchema.index({ epc_id: 1, timestamp: -1 });
 EPCServiceStatusSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 }); // Keep 7 days
 
+/**
+ * EPC Log Schema
+ * Stores logs received from remote EPCs during check-in
+ */
+const EPCLogSchema = new mongoose.Schema({
+  epc_id: { type: String, required: true, index: true },
+  tenant_id: { type: String, required: true, index: true },
+  timestamp: { type: Date, default: Date.now, index: true },
+  log_type: { type: String, enum: ['checkin', 'system', 'service', 'snmp', 'error'], default: 'checkin', index: true },
+  source: { type: String, default: 'epc-checkin-agent' },
+  level: { type: String, enum: ['info', 'warning', 'error', 'debug'], default: 'info' },
+  message: { type: String, required: true },
+  details: mongoose.Schema.Types.Mixed
+}, {
+  timestamps: { createdAt: 'timestamp', updatedAt: false }
+});
+
+EPCLogSchema.index({ epc_id: 1, timestamp: -1 });
+EPCLogSchema.index({ tenant_id: 1, timestamp: -1 });
+EPCLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 2592000 }); // Keep 30 days
+
 // Models
 const RemoteEPC = mongoose.model('RemoteEPC', RemoteEPCSchema);
 const EPCMetrics = mongoose.model('EPCMetrics', EPCMetricsSchema);
@@ -490,6 +511,7 @@ const AttachDetachEvent = mongoose.model('AttachDetachEvent', AttachDetachEventS
 const EPCAlert = mongoose.model('EPCAlert', EPCAlertSchema);
 const EPCCommand = mongoose.model('EPCCommand', EPCCommandSchema);
 const EPCServiceStatus = mongoose.model('EPCServiceStatus', EPCServiceStatusSchema);
+const EPCLog = mongoose.model('EPCLog', EPCLogSchema);
 
 module.exports = {
   RemoteEPC,
@@ -498,6 +520,7 @@ module.exports = {
   AttachDetachEvent,
   EPCAlert,
   EPCCommand,
-  EPCServiceStatus
+  EPCServiceStatus,
+  EPCLog
 };
 
