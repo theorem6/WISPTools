@@ -388,6 +388,43 @@ fi
 # ============================================================================
 log "=== PHASE 2: Device code and configuration ==="
 
+# CRITICAL CHECK: If Open5GS services are already running, skip deployment entirely
+if systemctl is-active --quiet open5gs-mmed 2>/dev/null || \
+   systemctl is-active --quiet open5gs-sgwcd 2>/dev/null || \
+   systemctl is-active --quiet open5gs-smfd 2>/dev/null; then
+    log "Open5GS services are already running - device is fully deployed"
+    
+    # Get device code and verify registration
+    DEVICE_CODE=$(cat /etc/wisptools/device_code 2>/dev/null || \
+                  cat /etc/wisptools/device-code.env 2>/dev/null | grep DEVICE_CODE | cut -d= -f2 || \
+                  ip link show | grep -A1 "state UP" | grep link/ether | head -1 | awk '{print $2}' | tr -d ':' | cut -c1-8 | tr '[:lower:]' '[:upper:]')
+    HARDWARE_ID=$(cat /sys/class/dmi/id/product_uuid 2>/dev/null || \
+                  ip link show | grep ether | head -1 | awk '{print $2}' | tr -d ':')
+    IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
+    
+    if [ -n "$DEVICE_CODE" ] && [ -n "$IP_ADDR" ]; then
+        RESPONSE=$(curl -s -X POST "https://$GCE_DOMAIN:$HSS_PORT/api/epc/checkin" \
+            -H "Content-Type: application/json" \
+            -d "{\"device_code\":\"$DEVICE_CODE\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$IP_ADDR\"}" 2>/dev/null) || true
+        
+        EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
+        
+        if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ]; then
+            log "Device is registered (EPC: $EPC_ID) and services are running - system fully operational"
+            
+            # Ensure startup service is disabled
+            systemctl disable wisptools-startup.service 2>/dev/null || true
+            
+            # Create configured file if it doesn't exist
+            touch "$CONFIGURED_FILE" 2>/dev/null || true
+            
+            # Show running status and exit - never show waiting page
+            log "System is fully operational - exiting startup script"
+            exit 0
+        fi
+    fi
+fi
+
 # Generate device code if needed
 if [ ! -f "$DEVICE_CODE_FILE" ]; then
     DEVICE_CODE=$(cat /dev/urandom | tr -dc 'A-Z0-9' | head -c8)
