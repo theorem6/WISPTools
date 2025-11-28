@@ -366,7 +366,7 @@ const EPCCommandSchema = new mongoose.Schema({
   // Command Details
   command_type: {
     type: String,
-    enum: ['service_control', 'reboot', 'update', 'script', 'config_update'],
+    enum: ['service_control', 'reboot', 'update', 'script', 'script_execution', 'config_update'],
     required: true
   },
   
