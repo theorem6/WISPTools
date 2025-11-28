@@ -807,6 +807,13 @@ router.put('/epc/:epc_id', async (req, res) => {
     const new_epc_id_value = new_epc_id || new_epc_id_from_body;
     
     console.log(`[HSS/EPC] Updating EPC ${epc_id} for tenant ${tenantId}`);
+    console.log(`[HSS/EPC] Request body:`, {
+      site_id: site_id !== undefined ? site_id : 'undefined',
+      site_name: site_name !== undefined ? site_name : 'undefined',
+      has_hss_config: !!hss_config,
+      has_snmp_config: !!snmp_config,
+      deployment_type
+    });
 
     // Find the EPC
     const epc = await RemoteEPC.findOne({

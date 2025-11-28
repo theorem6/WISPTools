@@ -243,7 +243,7 @@ execute_command() {
     local target_services=$4
     local script_content=$5
     local script_url=$6
-    local config_data=$7  # Add config_data parameter
+    local cmd_json_file=$7  # Path to JSON file containing full command (for config_data extraction)
     
     log "Executing command $cmd_id: $cmd_type / $action"
     
@@ -251,6 +251,13 @@ execute_command() {
     local result_output=""
     local result_error=""
     local exit_code=0
+    
+    # Extract config_data from command JSON file if it exists and command type is config_update
+    local config_data=""
+    if [ "$cmd_type" = "config_update" ] && [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
+        config_data=$(cat "$cmd_json_file" | jq -c '.config_data // {}')
+        log "Extracted config_data from command JSON: ${config_data:0:100}..."  # Log first 100 chars
+    fi
     
     case "$cmd_type" in
         service_control)
@@ -335,9 +342,14 @@ execute_command() {
         config_update)
             log "  -> Applying configuration update"
             
+            # Use config_data extracted at function start (from cmd_json_file)
             if [ -z "$config_data" ] || [ "$config_data" = "null" ] || [ "$config_data" = "{}" ]; then
                 result_success=false
                 result_error="No config_data provided in command"
+                log "ERROR: Config data empty or missing - cmd_json_file: ${cmd_json_file:-none}, config_data length: ${#config_data}"
+                if [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
+                    log "Command JSON file contents: $(cat "$cmd_json_file" | head -c 500)"
+                fi
                 exit_code=1
             else
                 # Store configuration for later use
@@ -373,6 +385,9 @@ execute_command() {
                     log "Configuration update applied - Site: ${site_name:-N/A}, Site ID: ${site_id:-N/A}"
                 fi
             fi
+            
+            # Clean up command JSON file
+            [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ] && rm -f "$cmd_json_file"
             ;;
             
         *)
@@ -559,9 +574,12 @@ do_checkin() {
                 local target_services=$(echo "$cmd" | jq -r '.target_services | join(" ") // "all"')
                 local script_content=$(echo "$cmd" | jq -r '.script_content // empty')
                 local script_url=$(echo "$cmd" | jq -r '.script_url // empty')
-                local config_data=$(echo "$cmd" | jq -c '.config_data // {}')
                 
-                execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url" "$config_data"
+                # For config_update, pass the full command JSON so we can extract config_data properly
+                local cmd_json_file="/tmp/wisptools-cmd-$cmd_id.json"
+                echo "$cmd" > "$cmd_json_file"
+                
+                execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url" "$cmd_json_file"
             done
         fi
         

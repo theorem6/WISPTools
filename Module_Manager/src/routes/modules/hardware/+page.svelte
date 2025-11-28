@@ -335,6 +335,25 @@
       if (!user) throw new Error('Not authenticated');
       
       const token = await user.getIdToken();
+      
+      const requestBody = {
+        site_id: epcEditForm.site_id || null, // Always send site_id, use null if empty
+        site_name: epcEditForm.site_id ? undefined : (epcEditForm.site_name || undefined),
+        deployment_type: epcEditForm.deployment_type,
+        hss_config: epcEditForm.hss_config,
+        snmp_config: epcEditForm.snmp_config,
+        device_code: selectedEPCDevice.device_code || epcEditForm.device_code || undefined,
+        status: (selectedEPCDevice.device_code || epcEditForm.device_code) ? 'registered' : undefined
+      };
+      
+      console.log('[Hardware] Saving EPC device:', {
+        epcId,
+        site_id: requestBody.site_id,
+        site_name: requestBody.site_name,
+        has_hss_config: !!requestBody.hss_config,
+        has_snmp_config: !!requestBody.snmp_config
+      });
+      
       const response = await fetch(`${HSS_API}/epc/${epcId}`, {
         method: 'PUT',
         headers: {
@@ -342,15 +361,7 @@
           'X-Tenant-ID': tenantId,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          site_id: epcEditForm.site_id || null, // Always send site_id, use null if empty
-          site_name: epcEditForm.site_id ? undefined : (epcEditForm.site_name || undefined),
-          deployment_type: epcEditForm.deployment_type,
-          hss_config: epcEditForm.hss_config,
-          snmp_config: epcEditForm.snmp_config,
-          device_code: selectedEPCDevice.device_code || epcEditForm.device_code || undefined,
-          status: (selectedEPCDevice.device_code || epcEditForm.device_code) ? 'registered' : undefined
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
