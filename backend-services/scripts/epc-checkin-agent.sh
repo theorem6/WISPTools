@@ -243,6 +243,7 @@ execute_command() {
     local target_services=$4
     local script_content=$5
     local script_url=$6
+    local config_data=$7  # Add config_data parameter
     
     log "Executing command $cmd_id: $cmd_type / $action"
     
@@ -328,6 +329,49 @@ execute_command() {
                     result_error="$output"
                 fi
                 rm -f "$script_file"
+            fi
+            ;;
+            
+        config_update)
+            log "  -> Applying configuration update"
+            
+            if [ -z "$config_data" ] || [ "$config_data" = "null" ] || [ "$config_data" = "{}" ]; then
+                result_success=false
+                result_error="No config_data provided in command"
+                exit_code=1
+            else
+                # Store configuration for later use
+                local config_file="/etc/wisptools/epc-config.json"
+                echo "$config_data" > "$config_file" 2>/dev/null || {
+                    result_success=false
+                    result_error="Failed to write config file"
+                    exit_code=1
+                }
+                
+                if [ "$result_success" = true ]; then
+                    # Extract key config values
+                    local site_name=$(echo "$config_data" | jq -r '.site_name // empty')
+                    local site_id=$(echo "$config_data" | jq -r '.site_id // empty')
+                    
+                    # Update registration.json if it exists
+                    local reg_file="/etc/wisptools/registration.json"
+                    if [ -f "$reg_file" ]; then
+                        local reg_data=$(cat "$reg_file" 2>/dev/null || echo "{}")
+                        reg_data=$(echo "$reg_data" | jq --arg site_name "$site_name" --arg site_id "$site_id" \
+                            '.config.site_name = $site_name | .config.site_id = $site_id')
+                        echo "$reg_data" > "$reg_file" 2>/dev/null || true
+                    fi
+                    
+                    result_output="Configuration updated successfully"
+                    if [ -n "$site_name" ]; then
+                        result_output+="\nSite: $site_name"
+                    fi
+                    if [ -n "$site_id" ]; then
+                        result_output+="\nSite ID: $site_id"
+                    fi
+                    
+                    log "Configuration update applied - Site: ${site_name:-N/A}, Site ID: ${site_id:-N/A}"
+                fi
             fi
             ;;
             
@@ -515,8 +559,9 @@ do_checkin() {
                 local target_services=$(echo "$cmd" | jq -r '.target_services | join(" ") // "all"')
                 local script_content=$(echo "$cmd" | jq -r '.script_content // empty')
                 local script_url=$(echo "$cmd" | jq -r '.script_url // empty')
+                local config_data=$(echo "$cmd" | jq -c '.config_data // {}')
                 
-                execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url"
+                execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url" "$config_data"
             done
         fi
         

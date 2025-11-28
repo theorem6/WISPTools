@@ -968,7 +968,7 @@
                 <option>Loading sites...</option>
               </select>
             {:else}
-              <select on:change={handleSiteSelect} value={epcEditForm.site_id}>
+              <select bind:value={epcEditForm.site_id} on:change={handleSiteSelect}>
                 <option value="">-- Select a site --</option>
                 {#each availableSites as site}
                   <option value={site.id || site._id}>{site.name || site.siteName || 'Unnamed Site'}</option>
