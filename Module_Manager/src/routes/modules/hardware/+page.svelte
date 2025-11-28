@@ -251,6 +251,8 @@
     snmp_config: { enabled: true, community: 'public', version: '2c', pollingInterval: 60, autoDiscovery: true }
   };
   let isSavingEPC = false;
+  let snmpCommunitiesText = '';
+  let snmpSubnetsText = '';
   
   async function loadAvailableSites() {
     if (!$currentTenant?.id || loadingSites) return;
@@ -299,6 +301,11 @@
         autoDiscovery: device.snmp_config?.autoDiscovery !== false
       }
     };
+    
+    // Update textarea values for display
+    snmpCommunitiesText = epcEditForm.snmp_config.communities?.join('\n') || epcEditForm.snmp_config.community || 'public';
+    snmpSubnetsText = epcEditForm.snmp_config.targets?.join('\n') || '';
+    
     showEPCEditModal = true;
   }
   
@@ -1044,7 +1051,6 @@
               <label><input type="checkbox" bind:checked={epcEditForm.snmp_config.autoDiscovery} /> Auto-Discovery</label>
             </div>
             <div class="form-row">
-              <div class="form-group"><label>Community</label><input type="text" bind:value={epcEditForm.snmp_config.community} /></div>
               <div class="form-group">
                 <label>Version</label>
                 <select bind:value={epcEditForm.snmp_config.version}>
@@ -1053,8 +1059,43 @@
                   <option value="3">v3</option>
                 </select>
               </div>
+              <div class="form-group"><label>Polling Interval (sec)</label><input type="number" bind:value={epcEditForm.snmp_config.pollingInterval} min="10" max="3600" /></div>
             </div>
-            <div class="form-group"><label>Polling Interval (sec)</label><input type="number" bind:value={epcEditForm.snmp_config.pollingInterval} min="10" max="3600" /></div>
+            
+            <div class="form-group">
+              <label>Community Strings (one per line)</label>
+              <textarea 
+                bind:value={snmpCommunitiesText} 
+                on:input={(e) => {
+                  const communities = e.target.value.split('\n')
+                    .map(c => c.trim())
+                    .filter(c => c.length > 0);
+                  epcEditForm.snmp_config.communities = communities;
+                  if (communities.length > 0) {
+                    epcEditForm.snmp_config.community = communities[0]; // Keep first as legacy
+                  }
+                }}
+                placeholder="public&#10;private&#10;readonly"
+                rows="4"
+              ></textarea>
+              <small class="hint">Enter each community string on a new line</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Subnets to Scan (CIDR format, one per line)</label>
+              <textarea 
+                bind:value={snmpSubnetsText} 
+                on:input={(e) => {
+                  const subnets = e.target.value.split('\n')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                  epcEditForm.snmp_config.targets = subnets;
+                }}
+                placeholder="192.168.1.0/24&#10;10.0.0.0/8"
+                rows="4"
+              ></textarea>
+              <small class="hint">Enter each subnet in CIDR format (e.g., 192.168.1.0/24) on a new line</small>
+            </div>
           </div>
         {/if}
       </div>
