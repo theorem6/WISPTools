@@ -338,8 +338,25 @@ execute_command() {
             # Extract config_data from command JSON file
             local config_data=""
             if [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
-                config_data=$(cat "$cmd_json_file" | jq -c '.config_data // {}' 2>/dev/null || echo "{}")
-                log "  -> Extracted config_data from JSON file (length: ${#config_data} chars)"
+                # First check if config_data exists in the JSON
+                local has_config_data=$(cat "$cmd_json_file" | jq -r 'if .config_data != null then "yes" else "no" end' 2>/dev/null || echo "no")
+                log "  -> Command JSON file found. Has config_data: $has_config_data"
+                
+                if [ "$has_config_data" = "yes" ]; then
+                    config_data=$(cat "$cmd_json_file" | jq -c '.config_data' 2>/dev/null)
+                    local config_size=${#config_data}
+                    log "  -> Extracted config_data (${config_size} chars): ${config_data:0:200}..."
+                    
+                    # Validate it's valid JSON
+                    if ! echo "$config_data" | jq . >/dev/null 2>&1; then
+                        log "ERROR: Extracted config_data is not valid JSON"
+                        config_data=""
+                    fi
+                else
+                    log "ERROR: Command JSON does not contain config_data field"
+                    log "Command JSON keys: $(cat "$cmd_json_file" | jq -r 'keys | join(", ")' 2>/dev/null || echo "unknown")"
+                    log "Full command JSON: $(cat "$cmd_json_file" 2>/dev/null | head -c 500)"
+                fi
             else
                 log "ERROR: Command JSON file not found: ${cmd_json_file:-none}"
             fi
@@ -347,10 +364,7 @@ execute_command() {
             if [ -z "$config_data" ] || [ "$config_data" = "null" ] || [ "$config_data" = "{}" ]; then
                 result_success=false
                 result_error="No config_data provided in command"
-                log "ERROR: Config data is empty or invalid"
-                if [ -n "$cmd_json_file" ] && [ -f "$cmd_json_file" ]; then
-                    log "Command JSON file exists. Full contents: $(cat "$cmd_json_file")"
-                fi
+                log "ERROR: Config data is empty or invalid after extraction"
                 exit_code=1
             else
                 # Store configuration for later use
