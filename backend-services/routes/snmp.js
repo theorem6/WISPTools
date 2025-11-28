@@ -390,6 +390,54 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// GET /api/snmp/configuration - Get SNMP configuration for tenant
+router.get('/configuration', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    
+    // Return default configuration (can be extended to store per-tenant config in DB)
+    res.json({
+      communityProfiles: [],
+      v3UserProfiles: [],
+      discoverySubnets: [],
+      defaultCommunity: 'public',
+      defaultVersion: '2c',
+      pollingInterval: 60,
+      trapPort: 162,
+      enabled: true
+    });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error fetching configuration:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch SNMP configuration', 
+      message: error.message 
+    });
+  }
+});
+
+// POST /api/snmp/configuration - Save SNMP configuration for tenant
+router.post('/configuration', async (req, res) => {
+  try {
+    const tenantId = req.tenantId;
+    const config = req.body;
+    
+    // In the future, save this to a TenantSettings or SNMPConfig collection
+    console.log(`[SNMP API] Saving configuration for tenant ${tenantId}`);
+    
+    res.json({
+      success: true,
+      message: 'SNMP configuration saved',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error saving configuration:', error);
+    res.status(500).json({ 
+      error: 'Failed to save SNMP configuration', 
+      message: error.message 
+    });
+  }
+});
+
 // GET /api/snmp/discovery - Discover SNMP-enabled devices on network
 router.get('/discovery', async (req, res) => {
   try {

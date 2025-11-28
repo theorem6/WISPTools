@@ -545,6 +545,20 @@
     gap: 1rem;
   }
   
+  .no-data-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #64748b;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    margin: 2rem 0;
+  }
+  
+  .no-data-message p {
+    margin: 0.5rem 0;
+  }
+  
   .spinner {
     width: 40px;
     height: 40px;

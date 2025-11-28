@@ -1554,7 +1554,7 @@ export class CoverageMapController {
         await this.renderBackhaulLinks();
       }
 
-      if (this.filters.showTowers) {
+      if (this.filters.showTowers && Array.isArray(this.data.towers)) {
         const { default: PictureMarkerSymbol } = await import('@arcgis/core/symbols/PictureMarkerSymbol.js');
 
         const isMobile = window.innerWidth <= 768;
@@ -1644,7 +1644,7 @@ export class CoverageMapController {
         });
       }
 
-      if (this.filters.showCPE) {
+      if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
         this.data.cpeDevices.forEach(cpe => {
           if (cpe.status === 'inventory') return;
 
@@ -1680,10 +1680,11 @@ export class CoverageMapController {
         });
       }
 
-      if (this.filters.showEquipment) {
+      if (this.filters.showEquipment && Array.isArray(this.data.equipment)) {
+        const locationTypeFilter = Array.isArray(this.filters.locationTypeFilter) ? this.filters.locationTypeFilter : [];
         const visibleEquipment = this.data.equipment.filter(eq =>
-          this.filters.locationTypeFilter.length === 0 ||
-          this.filters.locationTypeFilter.includes(eq.locationType)
+          locationTypeFilter.length === 0 ||
+          locationTypeFilter.includes(eq.locationType)
         );
 
         const isMobile = window.innerWidth <= 768;
@@ -1720,9 +1721,11 @@ export class CoverageMapController {
         });
       }
 
-      console.log(`Rendered ${this.graphicsLayer.graphics.length} assets on map`);
+      const graphicsCount = this.graphicsLayer?.graphics?.length || 0;
+      console.log(`Rendered ${graphicsCount} assets on map`);
     } catch (err) {
       console.error('Failed to render assets:', err);
+      console.error('Error details:', err);
     }
   }
 
