@@ -277,7 +277,7 @@
     epcEditForm = {
       epc_id: device.epc_id || device.epcId || '',
       new_epc_id: device.epc_id || device.epcId || '',
-      site_id: device.site_id || '',
+      site_id: device.site_id ? String(device.site_id) : '', // Convert to string to match option values
       site_name: device.site_name || device.name || '',
       deployment_type: device.deployment_type || 'both',
       device_code: device.device_code || '',
@@ -292,8 +292,10 @@
       snmp_config: {
         enabled: device.snmp_config?.enabled !== false,
         community: device.snmp_config?.community || 'public',
+        communities: device.snmp_config?.communities || (device.snmp_config?.community ? [device.snmp_config.community] : ['public']),
         version: device.snmp_config?.version || '2c',
         pollingInterval: device.snmp_config?.pollingInterval || 60,
+        targets: device.snmp_config?.targets || [],
         autoDiscovery: device.snmp_config?.autoDiscovery !== false
       }
     };
