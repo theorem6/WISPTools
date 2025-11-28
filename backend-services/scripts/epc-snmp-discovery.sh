@@ -306,6 +306,20 @@ scan_network() {
     echo "$devices_array"
 }
 
+# Get tenant ID from cached value (set by check-in agent)
+get_tenant_id() {
+    local cached_tenant_file="/tmp/epc-tenant-id"
+    if [ -f "$cached_tenant_file" ]; then
+        local cached_tenant=$(cat "$cached_tenant_file" 2>/dev/null | tr -d '\n\r')
+        if [ -n "$cached_tenant" ] && [ "$cached_tenant" != "null" ]; then
+            echo "$cached_tenant"
+            return 0
+        fi
+    fi
+    echo ""
+    return 1
+}
+
 # Report discovered devices to server
 report_discovered_devices() {
     local device_code=$(get_device_code)
@@ -315,6 +329,9 @@ report_discovered_devices() {
         log "ERROR: No device code found"
         return 1
     fi
+    
+    # Get tenant ID from cache (set by check-in agent)
+    local tenant_id=$(get_tenant_id)
     
     # Always report, even if empty (so server knows discovery ran)
     if [ -z "$discovered_devices" ] || [ "$discovered_devices" = "[]" ]; then
