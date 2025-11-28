@@ -388,5 +388,69 @@ router.post('/:epc_id/service/:action', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/epc/:epc_id/trigger-snmp-discovery
+ * Queue a command to trigger SNMP discovery on remote EPC
+ */
+router.post('/:epc_id/trigger-snmp-discovery', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const tenant_id = req.headers['x-tenant-id'];
+    
+    if (!tenant_id) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+    
+    // Verify EPC exists and belongs to tenant
+    const epc = await RemoteEPC.findOne({ epc_id, tenant_id }).lean();
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Create command to run SNMP discovery script
+    const script_content = `#!/bin/bash
+# Force SNMP discovery
+LOG_FILE="/var/log/wisptools-checkin.log"
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [FORCE-SNMP] $1" | tee -a "$LOG_FILE"
+}
+
+log "Forcing SNMP discovery scan..."
+if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+    /opt/wisptools/epc-snmp-discovery.sh
+    log "SNMP discovery completed"
+else
+    log "ERROR: SNMP discovery script not found"
+    exit 1
+fi
+`;
+    
+    const command = new EPCCommand({
+      epc_id,
+      tenant_id,
+      command_type: 'script_execution',
+      priority: 3, // Higher priority to execute quickly
+      script_content,
+      notes: 'Force SNMP discovery scan',
+      created_by: req.headers['x-user-id'] || 'api'
+    });
+    
+    await command.save();
+    
+    console.log(`[EPC Command] Queued SNMP discovery command ${command._id} for EPC ${epc_id}`);
+    
+    res.json({
+      success: true,
+      command_id: command._id.toString(),
+      epc_id,
+      message: `SNMP discovery command queued for ${epc.site_name}. Will execute on next check-in (within 60 seconds).`
+    });
+    
+  } catch (error) {
+    console.error('[EPC Command] Error queuing SNMP discovery:', error);
+    res.status(500).json({ error: 'Failed to queue SNMP discovery', message: error.message });
+  }
+});
+
 module.exports = router;
 
