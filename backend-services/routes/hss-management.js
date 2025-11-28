@@ -757,19 +757,29 @@ router.get('/epc/remote/list', async (req, res) => {
         epcId: epc.epc_id,
         name: epc.site_name,
         site_name: epc.site_name,
+        type: 'epc',
         status: epc.status === 'online' || isOnline ? 'online' : 
                 epc.status === 'registered' ? 'pending' : 'offline',
         device_code: epc.device_code,
         hardware_id: epc.hardware_id,
-        ip_address: epc.ip_address || latestStatus?.network?.ip_address || null,
+        ipAddress: epc.ip_address || latestStatus?.network?.ip_address || null,
+        ip_address: epc.ip_address || latestStatus?.network?.ip_address || null, // Support both formats
         deployment_type: epc.deployment_type,
-        location: epc.location || {},
+        location: {
+          coordinates: {
+            latitude: epc.location?.coordinates?.latitude || epc.location?.latitude || 0,
+            longitude: epc.location?.coordinates?.longitude || epc.location?.longitude || 0
+          },
+          address: epc.location?.address || 'Unknown Location'
+        },
         network_config: epc.network_config || {},
         snmp_config: epc.snmp_config || {},
         last_seen: lastSeen,
         last_heartbeat: epc.last_heartbeat,
-        created_at: epc.created_at,
-        updated_at: epc.updated_at,
+        createdAt: epc.created_at,
+        updatedAt: epc.updated_at,
+        created_at: epc.created_at, // Support both formats
+        updated_at: epc.updated_at, // Support both formats
         metrics: metrics
       };
     });

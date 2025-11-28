@@ -128,21 +128,22 @@ router.get('/epc/list', async (req, res) => {
     const remoteEPCs = await RemoteEPC.find({ tenant_id: req.tenantId }).lean();
     console.log(`📡 [Monitoring] Found ${remoteEPCs.length} RemoteEPCs`);
     
-    // Get latest service status for all EPCs to populate metrics
+    // Get latest service status for all EPCs to populate metrics - use efficient aggregation
     const epcIds = remoteEPCs.map(epc => epc.epc_id);
-    const latestStatuses = await EPCServiceStatus.find({
-      epc_id: { $in: epcIds },
-      tenant_id: req.tenantId
-    })
-      .sort({ timestamp: -1 })
-      .lean();
+    const latestStatuses = await EPCServiceStatus.aggregate([
+      { $match: { epc_id: { $in: epcIds }, tenant_id: req.tenantId } },
+      { $sort: { timestamp: -1 } },
+      { $group: {
+          _id: '$epc_id',
+          latest: { $first: '$$ROOT' }
+        }
+      }
+    ]).allowDiskUse(true);
     
     // Create a map of epc_id -> latest status
     const statusMap = new Map();
-    latestStatuses.forEach(status => {
-      if (!statusMap.has(status.epc_id) || new Date(status.timestamp) > new Date(statusMap.get(status.epc_id).timestamp)) {
-        statusMap.set(status.epc_id, status);
-      }
+    latestStatuses.forEach(item => {
+      statusMap.set(item._id, item.latest);
     });
     
     remoteEPCs.forEach(epc => {
