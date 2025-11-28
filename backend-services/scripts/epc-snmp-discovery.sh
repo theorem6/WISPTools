@@ -182,21 +182,28 @@ scan_network() {
     
     log "Scanning 254 IPs with up to $max_parallel parallel connections..."
     log "Using timeout: 2s per IP, communities: $communities"
+    log "Starting scan at $(date)..."
     
     # Use jq to build array properly
     if ! command -v jq &> /dev/null; then
         log "WARNING: jq not found, JSON may have issues. Installing jq is recommended."
     fi
     
+    # Initialize results file
+    touch "$results_file"
+    
     # Scan IPs with parallel processing
     for i in $(seq 1 254); do
         local test_ip="${base_ip}.${i}"
         scanned=$((scanned + 1))
         
-        # Show progress every 25 IPs
-        if [ $((scanned % 25)) -eq 0 ]; then
+        # Show progress every 25 IPs or on first IP
+        if [ $scanned -eq 1 ] || [ $((scanned % 25)) -eq 0 ]; then
             local elapsed=$(($(date +%s) - start_time))
-            local current_found=$(wc -l < "$results_file" 2>/dev/null || echo "0")
+            local current_found=0
+            if [ -f "$results_file" ] && [ -s "$results_file" ]; then
+                current_found=$(wc -l < "$results_file" 2>/dev/null | tr -d ' ' || echo "0")
+            fi
             log "Progress: Scanned $scanned/254 IPs (${elapsed}s elapsed, $current_found device(s) found so far)..."
         fi
         
@@ -315,9 +322,14 @@ report_discovered_devices() {
         discovered_devices="[]"
     fi
     
+    # Ensure discovered_devices is valid JSON array
+    if [ -z "$discovered_devices" ]; then
+        discovered_devices="[]"
+    fi
+    
     # Validate JSON before sending
     if ! echo "$discovered_devices" | jq empty 2>/dev/null; then
-        log "ERROR: Invalid JSON generated for discovered devices"
+        log "ERROR: Invalid JSON generated for discovered devices, using empty array"
         log "JSON content: $discovered_devices"
         discovered_devices="[]"
     fi
@@ -325,19 +337,47 @@ report_discovered_devices() {
     local device_count=$(echo "$discovered_devices" | jq -r 'length // 0' 2>/dev/null || echo "0")
     log "Reporting $device_count discovered devices to server..."
     
-    # Use jq to properly construct the payload JSON
+    # Use jq to properly construct the payload JSON - always use jq for safety
     local payload
     if command -v jq &> /dev/null; then
-        payload=$(jq -n \
+        # Construct payload with jq - handle empty array properly
+        payload=$(echo "$discovered_devices" | jq -n \
             --arg device_code "$device_code" \
-            --argjson discovered_devices "$discovered_devices" \
+            --slurpfile devices <(echo "$discovered_devices" | jq '.') \
             '{
                 device_code: $device_code,
-                discovered_devices: $discovered_devices
-            }')
+                discovered_devices: ($devices[0] // [])
+            }' 2>/dev/null)
+        
+        # Alternative method if the above fails
+        if [ -z "$payload" ] || ! echo "$payload" | jq empty 2>/dev/null; then
+            payload=$(jq -n \
+                --arg device_code "$device_code" \
+                --argjson discovered_devices "$discovered_devices" \
+                '{
+                    device_code: $device_code,
+                    discovered_devices: $discovered_devices
+                }' 2>/dev/null)
+        fi
+        
+        # Final fallback if jq still fails
+        if [ -z "$payload" ] || ! echo "$payload" | jq empty 2>/dev/null; then
+            log "WARNING: jq payload construction failed, using simple fallback"
+            payload="{\"device_code\":\"$(echo "$device_code" | sed 's/"/\\"/g')\",\"discovered_devices\":[]}"
+        fi
     else
-        # Fallback: manual construction (less safe)
-        payload="{\"device_code\":\"$device_code\",\"discovered_devices\":$discovered_devices}"
+        # Fallback: manual construction (ensure valid JSON)
+        if [ "$discovered_devices" = "[]" ]; then
+            payload="{\"device_code\":\"$(echo "$device_code" | sed 's/"/\\"/g')\",\"discovered_devices\":[]}"
+        else
+            payload="{\"device_code\":\"$(echo "$device_code" | sed 's/"/\\"/g')\",\"discovered_devices\":$discovered_devices}"
+        fi
+    fi
+    
+    # Final validation of payload
+    if ! echo "$payload" | jq empty 2>/dev/null; then
+        log "ERROR: Final payload validation failed, using minimal payload"
+        payload="{\"device_code\":\"$(echo "$device_code" | sed 's/"/\\"/g')\",\"discovered_devices\":[]}"
     fi
     
     local response=$(curl -s -X POST "${API_URL}/snmp/discovered" \
