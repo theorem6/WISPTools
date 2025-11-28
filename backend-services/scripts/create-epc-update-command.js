@@ -24,22 +24,10 @@ if (!EPC_ID) {
 
 async function main() {
   try {
-    // Connect to MongoDB - load from .env file
-    const path = require('path');
-    const envPath = path.join(__dirname, '../../.env');
-    try {
-      require('dotenv').config({ path: envPath });
-    } catch (e) {
-      // .env file might not exist, try default locations
-      require('dotenv').config();
-    }
-    
-    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/wisptools';
-    if (!mongoUri || mongoUri.includes('localhost:27017')) {
-      console.error('ERROR: MongoDB URI not configured. Set MONGODB_URI environment variable.');
-      console.error('Current value:', mongoUri);
-      process.exit(1);
-    }
+    // Connect to MongoDB - use same config as server.js
+    require('dotenv').config();
+    const appConfig = require('../config/app');
+    const mongoUri = appConfig.mongodb.uri;
     
     await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB');

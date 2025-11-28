@@ -21,8 +21,11 @@ if (!IDENTIFIER) {
 
 async function main() {
   try {
-    // Connect to MongoDB
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/wisptools';
+    // Connect to MongoDB - use same config as server.js
+    require('dotenv').config();
+    const appConfig = require('../config/app');
+    const mongoUri = appConfig.mongodb.uri;
+    
     await mongoose.connect(mongoUri);
     console.log('Connected to MongoDB\n');
 
