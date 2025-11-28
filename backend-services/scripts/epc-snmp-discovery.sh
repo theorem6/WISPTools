@@ -52,10 +52,23 @@ get_device_info() {
     local ip=$1
     local community=$2
     
-    local sysDescr=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.1.0 2>/dev/null | sed 's/.*STRING: //')
-    local sysObjectID=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.2.0 2>/dev/null | sed 's/.*OID: //')
-    local sysName=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.5.0 2>/dev/null | sed 's/.*STRING: //' | tr -d '"')
-    local sysUpTime=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.3.0 2>/dev/null | sed 's/.*Timeticks: //' | awk '{print $1}')
+    # Get SNMP values - strip prefixes and clean up
+    local sysDescr_raw=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.1.0 2>/dev/null | sed 's/.*STRING: //' | tr -d '\n\r')
+    local sysObjectID_raw=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.2.0 2>/dev/null | sed 's/.*OID: //' | tr -d '\n\r')
+    local sysName_raw=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.5.0 2>/dev/null | sed 's/.*STRING: //' | sed 's/"//g' | tr -d '\n\r')
+    local sysUpTime_raw=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.3.0 2>/dev/null | sed 's/.*Timeticks: //' | awk '{print $1}' | tr -d '\n\r')
+    
+    # Sanitize values - remove control characters and limit length
+    local sysDescr=$(echo "$sysDescr_raw" | tr -d '\000-\037\177-\377' | cut -c1-200)
+    local sysObjectID=$(echo "$sysObjectID_raw" | tr -d '\000-\037\177-\377' | cut -c1-100)
+    local sysName=$(echo "$sysName_raw" | tr -d '\000-\037\177-\377' | cut -c1-100)
+    local sysUpTime=$(echo "$sysUpTime_raw" | tr -d '\000-\037\177-\377' | grep -oE '[0-9]+' | head -1)
+    
+    # Set defaults if empty
+    [ -z "$sysDescr" ] && sysDescr=""
+    [ -z "$sysObjectID" ] && sysObjectID=""
+    [ -z "$sysName" ] && sysName=""
+    [ -z "$sysUpTime" ] && sysUpTime=0
     
     # Detect device type from sysObjectID
     local device_type="generic"
@@ -72,8 +85,36 @@ get_device_info() {
         device_type="mikrotik"
     fi
     
-    # Build JSON output
-    echo "{\"ip_address\":\"$ip\",\"sysDescr\":\"$sysDescr\",\"sysObjectID\":\"$sysObjectID\",\"sysName\":\"$sysName\",\"sysUpTime\":$sysUpTime,\"device_type\":\"$device_type\",\"community\":\"$community\"}"
+    # Use jq to properly construct JSON with escaped strings
+    if command -v jq &> /dev/null; then
+        jq -n \
+            --arg ip "$ip" \
+            --arg sysDescr "$sysDescr" \
+            --arg sysObjectID "$sysObjectID" \
+            --arg sysName "$sysName" \
+            --argjson sysUpTime "$sysUpTime" \
+            --arg device_type "$device_type" \
+            --arg community "$community" \
+            '{
+                ip_address: $ip,
+                sysDescr: $sysDescr,
+                sysObjectID: $sysObjectID,
+                sysName: $sysName,
+                sysUpTime: $sysUpTime,
+                device_type: $device_type,
+                community: $community
+            }'
+    else
+        # Fallback: use printf to escape values properly
+        printf '{"ip_address":"%s","sysDescr":"%s","sysObjectID":"%s","sysName":"%s","sysUpTime":%s,"device_type":"%s","community":"%s"}' \
+            "$(printf '%s' "$ip" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
+            "$(printf '%s' "$sysDescr" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+            "$(printf '%s' "$sysObjectID" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+            "$(printf '%s' "$sysName" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+            "$sysUpTime" \
+            "$device_type" \
+            "$community"
+    fi
 }
 
 # Scan network for SNMP devices
@@ -162,10 +203,30 @@ report_discovered_devices() {
         discovered_devices="[]"
     fi
     
+    # Validate JSON before sending
+    if ! echo "$discovered_devices" | jq empty 2>/dev/null; then
+        log "ERROR: Invalid JSON generated for discovered devices"
+        log "JSON content: $discovered_devices"
+        discovered_devices="[]"
+    fi
+    
     local device_count=$(echo "$discovered_devices" | jq -r 'length // 0' 2>/dev/null || echo "0")
     log "Reporting $device_count discovered devices to server..."
     
-    local payload="{\"device_code\":\"$device_code\",\"discovered_devices\":$discovered_devices}"
+    # Use jq to properly construct the payload JSON
+    local payload
+    if command -v jq &> /dev/null; then
+        payload=$(jq -n \
+            --arg device_code "$device_code" \
+            --argjson discovered_devices "$discovered_devices" \
+            '{
+                device_code: $device_code,
+                discovered_devices: $discovered_devices
+            }')
+    else
+        # Fallback: manual construction (less safe)
+        payload="{\"device_code\":\"$device_code\",\"discovered_devices\":$discovered_devices}"
+    fi
     
     local response=$(curl -s -X POST "${API_URL}/snmp/discovered" \
         -H "Content-Type: application/json" \
