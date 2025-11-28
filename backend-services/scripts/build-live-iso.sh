@@ -456,6 +456,15 @@ systemctl start nginx 2>/dev/null || python3 -m http.server 80 -d /var/www/html 
 if [ -f "$CONFIGURED_FILE" ]; then
     log "Configuration file found, verifying with server..."
     
+    # Also check if Open5GS services are running (additional verification)
+    EPC_SERVICES_RUNNING=false
+    if systemctl is-active --quiet open5gs-mmed 2>/dev/null || \
+       systemctl is-active --quiet open5gs-sgwcd 2>/dev/null || \
+       systemctl is-active --quiet open5gs-smfd 2>/dev/null; then
+        EPC_SERVICES_RUNNING=true
+        log "Open5GS services are running - system is fully configured"
+    fi
+    
     # Verify device is still registered on server
     RESPONSE=$(curl -s -X POST "https://$GCE_DOMAIN:$HSS_PORT/api/epc/checkin" \
         -H "Content-Type: application/json" \
@@ -464,8 +473,10 @@ if [ -f "$CONFIGURED_FILE" ]; then
     EPC_ID=$(echo "$RESPONSE" | jq -r '.epc_id // empty' 2>/dev/null)
     STATUS=$(echo "$RESPONSE" | jq -r '.status // empty' 2>/dev/null)
     
+    # Skip deployment if registered AND (services running OR config files exist)
     if [ -n "$EPC_ID" ] && [ "$EPC_ID" != "null" ] && [ "$STATUS" = "ok" ]; then
-        log "Device already configured and registered on server - skipping deployment"
+        if [ "$EPC_SERVICES_RUNNING" = "true" ] || [ -f /etc/open5gs/mme.yaml ]; then
+            log "Device already configured and registered on server - skipping deployment"
         source /etc/wisptools/config.env 2>/dev/null || true
         
         # Create running status page
@@ -709,10 +720,17 @@ while true; do
             bash /opt/wisptools/deploy.sh 2>&1 | tee -a "$LOG"
         fi
         
-        # Configure EPC if enabled
+        # Configure EPC if enabled (only if not already configured)
         if [ "$ENABLE_EPC" = "true" ]; then
-            log "Configuring EPC services..."
-            /opt/wisptools/configure-epc.sh 2>&1 | tee -a "$LOG" || true
+            # Check if Open5GS is already configured and running
+            if systemctl is-active --quiet open5gs-mmed 2>/dev/null && \
+               [ -f /etc/open5gs/mme.yaml ] && \
+               [ -f /etc/freeDiameter/mme.conf ]; then
+                log "Open5GS already configured and running - skipping reconfiguration"
+            else
+                log "Configuring EPC services..."
+                /opt/wisptools/configure-epc.sh 2>&1 | tee -a "$LOG" || true
+            fi
         fi
         
         # Configure SNMP if enabled
@@ -792,8 +810,30 @@ log "Device Code: $DEVICE_CODE"
 log "Central HSS: $CENTRAL_HSS"
 log "MCC/MNC: $MCC/$MNC, TAC: $TAC"
 
-# Check if Open5GS is installed
-if ! command -v open5gs-mmed &>/dev/null; then
+# Check if Open5GS is already installed AND configured
+OPEN5GS_INSTALLED=false
+OPEN5GS_CONFIGURED=false
+
+# Check if Open5GS packages are installed
+if command -v open5gs-mmed &>/dev/null; then
+    OPEN5GS_INSTALLED=true
+    log "Open5GS packages already installed"
+    
+    # Check if services are running (indicates it's configured)
+    if systemctl is-active --quiet open5gs-mmed 2>/dev/null || \
+       systemctl is-active --quiet open5gs-sgwcd 2>/dev/null || \
+       systemctl is-active --quiet open5gs-smfd 2>/dev/null; then
+        OPEN5GS_CONFIGURED=true
+        log "Open5GS services are running - already configured"
+    elif [ -f "$CONFIG_DIR/mme.yaml" ] && [ -f "/etc/freeDiameter/mme.conf" ]; then
+        # Config files exist - likely configured
+        OPEN5GS_CONFIGURED=true
+        log "Open5GS configuration files exist - already configured"
+    fi
+fi
+
+# Only install if not installed
+if [ "$OPEN5GS_INSTALLED" = "false" ]; then
     log "Installing Open5GS EPC packages (NOT HSS/PCRF - those are central)..."
     echo "deb [trusted=yes] https://download.opensuse.org/repositories/home:/acetcom:/open5gs:/latest/Debian_12/ ./" > /etc/apt/sources.list.d/open5gs.list
     apt-get update -qq
@@ -804,6 +844,31 @@ if ! command -v open5gs-mmed &>/dev/null; then
         open5gs-sgwu \
         open5gs-smf \
         open5gs-upf
+    OPEN5GS_INSTALLED=true
+else
+    log "Skipping Open5GS installation - already installed"
+fi
+
+# Skip configuration if already configured
+if [ "$OPEN5GS_CONFIGURED" = "true" ]; then
+    log "Open5GS already configured and running - skipping reconfiguration"
+    log "To force reconfiguration, stop services and remove config files"
+    
+    # Just ensure services are enabled and started
+    for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
+        systemctl enable $svc 2>/dev/null || true
+        systemctl start $svc 2>/dev/null || true
+    done
+    
+    # Ensure local HSS/PCRF are disabled
+    for svc in open5gs-hssd open5gs-pcrfd; do
+        systemctl stop $svc 2>/dev/null || true
+        systemctl disable $svc 2>/dev/null || true
+        systemctl mask $svc 2>/dev/null || true
+    done
+    
+    log "Open5GS services verified and running"
+    exit 0
 fi
 
 # Configure MME to connect to central HSS
