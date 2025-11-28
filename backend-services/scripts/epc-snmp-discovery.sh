@@ -47,6 +47,57 @@ test_snmp_device() {
     return 1
 }
 
+# Get Mikrotik-specific info via SNMP
+get_mikrotik_info() {
+    local ip=$1
+    local community=$2
+    
+    local mikrotik_data="{}"
+    
+    # Mikrotik-specific OIDs
+    local identity=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.4.1.14988.1.1.1.1.1.3.0 2>/dev/null | sed 's/.*STRING: //' | tr -d '\n\r' | head -c 100)
+    local version=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.4.1.14988.1.1.1.1.1.4.0 2>/dev/null | sed 's/.*STRING: //' | tr -d '\n\r' | head -c 50)
+    local serial=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.4.1.14988.1.1.1.1.1.7.0 2>/dev/null | sed 's/.*STRING: //' | tr -d '\n\r' | head -c 50)
+    local board=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.4.1.14988.1.1.1.1.1.9.0 2>/dev/null | sed 's/.*STRING: //' | tr -d '\n\r' | head -c 100)
+    local cpu_load=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.4.1.14988.1.1.1.3.1.0 2>/dev/null | grep -oE '[0-9]+' | head -1)
+    local temp=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.4.1.14988.1.1.1.8.2.0 2>/dev/null | grep -oE '[0-9]+' | head -1)
+    local uptime_ticks=$(snmpget -v2c -c "$community" "$ip" 1.3.6.1.2.1.1.3.0 2>/dev/null | sed 's/.*Timeticks: //' | grep -oE '[0-9]+' | head -1)
+    
+    # Build Mikrotik info JSON
+    if command -v jq &> /dev/null; then
+        mikrotik_data=$(jq -n \
+            --arg identity "$identity" \
+            --arg version "$version" \
+            --arg serial "$serial" \
+            --arg board "$board" \
+            --argjson cpu_load "${cpu_load:-0}" \
+            --argjson temp "${temp:-0}" \
+            --argjson uptime_ticks "${uptime_ticks:-0}" \
+            '{
+                identity: (if $identity != "" then $identity else null end),
+                routerOS_version: (if $version != "" then $version else null end),
+                serial_number: (if $serial != "" then $serial else null end),
+                board_name: (if $board != "" then $board else null end),
+                cpu_load_percent: (if $cpu_load > 0 then $cpu_load else null end),
+                temperature_celsius: (if $temp > 0 then $temp else null end),
+                uptime_ticks: (if $uptime_ticks > 0 then $uptime_ticks else null end)
+            }')
+    else
+        # Fallback JSON construction
+        local parts=()
+        [ -n "$identity" ] && parts+=("\"identity\":\"$identity\"")
+        [ -n "$version" ] && parts+=("\"routerOS_version\":\"$version\"")
+        [ -n "$serial" ] && parts+=("\"serial_number\":\"$serial\"")
+        [ -n "$board" ] && parts+=("\"board_name\":\"$board\"")
+        [ -n "$cpu_load" ] && parts+=("\"cpu_load_percent\":$cpu_load")
+        [ -n "$temp" ] && parts+=("\"temperature_celsius\":$temp")
+        [ -n "$uptime_ticks" ] && parts+=("\"uptime_ticks\":$uptime_ticks")
+        mikrotik_data="{$(IFS=,; echo "${parts[*]}")}"
+    fi
+    
+    echo "$mikrotik_data"
+}
+
 # Get device info via SNMP
 get_device_info() {
     local ip=$1
@@ -81,8 +132,17 @@ get_device_info() {
     fi
     
     # Detect if Mikrotik from description
+    local is_mikrotik=false
     if echo "$sysDescr" | grep -qi "mikrotik\|routeros"; then
         device_type="mikrotik"
+        is_mikrotik=true
+    fi
+    
+    # Get Mikrotik-specific information if it's a Mikrotik device
+    local mikrotik_info="{}"
+    if [ "$device_type" = "mikrotik" ]; then
+        log "  Detected Mikrotik device, gathering additional information..."
+        mikrotik_info=$(get_mikrotik_info "$ip" "$community")
     fi
     
     # Use jq to properly construct JSON with escaped strings

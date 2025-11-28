@@ -84,18 +84,39 @@ router.post('/discovered', async (req, res, next) => {
           notes = existingDevice.notes;
         }
         
+        // Extract Mikrotik-specific info if present
+        const mikrotik_info = device.mikrotik || {};
+        const mikrotik_identity = mikrotik_info.identity || sysName || null;
+        const mikrotik_version = mikrotik_info.routerOS_version || null;
+        const mikrotik_serial = mikrotik_info.serial_number || null;
+        const mikrotik_board = mikrotik_info.board_name || null;
+        
+        // Determine device name and model based on Mikrotik info if available
+        let device_name = sysName || device_type || `SNMP-${ip_address}`;
+        let device_model = sysDescr || 'Unknown';
+        let device_serial = ip_address;
+        
+        if (device_type === 'mikrotik') {
+          // Use Mikrotik identity as name if available
+          device_name = mikrotik_identity || sysName || `Mikrotik-${ip_address}`;
+          // Use board name as model if available
+          device_model = mikrotik_board || sysDescr || 'Mikrotik RouterOS';
+          // Use serial number if available
+          device_serial = mikrotik_serial || ip_address;
+        }
+        
         // Update or create device record
         const deviceData = {
           tenantId: epc.tenant_id,
-          name: sysName || device_type || `SNMP-${ip_address}`,
+          name: device_name,
           type: device_type === 'mikrotik' ? 'router' : 
                 device_type === 'cisco' ? 'switch' : 
                 device_type === 'huawei' ? 'router' : 'other',
           manufacturer: device_type === 'mikrotik' ? 'Mikrotik' :
                        device_type === 'cisco' ? 'Cisco' :
                        device_type === 'huawei' ? 'Huawei' : 'Generic',
-          model: sysDescr || 'Unknown',
-          serialNumber: ip_address,
+          model: device_model,
+          serialNumber: device_serial,
           status: 'active',
           location: {
             latitude: epc.location?.coordinates?.latitude || epc.location?.latitude || 0,
@@ -115,7 +136,24 @@ router.post('/discovered', async (req, res, next) => {
             discovered_by_epc: epc.epc_id,
             discovered_at: new Date().toISOString(),
             discovery_source: 'epc_snmp_agent',
-            last_discovered: new Date().toISOString()
+            last_discovered: new Date().toISOString(),
+            // Include Mikrotik-specific info
+            ...(device_type === 'mikrotik' && Object.keys(mikrotik_info).length > 0 ? {
+              mikrotik: {
+                identity: mikrotik_identity,
+                routerOS_version: mikrotik_version,
+                serial_number: mikrotik_serial,
+                board_name: mikrotik_board,
+                cpu_load_percent: mikrotik_info.cpu_load_percent,
+                temperature_celsius: mikrotik_info.temperature_celsius,
+                uptime_ticks: mikrotik_info.uptime_ticks
+              },
+              mikrotik_api: {
+                enabled: true,
+                port: 8728,
+                username: 'admin'
+              }
+            } : {})
           }),
           updatedAt: new Date()
         };
