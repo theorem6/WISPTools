@@ -137,9 +137,14 @@ scan_network() {
     
     # Calculate IP range (simple /24 scan for now)
     local base_ip=$(echo "$network" | cut -d'.' -f1-3)
-    local discovered_devices="["
-    local first=true
+    local devices_array="[]"
     local count=0
+    local temp_file=$(mktemp)
+    
+    # Use jq to build array properly
+    if ! command -v jq &> /dev/null; then
+        log "WARNING: jq not found, JSON may have issues. Installing jq is recommended."
+    fi
     
     # Scan first 254 IPs (limit to avoid long scans)
     for i in $(seq 1 254); do
@@ -157,14 +162,25 @@ scan_network() {
                 
                 local device_info=$(get_device_info "$test_ip" "$community")
                 
-                if [ "$first" = true ]; then
-                    first=false
+                # Validate device_info JSON before adding
+                if command -v jq &> /dev/null; then
+                    if echo "$device_info" | jq empty 2>/dev/null; then
+                        devices_array=$(echo "$devices_array" | jq --argjson device "$device_info" '. + [$device]' 2>/dev/null || echo "$devices_array")
+                        count=$((count + 1))
+                    else
+                        log "WARNING: Invalid JSON for device $test_ip, skipping"
+                    fi
                 else
-                    discovered_devices="${discovered_devices},"
+                    # Fallback: manual array building (less safe)
+                    if [ "$devices_array" = "[]" ]; then
+                        devices_array="[$device_info]"
+                    else
+                        devices_array="${devices_array},${device_info}"
+                        devices_array="[${devices_array}]"
+                    fi
+                    count=$((count + 1))
                 fi
                 
-                discovered_devices="${discovered_devices}${device_info}"
-                count=$((count + 1))
                 break  # Found working community, move to next IP
             fi
         done
@@ -176,15 +192,25 @@ scan_network() {
         fi
     done
     
-    discovered_devices="${discovered_devices}]"
+    # Clean up temp file
+    rm -f "$temp_file"
     
     log "Discovery complete. Found $count SNMP devices"
     
     if [ "$count" -eq 0 ]; then
         log "No SNMP devices found. This is normal if no SNMP-enabled devices are on the network."
+        devices_array="[]"
     fi
     
-    echo "$discovered_devices"
+    # Final validation of JSON
+    if command -v jq &> /dev/null; then
+        if ! echo "$devices_array" | jq empty 2>/dev/null; then
+            log "ERROR: Generated invalid JSON array, returning empty array"
+            devices_array="[]"
+        fi
+    fi
+    
+    echo "$devices_array"
 }
 
 # Report discovered devices to server
