@@ -187,6 +187,41 @@ app.post('/api/epc/checkin', async (req, res) => {
           );
         }
       }
+      
+      // Check for script updates and queue update command if needed
+      try {
+        const { checkForUpdates, generateUpdateCommand } = require('./utils/epc-auto-update');
+        const updateInfo = await checkForUpdates(epc.epc_id, versions?.scripts || {});
+        
+        if (updateInfo.has_updates) {
+          // Check if update command already exists and is pending
+          const existingUpdate = await EPCCommand.findOne({
+            epc_id: epc.epc_id,
+            action: 'update_scripts',
+            status: { $in: ['pending', 'sent'] }
+          });
+          
+          if (!existingUpdate) {
+            // Create auto-update command
+            const updateCommand = generateUpdateCommand(updateInfo);
+            if (updateCommand) {
+              const autoUpdateCmd = new EPCCommand({
+                ...updateCommand,
+                epc_id: epc.epc_id,
+                tenant_id: epc.tenant_id,
+                status: 'pending',
+                created_at: new Date(),
+                description: 'Automatic script update'
+              });
+              await autoUpdateCmd.save();
+              console.log(`[EPC Check-in] Queued auto-update command for ${epc.epc_id}`);
+            }
+          }
+        }
+      } catch (updateError) {
+        console.warn(`[EPC Check-in] Error checking for updates:`, updateError.message);
+        // Don't fail check-in if update check fails
+      }
     }
     
     const commands = await EPCCommand.find({
