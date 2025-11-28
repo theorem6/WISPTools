@@ -98,7 +98,7 @@
             <p class="tenant-subdomain">{tenant.subdomain}</p>
             <div class="tenant-meta">
               <span class="status-badge status-{tenant.status}">{tenant.status}</span>
-              <span class="role-badge">Your Role: Owner</span>
+              <span class="role-badge">Your Role: Admin</span>
             </div>
           </button>
         {/each}
