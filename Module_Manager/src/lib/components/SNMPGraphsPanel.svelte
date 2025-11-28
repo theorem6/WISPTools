@@ -108,116 +108,301 @@
   }
   
   function initCharts() {
-    if (metricsData.length === 0) return;
-    
     // Destroy existing charts
     cpuChart?.destroy();
     memoryChart?.destroy();
     throughputChart?.destroy();
+    uptimeChart?.destroy();
     
+    // If no data, show empty state - don't create charts
+    if (metricsData.length === 0) {
+      cpuChart = null;
+      memoryChart = null;
+      throughputChart = null;
+      uptimeChart = null;
+      return;
+    }
+    
+    // Format labels based on time range for better readability
     const labels = metricsData.map(m => {
       const d = new Date(m.timestamp);
-      return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+      if (timeRange === '1h') {
+        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+      } else if (timeRange === '24h') {
+        return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`;
+      } else {
+        return `${d.getMonth() + 1}/${d.getDate()}`;
+      }
     });
     
+    // Professional time-series chart options
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 500 },
+      interaction: {
+        intersect: false,
+        mode: 'index' as const
+      },
+      animation: {
+        duration: 750,
+        easing: 'easeInOutQuart' as const
+      },
       plugins: {
-        legend: { display: false },
+        legend: { 
+          display: false,
+          labels: {
+            color: '#94a3b8',
+            usePointStyle: true,
+            padding: 15
+          }
+        },
         tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          titleColor: '#e2e8f0',
-          bodyColor: '#94a3b8',
-          borderColor: 'rgba(255,255,255,0.1)',
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#f1f5f9',
+          bodyColor: '#cbd5e1',
+          borderColor: 'rgba(59, 130, 246, 0.3)',
           borderWidth: 1,
           cornerRadius: 8,
-          padding: 12
+          padding: 12,
+          displayColors: true,
+          callbacks: {
+            label: function(context: any) {
+              const value = context.parsed.y;
+              if (value === null || value === undefined) return 'No data';
+              return `${context.dataset.label}: ${value.toFixed(2)}${context.dataset.label.includes('%') ? '%' : context.dataset.label.includes('MB') ? ' MB' : context.dataset.label.includes('GB') ? ' GB' : ''}`;
+            }
+          }
+        },
+        title: {
+          display: false
         }
       },
       scales: {
         y: {
           beginAtZero: true,
-          ticks: { color: '#9ca3af', font: { size: 10 } },
-          grid: { color: 'rgba(255,255,255,0.05)' }
+          ticks: { 
+            color: '#9ca3af', 
+            font: { size: 11 },
+            precision: 1
+          },
+          grid: { 
+            color: 'rgba(255,255,255,0.05)',
+            drawBorder: false
+          },
+          border: {
+            color: 'rgba(255,255,255,0.1)'
+          }
         },
         x: {
-          ticks: { color: '#9ca3af', maxRotation: 0, font: { size: 10 }, maxTicksLimit: 8 },
-          grid: { color: 'rgba(255,255,255,0.05)' }
+          ticks: { 
+            color: '#9ca3af', 
+            maxRotation: 45,
+            minRotation: 0,
+            font: { size: 10 }, 
+            maxTicksLimit: 12
+          },
+          grid: { 
+            color: 'rgba(255,255,255,0.05)',
+            display: false
+          },
+          border: {
+            color: 'rgba(255,255,255,0.1)'
+          }
         }
       }
     };
     
+    // Filter out null/undefined values and configure Chart.js to skip them
+    const cpuData = metricsData.map(m => {
+      const val = m.metrics?.cpuUsage;
+      return val !== null && val !== undefined ? val : null;
+    });
+    const memoryData = metricsData.map(m => {
+      const val = m.metrics?.memoryUsage;
+      return val !== null && val !== undefined ? val : null;
+    });
+    const inOctetsData = metricsData.map(m => {
+      const val = m.metrics?.interfaceInOctets;
+      return val !== null && val !== undefined ? val : null;
+    });
+    const outOctetsData = metricsData.map(m => {
+      const val = m.metrics?.interfaceOutOctets;
+      return val !== null && val !== undefined ? val : null;
+    });
+    
+    // Check if we have any real data
+    const hasCpuData = cpuData.some(v => v !== null);
+    const hasMemoryData = memoryData.some(v => v !== null);
+    const hasNetworkData = inOctetsData.some(v => v !== null) || outOctetsData.some(v => v !== null);
+    
     if (cpuChartCanvas) {
-      cpuChart = new Chart(cpuChartCanvas, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: 'CPU %',
-            data: metricsData.map(m => m.metrics?.cpuUsage ?? 0),
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            fill: true,
-            tension: 0.4,
-            pointRadius: 2
-          }]
-        },
-        options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, max: 100 } } }
-      });
+      if (hasCpuData) {
+        cpuChart = new Chart(cpuChartCanvas, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'CPU Usage (%)',
+              data: cpuData,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.15)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              borderWidth: 2,
+              spanGaps: false // Don't connect points across null gaps
+            }]
+          },
+          options: { 
+            ...chartOptions, 
+            scales: { 
+              ...chartOptions.scales, 
+              y: { 
+                ...chartOptions.scales.y, 
+                max: 100,
+                title: {
+                  display: true,
+                  text: 'Usage %',
+                  color: '#94a3b8',
+                  font: { size: 11 }
+                }
+              } 
+            } 
+          }
+        });
+      } else {
+        // Show "No Data" message instead of empty chart
+        const ctx = cpuChartCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, cpuChartCanvas.width, cpuChartCanvas.height);
+          ctx.fillStyle = '#64748b';
+          ctx.font = '14px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('No CPU data available', cpuChartCanvas.width / 2, cpuChartCanvas.height / 2);
+        }
+      }
     }
     
     if (memoryChartCanvas) {
-      memoryChart = new Chart(memoryChartCanvas, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Memory %',
-            data: metricsData.map(m => m.metrics?.memoryUsage ?? 0),
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-            fill: true,
-            tension: 0.4,
-            pointRadius: 2
-          }]
-        },
-        options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, max: 100 } } }
-      });
+      if (hasMemoryData) {
+        memoryChart = new Chart(memoryChartCanvas, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Memory Usage (%)',
+              data: memoryData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              borderWidth: 2,
+              spanGaps: false
+            }]
+          },
+          options: { 
+            ...chartOptions, 
+            scales: { 
+              ...chartOptions.scales, 
+              y: { 
+                ...chartOptions.scales.y, 
+                max: 100,
+                title: {
+                  display: true,
+                  text: 'Usage %',
+                  color: '#94a3b8',
+                  font: { size: 11 }
+                }
+              } 
+            } 
+          }
+        });
+      } else {
+        const ctx = memoryChartCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, memoryChartCanvas.width, memoryChartCanvas.height);
+          ctx.fillStyle = '#64748b';
+          ctx.font = '14px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('No Memory data available', memoryChartCanvas.width / 2, memoryChartCanvas.height / 2);
+        }
+      }
     }
     
     if (throughputChartCanvas) {
-      throughputChart = new Chart(throughputChartCanvas, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'In (bytes)',
-              data: metricsData.map(m => m.metrics?.interfaceInOctets ?? 0),
-              borderColor: '#8b5cf6',
-              backgroundColor: 'rgba(139, 92, 246, 0.1)',
-              fill: false,
-              tension: 0.4,
-              pointRadius: 2
+      if (hasNetworkData) {
+        throughputChart = new Chart(throughputChartCanvas, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'In (bytes)',
+                data: inOctetsData,
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+                spanGaps: false
+              },
+              {
+                label: 'Out (bytes)',
+                data: outOctetsData,
+                borderColor: '#ec4899',
+                backgroundColor: 'rgba(236, 72, 153, 0.1)',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                borderWidth: 2,
+                spanGaps: false
+              }
+            ]
+          },
+          options: {
+            ...chartOptions,
+            plugins: { 
+              ...chartOptions.plugins, 
+              legend: { 
+                display: true, 
+                position: 'top', 
+                labels: { 
+                  color: '#94a3b8',
+                  usePointStyle: true,
+                  padding: 12
+                } 
+              } 
             },
-            {
-              label: 'Out (bytes)',
-              data: metricsData.map(m => m.metrics?.interfaceOutOctets ?? 0),
-              borderColor: '#ec4899',
-              backgroundColor: 'rgba(236, 72, 153, 0.1)',
-              fill: false,
-              tension: 0.4,
-              pointRadius: 2
+            scales: {
+              ...chartOptions.scales,
+              y: {
+                ...chartOptions.scales.y,
+                title: {
+                  display: true,
+                  text: 'Bytes',
+                  color: '#94a3b8',
+                  font: { size: 11 }
+                }
+              }
             }
-          ]
-        },
-        options: {
-          ...chartOptions,
-          plugins: { ...chartOptions.plugins, legend: { display: true, position: 'top', labels: { color: '#94a3b8' } } }
+          }
+        });
+      } else {
+        const ctx = throughputChartCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, throughputChartCanvas.width, throughputChartCanvas.height);
+          ctx.fillStyle = '#64748b';
+          ctx.font = '14px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('No Network data available', throughputChartCanvas.width / 2, throughputChartCanvas.height / 2);
         }
-      });
+      }
     }
   }
   
@@ -305,26 +490,33 @@
           </div>
           
           <!-- Charts Grid -->
-          <div class="charts-grid">
-            <div class="chart-card">
-              <h4>CPU Usage</h4>
-              <div class="chart-container">
-                <canvas bind:this={cpuChartCanvas}></canvas>
+          {#if metricsData.length === 0}
+            <div class="no-data-message">
+              <p>📊 No metrics data available for this device</p>
+              <p class="hint">SNMP polling needs to collect data before graphs will appear</p>
+            </div>
+          {:else}
+            <div class="charts-grid">
+              <div class="chart-card">
+                <h4>CPU Usage</h4>
+                <div class="chart-container">
+                  <canvas bind:this={cpuChartCanvas}></canvas>
+                </div>
+              </div>
+              <div class="chart-card">
+                <h4>Memory Usage</h4>
+                <div class="chart-container">
+                  <canvas bind:this={memoryChartCanvas}></canvas>
+                </div>
+              </div>
+              <div class="chart-card wide">
+                <h4>Network Throughput (Interface)</h4>
+                <div class="chart-container">
+                  <canvas bind:this={throughputChartCanvas}></canvas>
+                </div>
               </div>
             </div>
-            <div class="chart-card">
-              <h4>Memory Usage</h4>
-              <div class="chart-container">
-                <canvas bind:this={memoryChartCanvas}></canvas>
-              </div>
-            </div>
-            <div class="chart-card wide">
-              <h4>Network Throughput (Interface)</h4>
-              <div class="chart-container">
-                <canvas bind:this={throughputChartCanvas}></canvas>
-              </div>
-            </div>
-          </div>
+          {/if}
         {:else}
           <div class="no-selection">
             <p>👈 Select a device to view metrics</p>
