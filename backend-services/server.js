@@ -133,6 +133,17 @@ app.post('/api/epc/checkin', async (req, res) => {
     }
     
     console.log(`[EPC Check-in] Device ${device_code} checking in from ${ip_address}`);
+    console.log(`[EPC Check-in] Payload received:`, {
+      hasServices: !!services,
+      hasSystem: !!system,
+      hasNetwork: !!network,
+      hasVersions: !!versions,
+      hasLogs: !!(logs && Array.isArray(logs) && logs.length > 0),
+      systemKeys: system ? Object.keys(system) : [],
+      systemUptime: system?.uptime_seconds,
+      systemCPU: system?.cpu_percent,
+      systemMemory: system?.memory_percent
+    });
     if (versions?.scripts) {
       console.log(`[EPC Check-in] Script versions reported:`, JSON.stringify(versions.scripts));
     } else {

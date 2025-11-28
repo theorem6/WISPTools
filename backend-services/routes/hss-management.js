@@ -685,6 +685,9 @@ router.get('/epc/remote/list', async (req, res) => {
     // Get latest service status for each EPC to include metrics
     const { EPCServiceStatus } = require('../models/distributed-epc-schema');
     const epcIds = remoteEPCs.map(e => e.epc_id);
+    
+    console.log(`[HSS/EPC] Looking up service status for EPCs:`, epcIds);
+    
     const latestStatuses = await EPCServiceStatus.aggregate([
       { $match: { epc_id: { $in: epcIds }, tenant_id: tenantId } },
       { $sort: { timestamp: -1 } },
@@ -693,12 +696,21 @@ router.get('/epc/remote/list', async (req, res) => {
           latest: { $first: '$$ROOT' }
         }
       }
-    ]);
+    ]).allowDiskUse(true);
+
+    console.log(`[HSS/EPC] Found ${latestStatuses.length} service status records`);
 
     // Create a map of epc_id to latest status
     const statusMap = new Map();
     latestStatuses.forEach(item => {
       statusMap.set(item._id, item.latest);
+      console.log(`[HSS/EPC] Service status for ${item._id}:`, {
+        timestamp: item.latest.timestamp,
+        hasSystem: !!item.latest.system,
+        cpuPercent: item.latest.system?.cpu_percent,
+        memoryPercent: item.latest.system?.memory_percent,
+        uptimeSeconds: item.latest.system?.uptime_seconds
+      });
     });
 
     // Format for frontend
@@ -708,23 +720,37 @@ router.get('/epc/remote/list', async (req, res) => {
       const latestStatus = statusMap.get(epc.epc_id);
       
       // Format metrics for frontend - always return metrics object, even if null
-      const metrics = latestStatus?.system ? {
-        cpuUsage: latestStatus.system.cpu_percent ?? null,
-        memoryUsage: latestStatus.system.memory_percent ?? null,
-        uptime: latestStatus.system.uptime_seconds 
-          ? formatUptime(latestStatus.system.uptime_seconds)
-          : (epc.metrics?.system_uptime_seconds 
-              ? formatUptime(epc.metrics.system_uptime_seconds)
-              : null)
-      } : (epc.metrics?.system_uptime_seconds ? {
-        cpuUsage: null,
-        memoryUsage: null,
-        uptime: formatUptime(epc.metrics.system_uptime_seconds)
-      } : {
+      let metrics = {
         cpuUsage: null,
         memoryUsage: null,
         uptime: null
-      });
+      };
+      
+      // Try to get from latest service status first
+      if (latestStatus?.system) {
+        metrics.cpuUsage = latestStatus.system.cpu_percent ?? null;
+        metrics.memoryUsage = latestStatus.system.memory_percent ?? null;
+        if (latestStatus.system.uptime_seconds) {
+          metrics.uptime = formatUptime(latestStatus.system.uptime_seconds);
+        } else if (epc.metrics?.system_uptime_seconds) {
+          metrics.uptime = formatUptime(epc.metrics.system_uptime_seconds);
+        }
+      } else if (epc.metrics?.system_uptime_seconds) {
+        // Fallback to RemoteEPC.metrics
+        metrics.uptime = formatUptime(epc.metrics.system_uptime_seconds);
+      }
+      
+      // Debug log for metrics
+      if (epc.epc_id === 'EPC-CB4C5042' || epc.device_code === 'YALNTFQC') {
+        console.log(`[HSS/EPC] Metrics for ${epc.epc_id}:`, {
+          hasLatestStatus: !!latestStatus,
+          hasSystem: !!latestStatus?.system,
+          cpuPercent: latestStatus?.system?.cpu_percent,
+          memoryPercent: latestStatus?.system?.memory_percent,
+          uptimeSeconds: latestStatus?.system?.uptime_seconds,
+          formattedMetrics: metrics
+        });
+      }
       
       return {
         id: epc._id?.toString() || epc.epc_id,
