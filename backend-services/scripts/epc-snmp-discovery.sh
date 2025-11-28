@@ -196,7 +196,8 @@ scan_network() {
         # Show progress every 25 IPs
         if [ $((scanned % 25)) -eq 0 ]; then
             local elapsed=$(($(date +%s) - start_time))
-            log "Progress: Scanned $scanned/254 IPs (${elapsed}s elapsed, $found device(s) found so far)..."
+            local current_found=$(wc -l < "$results_file" 2>/dev/null || echo "0")
+            log "Progress: Scanned $scanned/254 IPs (${elapsed}s elapsed, $current_found device(s) found so far)..."
         fi
         
         # Wait for available slot if we have too many parallel scans
@@ -213,13 +214,20 @@ scan_network() {
         done
         
         # Start scan in background
-        (scan_single_ip "$test_ip" "$communities" "$results_file" && found=$((found + 1))) &
+        scan_single_ip "$test_ip" "$communities" "$results_file" &
         pids+=($!)
         
-        # Limit total devices discovered per scan
-        if [ $found -ge 50 ]; then
-            log "Reached discovery limit (50 devices), stopping scan"
-            break
+        # Check device count periodically to see if we've hit the limit
+        if [ -f "$results_file" ]; then
+            local current_count=$(wc -l < "$results_file" 2>/dev/null || echo "0")
+            if [ "$current_count" -ge 50 ]; then
+                log "Reached discovery limit (50 devices), stopping scan"
+                # Kill remaining background jobs
+                for pid in "${pids[@]}"; do
+                    kill "$pid" 2>/dev/null || true
+                done
+                break
+            fi
         fi
     done
     
