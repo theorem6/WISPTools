@@ -147,33 +147,69 @@ get_device_info() {
     
     # Use jq to properly construct JSON with escaped strings
     if command -v jq &> /dev/null; then
-        jq -n \
-            --arg ip "$ip" \
-            --arg sysDescr "$sysDescr" \
-            --arg sysObjectID "$sysObjectID" \
-            --arg sysName "$sysName" \
-            --argjson sysUpTime "$sysUpTime" \
-            --arg device_type "$device_type" \
-            --arg community "$community" \
-            '{
-                ip_address: $ip,
-                sysDescr: $sysDescr,
-                sysObjectID: $sysObjectID,
-                sysName: $sysName,
-                sysUpTime: $sysUpTime,
-                device_type: $device_type,
-                community: $community
-            }'
+        if [ "$device_type" = "mikrotik" ]; then
+            # Include Mikrotik-specific info
+            jq -n \
+                --arg ip "$ip" \
+                --arg sysDescr "$sysDescr" \
+                --arg sysObjectID "$sysObjectID" \
+                --arg sysName "$sysName" \
+                --argjson sysUpTime "$sysUpTime" \
+                --arg device_type "$device_type" \
+                --arg community "$community" \
+                --argjson mikrotik_info "$mikrotik_info" \
+                '{
+                    ip_address: $ip,
+                    sysDescr: $sysDescr,
+                    sysObjectID: $sysObjectID,
+                    sysName: $sysName,
+                    sysUpTime: $sysUpTime,
+                    device_type: $device_type,
+                    community: $community,
+                    mikrotik: $mikrotik_info
+                }'
+        else
+            # Standard device info
+            jq -n \
+                --arg ip "$ip" \
+                --arg sysDescr "$sysDescr" \
+                --arg sysObjectID "$sysObjectID" \
+                --arg sysName "$sysName" \
+                --argjson sysUpTime "$sysUpTime" \
+                --arg device_type "$device_type" \
+                --arg community "$community" \
+                '{
+                    ip_address: $ip,
+                    sysDescr: $sysDescr,
+                    sysObjectID: $sysObjectID,
+                    sysName: $sysName,
+                    sysUpTime: $sysUpTime,
+                    device_type: $device_type,
+                    community: $community
+                }'
+        fi
     else
         # Fallback: use printf to escape values properly
-        printf '{"ip_address":"%s","sysDescr":"%s","sysObjectID":"%s","sysName":"%s","sysUpTime":%s,"device_type":"%s","community":"%s"}' \
-            "$(printf '%s' "$ip" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
-            "$(printf '%s' "$sysDescr" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
-            "$(printf '%s' "$sysObjectID" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
-            "$(printf '%s' "$sysName" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
-            "$sysUpTime" \
-            "$device_type" \
-            "$community"
+        if [ "$device_type" = "mikrotik" ] && [ "$mikrotik_info" != "{}" ]; then
+            printf '{"ip_address":"%s","sysDescr":"%s","sysObjectID":"%s","sysName":"%s","sysUpTime":%s,"device_type":"%s","community":"%s","mikrotik":%s}' \
+                "$(printf '%s' "$ip" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
+                "$(printf '%s' "$sysDescr" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+                "$(printf '%s' "$sysObjectID" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+                "$(printf '%s' "$sysName" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+                "$sysUpTime" \
+                "$device_type" \
+                "$community" \
+                "$mikrotik_info"
+        else
+            printf '{"ip_address":"%s","sysDescr":"%s","sysObjectID":"%s","sysName":"%s","sysUpTime":%s,"device_type":"%s","community":"%s"}' \
+                "$(printf '%s' "$ip" | sed 's/\\/\\\\/g; s/"/\\"/g')" \
+                "$(printf '%s' "$sysDescr" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+                "$(printf '%s' "$sysObjectID" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+                "$(printf '%s' "$sysName" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r//g')" \
+                "$sysUpTime" \
+                "$device_type" \
+                "$community"
+        fi
     fi
 }
 
