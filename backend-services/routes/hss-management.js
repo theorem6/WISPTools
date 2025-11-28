@@ -652,6 +652,20 @@ router.delete('/bandwidth-plans/:id', async (req, res) => {
   }
 });
 
+// Helper function to format uptime
+function formatUptime(seconds) {
+  if (!seconds || seconds === 0) return '0s';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
+
 // Remote EPC devices endpoint (for Hardware page)
 // GET /api/hss/epc/remote/list - Lists EPCs linked via device code
 router.get('/epc/remote/list', async (req, res) => {
@@ -668,20 +682,50 @@ router.get('/epc/remote/list', async (req, res) => {
     
     console.log(`[HSS/EPC] Found ${remoteEPCs.length} remote EPCs`);
 
+    // Get latest service status for each EPC to include metrics
+    const { EPCServiceStatus } = require('../models/distributed-epc-schema');
+    const epcIds = remoteEPCs.map(e => e.epc_id);
+    const latestStatuses = await EPCServiceStatus.aggregate([
+      { $match: { epc_id: { $in: epcIds }, tenant_id: tenantId } },
+      { $sort: { timestamp: -1 } },
+      { $group: {
+          _id: '$epc_id',
+          latest: { $first: '$$ROOT' }
+        }
+      }
+    ]);
+
+    // Create a map of epc_id to latest status
+    const statusMap = new Map();
+    latestStatuses.forEach(item => {
+      statusMap.set(item._id, item.latest);
+    });
+
     // Format for frontend
     const epcs = remoteEPCs.map(epc => {
       const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
       const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+      const latestStatus = statusMap.get(epc.epc_id);
+      
+      // Format metrics for frontend
+      const metrics = latestStatus?.system ? {
+        cpuUsage: latestStatus.system.cpu_percent ?? null,
+        memoryUsage: latestStatus.system.memory_percent ?? null,
+        uptime: latestStatus.system.uptime_seconds 
+          ? formatUptime(latestStatus.system.uptime_seconds)
+          : null
+      } : null;
       
       return {
         id: epc._id?.toString() || epc.epc_id,
         epcId: epc.epc_id,
         name: epc.site_name,
+        site_name: epc.site_name,
         status: epc.status === 'online' || isOnline ? 'online' : 
                 epc.status === 'registered' ? 'pending' : 'offline',
         device_code: epc.device_code,
         hardware_id: epc.hardware_id,
-        ip_address: epc.ip_address,
+        ip_address: epc.ip_address || latestStatus?.network?.ip_address || null,
         deployment_type: epc.deployment_type,
         location: epc.location || {},
         network_config: epc.network_config || {},
@@ -689,7 +733,8 @@ router.get('/epc/remote/list', async (req, res) => {
         last_seen: lastSeen,
         last_heartbeat: epc.last_heartbeat,
         created_at: epc.created_at,
-        updated_at: epc.updated_at
+        updated_at: epc.updated_at,
+        metrics: metrics
       };
     });
 

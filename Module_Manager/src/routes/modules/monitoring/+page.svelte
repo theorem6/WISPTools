@@ -648,7 +648,7 @@
                 <span class="device-status status-{device.status}">
                   {device.status === 'online' ? '🟢' : '🔴'}
                 </span>
-                <h3>{device.site_name || device.name || 'EPC Device'}</h3>
+                <h3>{device.site_name || device.name || 'Remote EPC Device'}</h3>
               </div>
               <div class="device-info">
                 <div class="info-row">
