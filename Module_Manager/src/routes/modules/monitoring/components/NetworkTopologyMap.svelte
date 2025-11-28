@@ -337,6 +337,81 @@
   
   function analyzeNetworkTopology(nodes) {
     const connections = [];
+    const processedConnections = new Set(); // Track connections to avoid duplicates
+    
+    // Helper to add connection if not already processed
+    const addConnection = (from, to, type, metadata = {}) => {
+      const connId = `${from}-${to}`;
+      const reverseId = `${to}-${from}`;
+      if (!processedConnections.has(connId) && !processedConnections.has(reverseId)) {
+        processedConnections.add(connId);
+        connections.push({
+          from,
+          to,
+          type,
+          ...metadata
+        });
+      }
+    };
+    
+    // FIRST: Use neighbor relationships from discovered devices (CDP/LLDP)
+    nodes.forEach(node => {
+      if (!node.device) return;
+      
+      // Check for neighbor information in device notes or directly on device
+      let neighbors = null;
+      if (node.device.neighbors && Array.isArray(node.device.neighbors)) {
+        neighbors = node.device.neighbors;
+      } else if (node.device.notes) {
+        try {
+          const notes = typeof node.device.notes === 'string' 
+            ? JSON.parse(node.device.notes) 
+            : node.device.notes;
+          
+          if (notes.neighbors && Array.isArray(notes.neighbors)) {
+            neighbors = notes.neighbors;
+          } else if (notes.mikrotik && notes.mikrotik.neighbors && Array.isArray(notes.mikrotik.neighbors)) {
+            neighbors = notes.mikrotik.neighbors;
+          }
+        } catch (e) {
+          // Notes not JSON, skip
+        }
+      }
+      
+      // Process neighbors to create connections
+      if (neighbors && neighbors.length > 0) {
+        neighbors.forEach(neighbor => {
+          // Try to find the neighbor device by IP, system name, or device ID
+          const neighborIP = neighbor.ip_address || neighbor.management_ip;
+          const neighborName = neighbor.system_name || neighbor.device_id;
+          
+          // Find matching node
+          const neighborNode = nodes.find(n => {
+            if (!n.device) return false;
+            const deviceIP = n.device.ipAddress || n.device.serialNumber;
+            const deviceName = n.device.name || n.device.sysName;
+            
+            return (neighborIP && deviceIP && deviceIP.includes(neighborIP)) ||
+                   (neighborName && deviceName && deviceName.toLowerCase().includes(neighborName.toLowerCase()));
+          });
+          
+          if (neighborNode) {
+            const connectionType = neighbor.discovered_via === 'cdp' ? 'ethernet' :
+                                  neighbor.discovered_via === 'lldp' ? 'ethernet' :
+                                  'ethernet';
+            
+            addConnection(node.id, neighborNode.id, connectionType, {
+              bandwidth: '1 Gbps',
+              latency: '1ms',
+              packetLoss: '0%',
+              discoveredVia: neighbor.discovered_via || 'neighbor_discovery',
+              localPort: neighbor.local_port || neighbor.local_interface,
+              remotePort: neighbor.remote_port || neighbor.port
+            });
+          }
+        });
+      }
+    });
     
     // Connect EPCs to internet through routers
     const epcs = nodes.filter(n => n.deviceType === 'epc');
@@ -345,84 +420,93 @@
     const switches = nodes.filter(n => n.deviceType === 'mikrotik_switch');
     const cpes = nodes.filter(n => n.deviceType === 'mikrotik_cpe');
     
-    // Connect routers to internet
+    // Connect routers to internet (only if not already connected via neighbors)
     routers.forEach(router => {
-      connections.push({
-        from: 'internet',
-        to: router.id,
-        type: 'internet',
-        bandwidth: '1 Gbps',
-        latency: '10ms',
-        packetLoss: '0%'
-      });
-    });
-    
-    // Connect EPCs to routers (typically fiber or ethernet)
-    epcs.forEach(epc => {
-      const nearestRouter = findNearestDevice(epc, routers);
-      if (nearestRouter) {
-        connections.push({
-          from: nearestRouter.id,
-          to: epc.id,
-          type: 'fiber',
-          bandwidth: '10 Gbps',
-          latency: '1ms',
-          packetLoss: '0%'
-        });
-      }
-    });
-    
-    // Connect switches to routers
-    switches.forEach(switchDevice => {
-      const nearestRouter = findNearestDevice(switchDevice, routers);
-      if (nearestRouter) {
-        connections.push({
-          from: nearestRouter.id,
-          to: switchDevice.id,
-          type: 'ethernet',
+      const connId = `internet-${router.id}`;
+      if (!processedConnections.has(connId)) {
+        addConnection('internet', router.id, 'internet', {
           bandwidth: '1 Gbps',
-          latency: '1ms',
+          latency: '10ms',
           packetLoss: '0%'
         });
       }
     });
     
-    // Connect APs to routers or switches
-    aps.forEach(ap => {
-      const nearestInfra = findNearestDevice(ap, [...routers, ...switches]);
-      if (nearestInfra) {
-        const connectionType = ap.device?.location && nearestInfra.device?.location && 
-                              calculateDistance(ap.device.location.coordinates, nearestInfra.device.location.coordinates) > 5 
-                              ? 'wireless' : 'ethernet';
-        
-        connections.push({
-          from: nearestInfra.id,
-          to: ap.id,
-          type: connectionType,
-          bandwidth: connectionType === 'wireless' ? '100 Mbps' : '1 Gbps',
-          latency: connectionType === 'wireless' ? '5ms' : '1ms',
-          packetLoss: connectionType === 'wireless' ? '0.1%' : '0%'
-        });
+    // Connect EPCs to routers (typically fiber or ethernet) - only if no neighbor connection exists
+    epcs.forEach(epc => {
+      const hasNeighborConnection = connections.some(c => c.to === epc.id || c.from === epc.id);
+      if (!hasNeighborConnection) {
+        const nearestRouter = findNearestDevice(epc, routers);
+        if (nearestRouter) {
+          addConnection(nearestRouter.id, epc.id, 'fiber', {
+            bandwidth: '10 Gbps',
+            latency: '1ms',
+            packetLoss: '0%'
+          });
+        }
       }
     });
     
-    // Connect CPEs to APs (wireless connections)
+    // Connect switches to routers - only if no neighbor connection exists
+    switches.forEach(switchDevice => {
+      const hasNeighborConnection = connections.some(c => 
+        (c.to === switchDevice.id || c.from === switchDevice.id) && 
+        (c.discoveredVia === 'neighbor_discovery' || c.discoveredVia === 'lldp' || c.discoveredVia === 'cdp')
+      );
+      if (!hasNeighborConnection) {
+        const nearestRouter = findNearestDevice(switchDevice, routers);
+        if (nearestRouter) {
+          addConnection(nearestRouter.id, switchDevice.id, 'ethernet', {
+            bandwidth: '1 Gbps',
+            latency: '1ms',
+            packetLoss: '0%'
+          });
+        }
+      }
+    });
+    
+    // Connect APs to routers or switches - only if no neighbor connection exists
+    aps.forEach(ap => {
+      const hasNeighborConnection = connections.some(c => 
+        (c.to === ap.id || c.from === ap.id) && 
+        (c.discoveredVia === 'neighbor_discovery' || c.discoveredVia === 'lldp' || c.discoveredVia === 'cdp')
+      );
+      if (!hasNeighborConnection) {
+        const nearestInfra = findNearestDevice(ap, [...routers, ...switches]);
+        if (nearestInfra) {
+          const connectionType = ap.device?.location && nearestInfra.device?.location && 
+                                calculateDistance(ap.device.location.coordinates, nearestInfra.device.location.coordinates) > 5 
+                                ? 'wireless' : 'ethernet';
+          
+          addConnection(nearestInfra.id, ap.id, connectionType, {
+            bandwidth: connectionType === 'wireless' ? '100 Mbps' : '1 Gbps',
+            latency: connectionType === 'wireless' ? '5ms' : '1ms',
+            packetLoss: connectionType === 'wireless' ? '0.1%' : '0%'
+          });
+        }
+      }
+    });
+    
+    // Connect CPEs to APs (wireless connections) - only if no neighbor connection exists
     cpes.forEach(cpe => {
-      const nearestAP = findNearestDevice(cpe, aps);
-      if (nearestAP) {
-        // Get signal strength from SNMP data if available
-        const signalStrength = cpe.snmpData?.signalStrength || -70;
-        const bandwidth = signalStrength > -60 ? '50 Mbps' : signalStrength > -70 ? '25 Mbps' : '10 Mbps';
-        
-        connections.push({
-          from: nearestAP.id,
-          to: cpe.id,
-          type: 'wireless',
-          bandwidth: bandwidth,
-          latency: '10ms',
-          packetLoss: signalStrength > -70 ? '0.1%' : '0.5%',
-          signalStrength: signalStrength
-        });
+      const hasNeighborConnection = connections.some(c => 
+        (c.to === cpe.id || c.from === cpe.id) && 
+        (c.discoveredVia === 'neighbor_discovery' || c.discoveredVia === 'lldp' || c.discoveredVia === 'cdp')
+      );
+      if (!hasNeighborConnection) {
+        const nearestAP = findNearestDevice(cpe, aps);
+        if (nearestAP) {
+          // Get signal strength from SNMP data if available
+          const signalStrength = cpe.snmpData?.signalStrength || -70;
+          const bandwidth = signalStrength > -60 ? '50 Mbps' : signalStrength > -70 ? '25 Mbps' : '10 Mbps';
+          
+          addConnection(nearestAP.id, cpe.id, 'wireless', {
+            bandwidth: bandwidth,
+            latency: '10ms',
+            packetLoss: signalStrength > -70 ? '0.1%' : '0.5%',
+            signalStrength: signalStrength
+          });
+        }
       }
     });
     

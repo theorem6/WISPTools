@@ -202,6 +202,13 @@ export class MonitoringService {
   }
 
   /**
+   * Get discovered SNMP devices from EPC agents
+   */
+  async getDiscoveredDevices() {
+    return this.get('/monitoring/snmp/discovered');
+  }
+
+  /**
    * Get latest SNMP metrics
    */
   async getSNMPMetrics() {

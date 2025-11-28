@@ -414,6 +414,18 @@
         }
       } catch (e) { console.log('SNMP API not available:', e); }
       
+      // Load discovered devices from EPC agents (CDP/LLDP, ping, SNMP)
+      try {
+        const discoveredResult = await monitoringService.getDiscoveredDevices();
+        if (discoveredResult.success && discoveredResult.data?.devices) {
+          discoveredResult.data.devices.forEach((device: any) => {
+            // Add discovered devices with neighbor information
+            addDevice(device, device.type || 'snmp');
+          });
+          console.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.data.devices.length);
+        }
+      } catch (e) { console.log('Discovered devices API not available:', e); }
+      
       networkDevices = devices;
       console.log('[Network Monitoring] Loaded network devices:', devices.length, '(deduped)');
     } catch (error) {
