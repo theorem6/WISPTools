@@ -419,9 +419,15 @@ do_checkin() {
     
     if [ "$status" = "ok" ]; then
         local epc_id=$(echo "$response" | jq -r '.epc_id')
+        local tenant_id=$(echo "$response" | jq -r '.tenant_id // empty')
         local cmd_count=$(echo "$response" | jq -r '.commands | length')
         
         log "Check-in successful. EPC: $epc_id, Commands: $cmd_count"
+        
+        # Cache tenant_id for SNMP discovery script
+        if [ -n "$tenant_id" ] && [ "$tenant_id" != "null" ]; then
+            echo "$tenant_id" > /tmp/epc-tenant-id 2>/dev/null || true
+        fi
         
         # Update check-in interval if provided
         local new_interval=$(echo "$response" | jq -r '.checkin_interval // empty')

@@ -338,6 +338,7 @@ app.post('/api/epc/checkin', async (req, res) => {
     res.json({
       status: 'ok',
       epc_id: epc.epc_id,
+      tenant_id: epc.tenant_id, // Include tenant_id for SNMP discovery script
       site_name: epc.site_name,
       checkin_interval: epc.metrics_config?.update_interval_seconds || 60,
       commands: commands.map(c => ({

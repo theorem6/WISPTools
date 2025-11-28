@@ -1,6 +1,7 @@
 /**
  * EPC SNMP Discovery API Routes
  * Receives discovered devices from remote EPC agents
+ * NOTE: These routes do NOT require X-Tenant-ID header - they use device_code to find tenant
  */
 
 const express = require('express');
@@ -13,9 +14,15 @@ const { SNMPMetrics } = require('../models/snmp-metrics-schema');
  * POST /api/epc/snmp/discovered
  * Receive SNMP discovered devices from remote EPC
  * Called by epc-snmp-discovery.sh script
- * NOTE: No tenant ID required - uses device_code to find tenant
+ * NOTE: No tenant ID header required - uses device_code to find tenant from EPC lookup
+ * This endpoint bypasses the tenant requirement middleware since it gets tenant_id from EPC
  */
-router.post('/discovered', async (req, res) => {
+router.post('/discovered', async (req, res, next) => {
+  // Bypass tenant requirement - we'll get it from EPC lookup
+  // Set a dummy tenant to bypass middleware, will be replaced by actual lookup
+  req.tenantId = 'pending'; 
+  next();
+}, async (req, res) => {
   try {
     const device_code = req.body.device_code || req.headers['x-device-code'];
     const { discovered_devices } = req.body;
