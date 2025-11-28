@@ -533,4 +533,92 @@ router.get('/discovery', async (req, res) => {
   }
 });
 
+// GET /api/snmp/discovered - Get discovered SNMP devices from EPC agents
+router.get('/discovered', async (req, res) => {
+  try {
+    console.log(`🔍 [SNMP API] Fetching discovered SNMP devices for tenant: ${req.tenantId}`);
+    
+    // Get devices that were discovered by EPC agents
+    const discoveredEquipment = await NetworkEquipment.find({
+      tenantId: req.tenantId,
+      $or: [
+        { 'notes': { $regex: /discovery_source.*epc/i } },
+        { 'notes': { $regex: /discovered_by_epc/i } },
+        { 'notes': { $regex: /discovered_at/i } }
+      ]
+    }).lean();
+    
+    console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
+    
+    const devices = [];
+    
+    discoveredEquipment.forEach(equipment => {
+      // Parse notes to get discovery info
+      let notes = {};
+      if (equipment.notes) {
+        try {
+          notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
+        } catch (e) {
+          notes = {};
+        }
+      }
+      
+      // Filter out fake devices
+      if (isFakeDevice(equipment.name)) {
+        console.log(`  ⚠️ Filtering out fake device: ${equipment.name}`);
+        return;
+      }
+      
+      const device = {
+        id: equipment._id.toString(),
+        name: equipment.name || notes.sysName || notes.management_ip || 'Unknown Device',
+        type: 'snmp',
+        deviceType: equipment.type || notes.device_type || 'other',
+        status: equipment.status === 'active' ? 'online' : 'offline',
+        manufacturer: equipment.manufacturer || 'Generic',
+        model: equipment.model || notes.sysDescr || 'Unknown',
+        serialNumber: equipment.serialNumber || notes.management_ip || equipment._id.toString(),
+        location: {
+          coordinates: {
+            latitude: equipment.location?.latitude || equipment.location?.coordinates?.latitude || 0,
+            longitude: equipment.location?.longitude || equipment.location?.coordinates?.longitude || 0
+          },
+          address: equipment.location?.address || 'Unknown Location'
+        },
+        ipAddress: notes.management_ip || equipment.serialNumber || 'Unknown',
+        snmp: {
+          enabled: true,
+          version: notes.snmp_version || 'v2c',
+          community: notes.snmp_community || 'public',
+          port: notes.snmp_port || 161
+        },
+        discoveredBy: notes.discovered_by_epc || 'Unknown EPC',
+        discoveredAt: notes.discovered_at || equipment.createdAt || new Date().toISOString(),
+        lastSeen: notes.last_discovered || equipment.updatedAt || new Date().toISOString(),
+        sysDescr: notes.sysDescr || notes.sysName || null,
+        sysObjectID: notes.sysObjectID || null,
+        createdAt: equipment.createdAt,
+        updatedAt: equipment.updatedAt
+      };
+      
+      devices.push(device);
+    });
+    
+    console.log(`📊 Returning ${devices.length} discovered SNMP devices for tenant ${req.tenantId}`);
+    
+    res.json({
+      devices,
+      total: devices.length,
+      tenant: req.tenantId
+    });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error fetching discovered devices:', error);
+    res.status(500).json({
+      error: 'Failed to fetch discovered devices',
+      message: error.message,
+      devices: []
+    });
+  }
+});
+
 module.exports = router;
