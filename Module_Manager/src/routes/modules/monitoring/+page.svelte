@@ -919,6 +919,16 @@
     bottom: 0;
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     overflow-y: auto;
+  }
+
+  .snmp-overlay {
+    position: absolute;
+    top: 80px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    overflow-y: auto;
     padding: 2rem;
     z-index: 5;
   }

@@ -25,9 +25,10 @@ export const API_CONFIG = {
     ADMIN: '/admin',
     ISO: '/api/deploy', // ISO proxy uses deploy endpoint
     PERMISSIONS: '/api/permissions',
-  MIKROTIK: '/api/mikrotik',
-  EPC_UPDATES: '/api/epc-updates',
-  SNMP_MONITORING: '/api/snmp'
+    MIKROTIK: '/api/mikrotik',
+    EPC_UPDATES: '/api/epc-updates',
+    SNMP_MONITORING: '/api/snmp',
+    API: '/api'
   },
   
   // Cloud Function endpoints (only used when direct access is needed)

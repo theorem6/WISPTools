@@ -38,7 +38,7 @@
       }
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.API}/snmp/discovered`, {
+      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': tenantId
@@ -72,7 +72,7 @@
       if (!user) return;
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.API}/inventory/items`, {
+      const response = await fetch(`${API_CONFIG.PATHS.INVENTORY}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': tenantId
@@ -98,6 +98,10 @@
   
   function handleAddHardware(device: any) {
     selectedDevice = device;
+    resetHardwareForm();
+    // Set default asset tag based on device
+    hardwareForm.assetTag = `SNMP-${device.ipAddress || device.id.substring(0, 8)}`;
+    hardwareForm.siteName = device.discoveredBy || '';
     showAddHardwareModal = true;
   }
   
@@ -106,20 +110,127 @@
     showAddHardwareModal = false;
     selectedDevice = null;
     existingHardware = [];
+    pairError = null;
+    createError = null;
+    resetHardwareForm();
   }
+  
+  let pairingDevice = false;
+  let creatingHardware = false;
+  let pairError: string | null = null;
+  let createError: string | null = null;
   
   async function pairWithHardware(device: any, hardwareId: string) {
-    // TODO: Implement pairing logic
-    console.log('Pairing device', device.id, 'with hardware', hardwareId);
-    closeModals();
-    await loadDiscoveredDevices();
+    if (!device || !hardwareId) return;
+    
+    pairingDevice = true;
+    pairError = null;
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) {
+        pairError = 'Not authenticated';
+        return;
+      }
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered/${device.id}/pair`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ hardwareId })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[SNMP Devices] Paired device:', data);
+        closeModals();
+        await loadDiscoveredDevices();
+        // Show success message
+        alert('Device paired successfully with hardware!');
+      } else {
+        const errorText = await response.text();
+        console.error('[SNMP Devices] Failed to pair:', response.status, errorText);
+        pairError = `Failed to pair: ${response.status}`;
+      }
+    } catch (err: any) {
+      console.error('[SNMP Devices] Error pairing device:', err);
+      pairError = err.message || 'Failed to pair device';
+    } finally {
+      pairingDevice = false;
+    }
   }
   
-  async function createNewHardware(device: any, hardwareData: any) {
-    // TODO: Implement create hardware logic
-    console.log('Creating new hardware from device', device.id, hardwareData);
-    closeModals();
-    await loadDiscoveredDevices();
+  let hardwareForm = {
+    assetTag: '',
+    category: 'Network Equipment',
+    siteName: ''
+  };
+  
+  async function createNewHardware(device: any) {
+    if (!device) return;
+    
+    // Set default asset tag if not provided
+    if (!hardwareForm.assetTag) {
+      hardwareForm.assetTag = `SNMP-${device.ipAddress || device.id.substring(0, 8)}`;
+    }
+    
+    creatingHardware = true;
+    createError = null;
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) {
+        createError = 'Not authenticated';
+        return;
+      }
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered/${device.id}/create-hardware`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          assetTag: hardwareForm.assetTag,
+          category: hardwareForm.category,
+          siteName: hardwareForm.siteName || device.discoveredBy || 'Unknown Site',
+          location: device.location || {}
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[SNMP Devices] Created hardware:', data);
+        closeModals();
+        hardwareForm = { assetTag: '', category: 'Network Equipment', siteName: '' };
+        await loadDiscoveredDevices();
+        // Show success message
+        alert('Hardware created successfully!');
+      } else {
+        const errorText = await response.text();
+        console.error('[SNMP Devices] Failed to create hardware:', response.status, errorText);
+        createError = `Failed to create hardware: ${response.status}`;
+      }
+    } catch (err: any) {
+      console.error('[SNMP Devices] Error creating hardware:', err);
+      createError = err.message || 'Failed to create hardware';
+    } finally {
+      creatingHardware = false;
+    }
+  }
+  
+  function resetHardwareForm() {
+    hardwareForm = {
+      assetTag: '',
+      category: 'Network Equipment',
+      siteName: ''
+    };
   }
   
   onMount(() => {
@@ -215,20 +326,27 @@
       {#if loadingHardware}
         <p>Loading hardware...</p>
       {:else if existingHardware.length === 0}
-        <p>No existing hardware found</p>
+        <p>No existing hardware found. Create new hardware instead.</p>
       {:else}
         <div class="hardware-list">
           {#each existingHardware as hardware}
-            <div class="hardware-item" on:click={() => pairWithHardware(selectedDevice, hardware.id)}>
-              <strong>{hardware.assetTag || hardware.name}</strong>
-              <span>{hardware.equipmentType || 'Unknown'}</span>
+            <div class="hardware-item" on:click={() => !pairingDevice && pairWithHardware(selectedDevice, hardware.id || hardware._id)}>
+              <strong>{hardware.assetTag || hardware.name || 'Unnamed Hardware'}</strong>
+              <span>{hardware.equipmentType || hardware.subcategory || 'Unknown'}</span>
+              {#if hardware.model}
+                <span class="hardware-model">{hardware.manufacturer || ''} {hardware.model}</span>
+              {/if}
             </div>
           {/each}
         </div>
       {/if}
       
+      {#if pairError}
+        <div class="error-message">{pairError}</div>
+      {/if}
+      
       <div class="modal-actions">
-        <button class="btn btn-secondary" on:click={closeModals}>Cancel</button>
+        <button class="btn btn-secondary" on:click={closeModals} disabled={pairingDevice}>Cancel</button>
       </div>
     </div>
   </div>
@@ -240,13 +358,52 @@
     <div class="modal-content" on:click|stopPropagation>
       <h3>Add as New Hardware</h3>
       <p>Create new hardware entry for {selectedDevice.name || selectedDevice.ipAddress}</p>
-      <!-- TODO: Add form for creating hardware -->
-      <div class="modal-actions">
-        <button class="btn btn-secondary" on:click={closeModals}>Cancel</button>
-        <button class="btn btn-primary" on:click={() => createNewHardware(selectedDevice, {})}>
-          Create Hardware
-        </button>
-      </div>
+      
+      <form on:submit|preventDefault={() => createNewHardware(selectedDevice)}>
+        <div class="form-group">
+          <label for="assetTag">Asset Tag:</label>
+          <input 
+            id="assetTag"
+            type="text" 
+            bind:value={hardwareForm.assetTag}
+            placeholder={`SNMP-${selectedDevice.ipAddress || 'DEVICE'}`}
+            required
+          />
+        </div>
+        
+        <div class="form-group">
+          <label for="category">Category:</label>
+          <select id="category" bind:value={hardwareForm.category}>
+            <option value="Network Equipment">Network Equipment</option>
+            <option value="Radio Equipment">Radio Equipment</option>
+            <option value="Antennas">Antennas</option>
+            <option value="Power Systems">Power Systems</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="siteName">Site Name:</label>
+          <input 
+            id="siteName"
+            type="text" 
+            bind:value={hardwareForm.siteName}
+            placeholder={selectedDevice.discoveredBy || 'Site Name'}
+          />
+        </div>
+        
+        {#if createError}
+          <div class="error-message">{createError}</div>
+        {/if}
+        
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" on:click={closeModals} disabled={creatingHardware}>
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" disabled={creatingHardware}>
+            {creatingHardware ? 'Creating...' : 'Create Hardware'}
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 {/if}
@@ -428,5 +585,48 @@
     gap: 0.5rem;
     justify-content: flex-end;
     margin-top: 1.5rem;
+  }
+  
+  .form-group {
+    margin-bottom: 1rem;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary, #111827);
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--primary, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .error-message {
+    padding: 0.75rem;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 4px;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+  }
+  
+  .hardware-model {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    margin-top: 0.25rem;
   }
 </style>

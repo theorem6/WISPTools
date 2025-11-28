@@ -539,14 +539,30 @@ router.get('/discovered', async (req, res) => {
     console.log(`🔍 [SNMP API] Fetching discovered SNMP devices for tenant: ${req.tenantId}`);
     
     // Get devices that were discovered by EPC agents
-    const discoveredEquipment = await NetworkEquipment.find({
-      tenantId: req.tenantId,
-      $or: [
-        { 'notes': { $regex: /discovery_source.*epc/i } },
-        { 'notes': { $regex: /discovered_by_epc/i } },
-        { 'notes': { $regex: /discovered_at/i } }
-      ]
+    // Notes is stored as JSON string, so we need to search the string content
+    const allEquipment = await NetworkEquipment.find({
+      tenantId: req.tenantId
     }).lean();
+    
+    // Filter devices that have discovery metadata in notes
+    const discoveredEquipment = allEquipment.filter(equipment => {
+      if (!equipment.notes) return false;
+      
+      let notes = {};
+      try {
+        notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
+      } catch (e) {
+        // If notes is not JSON, check as string
+        const notesStr = String(equipment.notes).toLowerCase();
+        return notesStr.includes('discovered_by_epc') || 
+               notesStr.includes('discovery_source') || 
+               notesStr.includes('discovered_at');
+      }
+      
+      return notes.discovered_by_epc || 
+             notes.discovery_source === 'epc_snmp_agent' ||
+             notes.discovered_at;
+    });
     
     console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
     
@@ -617,6 +633,192 @@ router.get('/discovered', async (req, res) => {
       error: 'Failed to fetch discovered devices',
       message: error.message,
       devices: []
+    });
+  }
+});
+
+// POST /api/snmp/discovered/:deviceId/pair - Pair discovered device with existing hardware
+router.post('/discovered/:deviceId/pair', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { hardwareId } = req.body;
+    
+    if (!hardwareId) {
+      return res.status(400).json({ error: 'hardwareId is required' });
+    }
+    
+    console.log(`🔗 [SNMP API] Pairing discovered device ${deviceId} with hardware ${hardwareId}`);
+    
+    // Get the discovered device
+    const device = await NetworkEquipment.findOne({
+      _id: deviceId,
+      tenantId: req.tenantId
+    });
+    
+    if (!device) {
+      return res.status(404).json({ error: 'Discovered device not found' });
+    }
+    
+    // Get the inventory item to pair with
+    const { InventoryItem } = require('../models/inventory');
+    const hardware = await InventoryItem.findOne({
+      _id: hardwareId,
+      tenantId: req.tenantId
+    });
+    
+    if (!hardware) {
+      return res.status(404).json({ error: 'Hardware item not found' });
+    }
+    
+    // Parse device notes
+    let notes = {};
+    if (device.notes) {
+      try {
+        notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
+      } catch (e) {
+        notes = {};
+      }
+    }
+    
+    // Update NetworkEquipment to link to inventory
+    device.inventoryId = hardwareId.toString();
+    if (typeof device.notes === 'string') {
+      notes.inventory_id = hardwareId.toString();
+      notes.paired_at = new Date().toISOString();
+      device.notes = JSON.stringify(notes);
+    } else {
+      device.notes = { ...notes, inventory_id: hardwareId.toString(), paired_at: new Date().toISOString() };
+    }
+    await device.save();
+    
+    // Update InventoryItem to link to NetworkEquipment
+    hardware.serialNumber = notes.management_ip || device.serialNumber || hardware.serialNumber;
+    if (!hardware.networkConfig) hardware.networkConfig = {};
+    hardware.networkConfig.management_ip = notes.management_ip || device.serialNumber || null;
+    hardware.networkConfig.snmp_enabled = true;
+    hardware.networkConfig.snmp_community = notes.snmp_community || 'public';
+    hardware.networkConfig.snmp_version = notes.snmp_version || '2c';
+    
+    // Update modules to link to SNMP device
+    if (!hardware.modules) hardware.modules = {};
+    if (!hardware.modules.snmp) hardware.modules.snmp = {};
+    hardware.modules.snmp.deviceId = deviceId.toString();
+    hardware.modules.snmp.lastSync = new Date();
+    
+    await hardware.save();
+    
+    console.log(`✅ [SNMP API] Paired device ${deviceId} with hardware ${hardwareId}`);
+    
+    res.json({
+      success: true,
+      deviceId,
+      hardwareId,
+      message: 'Device paired successfully with hardware'
+    });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error pairing device:', error);
+    res.status(500).json({
+      error: 'Failed to pair device',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/snmp/discovered/:deviceId/create-hardware - Create new hardware from discovered device
+router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { assetTag, category, siteName, location } = req.body;
+    
+    console.log(`➕ [SNMP API] Creating hardware from discovered device ${deviceId}`);
+    
+    // Get the discovered device
+    const device = await NetworkEquipment.findOne({
+      _id: deviceId,
+      tenantId: req.tenantId
+    });
+    
+    if (!device) {
+      return res.status(404).json({ error: 'Discovered device not found' });
+    }
+    
+    // Parse device notes
+    let notes = {};
+    if (device.notes) {
+      try {
+        notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
+      } catch (e) {
+        notes = {};
+      }
+    }
+    
+    // Create inventory item
+    const { InventoryItem } = require('../models/inventory');
+    const inventoryItem = new InventoryItem({
+      tenantId: req.tenantId,
+      assetTag: assetTag || `SNMP-${notes.management_ip || device.serialNumber || deviceId.substring(0, 8)}`,
+      category: category || 'Network Equipment',
+      subcategory: device.type === 'router' ? 'Router' :
+                   device.type === 'switch' ? 'Switch' :
+                   device.type === 'ap' ? 'Access Point' : 'Network Device',
+      equipmentType: device.manufacturer ? `${device.manufacturer} ${device.model || ''}`.trim() : 
+                     notes.device_type || 'SNMP Device',
+      manufacturer: device.manufacturer || 'Generic',
+      model: device.model || notes.sysDescr || 'Unknown',
+      serialNumber: notes.management_ip || device.serialNumber || deviceId,
+      physicalDescription: `${device.name || 'Discovered SNMP Device'} - ${notes.management_ip || 'Unknown IP'}`,
+      status: 'deployed',
+      condition: 'good',
+      currentLocation: {
+        type: 'tower',
+        siteName: siteName || 'Unknown Site',
+        address: location?.address || device.location?.address || 'Unknown Location'
+      },
+      ownership: 'owned',
+      networkConfig: {
+        management_ip: notes.management_ip || device.serialNumber || null,
+        snmp_enabled: true,
+        snmp_community: notes.snmp_community || 'public',
+        snmp_version: notes.snmp_version || '2c'
+      },
+      notes: `Created from discovered SNMP device. Discovered by EPC: ${notes.discovered_by_epc || 'Unknown'}. IP: ${notes.management_ip || 'Unknown'}`,
+      modules: {
+        snmp: {
+          deviceId: deviceId.toString(),
+          lastSync: new Date()
+        }
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    await inventoryItem.save();
+    
+    // Link NetworkEquipment to inventory
+    device.inventoryId = inventoryItem._id.toString();
+    if (typeof device.notes === 'string') {
+      notes.inventory_id = inventoryItem._id.toString();
+      notes.created_from_discovery = true;
+      device.notes = JSON.stringify(notes);
+    } else {
+      device.notes = { ...notes, inventory_id: inventoryItem._id.toString(), created_from_discovery: true };
+    }
+    await device.save();
+    
+    console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);
+    
+    res.json({
+      success: true,
+      deviceId,
+      hardwareId: inventoryItem._id.toString(),
+      hardware: inventoryItem,
+      message: 'Hardware created successfully from discovered device'
+    });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error creating hardware:', error);
+    res.status(500).json({
+      error: 'Failed to create hardware',
+      message: error.message
     });
   }
 });
