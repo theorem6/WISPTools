@@ -133,6 +133,11 @@ app.post('/api/epc/checkin', async (req, res) => {
     }
     
     console.log(`[EPC Check-in] Device ${device_code} checking in from ${ip_address}`);
+    if (versions?.scripts) {
+      console.log(`[EPC Check-in] Script versions reported:`, JSON.stringify(versions.scripts));
+    } else {
+      console.log(`[EPC Check-in] No script versions reported (old agent version?)`);
+    }
     
     const epc = await RemoteEPCCheckin.findOne({ device_code: device_code.toUpperCase() });
     
