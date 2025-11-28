@@ -393,17 +393,17 @@ report_discovered_devices() {
         payload="{\"device_code\":\"$device_code\",\"discovered_devices\":[]}"
     fi
     
-    # Build headers
-    local headers=(-H "Content-Type: application/json" -H "X-Device-Code: $device_code")
+    # Build curl command with headers
+    local curl_headers=("-H" "Content-Type: application/json" "-H" "X-Device-Code: $device_code")
     if [ -n "$tenant_id" ]; then
-        headers+=(-H "X-Tenant-ID: $tenant_id")
-        log "Including X-Tenant-ID header: $tenant_id"
+        curl_headers+=("-H" "X-Tenant-ID: $tenant_id")
+        log "Including X-Tenant-ID header"
     else
-        log "WARNING: No tenant ID available, request may fail"
+        log "WARNING: No tenant ID cached - request may fail tenant validation"
     fi
     
     local response=$(curl -s -X POST "${API_URL}/snmp/discovered" \
-        "${headers[@]}" \
+        "${curl_headers[@]}" \
         -w "\nHTTP_CODE:%{http_code}" \
         -d "$payload" 2>&1)
     
