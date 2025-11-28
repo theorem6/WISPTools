@@ -343,7 +343,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          site_id: epcEditForm.site_id || undefined,
+          site_id: epcEditForm.site_id || null, // Always send site_id, use null if empty
           site_name: epcEditForm.site_id ? undefined : (epcEditForm.site_name || undefined),
           deployment_type: epcEditForm.deployment_type,
           hss_config: epcEditForm.hss_config,

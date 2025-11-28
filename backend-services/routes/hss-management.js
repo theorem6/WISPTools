@@ -859,15 +859,19 @@ router.put('/epc/:epc_id', async (req, res) => {
       updateFields.epc_id = new_epc_id_value;
     }
 
-    // Allow updating site_id
+    // Allow updating site_id (explicitly check for null or string value)
     if (site_id !== undefined) {
-      updateFields.site_id = site_id || null;
+      const newSiteId = (site_id === null || site_id === '') ? null : site_id;
+      updateFields.site_id = newSiteId;
       
       // If site_id is set, regenerate site_name with proper suffix
-      if (site_id) {
+      if (newSiteId) {
         const { generateSiteNameWithSuffix } = require('../utils/site-naming');
-        const newSiteName = await generateSiteNameWithSuffix(site_id, tenantId);
+        const newSiteName = await generateSiteNameWithSuffix(newSiteId, tenantId);
         updateFields.site_name = newSiteName;
+      } else if (site_id === null || site_id === '') {
+        // If site_id is being cleared, also clear site_name
+        updateFields.site_name = null;
       }
     }
     
@@ -920,11 +924,19 @@ router.put('/epc/:epc_id', async (req, res) => {
       };
     }
 
-    // Check if any configuration changed (before update)
-    const configChanged = !!(site_id !== undefined || site_name !== undefined || 
-                             deployment_type !== undefined || hss_config !== undefined || 
-                             snmp_config !== undefined || network_config !== undefined ||
-                             status !== undefined || device_code !== undefined);
+    // Check if any configuration actually changed by comparing old vs new values
+    const configChanged = (
+      (site_id !== undefined && JSON.stringify(epc.site_id) !== JSON.stringify(site_id !== null && site_id !== undefined ? site_id : null)) ||
+      (site_name !== undefined && epc.site_name !== site_name) ||
+      (deployment_type !== undefined && epc.deployment_type !== deployment_type) ||
+      (hss_config !== undefined && JSON.stringify(epc.hss_config) !== JSON.stringify(hss_config)) ||
+      (snmp_config !== undefined && JSON.stringify(epc.snmp_config) !== JSON.stringify(snmp_config)) ||
+      (network_config !== undefined && JSON.stringify(epc.network_config) !== JSON.stringify(network_config)) ||
+      (status !== undefined && epc.status !== status) ||
+      (device_code !== undefined && epc.device_code !== device_code)
+    );
+    
+    console.log(`[HSS/EPC] Config change detection: ${configChanged ? 'CHANGED' : 'NO CHANGE'}`);
     
     // Update the EPC
     await RemoteEPC.updateOne(
