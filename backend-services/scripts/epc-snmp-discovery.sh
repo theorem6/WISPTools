@@ -444,6 +444,7 @@ test_single_ip() {
     
     local results_file=$(mktemp)
     local found=false
+    local report_result=0
     
     # Try each community
     for community in $(echo "$communities" | tr ',' ' '); do
@@ -455,14 +456,20 @@ test_single_ip() {
             # Validate and display
             if command -v jq &> /dev/null; then
                 if echo "$device_info" | jq empty 2>/dev/null; then
+                    echo ""
+                    echo "Device Information:"
                     echo "$device_info" | jq .
+                    echo ""
                     echo "$device_info" >> "$results_file"
                     found=true
                 else
                     log "ERROR: Invalid JSON generated for device"
                 fi
             else
+                echo ""
+                echo "Device Information:"
                 echo "$device_info"
+                echo ""
                 echo "$device_info" >> "$results_file"
                 found=true
             fi
@@ -473,7 +480,7 @@ test_single_ip() {
     done
     
     if [ "$found" = false ]; then
-        log "✗ No SNMP response from $test_ip with any community string"
+        log "✗ No SNMP response from $test_ip with any community string (tried: $communities)"
         rm -f "$results_file"
         return 1
     fi
@@ -495,8 +502,11 @@ test_single_ip() {
         devices_array="${devices_array}]"
         
         log "Reporting discovered device to server..."
-        report_discovered_devices "$devices_array"
-        local report_result=$?
+        if report_discovered_devices "$devices_array"; then
+            report_result=0
+        else
+            report_result=1
+        fi
     fi
     
     rm -f "$results_file"
