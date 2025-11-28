@@ -429,14 +429,106 @@ report_discovered_devices() {
     fi
 }
 
+# Scan a single IP address (for testing)
+test_single_ip() {
+    local test_ip=$1
+    local communities=${2:-"public,private,community"}
+    
+    log "Testing single IP: $test_ip"
+    
+    # Check if snmpget is available
+    if ! command -v snmpget &> /dev/null; then
+        log "ERROR: snmpget command not found. Install net-snmp package: sudo apt install snmp"
+        return 1
+    fi
+    
+    local results_file=$(mktemp)
+    local found=false
+    
+    # Try each community
+    for community in $(echo "$communities" | tr ',' ' '); do
+        log "Testing $test_ip with community: $community"
+        if test_snmp_device "$test_ip" "$community"; then
+            log "✓ Found SNMP device at $test_ip (community: $community)"
+            local device_info=$(get_device_info "$test_ip" "$community")
+            
+            # Validate and display
+            if command -v jq &> /dev/null; then
+                if echo "$device_info" | jq empty 2>/dev/null; then
+                    echo "$device_info" | jq .
+                    echo "$device_info" >> "$results_file"
+                    found=true
+                else
+                    log "ERROR: Invalid JSON generated for device"
+                fi
+            else
+                echo "$device_info"
+                echo "$device_info" >> "$results_file"
+                found=true
+            fi
+            break
+        else
+            log "✗ No response from $test_ip with community: $community"
+        fi
+    done
+    
+    if [ "$found" = false ]; then
+        log "✗ No SNMP response from $test_ip with any community string"
+        rm -f "$results_file"
+        return 1
+    fi
+    
+    # Report to server if device was found
+    if [ -s "$results_file" ]; then
+        local devices_array="["
+        local first=true
+        while IFS= read -r device_json; do
+            if [ -n "$device_json" ]; then
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    devices_array="${devices_array},"
+                fi
+                devices_array="${devices_array}${device_json}"
+            fi
+        done < "$results_file"
+        devices_array="${devices_array}]"
+        
+        log "Reporting discovered device to server..."
+        report_discovered_devices "$devices_array"
+        local report_result=$?
+    fi
+    
+    rm -f "$results_file"
+    return $report_result
+}
+
 # Main discovery function
 main() {
-    local network_info=$(get_network_info)
-    local local_ip=$(echo "$network_info" | cut -d'|' -f1)
-    local network=$(echo "$local_ip" | cut -d'.' -f1-3)
-    
-    # Default to /24 subnet
-    local subnet="${network}.0/24"
+    # Check if a specific IP was provided as argument
+    if [ -n "$1" ]; then
+        local target="$1"
+        
+        # If it's a single IP (no / in it), test that IP
+        if ! echo "$target" | grep -q "/"; then
+            log "Single IP mode: Testing $target"
+            test_single_ip "$target"
+            return $?
+        else
+            # It's a subnet, scan it
+            local subnet="$target"
+            log "Custom subnet mode: Scanning $subnet"
+        fi
+    else
+        # Default: auto-detect network
+        local network_info=$(get_network_info)
+        local local_ip=$(echo "$network_info" | cut -d'|' -f1)
+        local network=$(echo "$local_ip" | cut -d'.' -f1-3)
+        
+        # Default to /24 subnet
+        local subnet="${network}.0/24"
+        log "Auto-detected subnet mode: $subnet"
+    fi
     
     log "Starting SNMP discovery on subnet: $subnet"
     
