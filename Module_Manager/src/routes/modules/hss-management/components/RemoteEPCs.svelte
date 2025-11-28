@@ -460,7 +460,47 @@ To use:
   function viewEPCDetails(epc: any) {
     selectedEPC = epc;
     deviceCodeInput = epc.device_code || ''; // Pre-fill if already linked
+    detailsModalTab = 'details';
+    epcLogs = [];
+    logsError = null;
     showDetailsModal = true;
+    if (epc.epc_id || epc.epcId) {
+      loadEPCLogs();
+    }
+  }
+  
+  async function loadEPCLogs() {
+    if (!selectedEPC) return;
+    const epcId = selectedEPC.epc_id || selectedEPC.epcId;
+    if (!epcId) return;
+    
+    loadingLogs = true;
+    logsError = null;
+    
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${HSS_API}/epc/${epcId}/logs?limit=200`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        epcLogs = data.logs || [];
+      } else {
+        logsError = `Failed to load logs: ${response.status}`;
+      }
+    } catch (err: any) {
+      console.error('Error loading EPC logs:', err);
+      logsError = err.message || 'Failed to load logs';
+    } finally {
+      loadingLogs = false;
+    }
   }
   
   async function linkDeviceCode() {
@@ -1014,8 +1054,63 @@ To use:
         <button class="close-btn" on:click={() => showDetailsModal = false}>✕</button>
       </div>
       
+      <div class="modal-tabs">
+        <button 
+          class="tab-btn" 
+          class:active={detailsModalTab === 'details'}
+          on:click={() => detailsModalTab = 'details'}
+        >
+          ℹ️ Details
+        </button>
+        <button 
+          class="tab-btn" 
+          class:active={detailsModalTab === 'logs'}
+          on:click={() => { detailsModalTab = 'logs'; loadEPCLogs(); }}
+        >
+          📋 Logs {epcLogs.length > 0 ? `(${epcLogs.length})` : ''}
+        </button>
+      </div>
+      
       <div class="modal-body">
-        <div class="details-grid">
+        {#if detailsModalTab === 'logs'}
+          <div class="logs-viewer">
+            <div class="logs-header">
+              <button class="btn-secondary" on:click={loadEPCLogs} disabled={loadingLogs}>
+                {loadingLogs ? '⏳ Loading...' : '🔄 Refresh'}
+              </button>
+            </div>
+            
+            {#if loadingLogs && epcLogs.length === 0}
+              <div class="loading">Loading logs...</div>
+            {:else if logsError}
+              <div class="error">{logsError}</div>
+            {:else if epcLogs.length === 0}
+              <div class="empty-state">
+                <p>No logs available yet. Logs will appear here after the device checks in.</p>
+              </div>
+            {:else}
+              <div class="logs-container">
+                {#each epcLogs as log (log.id)}
+                  <div class="log-entry log-level-{log.level}">
+                    <div class="log-header">
+                      <span class="log-timestamp">{new Date(log.timestamp).toLocaleString()}</span>
+                      <span class="log-level-badge level-{log.level}">{log.level.toUpperCase()}</span>
+                      <span class="log-source">{log.source || 'unknown'}</span>
+                    </div>
+                    <div class="log-message">{log.message}</div>
+                    {#if log.details && Object.keys(log.details).length > 0}
+                      <details class="log-details">
+                        <summary>Details</summary>
+                        <pre>{JSON.stringify(log.details, null, 2)}</pre>
+                      </details>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <div class="details-grid">
           <div class="detail-section">
             <h3>Status</h3>
             <div class="status-large {getStatusBadge(selectedEPC.status).class}">
