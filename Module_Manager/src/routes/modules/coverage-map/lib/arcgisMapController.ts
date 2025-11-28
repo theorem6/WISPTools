@@ -1682,10 +1682,42 @@ export class CoverageMapController {
 
       if (this.filters.showEquipment && Array.isArray(this.data.equipment)) {
         const locationTypeFilter = Array.isArray(this.filters.locationTypeFilter) ? this.filters.locationTypeFilter : [];
-        const visibleEquipment = this.data.equipment.filter(eq =>
-          locationTypeFilter.length === 0 ||
-          locationTypeFilter.includes(eq.locationType)
-        );
+        
+        // Filter equipment by location type and validate coordinates
+        const visibleEquipment = this.data.equipment.filter(eq => {
+          // Check location type filter
+          if (locationTypeFilter.length > 0 && !locationTypeFilter.includes(eq.locationType)) {
+            return false;
+          }
+          
+          // Validate coordinates - must have valid lat/lon
+          const lat = eq.location?.latitude;
+          const lon = eq.location?.longitude;
+          
+          if (lat == null || lon == null) {
+            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - missing coordinates`);
+            return false;
+          }
+          
+          if (typeof lat !== 'number' || typeof lon !== 'number') {
+            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - invalid coordinate types`);
+            return false;
+          }
+          
+          // Filter out 0,0 (invalid location - middle of ocean)
+          if (lat === 0 && lon === 0) {
+            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - coordinates are 0,0`);
+            return false;
+          }
+          
+          // Validate coordinate ranges
+          if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - coordinates out of valid range: ${lat}, ${lon}`);
+            return false;
+          }
+          
+          return true;
+        });
 
         const isMobile = window.innerWidth <= 768;
         const symbolSize = isMobile ? '16px' : '12px';

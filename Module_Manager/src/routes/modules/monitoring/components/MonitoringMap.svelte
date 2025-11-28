@@ -38,58 +38,91 @@
     statusFilter: 'all'
   };
   
+  // Helper function to check if coordinates are valid (not 0,0 or null)
+  function hasValidCoordinates(lat: number | null | undefined, lon: number | null | undefined): boolean {
+    if (lat == null || lon == null) return false;
+    if (typeof lat !== 'number' || typeof lon !== 'number') return false;
+    if (lat === 0 && lon === 0) return false; // 0,0 is in the ocean
+    if (lat < -90 || lat > 90) return false; // Invalid latitude range
+    if (lon < -180 || lon > 180) return false; // Invalid longitude range
+    return true;
+  }
+
   // Convert devices to equipment format for the map
   function convertDevicesToEquipment() {
     console.log('[MonitoringMap] Converting devices:', devices);
     
-    equipment = devices.map(device => {
-      const equipmentItem = {
-        id: device.id,
-        name: device.name,
-        type: getEquipmentType(device),
-        status: device.status,
-        // Ensure location has the right structure
-        location: {
-          latitude: device.location?.coordinates?.latitude || device.location?.latitude || 0,
-          longitude: device.location?.coordinates?.longitude || device.location?.longitude || 0,
-          address: device.location?.address || 'Unknown Location'
-        },
-        ipAddress: device.ipAddress,
-        lastSeen: new Date().toISOString(),
-        metrics: device.metrics || {},
-        // Additional monitoring-specific fields
-        monitoringData: {
-          cpuUsage: device.metrics?.cpuUsage,
-          memoryUsage: device.metrics?.memoryUsage,
-          uptime: device.metrics?.uptime,
-          throughput: device.metrics?.throughput,
-          connectedClients: device.metrics?.connectedClients,
-          signalStrength: device.metrics?.signalStrength
+    equipment = devices
+      .filter(device => {
+        // Only include devices with valid location coordinates
+        const lat = device.location?.coordinates?.latitude || device.location?.latitude;
+        const lon = device.location?.coordinates?.longitude || device.location?.longitude;
+        const hasValid = hasValidCoordinates(lat, lon);
+        if (!hasValid) {
+          console.warn('[MonitoringMap] Skipping device without valid coordinates:', device.name, 'lat:', lat, 'lon:', lon);
         }
-      };
-      
-      console.log('[MonitoringMap] Converted device:', device.name, 'to equipment:', equipmentItem);
-      return equipmentItem;
-    });
+        return hasValid;
+      })
+      .map(device => {
+        const lat = device.location?.coordinates?.latitude || device.location?.latitude || 0;
+        const lon = device.location?.coordinates?.longitude || device.location?.longitude || 0;
+        
+        const equipmentItem = {
+          id: device.id,
+          name: device.name,
+          type: getEquipmentType(device),
+          status: device.status,
+          // Ensure location has the right structure with valid coordinates
+          location: {
+            latitude: lat,
+            longitude: lon,
+            address: device.location?.address || 'Unknown Location'
+          },
+          ipAddress: device.ipAddress,
+          lastSeen: new Date().toISOString(),
+          metrics: device.metrics || {},
+          // Additional monitoring-specific fields
+          monitoringData: {
+            cpuUsage: device.metrics?.cpuUsage,
+            memoryUsage: device.metrics?.memoryUsage,
+            uptime: device.metrics?.uptime,
+            throughput: device.metrics?.throughput,
+            connectedClients: device.metrics?.connectedClients,
+            signalStrength: device.metrics?.signalStrength
+          }
+        };
+        
+        console.log('[MonitoringMap] Converted device:', device.name, 'to equipment with location:', equipmentItem.location);
+        return equipmentItem;
+      });
     
-    // Also create some towers for devices that need them
+    // Also create some towers for devices that need them (only with valid coordinates)
     towers = devices
-      .filter(device => device.type === 'epc' || (device.type === 'mikrotik' && device.deviceType === 'router'))
-      .map(device => ({
-        id: `tower-${device.id}`,
-        name: `${device.name} Site`,
-        type: 'tower',
-        status: device.status,
-        location: {
-          latitude: device.location?.coordinates?.latitude || device.location?.latitude || 0,
-          longitude: device.location?.coordinates?.longitude || device.location?.longitude || 0,
-          address: device.location?.address || 'Unknown Location'
-        },
-        height: 50,
-        equipment: [device.id]
-      }));
+      .filter(device => {
+        const lat = device.location?.coordinates?.latitude || device.location?.latitude;
+        const lon = device.location?.coordinates?.longitude || device.location?.longitude;
+        return hasValidCoordinates(lat, lon) && (device.type === 'epc' || (device.type === 'mikrotik' && device.deviceType === 'router'));
+      })
+      .map(device => {
+        const lat = device.location?.coordinates?.latitude || device.location?.latitude || 0;
+        const lon = device.location?.coordinates?.longitude || device.location?.longitude || 0;
+        
+        return {
+          id: `tower-${device.id}`,
+          name: `${device.name} Site`,
+          type: 'tower',
+          status: device.status,
+          location: {
+            latitude: lat,
+            longitude: lon,
+            address: device.location?.address || 'Unknown Location'
+          },
+          height: 50,
+          equipment: [device.id]
+        };
+      });
     
-    console.log('[MonitoringMap] Converted devices to equipment:', equipment.length, 'towers:', towers.length);
+    console.log('[MonitoringMap] Converted devices to equipment:', equipment.length, 'towers:', towers.length, '(filtered out devices without valid coordinates)');
   }
   
   function getEquipmentType(device) {
