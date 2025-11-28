@@ -343,13 +343,13 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          site_name: epcEditForm.site_name,
           site_id: epcEditForm.site_id || undefined,
+          site_name: epcEditForm.site_id ? undefined : (epcEditForm.site_name || undefined),
           deployment_type: epcEditForm.deployment_type,
           hss_config: epcEditForm.hss_config,
           snmp_config: epcEditForm.snmp_config,
           device_code: selectedEPCDevice.device_code || epcEditForm.device_code || undefined,
-          status: selectedEPCDevice.device_code || epcEditForm.device_code ? 'registered' : undefined
+          status: (selectedEPCDevice.device_code || epcEditForm.device_code) ? 'registered' : undefined
         })
       });
       
