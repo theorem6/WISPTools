@@ -67,11 +67,15 @@ Write-Host "  → Copying epc-snmp-discovery.sh (fallback)..." -ForegroundColor 
 Invoke-GCECmd "sudo cp $REPO_DIR/backend-services/scripts/epc-snmp-discovery.sh $SCRIPTS_DIR/; sudo chmod 755 $SCRIPTS_DIR/epc-snmp-discovery.sh"
 
 # Copy npm package installer
-Write-Host "  → Copying install-epc-npm-packages.sh..." -ForegroundColor Gray
-Invoke-GCECmd "sudo cp $REPO_DIR/backend-services/scripts/install-epc-npm-packages.sh $SCRIPTS_DIR/; sudo chmod 755 $SCRIPTS_DIR/install-epc-npm-packages.sh"
+        Write-Host "  → Copying install-epc-npm-packages.sh..." -ForegroundColor Gray
+        Invoke-GCECmd "sudo cp $REPO_DIR/backend-services/scripts/install-epc-npm-packages.sh $SCRIPTS_DIR/; sudo chmod 755 $SCRIPTS_DIR/install-epc-npm-packages.sh"
 
-Write-Host ""
-Write-Host "✅ Scripts copied successfully" -ForegroundColor Green
+        # Copy device setup script
+        Write-Host "  → Copying setup-epc-device.sh..." -ForegroundColor Gray
+        Invoke-GCECmd "sudo cp $REPO_DIR/backend-services/scripts/setup-epc-device.sh $SCRIPTS_DIR/; sudo chmod 755 $SCRIPTS_DIR/setup-epc-device.sh"
+
+        Write-Host ""
+        Write-Host "✅ Scripts copied successfully" -ForegroundColor Green
 Write-Host ""
 
 # Step 4: Verify scripts are accessible
@@ -93,11 +97,12 @@ Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "✅ Deployment Complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Scripts are now available at:" -ForegroundColor Cyan
-Write-Host "  • https://hss.wisptools.io/downloads/scripts/epc-checkin-agent.sh" -ForegroundColor White
-Write-Host "  • https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.js" -ForegroundColor White
-Write-Host "  • https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.sh" -ForegroundColor White
-Write-Host "  • https://hss.wisptools.io/downloads/scripts/install-epc-npm-packages.sh" -ForegroundColor White
+        Write-Host "Scripts are now available at:" -ForegroundColor Cyan
+        Write-Host "  • https://hss.wisptools.io/downloads/scripts/epc-checkin-agent.sh" -ForegroundColor White
+        Write-Host "  • https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.js" -ForegroundColor White
+        Write-Host "  • https://hss.wisptools.io/downloads/scripts/epc-snmp-discovery.sh" -ForegroundColor White
+        Write-Host "  • https://hss.wisptools.io/downloads/scripts/install-epc-npm-packages.sh" -ForegroundColor White
+        Write-Host "  • https://hss.wisptools.io/downloads/scripts/setup-epc-device.sh" -ForegroundColor White
 Write-Host ""
 Write-Host "The remote EPC will automatically download the new scripts on next check-in." -ForegroundColor Yellow
 Write-Host ""
