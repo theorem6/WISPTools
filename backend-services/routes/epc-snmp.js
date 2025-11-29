@@ -65,7 +65,8 @@ router.post('/discovered', async (req, res, next) => {
     for (const device of discovered_devices) {
       try {
         const { ip_address, sysDescr, sysObjectID, sysName, device_type, community, 
-                oid_walk, interfaces, arp_table, routes, ip_addresses, neighbors } = device;
+                oid_walk, interfaces, arp_table, routes, ip_addresses, neighbors,
+                manufacturer_from_oui, oui_detection } = device;
         
         if (!ip_address) {
           console.warn('[SNMP Discovery] Skipping device without IP address');
@@ -112,6 +113,26 @@ router.post('/discovered', async (req, res, next) => {
               console.log(`[SNMP Discovery] Detected Mikrotik device ${ip_address} via OUI lookup from interface MAC: ${mac}`);
               break;
             }
+          }
+        }
+        
+        // Detect manufacturer via OUI lookup from ARP table
+        let manufacturerFromOUI = null;
+        if (ouiLookup && arp_table && Array.isArray(arp_table)) {
+          const manufacturersFromARP = ouiLookup.detectManufacturersFromArpTable(arp_table);
+          if (manufacturersFromARP && manufacturersFromARP.length > 0) {
+            // Use the most common manufacturer or the first one found
+            manufacturerFromOUI = manufacturersFromARP[0].manufacturer;
+            console.log(`[SNMP Discovery] Detected manufacturer ${manufacturerFromOUI} for device ${ip_address} via OUI lookup from ARP table`);
+          }
+        }
+        
+        // Also check interfaces for manufacturer detection
+        if (!manufacturerFromOUI && ouiLookup && interfaces && Array.isArray(interfaces)) {
+          const manufacturerInfo = ouiLookup.detectManufacturerFromInterfaces(interfaces);
+          if (manufacturerInfo && manufacturerInfo.manufacturer) {
+            manufacturerFromOUI = manufacturerInfo.manufacturer;
+            console.log(`[SNMP Discovery] Detected manufacturer ${manufacturerFromOUI} for device ${ip_address} via OUI lookup from interface MAC`);
           }
         }
         
@@ -167,6 +188,26 @@ router.post('/discovered', async (req, res, next) => {
           device_model = 'Network Device (SNMP not available)';
         }
         
+        // Determine manufacturer - use OUI lookup result if available, otherwise fall back to existing logic
+        let device_manufacturer = 'Generic';
+        // Priority: 1) manufacturer_from_oui from discovery script, 2) manufacturerFromOUI from backend OUI lookup, 3) device_type-based detection
+        if (manufacturer_from_oui) {
+          device_manufacturer = manufacturer_from_oui;
+          console.log(`[SNMP Discovery] Using manufacturer ${device_manufacturer} from discovery script OUI lookup for ${ip_address}`);
+        } else if (manufacturerFromOUI) {
+          device_manufacturer = manufacturerFromOUI;
+        } else if (detected_device_type === 'mikrotik') {
+          device_manufacturer = 'Mikrotik';
+        } else if (detected_device_type === 'cisco' || detected_device_type === 'cisco_router') {
+          device_manufacturer = 'Cisco';
+        } else if (detected_device_type === 'huawei') {
+          device_manufacturer = 'Huawei';
+        } else if (detected_device_type === 'ubiquiti') {
+          device_manufacturer = 'Ubiquiti Networks';
+        } else if (is_ping_only) {
+          device_manufacturer = 'Unknown';
+        }
+        
         // Update or create device record
         const deviceData = {
           tenantId: epc.tenant_id,
@@ -178,11 +219,7 @@ router.post('/discovered', async (req, res, next) => {
                 detected_device_type === 'cisco' ? 'switch' : 
                 detected_device_type === 'huawei' ? 'router' : 
                 (is_ping_only ? 'other' : 'other'),
-          manufacturer: detected_device_type === 'mikrotik' ? 'Mikrotik' :
-                       detected_device_type === 'cisco' || detected_device_type === 'cisco_router' ? 'Cisco' :
-                       detected_device_type === 'huawei' ? 'Huawei' :
-                       detected_device_type === 'ubiquiti' ? 'Ubiquiti' :
-                       (is_ping_only ? 'Unknown' : 'Generic'),
+          manufacturer: device_manufacturer,
           model: device_model,
           serialNumber: device_serial,
           status: 'active',
@@ -205,6 +242,13 @@ router.post('/discovered', async (req, res, next) => {
             discovered_at: new Date().toISOString(),
             discovery_source: device.discovered_via || 'epc_snmp_agent',
             last_discovered: new Date().toISOString(),
+            // Manufacturer detection via OUI (use discovery script result if available, otherwise backend result)
+            manufacturer_detected_via_oui: manufacturer_from_oui || manufacturerFromOUI || null,
+            oui_detection: oui_detection || (manufacturerFromOUI ? {
+              manufacturer: manufacturerFromOUI,
+              detected_at: new Date().toISOString(),
+              source: 'arp_table_or_interfaces'
+            } : null),
             // Include OID walk data
             ...(oid_walk ? {
               oid_walk: {

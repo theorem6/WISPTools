@@ -592,6 +592,38 @@ async function getDeviceInfo(ip, community) {
   // Identify device type based on walk results
   deviceInfo.device_type = identifyDeviceType(deviceInfo, walkData);
   
+  // Detect manufacturer via OUI lookup from ARP table or interfaces
+  if (ouiLookup) {
+    let manufacturerFromOUI = null;
+    
+    // Try ARP table first
+    if (walkData.arp_table && Array.isArray(walkData.arp_table)) {
+      const manufacturersFromARP = ouiLookup.detectManufacturersFromArpTable(walkData.arp_table);
+      if (manufacturersFromARP && manufacturersFromARP.length > 0) {
+        manufacturerFromOUI = manufacturersFromARP[0].manufacturer;
+        log(`  Detected manufacturer ${manufacturerFromOUI} via OUI lookup from ARP table`);
+      }
+    }
+    
+    // Try interfaces if ARP table didn't yield results
+    if (!manufacturerFromOUI && walkData.interfaces && Array.isArray(walkData.interfaces)) {
+      const manufacturerInfo = ouiLookup.detectManufacturerFromInterfaces(walkData.interfaces);
+      if (manufacturerInfo && manufacturerInfo.manufacturer) {
+        manufacturerFromOUI = manufacturerInfo.manufacturer;
+        log(`  Detected manufacturer ${manufacturerFromOUI} via OUI lookup from interface MAC`);
+      }
+    }
+    
+    if (manufacturerFromOUI) {
+      deviceInfo.manufacturer_from_oui = manufacturerFromOUI;
+      deviceInfo.oui_detection = {
+        manufacturer: manufacturerFromOUI,
+        detected_at: new Date().toISOString(),
+        source: 'arp_table_or_interfaces'
+      };
+    }
+  }
+  
   // Add walk data to device info
   deviceInfo.oid_walk = walkData;
   deviceInfo.interfaces = walkData.interfaces;
