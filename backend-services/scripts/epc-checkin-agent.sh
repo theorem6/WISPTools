@@ -552,7 +552,7 @@ do_checkin() {
             fi
         fi
         
-        # Run SNMP discovery every 15 minutes (separate from regular check-in)
+        # Run SNMP discovery every hour (separate from regular check-in)
         # Prefer Node.js version, fallback to bash script
         local last_discovery_file="/tmp/last-snmp-discovery"
         local should_discover=true
@@ -560,7 +560,7 @@ do_checkin() {
             local last_discovery=$(cat "$last_discovery_file" 2>/dev/null || echo "0")
             local now=$(date +%s)
             local elapsed=$((now - last_discovery))
-            if [ $elapsed -lt 900 ]; then
+            if [ $elapsed -lt 3600 ]; then
                 should_discover=false
             fi
         fi
