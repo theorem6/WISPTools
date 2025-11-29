@@ -42,7 +42,7 @@
       
       // Load discovered devices and deployments in parallel
       const [devicesResponse, deploymentsResponse] = await Promise.all([
-        fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {
+        fetch(`${API_CONFIG.PATHS.MONITORING}/snmp/discovered`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-Tenant-ID': tenantId
@@ -109,7 +109,7 @@
       // Update device in backend
       const deviceId = device.id || device._id;
       if (deviceId) {
-        await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/devices/${deviceId}/graphs`, {
+        await fetch(`${API_CONFIG.PATHS.MONITORING}/snmp/devices/${deviceId}/graphs`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
