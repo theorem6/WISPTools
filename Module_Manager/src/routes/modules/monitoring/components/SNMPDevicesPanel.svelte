@@ -141,8 +141,8 @@
       // Update device in backend
       const deviceId = device.id || device._id;
       if (deviceId) {
-        const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
-        await fetch(`${backendUrl}/monitoring/snmp/devices/${deviceId}/graphs`, {
+        // Use relative path through Firebase Hosting rewrites
+        await fetch(`/api/monitoring/snmp/devices/${deviceId}/graphs`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -258,8 +258,8 @@
       }
       
       const token = await user.getIdToken();
-      const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
-      const response = await fetch(`${backendUrl}/snmp/discovered/${device.id}/pair`, {
+      // Use relative path through Firebase Hosting rewrites
+      const response = await fetch(`/api/snmp/discovered/${device.id}/pair`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -314,8 +314,8 @@
       }
       
       const token = await user.getIdToken();
-      const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
-      const response = await fetch(`${backendUrl}/snmp/discovered/${device.id}/create-hardware`, {
+      // Use relative path through Firebase Hosting rewrites
+      const response = await fetch(`/api/snmp/discovered/${device.id}/create-hardware`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
