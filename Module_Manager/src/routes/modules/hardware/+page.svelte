@@ -1083,7 +1083,9 @@
                     epcEditForm.snmp_config.community = communities[0]; // Keep first as legacy
                   }
                 }}
-                placeholder="public&#10;private&#10;readonly"
+                placeholder="public
+private
+readonly"
                 rows="4"
               ></textarea>
               <small class="hint">Enter each community string on a new line</small>
@@ -1099,7 +1101,8 @@
                     .filter(s => s.length > 0);
                   epcEditForm.snmp_config.targets = subnets;
                 }}
-                placeholder="192.168.1.0/24&#10;10.0.0.0/8"
+                placeholder="192.168.1.0/24
+10.0.0.0/8"
                 rows="4"
               ></textarea>
               <small class="hint">Enter each subnet in CIDR format (e.g., 192.168.1.0/24) on a new line</small>
