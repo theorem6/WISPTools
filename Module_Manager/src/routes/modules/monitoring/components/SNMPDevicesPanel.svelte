@@ -41,8 +41,10 @@
       const token = await user.getIdToken();
       
       // Load discovered devices and deployments in parallel
+      // Use direct backend URL for monitoring endpoints (hss.wisptools.io:3001)
+      const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
       const [devicesResponse, deploymentsResponse] = await Promise.all([
-        fetch(`${API_CONFIG.PATHS.MONITORING}/snmp/discovered`, {
+        fetch(`${backendUrl}/monitoring/snmp/discovered`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-Tenant-ID': tenantId
@@ -109,7 +111,8 @@
       // Update device in backend
       const deviceId = device.id || device._id;
       if (deviceId) {
-        await fetch(`${API_CONFIG.PATHS.MONITORING}/snmp/devices/${deviceId}/graphs`, {
+        const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
+        await fetch(`${backendUrl}/monitoring/snmp/devices/${deviceId}/graphs`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -197,7 +200,8 @@
       }
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered/${device.id}/pair`, {
+      const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
+      const response = await fetch(`${backendUrl}/snmp/discovered/${device.id}/pair`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -252,7 +256,8 @@
       }
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered/${device.id}/create-hardware`, {
+      const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
+      const response = await fetch(`${backendUrl}/snmp/discovered/${device.id}/create-hardware`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
