@@ -91,9 +91,12 @@ router.post('/discovered', async (req, res, next) => {
         const mikrotik_serial = mikrotik_info.serial_number || null;
         const mikrotik_board = mikrotik_info.board_name || null;
         
+        // Handle ping-only devices (no SNMP)
+        const is_ping_only = device.discovered_via === 'ping_only' || device.snmp_enabled === false;
+        
         // Determine device name and model based on Mikrotik info if available
-        let device_name = sysName || device_type || `SNMP-${ip_address}`;
-        let device_model = sysDescr || 'Unknown';
+        let device_name = sysName || device_type || (is_ping_only ? `Device-${ip_address}` : `SNMP-${ip_address}`);
+        let device_model = sysDescr || (is_ping_only ? 'Generic Network Device' : 'Unknown');
         let device_serial = ip_address;
         
         if (device_type === 'mikrotik') {
@@ -103,6 +106,10 @@ router.post('/discovered', async (req, res, next) => {
           device_model = mikrotik_board || sysDescr || 'Mikrotik RouterOS';
           // Use serial number if available
           device_serial = mikrotik_serial || ip_address;
+        } else if (is_ping_only) {
+          // For ping-only devices, use IP-based naming
+          device_name = `Device-${ip_address}`;
+          device_model = 'Network Device (SNMP not available)';
         }
         
         // Update or create device record
@@ -111,10 +118,12 @@ router.post('/discovered', async (req, res, next) => {
           name: device_name,
           type: device_type === 'mikrotik' ? 'router' : 
                 device_type === 'cisco' ? 'switch' : 
-                device_type === 'huawei' ? 'router' : 'other',
+                device_type === 'huawei' ? 'router' : 
+                (is_ping_only ? 'other' : 'other'),
           manufacturer: device_type === 'mikrotik' ? 'Mikrotik' :
                        device_type === 'cisco' ? 'Cisco' :
-                       device_type === 'huawei' ? 'Huawei' : 'Generic',
+                       device_type === 'huawei' ? 'Huawei' : 
+                       (is_ping_only ? 'Unknown' : 'Generic'),
           model: device_model,
           serialNumber: device_serial,
           status: 'active',

@@ -92,11 +92,36 @@
     'other'
   ];
   
+  // Tenant reactive statements - sync to localStorage and reload on change
+  $: tenantId = $currentTenant?.id || '';
+  
+  // Sync tenantId to localStorage for services that use it
+  $: if (tenantId && browser) {
+    localStorage.setItem('selectedTenantId', tenantId);
+  }
+  
+  // Watch for tenant changes and reload data
+  $: if (browser && tenantId) {
+    console.log('[Hardware] Tenant loaded:', tenantId);
+    if (tenantId) {
+      loadData();
+      loadEPCDevices();
+    }
+  }
+  
   onMount(async () => {
-    await loadData();
+    if (tenantId) {
+      await loadData();
+    }
   });
   
   async function loadData() {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) {
+      console.warn('[Hardware] No tenant ID available, skipping data load');
+      return;
+    }
+    
     isLoading = true;
     error = '';
     
@@ -1102,7 +1127,7 @@ readonly"
                   epcEditForm.snmp_config.targets = subnets;
                 }}
                 placeholder="192.168.1.0/24
-10.0.0.0/8"
+10.0.0.0/24"
                 rows="4"
               ></textarea>
               <small class="hint">Enter each subnet in CIDR format (e.g., 192.168.1.0/24) on a new line</small>

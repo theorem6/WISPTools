@@ -213,17 +213,30 @@ get_device_info() {
     fi
 }
 
-# Scan a single IP address
-scan_single_ip() {
+# Ping a single IP address (quick check if host is alive)
+ping_single_ip() {
+    local test_ip=$1
+    local timeout=1
+    
+    # Skip our own IP
+    local our_ip=$(hostname -I | awk '{print $1}')
+    if [ "$test_ip" = "$our_ip" ]; then
+        return 1  # Skip self
+    fi
+    
+    # Use ping -c 1 -W timeout (Linux)
+    if ping -c 1 -W "$timeout" "$test_ip" >/dev/null 2>&1; then
+        return 0  # Host is alive
+    fi
+    
+    return 1  # Host not responding
+}
+
+# Scan a single IP address for SNMP
+scan_single_ip_snmp() {
     local test_ip=$1
     local communities=$2
     local results_file=$3
-    local our_ip=$(hostname -I | awk '{print $1}')
-    
-    # Skip our own IP
-    if [ "$test_ip" = "$our_ip" ]; then
-        return 0
-    fi
     
     # Try each community string
     for community in $(echo "$communities" | tr ',' ' '); do
@@ -249,61 +262,55 @@ scan_single_ip() {
     return 1
 }
 
-# Scan network for SNMP devices
-scan_network() {
-    local subnet=$1
-    local communities=${2:-"public,private"}
+# Create a generic device entry for ping-only devices (no SNMP)
+create_ping_only_device() {
+    local ip=$1
     
-    log "Starting SNMP discovery scan on subnet: $subnet"
-    
-    # Check if snmpget is available
-    if ! command -v snmpget &> /dev/null; then
-        log "ERROR: snmpget command not found. Install net-snmp package: sudo apt install snmp"
-        echo "[]"
-        return 1
+    if command -v jq &> /dev/null; then
+        jq -n \
+            --arg ip "$ip" \
+            '{
+                ip_address: $ip,
+                sysDescr: "Device responding to ping (SNMP not enabled or not accessible)",
+                sysObjectID: "",
+                sysName: "",
+                sysUpTime: 0,
+                device_type: "generic",
+                community: "",
+                snmp_enabled: false,
+                discovered_via: "ping_only"
+            }'
+    else
+        printf '{"ip_address":"%s","sysDescr":"Device responding to ping (SNMP not enabled or not accessible)","sysObjectID":"","sysName":"","sysUpTime":0,"device_type":"generic","community":"","snmp_enabled":false,"discovered_via":"ping_only"}' \
+            "$(printf '%s' "$ip" | sed 's/\\/\\\\/g; s/"/\\"/g')"
     fi
-    
-    # Extract network and CIDR
-    local network=$(echo "$subnet" | cut -d'/' -f1)
-    local cidr=$(echo "$subnet" | cut -d'/' -f2)
-    
-    # Calculate IP range (simple /24 scan for now)
-    local base_ip=$(echo "$network" | cut -d'.' -f1-3)
-    local results_file=$(mktemp)
+}
+
+# Ping sweep - find all responding IPs (Phase 1)
+ping_sweep() {
+    local subnet=$1
+    local base_ip=$(echo "$subnet" | cut -d'/' -f1 | cut -d'.' -f1-3)
+    local ping_file=$(mktemp)
     local pids=()
-    local max_parallel=20  # Scan 20 IPs in parallel
+    local max_parallel=50  # Ping 50 IPs in parallel (ping is fast)
     local scanned=0
-    local found=0
     local start_time=$(date +%s)
     
-    log "Scanning 254 IPs with up to $max_parallel parallel connections..."
-    log "Using timeout: 2s per IP, communities: $communities"
-    log "Starting scan at $(date)..."
+    log "Step 1: Ping sweep - finding responding hosts on subnet: $subnet"
     
-    # Use jq to build array properly
-    if ! command -v jq &> /dev/null; then
-        log "WARNING: jq not found, JSON may have issues. Installing jq is recommended."
-    fi
-    
-    # Initialize results file
-    touch "$results_file"
-    
-    # Scan IPs with parallel processing
+    # Ping all IPs in parallel
     for i in $(seq 1 254); do
         local test_ip="${base_ip}.${i}"
         scanned=$((scanned + 1))
         
-        # Show progress every 25 IPs or on first IP
-        if [ $scanned -eq 1 ] || [ $((scanned % 25)) -eq 0 ]; then
+        # Show progress every 50 IPs
+        if [ $scanned -eq 1 ] || [ $((scanned % 50)) -eq 0 ]; then
             local elapsed=$(($(date +%s) - start_time))
-            local current_found=0
-            if [ -f "$results_file" ] && [ -s "$results_file" ]; then
-                current_found=$(wc -l < "$results_file" 2>/dev/null | tr -d ' ' || echo "0")
-            fi
-            log "Progress: Scanned $scanned/254 IPs (${elapsed}s elapsed, $current_found device(s) found so far)..."
+            local current_found=$(wc -l < "$ping_file" 2>/dev/null | tr -d ' ' || echo "0")
+            log "  Ping progress: $scanned/254 IPs (${elapsed}s, $current_found host(s) responding)..."
         fi
         
-        # Wait for available slot if we have too many parallel scans
+        # Wait for available slot if we have too many parallel pings
         while [ ${#pids[@]} -ge $max_parallel ]; do
             for pid_idx in "${!pids[@]}"; do
                 if ! kill -0 "${pids[$pid_idx]}" 2>/dev/null; then
@@ -313,56 +320,145 @@ scan_network() {
             done
             # Rebuild array without gaps
             pids=("${pids[@]}")
-            sleep 0.1
+            sleep 0.05
         done
         
-        # Start scan in background
-        scan_single_ip "$test_ip" "$communities" "$results_file" &
+        # Ping in background
+        (ping_single_ip "$test_ip" && echo "$test_ip" >> "$ping_file") &
         pids+=($!)
-        
-        # Check device count periodically to see if we've hit the limit
-        if [ -f "$results_file" ]; then
-            local current_count=$(wc -l < "$results_file" 2>/dev/null || echo "0")
-            if [ "$current_count" -ge 50 ]; then
-                log "Reached discovery limit (50 devices), stopping scan"
-                # Kill remaining background jobs
-                for pid in "${pids[@]}"; do
-                    kill "$pid" 2>/dev/null || true
-                done
-                break
-            fi
-        fi
     done
     
-    # Wait for all remaining background jobs
-    log "Waiting for all scans to complete..."
+    # Wait for all pings to complete
     for pid in "${pids[@]}"; do
         wait "$pid" 2>/dev/null
     done
     
-    # Collect results
-    local devices_array="[]"
-    local count=0
+    # Read responding IPs
+    local responding_ips=()
+    if [ -s "$ping_file" ]; then
+        while IFS= read -r ip; do
+            if [ -n "$ip" ]; then
+                responding_ips+=("$ip")
+            fi
+        done < "$ping_file"
+    fi
     
-    if [ -s "$results_file" ]; then
-        if command -v jq &> /dev/null; then
-            # Read all results and build JSON array
-            devices_array="["
-            local first=true
-            while IFS= read -r device_json; do
-                if [ -n "$device_json" ] && echo "$device_json" | jq empty 2>/dev/null; then
-                    if [ "$first" = true ]; then
-                        first=false
-                    else
-                        devices_array="${devices_array},"
-                    fi
-                    devices_array="${devices_array}${device_json}"
-                    count=$((count + 1))
+    rm -f "$ping_file"
+    
+    local elapsed=$(($(date +%s) - start_time))
+    log "  Ping sweep complete: Found ${#responding_ips[@]} responding hosts in ${elapsed} seconds"
+    
+    # Return array of IPs (space-separated string for bash array)
+    echo "${responding_ips[*]}"
+}
+
+# Scan network for SNMP devices (two-phase: ping first, then SNMP)
+scan_network() {
+    local subnet=$1
+    local communities=${2:-"public,private"}
+    
+    log "Starting two-phase network discovery on subnet: $subnet"
+    
+    # Phase 1: Ping sweep to find responding hosts
+    local responding_ips_str=$(ping_sweep "$subnet")
+    local responding_ips=($responding_ips_str)
+    
+    if [ ${#responding_ips[@]} -eq 0 ]; then
+        log "No responding hosts found on subnet $subnet"
+        echo "[]"
+        return 0
+    fi
+    
+    log "Step 2: SNMP discovery - checking ${#responding_ips[@]} responding hosts for SNMP..."
+    
+    # Check if snmpget is available
+    local snmp_available=true
+    if ! command -v snmpget &> /dev/null; then
+        log "WARNING: snmpget not found. Will only report ping-responding devices."
+        snmp_available=false
+    fi
+    
+    if [ "$snmp_available" = false ]; then
+        # Still create devices for ping-only hosts
+        local ping_only_devices="["
+        local first=true
+        for ip in "${responding_ips[@]}"; do
+            if [ "$first" = true ]; then
+                first=false
+            else
+                ping_only_devices="${ping_only_devices},"
+            fi
+            ping_only_devices="${ping_only_devices}$(create_ping_only_device "$ip")"
+        done
+        ping_only_devices="${ping_only_devices}]"
+        echo "$ping_only_devices"
+        return 0
+    fi
+    
+    # Phase 2: SNMP scan on responding hosts
+    local snmp_results_file=$(mktemp)
+    local ping_only_file=$(mktemp)
+    local pids=()
+    local max_parallel=20  # SNMP queries in parallel
+    local scanned=0
+    local start_time=$(date +%s)
+    
+    # Scan responding IPs for SNMP
+    for test_ip in "${responding_ips[@]}"; do
+        scanned=$((scanned + 1))
+        
+        # Show progress
+        if [ $scanned -eq 1 ] || [ $((scanned % 10)) -eq 0 ]; then
+            local elapsed=$(($(date +%s) - start_time))
+            local current_snmp=$(wc -l < "$snmp_results_file" 2>/dev/null | tr -d ' ' || echo "0")
+            log "  SNMP progress: $scanned/${#responding_ips[@]} hosts (${elapsed}s, $current_snmp SNMP device(s) found)..."
+        fi
+        
+        # Wait for available slot
+        while [ ${#pids[@]} -ge $max_parallel ]; do
+            for pid_idx in "${!pids[@]}"; do
+                if ! kill -0 "${pids[$pid_idx]}" 2>/dev/null; then
+                    wait "${pids[$pid_idx]}" 2>/dev/null
+                    unset pids[$pid_idx]
                 fi
-            done < "$results_file"
-            devices_array="${devices_array}]"
+            done
+            pids=("${pids[@]}")
+            sleep 0.1
+        done
+        
+        # Scan SNMP in background
+        (
+            if scan_single_ip_snmp "$test_ip" "$communities" "$snmp_results_file"; then
+                :  # SNMP device found, already written to results
+            else
+                # No SNMP, but host responded to ping - add as ping-only device
+                echo "$test_ip" >> "$ping_only_file"
+            fi
+        ) &
+        pids+=($!)
+    done
+    
+    # Wait for all SNMP scans to complete
+    log "  Waiting for SNMP scans to complete..."
+    for pid in "${pids[@]}"; do
+        wait "$pid" 2>/dev/null
+    done
+    
+    # Build final device array
+    local devices_array="[]"
+    local snmp_count=0
+    local ping_only_count=0
+    
+    # Get SNMP devices
+    if [ -s "$snmp_results_file" ]; then
+        if command -v jq &> /dev/null; then
+            local snmp_devices=$(jq -s '.' < "$snmp_results_file" 2>/dev/null || echo "[]")
+            snmp_count=$(echo "$snmp_devices" | jq -r 'length // 0' 2>/dev/null || echo "0")
+            
+            # Start with SNMP devices
+            devices_array="$snmp_devices"
         else
-            # Fallback: manual array building
+            # Fallback
             devices_array="["
             local first=true
             while IFS= read -r device_json; do
@@ -373,29 +469,51 @@ scan_network() {
                         devices_array="${devices_array},"
                     fi
                     devices_array="${devices_array}${device_json}"
-                    count=$((count + 1))
+                    snmp_count=$((snmp_count + 1))
                 fi
-            done < "$results_file"
+            done < "$snmp_results_file"
             devices_array="${devices_array}]"
         fi
     fi
     
-    # Clean up
-    rm -f "$results_file"
-    
-    local elapsed=$(($(date +%s) - start_time))
-    log "Discovery complete. Found $count SNMP devices in ${elapsed} seconds"
-    
-    if [ "$count" -eq 0 ]; then
-        log "No SNMP devices found. This is normal if no SNMP-enabled devices are on the network."
-        devices_array="[]"
+    # Add ping-only devices (no SNMP)
+    if [ -s "$ping_only_file" ]; then
+        while IFS= read -r ping_ip; do
+            if [ -n "$ping_ip" ]; then
+                ping_only_count=$((ping_only_count + 1))
+                local ping_device=$(create_ping_only_device "$ping_ip")
+                
+                if command -v jq &> /dev/null; then
+                    # Merge ping device into array
+                    devices_array=$(echo "$devices_array" | jq ". + [$ping_device]" 2>/dev/null || echo "$devices_array")
+                else
+                    # Manual merge
+                    devices_array=$(echo "$devices_array" | sed 's/\]$//')
+                    if [ "$devices_array" != "[]" ]; then
+                        devices_array="${devices_array},"
+                    else
+                        devices_array="["
+                    fi
+                    devices_array="${devices_array}${ping_device}]"
+                fi
+            fi
+        done < "$ping_only_file"
     fi
     
-    # Final validation of JSON
+    # Clean up
+    rm -f "$snmp_results_file" "$ping_only_file"
+    
+    local elapsed=$(($(date +%s) - start_time))
+    local total_count=$((snmp_count + ping_only_count))
+    log "Discovery complete: $total_count total devices (${snmp_count} SNMP-enabled, ${ping_only_count} ping-only) in ${elapsed} seconds"
+    
+    # Final validation
     if command -v jq &> /dev/null; then
         if ! echo "$devices_array" | jq empty 2>/dev/null; then
             log "ERROR: Generated invalid JSON array, returning empty array"
             devices_array="[]"
+        else
+            total_count=$(echo "$devices_array" | jq -r 'length // 0' 2>/dev/null || echo "0")
         fi
     fi
     
