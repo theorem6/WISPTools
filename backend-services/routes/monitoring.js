@@ -320,6 +320,75 @@ router.get('/snmp/devices', async (req, res) => {
 });
 
 // GET /api/snmp/metrics/latest - Get latest SNMP metrics for all devices
+// GET /api/monitoring/snmp/discovered - Get discovered SNMP devices (proxies to SNMP route)
+router.get('/snmp/discovered', async (req, res) => {
+  try {
+    const { NetworkEquipment } = require('../models/network');
+    
+    if (!req.tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+
+    // Get all network equipment that was discovered via SNMP
+    const devices = await NetworkEquipment.find({
+      tenantId: req.tenantId,
+      'notes.discovery_source': 'epc_snmp_agent'
+    }).lean();
+
+    // Parse notes and format for frontend
+    const formattedDevices = devices.map(device => {
+      let notes = {};
+      if (typeof device.notes === 'string') {
+        try {
+          notes = JSON.parse(device.notes);
+        } catch (e) {
+          notes = {};
+        }
+      } else if (typeof device.notes === 'object') {
+        notes = device.notes;
+      }
+
+      // Check if device is deployed (has a siteId)
+      const isDeployed = !!device.siteId;
+      
+      // Get enable_graphs from notes
+      const enableGraphs = notes.enable_graphs !== false; // Default to true
+
+      return {
+        id: device._id.toString(),
+        name: device.name || notes.sysName || device.manufacturer || 'Unknown Device',
+        ipAddress: notes.management_ip || device.manufacturer || 'Unknown',
+        deviceType: notes.device_type || device.type || 'other',
+        manufacturer: device.manufacturer || notes.mikrotik?.identity || 'Unknown',
+        model: device.model || notes.mikrotik?.board_name || 'Unknown',
+        serialNumber: device.serialNumber || notes.mikrotik?.serial_number || null,
+        status: device.status || 'active',
+        discoveredAt: notes.discovered_at || notes.last_discovered || device.createdAt,
+        snmp: {
+          community: notes.snmp_community || 'public',
+          version: notes.snmp_version || 'v2c'
+        },
+        isDeployed,
+        enableGraphs,
+        // Include OID walk data if available
+        oidWalk: notes.oid_walk || null,
+        interfaces: notes.oid_walk?.interfaces || null,
+        arpTable: notes.oid_walk?.arp_table || null,
+        routes: notes.oid_walk?.routes || null
+      };
+    });
+
+    res.json({ devices: formattedDevices });
+  } catch (error) {
+    console.error('❌ [Monitoring API] Error fetching discovered devices:', error);
+    res.status(500).json({
+      error: 'Failed to fetch discovered devices',
+      message: error.message,
+      devices: []
+    });
+  }
+});
+
 router.get('/snmp/metrics/latest', async (req, res) => {
   try {
     console.log(`🔍 Fetching latest SNMP metrics for tenant: ${req.tenantId}`);
