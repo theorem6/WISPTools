@@ -476,20 +476,50 @@ do_checkin() {
     local versions_json=$(get_versions)
     
     # Collect recent logs (last 50 lines from check-in log, max 5000 chars)
-    local recent_logs=""
-    if [ -f "$LOG_FILE" ]; then
-        recent_logs=$(tail -n 50 "$LOG_FILE" 2>/dev/null | head -c 5000 | sed 's/"/\\"/g' | tr '\n' '|' || echo "")
-    fi
-    
-    # Build logs JSON
+    # Use jq to properly escape and build JSON
     local logs_json="[]"
-    if [ -n "$recent_logs" ]; then
-        # Create array of log entries (simple format for now)
-        logs_json="[{\"source\":\"checkin-agent\",\"level\":\"info\",\"message\":\"$recent_logs\"}]"
+    if [ -f "$LOG_FILE" ] && command -v jq >/dev/null 2>&1; then
+        local recent_logs=$(tail -n 50 "$LOG_FILE" 2>/dev/null | head -c 5000 || echo "")
+        if [ -n "$recent_logs" ]; then
+            logs_json=$(echo "$recent_logs" | jq -Rs '[split("\n") | map(select(length > 0)) | .[] | {
+                "source": "checkin-agent",
+                "level": "info",
+                "message": .
+            }]' 2>/dev/null || echo "[]")
+        fi
     fi
     
-    # Build check-in payload - include logs
-    local payload="{\"device_code\":\"$device_code\",\"hardware_id\":\"$hardware_id\",\"ip_address\":\"$ip_address\",\"services\":$services_json,\"system\":$system_json,\"network\":$network_json,\"versions\":$versions_json,\"logs\":$logs_json}"
+    # Build check-in payload using jq to ensure proper JSON escaping
+    local payload
+    if command -v jq >/dev/null 2>&1; then
+        payload=$(jq -n \
+            --arg device_code "$device_code" \
+            --arg hardware_id "$hardware_id" \
+            --arg ip_address "$ip_address" \
+            --argjson services "$services_json" \
+            --argjson system "$system_json" \
+            --argjson network "$network_json" \
+            --argjson versions "$versions_json" \
+            --argjson logs "$logs_json" \
+            '{
+                device_code: $device_code,
+                hardware_id: $hardware_id,
+                ip_address: $ip_address,
+                services: $services,
+                system: $system,
+                network: $network,
+                versions: $versions,
+                logs: $logs
+            }' 2>/dev/null)
+        
+        # Fallback to manual construction if jq fails
+        if [ -z "$payload" ] || [ "$payload" = "null" ]; then
+            payload="{\"device_code\":\"$device_code\",\"hardware_id\":\"$hardware_id\",\"ip_address\":\"$ip_address\",\"services\":$services_json,\"system\":$system_json,\"network\":$network_json,\"versions\":$versions_json,\"logs\":$logs_json}"
+        fi
+    else
+        # Manual construction without logs if jq not available
+        payload="{\"device_code\":\"$device_code\",\"hardware_id\":\"$hardware_id\",\"ip_address\":\"$ip_address\",\"services\":$services_json,\"system\":$system_json,\"network\":$network_json,\"versions\":$versions_json,\"logs\":[]}"
+    fi
     
     # Send check-in
     local response=$(curl -s -X POST "${API_URL}/checkin" \
