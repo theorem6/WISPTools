@@ -60,15 +60,27 @@ async function getCurrentManifest() {
 
 /**
  * Compare agent script versions and determine which need updates
+ * @param {Object} currentVersions - Current versions from agent (may be nested in .scripts or flat)
+ * @param {Object} serverVersions - Server manifest with scripts
  */
 function compareVersions(currentVersions, serverVersions) {
   const updatesNeeded = [];
   
+  // Normalize currentVersions - it might be the scripts object directly or nested
+  const currentScripts = currentVersions?.scripts || currentVersions || {};
+  
+  console.log(`[Agent Version Manager] Comparing versions:`, {
+    currentScriptsKeys: Object.keys(currentScripts),
+    serverScriptsKeys: Object.keys(serverVersions?.scripts || {})
+  });
+  
   for (const [scriptName, serverInfo] of Object.entries(serverVersions.scripts || {})) {
-    const currentInfo = currentVersions?.scripts?.[scriptName];
+    // Current version from agent (nested in scripts or direct)
+    const currentInfo = currentScripts[scriptName];
     
-    if (!currentInfo) {
-      // Script doesn't exist on agent - add it
+    if (!currentInfo || !currentInfo.hash) {
+      // Script doesn't exist on agent or has no hash - add it
+      console.log(`[Agent Version Manager] Script ${scriptName} needs install (missing on agent)`);
       updatesNeeded.push({
         script: scriptName,
         action: 'install',
@@ -79,6 +91,10 @@ function compareVersions(currentVersions, serverVersions) {
       });
     } else if (currentInfo.hash !== serverInfo.sha256) {
       // Hash mismatch - update needed
+      console.log(`[Agent Version Manager] Script ${scriptName} needs update:`, {
+        current: currentInfo.hash?.substring(0, 16) + '...',
+        server: serverInfo.sha256?.substring(0, 16) + '...'
+      });
       updatesNeeded.push({
         script: scriptName,
         action: 'update',
@@ -88,6 +104,8 @@ function compareVersions(currentVersions, serverVersions) {
         server_hash: serverInfo.sha256,
         info: serverInfo
       });
+    } else {
+      console.log(`[Agent Version Manager] Script ${scriptName} is up to date (hash: ${currentInfo.hash.substring(0, 16)}...)`);
     }
   }
   

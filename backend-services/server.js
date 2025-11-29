@@ -298,19 +298,32 @@ app.post('/api/epc/checkin', async (req, res) => {
       // Check for agent script updates using version manager
       try {
         const agentVersionManager = require('./utils/agent-version-manager');
+        
+        // Log what we received from agent
+        if (versions?.scripts) {
+          console.log(`[EPC Check-in] Checking for updates. Agent reported ${Object.keys(versions.scripts).length} script(s):`, 
+            Object.keys(versions.scripts).join(', '));
+        }
+        
         const queuedCommands = await agentVersionManager.checkAndQueueUpdates(
           epc.epc_id,
           epc.tenant_id,
-          versions.scripts
+          versions?.scripts || versions?.scripts || {} // Handle both nested and flat structures
         );
         
         if (queuedCommands.length > 0) {
-          console.log(`[EPC Check-in] Queued ${queuedCommands.length} update command(s) for ${epc.epc_id}`);
+          console.log(`[EPC Check-in] ✓ Queued ${queuedCommands.length} update command(s) for ${epc.epc_id}:`, 
+            queuedCommands.map(c => c.notes).join(', '));
+        } else {
+          console.log(`[EPC Check-in] No updates needed for ${epc.epc_id}`);
         }
       } catch (updateError) {
-        console.warn(`[EPC Check-in] Error checking for script updates:`, updateError.message);
+        console.error(`[EPC Check-in] Error checking for script updates:`, updateError.message);
+        console.error(`[EPC Check-in] Update error stack:`, updateError.stack);
         // Don't fail check-in if update check fails
       }
+    } else {
+      console.log(`[EPC Check-in] No versions object provided - skipping update check`);
     }
     
     const commands = await EPCCommand.find({
