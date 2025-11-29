@@ -531,7 +531,8 @@
 <style>
   .snmp-devices-panel {
     padding: 2rem;
-    background: white;
+    background: var(--card-bg, var(--bg-primary, #ffffff));
+    color: var(--text-primary, #111827);
     min-height: 100vh;
   }
   
@@ -551,7 +552,7 @@
     overflow-x: auto;
     border: 1px solid var(--border-color, #e5e7eb);
     border-radius: 8px;
-    background: white;
+    background: var(--card-bg, var(--bg-primary, #ffffff));
   }
   
   .devices-table {
@@ -712,7 +713,7 @@
   
   .btn-primary {
     background: var(--primary, #3b82f6);
-    color: white;
+    color: var(--text-inverse, #ffffff);
   }
   
   .btn-primary:hover {
@@ -753,7 +754,8 @@
   }
   
   .modal-content {
-    background: white;
+    background: var(--card-bg, var(--bg-primary, #ffffff));
+    color: var(--text-primary, #111827);
     border-radius: 8px;
     padding: 2rem;
     max-width: 500px;
@@ -764,6 +766,11 @@
   
   .modal-content h3 {
     margin-top: 0;
+    color: var(--text-primary, #111827);
+  }
+  
+  .modal-content p {
+    color: var(--text-secondary, #6b7280);
   }
   
   .hardware-list {
