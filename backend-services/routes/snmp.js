@@ -728,14 +728,6 @@ router.put('/devices/:id/graphs', async (req, res) => {
       message: error.message 
     });
   }
-  } catch (error) {
-    console.error('❌ [SNMP API] Error fetching discovered devices:', error);
-    res.status(500).json({
-      error: 'Failed to fetch discovered devices',
-      message: error.message,
-      devices: []
-    });
-  }
 });
 
 // POST /api/snmp/discovered/:deviceId/pair - Pair discovered device with existing hardware
