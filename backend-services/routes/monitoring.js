@@ -330,9 +330,13 @@ router.get('/snmp/discovered', async (req, res) => {
     }
 
     // Get all network equipment that was discovered via SNMP
+    // Notes are stored as JSON strings, so we search for the discovery_source string
     const devices = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      'notes.discovery_source': 'epc_snmp_agent'
+      $or: [
+        { 'notes.discovery_source': 'epc_snmp_agent' }, // If notes is an object (future-proofing)
+        { notes: { $regex: 'epc_snmp_agent', $options: 'i' } } // If notes is a JSON string (current format)
+      ]
     }).lean();
 
     // Parse notes and format for frontend
@@ -354,14 +358,28 @@ router.get('/snmp/discovered', async (req, res) => {
       // Get enable_graphs from notes
       const enableGraphs = notes.enable_graphs !== false; // Default to true
 
+      // Extract IP address from various possible fields
+      // serialNumber often contains the IP address as fallback
+      let ipAddress = notes.management_ip;
+      if (!ipAddress && device.serialNumber) {
+        // Check if serialNumber looks like an IP address
+        if (typeof device.serialNumber === 'string' && /^\d+\.\d+\.\d+\.\d+$/.test(device.serialNumber)) {
+          ipAddress = device.serialNumber;
+        }
+      }
+      if (!ipAddress) {
+        ipAddress = 'Unknown';
+      }
+      
       return {
         id: device._id.toString(),
-        name: device.name || notes.sysName || device.manufacturer || 'Unknown Device',
-        ipAddress: notes.management_ip || device.manufacturer || 'Unknown',
+        name: device.name || notes.sysName || notes.sysDescr || ipAddress || 'Unknown Device',
+        ipAddress: ipAddress,
+        ip_address: ipAddress, // Also include snake_case for compatibility
         deviceType: notes.device_type || device.type || 'other',
         manufacturer: device.manufacturer || notes.mikrotik?.identity || 'Unknown',
-        model: device.model || notes.mikrotik?.board_name || 'Unknown',
-        serialNumber: device.serialNumber || notes.mikrotik?.serial_number || null,
+        model: device.model || notes.mikrotik?.board_name || notes.sysDescr || 'Unknown',
+        serialNumber: device.serialNumber || notes.mikrotik?.serial_number || ipAddress,
         status: device.status || 'active',
         discoveredAt: notes.discovered_at || notes.last_discovered || device.createdAt,
         snmp: {
@@ -374,7 +392,11 @@ router.get('/snmp/discovered', async (req, res) => {
         oidWalk: notes.oid_walk || null,
         interfaces: notes.oid_walk?.interfaces || null,
         arpTable: notes.oid_walk?.arp_table || null,
-        routes: notes.oid_walk?.routes || null
+        routes: notes.oid_walk?.routes || null,
+        // Include raw notes fields for debugging
+        sysName: notes.sysName || null,
+        sysDescr: notes.sysDescr || null,
+        management_ip: notes.management_ip || null
       };
     });
 

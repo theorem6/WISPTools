@@ -87,10 +87,75 @@ export class MonitoringService {
   async get<T = any>(endpoint: string): Promise<{ success: boolean; data?: T; error?: string }> {
     try {
       const response = await this.makeRequest(endpoint, { method: 'GET' });
-      const data = await response.json();
+      
+      // ALWAYS read response as text first to check for HTML content
+      // This prevents JSON parsing errors when Firebase routing returns HTML (404 pages)
+      let responseText: string;
+      try {
+        responseText = await response.text();
+      } catch (textError: any) {
+        console.error(`Monitoring API GET ${endpoint} failed to read response:`, textError);
+        return {
+          success: false,
+          error: `Failed to read response: ${textError.message}. Status: ${response.status}`
+        };
+      }
+      
+      // Check if response is HTML (common when endpoint doesn't exist or routing fails)
+      const trimmedText = responseText.trim().toLowerCase();
+      const isHtml = trimmedText.startsWith('<!doctype') || trimmedText.startsWith('<html');
+      
+      if (isHtml) {
+        console.error(`Monitoring API GET ${endpoint} received HTML instead of JSON:`, {
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+          preview: responseText.substring(0, 300)
+        });
+        return {
+          success: false,
+          error: `Received HTML instead of JSON (likely 404 or routing issue). Status: ${response.status}. Endpoint: ${endpoint}. This usually means the endpoint doesn't exist or isn't routed correctly through Firebase Hosting.`
+        };
+      }
+      
+      // Check response status
+      if (!response.ok && response.status >= 400) {
+        // Try to parse as JSON for error response
+        try {
+          const errorData = JSON.parse(responseText);
+          return { 
+            success: false, 
+            error: errorData.error || `Request failed: ${response.status}` 
+          };
+        } catch {
+          // Not valid JSON, return error with text preview
+          return { 
+            success: false, 
+            error: `Request failed: ${response.status}. Response: ${responseText.substring(0, 200)}` 
+          };
+        }
+      }
+
+      // Parse the text as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonError: any) {
+        console.error(`Monitoring API GET ${endpoint} JSON parse failed:`, {
+          error: jsonError.message,
+          status: response.status,
+          contentType: response.headers.get('content-type'),
+          preview: responseText.substring(0, 200)
+        });
+        
+        return {
+          success: false,
+          error: `Failed to parse JSON response: ${jsonError.message}. Status: ${response.status}. Preview: ${responseText.substring(0, 100)}`
+        };
+      }
 
       if (!response.ok) {
-        return { success: false, error: data.error || 'Request failed' };
+        return { success: false, error: data.error || `Request failed: ${response.status}` };
       }
 
       return { success: true, data };

@@ -55,17 +55,33 @@
       
       if (discoveredResult.success && discoveredResult.data?.devices) {
         discoveredDevices = (discoveredResult.data.devices || []).map(device => {
-          // Ensure device has proper structure
+          // Ensure device has proper structure with normalized IP address
+          const ipAddress = device.ipAddress || device.ip_address || device.management_ip || device.serialNumber || 'Unknown';
           return {
             ...device,
+            ipAddress: ipAddress,
+            ip_address: ipAddress, // Also include snake_case for compatibility
+            name: device.name || device.sysName || ipAddress || 'Unknown Device',
             isDeployed: device.isDeployed === true || !!device.siteId
           };
         });
         
+        console.log('[SNMP Devices] Normalized devices:', discoveredDevices.length, 'devices with IP addresses');
+        
         // Load deployment info if available
         if (deploymentsResponse.ok) {
-          const deploymentsData = await deploymentsResponse.json();
-          deployments = deploymentsData.deployments || deploymentsData || [];
+          try {
+            const text = await deploymentsResponse.text();
+            // Check for HTML before parsing
+            if (text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
+              console.warn('[SNMP Devices] Deployments API returned HTML, skipping');
+            } else {
+              const deploymentsData = JSON.parse(text);
+              deployments = deploymentsData.deployments || deploymentsData || [];
+            }
+          } catch (e) {
+            console.warn('[SNMP Devices] Failed to parse deployments response:', e);
+          }
         }
         
         // Mark devices as deployed if they have a siteId or are in deployments
@@ -86,9 +102,11 @@
         
         console.log('[SNMP Devices] Loaded', discoveredDevices.length, 'discovered devices');
       } else {
-        const errorText = await devicesResponse.text();
-        console.error('[SNMP Devices] Failed to load:', devicesResponse.status, errorText);
-        error = `Failed to load: ${devicesResponse.status}`;
+        console.warn('[SNMP Devices] No devices found or request failed:', discoveredResult.error || 'Unknown error');
+        discoveredDevices = [];
+        if (discoveredResult.error) {
+          error = discoveredResult.error;
+        }
       }
     } catch (err: any) {
       console.error('[SNMP Devices] Error loading devices:', err);
@@ -354,7 +372,7 @@
               <td class="device-name">
                 <strong>{device.name || device.sysName || device.ipAddress || 'Unknown'}</strong>
               </td>
-              <td>{device.ipAddress || device.ip_address || 'N/A'}</td>
+              <td>{device.ipAddress || device.ip_address || device.management_ip || device.serialNumber || 'N/A'}</td>
               <td><span class="device-type-badge">{device.deviceType || device.type || device.device_type || 'unknown'}</span></td>
               <td>{device.manufacturer || 'Unknown'}</td>
               <td>{device.model || device.sysDescr?.substring(0, 50) || 'Unknown'}</td>
