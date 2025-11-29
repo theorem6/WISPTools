@@ -54,19 +54,29 @@
       ]);
       
       if (discoveredResult.success && discoveredResult.data?.devices) {
+        console.log('[SNMP Devices] Raw API response:', discoveredResult.data.devices.slice(0, 3)); // Log first 3 devices
+        
         discoveredDevices = (discoveredResult.data.devices || []).map(device => {
           // Ensure device has proper structure with normalized IP address
           const ipAddress = device.ipAddress || device.ip_address || device.management_ip || device.serialNumber || 'Unknown';
-          return {
+          const normalizedDevice = {
             ...device,
             ipAddress: ipAddress,
             ip_address: ipAddress, // Also include snake_case for compatibility
             name: device.name || device.sysName || ipAddress || 'Unknown Device',
             isDeployed: device.isDeployed === true || !!device.siteId
           };
+          
+          // Log if IP is missing for debugging
+          if (ipAddress === 'Unknown') {
+            console.warn('[SNMP Devices] Device missing IP address:', device);
+          }
+          
+          return normalizedDevice;
         });
         
-        console.log('[SNMP Devices] Normalized devices:', discoveredDevices.length, 'devices with IP addresses');
+        console.log('[SNMP Devices] Normalized', discoveredDevices.length, 'devices');
+        console.log('[SNMP Devices] Sample normalized device:', discoveredDevices[0]);
         
         // Load deployment info if available
         if (deploymentsResponse.ok) {
