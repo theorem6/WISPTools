@@ -73,12 +73,22 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
   }
 
   if (type === 'snmp') {
-    const config = device.notes ? JSON.parse(device.notes) : {};
+    let notes = {};
+    if (device.notes) {
+      try {
+        notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
+      } catch (e) {
+        notes = {};
+      }
+    }
     return {
       ...baseDevice,
       deviceType: deviceType || device.type,
-      ipAddress: config.management_ip || null,
-      manufacturer: device.manufacturer || 'Generic',
+      ipAddress: notes.management_ip || null,
+      manufacturer: notes.manufacturer_detected_via_oui || 
+                    notes.oui_detection?.manufacturer || 
+                    device.manufacturer || 
+                    'Generic',
       model: device.model || 'Unknown',
       snmpVersion: config.snmp_version || 'v2c',
       community: config.snmp_community || 'public',
@@ -377,7 +387,11 @@ router.get('/snmp/discovered', async (req, res) => {
         ipAddress: ipAddress,
         ip_address: ipAddress, // Also include snake_case for compatibility
         deviceType: notes.device_type || device.type || 'other',
-        manufacturer: device.manufacturer || notes.mikrotik?.identity || 'Unknown',
+        manufacturer: notes.manufacturer_detected_via_oui || 
+                      notes.oui_detection?.manufacturer || 
+                      device.manufacturer || 
+                      notes.mikrotik?.identity || 
+                      'Unknown',
         model: device.model || notes.mikrotik?.board_name || notes.sysDescr || 'Unknown',
         serialNumber: device.serialNumber || notes.mikrotik?.serial_number || ipAddress,
         status: device.status || 'active',

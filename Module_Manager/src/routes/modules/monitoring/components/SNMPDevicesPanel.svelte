@@ -314,6 +314,14 @@
       }
       
       const token = await user.getIdToken();
+      
+      // Look up site name from siteId
+      let siteName = '';
+      if (hardwareForm.siteId) {
+        const selectedSite = sites.find(s => (s._id || s.id) === hardwareForm.siteId);
+        siteName = selectedSite?.name || '';
+      }
+      
       // Use relative path through Firebase Hosting rewrites
       const response = await fetch(`/api/snmp/discovered/${device.id}/create-hardware`, {
         method: 'POST',
@@ -325,7 +333,7 @@
         body: JSON.stringify({
           assetTag: hardwareForm.assetTag,
           category: hardwareForm.category,
-          siteId: hardwareForm.siteId,
+          siteName: siteName || device.discoveredBy || 'Unknown Site',
           location: device.location || {}
         })
       });

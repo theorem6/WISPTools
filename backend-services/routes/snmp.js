@@ -616,7 +616,10 @@ router.get('/discovered', async (req, res) => {
         type: 'snmp',
         deviceType: equipment.type || notes.device_type || 'other',
         status: equipment.status === 'active' ? 'online' : 'offline',
-        manufacturer: equipment.manufacturer || 'Generic',
+        manufacturer: notes.manufacturer_detected_via_oui || 
+                      notes.oui_detection?.manufacturer || 
+                      equipment.manufacturer || 
+                      'Generic',
         model: equipment.model || notes.sysDescr || 'Unknown',
         serialNumber: equipment.serialNumber || notes.management_ip || equipment._id.toString(),
         siteId: equipment.siteId || null,
