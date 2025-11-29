@@ -8,6 +8,14 @@ const express = require('express');
 const router = express.Router();
 const { RemoteEPC } = require('../models/distributed-epc-schema');
 const { NetworkEquipment } = require('../models/network');
+
+// Try to load OUI lookup utility for Mikrotik detection
+let ouiLookup = null;
+try {
+  ouiLookup = require('../utils/oui-lookup');
+} catch (e) {
+  console.warn('[EPC SNMP] OUI lookup utility not available, OUI-based detection disabled');
+}
 const { SNMPMetrics } = require('../models/snmp-metrics-schema');
 
 /**
@@ -64,8 +72,20 @@ router.post('/discovered', async (req, res, next) => {
           continue;
         }
         
+        // Extract CDP/LLDP status flags - check multiple possible locations
+        const cdp_lldp_status = device.cdp_lldp_status || neighbors?.cdp_lldp_status || null;
+        const cdp_enabled = cdp_lldp_status?.cdp_enabled || neighbors?.cdp_enabled || device.cdp_enabled || false;
+        const lldp_enabled = cdp_lldp_status?.lldp_enabled || neighbors?.lldp_enabled || device.lldp_enabled || false;
+        const cdp_failed = cdp_lldp_status?.cdp_failed || neighbors?.cdp_failed || device.cdp_failed || false;
+        const lldp_failed = cdp_lldp_status?.lldp_failed || neighbors?.lldp_failed || device.lldp_failed || false;
+        const cdp_error = cdp_lldp_status?.cdp_error || neighbors?.cdp_error || device.cdp_error || null;
+        const lldp_error = cdp_lldp_status?.lldp_error || neighbors?.lldp_error || device.lldp_error || null;
+        
+        // Get actual neighbors array (could be nested in result object)
+        const neighborsArray = Array.isArray(neighbors) ? neighbors : (neighbors?.neighbors || []);
+        
         // Check if device is Mikrotik from neighbors (CDP/LLDP discovery)
-        const isMikrotikFromNeighbor = neighbors && neighbors.some(n => 
+        const isMikrotikFromNeighbor = neighborsArray && neighborsArray.some(n => 
           n.device_type === 'mikrotik' ||
           (n.system_name && n.system_name.toLowerCase().includes('mikrotik')) ||
           (n.system_description && n.system_description.toLowerCase().includes('mikrotik')) ||
@@ -73,8 +93,30 @@ router.post('/discovered', async (req, res, next) => {
           (n.device_id && n.device_id.toLowerCase().includes('mikrotik'))
         );
         
-        // Override device_type if detected as Mikrotik from neighbors
-        const detected_device_type = isMikrotikFromNeighbor ? 'mikrotik' : device_type;
+        // Check for Mikrotik via OUI lookup from ARP table
+        let isMikrotikFromOUI = false;
+        if (ouiLookup && arp_table && Array.isArray(arp_table)) {
+          const mikrotikFromARP = ouiLookup.detectMikrotikFromArpTable(arp_table);
+          if (mikrotikFromARP && mikrotikFromARP.length > 0) {
+            isMikrotikFromOUI = true;
+            console.log(`[SNMP Discovery] Detected Mikrotik device ${ip_address} via OUI lookup from ARP table`);
+          }
+        }
+        
+        // Also check interfaces for Mikrotik MAC addresses
+        if (!isMikrotikFromOUI && ouiLookup && interfaces && Array.isArray(interfaces)) {
+          for (const iface of interfaces) {
+            const mac = iface.mac_address || iface.phys_address;
+            if (mac && ouiLookup.isMikrotikOUI(mac)) {
+              isMikrotikFromOUI = true;
+              console.log(`[SNMP Discovery] Detected Mikrotik device ${ip_address} via OUI lookup from interface MAC: ${mac}`);
+              break;
+            }
+          }
+        }
+        
+        // Override device_type if detected as Mikrotik from neighbors or OUI
+        const detected_device_type = (isMikrotikFromNeighbor || isMikrotikFromOUI) ? 'mikrotik' : device_type;
         
         // Check if device already exists
         const existingDevice = await NetworkEquipment.findOne({
@@ -180,7 +222,18 @@ router.post('/discovered', async (req, res, next) => {
               }
             }),
             // Include neighbors (CDP/LLDP)
-            ...(neighbors && neighbors.length > 0 ? { neighbors } : {}),
+            ...(neighborsArray && neighborsArray.length > 0 ? { neighbors: neighborsArray } : {}),
+            // Include CDP/LLDP status flags
+            cdp_lldp_status: {
+              cdp_enabled,
+              lldp_enabled,
+              cdp_failed,
+              lldp_failed,
+              cdp_error,
+              lldp_error,
+              cdp_working: cdp_enabled && !cdp_failed,
+              lldp_working: lldp_enabled && !lldp_failed
+            },
             // Include Mikrotik-specific info
             ...(detected_device_type === 'mikrotik' && Object.keys(mikrotik_info).length > 0 ? {
               mikrotik: {
