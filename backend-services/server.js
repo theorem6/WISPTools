@@ -297,12 +297,16 @@ app.post('/api/epc/checkin', async (req, res) => {
     }
     
     // Check for agent script updates (ALWAYS run if versions provided, outside services block to ensure it always runs)
+    console.log(`[EPC Check-in] UPDATE CHECK: versions =`, versions ? JSON.stringify(versions).substring(0, 300) : 'null/undefined');
     if (versions) {
       try {
         const agentVersionManager = require('./utils/agent-version-manager');
         
         // Extract scripts from versions object (could be versions.scripts or versions.scripts.scripts)
         const agentScripts = versions?.scripts || {};
+        
+        console.log(`[EPC Check-in] UPDATE CHECK: Extracted agentScripts =`, JSON.stringify(agentScripts));
+        console.log(`[EPC Check-in] UPDATE CHECK: agentScripts keys =`, Object.keys(agentScripts));
         
         // Log what we received from agent
         if (Object.keys(agentScripts).length > 0) {
@@ -330,6 +334,9 @@ app.post('/api/epc/checkin', async (req, res) => {
         console.error(`[EPC Check-in] Update error stack:`, updateError.stack);
         // Don't fail check-in if update check fails
       }
+    } else {
+      console.log(`[EPC Check-in] No versions object provided in check-in payload - skipping update check`);
+      console.log(`[EPC Check-in] Versions object type:`, typeof versions, `Keys:`, versions ? Object.keys(versions).join(', ') : 'null/undefined');
     }
     
     // Fetch pending commands (includes any update commands just queued)
