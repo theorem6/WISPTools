@@ -3,6 +3,7 @@
   import { auth } from '$lib/firebase';
   import { API_CONFIG } from '$lib/config/api';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { monitoringService } from '$lib/services/monitoringService';
   
   export let tenantId: string = '';
   
@@ -41,15 +42,9 @@
       const token = await user.getIdToken();
       
       // Load discovered devices and deployments in parallel
-      // Use direct backend URL for monitoring endpoints (hss.wisptools.io:3001)
-      const backendUrl = API_CONFIG.BACKEND_SERVICES.DEFAULT || 'https://hss.wisptools.io:3001/api';
-      const [devicesResponse, deploymentsResponse] = await Promise.all([
-        fetch(`${backendUrl}/monitoring/snmp/discovered`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId
-          }
-        }),
+      // Use monitoringService which handles routing through Firebase Hosting
+      const [discoveredResult, deploymentsResponse] = await Promise.all([
+        monitoringService.getDiscoveredDevices().catch(() => ({ success: false, data: { devices: [] } })),
         fetch(`${API_CONFIG.PATHS.COVERAGE_MAP}/deployments`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -58,9 +53,14 @@
         }).catch(() => ({ ok: false })) // Deployment API might not exist, that's ok
       ]);
       
-      if (devicesResponse.ok) {
-        const data = await devicesResponse.json();
-        discoveredDevices = data.devices || [];
+      if (discoveredResult.success && discoveredResult.data?.devices) {
+        discoveredDevices = (discoveredResult.data.devices || []).map(device => {
+          // Ensure device has proper structure
+          return {
+            ...device,
+            isDeployed: device.isDeployed === true || !!device.siteId
+          };
+        });
         
         // Load deployment info if available
         if (deploymentsResponse.ok) {
