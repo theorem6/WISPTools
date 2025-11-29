@@ -1420,25 +1420,74 @@ function createPingOnlyDevice(ip) {
 }
 
 /**
+ * Calculate broadcast address from IP and netmask
+ */
+function calculateBroadcast(ip, netmask) {
+  const ipParts = ip.split('.').map(Number);
+  const maskParts = netmask.split('.').map(Number);
+  
+  const broadcast = ipParts.map((ipPart, i) => {
+    return (ipPart | (~maskParts[i] & 0xFF)) & 0xFF;
+  });
+  
+  return broadcast.join('.');
+}
+
+/**
+ * Get all active network interfaces with IPv4 addresses and their broadcast addresses
+ */
+async function getNetworkInterfaces() {
+  const interfaces = os.networkInterfaces();
+  const activeInterfaces = [];
+  
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    if (!addrs) continue;
+    
+    for (const addr of addrs) {
+      // Only IPv4, not loopback, not internal
+      if (addr.family === 'IPv4' && !addr.internal) {
+        const broadcastAddr = addr.netmask ? calculateBroadcast(addr.address, addr.netmask) : null;
+        activeInterfaces.push({
+          name: name,
+          address: addr.address,
+          netmask: addr.netmask,
+          broadcast: broadcastAddr,
+          mac: addr.mac
+        });
+        break; // Only need one IPv4 address per interface
+      }
+    }
+  }
+  
+  return activeInterfaces;
+}
+
+/**
  * Discover Mikrotik devices via MNDP (Mikrotik Neighbor Discovery Protocol)
  * MNDP is a Layer 2 broadcast protocol that Mikrotik devices use to announce themselves
- * Listens for UDP broadcasts on port 5678
+ * Listens for UDP broadcasts on port 5678 on all network interfaces
  */
 async function discoverMNDP(listenDuration = 5000) {
   log(`Phase 0: MNDP discovery - listening for Mikrotik neighbor broadcasts (${listenDuration/1000}s)...`);
   const startTime = Date.now();
-  const discoveredDevices = new Map(); // Use IP as key to avoid duplicates
+  const discoveredDevices = new Map(); // Use MAC or IP as key to avoid duplicates
+  
+  // Get all network interfaces
+  const interfaces = await getNetworkInterfaces();
+  log(`  MNDP: Found ${interfaces.length} active network interface(s): ${interfaces.map(i => `${i.name} (${i.address})`).join(', ')}`);
+  
+  // If no interfaces found, still try binding to 0.0.0.0 as fallback
+  if (interfaces.length === 0) {
+    log(`  MNDP: No active interfaces found, will bind to 0.0.0.0 as fallback`);
+  }
   
   return new Promise((resolve) => {
-    // Create UDP socket to listen for MNDP broadcasts
-    const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    const sockets = [];
+    let boundSockets = 0;
+    let timerStarted = false;
     
-    socket.on('error', (error) => {
-      log(`WARNING: MNDP socket error: ${error.message}`);
-      resolve({ discoveredIPs: [], neighbors: [] });
-    });
-    
-    socket.on('message', (msg, rinfo) => {
+    // Shared message handler for parsing MNDP packets
+    const handleMessage = (msg, rinfo, interfaceName = 'unknown') => {
       try {
         // MNDP packet format (based on Mikrotik RouterOS MNDP protocol):
         // MNDP uses UDP port 5678 for broadcasts
@@ -1532,40 +1581,135 @@ async function discoverMNDP(listenDuration = 5000) {
           
           // Only add if we got some useful information
           if (deviceInfo.ip_address || deviceInfo.identity || deviceInfo.mac_address) {
-            // Use IP as key, or MAC if available
-            const key = deviceInfo.ip_address || deviceInfo.mac_address || `mndp-${rinfo.address}`;
+            // Use MAC as primary key (most reliable), fallback to IP
+            const key = deviceInfo.mac_address || deviceInfo.ip_address || `mndp-${rinfo.address}`;
             discoveredDevices.set(key, deviceInfo);
             
-            log(`  MNDP: Discovered Mikrotik device ${deviceInfo.ip_address || 'unknown'} (${deviceInfo.identity || 'unknown identity'})`);
+            log(`  MNDP: Discovered Mikrotik device ${deviceInfo.ip_address || 'unknown'} (${deviceInfo.identity || 'unknown identity'}) via interface ${interfaceName}`);
           }
         }
       } catch (parseError) {
         // Ignore parsing errors, continue listening
       }
-    });
+    };
     
-    // Bind to UDP port 5678 (MNDP port) on all interfaces
-    socket.bind(5678, '0.0.0.0', () => {
-      log(`  MNDP: Listening on UDP port 5678 for Mikrotik neighbor broadcasts...`);
+    // Function to close all sockets and resolve
+    const closeAllAndResolve = () => {
+      sockets.forEach(socket => {
+        try {
+          socket.close();
+        } catch (e) {
+          // Ignore errors closing sockets
+        }
+      });
       
-      // Set socket to broadcast mode
-      try {
-        socket.setBroadcast(true);
-      } catch (e) {
-        // May not be supported on all systems
-      }
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      const neighbors = Array.from(discoveredDevices.values());
+      const discoveredIPs = neighbors.map(d => d.ip_address).filter(Boolean);
       
-      // Listen for specified duration
-      setTimeout(() => {
-        socket.close();
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        const neighbors = Array.from(discoveredDevices.values());
-        const discoveredIPs = neighbors.map(d => d.ip_address).filter(Boolean);
+      log(`MNDP discovery complete: Found ${discoveredDevices.size} Mikrotik device(s) in ${elapsed}s`);
+      resolve({ discoveredIPs, neighbors });
+    };
+    
+    // Create main socket bound to 0.0.0.0 (should receive broadcasts from all interfaces)
+    // Also try binding to each interface individually for better Layer 2 reception
+    
+    // Function to start the listening timer
+    function startTimerIfReady() {
+      if (!timerStarted && boundSockets > 0) {
+        timerStarted = true;
+        log(`  MNDP: ${boundSockets} socket(s) bound, listening for ${listenDuration/1000}s...`);
         
-        log(`MNDP discovery complete: Found ${discoveredDevices.size} Mikrotik device(s) in ${elapsed}s`);
-        resolve({ discoveredIPs, neighbors });
-      }, listenDuration);
-    });
+        setTimeout(() => {
+          closeAllAndResolve();
+        }, listenDuration);
+      }
+    }
+    
+    // First, bind to 0.0.0.0 (should receive broadcasts from all interfaces)
+    try {
+      const mainSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+      sockets.push(mainSocket);
+      
+      mainSocket.on('error', (error) => {
+        if (error.code !== 'EADDRINUSE') {
+          log(`WARNING: Main MNDP socket error: ${error.message}`);
+        }
+      });
+      
+      mainSocket.on('message', (msg, rinfo) => {
+        handleMessage(msg, rinfo, 'all-interfaces');
+      });
+      
+      mainSocket.bind(5678, '0.0.0.0', () => {
+        boundSockets++;
+        log(`  MNDP: Main socket bound to 0.0.0.0:5678 (receives broadcasts from all interfaces)...`);
+        
+        try {
+          mainSocket.setBroadcast(true);
+          mainSocket.setRecvBufferSize(65536); // Larger buffer for multiple broadcasts
+          // Try to enable SO_REUSEPORT if available (Linux only, allows multiple binds)
+          if (process.platform === 'linux') {
+            mainSocket.setRecvBufferSize(65536);
+          }
+        } catch (e) {}
+        
+        startTimerIfReady();
+      });
+    } catch (createError) {
+      log(`WARNING: Failed to create main MNDP socket: ${createError.message}`);
+    }
+    
+    // Also try to bind to each interface individually for better Layer 2 reception
+    // This is important because MNDP broadcasts are Layer 2 and may not reach 0.0.0.0 socket
+    for (const iface of interfaces) {
+      if (!iface.address || iface.address === '0.0.0.0') continue;
+      
+      try {
+        const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+        sockets.push(socket);
+        
+        socket.on('error', (error) => {
+          // EADDRINUSE is expected when binding same port - ignore it
+          if (error.code !== 'EADDRINUSE') {
+            // Other errors logged at debug level only
+          }
+        });
+        
+        socket.on('message', (msg, rinfo) => {
+          handleMessage(msg, rinfo, iface.name);
+        });
+        
+        // Try to bind to this interface's IP address
+        // Note: On Linux, we may need SO_REUSEPORT to bind same port multiple times
+        socket.bind(5678, iface.address, () => {
+          boundSockets++;
+          log(`  MNDP: Additional socket bound on ${iface.name} (${iface.address}:5678)...`);
+          startTimerIfReady();
+        });
+        
+      } catch (createError) {
+        // Binding to specific interface may fail - that's ok, main socket should work
+      }
+    }
+    
+    // Fallback: if no sockets bound after 1 second, resolve with empty results
+    setTimeout(() => {
+      if (!timerStarted) {
+        if (boundSockets > 0) {
+          startTimerIfReady();
+        } else {
+          log(`WARNING: No MNDP sockets bound successfully, resolving with empty results`);
+          closeAllAndResolve();
+        }
+      }
+    }, 1000);
+    
+    // If no sockets were created at all, resolve immediately
+    if (sockets.length === 0) {
+      log(`ERROR: No MNDP sockets could be created`);
+      resolve({ discoveredIPs: [], neighbors: [] });
+    }
   });
 }
 
@@ -1699,8 +1843,8 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
   const allDiscoveredNeighbors = [];
   
   // Phase 0: MNDP discovery (Mikrotik-specific, passive listening)
-  // Start MNDP discovery in parallel - it listens for broadcasts independently
-  const mndpDiscoveryPromise = discoverMNDP(3000); // Listen for 3 seconds
+  // Start MNDP discovery in parallel - it listens for broadcasts on all interfaces
+  const mndpDiscoveryPromise = discoverMNDP(10000); // Listen for 10 seconds to catch all broadcasts
   
   // Phase 1: CDP/LLDP discovery - query neighbor tables from gateways/routers
   const { discoveredIPs: cdpLldpIPs, neighbors: cdpLldpNeighbors } = await discoverCDPLLDP(subnet);
