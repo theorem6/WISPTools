@@ -291,7 +291,7 @@
   
   let hardwareForm = {
     assetTag: '',
-    category: 'Network Equipment',
+    category: 'Networking Equipment',
     siteId: ''
   };
   
@@ -362,7 +362,7 @@
   function resetHardwareForm() {
     hardwareForm = {
       assetTag: '',
-      category: 'Network Equipment',
+      category: 'Networking Equipment',
       siteId: ''
     };
   }
@@ -532,7 +532,7 @@
         <div class="form-group">
           <label for="category">Category:</label>
           <select id="category" bind:value={hardwareForm.category}>
-            <option value="Network Equipment">Network Equipment</option>
+            <option value="Networking Equipment">Networking Equipment</option>
             <option value="Radio Equipment">Radio Equipment</option>
             <option value="Antennas">Antennas</option>
             <option value="Power Systems">Power Systems</option>
