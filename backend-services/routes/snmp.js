@@ -575,6 +575,13 @@ router.get('/discovered', async (req, res) => {
     
     console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
     
+    // Get deployments to check deployment status
+    const { HardwareDeployment } = require('../models/network');
+    const deployments = await HardwareDeployment.find({
+      tenantId: req.tenantId,
+      status: 'deployed'
+    }).lean();
+    
     const devices = [];
     
     discoveredEquipment.forEach(equipment => {
@@ -594,6 +601,15 @@ router.get('/discovered', async (req, res) => {
         return;
       }
       
+      // Check if device is deployed (has siteId or matches a deployment)
+      const isDeployed = equipment.siteId || deployments.some(d => {
+        const deviceIP = notes.management_ip || equipment.serialNumber;
+        return (d.config?.management_ip === deviceIP || d.name === equipment.name);
+      });
+      
+      // Get enable_graphs flag from notes (default true for deployed devices)
+      const enableGraphs = isDeployed && (notes.enable_graphs !== false);
+      
       const device = {
         id: equipment._id.toString(),
         name: equipment.name || notes.sysName || notes.management_ip || 'Unknown Device',
@@ -603,6 +619,9 @@ router.get('/discovered', async (req, res) => {
         manufacturer: equipment.manufacturer || 'Generic',
         model: equipment.model || notes.sysDescr || 'Unknown',
         serialNumber: equipment.serialNumber || notes.management_ip || equipment._id.toString(),
+        siteId: equipment.siteId || null,
+        isDeployed: !!isDeployed,
+        enableGraphs: enableGraphs,
         location: {
           coordinates: {
             latitude: equipment.location?.latitude || equipment.location?.coordinates?.latitude || 0,
@@ -622,6 +641,11 @@ router.get('/discovered', async (req, res) => {
         lastSeen: notes.last_discovered || equipment.updatedAt || new Date().toISOString(),
         sysDescr: notes.sysDescr || notes.sysName || null,
         sysObjectID: notes.sysObjectID || null,
+        // Include OID walk data for graphing
+        oidWalk: notes.oid_walk || null,
+        interfaces: notes.oid_walk?.interfaces || null,
+        arpTable: notes.oid_walk?.arp_table || null,
+        routes: notes.oid_walk?.routes || null,
         createdAt: equipment.createdAt,
         updatedAt: equipment.updatedAt
       };
@@ -636,6 +660,74 @@ router.get('/discovered', async (req, res) => {
       total: devices.length,
       tenant: req.tenantId
     });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error fetching discovered devices:', error);
+    res.status(500).json({
+      error: 'Failed to fetch discovered devices',
+      message: error.message,
+      devices: []
+    });
+  }
+});
+
+// PUT /api/snmp/devices/:id/graphs - Toggle graphs enabled/disabled for a device
+router.put('/devices/:id/graphs', async (req, res) => {
+  try {
+    const deviceId = req.params.id;
+    const { enabled } = req.body;
+    
+    if (!req.tenantId) {
+      return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+    }
+    
+    // Find device
+    const device = await NetworkEquipment.findOne({ 
+      _id: deviceId,
+      tenantId: req.tenantId
+    });
+    
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+    
+    // Parse notes
+    let notes = {};
+    if (typeof device.notes === 'string') {
+      try {
+        notes = JSON.parse(device.notes);
+      } catch (e) {
+        notes = {};
+      }
+    } else if (typeof device.notes === 'object') {
+      notes = device.notes;
+    }
+    
+    // Update enable_graphs flag
+    notes.enable_graphs = enabled !== false;
+    
+    // Update device
+    await NetworkEquipment.updateOne(
+      { _id: deviceId },
+      { 
+        $set: { 
+          notes: JSON.stringify(notes),
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    res.json({ 
+      success: true, 
+      device_id: deviceId,
+      enable_graphs: notes.enable_graphs
+    });
+  } catch (error) {
+    console.error('❌ [SNMP API] Error toggling graphs:', error);
+    res.status(500).json({ 
+      error: 'Failed to toggle graphs', 
+      message: error.message 
+    });
+  }
   } catch (error) {
     console.error('❌ [SNMP API] Error fetching discovered devices:', error);
     res.status(500).json({

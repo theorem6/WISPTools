@@ -16,6 +16,7 @@
   let showAddHardwareModal = false;
   let existingHardware: any[] = [];
   let loadingHardware = false;
+  let deployments: any[] = [];
   
   $: if ($currentTenant?.id) {
     tenantId = $currentTenant.id;
@@ -38,27 +39,89 @@
       }
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
-        }
-      });
       
-      if (response.ok) {
-        const data = await response.json();
+      // Load discovered devices and deployments in parallel
+      const [devicesResponse, deploymentsResponse] = await Promise.all([
+        fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId
+          }
+        }),
+        fetch(`${API_CONFIG.PATHS.COVERAGE_MAP}/deployments`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId
+          }
+        }).catch(() => ({ ok: false })) // Deployment API might not exist, that's ok
+      ]);
+      
+      if (devicesResponse.ok) {
+        const data = await devicesResponse.json();
         discoveredDevices = data.devices || [];
+        
+        // Load deployment info if available
+        if (deploymentsResponse.ok) {
+          const deploymentsData = await deploymentsResponse.json();
+          deployments = deploymentsData.deployments || deploymentsData || [];
+        }
+        
+        // Mark devices as deployed if they have a siteId or are in deployments
+        discoveredDevices = discoveredDevices.map(device => {
+          const deviceIP = device.ipAddress || device.ip_address || device.management_ip;
+          const isDeployed = device.siteId || 
+                           deployments.some(d => 
+                             d.hardware_type === (device.type || device.deviceType) &&
+                             (d.config?.management_ip === deviceIP || d.name === device.name)
+                           );
+          
+          return {
+            ...device,
+            isDeployed,
+            enableGraphs: device.enable_graphs !== false && isDeployed // Only enable if deployed
+          };
+        });
+        
         console.log('[SNMP Devices] Loaded', discoveredDevices.length, 'discovered devices');
       } else {
-        const errorText = await response.text();
-        console.error('[SNMP Devices] Failed to load:', response.status, errorText);
-        error = `Failed to load: ${response.status}`;
+        const errorText = await devicesResponse.text();
+        console.error('[SNMP Devices] Failed to load:', devicesResponse.status, errorText);
+        error = `Failed to load: ${devicesResponse.status}`;
       }
     } catch (err: any) {
       console.error('[SNMP Devices] Error loading devices:', err);
       error = err.message || 'Failed to load devices';
     } finally {
       loading = false;
+    }
+  }
+  
+  async function toggleGraphs(device: any) {
+    if (!device.isDeployed) return; // Can't enable graphs for non-deployed devices
+    
+    const user = auth().currentUser;
+    if (!user) return;
+    
+    try {
+      const token = await user.getIdToken();
+      device.enableGraphs = !device.enableGraphs;
+      
+      // Update device in backend
+      const deviceId = device.id || device._id;
+      if (deviceId) {
+        await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/devices/${deviceId}/graphs`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Tenant-ID': tenantId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ enabled: device.enableGraphs })
+        });
+      }
+    } catch (err: any) {
+      console.error('[SNMP Devices] Error toggling graphs:', err);
+      device.enableGraphs = !device.enableGraphs; // Revert on error
     }
   }
   
@@ -263,55 +326,79 @@
       <p class="hint">Devices discovered by EPC agents will appear here</p>
     </div>
   {:else}
-    <div class="devices-grid">
-      {#each discoveredDevices as device (device.id)}
-        <div class="device-card">
-          <div class="device-header">
-            <h3>{device.name || device.ipAddress}</h3>
-            <span class="device-type">{device.deviceType || 'unknown'}</span>
-          </div>
-          
-          <div class="device-details">
-            <div class="detail-row">
-              <span class="label">IP Address:</span>
-              <span class="value">{device.ipAddress}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Manufacturer:</span>
-              <span class="value">{device.manufacturer || 'Unknown'}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Model:</span>
-              <span class="value">{device.model || 'Unknown'}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">SNMP Community:</span>
-              <span class="value">{device.snmp?.community || 'public'}</span>
-            </div>
-            {#if device.discoveredBy}
-              <div class="detail-row">
-                <span class="label">Discovered By:</span>
-                <span class="value">{device.discoveredBy}</span>
-              </div>
-            {/if}
-            {#if device.discoveredAt}
-              <div class="detail-row">
-                <span class="label">Discovered:</span>
-                <span class="value">{new Date(device.discoveredAt).toLocaleString()}</span>
-              </div>
-            {/if}
-          </div>
-          
-          <div class="device-actions">
-            <button class="btn btn-secondary" on:click={() => handlePairDevice(device)}>
-              🔗 Pair with Hardware
-            </button>
-            <button class="btn btn-primary" on:click={() => handleAddHardware(device)}>
-              ➕ Add as New Hardware
-            </button>
-          </div>
-        </div>
-      {/each}
+    <div class="devices-table-container">
+      <table class="devices-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>IP Address</th>
+            <th>Type</th>
+            <th>Manufacturer</th>
+            <th>Model</th>
+            <th>SNMP Community</th>
+            <th>Status</th>
+            <th>Deployed</th>
+            <th>Graphs</th>
+            <th>Discovered</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each discoveredDevices as device (device.id || device._id)}
+            <tr>
+              <td class="device-name">
+                <strong>{device.name || device.sysName || device.ipAddress || 'Unknown'}</strong>
+              </td>
+              <td>{device.ipAddress || device.ip_address || 'N/A'}</td>
+              <td><span class="device-type-badge">{device.deviceType || device.type || device.device_type || 'unknown'}</span></td>
+              <td>{device.manufacturer || 'Unknown'}</td>
+              <td>{device.model || device.sysDescr?.substring(0, 50) || 'Unknown'}</td>
+              <td>{device.snmp?.community || device.community || 'public'}</td>
+              <td>
+                <span class="status-badge status-{device.status || 'active'}">
+                  {device.status || 'active'}
+                </span>
+              </td>
+              <td>
+                {#if device.isDeployed}
+                  <span class="deployed-badge deployed">✓ Deployed</span>
+                {:else}
+                  <span class="deployed-badge not-deployed">Not Deployed</span>
+                {/if}
+              </td>
+              <td>
+                {#if device.isDeployed}
+                  <label class="toggle-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={device.enableGraphs} 
+                      on:change={() => toggleGraphs(device)}
+                    />
+                    <span class="toggle-slider"></span>
+                  </label>
+                {:else}
+                  <span class="text-muted">N/A</span>
+                {/if}
+              </td>
+              <td class="date-cell">
+                {#if device.discoveredAt}
+                  {new Date(device.discoveredAt).toLocaleDateString()}
+                {:else}
+                  N/A
+                {/if}
+              </td>
+              <td class="actions-cell">
+                <button class="btn btn-sm btn-secondary" on:click={() => handlePairDevice(device)} title="Pair with Hardware">
+                  🔗
+                </button>
+                <button class="btn btn-sm btn-primary" on:click={() => handleAddHardware(device)} title="Add as New Hardware">
+                  ➕
+                </button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     </div>
   {/if}
 </div>
@@ -427,73 +514,158 @@
     color: var(--text-primary, #111827);
   }
   
-  .devices-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .device-card {
+  .devices-table-container {
+    overflow-x: auto;
     border: 1px solid var(--border-color, #e5e7eb);
     border-radius: 8px;
-    padding: 1.5rem;
-    background: var(--bg-primary, white);
-    transition: box-shadow 0.2s;
+    background: white;
   }
   
-  .device-card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  .device-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-  }
-  
-  .device-header h3 {
-    margin: 0;
-    font-size: 1.125rem;
-    color: var(--text-primary, #111827);
-  }
-  
-  .device-type {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    background: var(--bg-secondary, #f3f4f6);
-    border-radius: 4px;
-    color: var(--text-secondary, #6b7280);
-  }
-  
-  .device-details {
-    margin-bottom: 1rem;
-  }
-  
-  .detail-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
+  .devices-table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: 0.875rem;
   }
   
-  .detail-row .label {
-    color: var(--text-secondary, #6b7280);
-    font-weight: 500;
+  .devices-table thead {
+    background: var(--bg-secondary, #f9fafb);
+    border-bottom: 2px solid var(--border-color, #e5e7eb);
   }
   
-  .detail-row .value {
+  .devices-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  
+  .devices-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
     color: var(--text-primary, #111827);
   }
   
-  .device-actions {
+  .devices-table tbody tr:hover {
+    background: var(--bg-secondary, #f9fafb);
+  }
+  
+  .device-name {
+    font-weight: 500;
+  }
+  
+  .device-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-tertiary, #e5e7eb);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    text-transform: capitalize;
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+  
+  .status-badge.status-active {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .status-badge.status-inactive {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  
+  .deployed-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .deployed-badge.deployed {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  
+  .deployed-badge.not-deployed {
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+  
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+  }
+  
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 24px;
+  }
+  
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+  }
+  
+  .toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary, #3b82f6);
+  }
+  
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+  }
+  
+  .date-cell {
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #6b7280);
+  }
+  
+  .actions-cell {
     display: flex;
     gap: 0.5rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color, #e5e7eb);
+  }
+  
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .text-muted {
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.8125rem;
   }
   
   .btn {

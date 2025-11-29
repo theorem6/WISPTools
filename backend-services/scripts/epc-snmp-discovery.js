@@ -80,7 +80,45 @@ const STD_OIDS = {
   sysDescr: '1.3.6.1.2.1.1.1.0',
   sysObjectID: '1.3.6.1.2.1.1.2.0',
   sysName: '1.3.6.1.2.1.1.5.0',
-  sysUpTime: '1.3.6.1.2.1.1.3.0'
+  sysUpTime: '1.3.6.1.2.1.1.3.0',
+  sysContact: '1.3.6.1.2.1.1.4.0',
+  sysLocation: '1.3.6.1.2.1.1.6.0'
+};
+
+// Interface MIB OIDs (IF-MIB)
+const IF_MIB_OIDS = {
+  ifNumber: '1.3.6.1.2.1.2.1.0',
+  ifTable: '1.3.6.1.2.1.2.2.1', // Interface table
+  ifIndex: '1.3.6.1.2.1.2.2.1.1', // Interface index
+  ifDescr: '1.3.6.1.2.1.2.2.1.2', // Interface description
+  ifType: '1.3.6.1.2.1.2.2.1.3', // Interface type
+  ifMtu: '1.3.6.1.2.1.2.2.1.4', // MTU
+  ifSpeed: '1.3.6.1.2.1.2.2.1.5', // Interface speed (bps)
+  ifPhysAddress: '1.3.6.1.2.1.2.2.1.6', // MAC address
+  ifAdminStatus: '1.3.6.1.2.1.2.2.1.7', // Admin status (1=up, 2=down)
+  ifOperStatus: '1.3.6.1.2.1.2.2.1.8', // Operational status
+  ifInOctets: '1.3.6.1.2.1.2.2.1.10', // Octets in (counter)
+  ifOutOctets: '1.3.6.1.2.1.2.2.1.16', // Octets out (counter)
+  ifInErrors: '1.3.6.1.2.1.2.2.1.14', // Input errors
+  ifOutErrors: '1.3.6.1.2.1.2.2.1.20' // Output errors
+};
+
+// IP MIB OIDs (for ARP and routing)
+const IP_MIB_OIDS = {
+  ipAdEntAddr: '1.3.6.1.2.1.4.20.1.1', // IP address table
+  ipAdEntNetMask: '1.3.6.1.2.1.4.20.1.3', // Netmask
+  ipAdEntIfIndex: '1.3.6.1.2.1.4.20.1.2', // Interface index for IP
+  ipNetToMediaTable: '1.3.6.1.2.1.4.22.1', // ARP table
+  ipNetToMediaPhysAddress: '1.3.6.1.2.1.4.22.1.2', // MAC address in ARP
+  ipNetToMediaNetAddress: '1.3.6.1.2.1.4.22.1.3', // IP address in ARP
+  ipNetToMediaIfIndex: '1.3.6.1.2.1.4.22.1.1', // Interface index in ARP
+  ipNetToMediaType: '1.3.6.1.2.1.4.22.1.4', // ARP entry type
+  ipRouteTable: '1.3.6.1.2.1.4.21.1', // Routing table
+  ipRouteDest: '1.3.6.1.2.1.4.21.1.1', // Route destination
+  ipRouteNextHop: '1.3.6.1.2.1.4.21.1.7', // Next hop
+  ipRouteMask: '1.3.6.1.2.1.4.21.1.11', // Route mask
+  ipRouteType: '1.3.6.1.2.1.4.21.1.8', // Route type
+  ipRouteProto: '1.3.6.1.2.1.4.21.1.9' // Routing protocol
 };
 
 /**
@@ -243,16 +281,294 @@ async function pingSweep(subnet) {
 }
 
 /**
+ * Perform OID walk to collect comprehensive device information
+ */
+async function performOIDWalk(ip, community) {
+  const walkData = {
+    interfaces: [],
+    arp_table: [],
+    routes: [],
+    ip_addresses: []
+  };
+  
+  if (!snmp) {
+    return walkData; // Skip OID walk if net-snmp not available
+  }
+  
+  try {
+    const session = snmp.createSession(ip, community, {
+      port: 161,
+      retries: 1,
+      timeout: SNMP_TIMEOUT * 2, // Longer timeout for walks
+      transport: 'udp4'
+    });
+    
+    // Walk interface table
+    try {
+      await new Promise((resolve) => {
+        const interfaces = new Map();
+        session.subtree(IF_MIB_OIDS.ifTable, (error, varbinds) => {
+          if (error || !varbinds) {
+            resolve();
+            return;
+          }
+          
+          varbinds.forEach((vb) => {
+            const oid = vb.oid.toString();
+            const value = vb.value;
+            const ifIndex = parseInt(oid.split('.').pop());
+            
+            if (!interfaces.has(ifIndex)) {
+              interfaces.set(ifIndex, { index: ifIndex });
+            }
+            
+            const iface = interfaces.get(ifIndex);
+            
+            // Map OID to interface property
+            if (oid.includes(IF_MIB_OIDS.ifDescr.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.description = value?.toString() || '';
+            } else if (oid.includes(IF_MIB_OIDS.ifType.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.type = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifSpeed.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.speed = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifPhysAddress.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.mac_address = value?.toString() || '';
+            } else if (oid.includes(IF_MIB_OIDS.ifAdminStatus.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.admin_status = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifOperStatus.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.oper_status = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifInOctets.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.in_octets = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifOutOctets.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.out_octets = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifInErrors.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.in_errors = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            } else if (oid.includes(IF_MIB_OIDS.ifOutErrors.replace('1.3.6.1.2.1.2.2.1.', ''))) {
+              iface.out_errors = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+            }
+          });
+          
+          walkData.interfaces = Array.from(interfaces.values());
+          resolve();
+        });
+      });
+    } catch (error) {
+      log(`WARNING: Failed to walk interface table for ${ip}: ${error.message}`);
+    }
+    
+    // Walk ARP table
+    try {
+      await new Promise((resolve) => {
+        const arpEntries = new Map();
+        session.subtree(IP_MIB_OIDS.ipNetToMediaTable, (error, varbinds) => {
+          if (error || !varbinds) {
+            resolve();
+            return;
+          }
+          
+          varbinds.forEach((vb) => {
+            const oid = vb.oid.toString();
+            const value = vb.value;
+            
+            // Parse ARP entry index from OID
+            // Format: 1.3.6.1.2.1.4.22.1.X.Y.Z where X=ifIndex, Y=NetAddress type, Z=NetAddress
+            const parts = oid.split('.');
+            if (parts.length >= 9) {
+              const ifIndex = parseInt(parts[parts.length - 3]);
+              const entryKey = `${ifIndex}_${parts.slice(-2).join('.')}`;
+              
+              if (!arpEntries.has(entryKey)) {
+                arpEntries.set(entryKey, { if_index: ifIndex });
+              }
+              
+              const entry = arpEntries.get(entryKey);
+              
+              if (oid.includes(IP_MIB_OIDS.ipNetToMediaPhysAddress.replace('1.3.6.1.2.1.4.22.1.', ''))) {
+                entry.mac_address = value?.toString() || '';
+              } else if (oid.includes(IP_MIB_OIDS.ipNetToMediaNetAddress.replace('1.3.6.1.2.1.4.22.1.', ''))) {
+                entry.ip_address = value?.toString() || '';
+              } else if (oid.includes(IP_MIB_OIDS.ipNetToMediaType.replace('1.3.6.1.2.1.4.22.1.', ''))) {
+                entry.type = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+              }
+            }
+          });
+          
+          walkData.arp_table = Array.from(arpEntries.values()).filter(e => e.ip_address && e.mac_address);
+          resolve();
+        });
+      });
+    } catch (error) {
+      log(`WARNING: Failed to walk ARP table for ${ip}: ${error.message}`);
+    }
+    
+    // Walk routing table
+    try {
+      await new Promise((resolve) => {
+        const routes = new Map();
+        session.subtree(IP_MIB_OIDS.ipRouteTable, (error, varbinds) => {
+          if (error || !varbinds) {
+            resolve();
+            return;
+          }
+          
+          varbinds.forEach((vb) => {
+            const oid = vb.oid.toString();
+            const value = vb.value;
+            
+            // Parse route index from OID
+            // Format: 1.3.6.1.2.1.4.21.1.X.Y where Y is destination IP
+            const parts = oid.split('.');
+            if (parts.length >= 8) {
+              const destIP = parts.slice(-4).join('.');
+              const routeKey = destIP;
+              
+              if (!routes.has(routeKey)) {
+                routes.set(routeKey, { destination: destIP });
+              }
+              
+              const route = routes.get(routeKey);
+              
+              if (oid.includes(IP_MIB_OIDS.ipRouteNextHop.replace('1.3.6.1.2.1.4.21.1.', ''))) {
+                route.next_hop = value?.toString() || '';
+              } else if (oid.includes(IP_MIB_OIDS.ipRouteMask.replace('1.3.6.1.2.1.4.21.1.', ''))) {
+                route.mask = value?.toString() || '';
+              } else if (oid.includes(IP_MIB_OIDS.ipRouteType.replace('1.3.6.1.2.1.4.21.1.', ''))) {
+                route.type = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+              } else if (oid.includes(IP_MIB_OIDS.ipRouteProto.replace('1.3.6.1.2.1.4.21.1.', ''))) {
+                route.protocol = typeof value === 'number' ? value : parseInt(value?.toString() || '0');
+              }
+            }
+          });
+          
+          walkData.routes = Array.from(routes.values());
+          resolve();
+        });
+      });
+    } catch (error) {
+      log(`WARNING: Failed to walk routing table for ${ip}: ${error.message}`);
+    }
+    
+    // Walk IP address table
+    try {
+      await new Promise((resolve) => {
+        const ipAddrs = new Map();
+        session.subtree(IP_MIB_OIDS.ipAdEntAddr, (error, varbinds) => {
+          if (error || !varbinds) {
+            resolve();
+            return;
+          }
+          
+          varbinds.forEach((vb) => {
+            const ip = vb.value?.toString() || '';
+            if (ip && !ip.includes('127.') && !ip.includes('::1')) {
+              ipAddrs.set(ip, { ip_address: ip });
+            }
+          });
+          
+          walkData.ip_addresses = Array.from(ipAddrs.values());
+          resolve();
+        });
+      });
+    } catch (error) {
+      log(`WARNING: Failed to walk IP address table for ${ip}: ${error.message}`);
+    }
+    
+    session.close();
+  } catch (error) {
+    log(`WARNING: OID walk failed for ${ip}: ${error.message}`);
+  }
+  
+  return walkData;
+}
+
+/**
+ * Identify device type based on OID walk results
+ */
+function identifyDeviceType(deviceInfo, walkData) {
+  // Check sysObjectID and sysDescr first
+  const sysObjectID = deviceInfo.sysObjectID || '';
+  const sysDescr = (deviceInfo.sysDescr || '').toLowerCase();
+  
+  // Mikrotik
+  if (sysObjectID.includes('1.3.6.1.4.1.14988') || sysDescr.includes('mikrotik') || sysDescr.includes('routeros')) {
+    return 'mikrotik';
+  }
+  
+  // Cisco
+  if (sysObjectID.includes('1.3.6.1.4.1.9')) {
+    // Check for switch vs router
+    if (walkData.interfaces && walkData.interfaces.length > 8) {
+      const hasManyEth = walkData.interfaces.filter(i => i.type === 6).length > 4; // ethernetCsmacd = 6
+      if (hasManyEth) return 'switch';
+    }
+    return 'cisco_router';
+  }
+  
+  // Huawei
+  if (sysObjectID.includes('1.3.6.1.4.1.2011')) {
+    return 'huawei';
+  }
+  
+  // Ubiquiti
+  if (sysObjectID.includes('1.3.6.1.4.1.41112') || sysDescr.includes('ubiquiti')) {
+    return 'ubiquiti';
+  }
+  
+  // Determine by interface characteristics
+  if (walkData.interfaces && walkData.interfaces.length > 0) {
+    const interfaceCount = walkData.interfaces.length;
+    const ethernetCount = walkData.interfaces.filter(i => i.type === 6).length;
+    const hasVLAN = walkData.interfaces.some(i => i.type === 53 || i.description?.toLowerCase().includes('vlan'));
+    
+    // Switch characteristics: many ethernet interfaces, VLAN support, ARP table
+    if (ethernetCount > 4 && hasVLAN && walkData.arp_table && walkData.arp_table.length > 0) {
+      return 'switch';
+    }
+    
+    // Router characteristics: fewer interfaces, routing table
+    if (interfaceCount <= 8 && walkData.routes && walkData.routes.length > 1) {
+      return 'router';
+    }
+    
+    // AP characteristics: wireless interfaces (type 71 = ieee80211)
+    const wirelessCount = walkData.interfaces.filter(i => i.type === 71 || i.type === 6 && i.description?.toLowerCase().includes('wifi')).length;
+    if (wirelessCount > 0) {
+      return 'access_point';
+    }
+  }
+  
+  return deviceInfo.device_type || 'generic';
+}
+
+/**
  * Get device info via SNMP using net-snmp (if available) or system snmpget
  */
 async function getDeviceInfo(ip, community) {
+  let deviceInfo;
+  
   if (snmp) {
     // Use net-snmp package
-    return await getDeviceInfoWithNetSNMP(ip, community);
+    deviceInfo = await getDeviceInfoWithNetSNMP(ip, community);
   } else {
     // Fallback to system snmpget
-    return await getDeviceInfoWithSystemSNMP(ip, community);
+    deviceInfo = await getDeviceInfoWithSystemSNMP(ip, community);
   }
+  
+  // Perform comprehensive OID walk
+  log(`  Performing OID walk for ${ip}...`);
+  const walkData = await performOIDWalk(ip, community);
+  
+  // Identify device type based on walk results
+  deviceInfo.device_type = identifyDeviceType(deviceInfo, walkData);
+  
+  // Add walk data to device info
+  deviceInfo.oid_walk = walkData;
+  deviceInfo.interfaces = walkData.interfaces;
+  deviceInfo.arp_table = walkData.arp_table;
+  deviceInfo.routes = walkData.routes;
+  deviceInfo.ip_addresses = walkData.ip_addresses;
+  
+  return deviceInfo;
 }
 
 /**
@@ -488,10 +804,20 @@ async function getCDPNeighbors(session, ip, community) {
           // Map OID to field
           if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.6')) {
             neighborMap[neighborKey].device_id = value;
+            // Check if Mikrotik from device ID
+            if (value && typeof value === 'string' && 
+                (value.toLowerCase().includes('mikrotik') || value.toLowerCase().includes('routeros'))) {
+              neighborMap[neighborKey].device_type = 'mikrotik';
+            }
           } else if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.7')) {
             neighborMap[neighborKey].remote_port = value;
           } else if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.8')) {
             neighborMap[neighborKey].platform = value;
+            // Check if Mikrotik from platform
+            if (value && typeof value === 'string' && 
+                (value.toLowerCase().includes('mikrotik') || value.toLowerCase().includes('routeros'))) {
+              neighborMap[neighborKey].device_type = 'mikrotik';
+            }
           } else if (oid.includes('1.3.6.1.4.1.9.9.23.1.2.1.1.4')) {
             neighborMap[neighborKey].ip_address = value;
           }
@@ -521,11 +847,19 @@ async function getNeighborsWithSystemSNMP(ip, community) {
         if (match) {
           const sysName = match[7]?.replace(/STRING:\s*"?([^"]+)"?/, '$1').trim();
           if (sysName && sysName !== '""') {
-            neighbors.push({
+            const neighborEntry = {
               system_name: sysName,
               discovered_via: 'lldp',
               source_ip: ip
-            });
+            };
+            
+            // Check if device is Mikrotik from system name
+            if (sysName.toLowerCase().includes('mikrotik') || 
+                sysName.toLowerCase().includes('routeros')) {
+              neighborEntry.device_type = 'mikrotik';
+            }
+            
+            neighbors.push(neighborEntry);
           }
         }
       });
@@ -542,11 +876,19 @@ async function getNeighborsWithSystemSNMP(ip, community) {
           if (match) {
             const deviceId = match[5]?.replace(/STRING:\s*"?([^"]+)"?/, '$1').trim();
             if (deviceId && deviceId !== '""') {
-              neighbors.push({
+              const neighborEntry = {
                 device_id: deviceId,
                 discovered_via: 'cdp',
                 source_ip: ip
-              });
+              };
+              
+              // Check if device is Mikrotik from device ID
+              if (deviceId.toLowerCase().includes('mikrotik') || 
+                  deviceId.toLowerCase().includes('routeros')) {
+                neighborEntry.device_type = 'mikrotik';
+              }
+              
+              neighbors.push(neighborEntry);
             }
           }
         });

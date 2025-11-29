@@ -12,6 +12,7 @@
   import EPCMonitoringPanel from '$lib/components/EPCMonitoringPanel.svelte';
   import SNMPGraphsPanel from '$lib/components/SNMPGraphsPanel.svelte';
   import SNMPDevicesPanel from './components/SNMPDevicesPanel.svelte';
+  import MikrotikDevicesPanel from './components/MikrotikDevicesPanel.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
@@ -645,6 +646,14 @@
           <span class="control-icon">📈</span>
           <span class="control-label">Graphs</span>
         </button>
+        <button 
+          class="module-control-btn {mapView === 'mikrotik' ? 'active' : ''}"
+          on:click={() => mapView = 'mikrotik'}
+          title="Mikrotik Devices"
+        >
+          <span class="control-icon">🖥️</span>
+          <span class="control-label">Mikrotik</span>
+        </button>
       </div>
     </div>
   </div>
@@ -660,6 +669,13 @@
   {#if mapView === 'graphs'}
     <div class="graphs-overlay">
       <SNMPGraphsPanel />
+    </div>
+  {/if}
+  
+  <!-- Mikrotik Devices View -->
+  {#if mapView === 'mikrotik'}
+    <div class="mikrotik-overlay">
+      <MikrotikDevicesPanel {tenantId} />
     </div>
   {/if}
   
@@ -934,6 +950,18 @@
   }
 
   .snmp-overlay {
+    position: absolute;
+    top: 80px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white;
+    overflow-y: auto;
+    padding: 2rem;
+    z-index: 5;
+  }
+
+  .mikrotik-overlay {
     position: absolute;
     top: 80px;
     left: 0;

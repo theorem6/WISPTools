@@ -53,15 +53,28 @@ router.post('/discovered', async (req, res, next) => {
     
     const processedDevices = [];
     
-    // Process each discovered device
+        // Process each discovered device
     for (const device of discovered_devices) {
       try {
-        const { ip_address, sysDescr, sysObjectID, sysName, device_type, community } = device;
+        const { ip_address, sysDescr, sysObjectID, sysName, device_type, community, 
+                oid_walk, interfaces, arp_table, routes, ip_addresses, neighbors } = device;
         
         if (!ip_address) {
           console.warn('[SNMP Discovery] Skipping device without IP address');
           continue;
         }
+        
+        // Check if device is Mikrotik from neighbors (CDP/LLDP discovery)
+        const isMikrotikFromNeighbor = neighbors && neighbors.some(n => 
+          n.device_type === 'mikrotik' ||
+          (n.system_name && n.system_name.toLowerCase().includes('mikrotik')) ||
+          (n.system_description && n.system_description.toLowerCase().includes('mikrotik')) ||
+          (n.platform && n.platform.toLowerCase().includes('mikrotik')) ||
+          (n.device_id && n.device_id.toLowerCase().includes('mikrotik'))
+        );
+        
+        // Override device_type if detected as Mikrotik from neighbors
+        const detected_device_type = isMikrotikFromNeighbor ? 'mikrotik' : device_type;
         
         // Check if device already exists
         const existingDevice = await NetworkEquipment.findOne({
@@ -95,11 +108,11 @@ router.post('/discovered', async (req, res, next) => {
         const is_ping_only = device.discovered_via === 'ping_only' || device.snmp_enabled === false;
         
         // Determine device name and model based on Mikrotik info if available
-        let device_name = sysName || device_type || (is_ping_only ? `Device-${ip_address}` : `SNMP-${ip_address}`);
+        let device_name = sysName || detected_device_type || (is_ping_only ? `Device-${ip_address}` : `SNMP-${ip_address}`);
         let device_model = sysDescr || (is_ping_only ? 'Generic Network Device' : 'Unknown');
         let device_serial = ip_address;
         
-        if (device_type === 'mikrotik') {
+        if (detected_device_type === 'mikrotik') {
           // Use Mikrotik identity as name if available
           device_name = mikrotik_identity || sysName || `Mikrotik-${ip_address}`;
           // Use board name as model if available
@@ -116,13 +129,17 @@ router.post('/discovered', async (req, res, next) => {
         const deviceData = {
           tenantId: epc.tenant_id,
           name: device_name,
-          type: device_type === 'mikrotik' ? 'router' : 
-                device_type === 'cisco' ? 'switch' : 
-                device_type === 'huawei' ? 'router' : 
+          type: detected_device_type === 'mikrotik' ? 'router' : 
+                detected_device_type === 'switch' ? 'switch' :
+                detected_device_type === 'router' ? 'router' :
+                detected_device_type === 'access_point' ? 'radio' :
+                detected_device_type === 'cisco' ? 'switch' : 
+                detected_device_type === 'huawei' ? 'router' : 
                 (is_ping_only ? 'other' : 'other'),
-          manufacturer: device_type === 'mikrotik' ? 'Mikrotik' :
-                       device_type === 'cisco' ? 'Cisco' :
-                       device_type === 'huawei' ? 'Huawei' : 
+          manufacturer: detected_device_type === 'mikrotik' ? 'Mikrotik' :
+                       detected_device_type === 'cisco' || detected_device_type === 'cisco_router' ? 'Cisco' :
+                       detected_device_type === 'huawei' ? 'Huawei' :
+                       detected_device_type === 'ubiquiti' ? 'Ubiquiti' :
                        (is_ping_only ? 'Unknown' : 'Generic'),
           model: device_model,
           serialNumber: device_serial,
@@ -138,16 +155,34 @@ router.post('/discovered', async (req, res, next) => {
             sysDescr: sysDescr,
             sysObjectID: sysObjectID,
             sysName: sysName,
-            device_type: device_type,
+            device_type: detected_device_type,
             snmp_community: community || 'public',
             snmp_version: 'v2c',
-            snmp_enabled: true,
+            snmp_enabled: !is_ping_only,
             discovered_by_epc: epc.epc_id,
             discovered_at: new Date().toISOString(),
-            discovery_source: 'epc_snmp_agent',
+            discovery_source: device.discovered_via || 'epc_snmp_agent',
             last_discovered: new Date().toISOString(),
+            // Include OID walk data
+            ...(oid_walk ? {
+              oid_walk: {
+                interfaces: oid_walk.interfaces || interfaces || [],
+                arp_table: oid_walk.arp_table || arp_table || [],
+                routes: oid_walk.routes || routes || [],
+                ip_addresses: oid_walk.ip_addresses || ip_addresses || []
+              }
+            } : {
+              oid_walk: {
+                interfaces: interfaces || [],
+                arp_table: arp_table || [],
+                routes: routes || [],
+                ip_addresses: ip_addresses || []
+              }
+            }),
+            // Include neighbors (CDP/LLDP)
+            ...(neighbors && neighbors.length > 0 ? { neighbors } : {}),
             // Include Mikrotik-specific info
-            ...(device_type === 'mikrotik' && Object.keys(mikrotik_info).length > 0 ? {
+            ...(detected_device_type === 'mikrotik' && Object.keys(mikrotik_info).length > 0 ? {
               mikrotik: {
                 identity: mikrotik_identity,
                 routerOS_version: mikrotik_version,
@@ -162,7 +197,10 @@ router.post('/discovered', async (req, res, next) => {
                 port: 8728,
                 username: 'admin'
               }
-            } : {})
+            } : {}),
+            // Include device type-specific flags
+            enable_graphs: true, // Default to enabled
+            graphs_enabled: ['interfaces', 'arp', 'routes', 'cpu', 'memory', 'throughput']
           }),
           updatedAt: new Date()
         };
@@ -208,6 +246,65 @@ router.post('/discovered', async (req, res, next) => {
     console.error('[SNMP Discovery] Error:', error);
     res.status(500).json({ 
       error: 'Failed to process discovered devices', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * PUT /api/epc/snmp/devices/:id/graphs
+ * Toggle graphs enabled/disabled for a device
+ */
+router.put('/devices/:id/graphs', async (req, res) => {
+  try {
+    const deviceId = req.params.id;
+    const { enabled } = req.body;
+    
+    // Find device
+    const device = await NetworkEquipment.findOne({ 
+      _id: deviceId,
+      tenantId: req.tenantId || req.headers['x-tenant-id']
+    });
+    
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+    
+    // Parse notes
+    let notes = {};
+    if (typeof device.notes === 'string') {
+      try {
+        notes = JSON.parse(device.notes);
+      } catch (e) {
+        notes = {};
+      }
+    } else if (typeof device.notes === 'object') {
+      notes = device.notes;
+    }
+    
+    // Update enable_graphs flag
+    notes.enable_graphs = enabled !== false;
+    
+    // Update device
+    await NetworkEquipment.updateOne(
+      { _id: deviceId },
+      { 
+        $set: { 
+          notes: JSON.stringify(notes),
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    res.json({ 
+      success: true, 
+      device_id: deviceId,
+      enable_graphs: notes.enable_graphs
+    });
+  } catch (error) {
+    console.error('[SNMP] Error toggling graphs:', error);
+    res.status(500).json({ 
+      error: 'Failed to toggle graphs', 
       message: error.message 
     });
   }

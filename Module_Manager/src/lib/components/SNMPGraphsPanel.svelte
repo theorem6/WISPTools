@@ -48,7 +48,8 @@
       
       const token = await user.getIdToken();
       
-      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/devices`, {
+      // Load discovered devices (which includes deployment status)
+      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': $currentTenant.id
@@ -57,7 +58,27 @@
       
       if (response.ok) {
         const data = await response.json();
-        devices = data.devices || data || [];
+        let allDevices = data.devices || data || [];
+        
+        // Filter to only show deployed devices with graphs enabled
+        devices = allDevices.filter((device: any) => {
+          // Check if deployed
+          const isDeployed = device.isDeployed || device.siteId;
+          
+          // Check if graphs enabled (default to true if not set and device is deployed)
+          let graphsEnabled = true;
+          if (device.notes) {
+            try {
+              const notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
+              graphsEnabled = notes.enable_graphs !== false;
+            } catch (e) {
+              // If can't parse, assume enabled for deployed devices
+            }
+          }
+          
+          return isDeployed && graphsEnabled;
+        });
+        
         isLoading = false;
         
         // Auto-select first device if none selected
