@@ -333,6 +333,43 @@ app.post('/api/epc/checkin', async (req, res) => {
         console.log(`[EPC Check-in] No versions object provided in check-in payload - skipping update check`);
         console.log(`[EPC Check-in] Versions object type:`, typeof versions, `Keys:`, versions ? Object.keys(versions).join(', ') : 'null/undefined');
       }
+    }
+    
+    // Check for agent script updates (MUST run outside services block, but only if versions provided)
+    if (versions) {
+      try {
+        const agentVersionManager = require('./utils/agent-version-manager');
+        
+        // Extract scripts from versions object (could be versions.scripts or versions.scripts.scripts)
+        const agentScripts = versions?.scripts || {};
+        
+        // Log what we received from agent
+        if (Object.keys(agentScripts).length > 0) {
+          console.log(`[EPC Check-in] Checking for updates. Agent reported ${Object.keys(agentScripts).length} script(s):`, 
+            Object.keys(agentScripts).join(', '));
+          console.log(`[EPC Check-in] Agent script hashes:`, JSON.stringify(agentScripts, null, 2));
+        } else {
+          console.log(`[EPC Check-in] Agent reported versions object but no scripts found. Versions keys:`, Object.keys(versions || {}).join(', '));
+        }
+        
+        const queuedCommands = await agentVersionManager.checkAndQueueUpdates(
+          epc.epc_id,
+          epc.tenant_id,
+          agentScripts // Pass the scripts object directly
+        );
+        
+        if (queuedCommands.length > 0) {
+          console.log(`[EPC Check-in] ✓ Queued ${queuedCommands.length} update command(s) for ${epc.epc_id}:`, 
+            queuedCommands.map(c => c.notes).join(', '));
+        } else {
+          console.log(`[EPC Check-in] No updates needed for ${epc.epc_id} (all scripts up to date)`);
+        }
+      } catch (updateError) {
+        console.error(`[EPC Check-in] Error checking for script updates:`, updateError.message);
+        console.error(`[EPC Check-in] Update error stack:`, updateError.stack);
+        // Don't fail check-in if update check fails
+      }
+    }
     
     // Fetch pending commands (includes any update commands just queued)
     const commands = await EPCCommand.find({
