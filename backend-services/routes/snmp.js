@@ -32,7 +32,10 @@ const formatSNMPDevice = (device, source = 'equipment') => {
     type: 'snmp',
     deviceType: source === 'equipment' ? device.type : 'cpe',
     status: device.status === 'active' ? 'online' : 'offline',
-    manufacturer: device.manufacturer || 'Generic',
+    manufacturer: config.manufacturer_detected_via_oui || 
+                  config.oui_detection?.manufacturer || 
+                  device.manufacturer || 
+                  'Generic',
     model: device.model || 'Unknown',
     serialNumber: device.serialNumber || device._id.toString(),
     location: {
