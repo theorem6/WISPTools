@@ -856,7 +856,7 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     const inventoryItem = new InventoryItem({
       tenantId: req.tenantId,
       assetTag: assetTag || `SNMP-${notes.management_ip || device.serialNumber || deviceId.substring(0, 8)}`,
-      category: category || 'Network Equipment',
+      category: category === 'Network Equipment' ? 'Networking Equipment' : (category || 'Networking Equipment'),
       subcategory: device.type === 'router' ? 'Router' :
                    device.type === 'switch' ? 'Switch' :
                    device.type === 'ap' ? 'Access Point' : 'Network Device',
