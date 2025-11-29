@@ -12,6 +12,7 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const https = require('https');
 const http = require('http');
+const dgram = require('dgram'); // For UDP socket (MNDP)
 
 // Try to require npm packages, fallback to system commands if not available
 let pingScanner = null;
@@ -1419,6 +1420,156 @@ function createPingOnlyDevice(ip) {
 }
 
 /**
+ * Discover Mikrotik devices via MNDP (Mikrotik Neighbor Discovery Protocol)
+ * MNDP is a Layer 2 broadcast protocol that Mikrotik devices use to announce themselves
+ * Listens for UDP broadcasts on port 5678
+ */
+async function discoverMNDP(listenDuration = 5000) {
+  log(`Phase 0: MNDP discovery - listening for Mikrotik neighbor broadcasts (${listenDuration/1000}s)...`);
+  const startTime = Date.now();
+  const discoveredDevices = new Map(); // Use IP as key to avoid duplicates
+  
+  return new Promise((resolve) => {
+    // Create UDP socket to listen for MNDP broadcasts
+    const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    
+    socket.on('error', (error) => {
+      log(`WARNING: MNDP socket error: ${error.message}`);
+      resolve({ discoveredIPs: [], neighbors: [] });
+    });
+    
+    socket.on('message', (msg, rinfo) => {
+      try {
+        // MNDP packet format (based on Mikrotik RouterOS MNDP protocol):
+        // MNDP uses UDP port 5678 for broadcasts
+        // Packet structure: Header (variable) + TLV (Type-Length-Value) fields
+        // Common fields: Identity, Version, Platform, Board name, MAC address, Interface, Uptime
+        
+        if (msg.length < 8) {
+          return; // Too short to be valid MNDP packet
+        }
+        
+        // MNDP packets may have different header formats depending on RouterOS version
+        // Try multiple parsing strategies
+        if (msg.length >= 8) {
+          const deviceInfo = {
+            ip_address: rinfo.address,
+            mac_address: null,
+            identity: null,
+            version: null,
+            board_name: null,
+            platform: null,
+            uptime: null,
+            interface: null,
+            discovered_via: 'mndp',
+            source_ip: rinfo.address,
+            source_port: rinfo.port
+          };
+          
+          // Parse TLV fields (Type-Length-Value format)
+          // Common TLV types in MNDP:
+          // 0x01: Identity
+          // 0x02: Version
+          // 0x03: Platform
+          // 0x04: Board name
+          // 0x05: MAC address
+          // 0x06: Interface
+          // 0x07: Uptime
+          
+          let pos = 8; // Skip header
+          while (pos < msg.length - 2) {
+            if (pos + 2 > msg.length) break;
+            
+            const tlvType = msg[pos];
+            const tlvLength = msg.readUInt16BE(pos + 1);
+            pos += 3;
+            
+            if (pos + tlvLength > msg.length) break;
+            
+            const tlvValue = msg.slice(pos, pos + tlvLength);
+            pos += tlvLength;
+            
+            switch (tlvType) {
+              case 0x01: // Identity
+                deviceInfo.identity = tlvValue.toString('utf8').replace(/\0/g, '').trim();
+                break;
+              case 0x02: // Version
+                deviceInfo.version = tlvValue.toString('utf8').replace(/\0/g, '').trim();
+                break;
+              case 0x03: // Platform
+                deviceInfo.platform = tlvValue.toString('utf8').replace(/\0/g, '').trim();
+                break;
+              case 0x04: // Board name
+                deviceInfo.board_name = tlvValue.toString('utf8').replace(/\0/g, '').trim();
+                break;
+              case 0x05: // MAC address
+                if (tlvLength >= 6) {
+                  deviceInfo.mac_address = Array.from(tlvValue.slice(0, 6))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join(':').toUpperCase();
+                }
+                break;
+              case 0x06: // Interface
+                deviceInfo.interface = tlvValue.toString('utf8').replace(/\0/g, '').trim();
+                break;
+              case 0x07: // Uptime
+                if (tlvLength >= 4) {
+                  deviceInfo.uptime = tlvValue.readUInt32BE(0);
+                }
+                break;
+            }
+          }
+          
+          // Also try alternative parsing: sometimes MNDP packets have a simpler format
+          // Try to extract strings directly from the packet
+          if (!deviceInfo.identity && msg.length > 20) {
+            const packetStr = msg.toString('utf8', 8);
+            const identityMatch = packetStr.match(/([^\x00]{1,64})/);
+            if (identityMatch) {
+              deviceInfo.identity = identityMatch[1].trim();
+            }
+          }
+          
+          // Only add if we got some useful information
+          if (deviceInfo.ip_address || deviceInfo.identity || deviceInfo.mac_address) {
+            // Use IP as key, or MAC if available
+            const key = deviceInfo.ip_address || deviceInfo.mac_address || `mndp-${rinfo.address}`;
+            discoveredDevices.set(key, deviceInfo);
+            
+            log(`  MNDP: Discovered Mikrotik device ${deviceInfo.ip_address || 'unknown'} (${deviceInfo.identity || 'unknown identity'})`);
+          }
+        }
+      } catch (parseError) {
+        // Ignore parsing errors, continue listening
+      }
+    });
+    
+    // Bind to UDP port 5678 (MNDP port) on all interfaces
+    socket.bind(5678, '0.0.0.0', () => {
+      log(`  MNDP: Listening on UDP port 5678 for Mikrotik neighbor broadcasts...`);
+      
+      // Set socket to broadcast mode
+      try {
+        socket.setBroadcast(true);
+      } catch (e) {
+        // May not be supported on all systems
+      }
+      
+      // Listen for specified duration
+      setTimeout(() => {
+        socket.close();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        const neighbors = Array.from(discoveredDevices.values());
+        const discoveredIPs = neighbors.map(d => d.ip_address).filter(Boolean);
+        
+        log(`MNDP discovery complete: Found ${discoveredDevices.size} Mikrotik device(s) in ${elapsed}s`);
+        resolve({ discoveredIPs, neighbors });
+      }, listenDuration);
+    });
+  });
+}
+
+/**
  * Phase 1: Discover devices via CDP/LLDP neighbor tables
  * Queries CDP/LLDP neighbor tables from common gateway/router IPs first
  * This discovers devices even if they don't respond to ping or SNMP
@@ -1541,16 +1692,27 @@ async function queryCDPLLDPNeighbors(ips, communities = SNMP_COMMUNITIES) {
  * Scan network for devices (three-phase: CDP/LLDP first, then ping, then SNMP)
  */
 async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
-  log(`Starting three-phase network discovery on subnet: ${subnet}`);
+  log(`Starting four-phase network discovery on subnet: ${subnet}`);
   const startTime = Date.now();
   
   const allDiscoveredIPs = new Set();
   const allDiscoveredNeighbors = [];
   
+  // Phase 0: MNDP discovery (Mikrotik-specific, passive listening)
+  // Start MNDP discovery in parallel - it listens for broadcasts independently
+  const mndpDiscoveryPromise = discoverMNDP(3000); // Listen for 3 seconds
+  
   // Phase 1: CDP/LLDP discovery - query neighbor tables from gateways/routers
   const { discoveredIPs: cdpLldpIPs, neighbors: cdpLldpNeighbors } = await discoverCDPLLDP(subnet);
   cdpLldpIPs.forEach(ip => allDiscoveredIPs.add(ip));
   allDiscoveredNeighbors.push(...cdpLldpNeighbors);
+  
+  // Wait for MNDP discovery to complete (it runs in parallel)
+  const { discoveredIPs: mndpIPs, neighbors: mndpNeighbors } = await mndpDiscoveryPromise;
+  mndpIPs.forEach(ip => allDiscoveredIPs.add(ip));
+  allDiscoveredNeighbors.push(...mndpNeighbors);
+  
+  log(`  MNDP discovery added ${mndpIPs.length} Mikrotik device(s) to discovery list`);
   
   // Phase 2: Ping sweep
   log(`Phase 2: Ping sweep - finding responding hosts on subnet: ${subnet}`);
