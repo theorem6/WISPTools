@@ -70,10 +70,9 @@ apt-get install -y \
     jq \
     snmp \
     snmpd \
-    net-snmp \
-    net-snmp-utils \
+    snmp-mibs-downloader \
     nmap \
-    2>&1 | tee -a "$LOG_FILE"
+    2>&1 | tee -a "$LOG_FILE" || log "WARNING: Some system packages may have failed to install (continuing anyway)"
 
 # Verify snmpd is installed
 if command -v snmpd >/dev/null 2>&1; then
