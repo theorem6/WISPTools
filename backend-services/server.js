@@ -121,6 +121,23 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
 
+// Agent manifest endpoint (public - no auth required)
+app.get('/api/agent/manifest', async (req, res) => {
+  try {
+    const agentVersionManager = require('./utils/agent-version-manager');
+    const manifest = await agentVersionManager.getCurrentManifest();
+    
+    if (!manifest) {
+      return res.status(500).json({ error: 'Manifest not available' });
+    }
+    
+    res.json(manifest);
+  } catch (error) {
+    console.error('[Agent Manifest] Error:', error);
+    res.status(500).json({ error: 'Failed to load manifest', message: error.message });
+  }
+});
+
 // EPC Check-in endpoints - MUST be defined BEFORE /api/epc routes (no tenant ID required)
 const { RemoteEPC: RemoteEPCCheckin, EPCCommand, EPCServiceStatus, EPCAlert, EPCLog } = require('./models/distributed-epc-schema');
 
@@ -278,48 +295,20 @@ app.post('/api/epc/checkin', async (req, res) => {
         }
       }
       
-      // Check for script updates and queue update command if needed
+      // Check for agent script updates using version manager
       try {
-        const { checkForUpdates, generateUpdateCommand } = require('./utils/epc-auto-update');
+        const agentVersionManager = require('./utils/agent-version-manager');
+        const queuedCommands = await agentVersionManager.checkAndQueueUpdates(
+          epc.epc_id,
+          epc.tenant_id,
+          versions.scripts
+        );
         
-        // Extract script versions from versions object
-        // versions structure: { os: "...", kernel: "...", scripts: { "epc-checkin-agent.sh": { hash: "..." }, ... } }
-        const scriptVersions = versions?.scripts || {};
-        const updateInfo = await checkForUpdates(epc.epc_id, scriptVersions);
-        
-        if (updateInfo.has_updates) {
-          // Check if update command already exists and is pending or was sent recently (within last hour)
-          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-          const existingUpdate = await EPCCommand.findOne({
-            epc_id: epc.epc_id,
-            action: 'update_scripts',
-            $or: [
-              { status: { $in: ['pending', 'sent'] } },
-              { status: 'completed', created_at: { $gte: oneHourAgo } }
-            ]
-          });
-          
-          if (!existingUpdate) {
-            // Create auto-update command
-            const updateCommand = generateUpdateCommand(updateInfo);
-            if (updateCommand) {
-              const autoUpdateCmd = new EPCCommand({
-                ...updateCommand,
-                epc_id: epc.epc_id,
-                tenant_id: epc.tenant_id,
-                status: 'pending',
-                created_at: new Date(),
-                description: `Automatic script update: ${Object.keys(updateInfo.scripts).join(', ')}`
-              });
-              await autoUpdateCmd.save();
-              console.log(`[EPC Check-in] Queued auto-update command for ${epc.epc_id}: ${Object.keys(updateInfo.scripts).join(', ')}`);
-            }
-          } else {
-            console.log(`[EPC Check-in] Update already queued for ${epc.epc_id}`);
-          }
+        if (queuedCommands.length > 0) {
+          console.log(`[EPC Check-in] Queued ${queuedCommands.length} update command(s) for ${epc.epc_id}`);
         }
       } catch (updateError) {
-        console.warn(`[EPC Check-in] Error checking for updates:`, updateError.message);
+        console.warn(`[EPC Check-in] Error checking for script updates:`, updateError.message);
         // Don't fail check-in if update check fails
       }
     }
