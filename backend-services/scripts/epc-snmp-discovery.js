@@ -246,10 +246,16 @@ const CENTRAL_SERVER = 'hss.wisptools.io';
 const API_URL = `https://${CENTRAL_SERVER}/api/epc`;
 const CONFIG_DIR = '/etc/wisptools';
 const LOG_FILE = '/var/log/wisptools-snmp-discovery.log';
-const SNMP_COMMUNITIES = ['public', 'private', 'community'];
+const SNMP_COMMUNITIES = ['public', 'private', 'community']; // Default fallback
 const SNMP_TIMEOUT = 2000; // 2 seconds
 const MAX_PARALLEL_PINGS = 50;
 const MAX_PARALLEL_SNMP = 20;
+
+// SNMP configuration from EPC config (loaded at runtime)
+let SNMP_CONFIG = {
+  communities: SNMP_COMMUNITIES,
+  targets: [] // Subnets to scan
+};
 
 // Mikrotik-specific OIDs
 const MIKROTIK_OIDS = {
@@ -385,6 +391,55 @@ async function getTenantId() {
     // Ignore errors
   }
   return null;
+}
+
+/**
+ * Load SNMP configuration from EPC config file
+ */
+async function loadSNMPConfig() {
+  try {
+    const configFiles = [
+      '/etc/wisptools/last-config.json',
+      '/etc/wisptools/epc-config.json'
+    ];
+    
+    for (const configFile of configFiles) {
+      try {
+        if (await fs.access(configFile).then(() => true).catch(() => false)) {
+          const configContent = await fs.readFile(configFile, 'utf8');
+          const config = JSON.parse(configContent);
+          
+          if (config.snmp_config) {
+            const snmpConfig = config.snmp_config;
+            
+            // Load communities
+            if (snmpConfig.communities && Array.isArray(snmpConfig.communities) && snmpConfig.communities.length > 0) {
+              SNMP_CONFIG.communities = snmpConfig.communities.filter(c => c && c.trim().length > 0);
+              log(`Loaded ${SNMP_CONFIG.communities.length} SNMP communities from config: ${SNMP_CONFIG.communities.join(', ')}`);
+            } else if (snmpConfig.community) {
+              SNMP_CONFIG.communities = [snmpConfig.community];
+              log(`Loaded SNMP community from config: ${snmpConfig.community}`);
+            }
+            
+            // Load target subnets
+            if (snmpConfig.targets && Array.isArray(snmpConfig.targets) && snmpConfig.targets.length > 0) {
+              SNMP_CONFIG.targets = snmpConfig.targets.filter(t => t && t.trim().length > 0);
+              log(`Loaded ${SNMP_CONFIG.targets.length} SNMP target subnets from config: ${SNMP_CONFIG.targets.join(', ')}`);
+            }
+            
+            return true; // Successfully loaded config
+          }
+        }
+      } catch (fileError) {
+        // Try next file
+        continue;
+      }
+    }
+  } catch (error) {
+    log(`WARNING: Failed to load SNMP config: ${error.message}`);
+  }
+  
+  return false; // No config loaded, will use defaults
 }
 
 /**
@@ -1764,8 +1819,11 @@ async function main() {
   
   // Check for single IP test mode
   if (args.length > 0 && /^\d+\.\d+\.\d+\.\d+$/.test(args[0])) {
+    // Load SNMP config first
+    await loadSNMPConfig();
+    
     log(`Test mode: Scanning single IP ${args[0]}`);
-    const deviceInfo = await getDeviceInfo(args[0], SNMP_COMMUNITIES[0]).catch(() => null);
+    const deviceInfo = await getDeviceInfo(args[0], SNMP_CONFIG.communities[0] || SNMP_COMMUNITIES[0]).catch(() => null);
     if (deviceInfo) {
       console.log(JSON.stringify(deviceInfo, null, 2));
     } else {
@@ -1774,14 +1832,38 @@ async function main() {
     return;
   }
   
-  // Get network info
-  const subnet = args[0] || await getNetworkInfo();
+  // Load SNMP configuration from EPC config
+  await loadSNMPConfig();
   
-  log(`Starting SNMP discovery on subnet: ${subnet}`);
+  // Get subnets to scan (from config or command line arg or auto-detect)
+  let subnetsToScan = [];
+  
+  if (args[0] && !/^\d+\.\d+\.\d+\.\d+$/.test(args[0])) {
+    // Command line argument provided (subnet, not single IP)
+    subnetsToScan = [args[0]];
+  } else if (SNMP_CONFIG.targets && SNMP_CONFIG.targets.length > 0) {
+    // Use configured subnets
+    subnetsToScan = SNMP_CONFIG.targets;
+  } else {
+    // Auto-detect subnet
+    const autoSubnet = await getNetworkInfo();
+    subnetsToScan = [autoSubnet];
+  }
+  
+  log(`Starting SNMP discovery on ${subnetsToScan.length} subnet(s): ${subnetsToScan.join(', ')}`);
+  log(`Using SNMP communities: ${SNMP_CONFIG.communities.join(', ')}`);
   
   try {
-    // Scan network
-    const discoveredDevices = await scanNetwork(subnet);
+    // Scan all configured subnets
+    const allDiscoveredDevices = [];
+    
+    for (const subnet of subnetsToScan) {
+      log(`Scanning subnet: ${subnet}`);
+      const discoveredDevices = await scanNetwork(subnet, SNMP_CONFIG.communities);
+      allDiscoveredDevices.push(...discoveredDevices);
+    }
+    
+    const discoveredDevices = allDiscoveredDevices;
     
     // Report to server
     if (discoveredDevices.length > 0 || true) { // Always report, even if empty
