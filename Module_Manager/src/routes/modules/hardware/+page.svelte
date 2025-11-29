@@ -248,10 +248,18 @@
     deployment_type: 'both',
     device_code: '',
     hss_config: { mcc: '001', mnc: '01', tac: '1', apnName: 'internet', dnsPrimary: '8.8.8.8', dnsSecondary: '8.8.4.4' },
-    snmp_config: { enabled: true, community: 'public', version: '2c', pollingInterval: 60, autoDiscovery: true }
+    snmp_config: { 
+      enabled: true, 
+      community: 'public', 
+      communities: ['public'],
+      targets: [],
+      version: '2c', 
+      pollingInterval: 60, 
+      autoDiscovery: true 
+    }
   };
   let isSavingEPC = false;
-  let snmpCommunitiesText = '';
+  let snmpCommunitiesText = 'public';
   let snmpSubnetsText = '';
   
   async function loadAvailableSites() {
