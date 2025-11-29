@@ -272,7 +272,7 @@
       enabled: true, 
       community: 'public', 
       communities: ['public'],
-      targets: [],
+      targets: [] as string[],
       version: '2c', 
       pollingInterval: 60, 
       autoDiscovery: true 
