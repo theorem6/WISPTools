@@ -411,7 +411,10 @@
       try {
         const snmpResult = await monitoringService.getSNMPDevices();
         if (snmpResult.success && snmpResult.data?.devices) {
-          snmpResult.data.devices.forEach((device: any) => addDevice(device, 'snmp'));
+          // Filter to only deployed devices
+          snmpResult.data.devices
+            .filter((device: any) => device.isDeployed === true)
+            .forEach((device: any) => addDevice(device, 'snmp'));
         }
       } catch (e) { console.log('SNMP API not available:', e); }
       

@@ -54,6 +54,14 @@
     
     equipment = devices
       .filter(device => {
+        // Only include deployed devices with valid location coordinates
+        // Check if device is deployed (has siteId or isDeployed flag)
+        const isDeployed = device.isDeployed !== false && (device.siteId || device.isDeployed === true);
+        if (!isDeployed) {
+          console.warn('[MonitoringMap] Skipping non-deployed device:', device.name);
+          return false;
+        }
+        
         // Only include devices with valid location coordinates
         const lat = device.location?.coordinates?.latitude || device.location?.latitude;
         const lon = device.location?.coordinates?.longitude || device.location?.longitude;
@@ -96,9 +104,13 @@
         return equipmentItem;
       });
     
-    // Also create some towers for devices that need them (only with valid coordinates)
+    // Also create some towers for devices that need them (only deployed devices with valid coordinates)
     towers = devices
       .filter(device => {
+        // Only deployed devices
+        const isDeployed = device.isDeployed !== false && (device.siteId || device.isDeployed === true);
+        if (!isDeployed) return false;
+        
         const lat = device.location?.coordinates?.latitude || device.location?.latitude;
         const lon = device.location?.coordinates?.longitude || device.location?.longitude;
         return hasValidCoordinates(lat, lon) && (device.type === 'epc' || (device.type === 'mikrotik' && device.deviceType === 'router'));
