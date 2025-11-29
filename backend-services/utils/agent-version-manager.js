@@ -206,6 +206,9 @@ fi
 
 /**
  * Check for updates and queue update commands
+ * @param {string} epcId - EPC ID
+ * @param {string} tenantId - Tenant ID
+ * @param {Object} currentVersions - Current script versions from agent (may be flat scripts object or nested)
  */
 async function checkAndQueueUpdates(epcId, tenantId, currentVersions) {
   const EPCCommand = require('../models/distributed-epc-schema').EPCCommand;
@@ -216,7 +219,12 @@ async function checkAndQueueUpdates(epcId, tenantId, currentVersions) {
     return [];
   }
   
+  console.log(`[Agent Version Manager] Checking updates for EPC ${epcId}`);
+  console.log(`[Agent Version Manager] Agent reported scripts:`, currentVersions ? Object.keys(currentVersions).join(', ') : 'none');
+  
   const updatesNeeded = compareVersions(currentVersions, serverVersions);
+  
+  console.log(`[Agent Version Manager] Found ${updatesNeeded.length} update(s) needed`);
   
   if (updatesNeeded.length === 0) {
     console.log(`[Agent Version Manager] EPC ${epcId} has all scripts up to date`);
