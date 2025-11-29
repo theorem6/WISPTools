@@ -331,11 +331,18 @@ app.post('/api/epc/checkin', async (req, res) => {
         }
       } else {
         console.log(`[EPC Check-in] No versions object provided in check-in payload - skipping update check`);
+        console.log(`[EPC Check-in] Versions object type:`, typeof versions, `Keys:`, versions ? Object.keys(versions).join(', ') : 'null/undefined');
       }
     
+    // Fetch pending commands (includes any update commands just queued)
     const commands = await EPCCommand.find({
-      epc_id: epc.epc_id, status: 'pending', expires_at: { $gt: new Date() }
+      epc_id: epc.epc_id, 
+      status: 'pending', 
+      expires_at: { $gt: new Date() }
     }).sort({ priority: 1, created_at: 1 }).lean();
+    
+    console.log(`[EPC Check-in] Found ${commands.length} pending command(s) for ${epc.epc_id}:`, 
+      commands.map(c => `${c.command_type} (${c.notes || 'no notes'})`).join(', '));
     
     if (commands.length > 0) {
       await EPCCommand.updateMany(

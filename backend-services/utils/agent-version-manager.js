@@ -237,15 +237,20 @@ async function checkAndQueueUpdates(epcId, tenantId, currentVersions) {
   // Queue update commands
   const commands = [];
   for (const update of updatesNeeded) {
-    // Check if update command already exists for this script
+    // Check if update command already exists for this script (including recently completed ones)
+    // Only skip if there's a pending/sent command that was created in the last hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const existingCommand = await EPCCommand.findOne({
       epc_id: epcId,
-      status: { $in: ['pending', 'sent'] },
+      $or: [
+        { status: { $in: ['pending', 'sent'] } },
+        { status: 'completed', created_at: { $gte: oneHourAgo }, notes: new RegExp(`Auto-update.*${update.script}`) }
+      ],
       notes: new RegExp(`Auto-update.*${update.script}`)
     });
     
     if (existingCommand) {
-      console.log(`[Agent Version Manager] Update command for ${update.script} already queued, skipping`);
+      console.log(`[Agent Version Manager] Update command for ${update.script} already exists (status: ${existingCommand.status}), skipping`);
       continue;
     }
     
