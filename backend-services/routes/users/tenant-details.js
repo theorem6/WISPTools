@@ -36,6 +36,7 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     // Check if UserTenant model is available
     if (!UserTenant) {
       console.error('[tenant-details] UserTenant model not available');
+      console.error('[tenant-details] UserTenant import:', typeof UserTenant);
       return res.status(500).json({
         error: 'Internal Server Error',
         message: 'UserTenant model not initialized'
@@ -45,6 +46,7 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     // Check if Tenant model is available
     if (!Tenant) {
       console.error('[tenant-details] Tenant model not available');
+      console.error('[tenant-details] Tenant import:', typeof Tenant);
       return res.status(500).json({
         error: 'Internal Server Error',
         message: 'Tenant model not initialized'
@@ -148,12 +150,20 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     
   } catch (error) {
     console.error('[tenant-details] Error getting user tenants:', error);
+    console.error('[tenant-details] Error name:', error.name);
+    console.error('[tenant-details] Error message:', error.message);
     console.error('[tenant-details] Error stack:', error.stack);
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message || 'Failed to get user tenants',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('[tenant-details] Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
+    // Ensure response hasn't been sent
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: error.message || 'Failed to get user tenants',
+        errorName: error.name,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
 });
 
