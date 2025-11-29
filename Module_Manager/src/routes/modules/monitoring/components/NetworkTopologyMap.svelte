@@ -960,14 +960,14 @@
   
   .topology-controls {
     position: absolute;
-    top: 1rem;
+    top: 80px;
     left: 1rem;
     z-index: 1000;
     background: var(--card-bg, white);
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     max-width: 280px;
-    max-height: calc(100% - 2rem);
+    max-height: calc(100% - 100px);
     overflow-y: auto;
   }
   
@@ -1046,7 +1046,7 @@
   
   .details-panel {
     position: absolute;
-    top: 1rem;
+    top: 80px;
     right: 1rem;
     width: 300px;
     background: var(--card-bg, white);

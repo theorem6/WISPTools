@@ -194,7 +194,8 @@
 <style>
   .mikrotik-devices-panel {
     padding: 2rem;
-    background: white;
+    background: var(--card-bg, var(--bg-primary, #ffffff));
+    color: var(--text-primary, #111827);
     min-height: 100vh;
   }
   
@@ -203,6 +204,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    padding-top: 1rem;
   }
   
   .panel-header h2 {

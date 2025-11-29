@@ -35,7 +35,6 @@
   // EPC Monitoring
   let epcDevices: any[] = [];
   let selectedEpcDevice: any = null;
-  let showEpcPanel = false;
   
   // Tenant info - use currentTenant store
   $: tenantId = $currentTenant?.id || '';
@@ -175,14 +174,8 @@
     }
   }
   
-  function openEpcMonitoring(device: any) {
+  function selectEpcDevice(device: any) {
     selectedEpcDevice = device;
-    showEpcPanel = true;
-  }
-  
-  function closeEpcPanel() {
-    showEpcPanel = false;
-    selectedEpcDevice = null;
   }
   
   onDestroy(() => {
@@ -708,7 +701,7 @@
   <!-- EPC Devices View -->
   {#if mapView === 'epc'}
     <div class="epc-devices-overlay">
-      <div class="epc-devices-grid">
+      <div class="epc-devices-container">
         {#if loadingEPCDevices}
           <div class="no-devices">
             <p>⏳ Loading EPC devices...</p>
@@ -724,51 +717,44 @@
             <p class="hint">Link EPC devices via the Deploy module</p>
           </div>
         {:else}
-          {#each epcDevices as device (device.epc_id || device.epcId || device.id)}
-            <div class="epc-device-card" on:click={() => openEpcMonitoring(device)}>
-              <div class="device-header">
-                <span class="device-status status-{device.status}">
-                  {device.status === 'online' ? '🟢' : '🔴'}
-                </span>
-                <h3>{device.site_name || device.name || 'Remote EPC Device'}</h3>
-              </div>
-              <div class="device-info">
-                <div class="info-row">
-                  <span class="label">Device Code:</span>
-                  <code>{device.device_code || 'N/A'}</code>
-                </div>
-                <div class="info-row">
-                  <span class="label">IP Address:</span>
-                  <span>{device.ip_address || device.ipAddress || 'Unknown'}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">Last Seen:</span>
-                  <span>
-                    {#if device.last_seen}
-                      {formatInTenantTimezone(device.last_seen)}
-                    {:else}
-                      Never
-                    {/if}
+          <div class="epc-devices-sidebar">
+            <h3>EPC Devices ({epcDevices.length})</h3>
+            {#each epcDevices as device (device.epc_id || device.epcId || device.id)}
+              <div 
+                class="epc-device-card {selectedEpcDevice?.epc_id === device.epc_id ? 'selected' : ''}" 
+                on:click={() => selectEpcDevice(device)}
+              >
+                <div class="device-header">
+                  <span class="device-status status-{device.status}">
+                    {device.status === 'online' ? '🟢' : '🔴'}
                   </span>
+                  <h4>{device.site_name || device.name || 'Remote EPC Device'}</h4>
+                </div>
+                <div class="device-info-compact">
+                  <div class="info-row">
+                    <span class="label">IP:</span>
+                    <span>{device.ip_address || device.ipAddress || 'Unknown'}</span>
+                  </div>
+                  <div class="info-row">
+                    <span class="label">Code:</span>
+                    <code>{device.device_code || 'N/A'}</code>
+                  </div>
                 </div>
               </div>
-              <div class="device-metrics">
-                <div class="metric">
-                  <span class="metric-label">CPU</span>
-                  <span class="metric-value">{device.metrics?.cpuUsage ?? 'N/A'}%</span>
-                </div>
-                <div class="metric">
-                  <span class="metric-label">MEM</span>
-                  <span class="metric-value">{device.metrics?.memoryUsage ?? 'N/A'}%</span>
-                </div>
-                <div class="metric">
-                  <span class="metric-label">Uptime</span>
-                  <span class="metric-value">{device.metrics?.uptime || 'N/A'}</span>
-                </div>
+            {/each}
+          </div>
+          <div class="epc-monitoring-main">
+            {#if selectedEpcDevice}
+              <EPCMonitoringPanel 
+                epc={selectedEpcDevice}
+                onClose={() => selectedEpcDevice = null}
+              />
+            {:else}
+              <div class="no-selection">
+                <p>📡 Select an EPC device from the list to view monitoring details</p>
               </div>
-              <button class="view-details-btn">View Details →</button>
-            </div>
-          {/each}
+            {/if}
+          </div>
         {/if}
       </div>
     </div>
@@ -925,17 +911,6 @@
   </div>
 {/if}
 
-<!-- EPC Monitoring Panel Modal -->
-{#if showEpcPanel && selectedEpcDevice}
-  <div class="modal-overlay" on:click={closeEpcPanel}>
-    <div class="epc-modal-content" on:click|stopPropagation>
-      <EPCMonitoringPanel 
-        epc={selectedEpcDevice}
-        onClose={closeEpcPanel}
-      />
-    </div>
-  </div>
-{/if}
 
 <style>
   /* App Container - Full Screen */
@@ -957,11 +932,12 @@
   /* SNMP Graphs View */
   .graphs-overlay {
     position: absolute;
-    top: 80px;
+    top: 140px;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 5;
+    padding: 1.5rem;
   }
   
   /* EPC Devices View */
@@ -977,7 +953,7 @@
 
   .snmp-overlay {
     position: absolute;
-    top: 80px;
+    top: 140px;
     left: 0;
     right: 0;
     bottom: 0;
@@ -990,153 +966,17 @@
 
   .mikrotik-overlay {
     position: absolute;
-    top: 80px;
+    top: 140px;
     left: 0;
     right: 0;
     bottom: 0;
-    background: white;
+    background: var(--card-bg, var(--bg-primary, #ffffff));
+    color: var(--text-primary, #111827);
     overflow-y: auto;
     padding: 2rem;
     z-index: 5;
   }
   
-  .epc-devices-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.5rem;
-    max-width: 1600px;
-    margin: 0 auto;
-  }
-  
-  .epc-device-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 1.25rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-  }
-  
-  .epc-device-card:hover {
-    background: rgba(255,255,255,0.1);
-    border-color: rgba(59, 130, 246, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-  }
-  
-  .epc-device-card .device-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-  
-  .epc-device-card .device-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #f1f5f9;
-    flex: 1;
-  }
-  
-  .epc-device-card .device-status {
-    font-size: 1rem;
-  }
-  
-  .epc-device-card .device-info {
-    margin-bottom: 1rem;
-  }
-  
-  .epc-device-card .info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.35rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-size: 0.875rem;
-  }
-  
-  .epc-device-card .info-row .label {
-    color: #94a3b8;
-  }
-  
-  .epc-device-card .info-row code {
-    background: rgba(59, 130, 246, 0.2);
-    padding: 0.125rem 0.5rem;
-    border-radius: 4px;
-    font-family: monospace;
-    color: #60a5fa;
-    font-size: 0.8rem;
-  }
-  
-  .epc-device-card .device-metrics {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    background: rgba(0,0,0,0.2);
-    border-radius: 8px;
-  }
-  
-  .epc-device-card .metric {
-    flex: 1;
-    text-align: center;
-  }
-  
-  .epc-device-card .metric-label {
-    display: block;
-    font-size: 0.7rem;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  
-  .epc-device-card .metric-value {
-    display: block;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #e2e8f0;
-  }
-  
-  .epc-device-card .view-details-btn {
-    width: 100%;
-    padding: 0.75rem;
-    background: rgba(59, 130, 246, 0.2);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 8px;
-    color: #60a5fa;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s;
-  }
-  
-  .epc-device-card .view-details-btn:hover {
-    background: rgba(59, 130, 246, 0.3);
-    border-color: #3b82f6;
-  }
-  
-  .no-devices {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #64748b;
-  }
-  
-  .no-devices p {
-    margin: 0.5rem 0;
-  }
-  
-  .no-devices .hint {
-    font-size: 0.875rem;
-  }
-  
-  /* EPC Modal */
-  .epc-modal-content {
-    width: 90%;
-    max-width: 1200px;
-    max-height: 90vh;
-    overflow: hidden;
-    border-radius: 12px;
-    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-  }
 
   /* Floating Header Overlay */
   /* Header Overlay - Using common styles from moduleHeaderMenu.css */

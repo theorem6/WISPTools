@@ -687,12 +687,13 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
+    padding-top: 1rem;
   }
   
   .device-header h2 {
     margin: 0;
     font-size: 1.5rem;
-    color: #f1f5f9;
+    color: var(--text-primary, #111827);
   }
   
   .time-selector {

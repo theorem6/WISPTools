@@ -18,6 +18,8 @@
   let existingHardware: any[] = [];
   let loadingHardware = false;
   let deployments: any[] = [];
+  let sites: any[] = [];
+  let loadingSites = false;
   
   $: if ($currentTenant?.id) {
     tenantId = $currentTenant.id;
@@ -45,7 +47,7 @@
       // Use monitoringService which handles routing through Firebase Hosting
       const [discoveredResult, deploymentsResponse] = await Promise.all([
         monitoringService.getDiscoveredDevices().catch(() => ({ success: false, data: { devices: [] } })),
-        fetch(`${API_CONFIG.PATHS.COVERAGE_MAP}/deployments`, {
+        fetch(`${API_CONFIG.PATHS.NETWORK}/deployments`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'X-Tenant-ID': tenantId
@@ -195,8 +197,36 @@
     resetHardwareForm();
     // Set default asset tag based on device
     hardwareForm.assetTag = `SNMP-${device.ipAddress || device.id.substring(0, 8)}`;
-    hardwareForm.siteName = device.discoveredBy || '';
+    hardwareForm.siteId = device.siteId || '';
+    loadSites();
     showAddHardwareModal = true;
+  }
+
+  async function loadSites() {
+    if (!tenantId) return;
+    
+    loadingSites = true;
+    try {
+      const user = auth().currentUser;
+      if (!user) return;
+      
+      const token = await user.getIdToken();
+      const response = await fetch(`${API_CONFIG.PATHS.NETWORK}/sites`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        sites = Array.isArray(data) ? data : [];
+      }
+    } catch (err: any) {
+      console.error('[SNMP Devices] Error loading sites:', err);
+    } finally {
+      loadingSites = false;
+    }
   }
   
   function closeModals() {
@@ -262,7 +292,7 @@
   let hardwareForm = {
     assetTag: '',
     category: 'Network Equipment',
-    siteName: ''
+    siteId: ''
   };
   
   async function createNewHardware(device: any) {
@@ -295,7 +325,7 @@
         body: JSON.stringify({
           assetTag: hardwareForm.assetTag,
           category: hardwareForm.category,
-          siteName: hardwareForm.siteName || device.discoveredBy || 'Unknown Site',
+          siteId: hardwareForm.siteId,
           location: device.location || {}
         })
       });
@@ -304,7 +334,7 @@
         const data = await response.json();
         console.log('[SNMP Devices] Created hardware:', data);
         closeModals();
-        hardwareForm = { assetTag: '', category: 'Network Equipment', siteName: '' };
+        hardwareForm = { assetTag: '', category: 'Network Equipment', siteId: '' };
         await loadDiscoveredDevices();
         // Show success message
         alert('Hardware created successfully!');
@@ -325,7 +355,7 @@
     hardwareForm = {
       assetTag: '',
       category: 'Network Equipment',
-      siteName: ''
+      siteId: ''
     };
   }
   
@@ -502,13 +532,23 @@
         </div>
         
         <div class="form-group">
-          <label for="siteName">Site Name:</label>
-          <input 
-            id="siteName"
-            type="text" 
-            bind:value={hardwareForm.siteName}
-            placeholder={selectedDevice.discoveredBy || 'Site Name'}
-          />
+          <label for="siteId">Site:</label>
+          {#if loadingSites}
+            <select id="siteId" disabled>
+              <option>Loading sites...</option>
+            </select>
+          {:else if sites.length === 0}
+            <select id="siteId" disabled>
+              <option>No sites available</option>
+            </select>
+          {:else}
+            <select id="siteId" bind:value={hardwareForm.siteId} required>
+              <option value="">-- Select a Site --</option>
+              {#each sites as site (site._id || site.id)}
+                <option value={site._id || site.id}>{site.name || 'Unnamed Site'}</option>
+              {/each}
+            </select>
+          {/if}
         </div>
         
         {#if createError}
@@ -541,6 +581,7 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    padding-top: 1rem;
   }
   
   .panel-header h2 {
