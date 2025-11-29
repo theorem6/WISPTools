@@ -9,7 +9,7 @@
     type InventoryFilters,
     type InventoryStats
   } from '$lib/services/inventoryService';
-  import { categoryList, getTypesByCategory, equipmentCategories } from '$lib/config/equipmentCategories';
+  import { categoryList, getEquipmentTypesByCategory, equipmentCategories } from '$lib/config/equipmentCategories';
   import { goto } from '$app/navigation';
   import ScanModal from '../inventory/components/ScanModal.svelte';
   import { auth } from '$lib/firebase';
@@ -92,21 +92,12 @@
     'other'
   ];
   
-  // Tenant reactive statements - sync to localStorage and reload on change
+  // Tenant ID - reactive to currentTenant store
   $: tenantId = $currentTenant?.id || '';
   
   // Sync tenantId to localStorage for services that use it
-  $: if (tenantId && browser) {
+  $: if (tenantId && browser && $currentTenant) {
     localStorage.setItem('selectedTenantId', tenantId);
-  }
-  
-  // Watch for tenant changes and reload data
-  $: if (browser && tenantId) {
-    console.log('[Hardware] Tenant loaded:', tenantId);
-    if (tenantId) {
-      loadData();
-      loadEPCDevices();
-    }
   }
   
   onMount(async () => {
@@ -115,9 +106,13 @@
     }
   });
   
+  // Watch for tenant changes and reload data (must check both tenantId and currentTenant exists)
+  $: if (browser && tenantId && $currentTenant?.id) {
+    loadData();
+  }
+  
   async function loadData() {
-    const tenantId = $currentTenant?.id;
-    if (!tenantId) {
+    if (!$currentTenant?.id) {
       console.warn('[Hardware] No tenant ID available, skipping data load');
       return;
     }
@@ -1100,9 +1095,11 @@
               <textarea 
                 bind:value={snmpCommunitiesText} 
                 on:input={(e) => {
-                  const communities = e.target.value.split('\n')
-                    .map(c => c.trim())
-                    .filter(c => c.length > 0);
+                  const target = e.target as HTMLTextAreaElement;
+                  if (!target) return;
+                  const communities = target.value.split('\n')
+                    .map((c: string) => c.trim())
+                    .filter((c: string) => c.length > 0);
                   epcEditForm.snmp_config.communities = communities;
                   if (communities.length > 0) {
                     epcEditForm.snmp_config.community = communities[0]; // Keep first as legacy
@@ -1121,9 +1118,11 @@ readonly"
               <textarea 
                 bind:value={snmpSubnetsText} 
                 on:input={(e) => {
-                  const subnets = e.target.value.split('\n')
-                    .map(s => s.trim())
-                    .filter(s => s.length > 0);
+                  const target = e.target as HTMLTextAreaElement;
+                  if (!target) return;
+                  const subnets = target.value.split('\n')
+                    .map((s: string) => s.trim())
+                    .filter((s: string) => s.length > 0);
                   epcEditForm.snmp_config.targets = subnets;
                 }}
                 placeholder="192.168.1.0/24
