@@ -398,11 +398,20 @@
       
       if (response.ok) {
         const data = await response.json();
-        console.log('[SNMP Devices] Created hardware:', data);
+        console.log('[SNMP Devices] Created hardware response:', {
+          success: data.success,
+          deviceId: data.deviceId,
+          hardwareId: data.hardwareId,
+          deviceSiteId: data.deviceSiteId,
+          message: data.message,
+          fullResponse: data
+        });
+        
         if (data.deviceSiteId) {
           console.log(`[SNMP Devices] ✓ Device ${data.deviceId} has siteId: ${data.deviceSiteId}`);
         } else {
-          console.warn(`[SNMP Devices] ⚠️ Device ${data.deviceId} does NOT have siteId in response`);
+          console.warn(`[SNMP Devices] ⚠️ Device ${data.deviceId} does NOT have siteId in response. Message: ${data.message || 'No message'}`);
+          console.warn(`[SNMP Devices] Request details - siteId sent: ${hardwareForm.siteId || 'none'}, siteName: ${siteName || 'none'}`);
         }
         closeModals();
         hardwareForm = { assetTag: '', category: 'Networking Equipment', siteId: '' };
