@@ -398,13 +398,15 @@
       
       if (response.ok) {
         const data = await response.json();
-        console.log('[SNMP Devices] Created hardware response:', {
+        console.log('[SNMP Devices] Created hardware response - FULL OBJECT:', JSON.stringify(data, null, 2));
+        console.log('[SNMP Devices] Created hardware response summary:', {
           success: data.success,
           deviceId: data.deviceId,
           hardwareId: data.hardwareId,
           deviceSiteId: data.deviceSiteId,
-          message: data.message,
-          fullResponse: data
+          attemptedSiteId: data.attemptedSiteId,
+          updateResultSiteId: data.updateResultSiteId,
+          message: data.message
         });
         
         if (data.deviceSiteId) {
