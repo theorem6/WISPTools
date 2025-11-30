@@ -856,6 +856,19 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       }
     }
     
+    // Check if device already has inventory item (already deployed)
+    const { InventoryItem } = require('../models/inventory');
+    let inventoryItem = null;
+    if (device.inventoryId) {
+      inventoryItem = await InventoryItem.findOne({ 
+        _id: device.inventoryId, 
+        tenantId: req.tenantId 
+      });
+      if (inventoryItem) {
+        console.log(`ℹ️ [SNMP API] Device ${deviceId} already has inventory item ${inventoryItem._id}, will update it`);
+      }
+    }
+    
     // Find site by siteId or siteName
     let site = null;
     const { UnifiedSite } = require('../models/network');
@@ -865,11 +878,37 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       site = await UnifiedSite.findOne({ name: siteName, tenantId: req.tenantId }).lean();
     }
     
-    // Create inventory item
-    const { InventoryItem } = require('../models/inventory');
-    const inventoryItem = new InventoryItem({
+    // If no existing inventory item, check if assetTag already exists to avoid duplicates
+    if (!inventoryItem) {
+      const proposedAssetTag = assetTag || `SNMP-${notes.management_ip || device.serialNumber || deviceId.substring(0, 8)}`;
+      const existingByTag = await InventoryItem.findOne({ 
+        assetTag: proposedAssetTag, 
+        tenantId: req.tenantId 
+      });
+      
+      if (existingByTag) {
+        // Asset tag exists - use the existing item
+        console.log(`ℹ️ [SNMP API] Asset tag ${proposedAssetTag} already exists, using existing inventory item ${existingByTag._id}`);
+        inventoryItem = existingByTag;
+      }
+    }
+    
+    // Create or update inventory item
+    if (!inventoryItem) {
+      // Generate unique assetTag if needed
+      const baseAssetTag = assetTag || `SNMP-${notes.management_ip || device.serialNumber || deviceId.substring(0, 8)}`;
+      let uniqueAssetTag = baseAssetTag;
+      let suffix = 1;
+      
+      // Check if base tag exists, append suffix if needed
+      while (await InventoryItem.findOne({ assetTag: uniqueAssetTag, tenantId: req.tenantId })) {
+        uniqueAssetTag = `${baseAssetTag}-${suffix}`;
+        suffix++;
+      }
+      
+      inventoryItem = new InventoryItem({
       tenantId: req.tenantId,
-      assetTag: assetTag || `SNMP-${notes.management_ip || device.serialNumber || deviceId.substring(0, 8)}`,
+      assetTag: uniqueAssetTag,
       category: category === 'Network Equipment' ? 'Networking Equipment' : (category || 'Networking Equipment'),
       subcategory: device.type === 'router' ? 'Router' :
                    device.type === 'switch' ? 'Switch' :
@@ -911,7 +950,12 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     // Mark device as deployed: Set siteId and enable graphs
     // siteId must be an ObjectId (not a string) for NetworkEquipment schema
     const savedSiteId = site?._id || null;
-    device.siteId = savedSiteId;
+    if (savedSiteId) {
+      device.siteId = savedSiteId;
+      console.log(`✅ [SNMP API] Setting device siteId to: ${savedSiteId.toString()}`);
+    } else {
+      console.warn(`⚠️ [SNMP API] No site found for siteId: ${siteId}, siteName: ${siteName}`);
+    }
     if (typeof device.notes === 'string') {
       notes.inventory_id = inventoryItem._id.toString();
       notes.created_from_discovery = true;
