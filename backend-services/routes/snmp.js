@@ -543,11 +543,12 @@ router.get('/discovered', async (req, res) => {
     
     // Get devices that were discovered by EPC agents
     // Notes can be stored as JSON string or object, and we need to search for discovery metadata
-    // Explicitly select siteId and inventoryId to ensure they're included in the response
+    // Explicitly include siteId and inventoryId - with lean(), all fields should be included by default
+    // But we'll be explicit to ensure siteId is returned
     const allEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       status: 'active'
-    }).select('+siteId +inventoryId').lean(); // + prefix includes fields that might be excluded by default
+    }).lean();
     
     // Filter devices that have discovery metadata in notes
     const discoveredEquipment = allEquipment.filter(equipment => {
@@ -612,7 +613,14 @@ router.get('/discovered', async (req, res) => {
       
       // Debug logging for devices with inventoryId (should have siteId)
       if (equipment.inventoryId || notes.inventory_id) {
-        console.log(`🔍 [SNMP API] Device ${equipment.name || equipment._id} - siteId: ${siteIdString || 'null'}, inventoryId: ${equipment.inventoryId || notes.inventory_id}`);
+        console.log(`🔍 [SNMP API] Device ${equipment.name || equipment._id}`, {
+          deviceId: equipment._id?.toString(),
+          siteId_raw: equipment.siteId,
+          siteId_string: siteIdString,
+          inventoryId: equipment.inventoryId || notes.inventory_id,
+          siteId_type: typeof equipment.siteId,
+          siteId_isObject: equipment.siteId?.constructor?.name
+        });
       }
       
       // Check if device is deployed (has siteId or matches a deployment)
@@ -1005,18 +1013,39 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     device.inventoryId = inventoryItem._id.toString();
     await device.save();
     
-    // Verify the save worked - explicitly select siteId
-    const updatedDevice = await NetworkEquipment.findById(deviceId).select('+siteId').lean();
-    let parsedNotes = {};
-    try {
-      parsedNotes = typeof updatedDevice?.notes === 'string' ? JSON.parse(updatedDevice.notes) : (updatedDevice?.notes || {});
-    } catch (e) {}
-    
-    console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);
-    console.log(`✅ [SNMP API] Device siteId after save: ${updatedDevice?.siteId ? updatedDevice.siteId.toString() : 'null'}, enable_graphs: ${parsedNotes.enable_graphs !== undefined ? parsedNotes.enable_graphs : 'not set'}`);
-    
-    if (!updatedDevice?.siteId) {
-      console.warn(`⚠️ [SNMP API] WARNING: Device ${deviceId} siteId was not saved correctly. Site lookup result:`, site ? { id: site._id?.toString(), name: site.name } : 'null');
+    // Verify the save worked - explicitly select siteId, refresh from DB
+    // Use findOneAndUpdate or refresh the device to ensure we get the latest
+    const refreshedDevice = await NetworkEquipment.findById(deviceId);
+    if (!refreshedDevice) {
+      console.error(`❌ [SNMP API] ERROR: Could not find device ${deviceId} after save`);
+    } else {
+      // Refresh from database
+      await refreshedDevice.populate('siteId');
+      const refreshedLean = await NetworkEquipment.findById(deviceId).lean();
+      
+      let parsedNotes = {};
+      try {
+        parsedNotes = typeof refreshedLean?.notes === 'string' ? JSON.parse(refreshedLean.notes) : (refreshedLean?.notes || {});
+      } catch (e) {}
+      
+      console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);
+      console.log(`✅ [SNMP API] Device siteId after save (refreshed):`, {
+        siteId_raw: refreshedLean?.siteId,
+        siteId_string: refreshedLean?.siteId ? (typeof refreshedLean.siteId === 'object' ? refreshedLean.siteId.toString() : String(refreshedLean.siteId)) : 'null',
+        siteId_type: typeof refreshedLean?.siteId,
+        enable_graphs: parsedNotes.enable_graphs !== undefined ? parsedNotes.enable_graphs : 'not set',
+        inventoryId: refreshedLean?.inventoryId
+      });
+      
+      if (!refreshedLean?.siteId) {
+        console.warn(`⚠️ [SNMP API] WARNING: Device ${deviceId} siteId was not saved correctly. Site lookup result:`, site ? { id: site._id?.toString(), name: site.name } : 'null');
+        console.warn(`⚠️ [SNMP API] Device data:`, {
+          _id: refreshedLean?._id,
+          name: refreshedLean?.name,
+          inventoryId: refreshedLean?.inventoryId,
+          siteId_field_exists: 'siteId' in (refreshedLean || {})
+        });
+      }
     }
     
     res.json({
