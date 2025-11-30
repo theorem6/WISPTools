@@ -51,6 +51,11 @@ async function loadManifest() {
       const manifestContent = await fs.readFile(manifestPath, 'utf8');
       const manifest = JSON.parse(manifestContent);
       console.log(`[Agent Version Manager] Loaded manifest from: ${manifestPath}`);
+      // Log first script hash for debugging
+      const firstScript = Object.keys(manifest.scripts || {})[0];
+      if (firstScript && manifest.scripts[firstScript]) {
+        console.log(`[Agent Version Manager] Sample hash from manifest: ${firstScript} = ${manifest.scripts[firstScript].sha256?.substring(0, 16)}...`);
+      }
       return manifest;
     } catch (error) {
       // Try next path
