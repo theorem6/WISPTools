@@ -879,7 +879,7 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       condition: 'good',
       currentLocation: {
         type: 'tower',
-        siteId: site?._id?.toString() || null,
+        siteId: site?._id?.toString() || null, // InventoryItem uses string for siteId in location
         siteName: site?.name || siteName || 'Unknown Site',
         address: location?.address || device.location?.address || site?.location?.address || 'Unknown Location'
       },
@@ -904,7 +904,8 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     await inventoryItem.save();
     
     // Mark device as deployed: Set siteId and enable graphs
-    const savedSiteId = site?._id?.toString() || null;
+    // siteId must be an ObjectId (not a string) for NetworkEquipment schema
+    const savedSiteId = site?._id || null;
     device.siteId = savedSiteId;
     if (typeof device.notes === 'string') {
       notes.inventory_id = inventoryItem._id.toString();
@@ -924,8 +925,17 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     
     // Verify the save worked
     const updatedDevice = await NetworkEquipment.findById(deviceId).lean();
+    let parsedNotes = {};
+    try {
+      parsedNotes = typeof updatedDevice?.notes === 'string' ? JSON.parse(updatedDevice.notes) : (updatedDevice?.notes || {});
+    } catch (e) {}
+    
     console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);
-    console.log(`✅ [SNMP API] Device siteId after save: ${updatedDevice?.siteId || 'null'}, enable_graphs: ${updatedDevice?.notes ? (typeof updatedDevice.notes === 'string' ? JSON.parse(updatedDevice.notes).enable_graphs : updatedDevice.notes.enable_graphs) : 'not set'}`);
+    console.log(`✅ [SNMP API] Device siteId after save: ${updatedDevice?.siteId ? updatedDevice.siteId.toString() : 'null'}, enable_graphs: ${parsedNotes.enable_graphs !== undefined ? parsedNotes.enable_graphs : 'not set'}`);
+    
+    if (!updatedDevice?.siteId) {
+      console.warn(`⚠️ [SNMP API] WARNING: Device ${deviceId} siteId was not saved correctly. Site lookup result:`, site ? { id: site._id?.toString(), name: site.name } : 'null');
+    }
     
     res.json({
       success: true,
