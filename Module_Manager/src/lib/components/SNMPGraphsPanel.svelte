@@ -471,7 +471,15 @@
               <span class="device-status {getStatusColor(device.status)}"></span>
               <div class="device-info">
                 <span class="device-name">{device.name || device.hostname || 'Unknown'}</span>
-                <span class="device-ip">{device.ip_address || device.management_ip || 'N/A'}</span>
+                <span class="device-details">
+                  <span class="device-ip">{device.ip_address || device.management_ip || 'N/A'}</span>
+                  {#if device.manufacturer && device.manufacturer !== 'Generic'}
+                    <span class="device-manufacturer"> • {device.manufacturer}</span>
+                  {/if}
+                  {#if device.deviceType && device.deviceType !== 'other'}
+                    <span class="device-type"> • {device.deviceType}</span>
+                  {/if}
+                </span>
               </div>
             </button>
           {/each}
@@ -676,6 +684,22 @@
     color: #64748b;
     font-family: monospace;
   }
+
+  .device-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .device-manufacturer,
+  .device-type {
+    font-size: 0.7rem;
+    color: #94a3b8;
+  }
+
+  .device-manufacturer {
+    font-weight: 500;
+  }
   
   .graphs-area {
     padding: 1.5rem;
@@ -691,9 +715,24 @@
   }
   
   .device-header h2 {
-    margin: 0;
+    margin: 0 0 0.25rem 0;
     font-size: 1.5rem;
     color: var(--text-primary, #111827);
+  }
+
+  .device-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+  }
+
+  .device-subtitle .manufacturer {
+    font-weight: 500;
+    color: #94a3b8;
+  }
+
+  .device-subtitle .device-type {
+    text-transform: capitalize;
   }
   
   .time-selector {

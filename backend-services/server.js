@@ -411,6 +411,18 @@ app.use('/api/epc', require('./routes/epc-logs')); // EPC logs
 app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));
+
+// Initialize SNMP polling service
+try {
+  const snmpPollingService = require('./services/snmp-polling-service');
+  snmpPollingService.start().catch(err => {
+    console.warn('⚠️ SNMP polling service failed to start:', err.message);
+  });
+  console.log('✅ SNMP polling service initialized');
+} catch (error) {
+  console.warn('⚠️ SNMP polling service disabled:', error.message);
+}
+
 // EPC delete route using POST (workaround for DELETE routing issues)
 const { RemoteEPC: RemoteEPCModel } = require('./models/distributed-epc-schema');
 const { InventoryItem: InventoryItemModel } = require('./models/inventory');

@@ -339,29 +339,43 @@ router.post('/poll/:deviceId', async (req, res) => {
     const { deviceId } = req.params;
     console.log(`🔄 [SNMP API] Manually polling device ${deviceId}`);
     
-    // TODO: This should trigger an immediate SNMP poll via the SNMP collector service
-    // For now, return the latest metrics from database if available
-    const SNMPMetrics = require('../models/snmp-metrics-schema').SNMPMetrics;
-    const latestMetric = await SNMPMetrics.findOne({
-      device_id: deviceId,
-      tenant_id: req.tenantId
-    }).sort({ timestamp: -1 }).lean();
+    // Trigger immediate SNMP poll via polling service
+    const snmpPollingService = require('../services/snmp-polling-service');
+    const startTime = Date.now();
     
-    const pollResult = {
-      deviceId,
-      timestamp: new Date().toISOString(),
-      success: latestMetric !== null,
-      responseTime: null,
-      metrics: latestMetric ? {
-        'system.sysUpTime': latestMetric.system?.uptime_seconds ?? null,
-        'hrProcessor.hrProcessorLoad': latestMetric.resources?.cpu_percent ?? null,
-        'hrStorage.hrStorageUsed': latestMetric.resources?.disk_percent ?? null,
-        'ifTable.ifInOctets.1': latestMetric.network?.interface_in_octets ?? null,
-        'ifTable.ifOutOctets.1': latestMetric.network?.interface_out_octets ?? null
-      } : null
-    };
-    
-    res.json(pollResult);
+    try {
+      const success = await snmpPollingService.pollDeviceById(deviceId, req.tenantId);
+      const responseTime = Date.now() - startTime;
+      
+      // Get latest metrics after polling
+      const SNMPMetrics = require('../models/snmp-metrics-schema').SNMPMetrics;
+      const latestMetric = await SNMPMetrics.findOne({
+        device_id: deviceId,
+        tenant_id: req.tenantId
+      }).sort({ timestamp: -1 }).lean();
+      
+      const pollResult = {
+        deviceId,
+        timestamp: new Date().toISOString(),
+        success: success && latestMetric !== null,
+        responseTime,
+        metrics: latestMetric ? {
+          'system.sysUpTime': latestMetric.system?.uptime_seconds ?? null,
+          'hrProcessor.hrProcessorLoad': latestMetric.resources?.cpu_percent ?? null,
+          'hrStorage.hrStorageUsed': latestMetric.resources?.disk_percent ?? null,
+          'ifTable.ifInOctets.1': latestMetric.network?.interface_in_octets ?? null,
+          'ifTable.ifOutOctets.1': latestMetric.network?.interface_out_octets ?? null
+        } : null
+      };
+      
+      res.json(pollResult);
+    } catch (pollError) {
+      console.error(`❌ [SNMP API] Polling failed for device ${deviceId}:`, pollError);
+      res.status(500).json({
+        error: 'Failed to poll device',
+        message: pollError.message
+      });
+    }
   } catch (error) {
     console.error('❌ [SNMP API] Error polling device:', error);
     res.status(500).json({ 
