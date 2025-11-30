@@ -944,8 +944,32 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       createdAt: new Date(),
       updatedAt: new Date()
     });
-    
-    await inventoryItem.save();
+      
+      await inventoryItem.save();
+      console.log(`✅ [SNMP API] Created new inventory item ${inventoryItem._id} with assetTag: ${uniqueAssetTag}`);
+    } else {
+      // Update existing inventory item
+      inventoryItem.assetTag = assetTag || inventoryItem.assetTag;
+      inventoryItem.category = category === 'Network Equipment' ? 'Networking Equipment' : (category || inventoryItem.category || 'Networking Equipment');
+      inventoryItem.subcategory = device.type === 'router' ? 'Router' :
+                                  device.type === 'switch' ? 'Switch' :
+                                  device.type === 'ap' ? 'Access Point' : (inventoryItem.subcategory || 'Network Device');
+      inventoryItem.equipmentType = device.manufacturer ? `${device.manufacturer} ${device.model || ''}`.trim() : 
+                                    (notes.device_type || inventoryItem.equipmentType || 'SNMP Device');
+      inventoryItem.manufacturer = device.manufacturer || inventoryItem.manufacturer || 'Generic';
+      inventoryItem.model = device.model || notes.sysDescr || inventoryItem.model || 'Unknown';
+      inventoryItem.status = 'deployed'; // Update status to deployed
+      inventoryItem.currentLocation = {
+        type: 'tower',
+        siteId: site?._id?.toString() || inventoryItem.currentLocation?.siteId || null,
+        siteName: site?.name || siteName || inventoryItem.currentLocation?.siteName || 'Unknown Site',
+        address: location?.address || device.location?.address || site?.location?.address || inventoryItem.currentLocation?.address || 'Unknown Location'
+      };
+      inventoryItem.updatedAt = new Date();
+      
+      await inventoryItem.save();
+      console.log(`✅ [SNMP API] Updated existing inventory item ${inventoryItem._id}`);
+    }
     
     // Mark device as deployed: Set siteId and enable graphs
     // siteId must be an ObjectId (not a string) for NetworkEquipment schema
