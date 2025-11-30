@@ -607,9 +607,20 @@ router.get('/discovered', async (req, res) => {
       }
       
       // Convert siteId to string if it exists (ObjectId -> string)
-      const siteIdString = equipment.siteId ? 
-        (typeof equipment.siteId === 'object' && equipment.siteId.toString ? equipment.siteId.toString() : String(equipment.siteId)) : 
-        null;
+      // Handle both ObjectId objects and string representations
+      let siteIdString = null;
+      if (equipment.siteId) {
+        if (equipment.siteId.toString && typeof equipment.siteId.toString === 'function') {
+          siteIdString = equipment.siteId.toString();
+        } else if (typeof equipment.siteId === 'string') {
+          siteIdString = equipment.siteId;
+        } else if (equipment.siteId._id) {
+          // Might be populated object
+          siteIdString = equipment.siteId._id.toString();
+        } else {
+          siteIdString = String(equipment.siteId);
+        }
+      }
       
       // Debug logging for devices with inventoryId (should have siteId)
       if (equipment.inventoryId || notes.inventory_id) {
@@ -619,7 +630,9 @@ router.get('/discovered', async (req, res) => {
           siteId_string: siteIdString,
           inventoryId: equipment.inventoryId || notes.inventory_id,
           siteId_type: typeof equipment.siteId,
-          siteId_isObject: equipment.siteId?.constructor?.name
+          siteId_isObject: equipment.siteId?.constructor?.name,
+          has_siteId_field: 'siteId' in equipment,
+          equipment_keys: Object.keys(equipment).slice(0, 10) // First 10 keys
         });
       }
       
