@@ -827,7 +827,7 @@ router.post('/discovered/:deviceId/pair', async (req, res) => {
 router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
   try {
     const { deviceId } = req.params;
-    const { assetTag, category, siteName, location } = req.body;
+    const { assetTag, category, siteId, siteName, location } = req.body;
     
     console.log(`➕ [SNMP API] Creating hardware from discovered device ${deviceId}`);
     
@@ -851,6 +851,15 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       }
     }
     
+    // Find site by siteId or siteName
+    let site = null;
+    const { UnifiedSite } = require('../models/network');
+    if (siteId) {
+      site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId }).lean();
+    } else if (siteName) {
+      site = await UnifiedSite.findOne({ name: siteName, tenantId: req.tenantId }).lean();
+    }
+    
     // Create inventory item
     const { InventoryItem } = require('../models/inventory');
     const inventoryItem = new InventoryItem({
@@ -870,8 +879,9 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       condition: 'good',
       currentLocation: {
         type: 'tower',
-        siteName: siteName || 'Unknown Site',
-        address: location?.address || device.location?.address || 'Unknown Location'
+        siteId: site?._id?.toString() || null,
+        siteName: site?.name || siteName || 'Unknown Site',
+        address: location?.address || device.location?.address || site?.location?.address || 'Unknown Location'
       },
       ownership: 'owned',
       networkConfig: {
@@ -893,15 +903,22 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     
     await inventoryItem.save();
     
-    // Link NetworkEquipment to inventory
-    device.inventoryId = inventoryItem._id.toString();
+    // Mark device as deployed: Set siteId and enable graphs
+    device.siteId = site?._id?.toString() || null;
     if (typeof device.notes === 'string') {
       notes.inventory_id = inventoryItem._id.toString();
       notes.created_from_discovery = true;
+      notes.enable_graphs = true; // Enable graphs when hardware is created
       device.notes = JSON.stringify(notes);
     } else {
-      device.notes = { ...notes, inventory_id: inventoryItem._id.toString(), created_from_discovery: true };
+      device.notes = { 
+        ...notes, 
+        inventory_id: inventoryItem._id.toString(), 
+        created_from_discovery: true,
+        enable_graphs: true // Enable graphs when hardware is created
+      };
     }
+    device.inventoryId = inventoryItem._id.toString();
     await device.save();
     
     console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);

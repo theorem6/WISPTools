@@ -333,6 +333,7 @@
         body: JSON.stringify({
           assetTag: hardwareForm.assetTag,
           category: hardwareForm.category,
+          siteId: hardwareForm.siteId || null,
           siteName: siteName || device.discoveredBy || 'Unknown Site',
           location: device.location || {}
         })
@@ -342,7 +343,7 @@
         const data = await response.json();
         console.log('[SNMP Devices] Created hardware:', data);
         closeModals();
-        hardwareForm = { assetTag: '', category: 'Network Equipment', siteId: '' };
+        hardwareForm = { assetTag: '', category: 'Networking Equipment', siteId: '' };
         await loadDiscoveredDevices();
         // Show success message
         alert('Hardware created successfully!');
