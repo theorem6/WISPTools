@@ -669,7 +669,10 @@ router.get('/discovered', async (req, res) => {
       devices.push(device);
     });
     
-    console.log(`📊 Returning ${devices.length} discovered SNMP devices for tenant ${req.tenantId}`);
+    // Count deployed devices for debugging
+    const deployedCount = devices.filter(d => d.isDeployed).length;
+    const withSiteIdCount = devices.filter(d => d.siteId).length;
+    console.log(`📊 Returning ${devices.length} discovered SNMP devices for tenant ${req.tenantId} (${deployedCount} deployed, ${withSiteIdCount} with siteId)`);
     
     res.json({
       devices,
