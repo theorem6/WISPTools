@@ -1061,11 +1061,16 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       }
     }
     
+    // Final verification - query one more time to be absolutely sure
+    const finalCheck = await NetworkEquipment.findById(deviceId).lean();
+    console.log(`🔍 [SNMP API] Final check - Device ${deviceId} siteId:`, finalCheck?.siteId ? finalCheck.siteId.toString() : 'null');
+    
     res.json({
       success: true,
       deviceId,
       hardwareId: inventoryItem._id.toString(),
       hardware: inventoryItem,
+      deviceSiteId: finalCheck?.siteId ? finalCheck.siteId.toString() : null, // Include siteId in response for debugging
       message: 'Hardware created successfully from discovered device'
     });
   } catch (error) {
