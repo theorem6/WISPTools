@@ -9,20 +9,57 @@ const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
 
-const MANIFEST_PATH = path.join(__dirname, '../agent-manifest.json');
+// Try multiple possible paths for the manifest file
+const MANIFEST_PATH = (() => {
+  const possiblePaths = [
+    path.join(__dirname, '../agent-manifest.json'), // Standard location (relative to utils/)
+    path.join(process.cwd(), 'agent-manifest.json'), // Current working directory
+    '/home/david_peterson_consulting_com/lte-wisp-backend/agent-manifest.json', // Server location
+  ];
+  
+  // Check which path exists and return it
+  const fs = require('fs');
+  for (const p of possiblePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    } catch (e) {
+      // Continue to next path
+    }
+  }
+  
+  // Default to first path if none found
+  return possiblePaths[0];
+})();
 const DOWNLOAD_BASE_URL = 'https://hss.wisptools.io/downloads/scripts';
 
 /**
  * Load the agent manifest
+ * Tries multiple possible paths to find the manifest file
  */
 async function loadManifest() {
-  try {
-    const manifestContent = await fs.readFile(MANIFEST_PATH, 'utf8');
-    return JSON.parse(manifestContent);
-  } catch (error) {
-    console.error('[Agent Version Manager] Failed to load manifest:', error.message);
-    return null;
+  const possiblePaths = [
+    path.join(__dirname, '../agent-manifest.json'), // Standard location (relative to utils/)
+    path.join(process.cwd(), 'agent-manifest.json'), // Current working directory
+    '/home/david_peterson_consulting_com/lte-wisp-backend/agent-manifest.json', // Server location
+  ];
+  
+  for (const manifestPath of possiblePaths) {
+    try {
+      await fs.access(manifestPath);
+      const manifestContent = await fs.readFile(manifestPath, 'utf8');
+      const manifest = JSON.parse(manifestContent);
+      console.log(`[Agent Version Manager] Loaded manifest from: ${manifestPath}`);
+      return manifest;
+    } catch (error) {
+      // Try next path
+      continue;
+    }
   }
+  
+  console.error('[Agent Version Manager] Failed to load manifest from any path:', possiblePaths);
+  return null;
 }
 
 /**
