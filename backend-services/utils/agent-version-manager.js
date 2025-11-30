@@ -26,7 +26,8 @@ async function loadManifest() {
 }
 
 /**
- * Get current version manifest (from file or generate from scripts directory)
+ * Get current version manifest (from file - use hashes as-is, don't recalculate)
+ * The manifest file should be kept in sync with the actual files on the server
  */
 async function getCurrentManifest() {
   const manifest = await loadManifest();
@@ -34,28 +35,12 @@ async function getCurrentManifest() {
     return null;
   }
   
-  // Calculate SHA256 hashes for all scripts
-  const scriptsDir = path.join(__dirname, '../scripts');
-  const updatedManifest = { ...manifest };
+  // Use the manifest as-is - hashes should match what's actually on the server
+  // The manifest is updated via update-agent-manifest.js script
+  // We trust the hashes in the manifest file rather than recalculating from local files
+  // since local files might differ from what's served from /downloads/scripts/
   
-  for (const [scriptName, scriptInfo] of Object.entries(manifest.scripts || {})) {
-    try {
-      const scriptPath = path.join(scriptsDir, scriptInfo.filename);
-      const scriptContent = await fs.readFile(scriptPath, 'utf8');
-      const hash = crypto.createHash('sha256').update(scriptContent).digest('hex');
-      updatedManifest.scripts[scriptName].sha256 = hash;
-      
-      // Update version based on file modification time or content hash (simplified versioning)
-      // For now, we'll use a simple version scheme based on file hash
-      const versionHash = hash.substring(0, 8);
-      updatedManifest.scripts[scriptName].version_hash = versionHash;
-    } catch (error) {
-      console.warn(`[Agent Version Manager] Failed to read ${scriptName}: ${error.message}`);
-    }
-  }
-  
-  updatedManifest.updated_at = new Date().toISOString();
-  return updatedManifest;
+  return manifest;
 }
 
 /**
