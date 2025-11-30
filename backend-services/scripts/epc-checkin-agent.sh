@@ -305,30 +305,52 @@ execute_command() {
             local script_file="/tmp/wisptools-cmd-$cmd_id.sh"
             
             if [ -n "$script_content" ]; then
-                echo "$script_content" > "$script_file"
+                log "  -> Script provided as content (${#script_content} chars)"
+                echo "$script_content" > "$script_file" 2>&1 || {
+                    result_success=false
+                    result_error="Failed to write script file"
+                    exit_code=1
+                    log "ERROR: Failed to write script to $script_file"
+                }
             elif [ -n "$script_url" ]; then
+                log "  -> Downloading script from $script_url"
                 if ! curl -fsSL "$script_url" -o "$script_file" 2>&1; then
                     result_success=false
                     result_error="Failed to download script from $script_url"
                     exit_code=1
+                    log "ERROR: Failed to download script: $result_error"
+                else
+                    log "  -> Script downloaded successfully ($(stat -c%s "$script_file" 2>/dev/null || echo 0) bytes)"
                 fi
             else
                 result_success=false
                 result_error="No script content or URL provided"
                 exit_code=1
+                log "ERROR: No script content or URL in command"
             fi
             
             if [ "$result_success" = true ] && [ -f "$script_file" ]; then
-                chmod +x "$script_file"
+                chmod +x "$script_file" 2>&1 || log "WARNING: Failed to chmod script file"
+                
+                # Log script first few lines for debugging
+                log "  -> Script preview: $(head -3 "$script_file" | tr '\n' '; ')"
+                
                 # Capture both stdout and stderr
+                log "  -> Running script..."
                 if output=$("$script_file" 2>&1); then
                     result_output="$output"
+                    log "  -> Script executed successfully"
+                    log "  -> Output: $(echo "$output" | head -5 | tr '\n' '; ')"
                 else
                     exit_code=$?
                     result_success=false
                     result_error="$output"
+                    log "ERROR: Script execution failed with exit code $exit_code"
+                    log "ERROR: Script output: $(echo "$output" | head -10 | tr '\n' '; ')"
                 fi
                 rm -f "$script_file"
+            elif [ "$result_success" = false ]; then
+                log "ERROR: Script file not created or command already failed"
             fi
             ;;
             
