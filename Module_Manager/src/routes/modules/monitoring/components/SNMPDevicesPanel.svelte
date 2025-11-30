@@ -61,12 +61,17 @@
         discoveredDevices = (discoveredResult.data.devices || []).map(device => {
           // Ensure device has proper structure with normalized IP address
           const ipAddress = device.ipAddress || device.ip_address || device.management_ip || device.serialNumber || 'Unknown';
+          
+          // Check if device is deployed - prioritize API's isDeployed flag and siteId
+          const isDeployedFromAPI = device.isDeployed === true || !!device.siteId;
+          
           const normalizedDevice = {
             ...device,
             ipAddress: ipAddress,
             ip_address: ipAddress, // Also include snake_case for compatibility
             name: device.name || device.sysName || ipAddress || 'Unknown Device',
-            isDeployed: device.isDeployed === true || !!device.siteId
+            isDeployed: isDeployedFromAPI,
+            enableGraphs: device.enableGraphs !== false && isDeployedFromAPI
           };
           
           // Log if IP is missing for debugging
@@ -74,13 +79,23 @@
             console.warn('[SNMP Devices] Device missing IP address:', device);
           }
           
+          // Log deployed status for debugging
+          if (device.siteId || device.isDeployed) {
+            console.log(`[SNMP Devices] Device ${device.name || device.id} - siteId: ${device.siteId}, isDeployed: ${device.isDeployed}, enableGraphs: ${device.enableGraphs}`);
+          }
+          
           return normalizedDevice;
         });
         
         console.log('[SNMP Devices] Normalized', discoveredDevices.length, 'devices');
-        console.log('[SNMP Devices] Sample normalized device:', discoveredDevices[0]);
+        if (discoveredDevices.length > 0) {
+          console.log('[SNMP Devices] Sample normalized device:', discoveredDevices[0]);
+          // Count deployed devices
+          const deployedCount = discoveredDevices.filter(d => d.isDeployed).length;
+          console.log(`[SNMP Devices] Deployed devices: ${deployedCount}/${discoveredDevices.length}`);
+        }
         
-        // Load deployment info if available
+        // Load deployment info if available (for additional deployment matching, but don't override siteId-based deployment)
         if (deploymentsResponse.ok) {
           try {
             const text = await deploymentsResponse.text();
@@ -95,22 +110,6 @@
             console.warn('[SNMP Devices] Failed to parse deployments response:', e);
           }
         }
-        
-        // Mark devices as deployed if they have a siteId or are in deployments
-        discoveredDevices = discoveredDevices.map(device => {
-          const deviceIP = device.ipAddress || device.ip_address || device.management_ip;
-          const isDeployed = device.siteId || 
-                           deployments.some(d => 
-                             d.hardware_type === (device.type || device.deviceType) &&
-                             (d.config?.management_ip === deviceIP || d.name === device.name)
-                           );
-          
-          return {
-            ...device,
-            isDeployed,
-            enableGraphs: device.enable_graphs !== false && isDeployed // Only enable if deployed
-          };
-        });
         
         console.log('[SNMP Devices] Loaded', discoveredDevices.length, 'discovered devices');
       } else {

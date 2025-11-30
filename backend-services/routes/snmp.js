@@ -904,7 +904,8 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     await inventoryItem.save();
     
     // Mark device as deployed: Set siteId and enable graphs
-    device.siteId = site?._id?.toString() || null;
+    const savedSiteId = site?._id?.toString() || null;
+    device.siteId = savedSiteId;
     if (typeof device.notes === 'string') {
       notes.inventory_id = inventoryItem._id.toString();
       notes.created_from_discovery = true;
@@ -921,7 +922,10 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     device.inventoryId = inventoryItem._id.toString();
     await device.save();
     
+    // Verify the save worked
+    const updatedDevice = await NetworkEquipment.findById(deviceId).lean();
     console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);
+    console.log(`✅ [SNMP API] Device siteId after save: ${updatedDevice?.siteId || 'null'}, enable_graphs: ${updatedDevice?.notes ? (typeof updatedDevice.notes === 'string' ? JSON.parse(updatedDevice.notes).enable_graphs : updatedDevice.notes.enable_graphs) : 'not set'}`);
     
     res.json({
       success: true,
