@@ -604,19 +604,24 @@ router.get('/discovered', async (req, res) => {
         return;
       }
       
+      // Convert siteId to string if it exists (ObjectId -> string)
+      const siteIdString = equipment.siteId ? 
+        (typeof equipment.siteId === 'object' && equipment.siteId.toString ? equipment.siteId.toString() : String(equipment.siteId)) : 
+        null;
+      
+      // Debug logging for devices with inventoryId (should have siteId)
+      if (equipment.inventoryId || notes.inventory_id) {
+        console.log(`🔍 [SNMP API] Device ${equipment.name || equipment._id} - siteId: ${siteIdString || 'null'}, inventoryId: ${equipment.inventoryId || notes.inventory_id}`);
+      }
+      
       // Check if device is deployed (has siteId or matches a deployment)
-      const isDeployed = equipment.siteId || deployments.some(d => {
+      const isDeployed = !!siteIdString || deployments.some(d => {
         const deviceIP = notes.management_ip || equipment.serialNumber;
         return (d.config?.management_ip === deviceIP || d.name === equipment.name);
       });
       
       // Get enable_graphs flag from notes (default true for deployed devices)
       const enableGraphs = isDeployed && (notes.enable_graphs !== false);
-      
-      // Convert siteId to string if it exists (ObjectId -> string)
-      const siteIdString = equipment.siteId ? 
-        (typeof equipment.siteId === 'object' && equipment.siteId.toString ? equipment.siteId.toString() : String(equipment.siteId)) : 
-        null;
       
       const device = {
         id: equipment._id.toString(),
