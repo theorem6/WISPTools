@@ -225,6 +225,31 @@
     showAddHardwareModal = true;
   }
 
+  // Helper function to identify fake sites
+  function isFakeSite(site: any): boolean {
+    if (!site || !site.name) return false;
+    const name = String(site.name).toLowerCase();
+    
+    // Patterns that indicate fake/demo sites
+    const fakePatterns = [
+      /customer.*cpe/i,
+      /customer.*lte/i,
+      /customer a/i,
+      /customer b/i,
+      /fake/i,
+      /demo/i,
+      /sample/i,
+      /^test$/i,
+      /mock/i,
+      /core router/i,
+      /core switch/i,
+      /epc core server/i,
+      /backhaul router/i
+    ];
+    
+    return fakePatterns.some(pattern => pattern.test(name));
+  }
+  
   async function loadSites() {
     if (!tenantId) return;
     
@@ -243,7 +268,16 @@
       
       if (response.ok) {
         const data = await response.json();
-        sites = Array.isArray(data) ? data : [];
+        const allSites = Array.isArray(data) ? data : [];
+        
+        // Filter out fake sites
+        sites = allSites.filter(site => !isFakeSite(site));
+        
+        const fakeCount = allSites.length - sites.length;
+        if (fakeCount > 0) {
+          console.log(`[SNMP Devices] Filtered out ${fakeCount} fake site(s)`);
+        }
+        console.log(`[SNMP Devices] Loaded ${sites.length} real site(s)`);
       }
     } catch (err: any) {
       console.error('[SNMP Devices] Error loading sites:', err);

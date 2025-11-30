@@ -899,6 +899,28 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       }
     }
     
+    // Helper to check if site is fake
+    function isFakeSite(site) {
+      if (!site || !site.name) return false;
+      const name = String(site.name).toLowerCase();
+      const fakePatterns = [
+        /customer.*cpe/i,
+        /customer.*lte/i,
+        /customer a/i,
+        /customer b/i,
+        /fake/i,
+        /demo/i,
+        /sample/i,
+        /^test$/i,
+        /mock/i,
+        /core router/i,
+        /core switch/i,
+        /epc core server/i,
+        /backhaul router/i
+      ];
+      return fakePatterns.some(pattern => pattern.test(name));
+    }
+    
     // Find site by siteId or siteName
     let site = null;
     const { UnifiedSite } = require('../models/network');
@@ -908,14 +930,24 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     if (siteId) {
       site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId }).lean();
       if (site) {
-        console.log(`✅ [SNMP API] Found site by ID: ${site._id?.toString()}, name: ${site.name}`);
+        if (isFakeSite(site)) {
+          console.warn(`⚠️ [SNMP API] Site found by ID is FAKE: ${site._id?.toString()}, name: ${site.name} - rejecting`);
+          site = null; // Reject fake sites
+        } else {
+          console.log(`✅ [SNMP API] Found REAL site by ID: ${site._id?.toString()}, name: ${site.name}`);
+        }
       } else {
         console.warn(`⚠️ [SNMP API] Site not found by ID: ${siteId}, tenantId: ${req.tenantId}`);
       }
     } else if (siteName) {
       site = await UnifiedSite.findOne({ name: siteName, tenantId: req.tenantId }).lean();
       if (site) {
-        console.log(`✅ [SNMP API] Found site by name: ${site._id?.toString()}, name: ${site.name}`);
+        if (isFakeSite(site)) {
+          console.warn(`⚠️ [SNMP API] Site found by name is FAKE: ${site._id?.toString()}, name: ${site.name} - rejecting`);
+          site = null; // Reject fake sites
+        } else {
+          console.log(`✅ [SNMP API] Found REAL site by name: ${site._id?.toString()}, name: ${site.name}`);
+        }
       } else {
         console.warn(`⚠️ [SNMP API] Site not found by name: ${siteName}, tenantId: ${req.tenantId}`);
       }
