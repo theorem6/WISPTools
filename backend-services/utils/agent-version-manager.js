@@ -222,21 +222,33 @@ async function checkAndQueueUpdates(epcId, tenantId, currentVersions) {
   // Queue update commands
   const commands = [];
   for (const update of updatesNeeded) {
-    // Check if update command already exists for this script (including recently completed ones)
-    // Only skip if there's a pending/sent command that was created in the last hour
+    // Check if update command already exists for this script
+    // Skip if there's a pending/sent command OR a recently completed one (within last hour)
+    // BUT allow failed commands to be re-queued (they might have wrong hashes)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const existingCommand = await EPCCommand.findOne({
       epc_id: epcId,
       $or: [
-        { status: { $in: ['pending', 'sent'] } },
+        { status: { $in: ['pending', 'sent'] }, notes: new RegExp(`Auto-update.*${update.script}`) },
         { status: 'completed', created_at: { $gte: oneHourAgo }, notes: new RegExp(`Auto-update.*${update.script}`) }
-      ],
-      notes: new RegExp(`Auto-update.*${update.script}`)
+      ]
     });
     
     if (existingCommand) {
       console.log(`[Agent Version Manager] Update command for ${update.script} already exists (status: ${existingCommand.status}), skipping`);
       continue;
+    }
+    
+    // If there's a failed command with wrong hash, delete it so we can create a new one
+    const failedCommand = await EPCCommand.findOne({
+      epc_id: epcId,
+      status: 'failed',
+      notes: new RegExp(`Auto-update.*${update.script}`)
+    });
+    
+    if (failedCommand) {
+      console.log(`[Agent Version Manager] Found failed update command for ${update.script}, deleting it to allow retry with correct hash`);
+      await EPCCommand.deleteOne({ _id: failedCommand._id });
     }
     
     const commandData = createUpdateCommand(epcId, tenantId, update);
