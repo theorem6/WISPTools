@@ -543,10 +543,11 @@ router.get('/discovered', async (req, res) => {
     
     // Get devices that were discovered by EPC agents
     // Notes can be stored as JSON string or object, and we need to search for discovery metadata
+    // Explicitly select siteId and inventoryId to ensure they're included in the response
     const allEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       status: 'active'
-    }).lean();
+    }).select('+siteId +inventoryId').lean(); // + prefix includes fields that might be excluded by default
     
     // Filter devices that have discovery metadata in notes
     const discoveredEquipment = allEquipment.filter(equipment => {
@@ -1004,8 +1005,8 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     device.inventoryId = inventoryItem._id.toString();
     await device.save();
     
-    // Verify the save worked
-    const updatedDevice = await NetworkEquipment.findById(deviceId).lean();
+    // Verify the save worked - explicitly select siteId
+    const updatedDevice = await NetworkEquipment.findById(deviceId).select('+siteId').lean();
     let parsedNotes = {};
     try {
       parsedNotes = typeof updatedDevice?.notes === 'string' ? JSON.parse(updatedDevice.notes) : (updatedDevice?.notes || {});

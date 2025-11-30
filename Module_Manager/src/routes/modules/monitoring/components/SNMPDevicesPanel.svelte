@@ -367,9 +367,11 @@
         console.log('[SNMP Devices] Created hardware:', data);
         closeModals();
         hardwareForm = { assetTag: '', category: 'Networking Equipment', siteId: '' };
+        // Small delay to ensure backend has finished saving, then reload
+        await new Promise(resolve => setTimeout(resolve, 500));
         await loadDiscoveredDevices();
         // Show success message
-        alert('Hardware created successfully!');
+        alert('Hardware created successfully! Device should now show as deployed.');
       } else {
         const errorText = await response.text();
         console.error('[SNMP Devices] Failed to create hardware:', response.status, errorText);
