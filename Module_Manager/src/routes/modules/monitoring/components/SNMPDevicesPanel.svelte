@@ -62,16 +62,22 @@
           // Ensure device has proper structure with normalized IP address
           const ipAddress = device.ipAddress || device.ip_address || device.management_ip || device.serialNumber || 'Unknown';
           
+          // Normalize siteId - handle both ObjectId objects and strings
+          const siteIdValue = device.siteId ? 
+            (typeof device.siteId === 'object' && device.siteId.toString ? device.siteId.toString() : String(device.siteId)) : 
+            null;
+          
           // Check if device is deployed - prioritize API's isDeployed flag and siteId
-          const isDeployedFromAPI = device.isDeployed === true || !!device.siteId;
+          const isDeployedFromAPI = device.isDeployed === true || !!siteIdValue;
           
           const normalizedDevice = {
             ...device,
             ipAddress: ipAddress,
             ip_address: ipAddress, // Also include snake_case for compatibility
             name: device.name || device.sysName || ipAddress || 'Unknown Device',
+            siteId: siteIdValue, // Ensure siteId is always a string or null
             isDeployed: isDeployedFromAPI,
-            enableGraphs: device.enableGraphs !== false && isDeployedFromAPI
+            enableGraphs: (device.enableGraphs !== false && isDeployedFromAPI) || device.enableGraphs === true
           };
           
           // Log if IP is missing for debugging
@@ -79,9 +85,14 @@
             console.warn('[SNMP Devices] Device missing IP address:', device);
           }
           
-          // Log deployed status for debugging
-          if (device.siteId || device.isDeployed) {
-            console.log(`[SNMP Devices] Device ${device.name || device.id} - siteId: ${device.siteId}, isDeployed: ${device.isDeployed}, enableGraphs: ${device.enableGraphs}`);
+          // Log deployed status for debugging - log ALL devices to see which have siteId
+          if (siteIdValue || device.isDeployed) {
+            console.log(`[SNMP Devices] ✓ DEPLOYED Device: ${device.name || device.id}`, {
+              siteId: siteIdValue,
+              isDeployed: device.isDeployed,
+              enableGraphs: normalizedDevice.enableGraphs,
+              rawSiteId: device.siteId
+            });
           }
           
           return normalizedDevice;
@@ -92,7 +103,20 @@
           console.log('[SNMP Devices] Sample normalized device:', discoveredDevices[0]);
           // Count deployed devices
           const deployedCount = discoveredDevices.filter(d => d.isDeployed).length;
-          console.log(`[SNMP Devices] Deployed devices: ${deployedCount}/${discoveredDevices.length}`);
+          const withSiteId = discoveredDevices.filter(d => d.siteId).length;
+          console.log(`[SNMP Devices] Deployed devices: ${deployedCount}/${discoveredDevices.length} (${withSiteId} with siteId)`);
+          
+          // Log first deployed device details
+          const firstDeployed = discoveredDevices.find(d => d.isDeployed);
+          if (firstDeployed) {
+            console.log('[SNMP Devices] First deployed device details:', {
+              name: firstDeployed.name,
+              id: firstDeployed.id,
+              siteId: firstDeployed.siteId,
+              isDeployed: firstDeployed.isDeployed,
+              enableGraphs: firstDeployed.enableGraphs
+            });
+          }
         }
         
         // Load deployment info if available (for additional deployment matching, but don't override siteId-based deployment)

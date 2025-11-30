@@ -613,6 +613,11 @@ router.get('/discovered', async (req, res) => {
       // Get enable_graphs flag from notes (default true for deployed devices)
       const enableGraphs = isDeployed && (notes.enable_graphs !== false);
       
+      // Convert siteId to string if it exists (ObjectId -> string)
+      const siteIdString = equipment.siteId ? 
+        (typeof equipment.siteId === 'object' && equipment.siteId.toString ? equipment.siteId.toString() : String(equipment.siteId)) : 
+        null;
+      
       const device = {
         id: equipment._id.toString(),
         name: equipment.name || notes.sysName || notes.management_ip || 'Unknown Device',
@@ -625,7 +630,7 @@ router.get('/discovered', async (req, res) => {
                       'Generic',
         model: equipment.model || notes.sysDescr || 'Unknown',
         serialNumber: equipment.serialNumber || notes.management_ip || equipment._id.toString(),
-        siteId: equipment.siteId || null,
+        siteId: siteIdString,
         isDeployed: !!isDeployed,
         enableGraphs: enableGraphs,
         location: {
