@@ -1111,13 +1111,29 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       }
     }
     
-    // Final verification query
-    const finalCheck = await NetworkEquipment.findById(deviceId).lean();
-    const finalSiteId = finalCheck?.siteId ? finalCheck.siteId.toString() : null;
-    console.log(`🔍 [SNMP API] Final verification - Device ${deviceId} siteId: ${finalSiteId || 'null'}`);
+    // Final verification query - use multiple checks
+    const finalCheck1 = await NetworkEquipment.findById(deviceId).lean();
+    const finalCheck2 = await NetworkEquipment.findOne({ _id: deviceId, tenantId: req.tenantId }).lean();
+    
+    const finalSiteId = finalCheck1?.siteId ? finalCheck1.siteId.toString() : 
+                       (finalCheck2?.siteId ? finalCheck2.siteId.toString() : null);
+    
+    console.log(`🔍 [SNMP API] Final verification - Device ${deviceId}:`, {
+      check1_siteId: finalCheck1?.siteId ? finalCheck1.siteId.toString() : 'null',
+      check2_siteId: finalCheck2?.siteId ? finalCheck2.siteId.toString() : 'null',
+      finalSiteId: finalSiteId,
+      attempted_siteId: savedSiteId ? savedSiteId.toString() : 'null',
+      updatedDevice_siteId: updatedDevice?.siteId ? updatedDevice.siteId.toString() : 'null'
+    });
     
     if (!finalSiteId && savedSiteId) {
-      console.error(`❌ [SNMP API] CRITICAL: siteId was not persisted! Attempted to save: ${savedSiteId.toString()}, but query returned: null`);
+      console.error(`❌ [SNMP API] CRITICAL: siteId was not persisted!`, {
+        attempted: savedSiteId.toString(),
+        check1_result: finalCheck1?.siteId || 'null',
+        check2_result: finalCheck2?.siteId || 'null',
+        update_result: updatedDevice?.siteId || 'null',
+        site_name: site?.name || 'null'
+      });
     }
     
     res.json({
@@ -1126,9 +1142,13 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       hardwareId: inventoryItem._id.toString(),
       hardware: inventoryItem,
       deviceSiteId: finalSiteId, // Include siteId in response
+      attemptedSiteId: savedSiteId ? savedSiteId.toString() : null, // Debug: what we tried to save
+      updateResultSiteId: updatedDevice?.siteId ? updatedDevice.siteId.toString() : null, // Debug: what update returned
       message: finalSiteId ? 
         'Hardware created successfully and device marked as deployed' : 
-        'Hardware created successfully but device siteId was not set'
+        (savedSiteId ? 
+          `Hardware created successfully but device siteId was not persisted (attempted: ${savedSiteId.toString()})` :
+          'Hardware created successfully but no site was provided')
     });
   } catch (error) {
     console.error('❌ [SNMP API] Error creating hardware:', error);
