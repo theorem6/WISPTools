@@ -902,10 +902,25 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     // Find site by siteId or siteName
     let site = null;
     const { UnifiedSite } = require('../models/network');
+    
+    console.log(`🔍 [SNMP API] Looking up site - siteId: ${siteId}, siteName: ${siteName}, tenantId: ${req.tenantId}`);
+    
     if (siteId) {
       site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId }).lean();
+      if (site) {
+        console.log(`✅ [SNMP API] Found site by ID: ${site._id?.toString()}, name: ${site.name}`);
+      } else {
+        console.warn(`⚠️ [SNMP API] Site not found by ID: ${siteId}, tenantId: ${req.tenantId}`);
+      }
     } else if (siteName) {
       site = await UnifiedSite.findOne({ name: siteName, tenantId: req.tenantId }).lean();
+      if (site) {
+        console.log(`✅ [SNMP API] Found site by name: ${site._id?.toString()}, name: ${site.name}`);
+      } else {
+        console.warn(`⚠️ [SNMP API] Site not found by name: ${siteName}, tenantId: ${req.tenantId}`);
+      }
+    } else {
+      console.warn(`⚠️ [SNMP API] No siteId or siteName provided in request body`);
     }
     
     // If no existing inventory item, check if assetTag already exists to avoid duplicates
@@ -1001,69 +1016,73 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       console.log(`✅ [SNMP API] Updated existing inventory item ${inventoryItem._id}`);
     }
     
-    // Mark device as deployed: Set siteId and enable graphs
-    // siteId must be an ObjectId (not a string) for NetworkEquipment schema
+    // Mark device as deployed: Set siteId and enable graphs using findOneAndUpdate
     const savedSiteId = site?._id || null;
-    if (savedSiteId) {
-      device.siteId = savedSiteId;
-      console.log(`✅ [SNMP API] Setting device siteId to: ${savedSiteId.toString()}`);
-    } else {
-      console.warn(`⚠️ [SNMP API] No site found for siteId: ${siteId}, siteName: ${siteName}`);
-    }
-    if (typeof device.notes === 'string') {
-      notes.inventory_id = inventoryItem._id.toString();
-      notes.created_from_discovery = true;
-      notes.enable_graphs = true; // Enable graphs when hardware is created
-      device.notes = JSON.stringify(notes);
-    } else {
-      device.notes = { 
-        ...notes, 
-        inventory_id: inventoryItem._id.toString(), 
-        created_from_discovery: true,
-        enable_graphs: true // Enable graphs when hardware is created
-      };
-    }
-    device.inventoryId = inventoryItem._id.toString();
-    await device.save();
     
-    // Verify the save worked - explicitly select siteId, refresh from DB
-    // Use findOneAndUpdate or refresh the device to ensure we get the latest
-    const refreshedDevice = await NetworkEquipment.findById(deviceId);
-    if (!refreshedDevice) {
-      console.error(`❌ [SNMP API] ERROR: Could not find device ${deviceId} after save`);
+    if (!savedSiteId) {
+      console.warn(`⚠️ [SNMP API] No site found for siteId: ${siteId}, siteName: ${siteName}. Device will not be marked as deployed.`);
     } else {
-      // Refresh from database
-      await refreshedDevice.populate('siteId');
-      const refreshedLean = await NetworkEquipment.findById(deviceId).lean();
-      
+      console.log(`✅ [SNMP API] Will set device siteId to: ${savedSiteId.toString()}`);
+    }
+    
+    // Prepare notes update
+    notes.inventory_id = inventoryItem._id.toString();
+    notes.created_from_discovery = true;
+    notes.enable_graphs = true; // Enable graphs when hardware is created
+    
+    // Build update object - use findOneAndUpdate for atomic update
+    const updateData = {
+      inventoryId: inventoryItem._id.toString(),
+      updatedAt: new Date()
+    };
+    
+    // Add siteId if we have it
+    if (savedSiteId) {
+      updateData.siteId = savedSiteId; // MongoDB will handle ObjectId conversion
+    }
+    
+    // Update notes (handle both string and object formats)
+    if (typeof device.notes === 'string') {
+      updateData.notes = JSON.stringify(notes);
+    } else {
+      updateData.notes = notes;
+    }
+    
+    // Use findOneAndUpdate for atomic update
+    const updatedDevice = await NetworkEquipment.findOneAndUpdate(
+      { _id: deviceId, tenantId: req.tenantId },
+      { $set: updateData },
+      { new: true, lean: true } // Return updated document
+    );
+    
+    if (!updatedDevice) {
+      console.error(`❌ [SNMP API] ERROR: Could not update device ${deviceId}`);
+    } else {
       let parsedNotes = {};
       try {
-        parsedNotes = typeof refreshedLean?.notes === 'string' ? JSON.parse(refreshedLean.notes) : (refreshedLean?.notes || {});
-      } catch (e) {}
+        parsedNotes = typeof updatedDevice.notes === 'string' ? JSON.parse(updatedDevice.notes) : (updatedDevice.notes || {});
+      } catch (e) {
+        parsedNotes = {};
+      }
       
       console.log(`✅ [SNMP API] Created hardware ${inventoryItem._id} from device ${deviceId}`);
-      console.log(`✅ [SNMP API] Device siteId after save (refreshed):`, {
-        siteId_raw: refreshedLean?.siteId,
-        siteId_string: refreshedLean?.siteId ? (typeof refreshedLean.siteId === 'object' ? refreshedLean.siteId.toString() : String(refreshedLean.siteId)) : 'null',
-        siteId_type: typeof refreshedLean?.siteId,
-        enable_graphs: parsedNotes.enable_graphs !== undefined ? parsedNotes.enable_graphs : 'not set',
-        inventoryId: refreshedLean?.inventoryId
+      console.log(`✅ [SNMP API] Device updated with findOneAndUpdate:`, {
+        _id: updatedDevice._id?.toString(),
+        siteId: updatedDevice.siteId ? updatedDevice.siteId.toString() : 'null',
+        inventoryId: updatedDevice.inventoryId,
+        enable_graphs: parsedNotes.enable_graphs,
+        siteId_type: typeof updatedDevice.siteId
       });
       
-      if (!refreshedLean?.siteId) {
-        console.warn(`⚠️ [SNMP API] WARNING: Device ${deviceId} siteId was not saved correctly. Site lookup result:`, site ? { id: site._id?.toString(), name: site.name } : 'null');
-        console.warn(`⚠️ [SNMP API] Device data:`, {
-          _id: refreshedLean?._id,
-          name: refreshedLean?.name,
-          inventoryId: refreshedLean?.inventoryId,
-          siteId_field_exists: 'siteId' in (refreshedLean || {})
-        });
+      if (!updatedDevice.siteId && savedSiteId) {
+        console.error(`❌ [SNMP API] ERROR: Device siteId was NOT saved even though we tried to set it! Site was:`, site ? { id: site._id?.toString(), name: site.name } : 'null');
       }
     }
     
-    // Get the final siteId for response
+    // Final verification query
     const finalCheck = await NetworkEquipment.findById(deviceId).lean();
     const finalSiteId = finalCheck?.siteId ? finalCheck.siteId.toString() : null;
+    console.log(`🔍 [SNMP API] Final verification - Device ${deviceId} siteId: ${finalSiteId || 'null'}`);
     
     if (!finalSiteId && savedSiteId) {
       console.error(`❌ [SNMP API] CRITICAL: siteId was not persisted! Attempted to save: ${savedSiteId.toString()}, but query returned: null`);
