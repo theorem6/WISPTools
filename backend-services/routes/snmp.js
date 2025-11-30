@@ -924,11 +924,18 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     // Find site by siteId or siteName
     let site = null;
     const { UnifiedSite } = require('../models/network');
+    const mongoose = require('mongoose');
     
     console.log(`🔍 [SNMP API] Looking up site - siteId: ${siteId}, siteName: ${siteName}, tenantId: ${req.tenantId}`);
     
     if (siteId) {
-      site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId }).lean();
+      // Convert siteId to ObjectId if it's a string
+      let siteQueryId = siteId;
+      if (typeof siteId === 'string' && mongoose.Types.ObjectId.isValid(siteId)) {
+        siteQueryId = new mongoose.Types.ObjectId(siteId);
+      }
+      
+      site = await UnifiedSite.findOne({ _id: siteQueryId, tenantId: req.tenantId }).lean();
       if (site) {
         if (isFakeSite(site)) {
           console.warn(`⚠️ [SNMP API] Site found by ID is FAKE: ${site._id?.toString()}, name: ${site.name} - rejecting`);
@@ -937,7 +944,10 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
           console.log(`✅ [SNMP API] Found REAL site by ID: ${site._id?.toString()}, name: ${site.name}`);
         }
       } else {
+        // Try string match as fallback
+        const allSites = await UnifiedSite.find({ tenantId: req.tenantId }).lean();
         console.warn(`⚠️ [SNMP API] Site not found by ID: ${siteId}, tenantId: ${req.tenantId}`);
+        console.warn(`⚠️ [SNMP API] Available sites in tenant: ${allSites.map(s => `${s._id?.toString()} (${s.name})`).join(', ')}`);
       }
     } else if (siteName) {
       site = await UnifiedSite.findOne({ name: siteName, tenantId: req.tenantId }).lean();
