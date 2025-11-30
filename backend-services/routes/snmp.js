@@ -1061,17 +1061,23 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
       }
     }
     
-    // Final verification - query one more time to be absolutely sure
+    // Get the final siteId for response
     const finalCheck = await NetworkEquipment.findById(deviceId).lean();
-    console.log(`🔍 [SNMP API] Final check - Device ${deviceId} siteId:`, finalCheck?.siteId ? finalCheck.siteId.toString() : 'null');
+    const finalSiteId = finalCheck?.siteId ? finalCheck.siteId.toString() : null;
+    
+    if (!finalSiteId && savedSiteId) {
+      console.error(`❌ [SNMP API] CRITICAL: siteId was not persisted! Attempted to save: ${savedSiteId.toString()}, but query returned: null`);
+    }
     
     res.json({
       success: true,
       deviceId,
       hardwareId: inventoryItem._id.toString(),
       hardware: inventoryItem,
-      deviceSiteId: finalCheck?.siteId ? finalCheck.siteId.toString() : null, // Include siteId in response for debugging
-      message: 'Hardware created successfully from discovered device'
+      deviceSiteId: finalSiteId, // Include siteId in response
+      message: finalSiteId ? 
+        'Hardware created successfully and device marked as deployed' : 
+        'Hardware created successfully but device siteId was not set'
     });
   } catch (error) {
     console.error('❌ [SNMP API] Error creating hardware:', error);

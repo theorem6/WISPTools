@@ -365,6 +365,11 @@
       if (response.ok) {
         const data = await response.json();
         console.log('[SNMP Devices] Created hardware:', data);
+        if (data.deviceSiteId) {
+          console.log(`[SNMP Devices] ✓ Device ${data.deviceId} has siteId: ${data.deviceSiteId}`);
+        } else {
+          console.warn(`[SNMP Devices] ⚠️ Device ${data.deviceId} does NOT have siteId in response`);
+        }
         closeModals();
         hardwareForm = { assetTag: '', category: 'Networking Equipment', siteId: '' };
         // Small delay to ensure backend has finished saving, then reload
