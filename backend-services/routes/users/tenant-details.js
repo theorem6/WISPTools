@@ -5,18 +5,8 @@
 
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
 const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
 const { UserTenant } = require('./user-schema');
-
-// Lazy load Tenant model to avoid circular dependencies
-let Tenant;
-function getTenantModel() {
-  if (!Tenant) {
-    Tenant = require('../../models/tenant').Tenant;
-  }
-  return Tenant;
-}
 
 /**
  * GET /api/user-tenants/:userId
@@ -47,42 +37,21 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     
     console.log(`[tenant-details] Found ${userTenants.length} tenant associations`);
     
-    // Lazy load Tenant model
-    const TenantModel = getTenantModel();
+    // For now, return UserTenant records with tenantId mapped to id
+    // TODO: Add full tenant details lookup once this works
+    const formattedTenants = userTenants.map(ut => ({
+      id: ut.tenantId,
+      tenantId: ut.tenantId,
+      userId: ut.userId,
+      role: ut.role || 'viewer',
+      userRole: ut.role || 'viewer',
+      status: ut.status,
+      createdAt: ut.createdAt,
+      updatedAt: ut.updatedAt
+    }));
     
-    // Get full tenant details for each association
-    const tenantsWithDetails = [];
-    for (const ut of userTenants) {
-      try {
-        if (!ut.tenantId) {
-          console.warn(`[tenant-details] UserTenant record missing tenantId`);
-          continue;
-        }
-        
-        // Convert string tenantId to ObjectId
-        if (!mongoose.Types.ObjectId.isValid(ut.tenantId)) {
-          console.warn(`[tenant-details] Invalid tenantId format: ${ut.tenantId}`);
-          continue;
-        }
-        
-        const tenantObjectId = new mongoose.Types.ObjectId(ut.tenantId);
-        const tenant = await TenantModel.findById(tenantObjectId).lean();
-        
-        if (tenant) {
-          tenantsWithDetails.push({
-            ...tenant,
-            id: tenant._id ? tenant._id.toString() : tenant.id,
-            userRole: ut.role || 'viewer'
-          });
-        }
-      } catch (err) {
-        console.error(`[tenant-details] Error fetching tenant ${ut.tenantId}:`, err.message);
-        // Continue with other tenants
-      }
-    }
-    
-    console.log(`[tenant-details] Returning ${tenantsWithDetails.length} tenants with details`);
-    res.json(tenantsWithDetails);
+    console.log(`[tenant-details] Returning ${formattedTenants.length} tenants`);
+    res.json(formattedTenants);
   } catch (error) {
     console.error('[tenant-details] Error getting user tenants:', error);
     console.error('[tenant-details] Error stack:', error.stack);
