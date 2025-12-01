@@ -7,11 +7,17 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
-const { UserTenant } = require('./user-schema');
+// Import directly from models/user to avoid import chain issues
+const { UserTenant } = require('../../models/user');
 
 // Test endpoint to verify route loads
 router.get('/test', (req, res) => {
-  res.json({ status: 'ok', message: 'tenants.js route loaded successfully' });
+  res.json({ 
+    status: 'ok', 
+    message: 'tenants.js route loaded successfully',
+    mongooseReadyState: mongoose.connection.readyState,
+    mongooseConnectionName: mongoose.connection.name
+  });
 });
 
 /**
@@ -37,12 +43,18 @@ router.get('/:userId', verifyAuth, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized', message: 'User not authenticated' });
     }
     
-    // Check MongoDB connection
+    // Check MongoDB connection BEFORE querying
     if (mongoose.connection.readyState !== 1) {
-      console.error('[UserTenantAPI] MongoDB not connected. ReadyState:', mongoose.connection.readyState);
+      const stateNames = {
+        0: 'disconnected',
+        1: 'connected',
+        2: 'connecting',
+        3: 'disconnecting'
+      };
+      console.error('[UserTenantAPI] MongoDB not connected. ReadyState:', mongoose.connection.readyState, stateNames[mongoose.connection.readyState]);
       return res.status(503).json({ 
         error: 'Service unavailable', 
-        message: 'Database connection not established',
+        message: `Database connection not established (state: ${stateNames[mongoose.connection.readyState] || mongoose.connection.readyState})`,
         readyState: mongoose.connection.readyState
       });
     }
@@ -62,10 +74,10 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     }
     
     // Find all tenant memberships
-    console.log('[UserTenantAPI] Querying MongoDB for UserTenant records...');
+    console.log('[UserTenantAPI] Querying MongoDB for UserTenant records with userId:', userId);
     const userTenants = await UserTenant.find({ userId }).lean();
     
-    console.log(`[UserTenantAPI] Found ${userTenants.length} tenant memberships`);
+    console.log(`[UserTenantAPI] Found ${userTenants.length} tenant memberships for user ${userId}`);
     
     res.json(userTenants);
   } catch (error) {
