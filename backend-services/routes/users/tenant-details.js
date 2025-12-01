@@ -7,7 +7,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
 const { Tenant } = require('../../models/tenant');
-const { UserTenant } = require('./user-schema');
+const { UserTenant } = require('../../models/user');
 
 const router = express.Router();
 
@@ -50,6 +50,23 @@ router.get('/:userId', verifyAuth, async (req, res) => {
       return res.status(500).json({
         error: 'Internal Server Error',
         message: 'Tenant model not initialized'
+      });
+    }
+    
+    // Verify models are functions (Mongoose models)
+    if (typeof UserTenant.find !== 'function') {
+      console.error('[tenant-details] UserTenant is not a valid Mongoose model');
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'UserTenant model is not properly initialized'
+      });
+    }
+    
+    if (typeof Tenant.findById !== 'function') {
+      console.error('[tenant-details] Tenant is not a valid Mongoose model');
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Tenant model is not properly initialized'
       });
     }
     
