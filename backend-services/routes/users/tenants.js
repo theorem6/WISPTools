@@ -29,8 +29,10 @@ try {
 try {
   const userModel = require('../../models/user');
   UserTenant = userModel.UserTenant;
+  console.log('[UserTenantAPI] UserTenant model loaded successfully');
 } catch (error) {
   console.error('[UserTenantAPI] Failed to require UserTenant model:', error);
+  console.error('[UserTenantAPI] Error stack:', error.stack);
 }
 
 // Test endpoint to verify route loads
@@ -42,7 +44,8 @@ router.get('/test', (req, res) => {
     mongooseReadyState: mongoose ? mongoose.connection.readyState : 'N/A',
     mongooseConnectionName: mongoose ? mongoose.connection.name : 'N/A',
     userTenantAvailable: !!UserTenant,
-    verifyAuthAvailable: !!verifyAuth
+    verifyAuthAvailable: !!verifyAuth,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -89,9 +92,17 @@ if (verifyAuth && UserTenant) {
       
       // Security: Users can only query their own tenants (unless platform admin)
       if (isPlatformAdminUser) {
-        const isPlatformAdmin = isPlatformAdminUser(req.user);
-        if (!isPlatformAdmin && req.user.uid !== userId) {
-          return res.status(403).json({ error: 'Forbidden: Cannot query other users tenants' });
+        try {
+          const isPlatformAdmin = isPlatformAdminUser(req.user);
+          if (!isPlatformAdmin && req.user.uid !== userId) {
+            return res.status(403).json({ error: 'Forbidden: Cannot query other users tenants' });
+          }
+        } catch (adminCheckError) {
+          console.error('[UserTenantAPI] Error checking platform admin status:', adminCheckError);
+          // Continue if admin check fails - just enforce user match
+          if (req.user.uid !== userId) {
+            return res.status(403).json({ error: 'Forbidden: Cannot query other users tenants' });
+          }
         }
       }
       
@@ -105,28 +116,51 @@ if (verifyAuth && UserTenant) {
       
       // Find all tenant memberships
       console.log('[UserTenantAPI] Querying MongoDB for UserTenant records with userId:', userId);
-      const userTenants = await UserTenant.find({ userId }).lean();
       
-      console.log(`[UserTenantAPI] Found ${userTenants.length} tenant memberships for user ${userId}`);
+      // Use try-catch around the actual query
+      let userTenants;
+      try {
+        userTenants = await UserTenant.find({ userId }).lean();
+        console.log(`[UserTenantAPI] MongoDB query completed. Found ${userTenants.length} tenant memberships for user ${userId}`);
+      } catch (queryError) {
+        console.error('[UserTenantAPI] MongoDB query failed:', queryError);
+        console.error('[UserTenantAPI] Query error name:', queryError.name);
+        console.error('[UserTenantAPI] Query error message:', queryError.message);
+        console.error('[UserTenantAPI] Query error stack:', queryError.stack);
+        throw queryError; // Re-throw to be caught by outer catch
+      }
       
-      res.json(userTenants);
+      // Return empty array if no tenants (this is valid - user might not have any tenants yet)
+      console.log(`[UserTenantAPI] Returning ${userTenants.length} tenant(s) for user ${userId}`);
+      res.json(userTenants || []);
+      
     } catch (error) {
       console.error('[UserTenantAPI] Error getting user tenants:', error);
       console.error('[UserTenantAPI] Error name:', error.name);
       console.error('[UserTenantAPI] Error message:', error.message);
       console.error('[UserTenantAPI] Error stack:', error.stack);
       console.error('[UserTenantAPI] MongoDB connection state:', mongoose ? mongoose.connection.readyState : 'N/A');
+      
+      // Return detailed error response
       res.status(500).json({ 
         error: 'Failed to get user tenants', 
         message: error.message || 'Internal server error',
         errorName: error.name,
-        mongooseReadyState: mongoose ? mongoose.connection.readyState : 'N/A'
+        mongooseReadyState: mongoose ? mongoose.connection.readyState : 'N/A',
+        details: process.env.NODE_ENV === 'development' ? {
+          stack: error.stack
+        } : undefined
       });
     }
   });
 } else {
   // Route handler that shows configuration error
   router.get('/:userId', (req, res) => {
+    console.error('[UserTenantAPI] Route handler called but dependencies not loaded', {
+      verifyAuthAvailable: !!verifyAuth,
+      userTenantAvailable: !!UserTenant,
+      mongooseAvailable: !!mongoose
+    });
     res.status(500).json({
       error: 'Route configuration error',
       message: 'Required dependencies not loaded',
