@@ -6,33 +6,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 
-// Wrap imports in try-catch to handle module load errors
-let verifyAuth, isPlatformAdminUser, Tenant, UserTenant;
-
-try {
-  const roleAuthMiddleware = require('./role-auth-middleware');
-  verifyAuth = roleAuthMiddleware.verifyAuth;
-  isPlatformAdminUser = roleAuthMiddleware.isPlatformAdminUser;
-} catch (err) {
-  console.error('[tenant-details] Error loading role-auth-middleware:', err);
-  throw err;
-}
-
-try {
-  const tenantModel = require('../../models/tenant');
-  Tenant = tenantModel.Tenant;
-} catch (err) {
-  console.error('[tenant-details] Error loading Tenant model:', err);
-  throw err;
-}
-
-try {
-  const userModel = require('../../models/user');
-  UserTenant = userModel.UserTenant;
-} catch (err) {
-  console.error('[tenant-details] Error loading UserTenant model:', err);
-  throw err;
-}
+const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
+const { Tenant } = require('../../models/tenant');
+const { UserTenant } = require('../../models/user');
 
 const router = express.Router();
 
