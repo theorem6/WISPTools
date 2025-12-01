@@ -1,0 +1,333 @@
+/**
+ * Monitoring Graphs API Routes
+ * Provides endpoints for retrieving ping and SNMP metrics for graphing
+ */
+
+const express = require('express');
+const router = express.Router();
+const { PingMetrics } = require('../models/ping-metrics-schema');
+const { SNMPMetrics } = require('../models/snmp-metrics-schema');
+const { InventoryItem } = require('../models/inventory');
+const { NetworkEquipment } = require('../models/network');
+
+// Middleware to extract tenant ID
+const requireTenant = (req, res, next) => {
+  const tenantId = req.headers['x-tenant-id'];
+  if (!tenantId) {
+    return res.status(400).json({ error: 'X-Tenant-ID header is required' });
+  }
+  req.tenantId = tenantId;
+  next();
+};
+
+router.use(requireTenant);
+
+/**
+ * GET /api/monitoring/graphs/ping/:deviceId
+ * Get ping metrics for a device (for graphing)
+ */
+router.get('/ping/:deviceId', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { hours = 24 } = req.query;
+    const hoursNum = parseInt(hours, 10) || 24;
+
+    // Limit hours to reasonable range (1 hour to 30 days)
+    const validHours = Math.max(1, Math.min(720, hoursNum));
+
+    const startTime = new Date(Date.now() - validHours * 60 * 60 * 1000);
+
+    const metrics = await PingMetrics.find({
+      device_id: deviceId,
+      tenant_id: req.tenantId,
+      timestamp: { $gte: startTime }
+    })
+    .sort({ timestamp: 1 })
+    .lean();
+
+    // Format for Chart.js
+    const labels = metrics.map(m => new Date(m.timestamp).toISOString());
+    const responseTimes = metrics.map(m => m.response_time_ms || null);
+    const success = metrics.map(m => m.success ? 1 : 0); // 1 for success, 0 for failure
+
+    res.json({
+      success: true,
+      deviceId,
+      hours: validHours,
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Response Time (ms)',
+            data: responseTimes,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            yAxisID: 'y'
+          },
+          {
+            label: 'Status (1=Online, 0=Offline)',
+            data: success,
+            borderColor: success.map(s => s === 1 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)'),
+            backgroundColor: success.map(s => s === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      stats: {
+        total: metrics.length,
+        successful: metrics.filter(m => m.success).length,
+        failed: metrics.filter(m => !m.success).length,
+        uptime_percent: metrics.length > 0 
+          ? Math.round((metrics.filter(m => m.success).length / metrics.length) * 10000) / 100
+          : 0,
+        avg_response_time: metrics.filter(m => m.response_time_ms).length > 0
+          ? Math.round(metrics.filter(m => m.response_time_ms).reduce((sum, m) => sum + m.response_time_ms, 0) / metrics.filter(m => m.response_time_ms).length * 100) / 100
+          : null
+      }
+    });
+  } catch (error) {
+    console.error('[Monitoring Graphs] Error getting ping metrics:', error);
+    res.status(500).json({
+      error: 'Failed to get ping metrics',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/monitoring/graphs/snmp/:deviceId
+ * Get SNMP metrics for a device (for graphing)
+ */
+router.get('/snmp/:deviceId', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { hours = 24, metric } = req.query;
+    const hoursNum = parseInt(hours, 10) || 24;
+
+    // Limit hours to reasonable range
+    const validHours = Math.max(1, Math.min(720, hoursNum));
+
+    const startTime = new Date(Date.now() - validHours * 60 * 60 * 1000);
+
+    const metrics = await SNMPMetrics.find({
+      device_id: deviceId,
+      tenant_id: req.tenantId,
+      timestamp: { $gte: startTime }
+    })
+    .sort({ timestamp: 1 })
+    .lean();
+
+    if (metrics.length === 0) {
+      return res.json({
+        success: true,
+        deviceId,
+        hours: validHours,
+        data: {
+          labels: [],
+          datasets: []
+        },
+        message: 'No SNMP metrics found for this time range'
+      });
+    }
+
+    // Format for Chart.js
+    const labels = metrics.map(m => new Date(m.timestamp).toISOString());
+
+    // If specific metric requested, return just that
+    if (metric) {
+      let data = [];
+      let label = '';
+      let borderColor = 'rgb(75, 192, 192)';
+
+      switch (metric) {
+        case 'cpu':
+          data = metrics.map(m => m.resources?.cpu_percent || null);
+          label = 'CPU Usage (%)';
+          borderColor = 'rgb(239, 68, 68)';
+          break;
+        case 'memory':
+          data = metrics.map(m => m.resources?.memory_percent || null);
+          label = 'Memory Usage (%)';
+          borderColor = 'rgb(59, 130, 246)';
+          break;
+        case 'uptime':
+          data = metrics.map(m => m.system?.uptime_seconds ? (m.system.uptime_seconds / 3600) : null);
+          label = 'Uptime (hours)';
+          borderColor = 'rgb(34, 197, 94)';
+          break;
+        case 'throughput_in':
+          data = metrics.map(m => m.network?.interface_in_octets || null);
+          label = 'Throughput In (bytes)';
+          borderColor = 'rgb(147, 51, 234)';
+          break;
+        case 'throughput_out':
+          data = metrics.map(m => m.network?.interface_out_octets || null);
+          label = 'Throughput Out (bytes)';
+          borderColor = 'rgb(236, 72, 153)';
+          break;
+        default:
+          return res.status(400).json({ error: 'Invalid metric. Valid options: cpu, memory, uptime, throughput_in, throughput_out' });
+      }
+
+      return res.json({
+        success: true,
+        deviceId,
+        metric,
+        hours: validHours,
+        data: {
+          labels,
+          datasets: [{
+            label,
+            data,
+            borderColor,
+            backgroundColor: borderColor.replace('rgb', 'rgba').replace(')', ', 0.2)'),
+            fill: false
+          }]
+        }
+      });
+    }
+
+    // Return all available metrics
+    const datasets = [];
+
+    // CPU
+    if (metrics.some(m => m.resources?.cpu_percent !== undefined)) {
+      datasets.push({
+        label: 'CPU Usage (%)',
+        data: metrics.map(m => m.resources?.cpu_percent || null),
+        borderColor: 'rgb(239, 68, 68)',
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        yAxisID: 'y'
+      });
+    }
+
+    // Memory
+    if (metrics.some(m => m.resources?.memory_percent !== undefined)) {
+      datasets.push({
+        label: 'Memory Usage (%)',
+        data: metrics.map(m => m.resources?.memory_percent || null),
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        yAxisID: 'y'
+      });
+    }
+
+    // Uptime
+    if (metrics.some(m => m.system?.uptime_seconds !== undefined)) {
+      datasets.push({
+        label: 'Uptime (hours)',
+        data: metrics.map(m => m.system?.uptime_seconds ? (m.system.uptime_seconds / 3600) : null),
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.2)',
+        yAxisID: 'y1'
+      });
+    }
+
+    res.json({
+      success: true,
+      deviceId,
+      hours: validHours,
+      data: {
+        labels,
+        datasets
+      },
+      available_metrics: ['cpu', 'memory', 'uptime', 'throughput_in', 'throughput_out']
+    });
+  } catch (error) {
+    console.error('[Monitoring Graphs] Error getting SNMP metrics:', error);
+    res.status(500).json({
+      error: 'Failed to get SNMP metrics',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/monitoring/graphs/devices
+ * Get list of devices available for graphing
+ */
+router.get('/devices', async (req, res) => {
+  try {
+    // Get all deployed inventory items with IP addresses
+    const inventoryItems = await InventoryItem.find({
+      tenantId: req.tenantId,
+      status: 'deployed',
+      $or: [
+        { ipAddress: { $exists: true, $ne: null, $ne: '' } },
+        { 'technicalSpecs.ipAddress': { $exists: true, $ne: null, $ne: '' } }
+      ]
+    })
+    .select('_id assetTag equipmentType manufacturer model ipAddress technicalSpecs.ipAddress currentLocation')
+    .lean();
+
+    // Get all deployed network equipment with graphs enabled
+    const networkEquipment = await NetworkEquipment.find({
+      tenantId: req.tenantId,
+      status: 'active',
+      siteId: { $exists: true, $ne: null }
+    })
+    .select('_id name type manufacturer model notes siteId')
+    .lean();
+
+    const devices = [];
+
+    // Process inventory items
+    for (const item of inventoryItems) {
+      const ipAddress = item.ipAddress || item.technicalSpecs?.ipAddress;
+      if (ipAddress && ipAddress.trim()) {
+        devices.push({
+          id: item._id.toString(),
+          name: item.assetTag || item.equipmentType || 'Unknown',
+          type: 'inventory',
+          manufacturer: item.manufacturer,
+          model: item.model,
+          ipAddress: ipAddress.trim(),
+          location: item.currentLocation?.siteName || 'Unknown',
+          hasPing: true,
+          hasSNMP: false
+        });
+      }
+    }
+
+    // Process network equipment
+    for (const equipment of networkEquipment) {
+      try {
+        const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
+        const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
+        const enableGraphs = notes.enable_graphs || false;
+
+        if (ipAddress && ipAddress.trim() && enableGraphs) {
+          devices.push({
+            id: equipment._id.toString(),
+            name: equipment.name || 'Unknown',
+            type: 'network_equipment',
+            manufacturer: equipment.manufacturer,
+            model: equipment.model,
+            ipAddress: ipAddress.trim(),
+            location: 'Unknown',
+            hasPing: true,
+            hasSNMP: true
+          });
+        }
+      } catch (e) {
+        // Invalid JSON in notes, skip
+        continue;
+      }
+    }
+
+    res.json({
+      success: true,
+      devices,
+      count: devices.length
+    });
+  } catch (error) {
+    console.error('[Monitoring Graphs] Error getting devices:', error);
+    res.status(500).json({
+      error: 'Failed to get devices',
+      message: error.message
+    });
+  }
+});
+
+module.exports = router;
+

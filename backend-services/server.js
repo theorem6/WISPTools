@@ -99,6 +99,8 @@ app.use('/api/network', require('./routes/network'));
 app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
 app.use('/api/monitoring', require('./routes/monitoring'));
+app.use('/api/monitoring/graphs', require('./routes/monitoring-graphs'));
+app.use('/api/device-assignment', require('./routes/device-assignment'));
 
 // Agent routes (public - no auth required)
 app.use('/api/agent', require('./routes/agent'));
@@ -123,6 +125,18 @@ try {
   console.log('✅ SNMP polling service initialized');
 } catch (error) {
   console.warn('⚠️ SNMP polling service disabled:', error.message);
+}
+
+// Initialize Ping monitoring service
+try {
+  const { getPingMonitoringService } = require('./services/ping-monitoring-service');
+  const pingMonitoringService = getPingMonitoringService();
+  pingMonitoringService.start().catch(err => {
+    console.warn('⚠️ Ping monitoring service failed to start:', err.message);
+  });
+  console.log('✅ Ping monitoring service initialized');
+} catch (error) {
+  console.warn('⚠️ Ping monitoring service disabled:', error.message);
 }
 
 // EPC management routes (includes delete endpoint)

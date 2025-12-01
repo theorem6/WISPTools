@@ -11,20 +11,35 @@
   let error = '';
   let devices: any[] = [];
   let selectedDevice: any = null;
-  let timeRange = '1h';
-  let metricsData: any[] = [];
+  let timeRange = '24h'; // Default to 24 hours
+  let pingMetrics: any = null;
+  let snmpMetrics: any = null;
+  let pingStats: any = null;
   
   // Chart references
+  let pingUptimeChartCanvas: HTMLCanvasElement;
+  let pingResponseChartCanvas: HTMLCanvasElement;
   let cpuChartCanvas: HTMLCanvasElement;
   let memoryChartCanvas: HTMLCanvasElement;
   let throughputChartCanvas: HTMLCanvasElement;
-  let uptimeChartCanvas: HTMLCanvasElement;
+  let pingUptimeChart: Chart | null = null;
+  let pingResponseChart: Chart | null = null;
   let cpuChart: Chart | null = null;
   let memoryChart: Chart | null = null;
   let throughputChart: Chart | null = null;
-  let uptimeChart: Chart | null = null;
   
   let refreshInterval: any = null;
+  
+  // Convert timeRange to hours for API
+  function getHours(): number {
+    switch (timeRange) {
+      case '1h': return 1;
+      case '24h': return 24;
+      case '7d': return 168;
+      case '30d': return 720;
+      default: return 24;
+    }
+  }
   
   onMount(async () => {
     await loadDevices();
@@ -33,10 +48,11 @@
   
   onDestroy(() => {
     if (refreshInterval) clearInterval(refreshInterval);
+    pingUptimeChart?.destroy();
+    pingResponseChart?.destroy();
     cpuChart?.destroy();
     memoryChart?.destroy();
     throughputChart?.destroy();
-    uptimeChart?.destroy();
   });
   
   async function loadDevices() {
@@ -48,8 +64,8 @@
       
       const token = await user.getIdToken();
       
-      // Load discovered devices (which includes deployment status)
-      const response = await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/discovered`, {
+      // Load devices from new monitoring graphs endpoint (includes both inventory and network equipment)
+      const response = await fetch(`${API_CONFIG.PATHS.MONITORING_GRAPHS}/devices`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Tenant-ID': $currentTenant.id
@@ -58,36 +74,23 @@
       
       if (response.ok) {
         const data = await response.json();
-        let allDevices = data.devices || data || [];
-        
-        // Filter to only show deployed devices with graphs enabled
-        devices = allDevices.filter((device: any) => {
-          // Check if deployed
-          const isDeployed = device.isDeployed || device.siteId;
-          
-          // Check if graphs enabled (default to true if not set and device is deployed)
-          let graphsEnabled = true;
-          if (device.notes) {
-            try {
-              const notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
-              graphsEnabled = notes.enable_graphs !== false;
-            } catch (e) {
-              // If can't parse, assume enabled for deployed devices
-            }
-          }
-          
-          return isDeployed && graphsEnabled;
-        });
-        
+        devices = data.devices || [];
         isLoading = false;
         
         // Auto-select first device if none selected
         if (!selectedDevice && devices.length > 0) {
           selectDevice(devices[0]);
+        } else if (selectedDevice) {
+          // Refresh selected device if it's still in the list
+          const refreshed = devices.find((d: any) => d.id === selectedDevice.id);
+          if (refreshed) {
+            selectedDevice = refreshed;
+            await loadDeviceMetrics();
+          }
         }
       }
     } catch (err) {
-      console.error('Failed to load SNMP devices:', err);
+      console.error('Failed to load devices:', err);
       error = 'Failed to load devices';
       isLoading = false;
     }
@@ -106,23 +109,55 @@
       if (!user) return;
       
       const token = await user.getIdToken();
-      const deviceId = selectedDevice._id || selectedDevice.id;
+      const deviceId = selectedDevice.id;
+      const hours = getHours();
       
-      const response = await fetch(
-        `${API_CONFIG.PATHS.SNMP_MONITORING}/metrics/${deviceId}?timeRange=${timeRange}`, 
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': $currentTenant.id
+      // Load ping metrics if device has ping capability
+      if (selectedDevice.hasPing && selectedDevice.ipAddress) {
+        try {
+          const pingResponse = await fetch(
+            `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`, 
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Tenant-ID': $currentTenant.id
+              }
+            }
+          );
+          
+          if (pingResponse.ok) {
+            const pingData = await pingResponse.json();
+            pingMetrics = pingData.data || null;
+            pingStats = pingData.stats || null;
           }
+        } catch (err) {
+          console.error('Failed to load ping metrics:', err);
         }
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        metricsData = data.dataPoints || [];
-        initCharts();
       }
+      
+      // Load SNMP metrics if device has SNMP capability
+      if (selectedDevice.hasSNMP) {
+        try {
+          const snmpResponse = await fetch(
+            `${API_CONFIG.PATHS.MONITORING_GRAPHS}/snmp/${deviceId}?hours=${hours}`, 
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Tenant-ID': $currentTenant.id
+              }
+            }
+          );
+          
+          if (snmpResponse.ok) {
+            const snmpData = await snmpResponse.json();
+            snmpMetrics = snmpData.data || null;
+          }
+        } catch (err) {
+          console.error('Failed to load SNMP metrics:', err);
+        }
+      }
+      
+      initCharts();
     } catch (err) {
       console.error('Failed to load device metrics:', err);
     }
@@ -130,53 +165,33 @@
   
   function initCharts() {
     // Destroy existing charts
+    pingUptimeChart?.destroy();
+    pingResponseChart?.destroy();
     cpuChart?.destroy();
     memoryChart?.destroy();
     throughputChart?.destroy();
-    uptimeChart?.destroy();
     
-    // If no data, show empty state - don't create charts
-    if (metricsData.length === 0) {
-      cpuChart = null;
-      memoryChart = null;
-      throughputChart = null;
-      uptimeChart = null;
-      return;
+    // Initialize ping charts
+    if (selectedDevice?.hasPing && pingMetrics) {
+      initPingCharts();
     }
     
-    // Format labels based on time range for better readability
-    const labels = metricsData.map(m => {
-      const d = new Date(m.timestamp);
-      if (timeRange === '1h') {
-        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
-      } else if (timeRange === '24h') {
-        return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:00`;
-      } else {
-        return `${d.getMonth() + 1}/${d.getDate()}`;
-      }
-    });
+    // Initialize SNMP charts
+    if (selectedDevice?.hasSNMP && snmpMetrics) {
+      initSNMPCharts();
+    }
+  }
+  
+  function initPingCharts() {
+    if (!pingMetrics || !pingMetrics.labels || pingMetrics.labels.length === 0) return;
     
-    // Professional time-series chart options
     const chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: {
-        intersect: false,
-        mode: 'index' as const
-      },
-      animation: {
-        duration: 750,
-        easing: 'easeInOutQuart' as const
-      },
+      interaction: { intersect: false, mode: 'index' as const },
+      animation: { duration: 750, easing: 'easeInOutQuart' as const },
       plugins: {
-        legend: { 
-          display: false,
-          labels: {
-            color: '#94a3b8',
-            usePointStyle: true,
-            padding: 15
-          }
-        },
+        legend: { display: true, labels: { color: '#94a3b8', usePointStyle: true } },
         tooltip: {
           backgroundColor: 'rgba(15, 23, 42, 0.95)',
           titleColor: '#f1f5f9',
@@ -184,221 +199,253 @@
           borderColor: 'rgba(59, 130, 246, 0.3)',
           borderWidth: 1,
           cornerRadius: 8,
-          padding: 12,
-          displayColors: true,
-          callbacks: {
-            label: function(context: any) {
-              const value = context.parsed.y;
-              if (value === null || value === undefined) return 'No data';
-              return `${context.dataset.label}: ${value.toFixed(2)}${context.dataset.label.includes('%') ? '%' : context.dataset.label.includes('MB') ? ' MB' : context.dataset.label.includes('GB') ? ' GB' : ''}`;
-            }
-          }
-        },
-        title: {
-          display: false
+          padding: 12
         }
       },
       scales: {
         y: {
           beginAtZero: true,
-          ticks: { 
-            color: '#9ca3af', 
-            font: { size: 11 },
-            precision: 1
-          },
-          grid: { 
-            color: 'rgba(255,255,255,0.05)',
-            drawBorder: false
-          },
-          border: {
-            color: 'rgba(255,255,255,0.1)'
-          }
+          ticks: { color: '#9ca3af', font: { size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }
         },
         x: {
-          ticks: { 
-            color: '#9ca3af', 
-            maxRotation: 45,
-            minRotation: 0,
-            font: { size: 10 }, 
-            maxTicksLimit: 12
-          },
-          grid: { 
-            color: 'rgba(255,255,255,0.05)',
-            display: false
-          },
-          border: {
-            color: 'rgba(255,255,255,0.1)'
-          }
+          ticks: { color: '#9ca3af', maxRotation: 45, font: { size: 10 }, maxTicksLimit: 12 },
+          grid: { color: 'rgba(255,255,255,0.05)', display: false }
         }
       }
     };
     
-    // Filter out null/undefined values and configure Chart.js to skip them
-    const cpuData = metricsData.map(m => {
-      const val = m.metrics?.cpuUsage;
-      return val !== null && val !== undefined ? val : null;
-    });
-    const memoryData = metricsData.map(m => {
-      const val = m.metrics?.memoryUsage;
-      return val !== null && val !== undefined ? val : null;
-    });
-    const inOctetsData = metricsData.map(m => {
-      const val = m.metrics?.interfaceInOctets;
-      return val !== null && val !== undefined ? val : null;
-    });
-    const outOctetsData = metricsData.map(m => {
-      const val = m.metrics?.interfaceOutOctets;
-      return val !== null && val !== undefined ? val : null;
-    });
+    // Ping Uptime Chart (Status: 1=Online, 0=Offline)
+    if (pingUptimeChartCanvas && pingMetrics.datasets && pingMetrics.datasets.length > 1) {
+      const statusDataset = pingMetrics.datasets.find((d: any) => d.label.includes('Status'));
+      if (statusDataset) {
+        pingUptimeChart = new Chart(pingUptimeChartCanvas, {
+          type: 'line',
+          data: {
+            labels: pingMetrics.labels.map((l: string) => {
+              const d = new Date(l);
+              return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }),
+            datasets: [{
+              ...statusDataset,
+              borderColor: statusDataset.data.map((v: number) => v === 1 ? '#22c55e' : '#ef4444'),
+              backgroundColor: statusDataset.data.map((v: number) => v === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+              fill: true,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+              tension: 0.1
+            }]
+          },
+          options: {
+            ...chartOptions,
+            scales: {
+              ...chartOptions.scales,
+              y: {
+                ...chartOptions.scales.y,
+                max: 1,
+                min: 0,
+                ticks: {
+                  ...chartOptions.scales.y.ticks,
+                  stepSize: 1,
+                  callback: function(value) {
+                    return value === 1 ? 'Online' : 'Offline';
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
     
-    // Check if we have any real data
-    const hasCpuData = cpuData.some(v => v !== null);
-    const hasMemoryData = memoryData.some(v => v !== null);
-    const hasNetworkData = inOctetsData.some(v => v !== null) || outOctetsData.some(v => v !== null);
+    // Ping Response Time Chart
+    if (pingResponseChartCanvas && pingMetrics.datasets) {
+      const responseTimeDataset = pingMetrics.datasets.find((d: any) => d.label.includes('Response Time'));
+      if (responseTimeDataset && responseTimeDataset.data.some((v: any) => v !== null)) {
+        pingResponseChart = new Chart(pingResponseChartCanvas, {
+          type: 'line',
+          data: {
+            labels: pingMetrics.labels.map((l: string) => {
+              const d = new Date(l);
+              return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }),
+            datasets: [{
+              ...responseTimeDataset,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.15)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              pointHoverRadius: 5
+            }]
+          },
+          options: {
+            ...chartOptions,
+            scales: {
+              ...chartOptions.scales,
+              y: {
+                ...chartOptions.scales.y,
+                title: {
+                  display: true,
+                  text: 'Response Time (ms)',
+                  color: '#94a3b8',
+                  font: { size: 11 }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  }
+  
+  function initSNMPCharts() {
+    if (!snmpMetrics || !snmpMetrics.labels || snmpMetrics.labels.length === 0) return;
     
-    if (cpuChartCanvas) {
-      if (hasCpuData) {
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' as const },
+      animation: { duration: 750, easing: 'easeInOutQuart' as const },
+      plugins: {
+        legend: { display: false, labels: { color: '#94a3b8' } },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#f1f5f9',
+          bodyColor: '#cbd5e1',
+          borderColor: 'rgba(59, 130, 246, 0.3)',
+          borderWidth: 1,
+          cornerRadius: 8,
+          padding: 12
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#9ca3af', font: { size: 11 } },
+          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }
+        },
+        x: {
+          ticks: { color: '#9ca3af', maxRotation: 45, font: { size: 10 }, maxTicksLimit: 12 },
+          grid: { color: 'rgba(255,255,255,0.05)', display: false }
+        }
+      }
+    };
+    
+    // CPU Chart
+    if (cpuChartCanvas && snmpMetrics.datasets) {
+      const cpuDataset = snmpMetrics.datasets.find((d: any) => d.label.includes('CPU'));
+      if (cpuDataset && cpuDataset.data.some((v: any) => v !== null)) {
         cpuChart = new Chart(cpuChartCanvas, {
           type: 'line',
           data: {
-            labels,
+            labels: snmpMetrics.labels.map((l: string) => {
+              const d = new Date(l);
+              return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }),
             datasets: [{
-              label: 'CPU Usage (%)',
-              data: cpuData,
+              ...cpuDataset,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 0,
+              pointHoverRadius: 4
+            }]
+          },
+          options: {
+            ...chartOptions,
+            scales: {
+              ...chartOptions.scales,
+              y: {
+                ...chartOptions.scales.y,
+                max: 100,
+                title: {
+                  display: true,
+                  text: 'CPU Usage (%)',
+                  color: '#94a3b8',
+                  font: { size: 11 }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+    
+    // Memory Chart
+    if (memoryChartCanvas && snmpMetrics.datasets) {
+      const memoryDataset = snmpMetrics.datasets.find((d: any) => d.label.includes('Memory'));
+      if (memoryDataset && memoryDataset.data.some((v: any) => v !== null)) {
+        memoryChart = new Chart(memoryChartCanvas, {
+          type: 'line',
+          data: {
+            labels: snmpMetrics.labels.map((l: string) => {
+              const d = new Date(l);
+              return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }),
+            datasets: [{
+              ...memoryDataset,
               borderColor: '#3b82f6',
               backgroundColor: 'rgba(59, 130, 246, 0.15)',
               fill: true,
               tension: 0.3,
               pointRadius: 0,
-              pointHoverRadius: 4,
-              borderWidth: 2,
-              spanGaps: false // Don't connect points across null gaps
+              pointHoverRadius: 4
             }]
-          },
-          options: { 
-            ...chartOptions, 
-            scales: { 
-              ...chartOptions.scales, 
-              y: { 
-                ...chartOptions.scales.y, 
-                max: 100,
-                title: {
-                  display: true,
-                  text: 'Usage %',
-                  color: '#94a3b8',
-                  font: { size: 11 }
-                }
-              } 
-            } 
-          }
-        });
-      } else {
-        // Show "No Data" message instead of empty chart
-        const ctx = cpuChartCanvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, cpuChartCanvas.width, cpuChartCanvas.height);
-          ctx.fillStyle = '#64748b';
-          ctx.font = '14px system-ui';
-          ctx.textAlign = 'center';
-          ctx.fillText('No CPU data available', cpuChartCanvas.width / 2, cpuChartCanvas.height / 2);
-        }
-      }
-    }
-    
-    if (memoryChartCanvas) {
-      if (hasMemoryData) {
-        memoryChart = new Chart(memoryChartCanvas, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Memory Usage (%)',
-              data: memoryData,
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              fill: true,
-              tension: 0.3,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-              borderWidth: 2,
-              spanGaps: false
-            }]
-          },
-          options: { 
-            ...chartOptions, 
-            scales: { 
-              ...chartOptions.scales, 
-              y: { 
-                ...chartOptions.scales.y, 
-                max: 100,
-                title: {
-                  display: true,
-                  text: 'Usage %',
-                  color: '#94a3b8',
-                  font: { size: 11 }
-                }
-              } 
-            } 
-          }
-        });
-      } else {
-        const ctx = memoryChartCanvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, memoryChartCanvas.width, memoryChartCanvas.height);
-          ctx.fillStyle = '#64748b';
-          ctx.font = '14px system-ui';
-          ctx.textAlign = 'center';
-          ctx.fillText('No Memory data available', memoryChartCanvas.width / 2, memoryChartCanvas.height / 2);
-        }
-      }
-    }
-    
-    if (throughputChartCanvas) {
-      if (hasNetworkData) {
-        throughputChart = new Chart(throughputChartCanvas, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [
-              {
-                label: 'In (bytes)',
-                data: inOctetsData,
-                borderColor: '#8b5cf6',
-                backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                fill: false,
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                borderWidth: 2,
-                spanGaps: false
-              },
-              {
-                label: 'Out (bytes)',
-                data: outOctetsData,
-                borderColor: '#ec4899',
-                backgroundColor: 'rgba(236, 72, 153, 0.1)',
-                fill: false,
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                borderWidth: 2,
-                spanGaps: false
-              }
-            ]
           },
           options: {
             ...chartOptions,
-            plugins: { 
-              ...chartOptions.plugins, 
-              legend: { 
-                display: true, 
-                position: 'top', 
-                labels: { 
+            scales: {
+              ...chartOptions.scales,
+              y: {
+                ...chartOptions.scales.y,
+                max: 100,
+                title: {
+                  display: true,
+                  text: 'Memory Usage (%)',
                   color: '#94a3b8',
-                  usePointStyle: true,
-                  padding: 12
-                } 
-              } 
+                  font: { size: 11 }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+    
+    // Throughput Chart
+    if (throughputChartCanvas && snmpMetrics.datasets) {
+      const throughputDatasets = snmpMetrics.datasets.filter((d: any) => 
+        d.label.includes('Throughput') || d.label.includes('In') || d.label.includes('Out')
+      );
+      if (throughputDatasets.length > 0) {
+        throughputChart = new Chart(throughputChartCanvas, {
+          type: 'line',
+          data: {
+            labels: snmpMetrics.labels.map((l: string) => {
+              const d = new Date(l);
+              return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }),
+            datasets: throughputDatasets.map((dataset: any, idx: number) => ({
+              ...dataset,
+              borderColor: idx === 0 ? '#8b5cf6' : '#ec4899',
+              backgroundColor: idx === 0 ? 'rgba(139, 92, 246, 0.1)' : 'rgba(236, 72, 153, 0.1)',
+              fill: false,
+              tension: 0.3,
+              pointRadius: 0,
+              pointHoverRadius: 4
+            }))
+          },
+          options: {
+            ...chartOptions,
+            plugins: {
+              ...chartOptions.plugins,
+              legend: {
+                display: true,
+                position: 'top',
+                labels: { color: '#94a3b8', usePointStyle: true }
+              }
             },
             scales: {
               ...chartOptions.scales,
@@ -414,25 +461,8 @@
             }
           }
         });
-      } else {
-        const ctx = throughputChartCanvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, throughputChartCanvas.width, throughputChartCanvas.height);
-          ctx.fillStyle = '#64748b';
-          ctx.font = '14px system-ui';
-          ctx.textAlign = 'center';
-          ctx.fillText('No Network data available', throughputChartCanvas.width / 2, throughputChartCanvas.height / 2);
-        }
       }
     }
-  }
-  
-  function formatUptime(seconds: number): string {
-    if (!seconds) return 'N/A';
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    if (days > 0) return `${days}d ${hours}h`;
-    return `${hours}h`;
   }
   
   function getStatusColor(status: string): string {
@@ -444,41 +474,51 @@
       default: return 'status-warning';
     }
   }
+  
+  function formatUptimePercent(percent: number): string {
+    if (percent === null || percent === undefined) return 'N/A';
+    return `${percent.toFixed(2)}%`;
+  }
 </script>
 
 <div class="snmp-graphs-panel">
   {#if isLoading}
     <div class="loading">
       <div class="spinner"></div>
-      <p>Loading SNMP devices...</p>
+      <p>Loading devices...</p>
     </div>
   {:else if devices.length === 0}
     <div class="no-devices">
-      <p>📊 No SNMP devices found</p>
-      <p class="hint">Add SNMP-enabled devices in the Hardware module</p>
+      <p>📊 No devices available for monitoring</p>
+      <p class="hint">Deploy devices with IP addresses to enable ping monitoring</p>
     </div>
   {:else}
     <div class="panel-layout">
       <!-- Device List Sidebar -->
       <div class="device-sidebar">
-        <h3>📡 SNMP Devices</h3>
+        <h3>📡 Devices</h3>
         <div class="device-list">
           {#each devices as device}
             <button 
-              class="device-item {selectedDevice?.id === device.id || selectedDevice?._id === device._id ? 'selected' : ''}"
+              class="device-item {selectedDevice?.id === device.id ? 'selected' : ''}"
               on:click={() => selectDevice(device)}
             >
-              <span class="device-status {getStatusColor(device.status)}"></span>
+              <span class="device-status {getStatusColor(device.status || 'unknown')}"></span>
               <div class="device-info">
-                <span class="device-name">{device.name || device.hostname || 'Unknown'}</span>
+                <span class="device-name">{device.name || 'Unknown'}</span>
                 <span class="device-details">
-                  <span class="device-ip">{device.ip_address || device.management_ip || 'N/A'}</span>
-                  {#if device.manufacturer && device.manufacturer !== 'Generic'}
+                  <span class="device-ip">{device.ipAddress || 'N/A'}</span>
+                  {#if device.manufacturer}
                     <span class="device-manufacturer"> • {device.manufacturer}</span>
                   {/if}
-                  {#if device.deviceType && device.deviceType !== 'other'}
-                    <span class="device-type"> • {device.deviceType}</span>
-                  {/if}
+                  <div class="device-capabilities">
+                    {#if device.hasPing}
+                      <span class="capability ping">Ping</span>
+                    {/if}
+                    {#if device.hasSNMP}
+                      <span class="capability snmp">SNMP</span>
+                    {/if}
+                  </div>
                 </span>
               </div>
             </button>
@@ -490,60 +530,115 @@
       <div class="graphs-area">
         {#if selectedDevice}
           <div class="device-header">
-            <h2>{selectedDevice.name || 'Device'}</h2>
+            <div>
+              <h2>{selectedDevice.name || 'Device'}</h2>
+              <div class="device-subtitle">
+                <span class="ip">{selectedDevice.ipAddress || 'No IP'}</span>
+                {#if selectedDevice.manufacturer}
+                  <span class="manufacturer"> • {selectedDevice.manufacturer}</span>
+                {/if}
+                {#if pingStats}
+                  <span class="uptime-badge {pingStats.current_status === 'online' ? 'online' : 'offline'}">
+                    {pingStats.uptime_percent} uptime
+                  </span>
+                {/if}
+              </div>
+            </div>
             <div class="time-selector">
               <button class="{timeRange === '1h' ? 'active' : ''}" on:click={() => { timeRange = '1h'; loadDeviceMetrics(); }}>1H</button>
               <button class="{timeRange === '24h' ? 'active' : ''}" on:click={() => { timeRange = '24h'; loadDeviceMetrics(); }}>24H</button>
               <button class="{timeRange === '7d' ? 'active' : ''}" on:click={() => { timeRange = '7d'; loadDeviceMetrics(); }}>7D</button>
+              <button class="{timeRange === '30d' ? 'active' : ''}" on:click={() => { timeRange = '30d'; loadDeviceMetrics(); }}>30D</button>
             </div>
           </div>
           
-          <!-- Quick Stats -->
-          <div class="quick-stats">
-            <div class="stat">
-              <span class="stat-label">Status</span>
-              <span class="stat-value {getStatusColor(selectedDevice.status)}">{selectedDevice.status || 'Unknown'}</span>
+          <!-- Ping Stats -->
+          {#if pingStats}
+            <div class="quick-stats">
+              <div class="stat">
+                <span class="stat-label">Current Status</span>
+                <span class="stat-value {pingStats.current_status === 'online' ? 'status-online' : 'status-offline'}">
+                  {pingStats.current_status || 'Unknown'}
+                </span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Uptime</span>
+                <span class="stat-value">{formatUptimePercent(pingStats.uptime_percent)}</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Avg Response</span>
+                <span class="stat-value">{pingStats.avg_response_time_ms ? `${pingStats.avg_response_time_ms.toFixed(1)}ms` : 'N/A'}</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Failed Pings</span>
+                <span class="stat-value">{pingStats.failed || 0} / {pingStats.total || 0}</span>
+              </div>
             </div>
-            <div class="stat">
-              <span class="stat-label">Type</span>
-              <span class="stat-value">{selectedDevice.type || selectedDevice.device_type || 'N/A'}</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">Uptime</span>
-              <span class="stat-value">{formatUptime(metricsData[metricsData.length - 1]?.metrics?.uptime)}</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">Temperature</span>
-              <span class="stat-value">{metricsData[metricsData.length - 1]?.metrics?.temperature ?? 'N/A'}°C</span>
-            </div>
-          </div>
+          {/if}
           
           <!-- Charts Grid -->
-          {#if metricsData.length === 0}
-            <div class="no-data-message">
-              <p>📊 No metrics data available for this device</p>
-              <p class="hint">SNMP polling needs to collect data before graphs will appear</p>
-            </div>
-          {:else}
-            <div class="charts-grid">
+          <div class="charts-grid">
+            {#if selectedDevice.hasPing}
               <div class="chart-card">
-                <h4>CPU Usage</h4>
+                <h4>🟢 Ping Uptime</h4>
                 <div class="chart-container">
-                  <canvas bind:this={cpuChartCanvas}></canvas>
+                  {#if pingUptimeChartCanvas}
+                    <canvas bind:this={pingUptimeChartCanvas}></canvas>
+                  {:else}
+                    <p class="no-data">No ping data available</p>
+                  {/if}
                 </div>
               </div>
               <div class="chart-card">
-                <h4>Memory Usage</h4>
+                <h4>⏱️ Ping Response Time</h4>
                 <div class="chart-container">
-                  <canvas bind:this={memoryChartCanvas}></canvas>
+                  {#if pingResponseChartCanvas}
+                    <canvas bind:this={pingResponseChartCanvas}></canvas>
+                  {:else}
+                    <p class="no-data">No response time data available</p>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+            
+            {#if selectedDevice.hasSNMP}
+              <div class="chart-card">
+                <h4>💻 CPU Usage</h4>
+                <div class="chart-container">
+                  {#if cpuChartCanvas}
+                    <canvas bind:this={cpuChartCanvas}></canvas>
+                  {:else}
+                    <p class="no-data">No CPU data available</p>
+                  {/if}
+                </div>
+              </div>
+              <div class="chart-card">
+                <h4>🧠 Memory Usage</h4>
+                <div class="chart-container">
+                  {#if memoryChartCanvas}
+                    <canvas bind:this={memoryChartCanvas}></canvas>
+                  {:else}
+                    <p class="no-data">No memory data available</p>
+                  {/if}
                 </div>
               </div>
               <div class="chart-card wide">
-                <h4>Network Throughput (Interface)</h4>
+                <h4>🌐 Network Throughput</h4>
                 <div class="chart-container">
-                  <canvas bind:this={throughputChartCanvas}></canvas>
+                  {#if throughputChartCanvas}
+                    <canvas bind:this={throughputChartCanvas}></canvas>
+                  {:else}
+                    <p class="no-data">No network data available</p>
+                  {/if}
                 </div>
               </div>
+            {/if}
+          </div>
+          
+          {#if !selectedDevice.hasPing && !selectedDevice.hasSNMP}
+            <div class="no-data-message">
+              <p>📊 No monitoring data available for this device</p>
+              <p class="hint">Device needs an IP address for ping monitoring or SNMP configuration for SNMP metrics</p>
             </div>
           {/if}
         {:else}
@@ -572,20 +667,6 @@
     height: 100%;
     color: #64748b;
     gap: 1rem;
-  }
-  
-  .no-data-message {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 3rem 2rem;
-    color: #64748b;
-    background: rgba(255,255,255,0.05);
-    border-radius: 12px;
-    margin: 2rem 0;
-  }
-  
-  .no-data-message p {
-    margin: 0.5rem 0;
   }
   
   .spinner {
@@ -669,6 +750,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    flex: 1;
   }
   
   .device-name {
@@ -684,21 +766,28 @@
     color: #64748b;
     font-family: monospace;
   }
-
-  .device-details {
+  
+  .device-capabilities {
     display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
   }
-
-  .device-manufacturer,
-  .device-type {
-    font-size: 0.7rem;
-    color: #94a3b8;
-  }
-
-  .device-manufacturer {
+  
+  .capability {
+    font-size: 0.65rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
     font-weight: 500;
+  }
+  
+  .capability.ping {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+  }
+  
+  .capability.snmp {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
   }
   
   .graphs-area {
@@ -709,7 +798,7 @@
   .device-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 1.5rem;
     padding-top: 1rem;
   }
@@ -717,22 +806,33 @@
   .device-header h2 {
     margin: 0 0 0.25rem 0;
     font-size: 1.5rem;
-    color: var(--text-primary, #111827);
+    color: #f1f5f9;
   }
-
+  
   .device-subtitle {
     font-size: 0.875rem;
     color: #64748b;
-    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
-
-  .device-subtitle .manufacturer {
+  
+  .uptime-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
     font-weight: 500;
-    color: #94a3b8;
   }
-
-  .device-subtitle .device-type {
-    text-transform: capitalize;
+  
+  .uptime-badge.online {
+    background: rgba(34, 197, 94, 0.2);
+    color: #34d399;
+  }
+  
+  .uptime-badge.offline {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
   }
   
   .time-selector {
@@ -815,8 +915,27 @@
   }
   
   .chart-container {
-    height: 180px;
+    height: 200px;
     position: relative;
+  }
+  
+  .no-data {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+    font-size: 0.875rem;
+  }
+  
+  .no-data-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #64748b;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    margin: 2rem 0;
   }
   
   @media (max-width: 768px) {

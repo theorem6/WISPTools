@@ -474,4 +474,3 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
 
 module.exports = router;
 
-module.exports = router;

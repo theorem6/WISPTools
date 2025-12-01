@@ -190,6 +190,9 @@ const InventoryItemSchema = new mongoose.Schema({
   macAddress: String,
   imei: String, // For devices with cellular
   
+  // Network IP Address (accessible top-level field for ping monitoring)
+  ipAddress: { type: String, index: true }, // Top-level IP address for ping monitoring
+  
   // Software/Firmware
   firmwareVersion: String,
   softwareVersion: String,

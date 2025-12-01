@@ -28,6 +28,8 @@ export const API_CONFIG = {
     MIKROTIK: '/api/mikrotik',
     EPC_UPDATES: '/api/epc-updates',
     SNMP_MONITORING: '/api/snmp',
+    MONITORING_GRAPHS: '/api/monitoring/graphs',
+    DEVICE_ASSIGNMENT: '/api/device-assignment',
     API: '/api'
   },
   
