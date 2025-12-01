@@ -19,6 +19,12 @@ router.get('/:userId', verifyAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     
+    // Ensure user is authenticated (verifyAuth should set req.user, but check anyway)
+    if (!req.user || !req.user.uid) {
+      console.error('[tenant-details] req.user not set after verifyAuth middleware');
+      return res.status(401).json({ error: 'Unauthorized', message: 'User not authenticated' });
+    }
+    
     // Security: Users can only query their own tenants (unless platform admin)
     const isPlatformAdmin = isPlatformAdminUser(req.user);
     if (!isPlatformAdmin && req.user.uid !== userId) {
@@ -75,7 +81,16 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     res.json(tenantsWithDetails);
   } catch (error) {
     console.error('[tenant-details] Error getting user tenants:', error);
-    res.status(500).json({ error: 'Failed to get user tenants', message: error.message });
+    console.error('[tenant-details] Error stack:', error.stack);
+    console.error('[tenant-details] Error name:', error.name);
+    
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Failed to get user tenants', 
+        message: error.message || 'Internal server error',
+        errorName: error.name
+      });
+    }
   }
 });
 
