@@ -8,33 +8,23 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
 const { UserTenant } = require('./user-schema');
-const { Tenant } = require('../../models/tenant');
+
+// Lazy load Tenant model to avoid circular dependencies
+let Tenant;
+function getTenantModel() {
+  if (!Tenant) {
+    Tenant = require('../../models/tenant').Tenant;
+  }
+  return Tenant;
+}
 
 /**
  * GET /api/user-tenants/:userId
  * Get all tenant memberships for a user with full tenant details
- * Used during login to determine which tenants the user has access to
  */
 router.get('/:userId', verifyAuth, async (req, res) => {
   try {
     const { userId } = req.params;
-    
-    // Validate models are loaded
-    if (!UserTenant) {
-      console.error('[tenant-details] UserTenant model is not loaded');
-      return res.status(500).json({ error: 'Service configuration error', message: 'UserTenant model not available' });
-    }
-    
-    if (!Tenant) {
-      console.error('[tenant-details] Tenant model is not loaded');
-      return res.status(500).json({ error: 'Service configuration error', message: 'Tenant model not available' });
-    }
-    
-    // Ensure user is authenticated (verifyAuth should set req.user, but check anyway)
-    if (!req.user || !req.user.uid) {
-      console.error('[tenant-details] req.user not set after verifyAuth middleware');
-      return res.status(401).json({ error: 'Unauthorized', message: 'User not authenticated' });
-    }
     
     // Security: Users can only query their own tenants (unless platform admin)
     const isPlatformAdmin = isPlatformAdminUser(req.user);
@@ -45,21 +35,10 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     console.log(`[tenant-details] Getting tenants for user: ${userId}`);
     
     // Find all active tenant memberships
-    let userTenants;
-    try {
-      userTenants = await UserTenant.find({ 
-        userId,
-        status: 'active'
-      }).lean();
-    } catch (dbError) {
-      console.error('[tenant-details] Database error querying UserTenant:', dbError);
-      console.error('[tenant-details] DB error stack:', dbError.stack);
-      return res.status(500).json({ 
-        error: 'Database error', 
-        message: 'Failed to query user tenant associations',
-        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
-      });
-    }
+    const userTenants = await UserTenant.find({ 
+      userId,
+      status: 'active'
+    }).lean();
     
     if (!userTenants || userTenants.length === 0) {
       console.log(`[tenant-details] No active tenant associations found for user: ${userId}`);
@@ -68,12 +47,15 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     
     console.log(`[tenant-details] Found ${userTenants.length} tenant associations`);
     
+    // Lazy load Tenant model
+    const TenantModel = getTenantModel();
+    
     // Get full tenant details for each association
     const tenantsWithDetails = [];
     for (const ut of userTenants) {
       try {
         if (!ut.tenantId) {
-          console.warn(`[tenant-details] UserTenant record missing tenantId:`, ut);
+          console.warn(`[tenant-details] UserTenant record missing tenantId`);
           continue;
         }
         
@@ -84,7 +66,7 @@ router.get('/:userId', verifyAuth, async (req, res) => {
         }
         
         const tenantObjectId = new mongoose.Types.ObjectId(ut.tenantId);
-        const tenant = await Tenant.findById(tenantObjectId).lean();
+        const tenant = await TenantModel.findById(tenantObjectId).lean();
         
         if (tenant) {
           tenantsWithDetails.push({
@@ -102,18 +84,12 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     console.log(`[tenant-details] Returning ${tenantsWithDetails.length} tenants with details`);
     res.json(tenantsWithDetails);
   } catch (error) {
-    console.error('[tenant-details] Unexpected error getting user tenants:', error);
+    console.error('[tenant-details] Error getting user tenants:', error);
     console.error('[tenant-details] Error stack:', error.stack);
-    console.error('[tenant-details] Error name:', error.name);
-    console.error('[tenant-details] Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
-    
-    if (!res.headersSent) {
-      res.status(500).json({ 
-        error: 'Failed to get user tenants', 
-        message: error.message || 'Internal server error',
-        errorName: error.name
-      });
-    }
+    res.status(500).json({ 
+      error: 'Failed to get user tenants', 
+      message: error.message || 'Internal server error'
+    });
   }
 });
 
