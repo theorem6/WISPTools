@@ -88,7 +88,15 @@ app.get('/api/debug/token', async (req, res) => {
 app.use('/api/auth', require('./routes/auth')); // Authentication routes
 app.use('/api/users', require('./routes/users')); // Includes auto-assign routes
 app.use('/api/tenants', require('./routes/tenants')); // User tenant creation (first tenant only)
-app.use('/api/user-tenants', require('./routes/users/tenant-details'));
+// User tenant details route (wrapped in try-catch to prevent server crash on load error)
+try {
+  app.use('/api/user-tenants', require('./routes/users/tenant-details'));
+  console.log('[Server] ✅ User tenant details route loaded successfully');
+} catch (error) {
+  console.error('[Server] ❌ Failed to load user tenant details route:', error);
+  console.error('[Server] Error details:', error.message, error.stack);
+  // Continue server startup even if this route fails
+}
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/inventory', require('./routes/inventory'));
