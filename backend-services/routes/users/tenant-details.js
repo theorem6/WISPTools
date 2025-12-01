@@ -5,9 +5,34 @@
 
 const express = require('express');
 const mongoose = require('mongoose');
-const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
-const { Tenant } = require('../../models/tenant');
-const { UserTenant } = require('../../models/user');
+
+// Wrap imports in try-catch to handle module load errors
+let verifyAuth, isPlatformAdminUser, Tenant, UserTenant;
+
+try {
+  const roleAuthMiddleware = require('./role-auth-middleware');
+  verifyAuth = roleAuthMiddleware.verifyAuth;
+  isPlatformAdminUser = roleAuthMiddleware.isPlatformAdminUser;
+} catch (err) {
+  console.error('[tenant-details] Error loading role-auth-middleware:', err);
+  throw err;
+}
+
+try {
+  const tenantModel = require('../../models/tenant');
+  Tenant = tenantModel.Tenant;
+} catch (err) {
+  console.error('[tenant-details] Error loading Tenant model:', err);
+  throw err;
+}
+
+try {
+  const userModel = require('../../models/user');
+  UserTenant = userModel.UserTenant;
+} catch (err) {
+  console.error('[tenant-details] Error loading UserTenant model:', err);
+  throw err;
+}
 
 const router = express.Router();
 
@@ -238,6 +263,18 @@ router.get('/tenant/:tenantId', verifyAuth, async (req, res) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message
+    });
+  }
+});
+
+// Add error handler middleware for unhandled errors
+router.use((err, req, res, next) => {
+  console.error('[tenant-details] Unhandled error in router:', err);
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: err.message || 'An unexpected error occurred',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 });
