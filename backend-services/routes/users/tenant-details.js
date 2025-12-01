@@ -19,6 +19,17 @@ router.get('/:userId', verifyAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     
+    // Validate models are loaded
+    if (!UserTenant) {
+      console.error('[tenant-details] UserTenant model is not loaded');
+      return res.status(500).json({ error: 'Service configuration error', message: 'UserTenant model not available' });
+    }
+    
+    if (!Tenant) {
+      console.error('[tenant-details] Tenant model is not loaded');
+      return res.status(500).json({ error: 'Service configuration error', message: 'Tenant model not available' });
+    }
+    
     // Ensure user is authenticated (verifyAuth should set req.user, but check anyway)
     if (!req.user || !req.user.uid) {
       console.error('[tenant-details] req.user not set after verifyAuth middleware');
@@ -34,10 +45,21 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     console.log(`[tenant-details] Getting tenants for user: ${userId}`);
     
     // Find all active tenant memberships
-    const userTenants = await UserTenant.find({ 
-      userId,
-      status: 'active'
-    }).lean();
+    let userTenants;
+    try {
+      userTenants = await UserTenant.find({ 
+        userId,
+        status: 'active'
+      }).lean();
+    } catch (dbError) {
+      console.error('[tenant-details] Database error querying UserTenant:', dbError);
+      console.error('[tenant-details] DB error stack:', dbError.stack);
+      return res.status(500).json({ 
+        error: 'Database error', 
+        message: 'Failed to query user tenant associations',
+        details: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+      });
+    }
     
     if (!userTenants || userTenants.length === 0) {
       console.log(`[tenant-details] No active tenant associations found for user: ${userId}`);
@@ -80,9 +102,10 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     console.log(`[tenant-details] Returning ${tenantsWithDetails.length} tenants with details`);
     res.json(tenantsWithDetails);
   } catch (error) {
-    console.error('[tenant-details] Error getting user tenants:', error);
+    console.error('[tenant-details] Unexpected error getting user tenants:', error);
     console.error('[tenant-details] Error stack:', error.stack);
     console.error('[tenant-details] Error name:', error.name);
+    console.error('[tenant-details] Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     
     if (!res.headersSent) {
       res.status(500).json({ 
