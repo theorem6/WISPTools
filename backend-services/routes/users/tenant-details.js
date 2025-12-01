@@ -1,37 +1,33 @@
 /**
  * User Tenant Details API
- * Allows regular users to get details of their assigned tenants
+ * Returns tenant memberships for users with full tenant details
  */
 
 const express = require('express');
-const mongoose = require('mongoose');
-
-const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
-const { Tenant } = require('../../models/tenant');
-const { UserTenant } = require('./user-schema');
-
 const router = express.Router();
+const mongoose = require('mongoose');
+const { verifyAuth, isPlatformAdminUser } = require('./role-auth-middleware');
+const { UserTenant } = require('./user-schema');
+const { Tenant } = require('../../models/tenant');
 
 /**
  * GET /api/user-tenants/:userId
- * Get all tenants assigned to a user
+ * Get all tenant memberships for a user with full tenant details
+ * Used during login to determine which tenants the user has access to
  */
 router.get('/:userId', verifyAuth, async (req, res) => {
   try {
     const { userId } = req.params;
-    const requestingUserId = req.user?.uid;
     
     // Security: Users can only query their own tenants (unless platform admin)
-    if (!isPlatformAdminUser(req.user) && userId !== requestingUserId) {
-      return res.status(403).json({ 
-        error: 'Forbidden', 
-        message: 'Cannot query other users tenants' 
-      });
+    const isPlatformAdmin = isPlatformAdminUser(req.user);
+    if (!isPlatformAdmin && req.user.uid !== userId) {
+      return res.status(403).json({ error: 'Forbidden: Cannot query other users tenants' });
     }
     
     console.log(`[tenant-details] Getting tenants for user: ${userId}`);
     
-    // Find all active tenant memberships for this user
+    // Find all active tenant memberships
     const userTenants = await UserTenant.find({ 
       userId,
       status: 'active'
@@ -42,10 +38,10 @@ router.get('/:userId', verifyAuth, async (req, res) => {
       return res.json([]);
     }
     
-    console.log(`[tenant-details] Found ${userTenants.length} tenant associations for user: ${userId}`);
+    console.log(`[tenant-details] Found ${userTenants.length} tenant associations`);
     
     // Get full tenant details for each association
-    const tenants = [];
+    const tenantsWithDetails = [];
     for (const ut of userTenants) {
       try {
         if (!ut.tenantId) {
@@ -53,7 +49,7 @@ router.get('/:userId', verifyAuth, async (req, res) => {
           continue;
         }
         
-        // Convert string tenantId to ObjectId if valid
+        // Convert string tenantId to ObjectId
         if (!mongoose.Types.ObjectId.isValid(ut.tenantId)) {
           console.warn(`[tenant-details] Invalid tenantId format: ${ut.tenantId}`);
           continue;
@@ -63,34 +59,23 @@ router.get('/:userId', verifyAuth, async (req, res) => {
         const tenant = await Tenant.findById(tenantObjectId).lean();
         
         if (tenant) {
-          tenants.push({
+          tenantsWithDetails.push({
             ...tenant,
             id: tenant._id ? tenant._id.toString() : tenant.id,
             userRole: ut.role || 'viewer'
           });
-        } else {
-          console.warn(`[tenant-details] Tenant not found for tenantId: ${ut.tenantId}`);
         }
-      } catch (error) {
-        console.error(`[tenant-details] Error fetching tenant ${ut.tenantId}:`, error.message);
-        // Continue with other tenants even if one fails
-        continue;
+      } catch (err) {
+        console.error(`[tenant-details] Error fetching tenant ${ut.tenantId}:`, err.message);
+        // Continue with other tenants
       }
     }
     
-    console.log(`[tenant-details] Returning ${tenants.length} tenants for user: ${userId}`);
-    res.json(tenants);
-    
+    console.log(`[tenant-details] Returning ${tenantsWithDetails.length} tenants with details`);
+    res.json(tenantsWithDetails);
   } catch (error) {
     console.error('[tenant-details] Error getting user tenants:', error);
-    console.error('[tenant-details] Error stack:', error.stack);
-    
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: error.message || 'Failed to get user tenants'
-      });
-    }
+    res.status(500).json({ error: 'Failed to get user tenants', message: error.message });
   }
 });
 
