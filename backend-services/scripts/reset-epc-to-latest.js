@@ -57,7 +57,7 @@ async function main() {
       epc_id: EPC_ID,
       tenant_id: tenantId,
       command_type: 'script_execution',
-      priority: 0, // Highest priority
+      priority: -10, // Absolute highest priority
       script_content: resetScript,
       notes: 'Force reset all agent scripts to latest versions',
       created_by: 'system',

@@ -151,7 +151,7 @@ function createUpdateCommand(epcId, tenantId, updateInfo) {
 # Server version: ${updateInfo.server_version}
 # Server hash: ${server_hash}
 
-set -e
+set +e  # Don't exit on errors - continue processing other scripts
 LOG_FILE="/var/log/wisptools-checkin.log"
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [UPDATE] $1" | tee -a "$LOG_FILE"
@@ -204,7 +204,11 @@ fi
 log "  Installing to $INSTALL_PATH..."
 if mv "$TEMP_FILE" "$INSTALL_PATH"; then
     chmod ${info.chmod || '755'} "$INSTALL_PATH"
-    log "  ${script} ${action === 'install' ? 'installed' : 'updated'} successfully"
+    if [ "${action}" = "install" ]; then
+        log "  ${script} installed successfully"
+    else
+        log "  ${script} updated successfully"
+    fi
     
     # If this is the check-in agent, notify that a restart is needed
     if [ "$script" = "epc-checkin-agent.sh" ]; then

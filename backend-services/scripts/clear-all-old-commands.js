@@ -18,25 +18,33 @@ async function main() {
 
     console.log(`\nClearing ALL old commands for EPC: ${EPC_ID}\n`);
 
-    // Delete ALL script_execution commands regardless of status
+    // Delete ALL script_execution commands regardless of status (except reset commands)
+    // Also delete by old hash patterns directly
     const result = await EPCCommand.deleteMany({
       epc_id: EPC_ID,
-      command_type: 'script_execution'
+      command_type: 'script_execution',
+      $or: [
+        { notes: { $not: { $regex: 'Force reset all agent scripts' } } },
+        { script_content: { $regex: '9a95994f1dcc8092037c2df5f28c28ef45535f08f077628152344c0e08df13d2' } }, // Old epc-checkin-agent.sh hash
+        { script_content: { $regex: '1780dd83d5e189e55c690f37062e1c13b17e76505da20e96298ef56bfaf19da6' } }, // Old epc-snmp-discovery.sh hash
+        { script_content: { $regex: '5aa0bcc4b95dec66e441c938b132f8e3a7c07533e8db8643ff819d4c03404f58' } }  // Old install-epc-dependencies.sh hash
+      ]
     });
 
-    console.log(`✅ Deleted ${result.deletedCount} script_execution command(s)\n`);
+    console.log(`✅ Deleted ${result.deletedCount} script_execution command(s) (keeping reset commands)\n`);
 
     // Also delete any commands that mention "update" or "Auto-generated" in any status
     const result2 = await EPCCommand.deleteMany({
       epc_id: EPC_ID,
       $or: [
         { script_content: { $regex: 'Auto-generated update script' } },
-        { script_content: { $regex: 'Expected hash' } },
+        { script_content: { $regex: 'Expected hash.*9a95994f|1780dd83|5aa0bcc4' } }, // Old hashes
         { notes: { $regex: 'Auto-update' } },
         { script_content: { $regex: 'epc-checkin-agent.sh.*update' } },
         { script_content: { $regex: 'epc-snmp-discovery.*update' } },
         { script_content: { $regex: 'install-epc-dependencies.*install' } }
-      ]
+      ],
+      notes: { $not: { $regex: 'Force reset all agent scripts' } } // Keep reset commands
     });
 
     console.log(`✅ Deleted ${result2.deletedCount} additional matching command(s)\n`);
