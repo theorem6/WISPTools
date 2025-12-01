@@ -36,6 +36,15 @@ try {
 
 const router = express.Router();
 
+// Test endpoint to verify route file is loaded
+router.get('/test', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'user-tenants route file loaded successfully',
+    timestamp: new Date().toISOString()
+  });
+});
+
 /**
  * GET /api/user-tenants/:userId
  * Get all tenants assigned to a user
