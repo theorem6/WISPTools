@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
-const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { RemoteEPC } = require('../../models/distributed-epc-schema');
 const { ensureDB } = require('./hss-middleware');
 
 console.log('🔗 HSS Management: Using MongoDB Atlas connection via mongoose');
@@ -676,7 +676,7 @@ router.get('/epc/remote/list', async (req, res) => {
     console.log(`[HSS/EPC] Found ${remoteEPCs.length} remote EPCs`);
 
     // Get latest service status for each EPC to include metrics
-    const { EPCServiceStatus } = require('../models/distributed-epc-schema');
+    const { EPCServiceStatus } = require('../../models/distributed-epc-schema');
     const epcIds = remoteEPCs.map(e => e.epc_id);
     
     console.log(`[HSS/EPC] Looking up service status for EPCs:`, epcIds);
