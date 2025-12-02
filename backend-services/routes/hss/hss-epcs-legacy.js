@@ -10,21 +10,11 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
 const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { ensureDB } = require('./hss-middleware');
 
 console.log('🔗 HSS Management: Using MongoDB Atlas connection via mongoose');
 
-// Middleware to ensure database connection
-const ensureDB = (req, res, next) => {
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(500).json({ error: 'Database not connected' });
-  }
-  req.db = mongoose.connection.db;
-  next();
-};
-
 // Apply middleware to all routes
-const { ensureDB } = require('./hss-middleware');
-const router = require('express').Router();
 router.use(ensureDB);
 
 
