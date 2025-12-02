@@ -16,6 +16,8 @@ const requireTenant = (req, res, next) => {
 
 router.use(requireTenant);
 
+// GET /api/snmp/metrics/latest - Get latest metrics for all devices
+router.get('/metrics/latest', async (req, res) => {
   try {
     console.log(`📊 [SNMP API] Fetching latest SNMP metrics for tenant: ${req.tenantId}`);
     
