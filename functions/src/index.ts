@@ -14,6 +14,10 @@ import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
 import { FieldValue } from 'firebase-admin/firestore';
 import { FUNCTIONS_CONFIG } from './config.js';
+import axios, { AxiosError } from 'axios';
+import axiosRetry from 'axios-retry';
+import http from 'http';
+import https from 'https';
 
 const corsHandler = cors({ origin: [...FUNCTIONS_CONFIG.cors.origins] });
 
@@ -334,7 +338,39 @@ export const apiProxy = onRequest({
   }
   
   try {
-    const headers: HeadersInit = {
+    // Create Axios instance with retry logic for this request
+    const axiosInstance = axios.create({
+      timeout: 30000, // 30 second timeout
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      // Keep connections alive for better performance
+      httpAgent: new http.Agent({ keepAlive: true }),
+      httpsAgent: new https.Agent({ keepAlive: true }),
+    });
+
+    // Configure retry logic
+    axiosRetry(axiosInstance, {
+      retries: 3, // Retry up to 3 times
+      retryDelay: axiosRetry.exponentialDelay, // Exponential backoff
+      retryCondition: (error: AxiosError) => {
+        // Retry on network errors or 5xx server errors
+        return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+               (error.response?.status ? error.response.status >= 500 : false) ||
+               error.code === 'ECONNREFUSED' ||
+               error.code === 'ETIMEDOUT' ||
+               error.code === 'ENOTFOUND';
+      },
+      onRetry: (retryCount, error, requestConfig) => {
+        console.log(`[apiProxy] Retry attempt ${retryCount} for ${requestConfig.url}`, {
+          errorCode: error.code,
+          status: (error as AxiosError).response?.status
+        });
+      },
+    });
+
+    // Build headers
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
     
@@ -365,48 +401,56 @@ export const apiProxy = onRequest({
       console.log('[apiProxy] Forwarding user email header:', emailValue);
     }
     
-    const options: RequestInit = {
-      method: req.method,
-      headers
+    // Prepare request config
+    const axiosConfig: any = {
+      method: req.method as any,
+      url: url,
+      headers: headers,
+      responseType: 'json', // Default to JSON, will change for text responses
+      validateStatus: () => true, // Don't throw on any status code
     };
     
+    // Add body for non-GET/HEAD requests
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      // Firebase Functions v2 onRequest with cors: true automatically parses JSON bodies
-      // req.body is already a parsed object, so we need to stringify it for the backend
       if (!req.body || (typeof req.body === 'object' && Object.keys(req.body).length === 0)) {
         // Empty body
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
-          options.body = '{}';
+          axiosConfig.data = {};
         }
       } else if (typeof req.body === 'string') {
-        // If body is already a string, use it directly (rare case)
-        options.body = req.body;
+        // If body is already a string, use it directly
+        axiosConfig.data = req.body;
         console.log('[apiProxy] Body is already string, length:', req.body.length);
       } else {
-        // Body is an object - stringify it
-        options.body = JSON.stringify(req.body);
-        console.log('[apiProxy] Body stringified, length:', options.body.length, 'first 100 chars:', options.body.substring(0, 100));
+        // Body is an object - Axios will automatically stringify it
+        axiosConfig.data = req.body;
+        console.log('[apiProxy] Body object, keys:', Object.keys(req.body));
       }
     }
     
-    const response = await fetch(url, options);
+    // Determine response type based on URL
+    if (url.includes('deployment-script')) {
+      axiosConfig.responseType = 'text';
+    }
+    
+    const response = await axiosInstance.request(axiosConfig);
     
     // Log response status for debugging
     console.log('[apiProxy] Backend response:', {
       status: response.status,
       statusText: response.statusText,
       url: url,
-      headers: Object.fromEntries(response.headers.entries())
+      contentType: response.headers['content-type']
     });
     
     // Check content type to determine how to handle response
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = response.headers['content-type'] || '';
     
-    if (contentType.includes('application/json')) {
-      const data = await response.json();
+    if (contentType.includes('application/json') || axiosConfig.responseType === 'json') {
+      const data = response.data;
       
       // Log error responses with full details
-      if (!response.ok) {
+      if (response.status >= 400) {
         console.error('[apiProxy] Backend returned error:', {
           status: response.status,
           statusText: response.statusText,
@@ -416,12 +460,12 @@ export const apiProxy = onRequest({
       }
       
       res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
-    } else if (contentType.includes('text/') || url.includes('deployment-script')) {
+    } else if (contentType.includes('text/') || url.includes('deployment-script') || typeof response.data === 'string') {
       // Handle text responses (like shell scripts)
-      const text = await response.text();
+      const text = typeof response.data === 'string' ? response.data : String(response.data);
       
       // Log error responses
-      if (!response.ok) {
+      if (response.status >= 400) {
         console.error('[apiProxy] Backend returned text error:', {
           status: response.status,
           statusText: response.statusText,
@@ -432,60 +476,67 @@ export const apiProxy = onRequest({
       
       res.set('Access-Control-Allow-Origin', origin).status(response.status).set('Content-Type', contentType || 'text/plain').send(text);
     } else {
-      // Fallback: try JSON, then text
-      try {
-        const data = await response.json();
-        
-        if (!response.ok) {
-          console.error('[apiProxy] Backend returned error (fallback JSON):', {
-            status: response.status,
-            statusText: response.statusText,
-            url: url,
-            errorData: data
-          });
-        }
-        
-        res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
-      } catch {
-        const text = await response.text();
-        
-        if (!response.ok) {
-          console.error('[apiProxy] Backend returned error (fallback text):', {
-            status: response.status,
-            statusText: response.statusText,
-            url: url,
-            text: text.substring(0, 500)
-          });
-        }
-        
-        res.set('Access-Control-Allow-Origin', origin).status(response.status).send(text);
+      // Fallback: try to send as JSON
+      const data = response.data;
+      
+      if (response.status >= 400) {
+        console.error('[apiProxy] Backend returned error (fallback):', {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          errorData: data
+        });
       }
+      
+      res.set('Access-Control-Allow-Origin', origin).status(response.status).json(data);
     }
   } catch (error: any) {
-    console.error('[apiProxy] Proxy fetch error:', {
-      message: error.message,
-      stack: error.stack,
-      url: url,
-      errorType: error.constructor?.name,
-      code: (error as any).code,
-      errno: (error as any).errno
-    });
-    
-    // Check if it's a connection error
-    const isConnectionError = 
-      error.message?.includes('ECONNREFUSED') ||
-      error.message?.includes('ETIMEDOUT') ||
-      error.message?.includes('ENOTFOUND') ||
-      error.code === 'ECONNREFUSED' ||
-      error.code === 'ETIMEDOUT';
-    
-    res.set('Access-Control-Allow-Origin', origin).status(500).json({ 
-      error: isConnectionError ? 'Backend service unavailable' : 'Proxy error',
-      message: error.message,
-      details: error.toString(),
-      url: url,
-      errorType: error.constructor?.name
-    });
+    // Handle Axios errors
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      console.error('[apiProxy] Proxy Axios error:', {
+        message: axiosError.message,
+        code: axiosError.code,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        url: axiosError.config?.url,
+        stack: axiosError.stack
+      });
+      
+      // Check if it's a connection error
+      const isConnectionError = 
+        axiosError.code === 'ECONNREFUSED' ||
+        axiosError.code === 'ETIMEDOUT' ||
+        axiosError.code === 'ENOTFOUND' ||
+        axiosError.message?.includes('ECONNREFUSED') ||
+        axiosError.message?.includes('ETIMEDOUT') ||
+        axiosError.message?.includes('ENOTFOUND');
+      
+      res.set('Access-Control-Allow-Origin', origin).status(500).json({ 
+        error: isConnectionError ? 'Backend service unavailable' : 'Proxy error',
+        message: axiosError.message,
+        details: axiosError.toString(),
+        url: url,
+        errorType: 'AxiosError',
+        code: axiosError.code
+      });
+    } else {
+      // Handle other errors
+      console.error('[apiProxy] Proxy error:', {
+        message: error.message,
+        stack: error.stack,
+        url: url,
+        errorType: error.constructor?.name
+      });
+      
+      res.set('Access-Control-Allow-Origin', origin).status(500).json({ 
+        error: 'Proxy error',
+        message: error.message,
+        details: error.toString(),
+        url: url,
+        errorType: error.constructor?.name
+      });
+    }
   }
 });
 
@@ -592,7 +643,39 @@ export const isoProxy = onRequest({
   });
   
   try {
-    const headers: HeadersInit = {
+    // Create Axios instance with retry logic for this request
+    const axiosInstance = axios.create({
+      timeout: 300000, // 5 minutes timeout for ISO generation
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      // Keep connections alive for better performance
+      httpAgent: new http.Agent({ keepAlive: true }),
+      httpsAgent: new https.Agent({ keepAlive: true }),
+    });
+
+    // Configure retry logic
+    axiosRetry(axiosInstance, {
+      retries: 3, // Retry up to 3 times
+      retryDelay: axiosRetry.exponentialDelay, // Exponential backoff
+      retryCondition: (error: AxiosError) => {
+        // Retry on network errors or 5xx server errors
+        return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+               (error.response?.status ? error.response.status >= 500 : false) ||
+               error.code === 'ECONNREFUSED' ||
+               error.code === 'ETIMEDOUT' ||
+               error.code === 'ENOTFOUND';
+      },
+      onRetry: (retryCount, error, requestConfig) => {
+        console.log(`[isoProxy] Retry attempt ${retryCount} for ${requestConfig.url}`, {
+          errorCode: error.code,
+          status: (error as AxiosError).response?.status
+        });
+      },
+    });
+
+    // Build headers
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
     
@@ -605,42 +688,47 @@ export const isoProxy = onRequest({
     const authHeader = req.headers['authorization'] || req.headers['Authorization'];
     if (authHeader) {
       headers['Authorization'] = authHeader as string;
-      console.log('[apiProxy] Forwarding Authorization header');
+      console.log('[isoProxy] Forwarding Authorization header');
     } else {
-      console.warn('[apiProxy] No Authorization header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth')));
+      console.warn('[isoProxy] No Authorization header found. Available headers:', Object.keys(req.headers).filter(h => h.toLowerCase().includes('auth')));
     }
     
-    const options: RequestInit = {
-      method: req.method,
-      headers
+    // Prepare request config
+    const axiosConfig: any = {
+      method: req.method as any,
+      url: url,
+      headers: headers,
+      responseType: 'json', // Default to JSON
+      validateStatus: () => true, // Don't throw on any status code
     };
     
+    // Add body for non-GET/HEAD requests
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      options.body = JSON.stringify(req.body);
+      axiosConfig.data = req.body || {};
     }
     
-    const response = await fetch(url, options);
+    const response = await axiosInstance.request(axiosConfig);
     
     // Log response details for debugging
     console.log('[isoProxy] Backend response:', {
       status: response.status,
       statusText: response.statusText,
-      contentType: response.headers.get('content-type'),
+      contentType: response.headers['content-type'],
       url: url
     });
     
     // Check content type to determine how to handle response
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = response.headers['content-type'] || '';
     
     if (contentType.includes('application/json')) {
-      const data = await response.json();
+      const data = response.data;
       res.status(response.status).json(data);
     } else {
       // Fallback for other content types
-      const text = await response.text();
+      const text = typeof response.data === 'string' ? response.data : String(response.data);
       
       // If we got an error response, try to parse it as JSON first
-      if (!response.ok) {
+      if (response.status >= 400) {
         try {
           const errorData = JSON.parse(text);
           res.status(response.status).json(errorData);
@@ -653,27 +741,57 @@ export const isoProxy = onRequest({
       }
     }
   } catch (error: any) {
-    console.error('[isoProxy] Error details:', {
-      message: error.message,
-      stack: error.stack,
-      url: url,
-      path: path
-    });
-    
-    // Provide more detailed error information
-    let errorMessage = error.message || 'Unknown error';
-    if (error.code === 'ECONNREFUSED') {
-      errorMessage = `Backend server not reachable at ${url}. Please verify the backend is running on port 3002.`;
-    } else if (error.code === 'ETIMEDOUT') {
-      errorMessage = `Backend server timeout at ${url}. The request took too long.`;
+    // Handle Axios errors
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      console.error('[isoProxy] Axios error details:', {
+        message: axiosError.message,
+        code: axiosError.code,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        url: axiosError.config?.url,
+        stack: axiosError.stack
+      });
+      
+      // Provide more detailed error information
+      let errorMessage = axiosError.message || 'Unknown error';
+      if (axiosError.code === 'ECONNREFUSED') {
+        errorMessage = `Backend server not reachable at ${url}. Please verify the backend is running.`;
+      } else if (axiosError.code === 'ETIMEDOUT') {
+        errorMessage = `Backend server timeout at ${url}. The request took too long.`;
+      }
+      
+      res.status(500).json({ 
+        error: 'ISO proxy error', 
+        message: errorMessage,
+        details: axiosError.toString(),
+        url: url,
+        path: path,
+        code: axiosError.code
+      });
+    } else {
+      // Handle other errors
+      console.error('[isoProxy] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        url: url,
+        path: path
+      });
+      
+      let errorMessage = error.message || 'Unknown error';
+      if (error.code === 'ECONNREFUSED') {
+        errorMessage = `Backend server not reachable at ${url}. Please verify the backend is running.`;
+      } else if (error.code === 'ETIMEDOUT') {
+        errorMessage = `Backend server timeout at ${url}. The request took too long.`;
+      }
+      
+      res.status(500).json({ 
+        error: 'ISO proxy error', 
+        message: errorMessage,
+        details: error.toString(),
+        url: url,
+        path: path
+      });
     }
-    
-    res.status(500).json({ 
-      error: 'ISO proxy error', 
-      message: errorMessage,
-      details: error.toString(),
-      url: url,
-      path: path
-    });
   }
 });
