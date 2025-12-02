@@ -102,6 +102,20 @@ router.get('/:userId', verifyAuth, async (req, res) => {
         console.log('[tenant-details] Total UserTenant records found (any status):', allRecords?.length || 0);
         if (allRecords && allRecords.length > 0) {
           console.log('[tenant-details] Record statuses:', allRecords.map(r => ({ tenantId: r.tenantId, status: r.status })));
+          // Also check if there are records with different userId casing
+          const caseInsensitiveQuery = await UserTenant.find({
+            $expr: { $eq: [{ $toLower: '$userId' }, userId.trim().toLowerCase()] }
+          }).lean();
+          if (caseInsensitiveQuery && caseInsensitiveQuery.length > 0) {
+            console.warn('[tenant-details] Found records with different casing!', caseInsensitiveQuery.map(r => r.userId));
+          }
+        } else {
+          // Try case-insensitive search
+          console.log('[tenant-details] Trying case-insensitive userId search...');
+          const caseInsensitiveRecords = await UserTenant.find({
+            $expr: { $eq: [{ $toLower: '$userId' }, userId.trim().toLowerCase()] }
+          }).lean();
+          console.log('[tenant-details] Case-insensitive records found:', caseInsensitiveRecords?.length || 0);
         }
       }
     } catch (queryError) {
