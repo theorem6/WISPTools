@@ -46,7 +46,7 @@ router.get('/epc/remote/list', async (req, res) => {
     console.log(`[HSS/EPC] Found ${remoteEPCs.length} remote EPCs`);
 
     // Get latest service status for each EPC to include metrics
-    const { EPCServiceStatus } = require('../models/distributed-epc-schema');
+    const { EPCServiceStatus } = require('../../models/distributed-epc-schema');
     const epcIds = remoteEPCs.map(e => e.epc_id);
     
     console.log(`[HSS/EPC] Looking up service status for EPCs:`, epcIds);
@@ -215,8 +215,8 @@ router.put('/epc/:epc_id', async (req, res) => {
       }
       
       // Also need to update related collections (EPCCommand, EPCServiceStatus, etc.)
-      const { EPCCommand, EPCServiceStatus } = require('../models/distributed-epc-schema');
-      const { InventoryItem } = require('../models/inventory');
+      const { EPCCommand, EPCServiceStatus } = require('../../models/distributed-epc-schema');
+      const { InventoryItem } = require('../../models/inventory');
       
       // Update related records
       await EPCCommand.updateMany({ epc_id: epc.epc_id }, { $set: { epc_id: new_epc_id_value } });
@@ -238,7 +238,7 @@ router.put('/epc/:epc_id', async (req, res) => {
       
       // If site_id is set, regenerate site_name with proper suffix
       if (newSiteId) {
-        const { generateSiteNameWithSuffix } = require('../utils/site-naming');
+        const { generateSiteNameWithSuffix } = require('../../utils/site-naming');
         const newSiteName = await generateSiteNameWithSuffix(newSiteId, tenantId);
         updateFields.site_name = newSiteName;
       } else if (site_id === null || site_id === '') {
@@ -326,7 +326,7 @@ router.put('/epc/:epc_id', async (req, res) => {
     // If configuration changed, queue a config_update command so EPC applies changes on next check-in
     if (configChanged && updatedEPC) {
       try {
-        const { EPCCommand } = require('../models/distributed-epc-schema');
+        const { EPCCommand } = require('../../models/distributed-epc-schema');
         
         console.log(`[HSS/EPC] Configuration changed detected, queuing config_update command for EPC ${final_epc_id}`);
         
@@ -412,7 +412,7 @@ router.post('/epc/:epc_id/install-component', async (req, res) => {
     }
 
     // Queue install command
-    const { EPCCommand } = require('../models/distributed-epc-schema');
+    const { EPCCommand } = require('../../models/distributed-epc-schema');
     
     // Determine script URL based on component
     let scriptUrl = '';
@@ -489,7 +489,7 @@ router.post('/epc/:epc_id/uninstall-component', async (req, res) => {
     }
 
     // Queue uninstall command
-    const { EPCCommand } = require('../models/distributed-epc-schema');
+    const { EPCCommand } = require('../../models/distributed-epc-schema');
     
     let scriptUrl = '';
     if (component === 'nodejs_npm') {
@@ -562,7 +562,7 @@ router.delete('/epc/:epc_id', async (req, res) => {
     }
 
     // Also delete associated inventory item if exists
-    const { InventoryItem } = require('../models/inventory');
+    const { InventoryItem } = require('../../models/inventory');
     await InventoryItem.deleteMany({
       $or: [
         { 'epcConfig.epc_id': epc_id },
