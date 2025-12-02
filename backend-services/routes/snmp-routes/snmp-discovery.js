@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../../models/network');
+const { UnifiedSite, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../../models/network');
 const { SNMPMetrics } = require('../../models/snmp-metrics-schema');
 const { formatSNMPDevice, isFakeDevice } = require('./snmp-helpers');
 
@@ -101,8 +101,17 @@ router.get('/discovered', async (req, res) => {
     console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
     
     // Get deployments to check deployment status
-    const { HardwareDeployment } = require('../models/network');
-    const deployments = await HardwareDeployment.find({
+    let deployments = [];
+    try {
+      if (HardwareDeployment) {
+        deployments = await HardwareDeployment.find({
+          tenantId: req.tenantId,
+          status: 'deployed'
+        }).lean();
+      }
+    } catch (deploymentError) {
+      console.warn('[SNMP API] HardwareDeployment query failed, skipping deployment check:', deploymentError.message);
+    }
       tenantId: req.tenantId,
       status: 'deployed'
     }).lean();
