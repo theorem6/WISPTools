@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
-const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { RemoteEPC } = require('../../models/distributed-epc-schema');
 const { ensureDB } = require('./hss-middleware');
 
 // Apply middleware to all routes
