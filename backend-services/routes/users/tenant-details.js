@@ -80,17 +80,34 @@ router.get('/:userId', verifyAuth, async (req, res) => {
     }
 
     console.log('[tenant-details] Querying UserTenant for userId:', userId);
+    console.log('[tenant-details] userId type:', typeof userId);
+    console.log('[tenant-details] userId value:', JSON.stringify(userId));
 
     // Get all tenant associations for this user
+    // First try with status filter
     let userTenants;
     try {
       userTenants = await UserTenant.find({
-        userId,
+        userId: userId.trim(),
         status: 'active'
       }).lean();
-      console.log('[tenant-details] UserTenant query result:', userTenants?.length || 0, 'records');
+      console.log('[tenant-details] UserTenant query result (with status filter):', userTenants?.length || 0, 'records');
+      
+      // If no results with status filter, try without status filter to see all associations
+      if (!userTenants || userTenants.length === 0) {
+        console.log('[tenant-details] No active records found, checking all records...');
+        const allRecords = await UserTenant.find({
+          userId: userId.trim()
+        }).lean();
+        console.log('[tenant-details] Total UserTenant records found (any status):', allRecords?.length || 0);
+        if (allRecords && allRecords.length > 0) {
+          console.log('[tenant-details] Record statuses:', allRecords.map(r => ({ tenantId: r.tenantId, status: r.status })));
+        }
+      }
     } catch (queryError) {
       console.error('[tenant-details] Error querying UserTenant:', queryError);
+      console.error('[tenant-details] Query error name:', queryError.name);
+      console.error('[tenant-details] Query error message:', queryError.message);
       console.error('[tenant-details] Query error stack:', queryError.stack);
       throw queryError;
     }
