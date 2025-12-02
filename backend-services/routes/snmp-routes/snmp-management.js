@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../../models/network');
-const { InventoryItem } = require('../../models/inventory');
+// Use absolute path to avoid resolution issues - resolve from backend-services root
+const inventoryPath = path.join(__dirname, '../../models/inventory');
+const { InventoryItem } = require(inventoryPath);
 const { SNMPMetrics } = require('../../models/snmp-metrics-schema');
 const { formatSNMPDevice, isFakeDevice } = require('./snmp-helpers');
 
