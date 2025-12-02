@@ -18,7 +18,9 @@
     "firebase-admin": "^13.5.0",
     "mongoose": "^7.5.0",
     "multer": "^2.0.2",
-    "nodemailer": "^6.9.16"
+    "net-snmp": "^3.9.1",
+    "nodemailer": "^6.9.16",
+    "ping": "^0.4.4"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
