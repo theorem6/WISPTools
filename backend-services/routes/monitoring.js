@@ -90,8 +90,8 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
                     device.manufacturer || 
                     'Generic',
       model: device.model || 'Unknown',
-      snmpVersion: config.snmp_version || 'v2c',
-      community: config.snmp_community || 'public',
+      snmpVersion: notes.snmp_version || 'v2c',
+      community: notes.snmp_community || 'public',
       metrics: device.metrics || {
         cpuUsage: null,
         memoryUsage: null,
