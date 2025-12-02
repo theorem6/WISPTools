@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../../models/network');
+const { InventoryItem } = require('../../models/inventory');
 const { SNMPMetrics } = require('../../models/snmp-metrics-schema');
 const { formatSNMPDevice, isFakeDevice } = require('./snmp-helpers');
 
@@ -99,7 +100,7 @@ router.post('/discovered/:deviceId/pair', async (req, res) => {
     }
     
     // Get the inventory item to pair with
-    const { InventoryItem } = require('../models/inventory');
+    // InventoryItem already imported at top level
     const hardware = await InventoryItem.findOne({
       _id: hardwareId,
       tenantId: req.tenantId
@@ -192,7 +193,7 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     }
     
     // Check if device already has inventory item (already deployed)
-    const { InventoryItem } = require('../models/inventory');
+    // InventoryItem already imported at top level
     let inventoryItem = null;
     if (device.inventoryId) {
       inventoryItem = await InventoryItem.findOne({ 
@@ -228,7 +229,7 @@ router.post('/discovered/:deviceId/create-hardware', async (req, res) => {
     
     // Find site by siteId or siteName
     let site = null;
-    const { UnifiedSite } = require('../models/network');
+    // UnifiedSite already imported at top level
     const mongoose = require('mongoose');
     
     console.log(`🔍 [SNMP API] Looking up site - siteId: ${siteId}, siteName: ${siteName}, tenantId: ${req.tenantId}`);
