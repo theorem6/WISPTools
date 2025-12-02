@@ -165,7 +165,7 @@
       const deviceId = device.id || device._id;
       if (deviceId) {
         // Use relative path through Firebase Hosting rewrites
-        await fetch(`/api/monitoring/snmp/devices/${deviceId}/graphs`, {
+        await fetch(`${API_CONFIG.PATHS.SNMP_MONITORING}/devices/${deviceId}/graphs`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,

@@ -112,9 +112,6 @@ router.get('/discovered', async (req, res) => {
     } catch (deploymentError) {
       console.warn('[SNMP API] HardwareDeployment query failed, skipping deployment check:', deploymentError.message);
     }
-      tenantId: req.tenantId,
-      status: 'deployed'
-    }).lean();
     
     const devices = [];
     
