@@ -289,7 +289,8 @@ export const apiProxy = onRequest({
   // Use domain name instead of IP address (hss.wisptools.io per memory)
   // Port 3001 is for the HSS Management API (per memory)
   // Backend server runs HTTP on port 3001
-  const backendHost = process.env.BACKEND_HOST || 'http://hss.wisptools.io:3001';
+  // Fallback to IP if domain doesn't resolve (Firebase Functions network issue)
+  const backendHost = process.env.BACKEND_HOST || 'http://136.112.111.167:3001';
   const url = `${backendHost}${proxiedPath}`;
   
   // Log request details for debugging
@@ -526,7 +527,7 @@ export const isoProxy = onRequest({
   // Use domain name instead of IP address (hss.wisptools.io per memory)
   // Port 3001 is for the HSS Management API (per memory)
   // Backend server runs HTTP on port 3001
-  const backendUrl = process.env.BACKEND_HOST || 'http://hss.wisptools.io:3001';  // Main API server port
+  const backendUrl = process.env.BACKEND_HOST || 'http://136.112.111.167:3001';  // Main API server port
   
   // Extract path and query string from request
   // Firebase Functions 2nd gen with Hosting rewrites:

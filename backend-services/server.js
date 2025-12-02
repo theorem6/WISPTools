@@ -88,8 +88,26 @@ app.get('/api/debug/token', async (req, res) => {
 app.use('/api/auth', require('./routes/auth')); // Authentication routes
 app.use('/api/users', require('./routes/users')); // Includes auto-assign routes
 app.use('/api/tenants', require('./routes/tenants')); // User tenant creation (first tenant only)
-// User tenant details route
-app.use('/api/user-tenants', require('./routes/users/tenant-details'));
+// User tenant details route (wrapped in try-catch to prevent server crash on load error)
+try {
+  const userTenantsRoute = require('./routes/users/tenant-details');
+  app.use('/api/user-tenants', userTenantsRoute);
+  console.log('[Server] ✅ User tenant details route loaded successfully');
+} catch (error) {
+  console.error('[Server] ❌ Failed to load user tenant details route:', error);
+  console.error('[Server] Error details:', error.message, error.stack);
+  // Don't crash - create a fallback route
+  app.use('/api/user-tenants', (req, res) => {
+    res.status(500).json({
+      error: 'Route configuration error',
+      message: 'The /api/user-tenants route failed to load during server startup. Check server logs for details.',
+      details: process.env.NODE_ENV === 'development' ? {
+        errorMessage: error.message,
+        errorStack: error.stack
+      } : undefined
+    });
+  });
+}
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/inventory', require('./routes/inventory'));
