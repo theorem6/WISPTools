@@ -286,10 +286,9 @@ export const apiProxy = onRequest({
   //   /api/plans, /api/maintain, /api/billing, /admin/** etc.
   // - Port 3002: EPC/ISO Generation API (min-epc-server.js) - Handles /api/deploy/**
   // Note: Port 3000 is available for separate HSS service if needed in future
-  const backendIp = process.env.BACKEND_HOST_IP || '136.112.111.167';
-  
-  // Route all API requests to the unified main API server on port 3001
-  const backendHost = `http://${backendIp}:3001`;
+  // Use domain name instead of IP address (hss.wisptools.io per memory)
+  // Port 3001 is for the HSS Management API (per memory)
+  const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io:3001';
   const url = `${backendHost}${proxiedPath}`;
   
   // Log request details for debugging
@@ -523,7 +522,9 @@ export const isoProxy = onRequest({
   
   // Port 3001 (Main API) - The /api/deploy/generate-epc-iso route exists on the main backend server
   // The route is registered in backend-services/routes/epc-deployment.js on port 3001
-  const backendUrl = `http://${process.env.BACKEND_HOST_IP || '136.112.111.167'}:3001`;  // Main API server port
+  // Use domain name instead of IP address (hss.wisptools.io per memory)
+  // Port 3001 is for the HSS Management API (per memory)
+  const backendUrl = process.env.BACKEND_HOST || 'https://hss.wisptools.io:3001';  // Main API server port
   
   // Extract path and query string from request
   // Firebase Functions 2nd gen with Hosting rewrites:
