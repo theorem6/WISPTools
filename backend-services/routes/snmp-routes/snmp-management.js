@@ -16,6 +16,8 @@ const requireTenant = (req, res, next) => {
 
 router.use(requireTenant);
 
+// PUT /api/snmp/devices/:id/graphs - Toggle graph generation for a device
+router.put('/devices/:id/graphs', async (req, res) => {
   try {
     const deviceId = req.params.id;
     const { enabled } = req.body;
