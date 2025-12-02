@@ -16,6 +16,8 @@ const requireTenant = (req, res, next) => {
 
 router.use(requireTenant);
 
+// GET /api/snmp/discovery - Start SNMP discovery on a subnet
+router.get('/discovery', async (req, res) => {
   try {
     const { subnet = '192.168.1.0/24' } = req.query;
     console.log(`🔍 [SNMP API] Starting SNMP discovery on subnet: ${subnet}`);
