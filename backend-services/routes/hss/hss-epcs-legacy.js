@@ -784,45 +784,6 @@ router.get('/epc/remote/list', async (req, res) => {
   }
 });
 
-// Update a RemoteEPC device
-// PUT /api/hss/epc/:epc_id
-router.put('/epc/:epc_id', async (req, res) => {
-  try {
-    const tenantId = req.headers['x-tenant-id'];
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
-    const { epc_id } = req.params;
-    const { epc_id: new_epc_id_from_body, new_epc_id, site_id, site_name, deployment_type, hss_config, snmp_config, network_config, device_code, status } = req.body;
-    
-    // Support both 'epc_id' and 'new_epc_id' in body for backward compatibility
-    const new_epc_id_value = new_epc_id || new_epc_id_from_body;
-    
-    console.log(`[HSS/EPC] Updating EPC ${epc_id} for tenant ${tenantId}`);
-    console.log(`[HSS/EPC] Request body:`, {
-      site_id: site_id !== undefined ? site_id : 'undefined',
-      site_name: site_name !== undefined ? site_name : 'undefined',
-      has_hss_config: !!hss_config,
-      has_snmp_config: !!snmp_config,
-      deployment_type
-  try {
-    const tenantId = req.headers['x-tenant-id'];
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
-    const epcs = await req.db.collection('epcs')
-      .find({ tenant_id: tenantId })
-      .toArray();
-
-    res.json(epcs);
-  } catch (error) {
-    console.error('Error fetching EPCs:', error);
-    res.status(500).json({ error: 'Failed to fetch EPCs' });
-  }
-});
-
 router.post('/epcs', async (req, res) => {
   try {
     const tenantId = req.headers['x-tenant-id'];
