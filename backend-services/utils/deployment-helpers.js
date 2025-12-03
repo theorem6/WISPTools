@@ -372,6 +372,85 @@ EOF
 
 print_success "FreeDiameter configured to connect to Cloud HSS at \$HSS_ADDR:\$HSS_PORT"
 
+print_header "Open5GS Performance Tuning"
+print_status "Applying socket buffer and performance optimizations..."
+
+# Create sysctl configuration for socket buffer tuning
+cat > /etc/sysctl.d/99-open5gs.conf << 'SYSCTLEOF'
+# Open5GS Performance Tuning: Socket Buffer Optimization for High-Throughput LTE Core
+# Based on production tuning that eliminated UDP socket buffer overflows
+
+# Socket Buffer Sizes - 64MB/128MB max
+net.core.rmem_max = 67108864
+net.core.wmem_max = 134217728
+net.core.rmem_default = 16777216
+net.core.wmem_default = 16777216
+
+# UDP Buffer Minimums
+net.ipv4.udp_rmem_min = 131072
+net.ipv4.udp_wmem_min = 262144
+
+# UDP Memory (pages: min pressure max)
+net.ipv4.udp_mem = 65536 131072 262144
+
+# Backlog Queue (handle bursts)
+net.core.netdev_max_backlog = 250000
+net.core.netdev_budget = 600
+
+# TCP Tuning
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.core.somaxconn = 65535
+
+# Connection Handling
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+
+# Required for GTP tunneling
+net.ipv4.ip_forward = 1
+SYSCTLEOF
+
+# Apply sysctl settings immediately
+sysctl -p /etc/sysctl.d/99-open5gs.conf
+print_success "Socket buffer tuning applied"
+
+# Create systemd override for open5gs-sgwud service priority
+print_status "Configuring SGWU/UPF service priority..."
+mkdir -p /etc/systemd/system/open5gs-sgwud.service.d
+cat > /etc/systemd/system/open5gs-sgwud.service.d/priority.conf << 'PRIORITYEOF'
+[Service]
+Nice=-10
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+PRIORITYEOF
+print_success "SGWU/UPF service priority configured"
+
+# Create systemd service for GTP tunnel interface tuning
+print_status "Creating GTP tunnel interface tuning service..."
+cat > /etc/systemd/system/open5gs-tuning.service << 'TUNINGEOFSERVICE'
+[Unit]
+Description=Open5GS Performance Tuning Service
+After=network.target open5gs-upfd.service
+Wants=open5gs-upfd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'if ip link show ogstun >/dev/null 2>&1; then ip link set ogstun txqueuelen 10000; echo "GTP tunnel interface tuned"; else echo "Waiting for ogstun interface..."; sleep 5; ip link set ogstun txqueuelen 10000 || true; fi'
+ExecStartPost=/bin/sleep 2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=open5gs-tuning
+
+[Install]
+WantedBy=multi-user.target
+TUNINGEOFSERVICE
+
+systemctl daemon-reload
+systemctl enable open5gs-tuning.service
+print_success "GTP tunnel interface tuning service created"
+
 else
   print_status "Skipping EPC installation (deployment type: ${deploymentType})"
 fi  # End of INSTALL_EPC section
@@ -1313,6 +1392,7 @@ if [ "\$INSTALL_EPC" = "1" ]; then
   systemctl enable open5gs-smfd
   systemctl enable open5gs-upfd
   systemctl enable open5gs-pcrfd
+  systemctl enable open5gs-tuning
   
   systemctl start open5gs-mmed
   systemctl start open5gs-sgwcd
@@ -1322,6 +1402,9 @@ if [ "\$INSTALL_EPC" = "1" ]; then
   systemctl start open5gs-pcrfd
   
   sleep 3
+  
+  # Start tuning service after UPF is running (to tune ogstun interface)
+  systemctl start open5gs-tuning
   
   # Check EPC service status
   print_status "Checking EPC service status..."

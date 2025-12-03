@@ -141,16 +141,99 @@ if [ -f "$CONFIG_DIR/smf.yaml" ]; then
     log "SMF configured for central PCRF at $CENTRAL_HSS"
 fi
 
-# Step 6: Start EPC services (NOT HSS or PCRF)
-echo "[6/7] Starting EPC services..."
+# Step 6: Apply Open5GS Performance Tuning
+echo "[6/8] Applying Open5GS performance tuning..."
+log "Configuring socket buffer and performance optimizations..."
+
+# Create sysctl configuration for socket buffer tuning
+cat > /etc/sysctl.d/99-open5gs.conf << 'SYSCTLEOF'
+# Open5GS Performance Tuning: Socket Buffer Optimization for High-Throughput LTE Core
+# Based on production tuning that eliminated UDP socket buffer overflows
+
+# Socket Buffer Sizes - 64MB/128MB max
+net.core.rmem_max = 67108864
+net.core.wmem_max = 134217728
+net.core.rmem_default = 16777216
+net.core.wmem_default = 16777216
+
+# UDP Buffer Minimums
+net.ipv4.udp_rmem_min = 131072
+net.ipv4.udp_wmem_min = 262144
+
+# UDP Memory (pages: min pressure max)
+net.ipv4.udp_mem = 65536 131072 262144
+
+# Backlog Queue (handle bursts)
+net.core.netdev_max_backlog = 250000
+net.core.netdev_budget = 600
+
+# TCP Tuning
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.core.somaxconn = 65535
+
+# Connection Handling
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+
+# Required for GTP tunneling
+net.ipv4.ip_forward = 1
+SYSCTLEOF
+
+# Apply sysctl settings immediately
+sysctl -p /etc/sysctl.d/99-open5gs.conf >/dev/null 2>&1
+log "Socket buffer tuning applied"
+
+# Create systemd override for open5gs-sgwud service priority
+mkdir -p /etc/systemd/system/open5gs-sgwud.service.d
+cat > /etc/systemd/system/open5gs-sgwud.service.d/priority.conf << 'PRIORITYEOF'
+[Service]
+Nice=-10
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+PRIORITYEOF
+log "SGWU/UPF service priority configured"
+
+# Create systemd service for GTP tunnel interface tuning
+cat > /etc/systemd/system/open5gs-tuning.service << 'TUNINGEOFSERVICE'
+[Unit]
+Description=Open5GS Performance Tuning Service
+After=network.target open5gs-upfd.service
+Wants=open5gs-upfd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'if ip link show ogstun >/dev/null 2>&1; then ip link set ogstun txqueuelen 10000; echo "GTP tunnel interface tuned"; else echo "Waiting for ogstun interface..."; sleep 5; ip link set ogstun txqueuelen 10000 || true; fi'
+ExecStartPost=/bin/sleep 2
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=open5gs-tuning
+
+[Install]
+WantedBy=multi-user.target
+TUNINGEOFSERVICE
+
+systemctl daemon-reload
+systemctl enable open5gs-tuning.service
+log "GTP tunnel interface tuning service created"
+
+# Step 7: Start EPC services (NOT HSS or PCRF)
+echo "[7/8] Starting EPC services..."
 for svc in open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd; do
     systemctl enable $svc 2>/dev/null || true
     systemctl restart $svc 2>/dev/null || true
 done
+
+# Wait for UPF to create ogstun interface, then start tuning service
+sleep 3
+systemctl start open5gs-tuning 2>/dev/null || true
+
 log "EPC services started"
 
-# Step 7: Install/update check-in agent for remote management
-echo "[7/7] Installing check-in agent..."
+# Step 8: Install/update check-in agent for remote management
+echo "[8/8] Installing check-in agent..."
 curl -fsSL "https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
 chmod +x /opt/wisptools/epc-checkin-agent.sh
 /opt/wisptools/epc-checkin-agent.sh install
