@@ -260,11 +260,12 @@ router.get('/devices', async (req, res) => {
     .select('_id assetTag equipmentType manufacturer model ipAddress technicalSpecs.ipAddress currentLocation')
     .lean();
 
-    // Get all network equipment (including discovered SNMP devices) with graphs enabled
-    // Include devices with or without siteId - discovered devices might not be deployed yet
+    // Get only deployed network equipment (must have siteId to be considered deployed)
+    // Only show graphs for devices that are actually deployed at sites
     const networkEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      status: 'active'
+      status: 'active',
+      siteId: { $exists: true, $ne: null } // Only deployed devices (have a siteId)
     })
     .select('_id name type manufacturer model notes siteId')
     .lean();
