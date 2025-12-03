@@ -559,19 +559,22 @@ do_checkin() {
     http_code=$(echo "$response" | tail -n1)
     response=$(echo "$response" | sed '$d')  # Remove last line (HTTP code)
     
-    # Check if response is HTML (only check for HTML document structure, not status codes)
-    # Only detect HTML if it starts with HTML tags or contains HTML structure
-    if echo "$response" | head -c 100 | grep -qiE "^[[:space:]]*<(!DOCTYPE|html|head|body)"; then
-        log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
-        log "Response preview: $(echo "$response" | head -c 200)"
-        return 1
-    fi
-    
-    # Also check for nginx error pages by looking for specific HTML structure
-    if echo "$response" | grep -qi "<center><h1>.*Bad Gateway\|502.*Bad Gateway\|<title>.*Bad Gateway"; then
-        log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
-        log "Response preview: $(echo "$response" | head -c 200)"
-        return 1
+    # Only check for HTML on error status codes (4xx, 5xx)
+    # Don't check for HTML on successful responses (2xx) as they should be JSON
+    if [ "$http_code" -ge 400 ]; then
+        # Check if response starts with HTML document structure
+        if echo "$response" | head -c 100 | grep -qiE "^[[:space:]]*<(!DOCTYPE|html|head|body)"; then
+            log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
+            log "Response preview: $(echo "$response" | head -c 200)"
+            return 1
+        fi
+        
+        # Also check for nginx error pages by looking for specific HTML structure
+        if echo "$response" | grep -qi "<center><h1>.*Bad Gateway\|<title>.*Bad Gateway"; then
+            log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
+            log "Response preview: $(echo "$response" | head -c 200)"
+            return 1
+        fi
     fi
     
     # Validate JSON response before parsing
