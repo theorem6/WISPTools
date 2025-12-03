@@ -480,7 +480,7 @@ get_monitoring_devices() {
         return 1
     fi
     
-    local response=$(curl -s "${API_URL}/checkin/monitoring-devices?device_code=${device_code}")
+    local response=$(curl -k -s --max-time 30 --connect-timeout 10 "${API_URL}/checkin/monitoring-devices?device_code=${device_code}")
     
     if [ $? -eq 0 ] && echo "$response" | jq . >/dev/null 2>&1; then
         local devices=$(echo "$response" | jq -c '.devices // []')
@@ -585,10 +585,13 @@ perform_ping_monitoring() {
             return 1
         fi
         
-        local http_code=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/ping-metrics" \
+        local http_code=$(curl -k -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/ping-metrics" \
             -H "Content-Type: application/json" \
             -H "X-Device-Code: $device_code" \
-            -d "$payload" 2>&1 | tail -1)
+            -d "$payload" \
+            --max-time 30 \
+            --connect-timeout 10 \
+            2>&1 | tail -1)
         
         if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
             log "Ping metrics sent successfully (HTTP $http_code)"
@@ -614,7 +617,7 @@ report_command_result() {
     output=$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')
     error=$(echo "$error" | sed 's/"/\\"/g' | tr '\n' ' ')
     
-    curl -s -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
+    curl -k -s -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
         -H "Content-Type: application/json" \
         -H "X-Device-Code: $device_code" \
         -d "{
@@ -622,7 +625,10 @@ report_command_result() {
             \"output\": \"$output\",
             \"error\": \"$error\",
             \"exit_code\": $exit_code
-        }" >/dev/null 2>&1
+        }" \
+        --max-time 30 \
+        --connect-timeout 10 \
+        >/dev/null 2>&1
     
     log "Command $cmd_id result reported: success=$success"
 }
@@ -707,19 +713,28 @@ do_checkin() {
     
     # Send check-in with HTTP status code capture
     local http_code=0
-    local response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
+    local response=$(curl -k -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
         -H "Content-Type: application/json" \
         -H "X-Device-Code: $device_code" \
-        -d "$payload" 2>&1)
+        -d "$payload" \
+        --max-time 30 \
+        --connect-timeout 10 \
+        2>&1)
     
-    if [ $? -ne 0 ]; then
-        log "ERROR: Check-in failed - network error"
-        return 1
-    fi
+    local curl_exit_code=$?
     
     # Extract HTTP status code (last line)
     http_code=$(echo "$response" | tail -n1)
     response=$(echo "$response" | sed '$d')  # Remove last line (HTTP code)
+    
+    # Check for curl errors (exit code != 0) or HTTP 000 (connection failed)
+    if [ $curl_exit_code -ne 0 ] || [ "$http_code" = "000" ]; then
+        log "ERROR: Check-in failed - connection error (curl exit: $curl_exit_code, HTTP: $http_code)"
+        if [ -n "$response" ]; then
+            log "Error details: $(echo "$response" | head -c 200)"
+        fi
+        return 1
+    fi
     
     # Only check for HTML on error status codes (4xx, 5xx)
     # Don't check for HTML on successful responses (2xx) as they should be JSON
