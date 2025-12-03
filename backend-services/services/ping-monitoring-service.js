@@ -56,6 +56,34 @@ class PingMonitoringService {
   }
 
   /**
+   * Check if an IP address is in a private network range
+   * Returns: true if private, false if public
+   */
+  isPrivateIP(ipAddress) {
+    if (!ipAddress || typeof ipAddress !== 'string') {
+      return false;
+    }
+
+    const parts = ipAddress.split('.').map(Number);
+    if (parts.length !== 4 || parts.some(isNaN)) {
+      return false;
+    }
+
+    // Private IP ranges:
+    // 10.0.0.0/8 (10.0.0.0 - 10.255.255.255)
+    // 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+    // 192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
+    // 127.0.0.0/8 (127.0.0.0 - 127.255.255.255) - loopback
+
+    return (
+      parts[0] === 10 ||
+      (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+      (parts[0] === 192 && parts[1] === 168) ||
+      (parts[0] === 127)
+    );
+  }
+
+  /**
    * Ping a single IP address
    * Returns: { success: boolean, responseTime: number (ms) | null, error: string | null }
    */
@@ -296,14 +324,19 @@ class PingMonitoringService {
           const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
           const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
           
-          // Ping ALL devices with valid IP addresses - no filters
+          // Ping ALL devices with valid IP addresses - but skip private IPs
+          // Private IPs should be pinged by remote EPC agents on their local networks
           if (ipAddress && ipAddress.trim()) {
-            devicesToPing.push({
-              deviceId: equipment._id.toString(),
-              tenantId: equipment.tenantId,
-              ipAddress: ipAddress.trim(),
-              type: 'network_equipment'
-            });
+            const trimmedIP = ipAddress.trim();
+            // Skip private IPs - these should be pinged by remote EPC agents
+            if (!this.isPrivateIP(trimmedIP)) {
+              devicesToPing.push({
+                deviceId: equipment._id.toString(),
+                tenantId: equipment.tenantId,
+                ipAddress: trimmedIP,
+                type: 'network_equipment'
+              });
+            }
           }
         } catch (e) {
           // Invalid JSON in notes, skip
@@ -418,6 +451,38 @@ class PingMonitoringService {
       const currentStatus = lastMetric.success ? 'online' : 'offline';
 
       return {
+        total: metrics.length,
+        successful,
+        failed,
+        uptime_percent: Math.round(uptimePercent * 100) / 100,
+        avg_response_time_ms: avgResponseTime ? Math.round(avgResponseTime * 100) / 100 : null,
+        current_status: currentStatus,
+        last_ping: lastMetric.timestamp,
+        consecutive_failures: lastMetric.consecutive_failures || 0
+      };
+    } catch (error) {
+      console.error(`[Ping Monitoring] Error getting ping stats:`, error);
+      throw error;
+    }
+  }
+}
+
+// Singleton instance
+let pingMonitoringService = null;
+
+function getPingMonitoringService() {
+  if (!pingMonitoringService) {
+    pingMonitoringService = new PingMonitoringService();
+  }
+  return pingMonitoringService;
+}
+
+module.exports = {
+  PingMonitoringService,
+  getPingMonitoringService
+};
+
+
         total: metrics.length,
         successful,
         failed,
