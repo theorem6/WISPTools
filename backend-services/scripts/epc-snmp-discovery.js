@@ -2028,11 +2028,141 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
     await Promise.all(snmpPromises);
   }
   
-  // Combine SNMP devices and ping-only devices
-  const allDevices = [...devices, ...pingOnlyDevices];
+  // Phase 4: Process MNDP-discovered devices that weren't found via SNMP
+  // Create device entries for MNDP-discovered Mikrotik devices
+  const mndpDevices = [];
+  const processedIPs = new Set();
+  
+  // Track which IPs we've already processed
+  devices.forEach(d => {
+    if (d.ip_address) processedIPs.add(d.ip_address);
+  });
+  pingOnlyDevices.forEach(d => {
+    if (d.ip_address) processedIPs.add(d.ip_address);
+  });
+  
+  // Build MAC-to-IP mapping from all ARP tables collected during discovery
+  const macToIPMap = new Map(); // MAC address -> IP address
+  const macToDeviceInfoMap = new Map(); // MAC address -> device info with ARP table
+  
+  // Collect ARP tables from all discovered devices
+  [...devices, ...pingOnlyDevices].forEach(device => {
+    if (device.arp_table && Array.isArray(device.arp_table)) {
+      device.arp_table.forEach(arpEntry => {
+        const mac = ouiLookup.normalizeMacAddress(arpEntry.mac_address || arpEntry.mac || arpEntry.phys_address);
+        const ip = arpEntry.ip_address || arpEntry.ip;
+        if (mac && ip && ip !== '0.0.0.0') {
+          macToIPMap.set(mac, ip);
+          macToDeviceInfoMap.set(mac, {
+            source_device: device.ip_address,
+            arp_entry: arpEntry
+          });
+        }
+      });
+    }
+  });
+  
+  log(`  Built MAC-to-IP mapping from ARP tables: ${macToIPMap.size} MAC address(es) mapped`);
+  
+  // Process MNDP-discovered neighbors that weren't already processed
+  for (const mndpNeighbor of mndpNeighbors) {
+    let ip = mndpNeighbor.ip_address;
+    let resolvedIP = null;
+    
+    // Try to resolve IP from MAC address using ARP table lookup
+    if (mndpNeighbor.mac_address) {
+      const normalizedMac = ouiLookup.normalizeMacAddress(mndpNeighbor.mac_address);
+      if (normalizedMac && macToIPMap.has(normalizedMac)) {
+        resolvedIP = macToIPMap.get(normalizedMac);
+        const deviceInfo = macToDeviceInfoMap.get(normalizedMac);
+        log(`  Resolved MNDP MAC ${normalizedMac} to IP ${resolvedIP} via ARP table from ${deviceInfo.source_device}`);
+        
+        // Use resolved IP if original IP is invalid or missing
+        if (!ip || ip === '0.0.0.0') {
+          ip = resolvedIP;
+        }
+      }
+    }
+    
+    // Skip if already processed
+    if (ip && ip !== '0.0.0.0' && processedIPs.has(ip)) {
+      continue;
+    }
+    
+    // If no valid IP found and no MAC to resolve, skip (unless we have identity)
+    if ((!ip || ip === '0.0.0.0') && !mndpNeighbor.mac_address && !mndpNeighbor.identity) {
+      continue;
+    }
+    
+    // Create device entry for MNDP-discovered Mikrotik device
+    const mndpDevice = {
+      ip_address: (ip && ip !== '0.0.0.0') ? ip : (resolvedIP || null),
+      sysDescr: `Mikrotik RouterOS${mndpNeighbor.version ? ' ' + mndpNeighbor.version : ''}`,
+      sysObjectID: '1.3.6.1.4.1.14988', // Mikrotik OID
+      sysName: mndpNeighbor.identity || ip || resolvedIP || 'Mikrotik Device',
+      sysUpTime: mndpNeighbor.uptime || 0,
+      device_type: 'mikrotik',
+      community: '',
+      snmp_enabled: false, // Not verified via SNMP yet
+      discovered_via: 'mndp',
+      mikrotik: {
+        identity: mndpNeighbor.identity || null,
+        routerOS_version: mndpNeighbor.version || null,
+        board_name: mndpNeighbor.board_name || null,
+        platform: mndpNeighbor.platform || null
+      },
+      mac_address: mndpNeighbor.mac_address || null,
+      ip_resolved_from_mac: resolvedIP ? true : false,
+      original_mndp_ip: mndpNeighbor.ip_address || null
+    };
+    
+    // Use resolved IP for SNMP queries
+    const ipToQuery = (ip && ip !== '0.0.0.0') ? ip : resolvedIP;
+    
+    // Try to get SNMP info if device responds to SNMP (even though it wasn't found in Phase 3)
+    // This can happen if SNMP failed but MNDP succeeded
+    let hasSNMP = false;
+    if (ipToQuery && ipToQuery !== '0.0.0.0') {
+      for (const community of communities) {
+        try {
+          const deviceInfo = await getDeviceInfo(ipToQuery, community);
+          if (deviceInfo.device_type === 'mikrotik') {
+            const mikrotikInfo = await getMikrotikInfo(ipToQuery, community);
+            mndpDevice.snmp_enabled = true;
+            mndpDevice.community = community;
+            mndpDevice.ip_address = ipToQuery; // Use resolved IP
+            mndpDevice.mikrotik = {
+              ...mndpDevice.mikrotik,
+              ...mikrotikInfo
+            };
+            if (deviceInfo.sysDescr) mndpDevice.sysDescr = deviceInfo.sysDescr;
+            if (deviceInfo.sysName) mndpDevice.sysName = deviceInfo.sysName;
+            if (deviceInfo.sysUpTime) mndpDevice.sysUpTime = deviceInfo.sysUpTime;
+            hasSNMP = true;
+            log(`  MNDP device ${ipToQuery} also responds to SNMP - enhanced device info`);
+            break;
+          }
+        } catch (e) {
+          // SNMP not available, continue with MNDP info only
+        }
+      }
+    }
+    
+    mndpDevices.push(mndpDevice);
+    if (mndpDevice.ip_address) {
+      processedIPs.add(mndpDevice.ip_address);
+    }
+    
+    const ipDisplay = mndpDevice.ip_address || 'unknown IP';
+    const resolutionNote = resolvedIP ? ` (IP resolved from MAC)` : '';
+    log(`  Added MNDP-discovered Mikrotik device: ${ipDisplay} (${mndpNeighbor.identity || 'unknown'})${resolutionNote}${hasSNMP ? ' with SNMP' : ' (SNMP not available)'}`);
+  }
+  
+  // Combine all devices: SNMP devices, ping-only devices, and MNDP devices
+  const allDevices = [...devices, ...pingOnlyDevices, ...mndpDevices];
   
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  log(`Discovery complete: ${allDevices.length} total devices (${devices.length} SNMP-enabled, ${pingOnlyDevices.length} ping-only) in ${elapsed}s`);
+  log(`Discovery complete: ${allDevices.length} total devices (${devices.length} SNMP-enabled, ${pingOnlyDevices.length} ping-only, ${mndpDevices.length} MNDP-discovered) in ${elapsed}s`);
   
   return allDevices;
 }
