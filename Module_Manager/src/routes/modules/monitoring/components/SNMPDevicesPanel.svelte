@@ -637,12 +637,15 @@
               <option>No sites available</option>
             </select>
           {:else}
-            <select id="siteId" bind:value={hardwareForm.siteId} required>
-              <option value="">-- Select a Site --</option>
+            <select id="siteId" bind:value={hardwareForm.siteId}>
+              <option value="">-- Select a Site (Optional) --</option>
               {#each sites as site (site._id || site.id)}
                 <option value={site._id || site.id}>{site.name || 'Unnamed Site'}</option>
               {/each}
             </select>
+            <small style="color: var(--text-secondary, #6b7280); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
+              Note: A site must be selected for the device to be marked as deployed
+            </small>
           {/if}
         </div>
         
