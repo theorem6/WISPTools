@@ -56,9 +56,13 @@
       .filter(device => {
         // Only include deployed devices with valid location coordinates
         // Check if device is deployed (has siteId or isDeployed flag)
-        const isDeployed = device.isDeployed !== false && (device.siteId || device.isDeployed === true);
+        const isDeployed = device.isDeployed === true || !!device.siteId;
         if (!isDeployed) {
-          console.warn('[MonitoringMap] Skipping non-deployed device:', device.name);
+          console.log('[MonitoringMap] Skipping non-deployed device:', device.name || device.id, {
+            isDeployed: device.isDeployed,
+            siteId: device.siteId,
+            hasLocation: !!device.location
+          });
           return false;
         }
         
@@ -67,7 +71,12 @@
         const lon = device.location?.coordinates?.longitude || device.location?.longitude;
         const hasValid = hasValidCoordinates(lat, lon);
         if (!hasValid) {
-          console.warn('[MonitoringMap] Skipping device without valid coordinates:', device.name, 'lat:', lat, 'lon:', lon);
+          console.log('[MonitoringMap] Skipping deployed device without valid coordinates:', device.name || device.id, {
+            lat,
+            lon,
+            hasLocation: !!device.location,
+            locationType: typeof device.location
+          });
         }
         return hasValid;
       })
