@@ -290,7 +290,7 @@ router.get('/devices', async (req, res) => {
       }
     }
 
-    // Process network equipment (including discovered SNMP devices)
+    // Process deployed network equipment (all returned have siteId)
     for (const equipment of networkEquipment) {
       try {
         const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
@@ -298,17 +298,12 @@ router.get('/devices', async (req, res) => {
         // Default to true if not explicitly set to false (consistent with discovered devices)
         const enableGraphs = notes.enable_graphs !== false;
         
-        // Check if this is a discovered SNMP device (from EPC agents)
-        const isDiscovered = notes.discovery_source === 'epc_snmp_agent' || 
-                            (typeof equipment.notes === 'string' && equipment.notes.includes('epc_snmp_agent'));
-
-        // Only include devices that are deployed (have siteId)
-        // This ensures graphs only show deployed devices
-        if (ipAddress && ipAddress.trim() && equipment.siteId) {
-          // Include device if graphs are enabled
-          // All deployed devices should be available for graphing
+        // All devices returned here are already deployed (have siteId from query filter)
+        // Only include if they have an IP address and graphs are enabled
+        if (ipAddress && ipAddress.trim()) {
           const hasSNMPConfig = notes.snmp_community || notes.snmp_version || notes.enable_graphs === true;
           
+          // Include deployed device if graphs are enabled (default true)
           if (enableGraphs || hasSNMPConfig) {
             devices.push({
               id: equipment._id.toString(),
@@ -319,7 +314,7 @@ router.get('/devices', async (req, res) => {
               ipAddress: ipAddress.trim(),
               location: 'Unknown',
               hasPing: true,
-              hasSNMP: hasSNMPConfig // Only deployed devices are shown
+              hasSNMP: hasSNMPConfig
             });
           }
         }
