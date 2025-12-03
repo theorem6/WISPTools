@@ -480,7 +480,7 @@ get_monitoring_devices() {
         return 1
     fi
     
-    local response=$(curl -k -s --max-time 30 --connect-timeout 10 "${API_URL}/checkin/monitoring-devices?device_code=${device_code}")
+    local response=$(curl -s --max-time 30 --connect-timeout 10 "${API_URL}/checkin/monitoring-devices?device_code=${device_code}")
     
     if [ $? -eq 0 ] && echo "$response" | jq . >/dev/null 2>&1; then
         local devices=$(echo "$response" | jq -c '.devices // []')
@@ -585,7 +585,7 @@ perform_ping_monitoring() {
             return 1
         fi
         
-        local http_code=$(curl -k -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/ping-metrics" \
+        local http_code=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/ping-metrics" \
             -H "Content-Type: application/json" \
             -H "X-Device-Code: $device_code" \
             -d "$payload" \
@@ -617,7 +617,7 @@ report_command_result() {
     output=$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')
     error=$(echo "$error" | sed 's/"/\\"/g' | tr '\n' ' ')
     
-    curl -k -s -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
+    curl -s -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
         -H "Content-Type: application/json" \
         -H "X-Device-Code: $device_code" \
         -d "{
@@ -713,7 +713,7 @@ do_checkin() {
     
     # Send check-in with HTTP status code capture
     local http_code=0
-    local response=$(curl -k -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
+    local response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
         -H "Content-Type: application/json" \
         -H "X-Device-Code: $device_code" \
         -d "$payload" \
