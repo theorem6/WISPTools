@@ -302,14 +302,14 @@ router.get('/devices', async (req, res) => {
         const isDiscovered = notes.discovery_source === 'epc_snmp_agent' || 
                             (typeof equipment.notes === 'string' && equipment.notes.includes('epc_snmp_agent'));
 
-        if (ipAddress && ipAddress.trim()) {
-          // Include device if:
-          // 1. enableGraphs is true (default), OR
-          // 2. it has SNMP configuration, OR
-          // 3. it's a discovered device (always include discovered devices for monitoring)
+        // Only include devices that are deployed (have siteId)
+        // This ensures graphs only show deployed devices
+        if (ipAddress && ipAddress.trim() && equipment.siteId) {
+          // Include device if graphs are enabled
+          // All deployed devices should be available for graphing
           const hasSNMPConfig = notes.snmp_community || notes.snmp_version || notes.enable_graphs === true;
           
-          if (enableGraphs || hasSNMPConfig || isDiscovered) {
+          if (enableGraphs || hasSNMPConfig) {
             devices.push({
               id: equipment._id.toString(),
               name: equipment.name || notes.sysName || notes.sysDescr || ipAddress || 'Unknown',
@@ -319,7 +319,7 @@ router.get('/devices', async (req, res) => {
               ipAddress: ipAddress.trim(),
               location: 'Unknown',
               hasPing: true,
-              hasSNMP: hasSNMPConfig || isDiscovered // Discovered devices can have SNMP
+              hasSNMP: hasSNMPConfig // Only deployed devices are shown
             });
           }
         }
