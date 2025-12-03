@@ -2069,9 +2069,7 @@ async function reportDiscoveredDevices(discoveredDevices) {
         'Content-Length': Buffer.byteLength(payloadStr),
         ...(tenantId ? { 'X-Tenant-ID': tenantId } : {})
       },
-      timeout: 30000,
-      rejectUnauthorized: false // Allow self-signed certificates
-      rejectUnauthorized: false // Allow self-signed certificates
+      timeout: 30000
     };
     
     const req = https.request(options, (res) => {
