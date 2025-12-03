@@ -559,8 +559,16 @@ do_checkin() {
     http_code=$(echo "$response" | tail -n1)
     response=$(echo "$response" | sed '$d')  # Remove last line (HTTP code)
     
-    # Check if response is HTML (502 Bad Gateway or other errors)
-    if echo "$response" | grep -q "<!DOCTYPE\|<html\|Bad Gateway\|502\|503\|504"; then
+    # Check if response is HTML (only check for HTML document structure, not status codes)
+    # Only detect HTML if it starts with HTML tags or contains HTML structure
+    if echo "$response" | head -c 100 | grep -qiE "^[[:space:]]*<(!DOCTYPE|html|head|body)"; then
+        log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
+        log "Response preview: $(echo "$response" | head -c 200)"
+        return 1
+    fi
+    
+    # Also check for nginx error pages by looking for specific HTML structure
+    if echo "$response" | grep -qi "<center><h1>.*Bad Gateway\|502.*Bad Gateway\|<title>.*Bad Gateway"; then
         log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
         log "Response preview: $(echo "$response" | head -c 200)"
         return 1
