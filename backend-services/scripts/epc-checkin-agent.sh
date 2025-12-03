@@ -498,10 +498,10 @@ do_checkin() {
     local versions_json=$(get_versions)
     
     # Collect recent logs (last 50 lines from check-in log, max 5000 chars)
-    # Use jq to properly escape and build JSON
+    # Sanitize control characters before building JSON
     local logs_json="[]"
     if [ -f "$LOG_FILE" ] && command -v jq >/dev/null 2>&1; then
-        local recent_logs=$(tail -n 50 "$LOG_FILE" 2>/dev/null | head -c 5000 || echo "")
+        local recent_logs=$(tail -n 50 "$LOG_FILE" 2>/dev/null | head -c 5000 | tr -d '\000-\010\013-\037' || echo "")
         if [ -n "$recent_logs" ]; then
             logs_json=$(echo "$recent_logs" | jq -Rs '[split("\n") | map(select(length > 0)) | .[] | {
                 "source": "checkin-agent",
@@ -543,14 +543,33 @@ do_checkin() {
         payload="{\"device_code\":\"$device_code\",\"hardware_id\":\"$hardware_id\",\"ip_address\":\"$ip_address\",\"services\":$services_json,\"system\":$system_json,\"network\":$network_json,\"versions\":$versions_json,\"logs\":[]}"
     fi
     
-    # Send check-in
-    local response=$(curl -s -X POST "${API_URL}/checkin" \
+    # Send check-in with HTTP status code capture
+    local http_code=0
+    local response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
         -H "Content-Type: application/json" \
         -H "X-Device-Code: $device_code" \
         -d "$payload" 2>&1)
     
     if [ $? -ne 0 ]; then
         log "ERROR: Check-in failed - network error"
+        return 1
+    fi
+    
+    # Extract HTTP status code (last line)
+    http_code=$(echo "$response" | tail -n1)
+    response=$(echo "$response" | sed '$d')  # Remove last line (HTTP code)
+    
+    # Check if response is HTML (502 Bad Gateway or other errors)
+    if echo "$response" | grep -q "<!DOCTYPE\|<html\|Bad Gateway\|502\|503\|504"; then
+        log "ERROR: Check-in failed - Backend returned HTML error page (HTTP $http_code)"
+        log "Response preview: $(echo "$response" | head -c 200)"
+        return 1
+    fi
+    
+    # Validate JSON response before parsing
+    if ! echo "$response" | jq . >/dev/null 2>&1; then
+        log "ERROR: Check-in failed - Invalid JSON response (HTTP $http_code)"
+        log "Response preview: $(echo "$response" | head -c 200)"
         return 1
     fi
     
@@ -656,7 +675,10 @@ do_checkin() {
     elif [ "$status" = "unregistered" ]; then
         log "Device not registered. Enter code $device_code in the management portal."
     else
-        log "ERROR: Check-in failed - $response"
+        # Extract error message from response if available
+        local error_msg=$(echo "$response" | jq -r '.error // .message // "Unknown error"' 2>/dev/null || echo "Unknown error")
+        log "ERROR: Check-in failed (HTTP $http_code) - $error_msg"
+        log "Full response: $(echo "$response" | head -c 500)"
         return 1
     fi
 }
