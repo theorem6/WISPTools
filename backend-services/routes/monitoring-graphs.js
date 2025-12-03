@@ -294,20 +294,26 @@ router.get('/devices', async (req, res) => {
       try {
         const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
         const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
-        const enableGraphs = notes.enable_graphs || false;
+        // Default to true if not explicitly set to false (consistent with discovered devices)
+        const enableGraphs = notes.enable_graphs !== false;
 
-        if (ipAddress && ipAddress.trim() && enableGraphs) {
-          devices.push({
-            id: equipment._id.toString(),
-            name: equipment.name || 'Unknown',
-            type: 'network_equipment',
-            manufacturer: equipment.manufacturer,
-            model: equipment.model,
-            ipAddress: ipAddress.trim(),
-            location: 'Unknown',
-            hasPing: true,
-            hasSNMP: true
-          });
+        if (ipAddress && ipAddress.trim()) {
+          // Include device if enableGraphs is true (default) OR if it has SNMP configuration
+          const hasSNMPConfig = notes.snmp_community || notes.snmp_version || notes.enable_graphs === true;
+          
+          if (enableGraphs || hasSNMPConfig) {
+            devices.push({
+              id: equipment._id.toString(),
+              name: equipment.name || 'Unknown',
+              type: 'network_equipment',
+              manufacturer: equipment.manufacturer,
+              model: equipment.model,
+              ipAddress: ipAddress.trim(),
+              location: 'Unknown',
+              hasPing: true,
+              hasSNMP: hasSNMPConfig // Set based on actual SNMP config presence
+            });
+          }
         }
       } catch (e) {
         // Invalid JSON in notes, skip

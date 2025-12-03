@@ -60,7 +60,11 @@
     
     try {
       const user = auth().currentUser;
-      if (!user) return;
+      if (!user) {
+        error = 'Not authenticated';
+        isLoading = false;
+        return;
+      }
       
       const token = await user.getIdToken();
       
@@ -76,6 +80,9 @@
         const data = await response.json();
         devices = data.devices || [];
         isLoading = false;
+        error = '';
+        
+        console.log(`[SNMP Graphs] Loaded ${devices.length} devices for graphing`);
         
         // Auto-select first device if none selected
         if (!selectedDevice && devices.length > 0) {
@@ -88,11 +95,22 @@
             await loadDeviceMetrics();
           }
         }
+      } else {
+        const errorText = await response.text();
+        console.error('[SNMP Graphs] Failed to load devices:', response.status, errorText);
+        error = `Failed to load devices: ${response.status} ${response.statusText}`;
+        isLoading = false;
+        devices = [];
       }
-    } catch (err) {
-      console.error('Failed to load devices:', err);
-      error = 'Failed to load devices';
+    } catch (err: any) {
+      console.error('[SNMP Graphs] Error loading devices:', err);
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('network')) {
+        error = 'Backend server is not reachable. Please check if the monitoring service is running.';
+      } else {
+        error = `Failed to load devices: ${err.message || 'Unknown error'}`;
+      }
       isLoading = false;
+      devices = [];
     }
   }
   
@@ -487,10 +505,15 @@
       <div class="spinner"></div>
       <p>Loading devices...</p>
     </div>
+  {:else if error}
+    <div class="no-devices error">
+      <p>⚠️ {error}</p>
+      <p class="hint">Please check your connection and try refreshing the page</p>
+    </div>
   {:else if devices.length === 0}
     <div class="no-devices">
       <p>📊 No devices available for monitoring</p>
-      <p class="hint">Deploy devices with IP addresses to enable ping monitoring</p>
+      <p class="hint">Deploy devices with IP addresses to enable ping monitoring, or enable graphs on discovered SNMP devices</p>
     </div>
   {:else}
     <div class="panel-layout">
@@ -685,6 +708,15 @@
   .hint {
     font-size: 0.875rem;
     color: #475569;
+  }
+  
+  .no-devices.error {
+    color: #f87171;
+  }
+  
+  .no-devices.error p {
+    font-size: 1.1rem;
+    font-weight: 500;
   }
   
   .panel-layout {
