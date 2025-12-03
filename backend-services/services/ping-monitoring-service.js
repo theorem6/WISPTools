@@ -267,10 +267,10 @@ class PingMonitoringService {
         tenantId: { $exists: true } // Ensure tenantId exists
       }).select('_id tenantId ipAddress technicalSpecs.ipAddress').lean();
 
-      // Get all deployed network equipment with IP addresses
+      // Get all network equipment with IP addresses (same logic as graphs endpoint)
+      // Include both deployed and discovered devices without siteId
       const networkEquipment = await NetworkEquipment.find({
-        status: 'active',
-        siteId: { $exists: true, $ne: null }
+        status: 'active'
       }).select('_id tenantId notes').lean();
 
       console.log(`[Ping Monitoring] Found ${inventoryItems.length} inventory items and ${networkEquipment.length} network equipment to check`);
@@ -291,11 +291,20 @@ class PingMonitoringService {
       }
 
       // Process network equipment (IP might be in notes JSON)
+      // Use same logic as graphs endpoint - include all devices with graphs enabled
       for (const equipment of networkEquipment) {
         try {
-          const notes = equipment.notes ? JSON.parse(equipment.notes) : {};
+          const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
           const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
-          if (ipAddress && ipAddress.trim()) {
+          
+          // Check if graphs are enabled (default true, same as graphs endpoint)
+          const enableGraphs = notes.enable_graphs !== false;
+          
+          // Check if this is a discovered device
+          const isDiscovered = notes.discovery_source === 'epc_snmp_agent' || 
+                              (typeof equipment.notes === 'string' && equipment.notes.includes('epc_snmp_agent'));
+          
+          if (ipAddress && ipAddress.trim() && (enableGraphs || isDiscovered)) {
             devicesToPing.push({
               deviceId: equipment._id.toString(),
               tenantId: equipment.tenantId,

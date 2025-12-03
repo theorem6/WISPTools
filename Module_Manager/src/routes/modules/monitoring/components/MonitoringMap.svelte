@@ -180,11 +180,64 @@
     }
   }
 
-  // Calculate uptime percentage
+  // Calculate uptime percentage (device availability)
   function calculateUptime() {
     if (!networkDevices || networkDevices.length === 0) return 0;
     const onlineDevices = networkDevices.filter(d => d.status === 'online').length;
     return Math.round((onlineDevices / networkDevices.length) * 100);
+  }
+  
+  // Get EPC system uptime (actual system runtime)
+  function getEPCSystemUptime() {
+    if (!networkDevices || networkDevices.length === 0) return null;
+    
+    // Find EPC devices with uptime metrics
+    const epcDevices = networkDevices.filter(d => d.type === 'epc' && d.metrics?.uptime);
+    
+    if (epcDevices.length === 0) return null;
+    
+    // Return the longest uptime (most reliable EPC)
+    const uptimes = epcDevices
+      .map(d => {
+        const uptimeStr = d.metrics?.uptime;
+        if (!uptimeStr) return null;
+        
+        // Parse formatted uptime string (e.g., "10d 5h 30m" or "5h 30m" or "30m")
+        // Or if it's a number (seconds), convert it
+        if (typeof uptimeStr === 'number') {
+          return uptimeStr;
+        }
+        
+        // Parse formatted string
+        const daysMatch = uptimeStr.match(/(\d+)d/);
+        const hoursMatch = uptimeStr.match(/(\d+)h/);
+        const minutesMatch = uptimeStr.match(/(\d+)m/);
+        
+        const days = daysMatch ? parseInt(daysMatch[1]) : 0;
+        const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
+        const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 0;
+        
+        return (days * 24 * 60 * 60) + (hours * 60 * 60) + (minutes * 60);
+      })
+      .filter(u => u !== null && u > 0);
+    
+    if (uptimes.length === 0) return null;
+    
+    // Return the longest uptime in seconds
+    const maxUptime = Math.max(...uptimes);
+    
+    // Format it nicely
+    const days = Math.floor(maxUptime / (24 * 60 * 60));
+    const hours = Math.floor((maxUptime % (24 * 60 * 60)) / (60 * 60));
+    const minutes = Math.floor((maxUptime % (60 * 60)) / 60);
+    
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
   }
   
   // Watch for device changes
@@ -234,9 +287,19 @@
             <div class="status-icon">📊</div>
             <div class="status-content">
               <div class="status-value">{calculateUptime()}%</div>
-              <div class="status-label">Uptime</div>
+              <div class="status-label">Device Uptime</div>
             </div>
           </div>
+          
+          {#if getEPCSystemUptime()}
+            <div class="status-card success">
+              <div class="status-icon">⏱️</div>
+              <div class="status-content">
+                <div class="status-value" style="font-size: 0.9rem;">{getEPCSystemUptime()}</div>
+                <div class="status-label">EPC System Uptime</div>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
 
@@ -400,6 +463,11 @@
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
     margin-top: 0.75rem;
+  }
+  
+  /* If there are 5 cards, make them wrap nicely */
+  .status-cards:has(> :nth-child(5)) {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .status-card {

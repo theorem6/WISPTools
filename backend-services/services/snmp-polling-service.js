@@ -61,9 +61,9 @@ class SNMPPollingService {
     const startTime = Date.now();
 
     try {
-      // Find all deployed devices with graphs enabled
+      // Find all devices with graphs enabled (same logic as graphs endpoint)
+      // Include both deployed and discovered devices without siteId
       const devices = await NetworkEquipment.find({
-        siteId: { $exists: true, $ne: null }, // Deployed devices
         status: 'active'
       }).lean();
 
@@ -120,16 +120,28 @@ class SNMPPollingService {
         }
       }
 
-      // Check if graphs are enabled (default true for deployed devices)
+      // Check if graphs are enabled (default true, same logic as graphs endpoint)
       const enableGraphs = notes.enable_graphs !== false;
-      if (!enableGraphs) {
-        return false; // Skip devices with graphs disabled
+      
+      // Check if this is a discovered device (from EPC agents)
+      const isDiscovered = notes.discovery_source === 'epc_snmp_agent' || 
+                          (typeof device.notes === 'string' && device.notes.includes('epc_snmp_agent'));
+      
+      // Include device if graphs enabled OR if it's a discovered device (always poll discovered devices)
+      if (!enableGraphs && !isDiscovered) {
+        return false; // Skip devices with graphs explicitly disabled
       }
 
-      // Get SNMP configuration
-      const ipAddress = notes.management_ip || device.serialNumber;
+      // Get SNMP configuration (same logic as graphs endpoint)
+      const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress || device.serialNumber;
       if (!ipAddress || !/^\d+\.\d+\.\d+\.\d+$/.test(ipAddress)) {
         return false; // Skip if no valid IP
+      }
+      
+      // Check if device has SNMP capability (has SNMP community or is discovered)
+      const hasSNMPConfig = notes.snmp_community || notes.snmp_version || isDiscovered;
+      if (!hasSNMPConfig) {
+        return false; // Skip devices without SNMP configuration
       }
 
       const snmpVersion = notes.snmp_version || '2c';

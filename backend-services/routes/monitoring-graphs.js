@@ -260,11 +260,11 @@ router.get('/devices', async (req, res) => {
     .select('_id assetTag equipmentType manufacturer model ipAddress technicalSpecs.ipAddress currentLocation')
     .lean();
 
-    // Get all deployed network equipment with graphs enabled
+    // Get all network equipment (including discovered SNMP devices) with graphs enabled
+    // Include devices with or without siteId - discovered devices might not be deployed yet
     const networkEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      status: 'active',
-      siteId: { $exists: true, $ne: null }
+      status: 'active'
     })
     .select('_id name type manufacturer model notes siteId')
     .lean();
@@ -289,29 +289,36 @@ router.get('/devices', async (req, res) => {
       }
     }
 
-    // Process network equipment
+    // Process network equipment (including discovered SNMP devices)
     for (const equipment of networkEquipment) {
       try {
         const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
         const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
         // Default to true if not explicitly set to false (consistent with discovered devices)
         const enableGraphs = notes.enable_graphs !== false;
+        
+        // Check if this is a discovered SNMP device (from EPC agents)
+        const isDiscovered = notes.discovery_source === 'epc_snmp_agent' || 
+                            (typeof equipment.notes === 'string' && equipment.notes.includes('epc_snmp_agent'));
 
         if (ipAddress && ipAddress.trim()) {
-          // Include device if enableGraphs is true (default) OR if it has SNMP configuration
+          // Include device if:
+          // 1. enableGraphs is true (default), OR
+          // 2. it has SNMP configuration, OR
+          // 3. it's a discovered device (always include discovered devices for monitoring)
           const hasSNMPConfig = notes.snmp_community || notes.snmp_version || notes.enable_graphs === true;
           
-          if (enableGraphs || hasSNMPConfig) {
+          if (enableGraphs || hasSNMPConfig || isDiscovered) {
             devices.push({
               id: equipment._id.toString(),
-              name: equipment.name || 'Unknown',
+              name: equipment.name || notes.sysName || notes.sysDescr || ipAddress || 'Unknown',
               type: 'network_equipment',
-              manufacturer: equipment.manufacturer,
-              model: equipment.model,
+              manufacturer: equipment.manufacturer || notes.manufacturer_detected_via_oui || notes.oui_detection?.manufacturer || 'Unknown',
+              model: equipment.model || notes.mikrotik?.board_name || notes.sysDescr || 'Unknown',
               ipAddress: ipAddress.trim(),
               location: 'Unknown',
               hasPing: true,
-              hasSNMP: hasSNMPConfig // Set based on actual SNMP config presence
+              hasSNMP: hasSNMPConfig || isDiscovered // Discovered devices can have SNMP
             });
           }
         }
