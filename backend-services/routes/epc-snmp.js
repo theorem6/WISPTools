@@ -178,14 +178,22 @@ router.post('/discovered', async (req, res, next) => {
         if (detected_device_type === 'mikrotik') {
           // Use Mikrotik identity as name if available
           device_name = mikrotik_identity || sysName || `Mikrotik-${ip_address}`;
-          // Use board name as model if available
-          device_model = mikrotik_board || sysDescr || 'Mikrotik RouterOS';
+          // Use board name as model if available, otherwise try to extract from sysDescr
+          device_model = mikrotik_board || (sysDescr && sysDescr.length > 0 ? sysDescr.split(' ').slice(0, 2).join(' ') : 'Mikrotik RouterOS') || 'Mikrotik RouterOS';
           // Use serial number if available
           device_serial = mikrotik_serial || ip_address;
         } else if (is_ping_only) {
           // For ping-only devices, use IP-based naming
           device_name = `Device-${ip_address}`;
           device_model = 'Network Device (SNMP not available)';
+        } else if (sysDescr && sysDescr.length > 0) {
+          // Try to extract better model info from sysDescr for non-Mikrotik devices
+          // Common format: "Manufacturer Model Version" - try to get first 2-3 words
+          const descrParts = sysDescr.trim().split(/\s+/);
+          if (descrParts.length >= 2) {
+            // Use first 2-3 words as model if it looks reasonable
+            device_model = descrParts.slice(0, Math.min(3, descrParts.length)).join(' ');
+          }
         }
         
         // Determine manufacturer - use OUI lookup result if available, otherwise fall back to existing logic
@@ -303,18 +311,20 @@ router.post('/discovered', async (req, res, next) => {
         };
         
         if (existingDevice) {
-          // Update existing device
+          // Update existing device - ensure all profiling fields are updated
           await NetworkEquipment.updateOne(
             { _id: existingDevice._id },
-            { $set: deviceData }
+            { 
+              $set: deviceData
+            }
           );
-          console.log(`[SNMP Discovery] Updated device: ${ip_address}`);
+          console.log(`[SNMP Discovery] Updated device: ${ip_address} (Manufacturer: ${deviceData.manufacturer}, Model: ${deviceData.model}, Type: ${deviceData.type})`);
         } else {
           // Create new device
           deviceData.createdAt = new Date();
           const newDevice = new NetworkEquipment(deviceData);
           await newDevice.save();
-          console.log(`[SNMP Discovery] Created device: ${ip_address}`);
+          console.log(`[SNMP Discovery] Created device: ${ip_address} (Manufacturer: ${deviceData.manufacturer}, Model: ${deviceData.model}, Type: ${deviceData.type})`);
         }
         
         processedDevices.push({

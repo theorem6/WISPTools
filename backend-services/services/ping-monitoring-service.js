@@ -257,9 +257,8 @@ class PingMonitoringService {
     const startTime = Date.now();
 
     try {
-      // Get all deployed inventory items with IP addresses
+      // Get ALL inventory items with IP addresses (not just deployed) - ping sweep should check all devices
       const inventoryItems = await InventoryItem.find({
-        status: 'deployed',
         $or: [
           { ipAddress: { $exists: true, $ne: null, $ne: '' } },
           { 'technicalSpecs.ipAddress': { $exists: true, $ne: null, $ne: '' } }
@@ -291,20 +290,14 @@ class PingMonitoringService {
       }
 
       // Process network equipment (IP might be in notes JSON)
-      // Use same logic as graphs endpoint - include all devices with graphs enabled
+      // Ping ALL devices with IP addresses - no filtering by graphs or discovery status
       for (const equipment of networkEquipment) {
         try {
           const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
           const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
           
-          // Check if graphs are enabled (default true, same as graphs endpoint)
-          const enableGraphs = notes.enable_graphs !== false;
-          
-          // Check if this is a discovered device
-          const isDiscovered = notes.discovery_source === 'epc_snmp_agent' || 
-                              (typeof equipment.notes === 'string' && equipment.notes.includes('epc_snmp_agent'));
-          
-          if (ipAddress && ipAddress.trim() && (enableGraphs || isDiscovered)) {
+          // Ping ALL devices with valid IP addresses - no filters
+          if (ipAddress && ipAddress.trim()) {
             devicesToPing.push({
               deviceId: equipment._id.toString(),
               tenantId: equipment.tenantId,
