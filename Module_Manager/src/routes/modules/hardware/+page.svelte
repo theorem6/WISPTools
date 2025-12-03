@@ -17,6 +17,7 @@
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import { formatInTenantTimezone } from '$lib/utils/timezone';
   import { coverageMapService } from '../coverage-map/lib/coverageMapService.mongodb';
+  import SNMPDevicesPanel from '../monitoring/components/SNMPDevicesPanel.svelte';
   
   const HSS_API = API_CONFIG.PATHS.HSS;
   
@@ -726,21 +727,20 @@
     </div>
   {:else if activeHardwareTab === 'epc' || (activeHardwareTab === 'all' && epcDevices.length > 0)}
     <!-- EPC/SNMP Devices Section -->
-    {#if activeHardwareTab === 'epc' || activeHardwareTab === 'all'}
-      {#if epcDevices.length === 0 && activeHardwareTab === 'epc'}
+    {#if activeHardwareTab === 'epc'}
+      <!-- EPC Devices Section -->
+      {#if epcDevices.length === 0}
         <div class="empty-state">
           <span class="empty-icon">📡</span>
-          <h3>No EPC/SNMP devices deployed</h3>
-          <p>Deploy EPC/SNMP devices from the Deploy module</p>
+          <h3>No EPC devices deployed</h3>
+          <p>Deploy EPC devices from the Deploy module</p>
           <button class="btn-primary" on:click={() => goto('/modules/deploy')}>
             🚀 Go to Deploy
           </button>
         </div>
-      {:else if epcDevices.length > 0}
+      {:else}
         <div class="epc-section">
-          {#if activeHardwareTab === 'all'}
-            <h3 class="section-title">📡 EPC/SNMP Devices ({epcDevices.length})</h3>
-          {/if}
+          <h3 class="section-title">📡 EPC Devices ({epcDevices.length})</h3>
           <div class="table-container">
             <table class="hardware-table">
               <thead>
@@ -826,6 +826,99 @@
           </div>
         </div>
       {/if}
+      
+      <!-- Discovered SNMP Devices Section -->
+      <div class="snmp-section" style="margin-top: 2rem;">
+        <SNMPDevicesPanel tenantId={tenantId} />
+      </div>
+    {:else if activeHardwareTab === 'all' && epcDevices.length > 0}
+      <!-- Show EPC devices in "All" tab -->
+      <div class="epc-section">
+        <h3 class="section-title">📡 EPC/SNMP Devices ({epcDevices.length})</h3>
+        <div class="table-container">
+          <table class="hardware-table">
+            <thead>
+              <tr>
+                <th>Site / Device</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Device Code</th>
+                <th>Network Config</th>
+                <th>SNMP</th>
+                <th>Last Seen</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each epcDevices as device (device.epc_id || device.epcId || device.id)}
+                <tr>
+                  <td class="hardware-cell">
+                    <div class="hardware-info">
+                      <div class="hardware-name">{device.site_name || device.name || 'Unnamed'}</div>
+                      <div class="hardware-manufacturer">ID: {(device.epc_id || device.epcId || device.id || 'unknown').substring(0, 12)}...</div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="category-badge epc-type">
+                      {#if device.deployment_type === 'epc'}📡 EPC
+                      {:else if device.deployment_type === 'snmp'}📊 SNMP
+                      {:else}📡📊 Both{/if}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="status-badge status-{device.status || 'registered'}">
+                      {#if device.status === 'online'}🟢 Online
+                      {:else if device.status === 'offline'}🔴 Offline
+                      {:else if device.status === 'error'}⚠️ Error
+                      {:else}⏳ Registered{/if}
+                    </span>
+                  </td>
+                  <td>
+                    {#if device.device_code}
+                      <code class="device-code">{device.device_code}</code>
+                    {:else}
+                      <span class="text-muted">Not linked</span>
+                    {/if}
+                  </td>
+                  <td class="config-cell">
+                    {#if device.deployment_type !== 'snmp'}
+                      MCC: {device.hss_config?.mcc || device.network_config?.mcc || '001'}<br>
+                      MNC: {device.hss_config?.mnc || device.network_config?.mnc || '01'}
+                    {:else}
+                      <span class="text-muted">N/A</span>
+                    {/if}
+                  </td>
+                  <td>
+                    {#if device.deployment_type !== 'epc'}
+                      {device.snmp_config?.enabled !== false ? '✓' : '✗'}
+                      {device.snmp_config?.community || 'public'}
+                    {:else}
+                      <span class="text-muted">N/A</span>
+                    {/if}
+                  </td>
+                  <td class="date-cell">
+                    {#if device.last_seen}
+                      {formatInTenantTimezone(device.last_seen)}
+                    {:else}
+                      <span class="text-muted">Never</span>
+                    {/if}
+                  </td>
+                  <td class="actions-cell">
+                    <div class="action-buttons">
+                      <button class="btn-icon" on:click={() => editEPCDevice(device)} title="Edit">
+                        ✏️
+                      </button>
+                      <button class="btn-icon btn-danger" on:click={() => deleteEPCDevice(device)} title="Delete">
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
     {/if}
   {/if}
   

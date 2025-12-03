@@ -11,7 +11,6 @@
   import MikrotikCredentialsModal from './components/MikrotikCredentialsModal.svelte';
   import EPCMonitoringPanel from '$lib/components/EPCMonitoringPanel.svelte';
   import SNMPGraphsPanel from '$lib/components/SNMPGraphsPanel.svelte';
-  import SNMPDevicesPanel from './components/SNMPDevicesPanel.svelte';
   import MikrotikDevicesPanel from './components/MikrotikDevicesPanel.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
@@ -27,7 +26,7 @@
   let networkDevices = [];
   let snmpData = [];
   let selectedDevice = null;
-  let mapView = 'geographic'; // 'geographic', 'topology', 'epc', 'snmp', or 'graphs'
+  let mapView = 'geographic'; // 'geographic', 'topology', 'epc', or 'graphs'
   let loading = true;
   let showMikrotikCredentialsModal = false;
   let selectedMikrotikDevice: any = null;
@@ -650,14 +649,6 @@
           <span class="control-label">EPC ({epcDevices.length})</span>
         </button>
         <button 
-          class="module-control-btn {mapView === 'snmp' ? 'active' : ''}"
-          on:click={() => mapView = 'snmp'}
-          title="SNMP Devices"
-        >
-          <span class="control-icon">📡</span>
-          <span class="control-label">SNMP</span>
-        </button>
-        <button 
           class="module-control-btn {mapView === 'graphs' ? 'active' : ''}"
           on:click={() => mapView = 'graphs'}
           title="SNMP Graphs"
@@ -676,13 +667,6 @@
       </div>
     </div>
   </div>
-  
-  <!-- SNMP Devices View -->
-  {#if mapView === 'snmp'}
-    <div class="snmp-overlay">
-      <SNMPDevicesPanel {tenantId} />
-    </div>
-  {/if}
   
   <!-- SNMP Graphs View -->
   {#if mapView === 'graphs'}

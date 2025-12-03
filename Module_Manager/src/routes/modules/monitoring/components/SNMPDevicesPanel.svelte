@@ -420,12 +420,23 @@
         // Small delay to ensure backend has finished saving, then reload
         await new Promise(resolve => setTimeout(resolve, 500));
         await loadDiscoveredDevices();
-        // Show success message
-        alert('Hardware created successfully! Device should now show as deployed.');
+        // Show success message - device should now show as deployed
+        console.log('[SNMP Devices] ✅ Hardware created successfully! Device should now show as deployed.');
       } else {
-        const errorText = await response.text();
+        let errorText = '';
+        let errorData: any = null;
+        try {
+          errorText = await response.text();
+          try {
+            errorData = JSON.parse(errorText);
+            createError = errorData.error || errorData.message || `Failed to create hardware: ${response.status}`;
+          } catch (e) {
+            createError = errorText || `Failed to create hardware: ${response.status}`;
+          }
+        } catch (e) {
+          createError = `Failed to create hardware: ${response.status}`;
+        }
         console.error('[SNMP Devices] Failed to create hardware:', response.status, errorText);
-        createError = `Failed to create hardware: ${response.status}`;
       }
     } catch (err: any) {
       console.error('[SNMP Devices] Error creating hardware:', err);
@@ -538,8 +549,8 @@
                 <button class="btn btn-sm btn-secondary" on:click={() => handlePairDevice(device)} title="Pair with Hardware">
                   🔗
                 </button>
-                <button class="btn btn-sm btn-primary" on:click={() => handleAddHardware(device)} title="Add as New Hardware">
-                  ➕
+                <button class="btn btn-sm btn-primary" on:click={() => handleAddHardware(device)} title="Deploy as Hardware">
+                  🚀 Deploy
                 </button>
               </td>
             </tr>
