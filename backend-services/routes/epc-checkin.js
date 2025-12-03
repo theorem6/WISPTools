@@ -263,9 +263,68 @@ router.get('/checkin/monitoring-devices', async (req, res) => {
       }
     }
 
-    // Get inventory items associated with this EPC's location/site
-    // For now, we'll skip inventory items as they're typically managed differently
-    // But could be added if needed
+    // Also get ALL network equipment with IPs for this tenant (not just discovered by this EPC)
+    // This ensures manually added devices or devices discovered by other means are also monitored
+    const allNetworkEquipment = await NetworkEquipment.find({
+      tenantId,
+      status: 'active'
+    })
+    .select('_id name type notes status')
+    .lean();
+
+    // Track devices we've already added to avoid duplicates
+    const addedDeviceIds = new Set(devices.map(d => d.device_id));
+
+    for (const equipment of allNetworkEquipment) {
+      // Skip if already added
+      if (addedDeviceIds.has(equipment._id.toString())) {
+        continue;
+      }
+
+      try {
+        const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
+        const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
+        
+        // Only add devices with valid IP addresses
+        if (ipAddress && ipAddress.trim()) {
+          devices.push({
+            device_id: equipment._id.toString(),
+            name: equipment.name || 'Unknown Device',
+            type: equipment.type || 'other',
+            ip_address: ipAddress.trim(),
+            source: 'network_equipment'
+          });
+          addedDeviceIds.add(equipment._id.toString());
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    // Get inventory items with IP addresses that are deployed
+    const inventoryItems = await InventoryItem.find({
+      tenantId,
+      status: 'deployed',
+      $or: [
+        { ipAddress: { $exists: true, $ne: null, $ne: '' } },
+        { 'technicalSpecs.ipAddress': { $exists: true, $ne: null, $ne: '' } }
+      ]
+    })
+    .select('_id name type ipAddress technicalSpecs.ipAddress status')
+    .lean();
+
+    for (const item of inventoryItems) {
+      const ipAddress = item.ipAddress || item.technicalSpecs?.ipAddress;
+      if (ipAddress && ipAddress.trim()) {
+        devices.push({
+          device_id: item._id.toString(),
+          name: item.name || 'Unknown Device',
+          type: item.type || 'other',
+          ip_address: ipAddress.trim(),
+          source: 'inventory_item'
+        });
+      }
+    }
 
     console.log(`[Monitoring Devices] Returning ${devices.length} devices for EPC ${epcId} to monitor`);
 
