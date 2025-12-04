@@ -535,6 +535,9 @@ export const apiProxy = onRequest({
         details: error.toString(),
         url: url,
         errorType: error.constructor?.name
+
+
+        
       });
     }
   }
