@@ -150,52 +150,23 @@ router.get('/metrics/:deviceId', async (req, res) => {
 });
 
 // POST /api/snmp/poll/:deviceId - Manually poll specific device
+// NOTE: SNMP polling is DISABLED on cloud backend - should only run on remote EPC agents
 router.post('/poll/:deviceId', async (req, res) => {
   try {
     const { deviceId } = req.params;
-    console.log(`🔄 [SNMP API] Manually polling device ${deviceId}`);
+    console.log(`🔄 [SNMP API] Manual poll requested for device ${deviceId}`);
     
-    // Trigger immediate SNMP poll via polling service
-    const snmpPollingService = require('../services/snmp-polling-service');
-    const startTime = Date.now();
-    
-    try {
-      const success = await snmpPollingService.pollDeviceById(deviceId, req.tenantId);
-      const responseTime = Date.now() - startTime;
-      
-      // Get latest metrics after polling
-      const SNMPMetrics = require('../models/snmp-metrics-schema').SNMPMetrics;
-      const latestMetric = await SNMPMetrics.findOne({
-        device_id: deviceId,
-        tenant_id: req.tenantId
-      }).sort({ timestamp: -1 }).lean();
-      
-      const pollResult = {
-        deviceId,
-        timestamp: new Date().toISOString(),
-        success: success && latestMetric !== null,
-        responseTime,
-        metrics: latestMetric ? {
-          'system.sysUpTime': latestMetric.system?.uptime_seconds ?? null,
-          'hrProcessor.hrProcessorLoad': latestMetric.resources?.cpu_percent ?? null,
-          'hrStorage.hrStorageUsed': latestMetric.resources?.disk_percent ?? null,
-          'ifTable.ifInOctets.1': latestMetric.network?.interface_in_octets ?? null,
-          'ifTable.ifOutOctets.1': latestMetric.network?.interface_out_octets ?? null
-        } : null
-      };
-      
-      res.json(pollResult);
-    } catch (pollError) {
-      console.error(`❌ [SNMP API] Polling failed for device ${deviceId}:`, pollError);
-      res.status(500).json({
-        error: 'Failed to poll device',
-        message: pollError.message
-      });
-    }
+    // SNMP polling is disabled on cloud backend - return error explaining why
+    res.status(503).json({
+      error: 'SNMP polling disabled on cloud backend',
+      message: 'SNMP polling is disabled on the cloud backend. Devices on private networks cannot be reached from the cloud. SNMP polling should be performed by remote EPC agents on local networks.',
+      deviceId,
+      suggestion: 'Use remote EPC agents to perform SNMP discovery and polling, or check existing metrics that have been reported by agents.'
+    });
   } catch (error) {
-    console.error('❌ [SNMP API] Error polling device:', error);
+    console.error('❌ [SNMP API] Error in poll endpoint:', error);
     res.status(500).json({ 
-      error: 'Failed to poll device', 
+      error: 'Failed to process poll request', 
       message: error.message 
     });
   }
