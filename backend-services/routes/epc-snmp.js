@@ -136,6 +136,18 @@ router.post('/discovered', async (req, res, next) => {
           }
         }
         
+        // Also check device's direct MAC address (from MNDP or other sources)
+        if (!manufacturerFromOUI && ouiLookup && device.mac_address) {
+          const normalizedMac = ouiLookup.normalizeMacAddress(device.mac_address);
+          if (normalizedMac) {
+            const manufacturer = ouiLookup.lookupManufacturer(normalizedMac);
+            if (manufacturer) {
+              manufacturerFromOUI = manufacturer;
+              console.log(`[SNMP Discovery] Detected manufacturer ${manufacturerFromOUI} for device ${ip_address} via OUI lookup from device MAC address ${normalizedMac}`);
+            }
+          }
+        }
+        
         // Override device_type if detected as Mikrotik from neighbors or OUI
         const detected_device_type = (isMikrotikFromNeighbor || isMikrotikFromOUI) ? 'mikrotik' : device_type;
         

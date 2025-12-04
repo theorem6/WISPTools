@@ -2094,6 +2094,27 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
       continue;
     }
     
+    // Perform OUI lookup on MNDP-discovered device's MAC address
+    let manufacturerFromOUI = null;
+    let oui_detection = null;
+    
+    if (mndpNeighbor.mac_address && ouiLookup) {
+      const normalizedMac = ouiLookup.normalizeMacAddress(mndpNeighbor.mac_address);
+      if (normalizedMac) {
+        manufacturerFromOUI = ouiLookup.lookupManufacturer(normalizedMac);
+        if (manufacturerFromOUI) {
+          oui_detection = {
+            manufacturer: manufacturerFromOUI,
+            detected_at: new Date().toISOString(),
+            source: 'mndp_mac_address',
+            mac_address: normalizedMac,
+            oui: ouiLookup.extractOUI(normalizedMac)
+          };
+          log(`  Detected manufacturer ${manufacturerFromOUI} for MNDP device via OUI lookup from MAC ${normalizedMac}`);
+        }
+      }
+    }
+    
     // Create device entry for MNDP-discovered Mikrotik device
     const mndpDevice = {
       ip_address: (ip && ip !== '0.0.0.0') ? ip : (resolvedIP || null),
@@ -2105,6 +2126,8 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
       community: '',
       snmp_enabled: false, // Not verified via SNMP yet
       discovered_via: 'mndp',
+      manufacturer_from_oui: manufacturerFromOUI || null,
+      oui_detection: oui_detection || null,
       mikrotik: {
         identity: mndpNeighbor.identity || null,
         routerOS_version: mndpNeighbor.version || null,
