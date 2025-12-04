@@ -408,7 +408,15 @@
             }
           }
         });
+        console.log(`[SNMP Graphs] Ping response time chart created successfully`);
+        } catch (err) {
+          console.error('[SNMP Graphs] Error creating ping response time chart:', err);
+        }
+      } else {
+        console.log(`[SNMP Graphs] Response time dataset not found or has no valid data`);
       }
+    } else {
+      console.log(`[SNMP Graphs] Cannot create ping response time chart - canvas: ${!!pingResponseChartCanvas}`);
     }
   }
   
