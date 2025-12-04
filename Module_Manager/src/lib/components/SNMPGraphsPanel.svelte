@@ -700,21 +700,13 @@
               <div class="chart-card">
                 <h4>🟢 Ping Uptime</h4>
                 <div class="chart-container">
-                  {#if pingUptimeChartCanvas}
-                    <canvas bind:this={pingUptimeChartCanvas}></canvas>
-                  {:else}
-                    <p class="no-data">No ping data available</p>
-                  {/if}
+                  <canvas bind:this={pingUptimeChartCanvas}></canvas>
                 </div>
               </div>
               <div class="chart-card">
                 <h4>⏱️ Ping Response Time</h4>
                 <div class="chart-container">
-                  {#if pingResponseChartCanvas}
-                    <canvas bind:this={pingResponseChartCanvas}></canvas>
-                  {:else}
-                    <p class="no-data">No response time data available</p>
-                  {/if}
+                  <canvas bind:this={pingResponseChartCanvas}></canvas>
                 </div>
               </div>
             {/if}
@@ -723,31 +715,19 @@
               <div class="chart-card">
                 <h4>💻 CPU Usage</h4>
                 <div class="chart-container">
-                  {#if cpuChartCanvas}
-                    <canvas bind:this={cpuChartCanvas}></canvas>
-                  {:else}
-                    <p class="no-data">No CPU data available</p>
-                  {/if}
+                  <canvas bind:this={cpuChartCanvas}></canvas>
                 </div>
               </div>
               <div class="chart-card">
                 <h4>🧠 Memory Usage</h4>
                 <div class="chart-container">
-                  {#if memoryChartCanvas}
-                    <canvas bind:this={memoryChartCanvas}></canvas>
-                  {:else}
-                    <p class="no-data">No memory data available</p>
-                  {/if}
+                  <canvas bind:this={memoryChartCanvas}></canvas>
                 </div>
               </div>
               <div class="chart-card wide">
                 <h4>🌐 Network Throughput</h4>
                 <div class="chart-container">
-                  {#if throughputChartCanvas}
-                    <canvas bind:this={throughputChartCanvas}></canvas>
-                  {:else}
-                    <p class="no-data">No network data available</p>
-                  {/if}
+                  <canvas bind:this={throughputChartCanvas}></canvas>
                 </div>
               </div>
             {/if}
