@@ -484,8 +484,18 @@ scan_network() {
                 local ping_device=$(create_ping_only_device "$ping_ip")
                 
                 if command -v jq &> /dev/null; then
-                    # Merge ping device into array
-                    devices_array=$(echo "$devices_array" | jq ". + [$ping_device]" 2>/dev/null || echo "$devices_array")
+                    # Validate ping_device JSON first
+                    if echo "$ping_device" | jq empty 2>/dev/null; then
+                        # Merge ping device into array
+                        local merged=$(echo "$devices_array" | jq ". + [$ping_device]" 2>&1)
+                        if [ $? -eq 0 ] && echo "$merged" | jq empty 2>/dev/null; then
+                            devices_array="$merged"
+                        else
+                            log "WARNING: Failed to merge ping device $ping_ip into array: $merged"
+                        fi
+                    else
+                        log "WARNING: Invalid JSON for ping device $ping_ip: $ping_device"
+                    fi
                 else
                     # Manual merge
                     devices_array=$(echo "$devices_array" | sed 's/\]$//')
@@ -507,16 +517,21 @@ scan_network() {
     local total_count=$((snmp_count + ping_only_count))
     log "Discovery complete: $total_count total devices (${snmp_count} SNMP-enabled, ${ping_only_count} ping-only) in ${elapsed} seconds"
     
-    # Final validation
+    # Final validation and logging
     if command -v jq &> /dev/null; then
         if ! echo "$devices_array" | jq empty 2>/dev/null; then
             log "ERROR: Generated invalid JSON array, returning empty array"
+            log "DEBUG: Invalid array was: ${devices_array:0:500}"
             devices_array="[]"
         else
             total_count=$(echo "$devices_array" | jq -r 'length // 0' 2>/dev/null || echo "0")
+            if [ "$total_count" != "$((snmp_count + ping_only_count))" ]; then
+                log "WARNING: Device count mismatch - expected $((snmp_count + ping_only_count)), got $total_count"
+            fi
         fi
     fi
     
+    log "Returning $total_count device(s) from discovery (SNMP: $snmp_count, Ping-only: $ping_only_count)"
     echo "$devices_array"
 }
 
