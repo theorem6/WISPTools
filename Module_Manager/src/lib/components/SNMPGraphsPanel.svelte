@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { Chart, registerables } from 'chart.js';
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
@@ -29,6 +29,20 @@
   let throughputChart: Chart | null = null;
   
   let refreshInterval: any = null;
+  let chartsInitialized = false;
+  
+  // Reactive: Re-initialize charts when canvas elements become available
+  $: if (selectedDevice && pingMetrics && !chartsInitialized) {
+    // Wait for canvas elements to be mounted
+    setTimeout(async () => {
+      await tick();
+      if (pingUptimeChartCanvas || cpuChartCanvas) {
+        console.log('[SNMP Graphs] Canvas elements detected, re-initializing charts...');
+        initCharts();
+        chartsInitialized = true;
+      }
+    }, 200);
+  }
   
   // Convert timeRange to hours for API
   function getHours(): number {
@@ -202,7 +216,18 @@
       }
       
       console.log(`[SNMP Graphs] Metrics loaded - pingMetrics: ${!!pingMetrics}, snmpMetrics: ${!!snmpMetrics}`);
-      initCharts();
+      
+      // Wait for DOM to update before initializing charts
+      await tick();
+      
+      // Reset initialization flag
+      chartsInitialized = false;
+      
+      // Add small delay to ensure canvas elements are mounted
+      setTimeout(() => {
+        initCharts();
+        chartsInitialized = true;
+      }, 200);
     } catch (err) {
       console.error('[SNMP Graphs] Failed to load device metrics:', err);
     }
@@ -210,6 +235,16 @@
   
   function initCharts() {
     console.log(`[SNMP Graphs] Initializing charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}, hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}`);
+    
+    // Check if canvas elements are available
+    const canvasCheck = {
+      pingUptime: !!pingUptimeChartCanvas,
+      pingResponse: !!pingResponseChartCanvas,
+      cpu: !!cpuChartCanvas,
+      memory: !!memoryChartCanvas,
+      throughput: !!throughputChartCanvas
+    };
+    console.log(`[SNMP Graphs] Canvas elements available:`, canvasCheck);
     
     // Destroy existing charts
     pingUptimeChart?.destroy();
@@ -221,7 +256,11 @@
     // Initialize ping charts
     if (selectedDevice?.hasPing && pingMetrics) {
       console.log(`[SNMP Graphs] Initializing ping charts...`);
-      initPingCharts();
+      try {
+        initPingCharts();
+      } catch (err) {
+        console.error('[SNMP Graphs] Error initializing ping charts:', err);
+      }
     } else {
       console.log(`[SNMP Graphs] Skipping ping charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}`);
     }
@@ -229,14 +268,23 @@
     // Initialize SNMP charts
     if (selectedDevice?.hasSNMP && snmpMetrics) {
       console.log(`[SNMP Graphs] Initializing SNMP charts...`);
-      initSNMPCharts();
+      try {
+        initSNMPCharts();
+      } catch (err) {
+        console.error('[SNMP Graphs] Error initializing SNMP charts:', err);
+      }
     } else {
       console.log(`[SNMP Graphs] Skipping SNMP charts - hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}`);
     }
   }
   
   function initPingCharts() {
-    if (!pingMetrics || !pingMetrics.labels || pingMetrics.labels.length === 0) return;
+    console.log(`[SNMP Graphs] initPingCharts called - pingMetrics:`, !!pingMetrics, 'labels:', pingMetrics?.labels?.length);
+    
+    if (!pingMetrics || !pingMetrics.labels || pingMetrics.labels.length === 0) {
+      console.log(`[SNMP Graphs] initPingCharts aborted - no valid pingMetrics`);
+      return;
+    }
     
     const chartOptions = {
       responsive: true,
@@ -272,7 +320,9 @@
     if (pingUptimeChartCanvas && pingMetrics.datasets && pingMetrics.datasets.length > 1) {
       const statusDataset = pingMetrics.datasets.find((d: any) => d.label.includes('Status'));
       if (statusDataset) {
-        pingUptimeChart = new Chart(pingUptimeChartCanvas, {
+        try {
+          console.log(`[SNMP Graphs] Creating ping uptime chart with ${statusDataset.data.length} data points`);
+          pingUptimeChart = new Chart(pingUptimeChartCanvas, {
           type: 'line',
           data: {
             labels: pingMetrics.labels.map((l: string) => {
@@ -308,14 +358,24 @@
             }
           }
         });
+        console.log(`[SNMP Graphs] Ping uptime chart created successfully`);
+        } catch (err) {
+          console.error('[SNMP Graphs] Error creating ping uptime chart:', err);
+        }
+      } else {
+        console.log(`[SNMP Graphs] Status dataset not found in ping metrics`);
       }
+    } else {
+      console.log(`[SNMP Graphs] Cannot create ping uptime chart - canvas: ${!!pingUptimeChartCanvas}, datasets: ${pingMetrics.datasets?.length || 0}`);
     }
     
     // Ping Response Time Chart
     if (pingResponseChartCanvas && pingMetrics.datasets) {
       const responseTimeDataset = pingMetrics.datasets.find((d: any) => d.label.includes('Response Time'));
       if (responseTimeDataset && responseTimeDataset.data.some((v: any) => v !== null)) {
-        pingResponseChart = new Chart(pingResponseChartCanvas, {
+        try {
+          console.log(`[SNMP Graphs] Creating ping response time chart with ${responseTimeDataset.data.length} data points`);
+          pingResponseChart = new Chart(pingResponseChartCanvas, {
           type: 'line',
           data: {
             labels: pingMetrics.labels.map((l: string) => {
