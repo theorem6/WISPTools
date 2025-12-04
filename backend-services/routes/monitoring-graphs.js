@@ -49,10 +49,16 @@ router.get('/ping/:deviceId', async (req, res) => {
 
     console.log(`[Monitoring Graphs] Found ${metrics.length} ping metrics for device ${deviceId}`);
 
-    // Format for Chart.js
-    const labels = metrics.map(m => new Date(m.timestamp).toISOString());
-    const responseTimes = metrics.map(m => m.response_time_ms || null);
-    const success = metrics.map(m => m.success ? 1 : 0); // 1 for success, 0 for failure
+    // Always return valid structure, even if empty
+    const labels = metrics.length > 0 
+      ? metrics.map(m => new Date(m.timestamp).toISOString())
+      : [];
+    const responseTimes = metrics.length > 0
+      ? metrics.map(m => m.response_time_ms || null)
+      : [];
+    const success = metrics.length > 0
+      ? metrics.map(m => m.success ? 1 : 0) // 1 for success, 0 for failure
+      : [];
 
     const response = {
       success: true,
@@ -71,8 +77,12 @@ router.get('/ping/:deviceId', async (req, res) => {
           {
             label: 'Status (1=Online, 0=Offline)',
             data: success,
-            borderColor: success.map(s => s === 1 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)'),
-            backgroundColor: success.map(s => s === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'),
+            borderColor: success.length > 0 
+              ? success.map(s => s === 1 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)')
+              : [],
+            backgroundColor: success.length > 0
+              ? success.map(s => s === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)')
+              : [],
             yAxisID: 'y1'
           }
         ]
@@ -90,7 +100,14 @@ router.get('/ping/:deviceId', async (req, res) => {
       }
     };
 
-    console.log(`[Monitoring Graphs] Returning ping data: ${response.data.labels.length} labels, ${response.data.datasets.length} datasets`);
+    console.log(`[Monitoring Graphs] Returning ping data: ${response.data.labels.length} labels, ${response.data.datasets.length} datasets, stats: ${JSON.stringify(response.stats)}`);
+    
+    // Log sample of device_ids if no metrics found to help debug
+    if (metrics.length === 0) {
+      const sampleDevices = await PingMetrics.distinct('device_id', { tenant_id: req.tenantId }).limit(5);
+      console.log(`[Monitoring Graphs] No metrics found for device ${deviceId}. Sample device_ids in database: ${sampleDevices.join(', ')}`);
+    }
+    
     res.json(response);
   } catch (error) {
     console.error('[Monitoring Graphs] Error getting ping metrics:', error);
