@@ -82,17 +82,22 @@
         isLoading = false;
         error = '';
         
-        console.log(`[SNMP Graphs] Loaded ${devices.length} devices for graphing`);
+        console.log(`[SNMP Graphs] Loaded ${devices.length} devices for graphing`, devices);
         
         // Auto-select first device if none selected
         if (!selectedDevice && devices.length > 0) {
+          console.log(`[SNMP Graphs] Auto-selecting first device:`, devices[0]);
           selectDevice(devices[0]);
         } else if (selectedDevice) {
           // Refresh selected device if it's still in the list
           const refreshed = devices.find((d: any) => d.id === selectedDevice.id);
           if (refreshed) {
+            console.log(`[SNMP Graphs] Refreshing selected device:`, refreshed);
             selectedDevice = refreshed;
             await loadDeviceMetrics();
+          } else {
+            console.log(`[SNMP Graphs] Selected device not found in list, auto-selecting first`);
+            selectDevice(devices[0]);
           }
         }
       } else {
@@ -115,23 +120,35 @@
   }
   
   async function selectDevice(device: any) {
+    console.log(`[SNMP Graphs] Selecting device:`, device);
     selectedDevice = device;
     await loadDeviceMetrics();
   }
   
   async function loadDeviceMetrics() {
-    if (!selectedDevice || !$currentTenant?.id) return;
+    if (!selectedDevice || !$currentTenant?.id) {
+      console.log(`[SNMP Graphs] Cannot load metrics - selectedDevice:`, selectedDevice, 'tenant:', $currentTenant?.id);
+      return;
+    }
+    
+    console.log(`[SNMP Graphs] Loading metrics for device:`, selectedDevice.id, selectedDevice.name);
     
     try {
       const user = auth().currentUser;
-      if (!user) return;
+      if (!user) {
+        console.log(`[SNMP Graphs] No authenticated user`);
+        return;
+      }
       
       const token = await user.getIdToken();
       const deviceId = selectedDevice.id;
       const hours = getHours();
       
+      console.log(`[SNMP Graphs] Device capabilities - hasPing: ${selectedDevice.hasPing}, hasSNMP: ${selectedDevice.hasSNMP}, ipAddress: ${selectedDevice.ipAddress}`);
+      
       // Load ping metrics if device has ping capability
       if (selectedDevice.hasPing && selectedDevice.ipAddress) {
+        console.log(`[SNMP Graphs] Fetching ping metrics for device ${deviceId}...`);
         try {
           const pingResponse = await fetch(
             `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`, 
@@ -184,13 +201,16 @@
         }
       }
       
+      console.log(`[SNMP Graphs] Metrics loaded - pingMetrics: ${!!pingMetrics}, snmpMetrics: ${!!snmpMetrics}`);
       initCharts();
     } catch (err) {
-      console.error('Failed to load device metrics:', err);
+      console.error('[SNMP Graphs] Failed to load device metrics:', err);
     }
   }
   
   function initCharts() {
+    console.log(`[SNMP Graphs] Initializing charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}, hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}`);
+    
     // Destroy existing charts
     pingUptimeChart?.destroy();
     pingResponseChart?.destroy();
@@ -200,12 +220,18 @@
     
     // Initialize ping charts
     if (selectedDevice?.hasPing && pingMetrics) {
+      console.log(`[SNMP Graphs] Initializing ping charts...`);
       initPingCharts();
+    } else {
+      console.log(`[SNMP Graphs] Skipping ping charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}`);
     }
     
     // Initialize SNMP charts
     if (selectedDevice?.hasSNMP && snmpMetrics) {
+      console.log(`[SNMP Graphs] Initializing SNMP charts...`);
       initSNMPCharts();
+    } else {
+      console.log(`[SNMP Graphs] Skipping SNMP charts - hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}`);
     }
   }
   
