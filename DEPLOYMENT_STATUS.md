@@ -1,38 +1,42 @@
-# Deployment Status Summary
+# Deployment Status - OUI Lookup Fix
 
-## ✅ Completed
-1. **Backend Syntax Fix** - Fixed import paths in `hss-epcs-legacy.js` (committed)
-2. **Firebase Functions** - Deployed apiProxy and isoProxy with Axios
+## ✅ Deployment Verification
 
-## ❌ Current Issue
-**Backend Server Crashed** - `ECONNREFUSED` error
+### Discovery Script
+- **Location**: `/var/www/html/downloads/scripts/epc-snmp-discovery.js`
+- **Size**: 87K
+- **Status**: ✅ Deployed
+- **Contains**: OUI lookup code for MNDP devices
+- **Available for**: EPC agents to download
 
-### Error Details
-- Firebase Functions cannot connect to `136.112.111.167:3001`
-- Backend server (`main-api`) status: **ERROred**
-- Root cause: MODULE_NOT_FOUND error preventing server startup
+### Backend Route
+- **Location**: `/opt/lte-pci-mapper/backend-services/routes/epc-snmp.js`
+- **Status**: ✅ Updated (has MAC address fallback code)
+- **Git Commit**: `e25c634` (latest)
 
-### Fix Applied (in Git)
-- ✅ Fixed import paths in `hss-epcs-legacy.js`
-  - Line 12: `../../models/distributed-epc-schema` (was `../models/`)
-  - Line 679: `../../models/distributed-epc-schema` (was `../models/`)
+### Backend Services
+- **main-api**: Running (MongoDB connected)
+- **epc-api**: Running
+- **Status**: Services restarted with latest code
 
-### Next Step
-Deploy the fix to the GCE server. The deployment script had permission issues, so manual deployment may be needed:
+## What's Deployed
 
-```bash
-# Option 1: Try deployment script again
-.\scripts\deployment\Deploy-GCE-Backend.ps1
+1. ✅ **Discovery Script OUI Lookup**: MNDP devices get manufacturer from MAC addresses
+2. ✅ **Backend Route Fallback**: Direct MAC address OUI lookup as fallback
+3. ✅ **Git Repository**: All changes committed and pushed
 
-# Option 2: Manual deployment
-gcloud compute ssh acs-hss-server --zone=us-central1-a
-cd /opt/lte-pci-mapper
-sudo git pull
-sudo pm2 restart main-api
-```
+## Next Steps
+
+The discovery script is ready for EPC agents to download. To apply to existing EPCs:
+1. Create update command for EPC device code
+2. EPC will download updated script on next check-in
+3. Next SNMP discovery will include manufacturer information
 
 ## Verification
-After deployment, verify:
-1. `pm2 status` shows `main-api` as "online"
-2. `curl http://localhost:3001/health` returns success
-3. Frontend can connect (no more ECONNREFUSED)
+
+- Discovery script: ✅ Has OUI lookup code
+- Backend route: ✅ Has MAC address fallback
+- Backend services: ✅ Running
+- All code: ✅ Committed to Git
+
+**Deployment Status: COMPLETE** ✅
