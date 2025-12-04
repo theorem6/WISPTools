@@ -2324,15 +2324,51 @@ async function main() {
     
     const discoveredDevices = allDiscoveredDevices;
     
-    // Report to server
-    if (discoveredDevices.length > 0 || true) { // Always report, even if empty
-      await reportDiscoveredDevices(discoveredDevices);
-    } else {
-      log(`No devices discovered, skipping report`);
+    // Report to server - ALWAYS report, even if empty or if errors occurred
+    log(`Attempting to report ${discoveredDevices.length} discovered devices to backend...`);
+    
+    let reportSuccess = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!reportSuccess && retryCount < maxRetries) {
+      try {
+        reportSuccess = await reportDiscoveredDevices(discoveredDevices);
+        if (reportSuccess) {
+          log(`Successfully reported ${discoveredDevices.length} discovered devices to backend`);
+        } else {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            log(`Report failed, retrying in 5 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+        }
+      } catch (reportError) {
+        retryCount++;
+        log(`ERROR: Failed to report discovered devices (attempt ${retryCount}/${maxRetries}): ${reportError.message}`);
+        if (retryCount < maxRetries) {
+          log(`Retrying in 5 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } else {
+          log(`ERROR: All ${maxRetries} reporting attempts failed. Devices found but not reported.`);
+        }
+      }
+    }
+    
+    if (!reportSuccess) {
+      log(`CRITICAL: Failed to report ${discoveredDevices.length} discovered devices after ${maxRetries} attempts`);
+      log(`Devices found: ${discoveredDevices.map(d => d.ip_address || d.sysName || 'unknown').join(', ')}`);
     }
   } catch (error) {
     log(`ERROR: Discovery failed: ${error.message}`);
     console.error(error);
+    // Try to report empty array even on failure
+    try {
+      await reportDiscoveredDevices([]);
+      log(`Reported empty discovery result due to error`);
+    } catch (reportError) {
+      log(`ERROR: Failed to report discovery failure: ${reportError.message}`);
+    }
     process.exit(1);
   }
 }

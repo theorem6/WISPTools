@@ -662,15 +662,32 @@ do_checkin() {
         if [ "$should_discover" = true ]; then
             log "Starting SNMP discovery in background..."
             
+            # Ensure device code and tenant ID are available for discovery script
+            local device_code=$(get_device_code)
+            local tenant_id_cache="/tmp/epc-tenant-id"
+            if [ -n "$device_code" ] && [ ! -f "$tenant_id_cache" ]; then
+                # Cache device code in discovery-friendly location
+                mkdir -p /etc/wisptools
+                echo "$device_code" > /etc/wisptools/device_code 2>/dev/null || true
+            fi
+            
             # Try Node.js version first, fallback to bash script
             if command -v node >/dev/null 2>&1 && [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+                log "Launching Node.js SNMP discovery script..."
+                # Run in background but capture PID to check later
                 node /opt/wisptools/epc-snmp-discovery.js >> "$LOG_FILE" 2>&1 &
+                local discovery_pid=$!
+                log "SNMP discovery started (PID: $discovery_pid)"
             elif [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+                log "Launching bash SNMP discovery script..."
                 /opt/wisptools/epc-snmp-discovery.sh >> "$LOG_FILE" 2>&1 &
+                local discovery_pid=$!
+                log "SNMP discovery started (PID: $discovery_pid)"
             else
                 log "WARNING: SNMP discovery script not found"
             fi
             
+            # Set timestamp AFTER launching discovery (not before completion)
             echo "$(date +%s)" > "$last_discovery_file"
         fi
         
