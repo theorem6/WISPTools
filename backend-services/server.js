@@ -135,28 +135,34 @@ app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));
 
-// Initialize SNMP polling service
-try {
-  const snmpPollingService = require('./services/snmp-polling-service');
-  snmpPollingService.start().catch(err => {
-    console.warn('⚠️ SNMP polling service failed to start:', err.message);
-  });
-  console.log('✅ SNMP polling service initialized');
-} catch (error) {
-  console.warn('⚠️ SNMP polling service disabled:', error.message);
-}
+// NOTE: SNMP polling and Ping monitoring are DISABLED on cloud backend
+// These services should ONLY run on remote EPC agents, not on the cloud GCE server.
+// The cloud backend cannot reach devices on private IP addresses and should not perform network discovery.
 
-// Initialize Ping monitoring service
-try {
-  const { getPingMonitoringService } = require('./services/ping-monitoring-service');
-  const pingMonitoringService = getPingMonitoringService();
-  pingMonitoringService.start().catch(err => {
-    console.warn('⚠️ Ping monitoring service failed to start:', err.message);
-  });
-  console.log('✅ Ping monitoring service initialized');
-} catch (error) {
-  console.warn('⚠️ Ping monitoring service disabled:', error.message);
-}
+// Initialize SNMP polling service - DISABLED (should only run on remote EPC agents)
+// try {
+//   const snmpPollingService = require('./services/snmp-polling-service');
+//   snmpPollingService.start().catch(err => {
+//     console.warn('⚠️ SNMP polling service failed to start:', err.message);
+//   });
+//   console.log('✅ SNMP polling service initialized');
+// } catch (error) {
+//   console.warn('⚠️ SNMP polling service disabled:', error.message);
+// }
+console.log('⚠️ SNMP polling service DISABLED - cloud backend should not perform SNMP polling');
+
+// Initialize Ping monitoring service - DISABLED (should only run on remote EPC agents)
+// try {
+//   const { getPingMonitoringService } = require('./services/ping-monitoring-service');
+//   const pingMonitoringService = getPingMonitoringService();
+//   pingMonitoringService.start().catch(err => {
+//     console.warn('⚠️ Ping monitoring service failed to start:', err.message);
+//   });
+//   console.log('✅ Ping monitoring service initialized');
+// } catch (error) {
+//   console.warn('⚠️ Ping monitoring service disabled:', error.message);
+// }
+console.log('⚠️ Ping monitoring service DISABLED - cloud backend should not perform ping sweeps');
 
 // EPC management routes (includes delete endpoint)
 app.use('/api/epc-management', require('./routes/epc-management'));
