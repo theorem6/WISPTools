@@ -37,6 +37,8 @@ router.get('/ping/:deviceId', async (req, res) => {
 
     const startTime = new Date(Date.now() - validHours * 60 * 60 * 1000);
 
+    console.log(`[Monitoring Graphs] Fetching ping metrics for device ${deviceId}, tenant ${req.tenantId}, hours: ${validHours}`);
+
     const metrics = await PingMetrics.find({
       device_id: deviceId,
       tenant_id: req.tenantId,
@@ -45,12 +47,14 @@ router.get('/ping/:deviceId', async (req, res) => {
     .sort({ timestamp: 1 })
     .lean();
 
+    console.log(`[Monitoring Graphs] Found ${metrics.length} ping metrics for device ${deviceId}`);
+
     // Format for Chart.js
     const labels = metrics.map(m => new Date(m.timestamp).toISOString());
     const responseTimes = metrics.map(m => m.response_time_ms || null);
     const success = metrics.map(m => m.success ? 1 : 0); // 1 for success, 0 for failure
 
-    res.json({
+    const response = {
       success: true,
       deviceId,
       hours: validHours,
@@ -84,7 +88,10 @@ router.get('/ping/:deviceId', async (req, res) => {
           ? Math.round(metrics.filter(m => m.response_time_ms).reduce((sum, m) => sum + m.response_time_ms, 0) / metrics.filter(m => m.response_time_ms).length * 100) / 100
           : null
       }
-    });
+    };
+
+    console.log(`[Monitoring Graphs] Returning ping data: ${response.data.labels.length} labels, ${response.data.datasets.length} datasets`);
+    res.json(response);
   } catch (error) {
     console.error('[Monitoring Graphs] Error getting ping metrics:', error);
     res.status(500).json({

@@ -145,8 +145,17 @@
           
           if (pingResponse.ok) {
             const pingData = await pingResponse.json();
+            console.log('[SNMP Graphs] Ping data received:', {
+              hasData: !!pingData.data,
+              labelsCount: pingData.data?.labels?.length || 0,
+              datasetsCount: pingData.data?.datasets?.length || 0,
+              stats: pingData.stats
+            });
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;
+          } else {
+            const errorText = await pingResponse.text();
+            console.error('[SNMP Graphs] Ping metrics request failed:', pingResponse.status, errorText);
           }
         } catch (err) {
           console.error('Failed to load ping metrics:', err);
