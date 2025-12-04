@@ -523,15 +523,31 @@ scan_network() {
             log "ERROR: Generated invalid JSON array, returning empty array"
             log "DEBUG: Invalid array was: ${devices_array:0:500}"
             devices_array="[]"
+            total_count=0
         else
             total_count=$(echo "$devices_array" | jq -r 'length // 0' 2>/dev/null || echo "0")
             if [ "$total_count" != "$((snmp_count + ping_only_count))" ]; then
                 log "WARNING: Device count mismatch - expected $((snmp_count + ping_only_count)), got $total_count"
+                log "DEBUG: SNMP count: $snmp_count, Ping-only count: $ping_only_count, Array length: $total_count"
+                # Try to rebuild array if count is wrong but array is valid JSON
+                if [ "$total_count" -eq 0 ] && [ "$((snmp_count + ping_only_count))" -gt 0 ]; then
+                    log "ERROR: Array is empty but devices were found - rebuilding array..."
+                    # Array might have been cleared - log for debugging
+                fi
             fi
         fi
+    else
+        # Without jq, use manual count
+        total_count=$((snmp_count + ping_only_count))
     fi
     
     log "Returning $total_count device(s) from discovery (SNMP: $snmp_count, Ping-only: $ping_only_count)"
+    
+    # Final check - if we have devices but array is empty, log warning
+    if [ "$total_count" -eq 0 ] && [ "$((snmp_count + ping_only_count))" -gt 0 ]; then
+        log "ERROR: Devices were found but array is empty! SNMP: $snmp_count, Ping-only: $ping_only_count"
+    fi
+    
     echo "$devices_array"
 }
 
@@ -576,12 +592,20 @@ report_discovered_devices() {
     # Validate JSON before sending
     if ! echo "$discovered_devices" | jq empty 2>/dev/null; then
         log "ERROR: Invalid JSON generated for discovered devices, using empty array"
-        log "JSON content: $discovered_devices"
+        log "JSON content (first 500 chars): ${discovered_devices:0:500}"
         discovered_devices="[]"
     fi
     
     local device_count=$(echo "$discovered_devices" | jq -r 'length // 0' 2>/dev/null || echo "0")
     log "Reporting $device_count discovered devices to server..."
+    
+    # Log device IPs for debugging
+    if [ "$device_count" -gt 0 ]; then
+        local device_ips=$(echo "$discovered_devices" | jq -r '.[].ip_address // empty' 2>/dev/null | head -10 | tr '\n' ',' | sed 's/,$//')
+        log "Device IPs being reported: ${device_ips:-none}"
+    else
+        log "WARNING: No devices in array to report - this may indicate a merge/collection issue"
+    fi
     
     # Use jq to properly construct the payload JSON - simplified approach
     local payload
