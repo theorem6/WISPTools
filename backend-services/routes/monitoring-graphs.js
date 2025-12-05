@@ -104,7 +104,8 @@ router.get('/ping/:deviceId', async (req, res) => {
     
     // Log sample of device_ids if no metrics found to help debug
     if (metrics.length === 0) {
-      const sampleDevices = await PingMetrics.distinct('device_id', { tenant_id: req.tenantId }).limit(5);
+      const allDeviceIds = await PingMetrics.distinct('device_id', { tenant_id: req.tenantId });
+      const sampleDevices = allDeviceIds.slice(0, 5);
       console.log(`[Monitoring Graphs] No metrics found for device ${deviceId}. Sample device_ids in database: ${sampleDevices.join(', ')}`);
     }
     
