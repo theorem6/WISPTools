@@ -173,10 +173,28 @@
               hasData: !!pingData.data,
               labelsCount: pingData.data?.labels?.length || 0,
               datasetsCount: pingData.data?.datasets?.length || 0,
-              stats: pingData.stats
+              stats: pingData.stats,
+              fullResponse: pingData
             });
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;
+            
+            // Log detailed info about the data structure
+            console.log('[SNMP Graphs] Ping metrics structure:', {
+              pingData: pingData,
+              pingMetrics: pingMetrics,
+              hasLabels: !!pingMetrics?.labels,
+              labelsType: typeof pingMetrics?.labels,
+              labelsLength: Array.isArray(pingMetrics?.labels) ? pingMetrics.labels.length : 'not array',
+              hasDatasets: !!pingMetrics?.datasets,
+              datasetsLength: Array.isArray(pingMetrics?.datasets) ? pingMetrics.datasets.length : 'not array',
+              sampleLabels: Array.isArray(pingMetrics?.labels) && pingMetrics.labels.length > 0 ? pingMetrics.labels.slice(0, 3) : 'empty or not array',
+              stats: pingStats
+            });
+            
+            if (pingMetrics && (!pingMetrics.labels || pingMetrics.labels.length === 0)) {
+              console.warn('[SNMP Graphs] ⚠️ No ping metrics data found for this device/time range. Stats:', pingStats);
+            }
           } else {
             const errorText = await pingResponse.text();
             console.error('[SNMP Graphs] Ping metrics request failed:', pingResponse.status, errorText);
@@ -201,7 +219,32 @@
           
           if (snmpResponse.ok) {
             const snmpData = await snmpResponse.json();
+            console.log('[SNMP Graphs] SNMP data received:', {
+              hasData: !!snmpData.data,
+              labelsCount: snmpData.data?.labels?.length || 0,
+              datasetsCount: snmpData.data?.datasets?.length || 0,
+              fullResponse: snmpData
+            });
             snmpMetrics = snmpData.data || null;
+            
+            // Log detailed info about the data structure
+            console.log('[SNMP Graphs] SNMP metrics structure:', {
+              snmpData: snmpData,
+              snmpMetrics: snmpMetrics,
+              hasLabels: !!snmpMetrics?.labels,
+              labelsType: typeof snmpMetrics?.labels,
+              labelsLength: Array.isArray(snmpMetrics?.labels) ? snmpMetrics.labels.length : 'not array',
+              hasDatasets: !!snmpMetrics?.datasets,
+              datasetsLength: Array.isArray(snmpMetrics?.datasets) ? snmpMetrics.datasets.length : 'not array',
+              sampleLabels: Array.isArray(snmpMetrics?.labels) && snmpMetrics.labels.length > 0 ? snmpMetrics.labels.slice(0, 3) : 'empty or not array'
+            });
+            
+            if (snmpMetrics && (!snmpMetrics.labels || snmpMetrics.labels.length === 0)) {
+              console.warn('[SNMP Graphs] ⚠️ No SNMP metrics data found for this device/time range');
+            }
+          } else {
+            const errorText = await snmpResponse.text();
+            console.error('[SNMP Graphs] SNMP metrics request failed:', snmpResponse.status, errorText);
           }
         } catch (err) {
           console.error('Failed to load SNMP metrics:', err);
