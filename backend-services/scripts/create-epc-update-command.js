@@ -53,11 +53,12 @@ async function main() {
       process.exit(1);
     }
 
-    // Check if update command already exists
+    // Check if update command already exists (only pending - sent commands won't be returned again)
     const existingUpdate = await EPCCommand.findOne({
       epc_id: EPC_ID,
       action: 'update_scripts',
-      status: { $in: ['pending', 'sent'] }
+      status: 'pending',
+      expires_at: { $gt: new Date() }
     });
 
     if (existingUpdate) {
