@@ -691,6 +691,15 @@ do_checkin() {
             echo "$(date +%s)" > "$last_discovery_file"
         fi
         
+        # Collect and send ping metrics for monitoring devices
+        if command -v node >/dev/null 2>&1 && [ -f /opt/wisptools/epc-ping-monitor.js ]; then
+            log "Collecting ping metrics for monitoring devices..."
+            # Run a single ping cycle in background (non-blocking)
+            node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1 &
+            local ping_pid=$!
+            log "Ping monitoring cycle started (PID: $ping_pid)"
+        fi
+        
         # Execute commands
         if [ "$cmd_count" -gt 0 ]; then
             echo "$response" | jq -c '.commands[]' | while read -r cmd; do
@@ -761,6 +770,14 @@ install_agent() {
     if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
         chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
         echo "Bash SNMP discovery script downloaded (fallback)"
+    fi
+    
+    # Download ping monitoring script
+    echo "Downloading ping monitoring script..."
+    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null || true
+    if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
+        chmod +x /opt/wisptools/epc-ping-monitor.js
+        echo "Ping monitoring script downloaded"
     fi
     
     # Create systemd service
