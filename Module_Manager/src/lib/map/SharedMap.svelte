@@ -94,6 +94,8 @@
             lastResultCount: marketing.lastResultCount ?? null,
             lastBoundingBox: marketing.lastBoundingBox ?? null,
             lastCenter: marketing.lastCenter ?? null,
+            // IMPORTANT: Send ALL addresses from the plan (not limited like the discovery API response)
+            // All addresses are merged and saved to the database, so the plan contains the complete set
             addresses: Array.isArray(marketing.addresses) ? marketing.addresses : []
           }
         : null;

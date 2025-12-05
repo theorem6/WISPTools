@@ -197,6 +197,9 @@ router.put('/:id', async (req, res) => {
           }
         : marketingUpdateRaw;
 
+    // Check if status is changing to 'deployed' - addresses should become permanent
+    const statusChangingToDeployed = req.body.status === 'deployed' && existingPlan.status !== 'deployed';
+    
     // Update only provided fields
     if (req.body.name !== undefined) existingPlan.name = req.body.name;
     if (req.body.description !== undefined) existingPlan.description = req.body.description;
@@ -213,6 +216,35 @@ router.put('/:id', async (req, res) => {
     
     if (req.body.marketing !== undefined) {
       existingPlan.marketing = marketingUpdate;
+    }
+    
+    // When project is deployed, ensure addresses are converted to permanent leads
+    // and clear them from plan (they're now in customer leads as permanent addresses)
+    if (statusChangingToDeployed) {
+      const planMarketingLeadService = require('../../services/planMarketingLeadService');
+      
+      // Ensure all addresses are converted to permanent customer leads
+      try {
+        await planMarketingLeadService.createMarketingLeadsForPlan(
+          existingPlan,
+          req.tenantId,
+          req.user?.email || req.user?.name || 'System'
+        );
+        console.log('Marketing leads synced for plan deployment:', {
+          planId: existingPlan._id?.toString?.() ?? existingPlan.id
+        });
+        
+        // Clear addresses from plan since they're now permanent (in customer leads)
+        if (existingPlan.marketing && existingPlan.marketing.addresses) {
+          const addressCount = existingPlan.marketing.addresses.length;
+          existingPlan.marketing.addresses = [];
+          existingPlan.marketing.totalUniqueAddresses = 0;
+          console.log(`Cleared ${addressCount} addresses from plan - now in permanent address layer`);
+        }
+      } catch (leadError) {
+        console.error('Failed to sync marketing leads during plan deployment:', leadError);
+        // Don't fail the deployment if lead sync fails - addresses may already be synced
+      }
     }
     
     existingPlan.updatedAt = new Date();

@@ -491,7 +491,8 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
       
       let existingAddressesWithRealAddresses = 0;
-      let existingAddressesSkippedAsDuplicates = 0;
+      // All existing addresses are now preserved (no longer skipped)
+      // This ensures multiple discovery attempts add to the map, not replace
       
       // Use a spatial grid to optimize distance checks for large datasets
       // Grid cell size ~50m to match dedupDistanceMeters
@@ -527,24 +528,24 @@ router.post('/:id/marketing/discover', async (req, res) => {
         const workingAddress = { ...existing };
         const addressLine1Str = workingAddress.addressLine1 ? String(workingAddress.addressLine1).trim() : '';
         
-        // Check if addressLine1 is just coordinates (these are duplicates with less precision)
-        // Skip these - they'll be replaced by new addresses with full precision and proper geocoding
+        // Check if addressLine1 is just coordinates
         const isCoordinates = addressLine1Str.length > 0 && 
                              /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addressLine1Str);
         
-        // If existing address only has coordinates, skip it as a duplicate
-        // The new discovery will replace it with properly geocoded addresses
-        if (isCoordinates || !addressLine1Str) {
-          // Mark coordinate as seen to prevent adding it as a duplicate later
-          const coordinateKey = `${latitude.toFixed(7)},${longitude.toFixed(7)}`;
-          if (!coordinateHashes.has(coordinateKey)) {
-            coordinateHashes.add(coordinateKey);
-          }
-          existingAddressesSkippedAsDuplicates++;
-          continue;
-        }
+        // Always preserve existing addresses, even if they only have coordinates
+        // This ensures that multiple address discovery attempts add to the map, not replace
+        // Coordinate-only addresses may be from building footprints and should be preserved
+        // They can be reverse-geocoded later if needed, but should not be lost
         
-        existingAddressesWithRealAddresses++;
+        if (isCoordinates || !addressLine1Str) {
+          // Ensure coordinate-only addresses have a proper coordinate string
+          if (!workingAddress.addressLine1 && latitude !== undefined && longitude !== undefined) {
+            workingAddress.addressLine1 = `${latitude.toFixed(7)}, ${longitude.toFixed(7)}`;
+          }
+          // Count these separately but still include them
+        } else {
+          existingAddressesWithRealAddresses++;
+        }
 
         // Address has a real address (not just coordinates), so include it directly
         // Always include existing addresses with real addresses, regardless of current bounding box
@@ -617,17 +618,20 @@ router.post('/:id/marketing/discover', async (req, res) => {
       console.log(`[MarketingDiscovery] Seeded existing addresses`, {
         totalInput: addressesToSeed.length,
         withRealAddresses: existingAddressesWithRealAddresses,
-        skippedAsCoordinateDuplicates: existingAddressesSkippedAsDuplicates,
+        // All addresses preserved (including coordinate-only)
         addedToCombined: combinedAddresses.length
       });
     };
 
+    // IMPORTANT: Seed ALL existing addresses first - this ensures multiple discovery attempts ADD addresses, not replace them
+    // All existing addresses (including coordinate-only from building footprints) are preserved
     seedExistingAddresses(existingAddresses);
 
     if (previousAddressCount > 0) {
       console.log('[MarketingDiscovery] Seeded existing marketing addresses', {
         previousAddressCount,
-        dedupedSeedCount: combinedAddresses.length
+        dedupedSeedCount: combinedAddresses.length,
+        note: 'Existing addresses preserved - new discoveries will add to these, not replace'
       });
     }
 
@@ -1034,9 +1038,11 @@ router.post('/:id/marketing/discover', async (req, res) => {
       }
     }
 
-    // Don't filter existing addresses - only new addresses were already filtered in addAddressToCombined
+    // IMPORTANT: All existing addresses are preserved and merged with new discoveries
+    // Multiple address discovery attempts ADD to the existing addresses, they do NOT replace them
     // This allows re-discover to merge addresses from multiple areas scanned
-    // New addresses are already checked against bounding box at line 1840 in addAddressToCombined
+    // Existing addresses (including coordinate-only) are preserved regardless of current bounding box
+    // New addresses are added and deduplicated against existing addresses
 
     const totalUniqueAddresses = combinedAddresses.length;
     const totalRuns = priorTotalRuns + 1;

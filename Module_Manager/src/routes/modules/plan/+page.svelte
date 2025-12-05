@@ -1137,11 +1137,14 @@ function handleAddRequirementOverlayKeydown(event: KeyboardEvent) {
         
         // Update the map context to trigger map refresh with new marketing addresses
         // This ensures SharedMap posts the updated plan to the iframe, which will render the new markers
+        // IMPORTANT: Always use the full plan from the database (not the limited API response)
+        // The discovery API response is limited to 2000 addresses, but ALL addresses are saved to the database
         setMapData({ activePlan: updatedPlan });
         
         console.log('[Plan] Map updated with new marketing addresses after rectangle discovery', {
           planId: updatedPlan.id,
-          addressCount: updatedPlan.marketing?.addresses?.length || 0
+          addressCount: updatedPlan.marketing?.addresses?.length || 0,
+          note: 'Full plan loaded from database with all addresses (not just discovery response)'
         });
       }
       

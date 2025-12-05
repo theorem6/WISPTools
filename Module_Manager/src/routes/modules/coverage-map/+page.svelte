@@ -442,12 +442,17 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         visiblePlanIds = Array.from(new Set([...visiblePlanIds, sharedActivePlanId]));
       }
 
+      // Filter plans to only show addresses from active projects (not deployed/cancelled/rejected)
+      // Deployed/cancelled/rejected projects should have addresses in permanent layer (customer leads)
+      const activeProjectStatuses = ['draft', 'active', 'ready', 'approved', 'authorized'];
+      
       if (isPlanMode && planId) {
         const activePlan = plans.find((p: any) => String(p.id || p._id) === planId);
         activePlanName = activePlan?.name || null;
         if (!sharedActivePlanId) {
-          // Only show marketing addresses if the active plan is visible
-          if (activePlan && currentVisiblePlanIds.has(String(planId))) {
+          // Only show marketing addresses if the active plan is visible AND active (not deployed)
+          const isActiveProject = activePlan && activeProjectStatuses.includes(activePlan.status);
+          if (activePlan && isActiveProject && currentVisiblePlanIds.has(String(planId))) {
             const addresses = activePlan?.marketing?.addresses;
             marketingLeads = Array.isArray(addresses) ? addresses : [];
           } else {
@@ -457,17 +462,19 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       } else {
         activePlanName = null;
         if (!sharedActivePlanId) {
-          // Aggregate marketing addresses from all visible plans
+          // Aggregate marketing addresses from all visible active plans only
           const allMarketingAddresses: any[] = [];
           plans.forEach((plan: any) => {
             const planIdStr = String(plan.id || plan._id);
-            if (currentVisiblePlanIds.has(planIdStr) && plan.marketing?.addresses) {
+            const isActiveProject = activeProjectStatuses.includes(plan.status);
+            // Only include addresses from active projects (not deployed/cancelled/rejected)
+            if (currentVisiblePlanIds.has(planIdStr) && isActiveProject && plan.marketing?.addresses) {
               const addresses = Array.isArray(plan.marketing.addresses) ? plan.marketing.addresses : [];
               allMarketingAddresses.push(...addresses);
             }
           });
           marketingLeads = allMarketingAddresses;
-          console.log(`[CoverageMap] Loaded ${marketingLeads.length} marketing addresses from ${currentVisiblePlanIds.size} visible plans`);
+          console.log(`[CoverageMap] Loaded ${marketingLeads.length} marketing addresses from ${currentVisiblePlanIds.size} visible active plans`);
         }
       }
 
@@ -670,9 +677,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       marketingLeads = (isPlanVisible && Array.isArray(inboundMarketing)) ? [...inboundMarketing] : [];
       console.log('[CoverageMap] Marketing leads updated from state', {
         count: marketingLeads.length,
+        inboundMarketingCount: inboundMarketing.length,
         hasActivePlan: !!state.activePlan,
         activePlanId: activePlanIdFromState,
-        isPlanVisible
+        isPlanVisible,
+        note: 'All addresses from plan should be displayed (not limited to discovery response)'
       });
     } else if (source === 'shared-map' && type === 'center-map') {
       // Handle center-map message from parent
