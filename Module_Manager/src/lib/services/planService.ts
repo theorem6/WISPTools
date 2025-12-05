@@ -908,10 +908,23 @@ class PlanService {
       return addr;
     });
     
-    // Filter out addresses without address information (no addressLine1)
-    // BUT keep addresses with coordinates (even if no real address)
+    // Keep addresses with coordinates OR addressLine1
+    // Addresses with only coordinates (from building footprints) should still be displayed
     const addressesWithInfo = addressesWithExtractedCoords.filter((addr) => {
-      return addr && addr.addressLine1 && addr.addressLine1.trim().length > 0;
+      if (!addr) return false;
+      
+      // Keep if has valid coordinates (latitude and longitude)
+      const hasCoordinates = addr.latitude !== undefined && addr.longitude !== undefined &&
+                             typeof addr.latitude === 'number' && typeof addr.longitude === 'number' &&
+                             Number.isFinite(addr.latitude) && Number.isFinite(addr.longitude) &&
+                             addr.latitude >= -90 && addr.latitude <= 90 &&
+                             addr.longitude >= -180 && addr.longitude <= 180;
+      
+      // Keep if has addressLine1 (even if it's just coordinates as a string)
+      const hasAddressLine1 = addr.addressLine1 && addr.addressLine1.trim().length > 0;
+      
+      // Keep addresses that have either coordinates OR addressLine1
+      return hasCoordinates || hasAddressLine1;
     });
 
     // Deduplicate addresses based on addressLine1 + city + state + postalCode
