@@ -408,7 +408,7 @@ export class CoverageMapController {
           viewInteractive: this.mapView.interactive,
           drawingLayerVisible: this.drawingGraphicsLayer.visible
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('[CoverageMap] Failed to start rectangle creation:', error);
         console.error('[CoverageMap] Error details:', {
           errorMessage: error?.message,
@@ -928,23 +928,21 @@ export class CoverageMapController {
     const shouldHideLayerList = isPlanMode || isDeployMode;
 
     try {
-      const imports = [
-        import('@arcgis/core/widgets/Zoom.js'),
-        import('@arcgis/core/widgets/Compass.js')
-      ];
-      
-      // Only import LayerList if not in plan mode or deploy mode
-      if (!shouldHideLayerList) {
-        imports.push(import('@arcgis/core/widgets/LayerList.js'));
-      }
-      
+      // Import widgets conditionally to avoid type issues
       const [
         { default: Zoom },
-        { default: Compass },
-        ...rest
-      ] = await Promise.all(imports);
+        { default: Compass }
+      ] = await Promise.all([
+        import('@arcgis/core/widgets/Zoom.js'),
+        import('@arcgis/core/widgets/Compass.js')
+      ]);
       
-      const LayerList = !shouldHideLayerList ? rest[0]?.default : null;
+      // Only import LayerList if not in plan mode or deploy mode
+      let LayerList: any = null;
+      if (!shouldHideLayerList) {
+        const layerListModule = await import('@arcgis/core/widgets/LayerList.js');
+        LayerList = layerListModule.default;
+      }
 
       const zoom = new Zoom({
         view: this.mapView,
@@ -960,7 +958,7 @@ export class CoverageMapController {
       if (!shouldHideLayerList && LayerList) {
         const layerList = new LayerList({
           view: this.mapView,
-          listItemCreatedFunction: (event) => {
+          listItemCreatedFunction: (event: any) => {
             const item = event.item;
             // Customize layer list items if needed
             if (item.layer === this.drawingGraphicsLayer) {
@@ -1420,23 +1418,52 @@ export class CoverageMapController {
   /**
    * Setup modifier key requirement for mouse wheel zoom
    * Prevents accidental zooming on Mac trackpads while allowing intentional zoom with Ctrl/Cmd
+   * Mac-specific: Detects trackpad vs mouse and handles accordingly
    */
   private setupModifierKeyZoom(): void {
     if (!this.mapView || !this.mapView.container) return;
     
     const container = this.mapView.container;
+    let isMacTrackpad = false;
     
-    // Intercept wheel events and require modifier key (Ctrl on Windows/Linux, Cmd on Mac)
-    container.addEventListener('wheel', (event: WheelEvent) => {
-      // Check if modifier key is pressed (Ctrl on Windows/Linux, Cmd on Mac)
-      const hasModifier = event.ctrlKey || event.metaKey;
+    // Detect Mac trackpad (pinch gestures typically have ctrlKey set, but we want to allow panning)
+    const detectMacTrackpad = (event: WheelEvent) => {
+      // Mac trackpad characteristics:
+      // - deltaY is typically small and smooth
+      // - ctrlKey is often set for pinch-to-zoom gestures
+      // - deltaMode is usually DOM_DELTA_PIXEL (0)
+      const isSmoothScroll = Math.abs(event.deltaY) < 10 && event.deltaMode === 0;
+      const isPinchGesture = event.ctrlKey && Math.abs(event.deltaY) > 0;
       
-      if (!hasModifier) {
-        // Prevent zoom if no modifier key is pressed
+      // On Mac, allow pinch-to-zoom (ctrlKey + wheel) but prevent accidental scroll-zoom
+      if (event.metaKey || (event.ctrlKey && isPinchGesture)) {
+        // Intentional zoom gesture - allow it
+        return false;
+      }
+      
+      // For Mac trackpads, allow panning (scroll without modifier) but prevent zoom
+      // For Windows/Linux mice, require Ctrl for zoom
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                    navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      
+      if (isMac && isSmoothScroll && !event.ctrlKey && !event.metaKey) {
+        // Mac trackpad panning - allow default behavior (panning)
+        return false;
+      }
+      
+      // Prevent zoom if no modifier key is pressed
+      if (!event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         event.stopPropagation();
+        return true;
       }
-      // If modifier key is pressed, allow the default zoom behavior
+      
+      return false;
+    };
+    
+    // Intercept wheel events
+    container.addEventListener('wheel', (event: WheelEvent) => {
+      detectMacTrackpad(event);
     }, { passive: false });
   }
 

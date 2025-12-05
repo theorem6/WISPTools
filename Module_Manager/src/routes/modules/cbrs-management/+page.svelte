@@ -187,10 +187,30 @@ let configStatus: ConfigStatus = getConfigStatus(null);
       map._graphicsLayer = graphicsLayer;
 
       // Require modifier key (Ctrl/Cmd) for mouse wheel zoom to prevent accidental zooming
+      // Mac-specific: Handle trackpad vs mouse differently
       await view.when();
       if (view.container) {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                      navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+        
         view.container.addEventListener('wheel', (event: WheelEvent) => {
           const hasModifier = event.ctrlKey || event.metaKey;
+          const isSmoothScroll = Math.abs(event.deltaY) < 10 && event.deltaMode === 0;
+          const isPinchGesture = event.ctrlKey && Math.abs(event.deltaY) > 0;
+          
+          // On Mac: allow pinch-to-zoom and trackpad panning
+          if (isMac) {
+            if (hasModifier || isPinchGesture) {
+              // Intentional zoom gesture - allow it
+              return;
+            }
+            if (isSmoothScroll && !hasModifier) {
+              // Mac trackpad panning - allow default behavior
+              return;
+            }
+          }
+          
+          // Prevent zoom if no modifier key is pressed
           if (!hasModifier) {
             event.preventDefault();
             event.stopPropagation();

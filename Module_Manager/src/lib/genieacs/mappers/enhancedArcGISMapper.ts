@@ -173,17 +173,33 @@ export class EnhancedPCIArcGISMapper {
     
     const container = this.mapView.container;
     
-    // Intercept wheel events and require modifier key (Ctrl on Windows/Linux, Cmd on Mac)
+    // Detect Mac platform
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0 || 
+                  navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    
+    // Intercept wheel events
     container.addEventListener('wheel', (event: WheelEvent) => {
-      // Check if modifier key is pressed (Ctrl on Windows/Linux, Cmd on Mac)
       const hasModifier = event.ctrlKey || event.metaKey;
+      const isSmoothScroll = Math.abs(event.deltaY) < 10 && event.deltaMode === 0;
+      const isPinchGesture = event.ctrlKey && Math.abs(event.deltaY) > 0;
       
+      // On Mac: allow pinch-to-zoom and trackpad panning
+      if (isMac) {
+        if (hasModifier || isPinchGesture) {
+          // Intentional zoom gesture - allow it
+          return;
+        }
+        if (isSmoothScroll && !hasModifier) {
+          // Mac trackpad panning - allow default behavior
+          return;
+        }
+      }
+      
+      // Prevent zoom if no modifier key is pressed
       if (!hasModifier) {
-        // Prevent zoom if no modifier key is pressed
         event.preventDefault();
         event.stopPropagation();
       }
-      // If modifier key is pressed, allow the default zoom behavior
     }, { passive: false });
   }
 
