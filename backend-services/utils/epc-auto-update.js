@@ -33,7 +33,8 @@ async function checkForUpdates(epc_id, currentVersions = {}) {
   const scripts = [
     'epc-checkin-agent.sh',
     'epc-snmp-discovery.sh',
-    'epc-snmp-discovery.js'  // Node.js version
+    'epc-snmp-discovery.js',  // Node.js version
+    'epc-ping-monitor.js'     // Ping monitoring script
   ];
   
   const updates = {};

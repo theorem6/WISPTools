@@ -692,12 +692,24 @@ do_checkin() {
         fi
         
         # Collect and send ping metrics for monitoring devices
-        if command -v node >/dev/null 2>&1 && [ -f /opt/wisptools/epc-ping-monitor.js ]; then
-            log "Collecting ping metrics for monitoring devices..."
-            # Run a single ping cycle in background (non-blocking)
-            node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1 &
-            local ping_pid=$!
-            log "Ping monitoring cycle started (PID: $ping_pid)"
+        if command -v node >/dev/null 2>&1; then
+            # Download ping monitor script if missing
+            if [ ! -f /opt/wisptools/epc-ping-monitor.js ]; then
+                log "Ping monitor script not found, downloading..."
+                curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
+                chmod +x /opt/wisptools/epc-ping-monitor.js && \
+                log "Ping monitor script downloaded successfully" || \
+                log "WARNING: Failed to download ping monitor script"
+            fi
+            
+            # Run ping cycle if script exists
+            if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
+                log "Collecting ping metrics for monitoring devices..."
+                # Run a single ping cycle in background (non-blocking)
+                node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1 &
+                local ping_pid=$!
+                log "Ping monitoring cycle started (PID: $ping_pid)"
+            fi
         fi
         
         # Execute commands
