@@ -8,9 +8,10 @@ const express = require('express');
 const router = express.Router();
 const checkinService = require('../services/epc-checkin-service');
 const { PingMetrics } = require('../models/ping-metrics-schema');
-const { RemoteEPC } = require('../models/distributed-epc-schema');
+const { RemoteEPC, EPCCommand } = require('../models/distributed-epc-schema');
 const { NetworkEquipment } = require('../models/network');
 const { InventoryItem } = require('../models/inventory');
+const { checkForUpdates, generateUpdateCommand } = require('../utils/epc-auto-update');
 
 /**
  * POST /api/epc/checkin
@@ -79,9 +80,50 @@ router.post('/checkin', async (req, res) => {
     await checkinService.saveServiceStatus(epc, services, system, network, versions);
     await checkinService.checkServiceHealth(epc, services);
 
-    // Check for agent script updates (TEMPORARILY DISABLED - commands have wrong hashes)
-    // TODO: Re-enable once manifest hashes are verified and commands use correct hashes
-    console.log(`[EPC Check-in] UPDATE CHECK: Temporarily disabled - automatic update generation skipped`);
+    // Check for agent script updates automatically
+    try {
+      const scriptVersions = versions?.scripts || {};
+      console.log(`[EPC Check-in] Checking for script updates for ${epc.epc_id}...`);
+      
+      const updateInfo = await checkForUpdates(epc.epc_id, scriptVersions);
+      
+      if (updateInfo.has_updates) {
+        console.log(`[EPC Check-in] Updates available: ${Object.keys(updateInfo.scripts).join(', ')}`);
+        
+        // Check if update command already exists
+        const existingUpdate = await EPCCommand.findOne({
+          epc_id: epc.epc_id,
+          action: 'update_scripts',
+          status: { $in: ['pending', 'sent'] }
+        });
+        
+        if (!existingUpdate) {
+          // Generate and queue update command
+          const updateCommand = generateUpdateCommand(updateInfo);
+          
+          if (updateCommand) {
+            const cmd = new EPCCommand({
+              ...updateCommand,
+              epc_id: epc.epc_id,
+              tenant_id: epc.tenant_id,
+              status: 'pending',
+              created_at: new Date(),
+              description: `Automatic script update: ${Object.keys(updateInfo.scripts).join(', ')}`
+            });
+            
+            await cmd.save();
+            console.log(`[EPC Check-in] ✅ Auto-update command queued for ${epc.epc_id}: ${Object.keys(updateInfo.scripts).join(', ')}`);
+          }
+        } else {
+          console.log(`[EPC Check-in] Update command already exists for ${epc.epc_id}, skipping`);
+        }
+      } else {
+        console.log(`[EPC Check-in] All scripts are up to date for ${epc.epc_id}`);
+      }
+    } catch (updateError) {
+      console.error(`[EPC Check-in] Error checking for updates:`, updateError.message);
+      // Continue with check-in even if update check fails
+    }
 
     // Fetch pending commands
     const commands = await checkinService.getPendingCommands(epc.epc_id);
