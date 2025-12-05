@@ -90,11 +90,12 @@ router.post('/checkin', async (req, res) => {
       if (updateInfo.has_updates) {
         console.log(`[EPC Check-in] Updates available: ${Object.keys(updateInfo.scripts).join(', ')}`);
         
-        // Check if update command already exists
+        // Check if update command already exists (only pending - sent commands won't be returned again)
         const existingUpdate = await EPCCommand.findOne({
           epc_id: epc.epc_id,
           action: 'update_scripts',
-          status: { $in: ['pending', 'sent'] }
+          status: 'pending',
+          expires_at: { $gt: new Date() }
         });
         
         if (!existingUpdate) {
@@ -115,7 +116,7 @@ router.post('/checkin', async (req, res) => {
             console.log(`[EPC Check-in] ✅ Auto-update command queued for ${epc.epc_id}: ${Object.keys(updateInfo.scripts).join(', ')}`);
           }
         } else {
-          console.log(`[EPC Check-in] Update command already exists for ${epc.epc_id}, skipping`);
+          console.log(`[EPC Check-in] Update command already pending for ${epc.epc_id}, skipping`);
         }
       } else {
         console.log(`[EPC Check-in] All scripts are up to date for ${epc.epc_id}`);
