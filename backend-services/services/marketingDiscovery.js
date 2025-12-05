@@ -889,6 +889,244 @@ function normalizeArcgisAddressKey(address = {}) {
   return buildAddressHash(address);
 }
 
+// ArcGIS Address Points discovery by bounding box
+async function discoverAddressPointsByBoundingBox({ boundingBox, center, radiusMiles }) {
+  const result = {
+    addresses: [],
+    error: null
+  };
+
+  try {
+    const runtimeApiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+    
+    if (!runtimeApiKey) {
+      result.error = 'ArcGIS API key not configured';
+      return result;
+    }
+
+    if (!boundingBox || !boundingBox.west || !boundingBox.south || !boundingBox.east || !boundingBox.north) {
+      result.error = 'Invalid bounding box';
+      return result;
+    }
+
+    // Use ArcGIS Geocoding Service to find address candidates within bounding box
+    // We'll query with a search that should return addresses in the area
+    const searchExtent = `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`;
+    
+    // Query for address points - use findAddressCandidates with bounding box
+    const params = {
+      f: 'json',
+      searchExtent: searchExtent,
+      outFields: 'Match_addr,Addr_type,City,Region,Postal,Country',
+      maxLocations: 2000, // Max allowed by ArcGIS
+      outSR: 4326,
+      forStorage: false,
+      token: runtimeApiKey
+    };
+
+    // Try multiple queries to get residential addresses
+    // Use a generic search that should return addresses in the area
+    const queries = [];
+    
+    // Query 1: Search for addresses in the center of the bounding box
+    const centerLat = center?.lat || (boundingBox.north + boundingBox.south) / 2;
+    const centerLon = center?.lon || (boundingBox.east + boundingBox.west) / 2;
+    
+    queries.push({
+      singleLine: `${centerLat},${centerLon}`,
+      searchExtent: searchExtent,
+      category: 'Address',
+      maxLocations: 2000,
+      token: runtimeApiKey
+    });
+
+    const addresses = [];
+    const seenAddresses = new Set();
+
+    for (const queryParams of queries) {
+      try {
+        const response = await httpClient.get(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+          params: {
+            f: 'json',
+            ...queryParams,
+            outFields: 'Match_addr,Addr_type,City,Region,Postal,Country,StAddr',
+            outSR: 4326,
+            forStorage: false
+          },
+          timeout: 15000
+        });
+
+        const data = response.data;
+        
+        if (data.error) {
+          console.warn('[MarketingDiscovery] ArcGIS address points query error:', data.error);
+          continue;
+        }
+
+        if (data.candidates && Array.isArray(data.candidates)) {
+          for (const candidate of data.candidates) {
+            if (!candidate.location) continue;
+            
+            const lat = candidate.location.y;
+            const lon = candidate.location.x;
+            
+            // Check if within bounding box
+            if (lat < boundingBox.south || lat > boundingBox.north ||
+                lon < boundingBox.west || lon > boundingBox.east) {
+              continue;
+            }
+
+            // Filter to residential addresses only (exclude POI)
+            const addrType = candidate.attributes?.Addr_type || '';
+            if (addrType && !['PointAddress', 'StreetAddress', 'Subaddress'].includes(addrType)) {
+              continue;
+            }
+
+            const addressKey = `${lat.toFixed(7)},${lon.toFixed(7)}`;
+            if (seenAddresses.has(addressKey)) {
+              continue;
+            }
+            seenAddresses.add(addressKey);
+
+            const addressLine1 = candidate.attributes?.StAddr || candidate.attributes?.Match_addr || '';
+            
+            addresses.push({
+              addressLine1: addressLine1,
+              city: candidate.attributes?.City || undefined,
+              state: candidate.attributes?.Region || undefined,
+              postalCode: candidate.attributes?.Postal || undefined,
+              country: candidate.attributes?.Country || 'US',
+              latitude: lat,
+              longitude: lon,
+              source: 'arcgis_address_points'
+            });
+          }
+        }
+      } catch (queryError) {
+        console.warn('[MarketingDiscovery] ArcGIS address points query failed:', queryError.message);
+        // Continue with other queries
+      }
+    }
+
+    result.addresses = addresses;
+    console.log(`[MarketingDiscovery] ArcGIS address points discovery found ${addresses.length} addresses`);
+    
+    return result;
+  } catch (error) {
+    result.error = error?.message || 'Unknown error in ArcGIS address points discovery';
+    console.error('[MarketingDiscovery] ArcGIS address points discovery error:', error);
+    return result;
+  }
+}
+
+// ArcGIS Places discovery by bounding box
+async function discoverPlacesByBoundingBox({ boundingBox, center, radiusMiles }) {
+  const result = {
+    addresses: [],
+    error: null
+  };
+
+  try {
+    const runtimeApiKey = appConfig?.externalServices?.arcgis?.apiKey || process.env.ARCGIS_API_KEY || ARC_GIS_API_KEY || '';
+    
+    if (!runtimeApiKey) {
+      result.error = 'ArcGIS API key not configured';
+      return result;
+    }
+
+    if (!boundingBox || !boundingBox.west || !boundingBox.south || !boundingBox.east || !boundingBox.north) {
+      result.error = 'Invalid bounding box';
+      return result;
+    }
+
+    const searchExtent = `${boundingBox.west},${boundingBox.south},${boundingBox.east},${boundingBox.north}`;
+    
+    // Query for POI/Places
+    const params = {
+      f: 'json',
+      searchExtent: searchExtent,
+      category: 'POI',
+      maxLocations: 2000,
+      outSR: 4326,
+      forStorage: false,
+      token: runtimeApiKey
+    };
+
+    const addresses = [];
+    const seenAddresses = new Set();
+
+    try {
+      const response = await httpClient.get(`${ARCGIS_GEOCODER_URL}/findAddressCandidates`, {
+        params: {
+          f: 'json',
+          category: 'POI',
+          searchExtent: searchExtent,
+          maxLocations: 2000,
+          outFields: 'Match_addr,Place_addr,PlaceName,City,Region,Postal,Country',
+          outSR: 4326,
+          forStorage: false,
+          token: runtimeApiKey
+        },
+        timeout: 15000
+      });
+
+      const data = response.data;
+      
+      if (data.error) {
+        result.error = data.error.message || 'ArcGIS places query error';
+        return result;
+      }
+
+      if (data.candidates && Array.isArray(data.candidates)) {
+        for (const candidate of data.candidates) {
+          if (!candidate.location) continue;
+          
+          const lat = candidate.location.y;
+          const lon = candidate.location.x;
+          
+          // Check if within bounding box
+          if (lat < boundingBox.south || lat > boundingBox.north ||
+              lon < boundingBox.west || lon > boundingBox.east) {
+            continue;
+          }
+
+          const addressKey = `${lat.toFixed(7)},${lon.toFixed(7)}`;
+          if (seenAddresses.has(addressKey)) {
+            continue;
+          }
+          seenAddresses.add(addressKey);
+
+          const addressLine1 = candidate.attributes?.Place_addr || candidate.attributes?.Match_addr || candidate.attributes?.PlaceName || '';
+          
+          addresses.push({
+            addressLine1: addressLine1,
+            city: candidate.attributes?.City || undefined,
+            state: candidate.attributes?.Region || undefined,
+            postalCode: candidate.attributes?.Postal || undefined,
+            country: candidate.attributes?.Country || 'US',
+            latitude: lat,
+            longitude: lon,
+            source: 'arcgis_places'
+          });
+        }
+      }
+    } catch (queryError) {
+      result.error = queryError?.message || 'ArcGIS places query failed';
+      console.error('[MarketingDiscovery] ArcGIS places discovery error:', queryError);
+      return result;
+    }
+
+    result.addresses = addresses;
+    console.log(`[MarketingDiscovery] ArcGIS places discovery found ${addresses.length} places`);
+    
+    return result;
+  } catch (error) {
+    result.error = error?.message || 'Unknown error in ArcGIS places discovery';
+    console.error('[MarketingDiscovery] ArcGIS places discovery error:', error);
+    return result;
+  }
+}
+
 module.exports = {
   // Query execution
   executeOverpassQuery,
@@ -908,6 +1146,8 @@ module.exports = {
   
   // Algorithm implementations
   discoverMicrosoftFootprints,
+  discoverAddressPointsByBoundingBox,
+  discoverPlacesByBoundingBox,
   
   // Address utilities
   buildAddressHash,
