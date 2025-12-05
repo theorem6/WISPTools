@@ -1,11 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
-  import { Chart, registerables } from 'chart.js';
+  import { Chart } from '$lib/chartSetup'; // Use centralized Chart.js setup
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { API_CONFIG } from '$lib/config/api';
-  
-  Chart.register(...registerables);
   
   let isLoading = true;
   let error = '';
@@ -29,19 +27,14 @@
   let throughputChart: Chart | null = null;
   
   let refreshInterval: any = null;
-  let chartsInitialized = false;
   
-  // Reactive: Re-initialize charts when canvas elements become available
-  $: if (selectedDevice && pingMetrics && !chartsInitialized) {
-    // Wait for canvas elements to be mounted
+  // Reactive: Re-initialize charts when device or metrics change
+  $: if (selectedDevice && (pingMetrics || snmpMetrics)) {
+    // Wait for DOM to update and canvas elements to be mounted
     setTimeout(async () => {
       await tick();
-      if (pingUptimeChartCanvas || cpuChartCanvas) {
-        console.log('[SNMP Graphs] Canvas elements detected, re-initializing charts...');
-        initCharts();
-        chartsInitialized = true;
-      }
-    }, 200);
+      initCharts();
+    }, 300);
   }
   
   // Convert timeRange to hours for API
@@ -220,61 +213,84 @@
       // Wait for DOM to update before initializing charts
       await tick();
       
-      // Reset initialization flag
-      chartsInitialized = false;
-      
-      // Add small delay to ensure canvas elements are mounted
+      // Add delay to ensure canvas elements are mounted and have dimensions
       setTimeout(() => {
         initCharts();
-        chartsInitialized = true;
-      }, 200);
+      }, 300);
     } catch (err) {
       console.error('[SNMP Graphs] Failed to load device metrics:', err);
     }
   }
   
   function initCharts() {
+    if (!selectedDevice) {
+      console.log('[SNMP Graphs] No device selected, skipping chart initialization');
+      return;
+    }
+
     console.log(`[SNMP Graphs] Initializing charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}, hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}`);
     
-    // Check if canvas elements are available
+    // Check if canvas elements are available and have dimensions
     const canvasCheck = {
-      pingUptime: !!pingUptimeChartCanvas,
-      pingResponse: !!pingResponseChartCanvas,
-      cpu: !!cpuChartCanvas,
-      memory: !!memoryChartCanvas,
-      throughput: !!throughputChartCanvas
+      pingUptime: !!pingUptimeChartCanvas && pingUptimeChartCanvas.offsetWidth > 0,
+      pingResponse: !!pingResponseChartCanvas && pingResponseChartCanvas.offsetWidth > 0,
+      cpu: !!cpuChartCanvas && cpuChartCanvas.offsetWidth > 0,
+      memory: !!memoryChartCanvas && memoryChartCanvas.offsetWidth > 0,
+      throughput: !!throughputChartCanvas && throughputChartCanvas.offsetWidth > 0
     };
-    console.log(`[SNMP Graphs] Canvas elements available:`, canvasCheck);
+    console.log(`[SNMP Graphs] Canvas elements available with dimensions:`, canvasCheck);
+    
+    // If no canvas elements are ready, retry after a delay
+    if (!canvasCheck.pingUptime && !canvasCheck.cpu && !canvasCheck.pingResponse && !canvasCheck.memory && !canvasCheck.throughput) {
+      console.log('[SNMP Graphs] Canvas elements not ready, retrying in 200ms...');
+      setTimeout(() => initCharts(), 200);
+      return;
+    }
     
     // Destroy existing charts
-    pingUptimeChart?.destroy();
-    pingResponseChart?.destroy();
-    cpuChart?.destroy();
-    memoryChart?.destroy();
-    throughputChart?.destroy();
+    if (pingUptimeChart) {
+      pingUptimeChart.destroy();
+      pingUptimeChart = null;
+    }
+    if (pingResponseChart) {
+      pingResponseChart.destroy();
+      pingResponseChart = null;
+    }
+    if (cpuChart) {
+      cpuChart.destroy();
+      cpuChart = null;
+    }
+    if (memoryChart) {
+      memoryChart.destroy();
+      memoryChart = null;
+    }
+    if (throughputChart) {
+      throughputChart.destroy();
+      throughputChart = null;
+    }
     
     // Initialize ping charts
-    if (selectedDevice?.hasPing && pingMetrics) {
+    if (selectedDevice?.hasPing && pingMetrics && pingMetrics.labels && pingMetrics.labels.length > 0) {
       console.log(`[SNMP Graphs] Initializing ping charts...`);
       try {
         initPingCharts();
       } catch (err) {
-        console.error('[SNMP Graphs] Error initializing ping charts:', err);
+        console.error('[SNMP Graphs] Error initializing ping charts:', err, err);
       }
     } else {
-      console.log(`[SNMP Graphs] Skipping ping charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}`);
+      console.log(`[SNMP Graphs] Skipping ping charts - hasPing: ${selectedDevice?.hasPing}, pingMetrics: ${!!pingMetrics}, labels: ${pingMetrics?.labels?.length || 0}`);
     }
     
     // Initialize SNMP charts
-    if (selectedDevice?.hasSNMP && snmpMetrics) {
+    if (selectedDevice?.hasSNMP && snmpMetrics && snmpMetrics.labels && snmpMetrics.labels.length > 0) {
       console.log(`[SNMP Graphs] Initializing SNMP charts...`);
       try {
         initSNMPCharts();
       } catch (err) {
-        console.error('[SNMP Graphs] Error initializing SNMP charts:', err);
+        console.error('[SNMP Graphs] Error initializing SNMP charts:', err, err);
       }
     } else {
-      console.log(`[SNMP Graphs] Skipping SNMP charts - hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}`);
+      console.log(`[SNMP Graphs] Skipping SNMP charts - hasSNMP: ${selectedDevice?.hasSNMP}, snmpMetrics: ${!!snmpMetrics}, labels: ${snmpMetrics?.labels?.length || 0}`);
     }
   }
   
@@ -317,9 +333,9 @@
     };
     
     // Ping Uptime Chart (Status: 1=Online, 0=Offline)
-    if (pingUptimeChartCanvas && pingMetrics.datasets && pingMetrics.datasets.length > 1) {
-      const statusDataset = pingMetrics.datasets.find((d: any) => d.label.includes('Status'));
-      if (statusDataset) {
+    if (pingUptimeChartCanvas && pingUptimeChartCanvas.offsetWidth > 0 && pingMetrics.datasets && pingMetrics.datasets.length > 0) {
+      const statusDataset = pingMetrics.datasets.find((d: any) => d.label && (d.label.includes('Status') || d.label.includes('status')));
+      if (statusDataset && statusDataset.data && statusDataset.data.length > 0) {
         try {
           console.log(`[SNMP Graphs] Creating ping uptime chart with ${statusDataset.data.length} data points`);
           pingUptimeChart = new Chart(pingUptimeChartCanvas, {
@@ -370,9 +386,9 @@
     }
     
     // Ping Response Time Chart
-    if (pingResponseChartCanvas && pingMetrics.datasets) {
-      const responseTimeDataset = pingMetrics.datasets.find((d: any) => d.label.includes('Response Time'));
-      if (responseTimeDataset && responseTimeDataset.data.some((v: any) => v !== null)) {
+    if (pingResponseChartCanvas && pingResponseChartCanvas.offsetWidth > 0 && pingMetrics.datasets) {
+      const responseTimeDataset = pingMetrics.datasets.find((d: any) => d.label && (d.label.includes('Response Time') || d.label.includes('ResponseTime') || d.label.includes('response')));
+      if (responseTimeDataset && responseTimeDataset.data && responseTimeDataset.data.some((v: any) => v !== null && v !== undefined)) {
         try {
           console.log(`[SNMP Graphs] Creating ping response time chart with ${responseTimeDataset.data.length} data points`);
           pingResponseChart = new Chart(pingResponseChartCanvas, {
@@ -421,7 +437,10 @@
   }
   
   function initSNMPCharts() {
-    if (!snmpMetrics || !snmpMetrics.labels || snmpMetrics.labels.length === 0) return;
+    if (!snmpMetrics || !snmpMetrics.labels || snmpMetrics.labels.length === 0) {
+      console.log('[SNMP Graphs] No valid SNMP metrics data for charts');
+      return;
+    }
     
     const chartOptions = {
       responsive: true,
@@ -454,10 +473,12 @@
     };
     
     // CPU Chart
-    if (cpuChartCanvas && snmpMetrics.datasets) {
-      const cpuDataset = snmpMetrics.datasets.find((d: any) => d.label.includes('CPU'));
-      if (cpuDataset && cpuDataset.data.some((v: any) => v !== null)) {
-        cpuChart = new Chart(cpuChartCanvas, {
+    if (cpuChartCanvas && cpuChartCanvas.offsetWidth > 0 && snmpMetrics.datasets) {
+      const cpuDataset = snmpMetrics.datasets.find((d: any) => d.label && (d.label.includes('CPU') || d.label.includes('cpu')));
+      if (cpuDataset && cpuDataset.data && cpuDataset.data.some((v: any) => v !== null && v !== undefined)) {
+        try {
+          console.log(`[SNMP Graphs] Creating CPU chart with ${cpuDataset.data.length} data points`);
+          cpuChart = new Chart(cpuChartCanvas, {
           type: 'line',
           data: {
             labels: snmpMetrics.labels.map((l: string) => {
@@ -491,14 +512,24 @@
             }
           }
         });
+        console.log('[SNMP Graphs] CPU chart created successfully');
+        } catch (err) {
+          console.error('[SNMP Graphs] Error creating CPU chart:', err);
+        }
+      } else {
+        console.log('[SNMP Graphs] CPU dataset not found or has no valid data');
       }
+    } else {
+      console.log(`[SNMP Graphs] Cannot create CPU chart - canvas: ${!!cpuChartCanvas}, hasDimensions: ${cpuChartCanvas?.offsetWidth > 0}`);
     }
     
     // Memory Chart
-    if (memoryChartCanvas && snmpMetrics.datasets) {
-      const memoryDataset = snmpMetrics.datasets.find((d: any) => d.label.includes('Memory'));
-      if (memoryDataset && memoryDataset.data.some((v: any) => v !== null)) {
-        memoryChart = new Chart(memoryChartCanvas, {
+    if (memoryChartCanvas && memoryChartCanvas.offsetWidth > 0 && snmpMetrics.datasets) {
+      const memoryDataset = snmpMetrics.datasets.find((d: any) => d.label && (d.label.includes('Memory') || d.label.includes('memory') || d.label.includes('RAM')));
+      if (memoryDataset && memoryDataset.data && memoryDataset.data.some((v: any) => v !== null && v !== undefined)) {
+        try {
+          console.log(`[SNMP Graphs] Creating Memory chart with ${memoryDataset.data.length} data points`);
+          memoryChart = new Chart(memoryChartCanvas, {
           type: 'line',
           data: {
             labels: snmpMetrics.labels.map((l: string) => {
@@ -532,16 +563,26 @@
             }
           }
         });
+        console.log('[SNMP Graphs] Memory chart created successfully');
+        } catch (err) {
+          console.error('[SNMP Graphs] Error creating Memory chart:', err);
+        }
+      } else {
+        console.log('[SNMP Graphs] Memory dataset not found or has no valid data');
       }
+    } else {
+      console.log(`[SNMP Graphs] Cannot create Memory chart - canvas: ${!!memoryChartCanvas}, hasDimensions: ${memoryChartCanvas?.offsetWidth > 0}`);
     }
     
     // Throughput Chart
-    if (throughputChartCanvas && snmpMetrics.datasets) {
+    if (throughputChartCanvas && throughputChartCanvas.offsetWidth > 0 && snmpMetrics.datasets) {
       const throughputDatasets = snmpMetrics.datasets.filter((d: any) => 
-        d.label.includes('Throughput') || d.label.includes('In') || d.label.includes('Out')
+        d.label && (d.label.includes('Throughput') || d.label.includes('throughput') || d.label.includes('In') || d.label.includes('Out') || d.label.includes('Network'))
       );
       if (throughputDatasets.length > 0) {
-        throughputChart = new Chart(throughputChartCanvas, {
+        try {
+          console.log(`[SNMP Graphs] Creating Throughput chart with ${throughputDatasets.length} datasets`);
+          throughputChart = new Chart(throughputChartCanvas, {
           type: 'line',
           data: {
             labels: snmpMetrics.labels.map((l: string) => {
@@ -582,7 +623,15 @@
             }
           }
         });
+        console.log('[SNMP Graphs] Throughput chart created successfully');
+        } catch (err) {
+          console.error('[SNMP Graphs] Error creating Throughput chart:', err);
+        }
+      } else {
+        console.log('[SNMP Graphs] Throughput datasets not found');
       }
+    } else {
+      console.log(`[SNMP Graphs] Cannot create Throughput chart - canvas: ${!!throughputChartCanvas}, hasDimensions: ${throughputChartCanvas?.offsetWidth > 0}`);
     }
   }
   
