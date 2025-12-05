@@ -106,7 +106,20 @@ router.get('/ping/:deviceId', async (req, res) => {
     if (metrics.length === 0) {
       const allDeviceIds = await PingMetrics.distinct('device_id', { tenant_id: req.tenantId });
       const sampleDevices = allDeviceIds.slice(0, 5);
-      console.log(`[Monitoring Graphs] No metrics found for device ${deviceId}. Sample device_ids in database: ${sampleDevices.join(', ')}`);
+      console.log(`[Monitoring Graphs] No metrics found for device ${deviceId}. Looking for device_id: "${deviceId}"`);
+      console.log(`[Monitoring Graphs] Sample device_ids in database for tenant ${req.tenantId}:`, sampleDevices);
+      console.log(`[Monitoring Graphs] Total unique device_ids in database: ${allDeviceIds.length}`);
+      
+      // Also check if there are any metrics at all for this tenant
+      const totalMetrics = await PingMetrics.countDocuments({ tenant_id: req.tenantId });
+      console.log(`[Monitoring Graphs] Total ping metrics in database for tenant: ${totalMetrics}`);
+      
+      // Check recent metrics (last 24 hours) for any device
+      const recentMetrics = await PingMetrics.countDocuments({ 
+        tenant_id: req.tenantId,
+        timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      });
+      console.log(`[Monitoring Graphs] Ping metrics in last 24 hours for tenant: ${recentMetrics}`);
     }
     
     res.json(response);
