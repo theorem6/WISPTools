@@ -23,13 +23,17 @@ if [ ! -f "$SSH_DIR/known_hosts" ] || ! grep -q "github.com" "$SSH_DIR/known_hos
   chmod 600 "$SSH_DIR/known_hosts"
 fi
 
+# GitHub token for private repository access
+GITHUB_TOKEN="${GITHUB_TOKEN:-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}"
+GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git"
+
 # Check if repo exists
 if [ ! -d "$REPO_DIR/.git" ]; then
   echo "📥 Initializing git repository..."
   cd "$REPO_DIR"
   git init
-  # Use SSH URL for private repository
-  git remote add origin git@github.com:theorem6/lte-pci-mapper.git 2>/dev/null || git remote set-url origin git@github.com:theorem6/lte-pci-mapper.git
+  # Use HTTPS URL with token for private repository
+  git remote add origin "$GIT_REPO_URL" 2>/dev/null || git remote set-url origin "$GIT_REPO_URL"
   git config user.name "GCE Server"
   git config user.email "server@wisptools.io"
   # Add all existing files
@@ -41,20 +45,21 @@ fi
 echo "📥 Pulling latest code from GitHub..."
 cd "$REPO_DIR"
 
-# Ensure remote is using SSH
+# Ensure remote is using HTTPS with token
 CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
-if [[ "$CURRENT_REMOTE" != *"git@github.com"* ]]; then
-  echo "🔄 Switching remote to SSH..."
-  git remote set-url origin git@github.com:theorem6/lte-pci-mapper.git
+if [[ "$CURRENT_REMOTE" != *"${GITHUB_TOKEN}@github.com"* ]]; then
+  echo "🔄 Updating remote to use HTTPS with token..."
+  git remote set-url origin "$GIT_REPO_URL"
 fi
 
-# Configure Git to use SSH
-export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SSH_DIR/known_hosts"
+# Configure Git to not prompt for credentials
+export GIT_TERMINAL_PROMPT=0
+git config --global credential.helper ''
 
 git fetch origin main || {
-  echo "⚠️  Could not fetch from GitHub (may require SSH key authentication)"
+  echo "⚠️  Could not fetch from GitHub (may require token authentication)"
   echo "📋 Current code will be used. To sync manually:"
-  echo "   1. Ensure SSH key is configured (fingerprint: SHA256:evjwW3FJ1wGL/y2JM6daCrcQA1OYVlV4BAyXiM5gdZ0)"
+  echo "   1. Check GITHUB_TOKEN environment variable is set"
   echo "   2. Commit current changes: git add -A && git commit -m 'Server state'"
   echo "   3. Pull from GitHub: git pull origin main"
   exit 0
