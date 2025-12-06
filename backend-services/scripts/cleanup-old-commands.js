@@ -30,10 +30,10 @@ async function main() {
       process.exit(0);
     }
 
-    // Delete all commands for this EPC (pending, sent, or failed - but keep completed for history)
+    // Delete all commands for this EPC (pending, sent, failed, executing - but keep completed for history)
     const result = await EPCCommand.deleteMany({
       epc_id: EPC_ID,
-      status: { $in: ['pending', 'sent', 'failed'] }
+      status: { $in: ['pending', 'sent', 'failed', 'executing'] }
     });
 
     console.log(`\n✅ Deleted ${result.deletedCount} old command(s) for ${EPC_ID}`);
