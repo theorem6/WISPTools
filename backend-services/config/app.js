@@ -91,6 +91,12 @@ module.exports = {
     firebase: {
       projectId: process.env.FIREBASE_PROJECT_ID || 'wisptools-production',
       region: process.env.FIREBASE_REGION || 'us-central1'
+    },
+    
+    // GitHub Configuration (for private repository access)
+    github: {
+      token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '',
+      repoUrl: 'https://github.com/theorem6/lte-pci-mapper.git'
     }
   },
   

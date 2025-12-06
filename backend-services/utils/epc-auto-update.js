@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
+const appConfig = require('../config/app');
 
 const SCRIPTS_DIR = '/var/www/html/downloads/scripts';
 const CENTRAL_SERVER = 'hss.wisptools.io';
@@ -124,17 +125,26 @@ function generateUpdateCommand(updateInfo, options = {}) {
   }
   
   // GitHub repository configuration
-  // Repository is public, so no authentication needed, but we can use token if available for rate limits
-  const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  // Repository is PRIVATE - requires authentication token
+  // Get token from environment variables or backend config
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN || 
+                       process.env.GH_TOKEN || 
+                       appConfig?.externalServices?.github?.token || 
+                       '';
   const GIT_REPO_BRANCH = 'main';
   const GIT_REPO_DIR = '/opt/wisptools/repo';
   const SCRIPTS_SOURCE_DIR = `${GIT_REPO_DIR}/backend-services/scripts`;
   
-  // Build repo URL - use token if available (for rate limits), otherwise use public URL
+  // Build repo URL - MUST use token for private repository authentication
   let GIT_REPO_URL = 'https://github.com/theorem6/lte-pci-mapper.git';
   if (GITHUB_TOKEN) {
-    // Embed token in URL for authentication (repository is public, but token helps with rate limits)
+    // Embed token in URL for authentication (REQUIRED for private repository)
+    // Format: https://TOKEN@github.com/user/repo.git
     GIT_REPO_URL = `https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git`;
+    console.log('[EPC Auto-Update] Using GitHub token for private repository authentication');
+  } else {
+    console.error('[EPC Auto-Update] ERROR: GITHUB_TOKEN not configured - git operations will fail for private repository');
+    console.error('[EPC Auto-Update] Please set GITHUB_TOKEN environment variable or configure in app config');
   }
   
   // Sort scripts by priority (lower number = higher priority)
