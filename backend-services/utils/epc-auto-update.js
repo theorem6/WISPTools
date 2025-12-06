@@ -123,10 +123,19 @@ function generateUpdateCommand(updateInfo, options = {}) {
     return null;
   }
   
-  const GIT_REPO_URL = 'https://github.com/theorem6/lte-pci-mapper.git';
+  // GitHub repository configuration
+  // Repository is public, so no authentication needed, but we can use token if available for rate limits
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
   const GIT_REPO_BRANCH = 'main';
   const GIT_REPO_DIR = '/opt/wisptools/repo';
   const SCRIPTS_SOURCE_DIR = `${GIT_REPO_DIR}/backend-services/scripts`;
+  
+  // Build repo URL - use token if available (for rate limits), otherwise use public URL
+  let GIT_REPO_URL = 'https://github.com/theorem6/lte-pci-mapper.git';
+  if (GITHUB_TOKEN) {
+    // Embed token in URL for authentication (repository is public, but token helps with rate limits)
+    GIT_REPO_URL = `https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git`;
+  }
   
   // Sort scripts by priority (lower number = higher priority)
   // Agent script should be updated first to enable hash reporting
@@ -156,20 +165,30 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 # Set up git repository with sparse checkout (only downloads needed files)
+# Configure git to not prompt for credentials (public repo - no auth needed)
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/echo
+
 if [ ! -d "${GIT_REPO_DIR}" ]; then
     log "Initializing git repository with sparse checkout..."
     mkdir -p "${GIT_REPO_DIR}"
     cd "${GIT_REPO_DIR}"
     git init >/dev/null 2>&1
-    git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     git config core.sparseCheckout true 2>&1
     git config core.sparseCheckoutCone false 2>&1
+    git config credential.helper "" 2>&1
+    git config http.sslVerify true 2>&1
+    git config http.postBuffer 524288000 2>&1
     
     # Configure sparse checkout to only download the scripts we need
     mkdir -p .git/info
     cat > .git/info/sparse-checkout << 'SPARSECHECKOUT'
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
+    
+    # Add remote (remove if exists to avoid errors)
+    git remote remove origin >/dev/null 2>&1 || true
+    git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
     log "Fetching only required files from git (sparse checkout)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
@@ -188,11 +207,21 @@ else
     log "Updating git repository (sparse checkout)..."
     cd "${GIT_REPO_DIR}"
     
+    # Configure git to not prompt for credentials
+    git config credential.helper "" 2>&1
+    git config http.postBuffer 524288000 2>&1
+    export GIT_TERMINAL_PROMPT=0
+    export GIT_ASKPASS=/bin/echo
+    
     # Update sparse checkout paths if needed (in case new scripts are added)
     mkdir -p .git/info
     cat > .git/info/sparse-checkout << 'SPARSECHECKOUT'
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
+    
+    # Ensure remote is configured correctly (update URL if changed)
+    git remote remove origin >/dev/null 2>&1 || true
+    git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
     log "Fetching latest changes (sparse checkout)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
