@@ -207,7 +207,23 @@ SPARSECHECKOUT
     fi
 else
     log "Updating git repository (sparse checkout)..."
-    cd "${GIT_REPO_DIR}"
+    cd "${GIT_REPO_DIR}" || {
+        log "ERROR: Cannot change to ${GIT_REPO_DIR}"
+        exit 1
+    }
+    
+    # Check if this is actually a git repository - if not, reinitialize
+    if [ ! -d ".git" ]; then
+        log "WARNING: Directory exists but is not a git repository. Reinitializing..."
+        cd /opt/wisptools || exit 1
+        rm -rf "${GIT_REPO_DIR}"
+        mkdir -p "${GIT_REPO_DIR}"
+        cd "${GIT_REPO_DIR}" || exit 1
+        git init >/dev/null 2>&1
+        git config core.sparseCheckout true 2>&1 | while read line; do log "$line"; done
+        git config core.sparseCheckoutCone false 2>&1 | while read line; do log "$line"; done
+        log "Git repository reinitialized"
+    fi
     
     # Configure Git for HTTPS with token (ALWAYS, in case config was changed)
     export GIT_TERMINAL_PROMPT=0
