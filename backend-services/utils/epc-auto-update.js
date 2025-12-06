@@ -212,16 +212,19 @@ else
         exit 1
     }
     
-    # Check if this is actually a git repository - if not, reinitialize
-    if [ ! -d ".git" ]; then
-        log "WARNING: Directory exists but is not a git repository. Reinitializing..."
+    # Check if this is actually a VALID git repository - test if git recognizes it
+    if [ ! -d ".git" ] || ! git rev-parse --git-dir >/dev/null 2>&1; then
+        log "WARNING: Directory exists but is NOT a valid git repository. Reinitializing..."
         cd /opt/wisptools || exit 1
         rm -rf "${GIT_REPO_DIR}"
         mkdir -p "${GIT_REPO_DIR}"
         cd "${GIT_REPO_DIR}" || exit 1
-        git init >/dev/null 2>&1
-        git config core.sparseCheckout true 2>&1 | while read line; do log "$line"; done
-        git config core.sparseCheckoutCone false 2>&1 | while read line; do log "$line"; done
+        git init >/dev/null 2>&1 || {
+            log "ERROR: Failed to initialize git repository"
+            exit 1
+        }
+        git config core.sparseCheckout true 2>&1 | while read line; do log "$line"; done || true
+        git config core.sparseCheckoutCone false 2>&1 | while read line; do log "$line"; done || true
         log "Git repository reinitialized"
     fi
     
