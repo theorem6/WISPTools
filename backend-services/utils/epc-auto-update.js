@@ -176,6 +176,8 @@ if [ ! -d "${GIT_REPO_DIR}" ]; then
     log "Initializing git repository with sparse checkout..."
     mkdir -p "${GIT_REPO_DIR}"
     cd "${GIT_REPO_DIR}"
+    # Fix ownership to prevent "dubious ownership" errors
+    chown -R root:root "${GIT_REPO_DIR}" 2>/dev/null || true
     git init >/dev/null 2>&1
     git config core.sparseCheckout true 2>&1
     git config core.sparseCheckoutCone false 2>&1
