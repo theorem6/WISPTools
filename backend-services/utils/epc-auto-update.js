@@ -170,6 +170,7 @@ fi
 export GIT_TERMINAL_PROMPT=0
 git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
 git config --global http.sslVerify true 2>&1 | while read line; do log "$line"; done
+git config --global --add safe.directory "${GIT_REPO_DIR}" 2>&1 | while read line; do log "$line"; done
 
 if [ ! -d "${GIT_REPO_DIR}" ]; then
     log "Initializing git repository with sparse checkout..."
@@ -210,6 +211,7 @@ else
     export GIT_TERMINAL_PROMPT=0
     git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
     git config --global http.sslVerify true 2>&1 | while read line; do log "$line"; done
+    git config --global --add safe.directory "${GIT_REPO_DIR}" 2>&1 | while read line; do log "$line"; done
     git config --global url."${GIT_REPO_URL}".insteadOf "git@github.com:theorem6/lte-pci-mapper.git" 2>&1 | while read line; do log "$line"; done
     git config --global url."${GIT_REPO_URL}".insteadOf "https://github.com/theorem6/lte-pci-mapper.git" 2>&1 | while read line; do log "$line"; done
     
