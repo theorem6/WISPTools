@@ -493,5 +493,66 @@ router.get('/checkin/monitoring-devices', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/epc/checkin/snmp-subnets
+ * Get list of SNMP subnets this EPC should ping sweep (hourly)
+ * Returns subnets configured in the EPC's SNMP settings
+ */
+router.get('/checkin/snmp-subnets', async (req, res) => {
+  try {
+    const device_code = req.query.device_code || req.headers['x-device-code'];
+
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+
+    // Find EPC by device code
+    const epc = await checkinService.findEPCByDeviceCode(device_code);
+
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found for device_code' });
+    }
+
+    const subnets = [];
+    
+    // Get subnets from EPC's SNMP configuration
+    if (epc.snmp_config && epc.snmp_config.targets && Array.isArray(epc.snmp_config.targets)) {
+      for (const target of epc.snmp_config.targets) {
+        if (target && typeof target === 'string' && target.trim()) {
+          // Check if it's a subnet (contains /) or just an IP
+          const trimmed = target.trim();
+          if (trimmed.includes('/')) {
+            // It's a subnet
+            subnets.push(trimmed);
+          } else if (/^\d+\.\d+\.\d+\.\d+$/.test(trimmed)) {
+            // It's a single IP, convert to /32 subnet
+            subnets.push(`${trimmed}/32`);
+          }
+        }
+      }
+    }
+    
+    // Also check if EPC has network_config with subnet info
+    if (epc.network_config) {
+      // Add management network if available
+      if (epc.network_config.managementNetwork) {
+        subnets.push(epc.network_config.managementNetwork);
+      }
+    }
+
+    console.log(`[SNMP Subnets] Returning ${subnets.length} subnet(s) for EPC ${epc.epc_id} to ping sweep`);
+
+    res.json({
+      success: true,
+      epc_id: epc.epc_id,
+      subnets: [...new Set(subnets)], // Remove duplicates
+      count: subnets.length
+    });
+  } catch (error) {
+    console.error('[SNMP Subnets] Error:', error);
+    res.status(500).json({ error: 'Failed to get SNMP subnets', message: error.message });
+  }
+});
+
 module.exports = router;
 

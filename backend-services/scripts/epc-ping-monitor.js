@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
  * EPC Ping Monitoring Agent
- * Continuously pings devices and sends metrics to the backend for graphing
  * 
  * This script:
- * 1. Fetches list of devices to monitor from backend
- * 2. Pings each device periodically
+ * 1. Hourly subnet ping sweep - pings all subnets in SNMP settings
+ * 2. Every minute before check-in - pings all monitored devices and reports
  * 3. Sends ping metrics to backend for storage and graphing
  * 
- * Runs as a daemon or can be triggered by checkin agent
+ * Usage:
+ *   node epc-ping-monitor.js cycle     - Run single ping cycle (for check-in)
+ *   node epc-ping-monitor.js sweep     - Run subnet ping sweep (hourly)
+ *   node epc-ping-monitor.js daemon    - Run as daemon (not recommended - use checkin agent)
  */
 
 const https = require('https');
@@ -24,8 +26,6 @@ const CENTRAL_SERVER = process.env.CENTRAL_SERVER || 'hss.wisptools.io';
 const API_URL = `https://${CENTRAL_SERVER}/api/epc`;
 const CONFIG_DIR = process.env.CONFIG_DIR || '/etc/wisptools';
 const LOG_FILE = process.env.LOG_FILE || '/var/log/wisptools-ping-monitor.log';
-const PING_INTERVAL = parseInt(process.env.PING_INTERVAL || '300', 10); // Default 5 minutes
-const DEVICE_LIST_REFRESH_INTERVAL = 3600; // Refresh device list every hour
 
 // Get device code
 async function getDeviceCode() {
@@ -79,7 +79,7 @@ async function pingDevice(ipAddress) {
     const { stdout } = await execAsync(`ping -c 3 -W 2 ${ipAddress} 2>&1 || true`);
     
     // Parse ping output for Linux
-    const timeMatch = stdout.match(/min\/avg\/max\/mdev = [\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/);
+    const timeMatch = stdout.match(/min\/avg\/max\/mdev = ([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/);
     if (timeMatch) {
       const avgTime = parseFloat(timeMatch[2]);
       return {
@@ -129,6 +129,60 @@ async function pingDevice(ipAddress) {
       error: error.message
     };
   }
+}
+
+// Generate IP addresses from subnet CIDR notation
+function getIPsFromSubnet(subnet) {
+  const ips = [];
+  
+  try {
+    const [network, prefixLength] = subnet.split('/');
+    if (!prefixLength) {
+      // Single IP, not a subnet
+      ips.push(network);
+      return ips;
+    }
+    
+    const prefix = parseInt(prefixLength, 10);
+    if (isNaN(prefix) || prefix < 0 || prefix > 32) {
+      log('WARN', `Invalid prefix length in subnet ${subnet}`);
+      return ips;
+    }
+    
+    const parts = network.split('.').map(p => parseInt(p, 10));
+    if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
+      log('WARN', `Invalid IP address in subnet ${subnet}`);
+      return ips;
+    }
+    
+    // Calculate number of hosts (exclude network and broadcast)
+    const hostBits = 32 - prefix;
+    const numHosts = Math.pow(2, hostBits) - 2;
+    
+    // Limit to reasonable number of hosts (max /24 = 254 hosts)
+    if (prefix < 24) {
+      log('WARN', `Subnet ${subnet} is too large (${numHosts} hosts), skipping to avoid excessive pings`);
+      return ips;
+    }
+    
+    // Generate all IP addresses in subnet
+    const networkNum = (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+    const mask = (0xFFFFFFFF << (32 - prefix)) >>> 0;
+    const networkAddr = networkNum & mask;
+    const broadcastAddr = networkAddr | (~mask >>> 0);
+    
+    // Generate IPs (skip network and broadcast)
+    for (let ipNum = networkAddr + 1; ipNum < broadcastAddr; ipNum++) {
+      const ip = `${(ipNum >>> 24) & 0xFF}.${(ipNum >>> 16) & 0xFF}.${(ipNum >>> 8) & 0xFF}.${ipNum & 0xFF}`;
+      ips.push(ip);
+    }
+    
+    log('INFO', `Generated ${ips.length} IP addresses from subnet ${subnet}`);
+  } catch (error) {
+    log('ERROR', `Error generating IPs from subnet ${subnet}: ${error.message}`);
+  }
+  
+  return ips;
 }
 
 // Fetch list of devices to monitor from backend
@@ -184,6 +238,59 @@ async function getMonitoringDevices(deviceCode) {
   }
 }
 
+// Fetch SNMP subnets for ping sweep
+async function getSNMPSubnets(deviceCode) {
+  try {
+    const url = new URL(`${API_URL}/checkin/snmp-subnets?device_code=${deviceCode}`);
+    
+    return new Promise((resolve, reject) => {
+      const client = url.protocol === 'https:' ? https : http;
+      
+      const req = client.get(url, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const response = JSON.parse(data);
+              if (response.success && Array.isArray(response.subnets)) {
+                resolve(response.subnets);
+              } else {
+                log('WARN', `Invalid response format from snmp-subnets endpoint`);
+                resolve([]);
+              }
+            } catch (e) {
+              log('ERROR', `Failed to parse response: ${e.message}`);
+              resolve([]);
+            }
+          } else {
+            log('WARN', `Failed to fetch SNMP subnets: HTTP ${res.statusCode}`);
+            resolve([]);
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        log('ERROR', `Error fetching SNMP subnets: ${error.message}`);
+        resolve([]);
+      });
+      
+      req.setTimeout(10000, () => {
+        req.destroy();
+        log('WARN', 'Timeout fetching SNMP subnets');
+        resolve([]);
+      });
+    });
+  } catch (error) {
+    log('ERROR', `Error in getSNMPSubnets: ${error.message}`);
+    return [];
+  }
+}
+
 // Send ping metrics to backend
 async function sendPingMetrics(deviceCode, pingMetrics) {
   if (!pingMetrics || pingMetrics.length === 0) {
@@ -231,7 +338,7 @@ async function sendPingMetrics(deviceCode, pingMetrics) {
         resolve(false);
       });
       
-      req.setTimeout(10000, () => {
+      req.setTimeout(30000, () => {
         req.destroy();
         log('WARN', 'Timeout sending ping metrics');
         resolve(false);
@@ -246,7 +353,7 @@ async function sendPingMetrics(deviceCode, pingMetrics) {
   }
 }
 
-// Main ping monitoring cycle
+// Main ping monitoring cycle (pings known devices)
 async function pingCycle(deviceCode, devices) {
   if (!devices || devices.length === 0) {
     log('INFO', 'No devices to ping');
@@ -259,7 +366,7 @@ async function pingCycle(deviceCode, devices) {
   const startTime = Date.now();
   
   // Ping all devices in parallel (with reasonable limit)
-  const maxParallel = 10;
+  const maxParallel = 20;
   for (let i = 0; i < devices.length; i += maxParallel) {
     const batch = devices.slice(i, i + maxParallel);
     
@@ -299,103 +406,124 @@ async function pingCycle(deviceCode, devices) {
   if (pingMetrics.length > 0) {
     await sendPingMetrics(deviceCode, pingMetrics);
   }
+  
+  return pingMetrics.length;
 }
 
-// Main monitoring loop
-async function startMonitoring() {
-  log('INFO', 'Starting EPC Ping Monitoring Agent');
-  
-  const deviceCode = await getDeviceCode();
-  if (!deviceCode) {
-    log('ERROR', 'Cannot start monitoring: device code not available');
-    process.exit(1);
+// Subnet ping sweep (hourly)
+async function subnetPingSweep(deviceCode, subnets) {
+  if (!subnets || subnets.length === 0) {
+    log('INFO', 'No subnets to sweep');
+    return;
   }
   
-  log('INFO', `Device code: ${deviceCode}`);
-  log('INFO', `Ping interval: ${PING_INTERVAL}s`);
+  log('INFO', `Starting subnet ping sweep for ${subnets.length} subnet(s)`);
   
-  let devices = [];
-  let lastDeviceListRefresh = 0;
+  const pingMetrics = [];
+  const startTime = Date.now();
   
-  // Initial device list fetch
-  log('INFO', 'Fetching initial device list...');
-  devices = await getMonitoringDevices(deviceCode);
-  log('INFO', `Found ${devices.length} device(s) to monitor`);
-  lastDeviceListRefresh = Date.now();
-  
-  // Main loop
-  while (true) {
-    try {
-      // Refresh device list periodically
-      const now = Date.now();
-      if (now - lastDeviceListRefresh > (DEVICE_LIST_REFRESH_INTERVAL * 1000)) {
-        log('INFO', 'Refreshing device list...');
-        const newDevices = await getMonitoringDevices(deviceCode);
-        if (newDevices.length > 0) {
-          devices = newDevices;
-          log('INFO', `Updated device list: ${devices.length} device(s)`);
+  for (const subnet of subnets) {
+    if (!subnet || !subnet.trim()) {
+      continue;
+    }
+    
+    log('INFO', `Sweeping subnet: ${subnet}`);
+    
+    // Generate IP addresses from subnet
+    const ips = getIPsFromSubnet(subnet.trim());
+    
+    if (ips.length === 0) {
+      log('WARN', `No IPs generated from subnet ${subnet}`);
+      continue;
+    }
+    
+    log('INFO', `Pinging ${ips.length} IPs in subnet ${subnet}`);
+    
+    // Ping all IPs in subnet in parallel (with reasonable limit)
+    const maxParallel = 50;
+    for (let i = 0; i < ips.length; i += maxParallel) {
+      const batch = ips.slice(i, i + maxParallel);
+      
+      const batchPromises = batch.map(async (ip) => {
+        const pingResult = await pingDevice(ip);
+        
+        // Only record successful pings (devices that responded)
+        if (pingResult.success) {
+          pingMetrics.push({
+            device_id: `subnet_${subnet.replace(/[\/\.]/g, '_')}_${ip.replace(/\./g, '_')}`,
+            ip_address: ip.trim(),
+            success: true,
+            response_time_ms: pingResult.response_time_ms,
+            error: null
+          });
+          
+          log('INFO', `  ✓ Found device at ${ip}: ${pingResult.response_time_ms}ms`);
         }
-        lastDeviceListRefresh = now;
-      }
+      });
       
-      // Run ping cycle
-      await pingCycle(deviceCode, devices);
-      
-      // Wait for next interval
-      log('INFO', `Waiting ${PING_INTERVAL}s until next ping cycle...`);
-      await new Promise(resolve => setTimeout(resolve, PING_INTERVAL * 1000));
-      
-    } catch (error) {
-      log('ERROR', `Error in monitoring loop: ${error.message}`);
-      log('ERROR', error.stack);
-      
-      // Wait a bit before retrying
-      await new Promise(resolve => setTimeout(resolve, 60 * 1000));
+      await Promise.all(batchPromises);
     }
   }
+  
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  log('INFO', `Subnet sweep completed in ${duration}s: ${pingMetrics.length} devices found and pinged`);
+  
+  // Send metrics to backend
+  if (pingMetrics.length > 0) {
+    await sendPingMetrics(deviceCode, pingMetrics);
+  }
+  
+  return pingMetrics.length;
 }
 
-// Run as daemon or single cycle based on arguments
+// Main execution
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const mode = args[0] || 'daemon';
+  const mode = args[0] || 'cycle';
   
-  if (mode === 'cycle' || mode === 'once') {
-    // Run a single ping cycle
-    (async () => {
-      try {
-        log('INFO', 'Running single ping cycle...');
-        const deviceCode = await getDeviceCode();
-        if (!deviceCode) {
-          log('ERROR', 'Cannot run ping cycle: device code not available');
-          process.exit(1);
-        }
-        
+  (async () => {
+    try {
+      const deviceCode = await getDeviceCode();
+      if (!deviceCode) {
+        log('ERROR', 'Cannot run ping monitor: device code not available');
+        process.exit(1);
+      }
+      
+      if (mode === 'cycle' || mode === 'once') {
+        // Run a single ping cycle (for check-in, every minute)
+        log('INFO', 'Running single ping cycle for monitored devices...');
         const devices = await getMonitoringDevices(deviceCode);
         log('INFO', `Found ${devices.length} device(s) to monitor`);
         await pingCycle(deviceCode, devices);
         log('INFO', 'Ping cycle completed');
         process.exit(0);
-      } catch (error) {
-        log('ERROR', `Fatal error: ${error.message}`);
-        log('ERROR', error.stack);
+      } else if (mode === 'sweep') {
+        // Run subnet ping sweep (hourly)
+        log('INFO', 'Running subnet ping sweep...');
+        const subnets = await getSNMPSubnets(deviceCode);
+        log('INFO', `Found ${subnets.length} subnet(s) to sweep`);
+        await subnetPingSweep(deviceCode, subnets);
+        log('INFO', 'Subnet sweep completed');
+        process.exit(0);
+      } else {
+        log('ERROR', `Unknown mode: ${mode}. Use 'cycle' or 'sweep'`);
         process.exit(1);
       }
-    })();
-  } else {
-    // Run as daemon
-    startMonitoring().catch((error) => {
+    } catch (error) {
       log('ERROR', `Fatal error: ${error.message}`);
       log('ERROR', error.stack);
       process.exit(1);
-    });
-  }
+    }
+  })();
 }
 
 module.exports = {
   pingDevice,
   getMonitoringDevices,
+  getSNMPSubnets,
   sendPingMetrics,
   pingCycle,
-  startMonitoring
+  subnetPingSweep,
+  getIPsFromSubnet
 };
+

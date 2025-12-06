@@ -68,7 +68,7 @@ const RemoteEPCSchema = new mongoose.Schema({
     communities: [{ type: String }], // Multiple community strings
     version: { type: String, enum: ['1', '2c', '3'], default: '2c' },
     port: { type: Number, default: 161 },
-    pollingInterval: { type: Number, default: 60 }, // seconds
+    pollingInterval: { type: Number, default: 300 }, // seconds (5 minutes)
     targets: [String], // List of IPs/networks to scan (subnets)
     trapReceiver: String, // Where to send SNMP traps
     autoDiscovery: { type: Boolean, default: true }

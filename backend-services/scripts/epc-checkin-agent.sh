@@ -15,7 +15,7 @@ CENTRAL_SERVER="hss.wisptools.io"
 API_URL="https://${CENTRAL_SERVER}/api/epc"
 CONFIG_DIR="/etc/wisptools"
 LOG_FILE="/var/log/wisptools-checkin.log"
-CHECKIN_INTERVAL=60  # Default 60 seconds
+CHECKIN_INTERVAL=300  # Default 5 minutes (300 seconds)
 
 # Git repository configuration
 GIT_REPO_URL="https://github.com/theorem6/lte-pci-mapper.git"
@@ -707,6 +707,75 @@ do_checkin() {
     
     log "Checking in as $device_code from $ip_address"
     
+    # Run ping cycle BEFORE check-in (synchronously, every 5 minutes)
+    # Ensure ping monitor script is available
+    if command -v node >/dev/null 2>&1; then
+        # Get ping monitor script from git repository if missing
+        if [ ! -f /opt/wisptools/epc-ping-monitor.js ]; then
+            log "Ping monitor script not found, checking git repository..."
+            # Try to get from git repository first
+            if [ -d "$GIT_REPO_DIR" ] && [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ]; then
+                cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/epc-ping-monitor.js
+                chmod +x /opt/wisptools/epc-ping-monitor.js
+                log "Ping monitor script copied from git repository"
+            elif [ -d "$GIT_REPO_DIR" ]; then
+                # Repository exists but script missing - try to update repo
+                log "Updating git repository to get ping monitor script..."
+                cd "$GIT_REPO_DIR" && git fetch origin "$GIT_REPO_BRANCH" >/dev/null 2>&1 && git reset --hard "origin/${GIT_REPO_BRANCH}" >/dev/null 2>&1
+                if [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ]; then
+                    cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/epc-ping-monitor.js
+                    chmod +x /opt/wisptools/epc-ping-monitor.js
+                    log "Ping monitor script copied from updated git repository"
+                else
+                    log "WARNING: Ping monitor script not found in repository, falling back to download"
+                    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
+                    chmod +x /opt/wisptools/epc-ping-monitor.js && \
+                    log "Ping monitor script downloaded successfully" || \
+                    log "WARNING: Failed to download ping monitor script"
+                fi
+            else
+                # No git repository - fallback to download
+                log "Git repository not available, downloading ping monitor script..."
+                curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
+                chmod +x /opt/wisptools/epc-ping-monitor.js && \
+                log "Ping monitor script downloaded successfully" || \
+                log "WARNING: Failed to download ping monitor script"
+            fi
+        fi
+        
+        # Run ping cycle synchronously BEFORE check-in (every 5 minutes)
+        if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
+            log "Running ping cycle before check-in..."
+            node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1
+            local ping_exit=$?
+            if [ $ping_exit -eq 0 ]; then
+                log "Ping cycle completed successfully"
+            else
+                log "WARNING: Ping cycle exited with code $ping_exit"
+            fi
+        fi
+        
+        # Run hourly subnet ping sweep (separate from regular ping cycle)
+        local last_sweep_file="/tmp/last-ping-sweep"
+        local should_sweep=true
+        if [ -f "$last_sweep_file" ]; then
+            local last_sweep=$(cat "$last_sweep_file" 2>/dev/null || echo "0")
+            local now=$(date +%s)
+            local elapsed=$((now - last_sweep))
+            if [ $elapsed -lt 3600 ]; then
+                should_sweep=false
+            fi
+        fi
+        
+        if [ "$should_sweep" = true ] && [ -f /opt/wisptools/epc-ping-monitor.js ]; then
+            log "Running hourly subnet ping sweep..."
+            node /opt/wisptools/epc-ping-monitor.js sweep >> "$LOG_FILE" 2>&1 &
+            local sweep_pid=$!
+            echo "$(date +%s)" > "$last_sweep_file"
+            log "Subnet ping sweep started in background (PID: $sweep_pid)"
+        fi
+    fi
+    
     # Collect service status - build JSON manually
     local services_json="{"
     local first=true
@@ -944,50 +1013,7 @@ do_checkin() {
             echo "$(date +%s)" > "$last_discovery_file"
         fi
         
-        # Collect and send ping metrics for monitoring devices
-        if command -v node >/dev/null 2>&1; then
-            # Get ping monitor script from git repository if missing
-            if [ ! -f /opt/wisptools/epc-ping-monitor.js ]; then
-                log "Ping monitor script not found, checking git repository..."
-                # Try to get from git repository first
-                if [ -d "$GIT_REPO_DIR" ] && [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ]; then
-                    cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/epc-ping-monitor.js
-                    chmod +x /opt/wisptools/epc-ping-monitor.js
-                    log "Ping monitor script copied from git repository"
-                elif [ -d "$GIT_REPO_DIR" ]; then
-                    # Repository exists but script missing - try to update repo
-                    log "Updating git repository to get ping monitor script..."
-                    cd "$GIT_REPO_DIR" && git fetch origin "$GIT_REPO_BRANCH" >/dev/null 2>&1 && git reset --hard "origin/${GIT_REPO_BRANCH}" >/dev/null 2>&1
-                    if [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ]; then
-                        cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/epc-ping-monitor.js
-                        chmod +x /opt/wisptools/epc-ping-monitor.js
-                        log "Ping monitor script copied from updated git repository"
-                    else
-                        log "WARNING: Ping monitor script not found in repository, falling back to download"
-                        curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
-                        chmod +x /opt/wisptools/epc-ping-monitor.js && \
-                        log "Ping monitor script downloaded successfully" || \
-                        log "WARNING: Failed to download ping monitor script"
-                    fi
-                else
-                    # No git repository - fallback to download
-                    log "Git repository not available, downloading ping monitor script..."
-                    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
-                    chmod +x /opt/wisptools/epc-ping-monitor.js && \
-                    log "Ping monitor script downloaded successfully" || \
-                    log "WARNING: Failed to download ping monitor script"
-                fi
-            fi
-            
-            # Run ping cycle if script exists
-            if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
-                log "Collecting ping metrics for monitoring devices..."
-                # Run a single ping cycle in background (non-blocking)
-                node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1 &
-                local ping_pid=$!
-                log "Ping monitoring cycle started (PID: $ping_pid)"
-            fi
-        fi
+        # Note: Ping monitoring now runs BEFORE check-in (synchronously) - see do_checkin() function
         
         # Execute commands
         if [ "$cmd_count" -gt 0 ]; then
