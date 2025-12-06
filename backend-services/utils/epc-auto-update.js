@@ -206,10 +206,33 @@ else
     log "Updating git repository (sparse checkout)..."
     cd "${GIT_REPO_DIR}"
     
-    # Configure Git for HTTPS with token
+    # Configure Git for HTTPS with token (ALWAYS, in case config was changed)
     export GIT_TERMINAL_PROMPT=0
     git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
     git config --global http.sslVerify true 2>&1 | while read line; do log "$line"; done
+    git config --global url."${GIT_REPO_URL}".insteadOf "git@github.com:theorem6/lte-pci-mapper.git" 2>&1 | while read line; do log "$line"; done
+    git config --global url."${GIT_REPO_URL}".insteadOf "https://github.com/theorem6/lte-pci-mapper.git" 2>&1 | while read line; do log "$line"; done
+    
+    # Check current remote - if it's SSH or wrong, force recreate
+    CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "none")
+    if [[ "$CURRENT_REMOTE" != *"https://"* ]] || [[ "$CURRENT_REMOTE" != *"@github.com"* ]] || [[ "$CURRENT_REMOTE" == *"git@github.com"* ]]; then
+        log "WARNING: Existing remote is incorrect: $CURRENT_REMOTE"
+        log "Removing old remote and setting up HTTPS with token..."
+        git remote remove origin >/dev/null 2>&1 || true
+    fi
+    
+    # Ensure remote exists with correct URL
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        log "Adding git remote with HTTPS token authentication..."
+        git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
+    else
+        # Update existing remote to ensure it's correct
+        git remote set-url origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
+    fi
+    
+    # Verify remote URL is correct
+    VERIFIED_REMOTE=$(git remote get-url origin 2>/dev/null || echo "none")
+    log "Git remote URL: ${VERIFIED_REMOTE}"
     
     # Update sparse checkout paths if needed (in case new scripts are added)
     mkdir -p .git/info
@@ -217,34 +240,35 @@ else
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
     
-    # ALWAYS update remote URL to ensure it uses HTTPS with token (not SSH)
-    log "Updating git remote URL to HTTPS with token..."
-    git remote remove origin >/dev/null 2>&1 || true
-    git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
-    
-    # Verify remote URL is correct
-    CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
-    if [[ "$CURRENT_REMOTE" != *"https://"* ]] || [[ "$CURRENT_REMOTE" != *"@github.com"* ]]; then
-        log "WARNING: Remote URL may be incorrect: $CURRENT_REMOTE"
-        log "Forcing remote URL update..."
-        git remote set-url origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
-    fi
-    
     log "Fetching latest changes (sparse checkout with HTTPS token)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
     FETCH_EXIT_CODE=$?
     
-    if [ $FETCH_EXIT_CODE -eq 0 ]; then
-        log "Checking out updated files..."
-        git checkout -f "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
-        git sparse-checkout reapply 2>&1 | while read line; do log "$line"; done
-    else
+    if [ $FETCH_EXIT_CODE -ne 0 ]; then
         log "ERROR: Git fetch failed (exit code: $FETCH_EXIT_CODE)"
-        log "ERROR: Token authentication may have failed or repository URL is incorrect"
-        log "ERROR: Current remote URL: $(git remote get-url origin 2>/dev/null || echo 'none')"
-        log "ERROR: Expected URL should contain: https://...@github.com/theorem6/lte-pci-mapper.git"
-        exit 1
+        log "ERROR: Attempting to fix repository..."
+        
+        # Try removing and re-adding remote
+        git remote remove origin >/dev/null 2>&1 || true
+        git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
+        
+        # Retry fetch
+        log "Retrying git fetch..."
+        git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+        FETCH_EXIT_CODE=$?
+        
+        if [ $FETCH_EXIT_CODE -ne 0 ]; then
+            log "ERROR: Git fetch still failed after retry"
+            log "ERROR: Token authentication may have failed or repository URL is incorrect"
+            log "ERROR: Repository URL should be: ${GIT_REPO_URL}"
+            exit 1
+        fi
     fi
+    
+    log "Checking out updated files..."
+    git checkout -f "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+    git sparse-checkout reapply 2>&1 | while read line; do log "$line"; done
+    log "Git repository updated successfully"
 fi
 
 # Copy updated scripts from repository
