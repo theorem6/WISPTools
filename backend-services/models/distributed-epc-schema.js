@@ -426,6 +426,7 @@ const EPCCommandSchema = new mongoose.Schema({
   
   // Metadata
   created_by: String, // User ID who created the command
+  version: String, // Version identifier for update commands (based on script hashes)
   notes: String
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

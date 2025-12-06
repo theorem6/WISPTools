@@ -78,6 +78,12 @@ coverage/
 *.temp
 .cache/
 
+# Binary/archive files
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+
 # TypeScript
 *.tsbuildinfo
 

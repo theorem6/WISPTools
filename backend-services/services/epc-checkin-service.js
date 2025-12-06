@@ -157,11 +157,13 @@ async function checkServiceHealth(epc, services) {
 
 /**
  * Get pending commands for EPC
+ * Only returns commands with status 'pending' (not 'sent' or 'completed')
+ * This prevents the same command from being returned multiple times
  */
 async function getPendingCommands(epcId) {
   return await EPCCommand.find({
     epc_id: epcId,
-    status: 'pending',
+    status: 'pending',  // Only pending - sent/completed commands should not be returned again
     expires_at: { $gt: new Date() }
   })
     .sort({ priority: 1, created_at: 1 })

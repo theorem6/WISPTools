@@ -1,5 +1,7 @@
 #!/bin/bash
 # WISPTools EPC Check-in Agent
+# Note: We don't use 'set -e' because we want to handle errors gracefully in daemon mode
+# Individual functions return error codes that are checked explicitly
 # Runs periodically on remote EPCs to:
 #   1. Report service status and system metrics
 #   2. Receive and execute queued commands
@@ -15,11 +17,19 @@ CONFIG_DIR="/etc/wisptools"
 LOG_FILE="/var/log/wisptools-checkin.log"
 CHECKIN_INTERVAL=60  # Default 60 seconds
 
+# Git repository configuration
+GIT_REPO_URL="https://github.com/theorem6/lte-pci-mapper.git"
+GIT_REPO_BRANCH="main"
+GIT_REPO_DIR="/opt/wisptools/repo"
+SCRIPTS_SOURCE_DIR="${GIT_REPO_DIR}/backend-services/scripts"
+
 # Required services to monitor
 REQUIRED_SERVICES="open5gs-mmed open5gs-sgwcd open5gs-sgwud open5gs-smfd open5gs-upfd snmpd"
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] $1" | tee -a "$LOG_FILE"
+    # Write logs to both file and stderr (for systemd journal)
+    # Use >&2 to ensure logs don't contaminate stdout (important for command substitution)
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] $1" | tee -a "$LOG_FILE" >&2
 }
 
 # Get device code
@@ -211,10 +221,11 @@ get_versions() {
     local open5gs_version=$(dpkg -l 2>/dev/null | grep open5gs-mme | awk '{print $3}' | head -1 | tr -d '\n\r')
     [ -z "$open5gs_version" ] && open5gs_version="not installed"
     
-    # Get script versions/hashes
+    # Get script versions/hashes - CRITICAL: Must report ALL script hashes to prevent duplicate updates
     local agent_hash=$(get_file_hash "/opt/wisptools/epc-checkin-agent.sh")
     local snmp_hash=""
     local snmp_js_hash=""
+    local ping_monitor_hash=""
     
     # Get hash for bash version (if exists)
     if [ -f "/opt/wisptools/epc-snmp-discovery.sh" ]; then
@@ -226,16 +237,23 @@ get_versions() {
         snmp_js_hash=$(get_file_hash "/opt/wisptools/epc-snmp-discovery.js")
     fi
     
-    # Build scripts object
+    # Get hash for ping monitor (if exists) - THIS WAS MISSING!
+    if [ -f "/opt/wisptools/epc-ping-monitor.js" ]; then
+        ping_monitor_hash=$(get_file_hash "/opt/wisptools/epc-ping-monitor.js")
+    fi
+    
+    # Build scripts object - include ALL scripts that might be updated
     local scripts_json="\"scripts\":{\"epc-checkin-agent.sh\":{\"hash\":\"$agent_hash\"}"
     [ -n "$snmp_hash" ] && scripts_json="${scripts_json},\"epc-snmp-discovery.sh\":{\"hash\":\"$snmp_hash\"}"
     [ -n "$snmp_js_hash" ] && scripts_json="${scripts_json},\"epc-snmp-discovery.js\":{\"hash\":\"$snmp_js_hash\"}"
+    [ -n "$ping_monitor_hash" ] && scripts_json="${scripts_json},\"epc-ping-monitor.js\":{\"hash\":\"$ping_monitor_hash\"}"
     scripts_json="${scripts_json}}"
     
     echo "{\"os\":\"$os_info\",\"kernel\":\"$kernel\",\"open5gs\":\"$open5gs_version\",$scripts_json}"
 }
 
 # Execute a command
+# Returns 0 on success (command executed and result reported), 1 on failure
 execute_command() {
     local cmd_id=$1
     local cmd_type=$2
@@ -335,6 +353,13 @@ execute_command() {
                 # Log script first few lines for debugging
                 log "  -> Script preview: $(head -3 "$script_file" | tr '\n' '; ')"
                 
+                # Check if script will restart daemon - if so, we need to report result first
+                local will_restart_daemon=false
+                if grep -q "systemctl.*restart.*wisptools-checkin\|restart.*checkin" "$script_file" 2>/dev/null; then
+                    will_restart_daemon=true
+                    log "  -> WARNING: Script will restart daemon - will report result before restart"
+                fi
+                
                 # Capture both stdout and stderr
                 log "  -> Running script..."
                 if output=$("$script_file" 2>&1); then
@@ -348,6 +373,158 @@ execute_command() {
                     log "ERROR: Script execution failed with exit code $exit_code"
                     log "ERROR: Script output: $(echo "$output" | head -10 | tr '\n' '; ')"
                 fi
+                
+                # CRITICAL: Report result in background process that survives daemon restart
+                # The script may restart the daemon, killing this process before HTTP request completes
+                # So we report in a background process that will continue even if this process dies
+                log "  -> Reporting command result in background (survives daemon restart)"
+                
+                # Get device code for background script
+                local device_code=$(get_device_code)
+                
+                # Create a temporary script to report the result
+                local report_script="/tmp/report-result-${cmd_id}.sh"
+                # Escape output and error for safe JSON embedding
+                # Use base64 encoding to avoid all escaping issues
+                local output_b64=$(echo -n "$result_output" | base64 -w 0 2>/dev/null || echo -n "$result_output" | base64 2>/dev/null | tr -d '\n')
+                local error_b64=$(echo -n "$result_error" | base64 -w 0 2>/dev/null || echo -n "$result_error" | base64 2>/dev/null | tr -d '\n')
+                
+                cat > "$report_script" << 'REPORTEOF'
+#!/bin/bash
+# Background result reporting script - survives daemon restart
+API_URL="https://hss.wisptools.io/api/epc"
+DEVICE_CODE="REPORTEOF
+                echo "$device_code" >> "$report_script"
+                cat >> "$report_script" << REPORTEOF
+"
+CMD_ID="REPORTEOF
+                echo "$cmd_id" >> "$report_script"
+                cat >> "$report_script" << REPORTEOF
+"
+SUCCESS="REPORTEOF
+                echo "$result_success" >> "$report_script"
+                cat >> "$report_script" << REPORTEOF
+"
+OUTPUT_B64="REPORTEOF
+                echo "$output_b64" >> "$report_script"
+                cat >> "$report_script" << REPORTEOF
+"
+ERROR_B64="REPORTEOF
+                echo "$error_b64" >> "$report_script"
+                cat >> "$report_script" << 'REPORTEOF'
+"
+EXIT_CODE=REPORTEOF
+                echo "$exit_code" >> "$report_script"
+                cat >> "$report_script" << 'REPORTEOF'
+
+# Decode base64 output/error
+OUTPUT=$(echo -n "$OUTPUT_B64" | base64 -d 2>/dev/null || echo "$OUTPUT_B64")
+ERROR=$(echo -n "$ERROR_B64" | base64 -d 2>/dev/null || echo "$ERROR_B64")
+
+# Escape for JSON
+OUTPUT_JSON=$(echo -n "$OUTPUT" | jq -Rs . 2>/dev/null || echo "\"$(echo -n "$OUTPUT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' ' ')\"")
+ERROR_JSON=$(echo -n "$ERROR" | jq -Rs . 2>/dev/null || echo "\"$(echo -n "$ERROR" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' ' ')\"")
+
+# Wait a moment for daemon restart to complete
+sleep 2
+
+# Report result with retries
+for i in 1 2 3; do
+    if command -v timeout >/dev/null 2>&1; then
+        response=$(timeout 30 curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/commands/${CMD_ID}/result" \
+            -H "Content-Type: application/json" \
+            -H "X-Device-Code: ${DEVICE_CODE}" \
+            -d "{\"success\":${SUCCESS},\"output\":${OUTPUT_JSON},\"error\":${ERROR_JSON},\"exit_code\":${EXIT_CODE}}" \
+            --max-time 25 \
+            --connect-timeout 10 \
+            2>&1)
+        http_code=$(echo "$response" | tail -n1)
+    else
+        response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/commands/${CMD_ID}/result" \
+            -H "Content-Type: application/json" \
+            -H "X-Device-Code: ${DEVICE_CODE}" \
+            -d "{\"success\":${SUCCESS},\"output\":${OUTPUT_JSON},\"error\":${ERROR_JSON},\"exit_code\":${EXIT_CODE}}" \
+            --max-time 25 \
+            --connect-timeout 10 \
+            2>&1)
+        http_code=$(echo "$response" | tail -n1)
+    fi
+    
+    if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] Command ${CMD_ID} result reported successfully (attempt $i)" >> /var/log/wisptools-checkin.log
+        rm -f "REPORTEOF
+                echo "$report_script" >> "$report_script"
+                cat >> "$report_script" << 'REPORTEOF'
+"
+        exit 0
+    else
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Failed to report command ${CMD_ID} result (HTTP $http_code, attempt $i)" >> /var/log/wisptools-checkin.log
+        if [ $i -lt 3 ]; then
+            sleep 5
+        fi
+    fi
+done
+
+# If all retries failed, log it
+echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Command ${CMD_ID} result reporting failed after 3 attempts" >> /var/log/wisptools-checkin.log
+rm -f "REPORTEOF
+                echo "$report_script" >> "$report_script"
+                cat >> "$report_script" << 'REPORTEOF'
+"
+REPORTEOF
+
+# Wait a moment for daemon restart to complete
+sleep 2
+
+# Report result with retries
+for i in 1 2 3; do
+    if command -v timeout >/dev/null 2>&1; then
+        response=\$(timeout 30 curl -s -w "\\n%{http_code}" -X POST "\${API_URL}/checkin/commands/\${CMD_ID}/result" \\
+            -H "Content-Type: application/json" \\
+            -H "X-Device-Code: \${DEVICE_CODE}" \\
+            -d "{\\"success\\":\${SUCCESS},\\"output\\":\\"\${OUTPUT}\\",\\"error\\":\\"\${ERROR}\\",\\"exit_code\\":\${EXIT_CODE}}" \\
+            --max-time 25 \\
+            --connect-timeout 10 \\
+            2>&1)
+        http_code=\$(echo "\$response" | tail -n1)
+    else
+        response=\$(curl -s -w "\\n%{http_code}" -X POST "\${API_URL}/checkin/commands/\${CMD_ID}/result" \\
+            -H "Content-Type: application/json" \\
+            -H "X-Device-Code: \${DEVICE_CODE}" \\
+            -d "{\\"success\\":\${SUCCESS},\\"output\\":\\"\${OUTPUT}\\",\\"error\\":\\"\${ERROR}\\",\\"exit_code\\":\${EXIT_CODE}}" \\
+            --max-time 25 \\
+            --connect-timeout 10 \\
+            2>&1)
+        http_code=\$(echo "\$response" | tail -n1)
+    fi
+    
+    if [ "\$http_code" = "200" ] || [ "\$http_code" = "201" ]; then
+        echo "\$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] Command \${CMD_ID} result reported successfully (attempt \$i)" >> /var/log/wisptools-checkin.log
+        rm -f "$report_script"
+        exit 0
+    else
+        echo "\$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Failed to report command \${CMD_ID} result (HTTP \$http_code, attempt \$i)" >> /var/log/wisptools-checkin.log
+        if [ \$i -lt 3 ]; then
+            sleep 5
+        fi
+    fi
+done
+
+# If all retries failed, log it
+echo "\$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Command \${CMD_ID} result reporting failed after 3 attempts" >> /var/log/wisptools-checkin.log
+rm -f "$report_script"
+EOF
+                chmod +x "$report_script"
+                
+                # Run in background with nohup - this will survive daemon restart
+                # Use nohup and redirect to log file so we can see if it worked
+                nohup bash "$report_script" >> /var/log/wisptools-checkin.log 2>&1 &
+                local report_pid=$!
+                log "  -> Result reporting started in background (PID: $report_pid, script: $report_script)"
+                
+                # Don't wait for it - let it run independently
+                # The background script will retry up to 3 times if needed
+                
                 rm -f "$script_file"
             elif [ "$result_success" = false ]; then
                 log "ERROR: Script file not created or command already failed"
@@ -434,8 +611,12 @@ execute_command() {
             ;;
     esac
     
-    # Report result
-    report_command_result "$cmd_id" "$result_success" "$result_output" "$result_error" "$exit_code"
+    # Report result (unless already reported in script_execution case)
+    # Script execution reports immediately to avoid daemon restart killing the process
+    if [ "$cmd_type" != "script_execution" ] && [ "$cmd_type" != "script" ]; then
+        report_command_result "$cmd_id" "$result_success" "$result_output" "$result_error" "$exit_code"
+    fi
+    # Note: script_execution already reported result above, before any daemon restart
 }
 
 # Report command result back to server
@@ -452,20 +633,65 @@ report_command_result() {
     output=$(echo "$output" | sed 's/"/\\"/g' | tr '\n' ' ')
     error=$(echo "$error" | sed 's/"/\\"/g' | tr '\n' ' ')
     
-    curl -s -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
-        -H "Content-Type: application/json" \
-        -H "X-Device-Code: $device_code" \
-        -d "{
-            \"success\": $success,
-            \"output\": \"$output\",
-            \"error\": \"$error\",
-            \"exit_code\": $exit_code
-        }" \
-        --max-time 30 \
-        --connect-timeout 10 \
-        >/dev/null 2>&1
+    # Report command result with timeout to prevent hanging (CRITICAL - must succeed to prevent duplicate commands)
+    # Use timeout command for extra safety in case curl hangs
+    local result_reported=false
+    if command -v timeout >/dev/null 2>&1; then
+        local result_response=$(timeout 35 curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
+            -H "Content-Type: application/json" \
+            -H "X-Device-Code: $device_code" \
+            -d "{
+                \"success\": $success,
+                \"output\": \"$output\",
+                \"error\": \"$error\",
+                \"exit_code\": $exit_code
+            }" \
+            --max-time 30 \
+            --connect-timeout 10 \
+            2>&1)
+        local result_http_code=$(echo "$result_response" | tail -n1)
+        if [ "$result_http_code" = "200" ] || [ "$result_http_code" = "201" ]; then
+            result_reported=true
+            log "Command $cmd_id result reported successfully: success=$success"
+        else
+            log "ERROR: Failed to report command result (HTTP $result_http_code) - command may be re-queued"
+            log "Response: $(echo "$result_response" | head -c 200)"
+        fi
+    else
+        # Fallback if timeout command not available
+        local result_response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin/commands/${cmd_id}/result" \
+            -H "Content-Type: application/json" \
+            -H "X-Device-Code: $device_code" \
+            -d "{
+                \"success\": $success,
+                \"output\": \"$output\",
+                \"error\": \"$error\",
+                \"exit_code\": $exit_code
+            }" \
+            --max-time 30 \
+            --connect-timeout 10 \
+            2>&1)
+        local result_http_code=$(echo "$result_response" | tail -n1)
+        if [ "$result_http_code" = "200" ] || [ "$result_http_code" = "201" ]; then
+            result_reported=true
+            log "Command $cmd_id result reported successfully: success=$success"
+        else
+            log "ERROR: Failed to report command result (HTTP $result_http_code) - command may be re-queued"
+            log "Response: $(echo "$result_response" | head -c 200)"
+        fi
+    fi
     
-    log "Command $cmd_id result reported: success=$success"
+    if [ "$result_reported" = false ]; then
+        log "ERROR: Command $cmd_id result NOT reported successfully - command may appear again on next check-in"
+        return 1
+    else
+        # Don't log "fully processed" here for script_execution - it's already logged above
+        # and the daemon might restart soon
+        if [ "$cmd_type" != "script_execution" ] && [ "$cmd_type" != "script" ]; then
+            log "Command $cmd_id fully processed: executed and result reported"
+        fi
+        return 0
+    fi
 }
 
 # Main check-in function
@@ -547,16 +773,43 @@ do_checkin() {
     fi
     
     # Send check-in with HTTP status code capture
+    # Use timeouts to prevent hanging: 30s total, 10s connect, 20s transfer
+    # Wrap curl with timeout command if available for extra safety
     local http_code=0
-    local response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
-        -H "Content-Type: application/json" \
-        -H "X-Device-Code: $device_code" \
-        -d "$payload" \
-        --max-time 30 \
-        --connect-timeout 10 \
-        2>&1)
+    local response
+    local curl_exit_code
     
-    local curl_exit_code=$?
+    if command -v timeout >/dev/null 2>&1; then
+        # Use timeout command for extra protection against hanging
+        response=$(timeout 35 curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
+            -H "Content-Type: application/json" \
+            -H "X-Device-Code: $device_code" \
+            -d "$payload" \
+            --max-time 30 \
+            --connect-timeout 10 \
+            --retry 0 \
+            --retry-delay 0 \
+            2>&1)
+        curl_exit_code=$?
+        
+        # Check if timeout command killed curl (exit code 124 = timeout)
+        if [ $curl_exit_code -eq 124 ]; then
+            log "ERROR: Check-in timed out after 35 seconds (timeout command)"
+            return 1
+        fi
+    else
+        # Fallback if timeout command not available (use curl's built-in timeouts)
+        response=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/checkin" \
+            -H "Content-Type: application/json" \
+            -H "X-Device-Code: $device_code" \
+            -d "$payload" \
+            --max-time 30 \
+            --connect-timeout 10 \
+            --retry 0 \
+            --retry-delay 0 \
+            2>&1)
+        curl_exit_code=$?
+    fi
     
     # Extract HTTP status code (last line)
     http_code=$(echo "$response" | tail -n1)
@@ -693,13 +946,37 @@ do_checkin() {
         
         # Collect and send ping metrics for monitoring devices
         if command -v node >/dev/null 2>&1; then
-            # Download ping monitor script if missing
+            # Get ping monitor script from git repository if missing
             if [ ! -f /opt/wisptools/epc-ping-monitor.js ]; then
-                log "Ping monitor script not found, downloading..."
-                curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
-                chmod +x /opt/wisptools/epc-ping-monitor.js && \
-                log "Ping monitor script downloaded successfully" || \
-                log "WARNING: Failed to download ping monitor script"
+                log "Ping monitor script not found, checking git repository..."
+                # Try to get from git repository first
+                if [ -d "$GIT_REPO_DIR" ] && [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ]; then
+                    cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/epc-ping-monitor.js
+                    chmod +x /opt/wisptools/epc-ping-monitor.js
+                    log "Ping monitor script copied from git repository"
+                elif [ -d "$GIT_REPO_DIR" ]; then
+                    # Repository exists but script missing - try to update repo
+                    log "Updating git repository to get ping monitor script..."
+                    cd "$GIT_REPO_DIR" && git fetch origin "$GIT_REPO_BRANCH" >/dev/null 2>&1 && git reset --hard "origin/${GIT_REPO_BRANCH}" >/dev/null 2>&1
+                    if [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ]; then
+                        cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/epc-ping-monitor.js
+                        chmod +x /opt/wisptools/epc-ping-monitor.js
+                        log "Ping monitor script copied from updated git repository"
+                    else
+                        log "WARNING: Ping monitor script not found in repository, falling back to download"
+                        curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
+                        chmod +x /opt/wisptools/epc-ping-monitor.js && \
+                        log "Ping monitor script downloaded successfully" || \
+                        log "WARNING: Failed to download ping monitor script"
+                    fi
+                else
+                    # No git repository - fallback to download
+                    log "Git repository not available, downloading ping monitor script..."
+                    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null && \
+                    chmod +x /opt/wisptools/epc-ping-monitor.js && \
+                    log "Ping monitor script downloaded successfully" || \
+                    log "WARNING: Failed to download ping monitor script"
+                fi
             fi
             
             # Run ping cycle if script exists
@@ -714,6 +991,7 @@ do_checkin() {
         
         # Execute commands
         if [ "$cmd_count" -gt 0 ]; then
+            log "Processing $cmd_count command(s) from check-in response"
             echo "$response" | jq -c '.commands[]' | while read -r cmd; do
                 local cmd_id=$(echo "$cmd" | jq -r '.id')
                 local cmd_type=$(echo "$cmd" | jq -r '.type')
@@ -722,15 +1000,27 @@ do_checkin() {
                 local script_content=$(echo "$cmd" | jq -r '.script_content // empty')
                 local script_url=$(echo "$cmd" | jq -r '.script_url // empty')
                 
+                # Validate command ID
+                if [ -z "$cmd_id" ] || [ "$cmd_id" = "null" ]; then
+                    log "ERROR: Invalid command ID in response, skipping command"
+                    continue
+                fi
+                
                 # For config_update, pass the full command JSON so we can extract config_data properly
                 local cmd_json_file="/tmp/wisptools-cmd-$cmd_id.json"
                 echo "$cmd" > "$cmd_json_file"
                 
                 # Log command details for debugging
-                log "Command details - ID: $cmd_id, Type: $cmd_type, Has config_data: $(echo "$cmd" | jq -r 'if .config_data then "yes" else "no" end')"
+                log "Executing command - ID: $cmd_id, Type: $cmd_type, Action: ${action:-N/A}, Has config_data: $(echo "$cmd" | jq -r 'if .config_data then "yes" else "no" end')"
                 
-                execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url" "$cmd_json_file"
+                # Execute command and ensure result is reported
+                if execute_command "$cmd_id" "$cmd_type" "$action" "$target_services" "$script_content" "$script_url" "$cmd_json_file"; then
+                    log "Command $cmd_id execution completed successfully"
+                else
+                    log "ERROR: Command $cmd_id execution failed or result reporting failed"
+                fi
             done
+            log "Finished processing all commands from check-in"
         fi
         
     elif [ "$status" = "unregistered" ]; then
@@ -754,45 +1044,88 @@ install_agent() {
     mkdir -p /opt/wisptools
     mkdir -p "$CONFIG_DIR"
     
-    # Download the script (handles piped install)
-    echo "Downloading check-in agent..."
-    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
+    # Install git if not present
+    if ! command -v git >/dev/null 2>&1; then
+        echo "Installing git..."
+        apt-get update -qq >/dev/null 2>&1
+        apt-get install -y git >/dev/null 2>&1 || {
+            echo "ERROR: Failed to install git"
+            exit 1
+        }
+        echo "Git installed successfully"
+    fi
+    
+    # Set up git repository for scripts
+    echo "Setting up git repository..."
+    if [ ! -d "$GIT_REPO_DIR" ]; then
+        mkdir -p "$GIT_REPO_DIR"
+        git clone --depth 1 --branch "$GIT_REPO_BRANCH" "$GIT_REPO_URL" "$GIT_REPO_DIR" 2>/dev/null || {
+            echo "WARNING: Could not clone repository, will use download method"
+            GIT_REPO_DIR=""
+        }
+    else
+        cd "$GIT_REPO_DIR"
+        git fetch origin "$GIT_REPO_BRANCH" 2>/dev/null || true
+        git reset --hard "origin/${GIT_REPO_BRANCH}" 2>/dev/null || true
+    fi
+    
+    # Download the script (handles piped install) - fallback if git fails
+    if [ -z "$GIT_REPO_DIR" ] || [ ! -f "${SCRIPTS_SOURCE_DIR}/epc-checkin-agent.sh" ]; then
+        echo "Downloading check-in agent from server..."
+        curl -fsSL --max-time 60 --connect-timeout 10 "https://${CENTRAL_SERVER}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to download check-in agent script"
+            exit 1
+        fi
+    else
+        echo "Copying check-in agent from git repository..."
+        cp "${SCRIPTS_SOURCE_DIR}/epc-checkin-agent.sh" /opt/wisptools/epc-checkin-agent.sh
+    fi
     chmod +x /opt/wisptools/epc-checkin-agent.sh
     
-    # Download SNMP discovery scripts (Node.js preferred, bash as fallback)
-    echo "Downloading SNMP discovery scripts..."
+    # Install/update scripts from git repository or download
+    echo "Installing agent scripts..."
     
-    # Node.js version
-    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.js" -o /opt/wisptools/epc-snmp-discovery.js 2>/dev/null || true
-    if [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
-        chmod +x /opt/wisptools/epc-snmp-discovery.js
-        echo "Node.js SNMP discovery script downloaded"
+    if [ -n "$GIT_REPO_DIR" ] && [ -d "$SCRIPTS_SOURCE_DIR" ]; then
+        # Copy scripts from git repository
+        echo "Copying scripts from git repository..."
+        [ -f "${SCRIPTS_SOURCE_DIR}/epc-snmp-discovery.js" ] && cp "${SCRIPTS_SOURCE_DIR}/epc-snmp-discovery.js" /opt/wisptools/ && chmod +x /opt/wisptools/epc-snmp-discovery.js && echo "Node.js SNMP discovery script installed"
+        [ -f "${SCRIPTS_SOURCE_DIR}/epc-snmp-discovery.sh" ] && cp "${SCRIPTS_SOURCE_DIR}/epc-snmp-discovery.sh" /opt/wisptools/ && chmod +x /opt/wisptools/epc-snmp-discovery.sh && echo "Bash SNMP discovery script installed"
+        [ -f "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" ] && cp "${SCRIPTS_SOURCE_DIR}/epc-ping-monitor.js" /opt/wisptools/ && chmod +x /opt/wisptools/epc-ping-monitor.js && echo "Ping monitoring script installed"
+    else
+        # Fallback to download method
+        echo "Downloading scripts from server..."
+        # Node.js version
+        curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.js" -o /opt/wisptools/epc-snmp-discovery.js 2>/dev/null || true
+        if [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+            chmod +x /opt/wisptools/epc-snmp-discovery.js
+            echo "Node.js SNMP discovery script downloaded"
+        fi
         
-        # Install npm packages if Node.js is available
-        if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-            echo "Installing npm packages for SNMP discovery..."
-            cd /opt/wisptools
-            npm init -y >/dev/null 2>&1 || true
-            npm install --no-save ping-scanner net-snmp >/dev/null 2>&1 || echo "Warning: Failed to install npm packages, will use fallback methods"
+        # Bash version (fallback)
+        curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.sh" -o /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+        if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
+            chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
+            echo "Bash SNMP discovery script downloaded (fallback)"
+        fi
+        
+        # Download ping monitoring script
+        curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null || true
+        if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
+            chmod +x /opt/wisptools/epc-ping-monitor.js
+            echo "Ping monitoring script downloaded"
         fi
     fi
     
-    # Bash version (fallback)
-    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-snmp-discovery.sh" -o /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
-    if [ -f /opt/wisptools/epc-snmp-discovery.sh ]; then
-        chmod +x /opt/wisptools/epc-snmp-discovery.sh 2>/dev/null || true
-        echo "Bash SNMP discovery script downloaded (fallback)"
+    # Install npm packages if Node.js is available
+    if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1 && [ -f /opt/wisptools/epc-snmp-discovery.js ]; then
+        echo "Installing npm packages for SNMP discovery..."
+        cd /opt/wisptools
+        npm init -y >/dev/null 2>&1 || true
+        npm install --no-save ping-scanner net-snmp >/dev/null 2>&1 || echo "Warning: Failed to install npm packages, will use fallback methods"
     fi
     
-    # Download ping monitoring script
-    echo "Downloading ping monitoring script..."
-    curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>/dev/null || true
-    if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
-        chmod +x /opt/wisptools/epc-ping-monitor.js
-        echo "Ping monitoring script downloaded"
-    fi
-    
-    # Create systemd service
+    # Create systemd service with robust restart configuration
     cat > /etc/systemd/system/wisptools-checkin.service << 'SVCEOF'
 [Unit]
 Description=WISPTools EPC Check-in Agent
@@ -804,6 +1137,20 @@ Type=simple
 ExecStart=/opt/wisptools/epc-checkin-agent.sh daemon
 Restart=always
 RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wisptools-checkin
+
+# Resource limits and timeouts
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+# Keep running even if service fails repeatedly
+StartLimitAction=none
 
 [Install]
 WantedBy=multi-user.target
@@ -819,13 +1166,57 @@ SVCEOF
     echo "View logs: tail -f $LOG_FILE"
 }
 
-# Daemon mode - continuous check-in loop
+# Daemon mode - continuous check-in loop with error recovery
 daemon_mode() {
     log "Starting check-in daemon (interval: ${CHECKIN_INTERVAL}s)"
     
+    local consecutive_failures=0
+    local max_consecutive_failures=10
+    local failure_backoff=60  # Start with 60 second backoff on failures
+    
     while true; do
-        do_checkin
-        sleep "$CHECKIN_INTERVAL"
+        # Run check-in with error handling
+        if do_checkin; then
+            # Success - reset failure counter and use normal interval
+            consecutive_failures=0
+            failure_backoff=60
+            sleep "$CHECKIN_INTERVAL"
+        else
+            # Failure - increment counter and use exponential backoff
+            consecutive_failures=$((consecutive_failures + 1))
+            log "Check-in failed (consecutive failures: $consecutive_failures/$max_consecutive_failures)"
+            
+            # Exponential backoff: 60s, 120s, 240s, 480s, max 600s
+            local backoff_time=$((failure_backoff * (2 ** (consecutive_failures - 1))))
+            if [ $backoff_time -gt 600 ]; then
+                backoff_time=600  # Cap at 10 minutes
+            fi
+            
+            # If too many consecutive failures, log warning but keep trying
+            if [ $consecutive_failures -ge $max_consecutive_failures ]; then
+                log "WARNING: $consecutive_failures consecutive check-in failures - using extended backoff (${backoff_time}s)"
+                log "Daemon will continue retrying - check network connectivity and backend status"
+            else
+                log "Retrying in ${backoff_time}s (backoff due to failure)"
+            fi
+            
+            sleep "$backoff_time"
+        fi
+        
+        # Safety check - if we've been running for a very long time without success, log it
+        # But don't exit - keep trying
+        if [ $consecutive_failures -gt 50 ]; then
+            log "CRITICAL: Over 50 consecutive failures - check-in may be completely broken"
+            log "Daemon will continue running - please investigate backend connectivity"
+            consecutive_failures=0  # Reset counter to prevent log spam
+        fi
+        
+        # Health check - log daemon is still alive periodically
+        # Log every 10 failures or every 10 successful check-ins (whichever comes first)
+        local health_check_interval=10
+        if [ $((consecutive_failures % $health_check_interval)) -eq 0 ] && [ $consecutive_failures -gt 0 ]; then
+            log "HEALTH: Daemon is running (consecutive failures: $consecutive_failures) - will continue retrying"
+        fi
     done
 }
 

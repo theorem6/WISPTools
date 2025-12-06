@@ -381,12 +381,20 @@ router.get('/snmp/discovered', async (req, res) => {
         ipAddress = 'Unknown';
       }
       
+      // Include location data from device record
+      const location = device.location || {};
+      const locationCoordinates = location.coordinates || {
+        latitude: location.latitude || 0,
+        longitude: location.longitude || 0
+      };
+
       return {
         id: device._id.toString(),
         name: device.name || notes.sysName || notes.sysDescr || ipAddress || 'Unknown Device',
         ipAddress: ipAddress,
         ip_address: ipAddress, // Also include snake_case for compatibility
         deviceType: notes.device_type || device.type || 'other',
+        type: notes.device_type || device.type || 'snmp', // Add type field for compatibility
         manufacturer: notes.manufacturer_detected_via_oui || 
                       notes.oui_detection?.manufacturer || 
                       device.manufacturer || 
@@ -401,7 +409,16 @@ router.get('/snmp/discovered', async (req, res) => {
           version: notes.snmp_version || 'v2c'
         },
         isDeployed,
+        siteId: device.siteId ? (typeof device.siteId === 'object' ? device.siteId.toString() : device.siteId) : null,
         enableGraphs,
+        // Include location data for map display
+        location: {
+          coordinates: {
+            latitude: locationCoordinates.latitude || 0,
+            longitude: locationCoordinates.longitude || 0
+          },
+          address: location.address || 'Discovered Device'
+        },
         // Include OID walk data if available
         oidWalk: notes.oid_walk || null,
         interfaces: notes.oid_walk?.interfaces || null,

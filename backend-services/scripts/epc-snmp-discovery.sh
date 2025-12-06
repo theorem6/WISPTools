@@ -8,7 +8,8 @@ CONFIG_DIR="/etc/wisptools"
 LOG_FILE="/var/log/wisptools-snmp-discovery.log"
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [SNMP-DISCOVERY] $1" | tee -a "$LOG_FILE"
+    # Write logs to stderr and log file, NOT stdout (stdout is used for JSON output)
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [SNMP-DISCOVERY] $1" | tee -a "$LOG_FILE" >&2
 }
 
 # Get device code
@@ -617,7 +618,7 @@ report_discovered_devices() {
             '{
                 device_code: $device_code,
                 discovered_devices: $discovered_devices
-            }' 2>&1)
+            }' 2>/dev/null)
         
         # Check if jq command succeeded
         if [ $? -ne 0 ] || [ -z "$payload" ] || ! echo "$payload" | jq empty 2>/dev/null; then
@@ -655,6 +656,7 @@ report_discovered_devices() {
         log "WARNING: No tenant ID cached - request may fail tenant validation"
     fi
     
+    # Capture curl response (stdout) but keep stderr visible for debugging
     local response=$(curl -s -X POST "${API_URL}/snmp/discovered" \
         "${curl_headers[@]}" \
         -w "\nHTTP_CODE:%{http_code}" \
@@ -798,8 +800,8 @@ main() {
     # Common SNMP communities to try
     local communities="public,private,community"
     
-    # Scan network
-    local discovered_devices=$(scan_network "$subnet" "$communities")
+    # Scan network - capture only stdout (JSON), stderr (logs) goes to terminal/log
+    local discovered_devices=$(scan_network "$subnet" "$communities" 2>/dev/null)
     
     # Report to server
     report_discovered_devices "$discovered_devices"

@@ -403,47 +403,66 @@
       try {
         const snmpResult = await monitoringService.getSNMPDevices();
         if (snmpResult.success && snmpResult.data?.devices) {
-          // Filter to only deployed devices with valid coordinates
-          snmpResult.data.devices
-            .filter((device: any) => {
-              // Only deployed devices
-              const isDeployed = device.isDeployed === true || !!device.siteId;
-              if (!isDeployed) return false;
-              
-              // Only devices with valid coordinates
-              const lat = device.location?.coordinates?.latitude || device.location?.latitude;
-              const lon = device.location?.coordinates?.longitude || device.location?.longitude;
-              return lat != null && lon != null && lat !== 0 && lon !== 0 && 
-                     lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-            })
-            .forEach((device: any) => addDevice(device, 'snmp'));
+          // Show all SNMP devices - include discovered ones even if not deployed
+          // The SNMP devices endpoint returns configured SNMP devices, which may include discovered ones
+          snmpResult.data.devices.forEach((device: any) => {
+            // Ensure location structure is correct
+            if (!device.location) {
+              device.location = {
+                coordinates: { latitude: 0, longitude: 0 },
+                address: 'SNMP Device - Location Unknown'
+              };
+            } else if (!device.location.coordinates) {
+              device.location = {
+                coordinates: {
+                  latitude: device.location.latitude || 0,
+                  longitude: device.location.longitude || 0
+                },
+                address: device.location.address || 'SNMP Device'
+              };
+            }
+            addDevice(device, 'snmp');
+          });
+          console.log('[Network Monitoring] Loaded SNMP devices:', snmpResult.data.devices.length);
         }
-      } catch (e) { console.log('SNMP API not available:', e); }
+      } catch (e) { 
+        console.error('[Network Monitoring] Error loading SNMP devices:', e); 
+      }
       
       // Load discovered devices from EPC agents (CDP/LLDP, ping, SNMP)
-      // Only add deployed devices with valid coordinates (same rules as map)
+      // Show ALL discovered devices - they don't need to be deployed or have coordinates
+      // Discovered devices are shown so users can see what was found and potentially deploy them
       try {
         const discoveredResult = await monitoringService.getDiscoveredDevices();
         if (discoveredResult.success && discoveredResult.data?.devices) {
-          discoveredResult.data.devices
-            .filter((device: any) => {
-              // Only deployed devices
-              const isDeployed = device.isDeployed === true || !!device.siteId;
-              if (!isDeployed) return false;
-              
-              // Only devices with valid coordinates
-              const lat = device.location?.coordinates?.latitude || device.location?.latitude;
-              const lon = device.location?.coordinates?.longitude || device.location?.longitude;
-              return lat != null && lon != null && lat !== 0 && lon !== 0 && 
-                     lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
-            })
-            .forEach((device: any) => {
-              // Add discovered devices with neighbor information
-              addDevice(device, device.type || 'snmp');
-            });
-          console.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.data.devices.length);
+          discoveredResult.data.devices.forEach((device: any) => {
+            // Add discovered devices - include all of them, not just deployed ones
+            // If device doesn't have location, use a default or the EPC's location
+            if (!device.location) {
+              device.location = {
+                coordinates: {
+                  latitude: 0,
+                  longitude: 0
+                },
+                address: 'Discovered Device - Location Unknown'
+              };
+            } else if (!device.location.coordinates) {
+              // Convert flat location to coordinates structure
+              device.location = {
+                coordinates: {
+                  latitude: device.location.latitude || 0,
+                  longitude: device.location.longitude || 0
+                },
+                address: device.location.address || 'Discovered Device'
+              };
+            }
+            addDevice(device, device.type || 'snmp');
+          });
+          console.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.data.devices.length, '(all devices, including undeployed)');
         }
-      } catch (e) { console.log('Discovered devices API not available:', e); }
+      } catch (e) { 
+        console.error('[Network Monitoring] Error loading discovered devices:', e); 
+      }
       
       networkDevices = devices;
       console.log('[Network Monitoring] Loaded network devices:', devices.length, '(deduped)');

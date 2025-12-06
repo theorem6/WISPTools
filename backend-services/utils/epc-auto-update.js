@@ -61,17 +61,33 @@ async function checkForUpdates(epc_id, currentVersions = {}) {
       // If version doesn't match or doesn't exist, mark for update
       const epcHash = currentVersion?.hash || null;
       
-      // Always check for updates - if no hash reported or hash differs, update
-      if (!epcHash || epcHash !== currentHash) {
+      // Check for updates - if no hash reported or hash differs, update
+      // BUT: If hash is reported and matches, skip update (even if file was just updated)
+      // SPECIAL CASE: If agent script itself needs updating and no hash is reported,
+      // prioritize it since updating the agent will enable hash reporting for other scripts
+      if (!epcHash) {
+        // No hash reported - EPC might be old version or script doesn't exist
+        // For agent script, this is critical - update it first to enable hash reporting
+        updates[scriptName] = {
+          url: `https://${CENTRAL_SERVER}/downloads/scripts/${scriptName}`,
+          hash: currentHash,
+          size: (await fs.stat(scriptPath)).size,
+          updated: true,
+          priority: scriptName === 'epc-checkin-agent.sh' ? 1 : 5 // Agent gets highest priority
+        };
+        console.log(`[EPC Auto-Update] ${scriptName} needs update (no hash reported). Server: ${currentHash.substring(0, 16)}...`);
+      } else if (epcHash !== currentHash) {
+        // Hash differs - needs update
         updates[scriptName] = {
           url: `https://${CENTRAL_SERVER}/downloads/scripts/${scriptName}`,
           hash: currentHash,
           size: (await fs.stat(scriptPath)).size,
           updated: true
         };
-        console.log(`[EPC Auto-Update] ${scriptName} needs update. EPC: ${epcHash || 'none'}, Server: ${currentHash}`);
+        console.log(`[EPC Auto-Update] ${scriptName} needs update. EPC: ${epcHash.substring(0, 16)}..., Server: ${currentHash.substring(0, 16)}...`);
       } else {
-        console.log(`[EPC Auto-Update] ${scriptName} is up to date (${currentHash.substring(0, 8)}...)`);
+        // Hash matches - up to date
+        console.log(`[EPC Auto-Update] ${scriptName} is up to date (${currentHash.substring(0, 16)}...)`);
       }
     } catch (error) {
       // Script doesn't exist, skip
@@ -79,41 +95,134 @@ async function checkForUpdates(epc_id, currentVersions = {}) {
     }
   }
   
+  // Calculate version hash from all script hashes (deterministic version)
+  let versionHash = null;
+  if (Object.keys(updates).length > 0) {
+    const hash = crypto.createHash('sha256');
+    Object.entries(updates).sort().forEach(([scriptName, info]) => {
+      hash.update(`${scriptName}:${info.hash}`);
+    });
+    versionHash = hash.digest('hex').substring(0, 16); // 16 char version
+  }
+  
   return {
     has_updates: Object.keys(updates).length > 0,
-    scripts: updates
+    scripts: updates,
+    version: versionHash // Version based on script hashes
   };
 }
 
 /**
- * Generate an update command for the EPC to download and update scripts
+ * Generate an update command for the EPC using git pull and apt updates
  * @param {Object} updateInfo - Update information from checkForUpdates
+ * @param {Object} options - Additional options (apt_packages, etc.)
  * @returns {Object} EPC command to execute
  */
-function generateUpdateCommand(updateInfo) {
-  if (!updateInfo.has_updates) {
+function generateUpdateCommand(updateInfo, options = {}) {
+  if (!updateInfo.has_updates && !options.apt_packages) {
     return null;
   }
   
-  // Create update script
-  const updateScript = Object.entries(updateInfo.scripts).map(([scriptName, info]) => {
-    const scriptExt = scriptName.endsWith('.js') ? 'js' : 'sh';
-    return `
-# Update ${scriptName}
-log "Updating ${scriptName}..."
-curl -fsSL "${info.url}" -o /opt/wisptools/${scriptName}.tmp
-if [ $? -eq 0 ]; then
-    mv /opt/wisptools/${scriptName}.tmp /opt/wisptools/${scriptName}
-    chmod +x /opt/wisptools/${scriptName}
-    log "Updated ${scriptName} successfully"
+  const GIT_REPO_URL = 'https://github.com/theorem6/lte-pci-mapper.git';
+  const GIT_REPO_BRANCH = 'main';
+  const GIT_REPO_DIR = '/opt/wisptools/repo';
+  const SCRIPTS_SOURCE_DIR = `${GIT_REPO_DIR}/backend-services/scripts`;
+  
+  // Sort scripts by priority (lower number = higher priority)
+  // Agent script should be updated first to enable hash reporting
+  const sortedScripts = updateInfo.has_updates ? Object.entries(updateInfo.scripts).sort((a, b) => {
+    const priorityA = a[1].priority || 5;
+    const priorityB = b[1].priority || 5;
+    return priorityA - priorityB;
+  }) : [];
+  
+  // Build git update script
+  let gitUpdateScript = '';
+  // DEBUG: Log the condition check
+  console.log('[DEBUG] generateUpdateCommand: updateInfo =', JSON.stringify({
+    has_updates: updateInfo.has_updates,
+    scripts_keys: updateInfo.scripts ? Object.keys(updateInfo.scripts) : 'no scripts',
+    scripts_count: updateInfo.scripts ? Object.keys(updateInfo.scripts).length : 0,
+    sortedScripts_length: sortedScripts.length
+  }, null, 2));
+  if (updateInfo.has_updates && sortedScripts.length > 0) {
+    gitUpdateScript = `
+# Ensure git is installed
+if ! command -v git >/dev/null 2>&1; then
+    log "Installing git..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y git >/dev/null 2>&1 || {
+        log "ERROR: Failed to install git"
+        exit 1
+    }
+fi
+
+# Set up or update git repository
+if [ ! -d "${GIT_REPO_DIR}" ]; then
+    log "Cloning git repository..."
+    mkdir -p "${GIT_REPO_DIR}"
+    git clone --depth 1 --branch "${GIT_REPO_BRANCH}" "${GIT_REPO_URL}" "${GIT_REPO_DIR}" 2>&1 | while read line; do log "$line"; done
+    if [ $? -ne 0 ]; then
+        log "ERROR: Failed to clone repository"
+        exit 1
+    fi
 else
-    log "ERROR: Failed to download ${scriptName}"
+    log "Updating git repository..."
+    cd "${GIT_REPO_DIR}"
+    git fetch origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+    git reset --hard "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+    if [ $? -ne 0 ]; then
+        log "WARNING: Git pull failed, but continuing..."
+    fi
+fi
+
+# Copy updated scripts from repository
+if [ -d "${SCRIPTS_SOURCE_DIR}" ]; then
+`;
+    
+    sortedScripts.forEach(([scriptName, info]) => {
+      gitUpdateScript += `
+    # Update ${scriptName}
+    if [ -f "${SCRIPTS_SOURCE_DIR}/${scriptName}" ]; then
+        log "Updating ${scriptName} from git repository..."
+        cp "${SCRIPTS_SOURCE_DIR}/${scriptName}" /opt/wisptools/${scriptName}
+        chmod +x /opt/wisptools/${scriptName}
+        log "Updated ${scriptName} successfully"
+    else
+        log "WARNING: ${scriptName} not found in repository"
+    fi
+`;
+    });
+    
+    gitUpdateScript += `else
+    log "ERROR: Scripts directory not found in repository"
+    exit 1
 fi
 `;
-  }).join('\n');
+  }
+  
+  // Build apt update script
+  let aptUpdateScript = '';
+  if (options.apt_packages && Array.isArray(options.apt_packages) && options.apt_packages.length > 0) {
+    aptUpdateScript = `
+# Update system packages
+log "Updating apt package lists..."
+apt-get update -qq 2>&1 | while read line; do log "$line"; done
+
+# Upgrade specified packages
+log "Upgrading packages: ${options.apt_packages.join(', ')}..."
+apt-get upgrade -y ${options.apt_packages.join(' ')} 2>&1 | while read line; do log "$line"; done
+if [ $? -eq 0 ]; then
+    log "Package updates completed successfully"
+else
+    log "WARNING: Some package updates may have failed"
+fi
+`;
+  }
   
   const fullScript = `#!/bin/bash
-# Auto-update script for EPC agent scripts
+# Auto-update script for EPC agent scripts and system packages
+# Uses git for code updates and apt for binary/system package updates
 CONFIG_DIR="/etc/wisptools"
 LOG_FILE="/var/log/wisptools-checkin.log"
 
@@ -121,10 +230,19 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [AUTO-UPDATE] $1" | tee -a "$LOG_FILE"
 }
 
-${updateScript}
+log "Starting auto-update process..."
+
+${gitUpdateScript}
+
+${aptUpdateScript}
 
 # Restart check-in service if agent was updated
+# NOTE: The check-in agent reports results in a background process that survives this restart
+# The background process will retry if the restart happens before the HTTP request completes
 if [ -f /opt/wisptools/epc-checkin-agent.sh ]; then
+    log "Restarting check-in agent (result will be reported in background)"
+    # Small delay to allow any immediate result reporting to start
+    sleep 1
     systemctl restart wisptools-checkin 2>/dev/null || true
     log "Restarted check-in agent"
 fi
@@ -132,12 +250,29 @@ fi
 log "Auto-update complete"
 `;
   
+  // Determine command priority based on what's being updated
+  // If agent script is being updated, use highest priority (1)
+  // Otherwise use standard update priority (5)
+  const isAgentUpdate = updateInfo.has_updates && Object.keys(updateInfo.scripts).includes('epc-checkin-agent.sh');
+  const commandPriority = isAgentUpdate ? 1 : 5;
+  
+  // Calculate version from update info (same as in checkForUpdates)
+  let versionHash = null;
+  if (updateInfo.has_updates) {
+    const hash = crypto.createHash('sha256');
+    Object.entries(updateInfo.scripts).sort().forEach(([scriptName, info]) => {
+      hash.update(`${scriptName}:${info.hash}`);
+    });
+    versionHash = hash.digest('hex').substring(0, 16);
+  }
+  
   return {
     command_type: 'script_execution',
     action: 'update_scripts',
     script_content: fullScript,
-    priority: 5, // Higher priority for updates (lower number = higher priority)
-    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    priority: commandPriority, // Higher priority for updates (lower number = higher priority)
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    version: versionHash // Version based on script hashes
   };
 }
 

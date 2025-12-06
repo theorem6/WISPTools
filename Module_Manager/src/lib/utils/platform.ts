@@ -56,3 +56,4 @@ export function shouldAllowWheelEvent(event: WheelEvent): boolean {
   // On Windows/Linux or Mac mouse: require modifier for zoom
   return hasModifier;
 }
+

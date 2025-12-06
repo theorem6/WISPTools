@@ -1031,8 +1031,18 @@ echo "Central Services (at $CENTRAL_HSS):"
 echo "  open5gs-hssd:        CENTRAL (subscriber database)"
 echo "  open5gs-pcrfd:       CENTRAL (policy/charging)"
 
-# Install and start check-in agent
+# Install and start check-in agent (using git-based method)
 log "Installing check-in agent..."
+
+# Install git if not present
+if ! command -v git >/dev/null 2>&1; then
+    log "Installing git..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y git >/dev/null 2>&1 || log "WARNING: Failed to install git"
+fi
+
+# The agent's install_agent() function will handle git setup
+# For initial install, download the agent script first
 curl -fsSL https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh -o /opt/wisptools/epc-checkin-agent.sh
 chmod +x /opt/wisptools/epc-checkin-agent.sh
 /opt/wisptools/epc-checkin-agent.sh install

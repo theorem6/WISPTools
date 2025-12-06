@@ -44,3 +44,4 @@ Write-Host "1. Clear browser cache (Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows)
 Write-Host "2. Test map functionality on Mac" -ForegroundColor White
 Write-Host "3. Verify trackpad gestures work correctly" -ForegroundColor White
 Write-Host ""
+

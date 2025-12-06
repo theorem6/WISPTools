@@ -182,15 +182,24 @@ else
 fi
 
 # ============================================================================
-# Step 3: Install/Update Check-in Agent
+# Step 3: Install/Update Check-in Agent (using git-based method)
 # ============================================================================
 log "Step 3: Installing/updating check-in agent..."
 
 mkdir -p /opt/wisptools
+
+# Install git if not present
+if ! command -v git >/dev/null 2>&1; then
+    log "Installing git..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -y git >/dev/null 2>&1 || log "WARNING: Failed to install git"
+fi
+
+# Download initial agent script (it will set up git during install)
 curl -fsSL "https://${CENTRAL_HSS}/downloads/scripts/epc-checkin-agent.sh" -o /opt/wisptools/epc-checkin-agent.sh
 chmod +x /opt/wisptools/epc-checkin-agent.sh
 
-# Install check-in agent service
+# Install check-in agent service (install_agent() function will handle git setup)
 if [ -f /opt/wisptools/epc-checkin-agent.sh ]; then
     /opt/wisptools/epc-checkin-agent.sh install
     log "✅ Check-in agent installed and running"

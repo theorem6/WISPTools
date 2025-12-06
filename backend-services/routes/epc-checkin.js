@@ -84,23 +84,98 @@ router.post('/checkin', async (req, res) => {
     try {
       const scriptVersions = versions?.scripts || {};
       console.log(`[EPC Check-in] Checking for script updates for ${epc.epc_id}...`);
+      console.log(`[EPC Check-in] Script versions received:`, JSON.stringify(scriptVersions, null, 2));
+      console.log(`[EPC Check-in] Has epc-ping-monitor.js hash:`, !!scriptVersions['epc-ping-monitor.js']?.hash);
+      if (scriptVersions['epc-ping-monitor.js']) {
+        console.log(`[EPC Check-in] epc-ping-monitor.js hash from agent:`, scriptVersions['epc-ping-monitor.js'].hash);
+      }
       
-      const updateInfo = await checkForUpdates(epc.epc_id, scriptVersions);
+      // CRITICAL: Check for VERY recent completed commands (last 2 minutes) to prevent immediate duplicates
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+      const veryRecentCompleted = await EPCCommand.findOne({
+        epc_id: epc.epc_id,
+        action: 'update_scripts',
+        status: { $in: ['completed', 'failed'] },
+        completed_at: { $gte: twoMinutesAgo }
+      }).sort({ completed_at: -1 });
       
-      if (updateInfo.has_updates) {
-        console.log(`[EPC Check-in] Updates available: ${Object.keys(updateInfo.scripts).join(', ')}`);
+      if (veryRecentCompleted) {
+        console.log(`[EPC Check-in] ⚠️ Very recent update command completed (${Math.round((Date.now() - new Date(veryRecentCompleted.completed_at).getTime()) / 1000)}s ago, ID: ${veryRecentCompleted._id}), skipping update check to prevent immediate duplicate`);
+        // Skip update check entirely if a command just completed
+      } else {
+        const updateInfo = await checkForUpdates(epc.epc_id, scriptVersions);
         
-        // Check if update command already exists (only pending - sent commands won't be returned again)
-        const existingUpdate = await EPCCommand.findOne({
+        if (updateInfo.has_updates) {
+        console.log(`[EPC Check-in] Updates available: ${Object.keys(updateInfo.scripts).join(', ')} (version: ${updateInfo.version})`);
+        
+        // Version-based duplicate prevention: Only create command if this version is newer
+        // Check for existing update command with same version (active OR recently completed)
+        // IMPORTANT: Check ALL update_scripts commands first, then filter by version
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        
+        // First, get ALL active update commands (regardless of version)
+        const activeUpdate = await EPCCommand.findOne({
           epc_id: epc.epc_id,
           action: 'update_scripts',
-          status: 'pending',
-          expires_at: { $gt: new Date() }
-        });
+          status: { $in: ['pending', 'sent'] }
+        }).sort({ created_at: -1 });
+        
+        // Then check for recently completed with same version
+        const recentCompleted = await EPCCommand.findOne({
+          epc_id: epc.epc_id,
+          action: 'update_scripts',
+          status: { $in: ['completed', 'failed'] },
+          version: updateInfo.version, // Must match version
+          completed_at: { $gte: tenMinutesAgo }
+        }).sort({ created_at: -1 });
+        
+        const existingUpdate = activeUpdate || recentCompleted;
+        
+        let shouldCreateNew = false;
         
         if (!existingUpdate) {
-          // Generate and queue update command
-          const updateCommand = generateUpdateCommand(updateInfo);
+          // No existing command - safe to create
+          shouldCreateNew = true;
+          console.log(`[EPC Check-in] No existing update command, creating new one (version: ${updateInfo.version})`);
+        } else if (activeUpdate) {
+          // Active command exists - check version
+          console.log(`[EPC Check-in] Found active update command: ID=${activeUpdate._id}, status=${activeUpdate.status}, version=${activeUpdate.version || 'none'}, new version=${updateInfo.version}`);
+          
+          if (activeUpdate.version && activeUpdate.version === updateInfo.version) {
+            shouldCreateNew = false;
+            console.log(`[EPC Check-in] ✅ Active update command exists with same version (${updateInfo.version}, status: ${activeUpdate.status}, ID: ${activeUpdate._id}), skipping duplicate`);
+          } else if (!activeUpdate.version) {
+            // Old format command - check age
+            const commandAge = Date.now() - new Date(activeUpdate.created_at).getTime();
+            const tenMinutesMs = 10 * 60 * 1000;
+            if (commandAge < tenMinutesMs) {
+              shouldCreateNew = false;
+              console.log(`[EPC Check-in] ✅ Old-format active update command exists (age: ${Math.round(commandAge / 1000)}s, ID: ${activeUpdate._id}), skipping duplicate`);
+            } else {
+              shouldCreateNew = true;
+              console.log(`[EPC Check-in] Old-format active command is old (${Math.round(commandAge / 1000)}s), creating new versioned command`);
+            }
+          } else {
+            // Version mismatch - different scripts need updating
+            shouldCreateNew = true;
+            console.log(`[EPC Check-in] ⚠️ Active command version mismatch: existing=${activeUpdate.version}, new=${updateInfo.version}, creating new command`);
+          }
+        } else if (recentCompleted) {
+          // Recently completed with same version - don't create
+          shouldCreateNew = false;
+          console.log(`[EPC Check-in] Recently completed update command exists with same version (${updateInfo.version}, completed: ${recentCompleted.completed_at}), skipping duplicate`);
+        } else {
+          // Should not reach here, but safety check
+          shouldCreateNew = true;
+          console.log(`[EPC Check-in] No matching command found, creating new one (version: ${updateInfo.version})`);
+        }
+        
+        if (shouldCreateNew) {
+          // Generate and queue update command (with optional apt packages)
+          // TODO: Add apt_packages from config if needed
+          const updateCommand = generateUpdateCommand(updateInfo, {
+            apt_packages: [] // Can be populated from EPC config in future
+          });
           
           if (updateCommand) {
             const cmd = new EPCCommand({
@@ -109,17 +184,17 @@ router.post('/checkin', async (req, res) => {
               tenant_id: epc.tenant_id,
               status: 'pending',
               created_at: new Date(),
-              description: `Automatic script update: ${Object.keys(updateInfo.scripts).join(', ')}`
+              version: updateInfo.version, // CRITICAL: Ensure version is saved for duplicate prevention
+              description: `Automatic script update: ${Object.keys(updateInfo.scripts).join(', ')} (v${updateInfo.version})`
             });
             
             await cmd.save();
-            console.log(`[EPC Check-in] ✅ Auto-update command queued for ${epc.epc_id}: ${Object.keys(updateInfo.scripts).join(', ')}`);
+            console.log(`[EPC Check-in] ✅ Auto-update command queued for ${epc.epc_id}: ${Object.keys(updateInfo.scripts).join(', ')} (version: ${updateInfo.version}, ID: ${cmd._id})`);
           }
-        } else {
-          console.log(`[EPC Check-in] Update command already pending for ${epc.epc_id}, skipping`);
         }
-      } else {
-        console.log(`[EPC Check-in] All scripts are up to date for ${epc.epc_id}`);
+        } else {
+          console.log(`[EPC Check-in] All scripts are up to date for ${epc.epc_id}`);
+        }
       }
     } catch (updateError) {
       console.error(`[EPC Check-in] Error checking for updates:`, updateError.message);
@@ -129,15 +204,25 @@ router.post('/checkin', async (req, res) => {
     // Fetch pending commands
     const commands = await checkinService.getPendingCommands(epc.epc_id);
 
-    console.log(`[EPC Check-in] Found ${commands.length} pending command(s) for ${epc.epc_id}:`,
-      commands.map(c => `${c.command_type} (${c.notes || 'no notes'})`).join(', '));
+    // Filter out any commands that are already sent/completed (safety check)
+    const trulyPending = commands.filter(c => c.status === 'pending');
+    
+    if (trulyPending.length !== commands.length) {
+      console.warn(`[EPC Check-in] Filtered out ${commands.length - trulyPending.length} non-pending commands for ${epc.epc_id}`);
+    }
 
-    // Mark commands as sent
-    await checkinService.markCommandsAsSent(commands.map(c => c._id));
+    console.log(`[EPC Check-in] Found ${trulyPending.length} pending command(s) for ${epc.epc_id}:`,
+      trulyPending.map(c => `${c.command_type}/${c.action || 'N/A'} (ID: ${c._id}, ${c.notes || 'no notes'})`).join(', '));
 
-    // Build and return response
+    // Mark commands as sent BEFORE returning them (prevents race condition)
+    if (trulyPending.length > 0) {
+      await checkinService.markCommandsAsSent(trulyPending.map(c => c._id));
+      console.log(`[EPC Check-in] Marked ${trulyPending.length} command(s) as sent for ${epc.epc_id}`);
+    }
+
+    // Build and return response (use filtered commands)
     const config = checkinService.buildCheckinConfig(epc);
-    const response = checkinService.buildCheckinResponse(epc, commands, config);
+    const response = checkinService.buildCheckinResponse(epc, trulyPending, config);
 
     res.json(response);
   } catch (error) {
@@ -154,10 +239,34 @@ router.post('/checkin/commands/:command_id/result', async (req, res) => {
   try {
     const { command_id } = req.params;
     const { success, output, error, exit_code } = req.body;
+    const device_code = req.headers['x-device-code'];
 
-    const { EPCCommand } = require('../models/distributed-epc-schema');
+    const { EPCCommand, RemoteEPC } = require('../models/distributed-epc-schema');
 
-    const command = await EPCCommand.findByIdAndUpdate(
+    // First, find the command to verify it exists and get epc_id
+    const command = await EPCCommand.findById(command_id);
+    
+    if (!command) {
+      console.error(`[EPC Command Result] Command ${command_id} not found`);
+      return res.status(404).json({ error: 'Command not found' });
+    }
+
+    // Verify device_code matches if provided
+    if (device_code) {
+      const epc = await RemoteEPC.findOne({ device_code: device_code.toUpperCase() });
+      if (!epc || epc.epc_id !== command.epc_id) {
+        console.error(`[EPC Command Result] Device code mismatch for command ${command_id}`);
+        return res.status(403).json({ error: 'Device code does not match command EPC' });
+      }
+    }
+
+    // Check if command is already completed
+    if (command.status === 'completed' || command.status === 'failed') {
+      console.log(`[EPC Command Result] Command ${command_id} already ${command.status}, updating result anyway`);
+    }
+
+    // Update command status
+    const updated = await EPCCommand.findByIdAndUpdate(
       command_id,
       {
         status: success ? 'completed' : 'failed',
@@ -167,12 +276,13 @@ router.post('/checkin/commands/:command_id/result', async (req, res) => {
       { new: true }
     );
 
-    if (!command) {
-      return res.status(404).json({ error: 'Command not found' });
+    if (!updated) {
+      console.error(`[EPC Command Result] Failed to update command ${command_id}`);
+      return res.status(500).json({ error: 'Failed to update command status' });
     }
 
-    console.log(`[EPC Command] Command ${command_id} completed: ${success ? 'SUCCESS' : 'FAILED'}`);
-    res.json({ success: true, message: 'Command result recorded' });
+    console.log(`[EPC Command] Command ${command_id} (EPC: ${command.epc_id}) completed: ${success ? 'SUCCESS' : 'FAILED'}, status changed from ${command.status} to ${updated.status}`);
+    res.json({ success: true, message: 'Command result recorded', command_id, previous_status: command.status, new_status: updated.status });
   } catch (error) {
     console.error('[EPC Command Result] Error:', error);
     res.status(500).json({ error: 'Failed to record result', message: error.message });
