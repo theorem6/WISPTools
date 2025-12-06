@@ -27,16 +27,22 @@
 
   function initChart() {
     if (!chartContainer || !mounted) {
+      console.log('[ECharts] Skipping initialization - container:', !!chartContainer, 'mounted:', mounted);
       return;
     }
 
     try {
       // Initialize ECharts instance
+      console.log('[ECharts] Initializing chart instance with theme:', theme);
       chart = echarts.init(chartContainer, theme);
+      console.log('[ECharts] Chart instance created successfully');
 
       // Set initial option
       if (option) {
         chart.setOption(option, true);
+        console.log('[ECharts] Chart option set');
+      } else {
+        console.log('[ECharts] No option provided yet');
       }
 
       // Handle window resize

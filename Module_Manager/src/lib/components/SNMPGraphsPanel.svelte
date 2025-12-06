@@ -36,8 +36,10 @@
   }
   
   onMount(async () => {
+    console.log('[SNMPGraphsPanel] Component mounted, initializing ECharts graphs...');
     await loadDevices();
     refreshInterval = setInterval(loadDevices, 60000);
+    console.log('[SNMPGraphsPanel] Initialization complete');
   });
   
   onDestroy(() => {
