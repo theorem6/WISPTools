@@ -11,12 +11,25 @@ BACKEND_DIR="$REPO_DIR/backend-services"
 echo "🔄 Updating backend from GitHub..."
 echo ""
 
+# Configure SSH for GitHub (if not already configured)
+SSH_DIR="$HOME/.ssh"
+mkdir -p "$SSH_DIR"
+chmod 700 "$SSH_DIR"
+
+# Add GitHub to known_hosts if not present
+if [ ! -f "$SSH_DIR/known_hosts" ] || ! grep -q "github.com" "$SSH_DIR/known_hosts" 2>/dev/null; then
+  echo "📝 Adding GitHub to SSH known_hosts..."
+  ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> "$SSH_DIR/known_hosts" 2>/dev/null || true
+  chmod 600 "$SSH_DIR/known_hosts"
+fi
+
 # Check if repo exists
 if [ ! -d "$REPO_DIR/.git" ]; then
   echo "📥 Initializing git repository..."
   cd "$REPO_DIR"
   git init
-  git remote add origin https://github.com/theorem6/lte-pci-mapper.git 2>/dev/null || git remote set-url origin https://github.com/theorem6/lte-pci-mapper.git
+  # Use SSH URL for private repository
+  git remote add origin git@github.com:theorem6/lte-pci-mapper.git 2>/dev/null || git remote set-url origin git@github.com:theorem6/lte-pci-mapper.git
   git config user.name "GCE Server"
   git config user.email "server@wisptools.io"
   # Add all existing files
@@ -27,11 +40,23 @@ fi
 
 echo "📥 Pulling latest code from GitHub..."
 cd "$REPO_DIR"
+
+# Ensure remote is using SSH
+CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+if [[ "$CURRENT_REMOTE" != *"git@github.com"* ]]; then
+  echo "🔄 Switching remote to SSH..."
+  git remote set-url origin git@github.com:theorem6/lte-pci-mapper.git
+fi
+
+# Configure Git to use SSH
+export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SSH_DIR/known_hosts"
+
 git fetch origin main || {
-  echo "⚠️  Could not fetch from GitHub (may require authentication or repo may be private)"
+  echo "⚠️  Could not fetch from GitHub (may require SSH key authentication)"
   echo "📋 Current code will be used. To sync manually:"
-  echo "   1. Commit current changes: git add -A && git commit -m 'Server state'"
-  echo "   2. Pull from GitHub: git pull origin main"
+  echo "   1. Ensure SSH key is configured (fingerprint: SHA256:evjwW3FJ1wGL/y2JM6daCrcQA1OYVlV4BAyXiM5gdZ0)"
+  echo "   2. Commit current changes: git add -A && git commit -m 'Server state'"
+  echo "   3. Pull from GitHub: git pull origin main"
   exit 0
 }
 
