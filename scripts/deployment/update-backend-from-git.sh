@@ -11,18 +11,6 @@ BACKEND_DIR="$REPO_DIR/backend-services"
 echo "🔄 Updating backend from GitHub..."
 echo ""
 
-# Configure SSH for GitHub (if not already configured)
-SSH_DIR="$HOME/.ssh"
-mkdir -p "$SSH_DIR"
-chmod 700 "$SSH_DIR"
-
-# Add GitHub to known_hosts if not present
-if [ ! -f "$SSH_DIR/known_hosts" ] || ! grep -q "github.com" "$SSH_DIR/known_hosts" 2>/dev/null; then
-  echo "📝 Adding GitHub to SSH known_hosts..."
-  ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> "$SSH_DIR/known_hosts" 2>/dev/null || true
-  chmod 600 "$SSH_DIR/known_hosts"
-fi
-
 # GitHub token for private repository access
 GITHUB_TOKEN="${GITHUB_TOKEN:-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}"
 GIT_REPO_URL="https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git"
