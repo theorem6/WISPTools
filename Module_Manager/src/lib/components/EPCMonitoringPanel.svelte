@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { API_CONFIG } from '$lib/config/api';
@@ -16,10 +16,10 @@
   let statusHistory: any[] = [];
   let commandHistory: any[] = [];
   
-  // Chart configs
-  let cpuChartConfig: ChartConfiguration | null = null;
-  let memoryChartConfig: ChartConfiguration | null = null;
-  let diskChartConfig: ChartConfiguration | null = null;
+  // ECharts options
+  let cpuChartOption: EChartsOption | null = null;
+  let memoryChartOption: EChartsOption | null = null;
+  let diskChartOption: EChartsOption | null = null;
   
   // Required services
   const SERVICES = [
@@ -145,99 +145,96 @@
   
   function initCharts() {
     if (statusHistory.length === 0) {
-      cpuChartConfig = null;
-      memoryChartConfig = null;
-      diskChartConfig = null;
+      cpuChartOption = null;
+      memoryChartOption = null;
+      diskChartOption = null;
       return;
     }
     
-    const labels = statusHistory.map(s => {
-      const d = new Date(s.timestamp);
-      return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
-    });
+    const timestamps = statusHistory.map(s => new Date(s.timestamp).getTime());
     
-    const chartOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 500 },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          titleColor: '#e2e8f0',
-          bodyColor: '#94a3b8',
-          borderColor: 'rgba(255,255,255,0.1)',
-          borderWidth: 1,
-          cornerRadius: 8,
-          padding: 12
-        }
+    // Common chart configuration
+    const commonConfig = {
+      grid: { top: 20, right: 30, bottom: 40, left: 50 },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        textStyle: { color: '#cbd5e1' },
+        axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } }
       },
-      scales: {
-        y: {
-          beginAtZero: true,
-          max: 100,
-          ticks: { color: '#9ca3af', font: { size: 10 } },
-          grid: { color: 'rgba(255,255,255,0.05)' }
+      xAxis: {
+        type: 'time',
+        boundaryGap: false,
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 10,
+          rotate: 45
         },
-        x: {
-          ticks: { color: '#9ca3af', maxRotation: 0, font: { size: 10 }, maxTicksLimit: 8 },
-          grid: { color: 'rgba(255,255,255,0.05)' }
-        }
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 100,
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 11,
+          formatter: '{value}%'
+        },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
       }
     };
     
-    cpuChartConfig = {
-      type: 'line' as const,
-      data: {
-        labels,
-        datasets: [{
-          label: 'CPU %',
-          data: statusHistory.map(s => s.cpu),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, 0.2)',
-          fill: true,
-          tension: 0.4,
-          pointRadius: 2,
-          pointHoverRadius: 5
-        }]
-      },
-      options: chartOptions
+    // CPU Chart
+    cpuChartOption = {
+      ...commonConfig,
+      series: [{
+        name: 'CPU %',
+        type: 'line',
+        data: timestamps.map((time, idx) => [time, statusHistory[idx].cpu]),
+        itemStyle: { color: '#3b82f6' },
+        areaStyle: { color: 'rgba(59, 130, 246, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }]
     };
     
-    memoryChartConfig = {
-      type: 'line' as const,
-      data: {
-        labels,
-        datasets: [{
-          label: 'Memory %',
-          data: statusHistory.map(s => s.memory),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.2)',
-          fill: true,
-          tension: 0.4,
-          pointRadius: 2,
-          pointHoverRadius: 5
-        }]
-      },
-      options: chartOptions
+    // Memory Chart
+    memoryChartOption = {
+      ...commonConfig,
+      series: [{
+        name: 'Memory %',
+        type: 'line',
+        data: timestamps.map((time, idx) => [time, statusHistory[idx].memory]),
+        itemStyle: { color: '#10b981' },
+        areaStyle: { color: 'rgba(16, 185, 129, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }]
     };
     
-    diskChartConfig = {
-      type: 'line' as const,
-      data: {
-        labels,
-        datasets: [{
-          label: 'Disk %',
-          data: statusHistory.map(s => s.disk),
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.2)',
-          fill: true,
-          tension: 0.4,
-          pointRadius: 2,
-          pointHoverRadius: 5
-        }]
-      },
-      options: chartOptions
+    // Disk Chart
+    diskChartOption = {
+      ...commonConfig,
+      series: [{
+        name: 'Disk %',
+        type: 'line',
+        data: timestamps.map((time, idx) => [time, statusHistory[idx].disk]),
+        itemStyle: { color: '#f59e0b' },
+        areaStyle: { color: 'rgba(245, 158, 11, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }]
     };
   }
   
@@ -493,8 +490,10 @@
         <div class="chart-card">
           <h4>CPU Usage</h4>
           <div class="chart-container">
-            {#if cpuChartConfig}
-              <Chart config={cpuChartConfig} height={200} />
+            {#if cpuChartOption}
+              <ECharts option={cpuChartOption} height={200} theme="dark" />
+            {:else}
+              <div class="chart-placeholder">No data available</div>
             {/if}
           </div>
           <div class="chart-current">
@@ -504,8 +503,10 @@
         <div class="chart-card">
           <h4>Memory Usage</h4>
           <div class="chart-container">
-            {#if memoryChartConfig}
-              <Chart config={memoryChartConfig} height={200} />
+            {#if memoryChartOption}
+              <ECharts option={memoryChartOption} height={200} theme="dark" />
+            {:else}
+              <div class="chart-placeholder">No data available</div>
             {/if}
           </div>
           <div class="chart-current">
@@ -516,8 +517,10 @@
         <div class="chart-card">
           <h4>Disk Usage</h4>
           <div class="chart-container">
-            {#if diskChartConfig}
-              <Chart config={diskChartConfig} height={200} />
+            {#if diskChartOption}
+              <ECharts option={diskChartOption} height={200} theme="dark" />
+            {:else}
+              <div class="chart-placeholder">No data available</div>
             {/if}
           </div>
           <div class="chart-current">
@@ -812,8 +815,17 @@
   }
   
   .chart-container {
-    height: 150px;
+    height: 200px;
     position: relative;
+  }
+  
+  .chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+    font-size: 0.875rem;
   }
   
   .chart-current {

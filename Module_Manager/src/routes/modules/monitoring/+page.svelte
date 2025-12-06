@@ -935,12 +935,14 @@
   /* SNMP Graphs View */
   .graphs-overlay {
     position: absolute;
-    top: 140px;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 5;
-    padding: 1.5rem;
+    padding: 0;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    overflow-y: auto;
   }
   
   /* EPC Devices View */

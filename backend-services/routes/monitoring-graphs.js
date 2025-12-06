@@ -75,14 +75,10 @@ router.get('/ping/:deviceId', async (req, res) => {
             yAxisID: 'y'
           },
           {
-            label: 'Status (1=Online, 0=Offline)',
+            label: 'Status',
             data: success,
-            borderColor: success.length > 0 
-              ? success.map(s => s === 1 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)')
-              : [],
-            backgroundColor: success.length > 0
-              ? success.map(s => s === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)')
-              : [],
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.2)',
             yAxisID: 'y1'
           }
         ]
@@ -94,7 +90,8 @@ router.get('/ping/:deviceId', async (req, res) => {
         uptime_percent: metrics.length > 0 
           ? Math.round((metrics.filter(m => m.success).length / metrics.length) * 10000) / 100
           : 0,
-        avg_response_time: metrics.filter(m => m.response_time_ms).length > 0
+        current_status: metrics.length > 0 && metrics[metrics.length - 1]?.success ? 'online' : 'offline',
+        avg_response_time_ms: metrics.filter(m => m.response_time_ms).length > 0
           ? Math.round(metrics.filter(m => m.response_time_ms).reduce((sum, m) => sum + m.response_time_ms, 0) / metrics.filter(m => m.response_time_ms).length * 100) / 100
           : null
       }
@@ -258,6 +255,28 @@ router.get('/snmp/:deviceId', async (req, res) => {
         borderColor: 'rgb(34, 197, 94)',
         backgroundColor: 'rgba(34, 197, 94, 0.2)',
         yAxisID: 'y1'
+      });
+    }
+
+    // Network Throughput - Input
+    if (metrics.some(m => m.network?.interface_in_octets !== undefined && m.network?.interface_in_octets !== null)) {
+      datasets.push({
+        label: 'Throughput In (bytes)',
+        data: metrics.map(m => m.network?.interface_in_octets || null),
+        borderColor: 'rgb(147, 51, 234)',
+        backgroundColor: 'rgba(147, 51, 234, 0.2)',
+        yAxisID: 'y2'
+      });
+    }
+
+    // Network Throughput - Output
+    if (metrics.some(m => m.network?.interface_out_octets !== undefined && m.network?.interface_out_octets !== null)) {
+      datasets.push({
+        label: 'Throughput Out (bytes)',
+        data: metrics.map(m => m.network?.interface_out_octets || null),
+        borderColor: 'rgb(236, 72, 153)',
+        backgroundColor: 'rgba(236, 72, 153, 0.2)',
+        yAxisID: 'y2'
       });
     }
 
