@@ -452,10 +452,6 @@ for i in 1 2 3; do
     
     if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] Command ${CMD_ID} result reported successfully (attempt $i)" >> /var/log/wisptools-checkin.log
-        rm -f "REPORTEOF
-                echo "$report_script" >> "$report_script"
-                cat >> "$report_script" << 'REPORTEOF'
-"
         exit 0
     else
         echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Failed to report command ${CMD_ID} result (HTTP $http_code, attempt $i)" >> /var/log/wisptools-checkin.log
@@ -467,53 +463,6 @@ done
 
 # If all retries failed, log it
 echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Command ${CMD_ID} result reporting failed after 3 attempts" >> /var/log/wisptools-checkin.log
-rm -f "REPORTEOF
-                echo "$report_script" >> "$report_script"
-                cat >> "$report_script" << 'REPORTEOF'
-"
-REPORTEOF
-
-# Wait a moment for daemon restart to complete
-sleep 2
-
-# Report result with retries
-for i in 1 2 3; do
-    if command -v timeout >/dev/null 2>&1; then
-        response=\$(timeout 30 curl -s -w "\\n%{http_code}" -X POST "\${API_URL}/checkin/commands/\${CMD_ID}/result" \\
-            -H "Content-Type: application/json" \\
-            -H "X-Device-Code: \${DEVICE_CODE}" \\
-            -d "{\\"success\\":\${SUCCESS},\\"output\\":\\"\${OUTPUT}\\",\\"error\\":\\"\${ERROR}\\",\\"exit_code\\":\${EXIT_CODE}}" \\
-            --max-time 25 \\
-            --connect-timeout 10 \\
-            2>&1)
-        http_code=\$(echo "\$response" | tail -n1)
-    else
-        response=\$(curl -s -w "\\n%{http_code}" -X POST "\${API_URL}/checkin/commands/\${CMD_ID}/result" \\
-            -H "Content-Type: application/json" \\
-            -H "X-Device-Code: \${DEVICE_CODE}" \\
-            -d "{\\"success\\":\${SUCCESS},\\"output\\":\\"\${OUTPUT}\\",\\"error\\":\\"\${ERROR}\\",\\"exit_code\\":\${EXIT_CODE}}" \\
-            --max-time 25 \\
-            --connect-timeout 10 \\
-            2>&1)
-        http_code=\$(echo "\$response" | tail -n1)
-    fi
-    
-    if [ "\$http_code" = "200" ] || [ "\$http_code" = "201" ]; then
-        echo "\$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] Command \${CMD_ID} result reported successfully (attempt \$i)" >> /var/log/wisptools-checkin.log
-        rm -f "$report_script"
-        exit 0
-    else
-        echo "\$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Failed to report command \${CMD_ID} result (HTTP \$http_code, attempt \$i)" >> /var/log/wisptools-checkin.log
-        if [ \$i -lt 3 ]; then
-            sleep 5
-        fi
-    fi
-done
-
-# If all retries failed, log it
-echo "\$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Command \${CMD_ID} result reporting failed after 3 attempts" >> /var/log/wisptools-checkin.log
-rm -f "$report_script"
-EOF
                 chmod +x "$report_script"
                 
                 # Run in background with nohup - this will survive daemon restart

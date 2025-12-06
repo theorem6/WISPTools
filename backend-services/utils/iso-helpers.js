@@ -51,8 +51,18 @@ autoinstall:
     - curl
     - wget
     - jq
+    - ntp
+    - ntpdate
+    - tzdata
+  
+  timezone: UTC  # Default, will be updated based on location
   
   late-commands:
+    # Configure NTP and timezone
+    - curtin in-target --target=/target -- timedatectl set-ntp true
+    - curtin in-target --target=/target -- systemctl enable systemd-timesyncd.service
+    - curtin in-target --target=/target -- systemctl start systemd-timesyncd.service
+    
     # Create wisptools directories
     - curtin in-target --target=/target -- mkdir -p /etc/wisptools
     - curtin in-target --target=/target -- mkdir -p /opt/wisptools
