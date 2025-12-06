@@ -136,16 +136,14 @@ function generateUpdateCommand(updateInfo, options = {}) {
     return priorityA - priorityB;
   }) : [];
   
-  // Build git update script
+  // Build git update script using sparse checkout (only downloads needed files)
   let gitUpdateScript = '';
-  // DEBUG: Log the condition check
-  console.log('[DEBUG] generateUpdateCommand: updateInfo =', JSON.stringify({
-    has_updates: updateInfo.has_updates,
-    scripts_keys: updateInfo.scripts ? Object.keys(updateInfo.scripts) : 'no scripts',
-    scripts_count: updateInfo.scripts ? Object.keys(updateInfo.scripts).length : 0,
-    sortedScripts_length: sortedScripts.length
-  }, null, 2));
   if (updateInfo.has_updates && sortedScripts.length > 0) {
+    // Build list of git paths for sparse checkout (only the scripts we need)
+    const gitPaths = sortedScripts.map(([scriptName]) => 
+      `backend-services/scripts/${scriptName}`
+    );
+    
     gitUpdateScript = `
 # Ensure git is installed
 if ! command -v git >/dev/null 2>&1; then
@@ -157,22 +155,53 @@ if ! command -v git >/dev/null 2>&1; then
     }
 fi
 
-# Set up or update git repository
+# Set up git repository with sparse checkout (only downloads needed files)
 if [ ! -d "${GIT_REPO_DIR}" ]; then
-    log "Cloning git repository..."
+    log "Initializing git repository with sparse checkout..."
     mkdir -p "${GIT_REPO_DIR}"
-    git clone --depth 1 --branch "${GIT_REPO_BRANCH}" "${GIT_REPO_URL}" "${GIT_REPO_DIR}" 2>&1 | while read line; do log "$line"; done
+    cd "${GIT_REPO_DIR}"
+    git init >/dev/null 2>&1
+    git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
+    git config core.sparseCheckout true 2>&1
+    git config core.sparseCheckoutCone false 2>&1
+    
+    # Configure sparse checkout to only download the scripts we need
+    mkdir -p .git/info
+    cat > .git/info/sparse-checkout << 'SPARSECHECKOUT'
+${gitPaths.join('\n')}
+SPARSECHECKOUT
+    
+    log "Fetching only required files from git (sparse checkout)..."
+    git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
     if [ $? -ne 0 ]; then
-        log "ERROR: Failed to clone repository"
+        log "ERROR: Failed to fetch from git repository"
+        exit 1
+    fi
+    
+    log "Checking out only required files..."
+    git checkout -b "${GIT_REPO_BRANCH}" "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+    if [ $? -ne 0 ]; then
+        log "ERROR: Failed to checkout files from repository"
         exit 1
     fi
 else
-    log "Updating git repository..."
+    log "Updating git repository (sparse checkout)..."
     cd "${GIT_REPO_DIR}"
-    git fetch origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
-    git reset --hard "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
-    if [ $? -ne 0 ]; then
-        log "WARNING: Git pull failed, but continuing..."
+    
+    # Update sparse checkout paths if needed (in case new scripts are added)
+    mkdir -p .git/info
+    cat > .git/info/sparse-checkout << 'SPARSECHECKOUT'
+${gitPaths.join('\n')}
+SPARSECHECKOUT
+    
+    log "Fetching latest changes (sparse checkout)..."
+    git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+    if [ $? -eq 0 ]; then
+        log "Checking out updated files..."
+        git checkout -f "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
+        git sparse-checkout reapply 2>&1 | while read line; do log "$line"; done
+    else
+        log "WARNING: Git fetch failed, but continuing with existing files..."
     fi
 fi
 
