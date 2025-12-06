@@ -209,6 +209,7 @@ else
     # Configure Git for HTTPS with token
     export GIT_TERMINAL_PROMPT=0
     git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
+    git config --global http.sslVerify true 2>&1 | while read line; do log "$line"; done
     
     # Update sparse checkout paths if needed (in case new scripts are added)
     mkdir -p .git/info
@@ -216,18 +217,33 @@ else
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
     
-    # Ensure remote is configured correctly with HTTPS URL (token embedded)
+    # ALWAYS update remote URL to ensure it uses HTTPS with token (not SSH)
+    log "Updating git remote URL to HTTPS with token..."
     git remote remove origin >/dev/null 2>&1 || true
     git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
+    # Verify remote URL is correct
+    CURRENT_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+    if [[ "$CURRENT_REMOTE" != *"https://"* ]] || [[ "$CURRENT_REMOTE" != *"@github.com"* ]]; then
+        log "WARNING: Remote URL may be incorrect: $CURRENT_REMOTE"
+        log "Forcing remote URL update..."
+        git remote set-url origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
+    fi
+    
     log "Fetching latest changes (sparse checkout with HTTPS token)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
-    if [ $? -eq 0 ]; then
+    FETCH_EXIT_CODE=$?
+    
+    if [ $FETCH_EXIT_CODE -eq 0 ]; then
         log "Checking out updated files..."
         git checkout -f "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
         git sparse-checkout reapply 2>&1 | while read line; do log "$line"; done
     else
-        log "WARNING: Git fetch failed (token authentication may have failed), but continuing with existing files..."
+        log "ERROR: Git fetch failed (exit code: $FETCH_EXIT_CODE)"
+        log "ERROR: Token authentication may have failed or repository URL is incorrect"
+        log "ERROR: Current remote URL: $(git remote get-url origin 2>/dev/null || echo 'none')"
+        log "ERROR: Expected URL should contain: https://...@github.com/theorem6/lte-pci-mapper.git"
+        exit 1
     fi
 fi
 
