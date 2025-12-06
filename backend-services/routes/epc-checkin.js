@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const checkinService = require('../services/epc-checkin-service');
 const { PingMetrics } = require('../models/ping-metrics-schema');
+const { SNMPMetrics } = require('../models/snmp-metrics-schema');
 const { RemoteEPC, EPCCommand } = require('../models/distributed-epc-schema');
 const { NetworkEquipment } = require('../models/network');
 const { InventoryItem } = require('../models/inventory');
@@ -358,6 +359,77 @@ router.post('/checkin/ping-metrics', async (req, res) => {
   } catch (error) {
     console.error('[Ping Metrics] Error:', error);
     res.status(500).json({ error: 'Failed to process ping metrics', message: error.message });
+  }
+});
+
+/**
+ * POST /api/epc/checkin/snmp-metrics
+ * Receive SNMP metrics from remote EPC agents
+ * Remote agents collect SNMP metrics from devices on their local network and send results here
+ */
+router.post('/checkin/snmp-metrics', async (req, res) => {
+  try {
+    const { device_code, snmp_metrics } = req.body;
+
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+
+    if (!Array.isArray(snmp_metrics)) {
+      return res.status(400).json({ error: 'snmp_metrics must be an array' });
+    }
+
+    // Find EPC by device code to get tenant_id
+    const epc = await checkinService.findEPCByDeviceCode(device_code);
+
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found for device_code' });
+    }
+
+    const tenantId = epc.tenant_id;
+    let storedCount = 0;
+
+    // Store each SNMP metric
+    for (const metric of snmp_metrics) {
+      try {
+        const { device_id, system, resources, network, temperature, raw_oids } = metric;
+
+        if (!device_id) {
+          console.warn(`[SNMP Metrics] Skipping invalid metric: missing device_id`);
+          continue;
+        }
+
+        const snmpMetric = new SNMPMetrics({
+          device_id: device_id.toString(),
+          tenant_id: tenantId,
+          timestamp: new Date(),
+          system: system || {},
+          resources: resources || {},
+          network: network || {},
+          temperature: temperature || null,
+          raw_oids: raw_oids || {},
+          collection_method: 'remote_epc_agent',
+          epc_id: epc.epc_id
+        });
+
+        await snmpMetric.save();
+        storedCount++;
+      } catch (metricError) {
+        console.error(`[SNMP Metrics] Error storing metric:`, metricError);
+        // Continue with next metric
+      }
+    }
+
+    console.log(`[SNMP Metrics] Received ${snmp_metrics.length} metrics from ${device_code}, stored ${storedCount}`);
+
+    res.json({
+      success: true,
+      received: snmp_metrics.length,
+      stored: storedCount
+    });
+  } catch (error) {
+    console.error('[SNMP Metrics] Error:', error);
+    res.status(500).json({ error: 'Failed to process SNMP metrics', message: error.message });
   }
 });
 

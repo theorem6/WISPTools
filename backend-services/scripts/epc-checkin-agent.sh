@@ -696,13 +696,21 @@ do_checkin() {
         # Run ping cycle synchronously BEFORE check-in (every 5 minutes)
         if [ -f /opt/wisptools/epc-ping-monitor.js ]; then
             log "Running ping cycle before check-in..."
-            node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1
-            local ping_exit=$?
-            if [ $ping_exit -eq 0 ]; then
+            if node /opt/wisptools/epc-ping-monitor.js cycle >> "$LOG_FILE" 2>&1; then
                 log "Ping cycle completed successfully"
             else
-                log "WARNING: Ping cycle exited with code $ping_exit"
+                local ping_exit=$?
+                log "WARNING: Ping cycle exited with code $ping_exit - check logs for details"
+                log "Last 5 lines of ping monitor output:"
+                tail -5 "$LOG_FILE" | grep -i "ping\|ERROR\|WARN" | tail -5 | while read line; do log "  $line"; done || true
             fi
+        else
+            log "WARNING: Ping monitor script not found at /opt/wisptools/epc-ping-monitor.js"
+            log "Attempting to download..."
+            curl -fsSL "https://${CENTRAL_SERVER}/downloads/scripts/epc-ping-monitor.js" -o /opt/wisptools/epc-ping-monitor.js 2>&1 && \
+            chmod +x /opt/wisptools/epc-ping-monitor.js && \
+            log "Ping monitor script downloaded" || \
+            log "ERROR: Failed to download ping monitor script"
         fi
         
         # Run hourly subnet ping sweep (separate from regular ping cycle)
