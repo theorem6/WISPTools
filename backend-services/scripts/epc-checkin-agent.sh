@@ -463,6 +463,7 @@ done
 
 # If all retries failed, log it
 echo "$(date '+%Y-%m-%d %H:%M:%S') [CHECKIN] ERROR: Command ${CMD_ID} result reporting failed after 3 attempts" >> /var/log/wisptools-checkin.log
+REPORTEOF
                 chmod +x "$report_script"
                 
                 # Run in background with nohup - this will survive daemon restart
