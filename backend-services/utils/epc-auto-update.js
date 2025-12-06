@@ -125,15 +125,18 @@ function generateUpdateCommand(updateInfo, options = {}) {
   }
   
   // GitHub repository configuration
-  // Repository is PRIVATE - uses SSH key authentication
+  // Repository is PRIVATE - uses HTTPS with token authentication
+  const GITHUB_TOKEN = process.env.GITHUB_TOKEN || 
+                       process.env.GH_TOKEN || 
+                       appConfig?.externalServices?.github?.token || 
+                       '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';
   const GIT_REPO_BRANCH = 'main';
   const GIT_REPO_DIR = '/opt/wisptools/repo';
   const SCRIPTS_SOURCE_DIR = `${GIT_REPO_DIR}/backend-services/scripts`;
   
-  // Use SSH URL for private repository (requires SSH key to be configured on EPC)
-  // SSH key fingerprint: SHA256:evjwW3FJ1wGL/y2JM6daCrcQA1OYVlV4BAyXiM5gdZ0
-  const GIT_REPO_URL = 'git@github.com:theorem6/lte-pci-mapper.git';
-  console.log('[EPC Auto-Update] Using SSH authentication for private repository');
+  // Use HTTPS URL with token for private repository
+  const GIT_REPO_URL = `https://${GITHUB_TOKEN}@github.com/theorem6/lte-pci-mapper.git`;
+  console.log('[EPC Auto-Update] Using HTTPS with token authentication for private repository');
   
   // Sort scripts by priority (lower number = higher priority)
   // Agent script should be updated first to enable hash reporting
@@ -152,33 +155,21 @@ function generateUpdateCommand(updateInfo, options = {}) {
     );
     
     gitUpdateScript = `
-# Ensure git and openssh-client are installed
+# Ensure git is installed
 if ! command -v git >/dev/null 2>&1; then
     log "Installing git..."
     apt-get update -qq >/dev/null 2>&1
-    apt-get install -y git openssh-client >/dev/null 2>&1 || {
+    apt-get install -y git >/dev/null 2>&1 || {
         log "ERROR: Failed to install git"
         exit 1
     }
 fi
 
-# Configure SSH for GitHub access
-# Repository is PRIVATE - uses SSH key authentication
-# SSH key fingerprint: SHA256:evjwW3FJ1wGL/y2JM6daCrcQA1OYVlV4BAyXiM5gdZ0
-SSH_DIR="/root/.ssh"
-mkdir -p "$SSH_DIR"
-chmod 700 "$SSH_DIR"
-
-# Configure SSH to accept GitHub's host key
-if [ ! -f "$SSH_DIR/known_hosts" ] || ! grep -q "github.com" "$SSH_DIR/known_hosts" 2>/dev/null; then
-    log "Adding GitHub to SSH known_hosts..."
-    ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> "$SSH_DIR/known_hosts" 2>/dev/null || true
-    chmod 600 "$SSH_DIR/known_hosts"
-fi
-
-# Configure Git to use SSH
-export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SSH_DIR/known_hosts"
+# Configure Git for HTTPS with token authentication
+# Repository is PRIVATE - uses HTTPS with token (token embedded in URL)
 export GIT_TERMINAL_PROMPT=0
+git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
+git config --global http.sslVerify true 2>&1 | while read line; do log "$line"; done
 
 if [ ! -d "${GIT_REPO_DIR}" ]; then
     log "Initializing git repository with sparse checkout..."
@@ -194,15 +185,14 @@ if [ ! -d "${GIT_REPO_DIR}" ]; then
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
     
-    # Add remote with SSH URL
+    # Add remote with HTTPS URL (token embedded)
     git remote remove origin >/dev/null 2>&1 || true
     git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
-    log "Fetching only required files from git (sparse checkout with SSH)..."
+    log "Fetching only required files from git (sparse checkout with HTTPS token)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
     if [ $? -ne 0 ]; then
-        log "ERROR: Failed to fetch from git repository (check SSH key authentication)"
-        log "ERROR: Ensure SSH key is configured with fingerprint: SHA256:evjwW3FJ1wGL/y2JM6daCrcQA1OYVlV4BAyXiM5gdZ0"
+        log "ERROR: Failed to fetch from git repository (check token authentication)"
         exit 1
     fi
     
@@ -216,9 +206,9 @@ else
     log "Updating git repository (sparse checkout)..."
     cd "${GIT_REPO_DIR}"
     
-    # Configure SSH for Git
-    export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$SSH_DIR/known_hosts"
+    # Configure Git for HTTPS with token
     export GIT_TERMINAL_PROMPT=0
+    git config --global credential.helper '' 2>&1 | while read line; do log "$line"; done
     
     # Update sparse checkout paths if needed (in case new scripts are added)
     mkdir -p .git/info
@@ -226,19 +216,18 @@ else
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
     
-    # Ensure remote is configured correctly with SSH URL
+    # Ensure remote is configured correctly with HTTPS URL (token embedded)
     git remote remove origin >/dev/null 2>&1 || true
     git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
-    log "Fetching latest changes (sparse checkout with SSH)..."
+    log "Fetching latest changes (sparse checkout with HTTPS token)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
     if [ $? -eq 0 ]; then
         log "Checking out updated files..."
         git checkout -f "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
         git sparse-checkout reapply 2>&1 | while read line; do log "$line"; done
     else
-        log "WARNING: Git fetch failed (SSH authentication may have failed), but continuing with existing files..."
-        log "WARNING: Ensure SSH key is configured with fingerprint: SHA256:evjwW3FJ1wGL/y2JM6daCrcQA1OYVlV4BAyXiM5gdZ0"
+        log "WARNING: Git fetch failed (token authentication may have failed), but continuing with existing files..."
     fi
 fi
 
