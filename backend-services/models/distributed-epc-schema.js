@@ -382,7 +382,7 @@ const EPCCommandSchema = new mongoose.Schema({
   // For script_execution: update_scripts (automatic updates)
   action: {
     type: String,
-    enum: ['start', 'stop', 'restart', 'status', 'enable', 'disable', 'update_scripts']
+    enum: ['start', 'stop', 'restart', 'status', 'enable', 'disable', 'update_scripts', 'configure_timezone', 'script']
   },
   
   // Target service(s) for service_control

@@ -58,7 +58,7 @@ async function main() {
       epc_id: epc.epc_id,
       tenant_id: epc.tenant_id,
       command_type: 'script_execution',
-      action: 'configure_timezone',
+      action: 'script', // Use 'script' action for custom configuration scripts
       script_content: scriptContent,
       priority: 3, // Medium-high priority
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
