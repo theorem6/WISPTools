@@ -145,10 +145,12 @@
           if (pingResponse.ok) {
             const pingData = await pingResponse.json();
             console.log('[SNMPGraphsPanel] Ping data received:', {
+              deviceId: deviceId,
               hasData: !!pingData.data,
               labelsCount: pingData.data?.labels?.length || 0,
               datasetsCount: pingData.data?.datasets?.length || 0,
-              stats: pingData.stats
+              stats: pingData.stats,
+              hours: hours
             });
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;
@@ -745,7 +747,41 @@
             {/if}
           </div>
           
-          {#if !selectedDevice.hasPing && !selectedDevice.hasSNMP}
+          {#if selectedDevice.hasPing || selectedDevice.hasSNMP}
+            {#if (!pingUptimeOption && !pingResponseOption && !cpuOption && !memoryOption && !throughputOption) && !isLoading}
+              <div class="no-data-message">
+                <p>📊 No monitoring data available yet</p>
+                <p class="hint">
+                  {#if selectedDevice.hasPing && selectedDevice.hasSNMP}
+                    {#if !pingUptimeOption && !pingResponseOption && !cpuOption && !memoryOption}
+                      <span>Waiting for ping and SNMP data collection...</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">• Ping data: Collected every 60 seconds</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">• SNMP data: Collected every 5 minutes</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">• Check back in a few minutes for data to appear</span>
+                    {:else if !pingUptimeOption && !pingResponseOption}
+                      <span>Ping monitoring is collecting data...</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">SNMP metrics are available. Ping data will appear once collected.</span>
+                    {:else}
+                      <span>SNMP monitoring is collecting data...</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">Ping data is available. SNMP metrics will appear once collected.</span>
+                    {/if}
+                  {:else if selectedDevice.hasPing && !pingUptimeOption && !pingResponseOption}
+                    <span>Ping monitoring is collecting data...</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• Devices are pinged every 60 seconds</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• Data will appear within the next few minutes</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• If no data appears, verify the IP address is reachable</span>
+                  {:else if selectedDevice.hasSNMP && !cpuOption && !memoryOption && !throughputOption}
+                    <span>SNMP metrics are being collected...</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• SNMP polling occurs every 5 minutes</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• Data will appear once the next poll completes</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• Verify SNMP community and version are configured correctly</span>
+                  {:else}
+                    Monitoring data is being collected. Data will appear once metrics are available.
+                  {/if}
+                </p>
+              </div>
+            {/if}
+          {:else}
             <div class="no-data-message">
               <p>📊 No monitoring data available for this device</p>
               <p class="hint">Device needs an IP address for ping monitoring or SNMP configuration for SNMP metrics</p>
@@ -1051,6 +1087,20 @@
     background: rgba(255,255,255,0.05);
     border-radius: 12px;
     margin: 2rem 0;
+  }
+  
+  .no-data-message p {
+    margin: 0.5rem 0;
+    line-height: 1.6;
+  }
+  
+  .no-data-message .hint {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.8;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
   }
   
   @media (max-width: 768px) {
