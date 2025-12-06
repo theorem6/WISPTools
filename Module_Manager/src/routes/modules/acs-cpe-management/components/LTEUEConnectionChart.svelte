@@ -1,129 +1,110 @@
 <script lang="ts">
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
-  import type { TooltipItem } from 'chart.js';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
   export let metrics: TR069CellularMetrics[] = [];
 
-  const tooltipLabel = (context: TooltipItem<'line'>): string => {
-    const label = context.dataset.label ?? '';
-    const value = context.parsed.y;
-    if (label.includes('%')) {
-      return `${label}: ${typeof value === 'number' ? value.toFixed(1) : 'N/A'}%`;
-    }
-    return `${label}: ${typeof value === 'number' ? Math.round(value) : 'N/A'}`;
-  };
-
-  $: config = {
-    type: 'line' as const,
-    data: {
-      labels: metrics.map((m) => {
+  $: option = {
+    grid: { top: 50, right: 80, bottom: 50, left: 70 },
+    legend: {
+      top: 10,
+      textStyle: { color: '#9ca3af' },
+      icon: 'circle'
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#cbd5e1' },
+      axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } },
+      formatter: (params: any) => {
+        if (Array.isArray(params)) {
+          return params.map((p: any) => {
+            if (p.seriesName.includes('%')) {
+              return `${p.seriesName}: ${typeof p.value === 'number' ? p.value.toFixed(1) : 'N/A'}%`;
+            }
+            return `${p.seriesName}: ${typeof p.value === 'number' ? Math.round(p.value) : 'N/A'}`;
+          }).join('<br/>');
+        }
+        return '';
+      }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: metrics.map((m) => {
         const time = new Date(m.timestamp);
         return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       }),
-      datasets: [
-        {
-          label: 'Connected UEs',
-          data: metrics.map((m) => m.ueCount ?? 0),
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139, 92, 246, 0.2)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 2,
-          pointHoverRadius: 6
-        },
-        {
-          label: 'PRB Utilization (%)',
-          data: metrics.map((m) => m.prbUtilization ?? 0),
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
-          tension: 0.4,
-          fill: false,
-          pointRadius: 2,
-          pointHoverRadius: 6,
-          yAxisID: 'y1'
-        }
-      ]
+      axisLabel: {
+        color: '#9ca3af',
+        fontSize: 10,
+        rotate: 45
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { show: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index' as const,
-        intersect: false
+    yAxis: [
+      {
+        type: 'value',
+        name: 'Connected UEs',
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: { color: '#8b5cf6', fontSize: 11 },
+        position: 'left',
+        min: 0,
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { lineStyle: { color: 'rgba(75, 85, 99, 0.2)' } }
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgb(156, 163, 175)',
-            usePointStyle: true,
-            padding: 15
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          callbacks: {
-            label: tooltipLabel
-          }
-        }
-      },
-      scales: {
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: {
-            display: true,
-            text: 'Connected UEs',
-            color: '#8b5cf6'
-          },
-          grid: {
-            color: 'rgba(75, 85, 99, 0.2)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)'
-          },
-          beginAtZero: true
-        },
-        y1: {
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: {
-            display: true,
-            text: 'PRB Utilization (%)',
-            color: '#f59e0b'
-          },
-          grid: {
-            drawOnChartArea: false
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)'
-          },
-          min: 0,
-          max: 100
-        },
-        x: {
-          grid: {
-            color: 'rgba(75, 85, 99, 0.1)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            maxRotation: 45,
-            minRotation: 45
-          }
-        }
+      {
+        type: 'value',
+        name: 'PRB Utilization (%)',
+        nameLocation: 'middle',
+        nameGap: 60,
+        nameTextStyle: { color: '#f59e0b', fontSize: 11 },
+        position: 'right',
+        min: 0,
+        max: 100,
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
       }
-    }
-  } satisfies ChartConfiguration<'line'>;
+    ],
+    series: [
+      {
+        name: 'Connected UEs',
+        type: 'line',
+        yAxisIndex: 0,
+        data: metrics.map((m) => m.ueCount ?? 0),
+        itemStyle: { color: '#8b5cf6' },
+        areaStyle: { color: 'rgba(139, 92, 246, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      },
+      {
+        name: 'PRB Utilization (%)',
+        type: 'line',
+        yAxisIndex: 1,
+        data: metrics.map((m) => m.prbUtilization ?? 0),
+        itemStyle: { color: '#f59e0b' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }
+    ]
+  } satisfies EChartsOption;
 </script>
 
 <div class="chart-container">
   <h3 class="chart-title">UE Connections & Resource Utilization</h3>
   <div class="chart-wrapper">
-    <Chart {config} height={300} />
+    <ECharts option={option} height={300} theme="dark" />
   </div>
 </div>
 
@@ -147,4 +128,3 @@
     position: relative;
   }
 </style>
-

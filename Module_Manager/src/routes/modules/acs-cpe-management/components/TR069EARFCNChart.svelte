@@ -1,7 +1,6 @@
 <script lang="ts">
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
-  import type { TooltipItem } from 'chart.js';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getLTEBandName } from '../lib/tr069MetricsService';
 
@@ -13,137 +12,116 @@
     return m.earfcn !== metrics[i - 1].earfcn;
   });
 
-  const tooltipLabel = (context: TooltipItem<'line'>): string | string[] => {
-    if (context.datasetIndex === 0) {
-      const value = context.parsed.y;
-      const idx = context.dataIndex;
-      const band = metrics[idx]?.band ?? 0;
-      return [
-        `EARFCN: ${typeof value === 'number' ? value : 'N/A'}`,
-        `Band: ${getLTEBandName(band)}`
-      ];
-    }
-    const bandValue = typeof context.parsed.y === 'number' ? context.parsed.y / 1000 : 0;
-    return getLTEBandName(bandValue);
-  };
-
-  const tooltipTitle = (contexts: TooltipItem<'line'>[]): string => {
-    const context = contexts[0];
-    const idx = context.dataIndex;
-    const baseLabel = context.label ?? '';
-    return earfcnChanges[idx] ? `${baseLabel} (Frequency Change)` : baseLabel;
-  };
-
-  const bandTickFormatter = (value: string | number): string => {
-    const numeric = typeof value === 'number' ? value : Number(value);
-    return `Band ${numeric / 1000}`;
-  };
-
-  $: config = {
-    type: 'line' as const,
-    data: {
-      labels: metrics.map((m, i) => {
+  $: option = {
+    grid: { top: 50, right: 80, bottom: 50, left: 70 },
+    legend: {
+      top: 10,
+      textStyle: { color: '#9ca3af' },
+      icon: 'circle'
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#cbd5e1' },
+      axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } },
+      formatter: (params: any) => {
+        if (Array.isArray(params)) {
+          const idx = params[0]?.dataIndex ?? 0;
+          const earfcnParam = params.find((p: any) => p.seriesName === 'EARFCN');
+          const bandParam = params.find((p: any) => p.seriesName === 'LTE Band');
+          const changed = earfcnChanges[idx];
+          const label = changed ? `${params[0].axisValue} (Frequency Change)` : params[0].axisValue;
+          let result = label;
+          if (earfcnParam) {
+            const band = metrics[idx]?.band ?? 0;
+            result += `<br/>EARFCN: ${earfcnParam.value}<br/>Band: ${getLTEBandName(band)}`;
+          }
+          if (bandParam) {
+            result += `<br/>Band: ${getLTEBandName(bandParam.value / 1000)}`;
+          }
+          return result;
+        }
+        return '';
+      }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: metrics.map((m, i) => {
         const time = new Date(m.timestamp);
         const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         return earfcnChanges[i] ? `${label} 📡` : label;
       }),
-      datasets: [
-        {
-          label: 'EARFCN',
-          data: metrics.map((m) => m.earfcn),
-          borderColor: '#ec4899',
-          backgroundColor: earfcnChanges.map((changed) =>
-            changed ? 'rgba(239, 68, 68, 0.3)' : 'rgba(236, 72, 153, 0.1)'
-          ),
-          pointBackgroundColor: earfcnChanges.map((changed) =>
-            changed ? '#ef4444' : '#ec4899'
-          ),
-          pointRadius: earfcnChanges.map((changed) => (changed ? 6 : 3)),
-          pointHoverRadius: 8,
-          stepped: 'before' as const,
-          borderWidth: 2
-        },
-        {
-          label: 'LTE Band',
-          data: metrics.map((m) => m.band * 1000), // Scale for visibility
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
-          pointRadius: 2,
-          pointHoverRadius: 6,
-          stepped: 'before' as const,
-          borderWidth: 2,
-          yAxisID: 'y1'
-        }
-      ]
+      axisLabel: {
+        color: '#9ca3af',
+        fontSize: 10,
+        rotate: 45
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { show: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index' as const,
-        intersect: false
+    yAxis: [
+      {
+        type: 'value',
+        name: 'EARFCN',
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: { color: '#ec4899', fontSize: 11 },
+        position: 'left',
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { lineStyle: { color: 'rgba(75, 85, 99, 0.2)' } }
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgb(156, 163, 175)',
-            usePointStyle: true,
-            padding: 15
-          }
+      {
+        type: 'value',
+        name: 'Band',
+        nameLocation: 'middle',
+        nameGap: 60,
+        nameTextStyle: { color: '#f59e0b', fontSize: 11 },
+        position: 'right',
+        axisLabel: { 
+          color: '#9ca3af', 
+          fontSize: 11,
+          formatter: (value: number) => `Band ${value / 1000}`
         },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          callbacks: {
-            label: tooltipLabel,
-            title: tooltipTitle
-          }
-        }
-      },
-      scales: {
-        y: {
-          title: {
-            display: true,
-            text: 'EARFCN',
-            color: '#ec4899'
-          },
-          grid: {
-            color: 'rgba(75, 85, 99, 0.2)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)'
-          }
-        },
-        y1: {
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: {
-            display: true,
-            text: 'Band',
-            color: '#f59e0b'
-          },
-          grid: {
-            drawOnChartArea: false
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            callback: bandTickFormatter
-          }
-        },
-        x: {
-          grid: {
-            color: 'rgba(75, 85, 99, 0.1)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            maxRotation: 45,
-            minRotation: 45
-          }
-        }
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
       }
-    }
-  } satisfies ChartConfiguration<'line'>;
+    ],
+    series: [
+      {
+        name: 'EARFCN',
+        type: 'line',
+        yAxisIndex: 0,
+        step: 'start',
+        data: metrics.map((m, i) => ({
+          value: m.earfcn,
+          itemStyle: {
+            color: earfcnChanges[i] ? '#ef4444' : '#ec4899'
+          },
+          symbolSize: earfcnChanges[i] ? 8 : 6
+        })),
+        areaStyle: {
+          color: (params: any) => {
+            const idx = params.dataIndex;
+            return earfcnChanges[idx] ? 'rgba(239, 68, 68, 0.3)' : 'rgba(236, 72, 153, 0.1)';
+          }
+        },
+        lineStyle: { width: 2 }
+      },
+      {
+        name: 'LTE Band',
+        type: 'line',
+        yAxisIndex: 1,
+        step: 'start',
+        data: metrics.map((m) => m.band * 1000), // Scale for visibility
+        itemStyle: { color: '#f59e0b' },
+        lineStyle: { width: 2 }
+      }
+    ]
+  } satisfies EChartsOption;
 
   $: frequencyChanges = earfcnChanges.filter(Boolean).length;
   $: currentEARFCN = metrics.length > 0 ? metrics[metrics.length - 1].earfcn : 0;
@@ -160,7 +138,7 @@
     {/if}
   </div>
   <div class="chart-wrapper">
-    <Chart {config} height={300} />
+    <ECharts option={option} height={300} theme="dark" />
   </div>
   <div class="chart-info">
     <span class="info-item">📡 Current EARFCN: {currentEARFCN}</span>
@@ -217,4 +195,3 @@
     color: var(--text-secondary);
   }
 </style>
-

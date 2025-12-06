@@ -1,104 +1,82 @@
 <script lang="ts">
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
-  import type { TooltipItem } from 'chart.js';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
   export let metrics: TR069CellularMetrics[] = [];
 
-  const tooltipLabel = (context: TooltipItem<'line'>): string => {
-    const value = context.parsed.y;
-    return `${context.dataset.label ?? ''}: ${typeof value === 'number' ? value.toFixed(1) : 'N/A'} dBm`;
-  };
-
-  $: config = {
-    type: 'line' as const,
-    data: {
-      labels: metrics.map((m) => {
+  $: option = {
+    grid: { top: 50, right: 30, bottom: 50, left: 70 },
+    legend: {
+      top: 10,
+      textStyle: { color: '#9ca3af' },
+      icon: 'circle'
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#cbd5e1' },
+      axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: metrics.map((m) => {
         const time = new Date(m.timestamp);
         return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       }),
-      datasets: [
-        {
-          label: 'RSSI (dBm)',
-          data: metrics.map((m) => m.rssi),
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.2)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 2,
-          pointHoverRadius: 6
-        },
-        {
-          label: 'RSCP (dBm)',
-          data: metrics.map((m) => m.rscp),
-          borderColor: '#14b8a6',
-          backgroundColor: 'rgba(20, 184, 166, 0.1)',
-          tension: 0.4,
-          fill: false,
-          pointRadius: 2,
-          pointHoverRadius: 6
-        }
-      ]
+      axisLabel: {
+        color: '#9ca3af',
+        fontSize: 10,
+        rotate: 45
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { show: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index' as const,
-        intersect: false
+    yAxis: {
+      type: 'value',
+      name: 'Signal Strength (dBm)',
+      nameLocation: 'middle',
+      nameGap: 50,
+      nameTextStyle: { color: '#9ca3af', fontSize: 11 },
+      min: -110,
+      max: -40,
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { lineStyle: { color: 'rgba(75, 85, 99, 0.2)' } }
+    },
+    series: [
+      {
+        name: 'RSSI (dBm)',
+        type: 'line',
+        data: metrics.map((m) => m.rssi),
+        itemStyle: { color: '#06b6d4' },
+        areaStyle: { color: 'rgba(6, 182, 212, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgb(156, 163, 175)',
-            usePointStyle: true,
-            padding: 15
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          callbacks: {
-            label: tooltipLabel
-          }
-        }
-      },
-      scales: {
-        y: {
-          title: {
-            display: true,
-            text: 'Signal Strength (dBm)',
-            color: 'rgb(156, 163, 175)'
-          },
-          grid: {
-            color: 'rgba(75, 85, 99, 0.2)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)'
-          },
-          min: -110,
-          max: -40
-        },
-        x: {
-          grid: {
-            color: 'rgba(75, 85, 99, 0.1)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            maxRotation: 45,
-            minRotation: 45
-          }
-        }
+      {
+        name: 'RSCP (dBm)',
+        type: 'line',
+        data: metrics.map((m) => m.rscp),
+        itemStyle: { color: '#14b8a6' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
       }
-    }
-  } satisfies ChartConfiguration<'line'>;
+    ]
+  } satisfies EChartsOption;
 </script>
 
 <div class="chart-container">
   <h3 class="chart-title">RSSI & RSCP (TR-069 Parameters)</h3>
   <div class="chart-wrapper">
-    <Chart {config} height={300} />
+    <ECharts option={option} height={300} theme="dark" />
   </div>
   <div class="chart-legend-info">
     <div class="legend-item">
@@ -156,4 +134,3 @@
     flex-shrink: 0;
   }
 </style>
-

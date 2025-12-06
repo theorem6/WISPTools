@@ -1,105 +1,90 @@
 <script lang="ts">
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
-  import type { TooltipItem } from 'chart.js';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
   export let metrics: TR069CellularMetrics[] = [];
 
-  const tooltipLabel = (context: TooltipItem<'line'>): string => {
-    const label = context.dataset.label ?? '';
-    const value = context.parsed.y;
-    const formatted = typeof value === 'number' ? value.toFixed(2) : 'N/A';
-    return `${label}: ${formatted} Mbps`;
-  };
-
-  $: config = {
-    type: 'line' as const,
-    data: {
-      labels: metrics.map((m) => {
+  $: option = {
+    grid: { top: 50, right: 30, bottom: 50, left: 70 },
+    legend: {
+      top: 10,
+      textStyle: { color: '#9ca3af' },
+      icon: 'circle'
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#cbd5e1' },
+      axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } },
+      formatter: (params: any) => {
+        if (Array.isArray(params)) {
+          return params.map((p: any) => {
+            return `${p.seriesName}: ${typeof p.value === 'number' ? p.value.toFixed(2) : 'N/A'} Mbps`;
+          }).join('<br/>');
+        }
+        return '';
+      }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: metrics.map((m) => {
         const time = new Date(m.timestamp);
         return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       }),
-      datasets: [
-        {
-          label: 'Download (Mbps)',
-          data: metrics.map((m) => m.throughputDL ?? 0),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.2)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 2,
-          pointHoverRadius: 6
-        },
-        {
-          label: 'Upload (Mbps)',
-          data: metrics.map((m) => m.throughputUL ?? 0),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, 0.2)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 2,
-          pointHoverRadius: 6
-        }
-      ]
+      axisLabel: {
+        color: '#9ca3af',
+        fontSize: 10,
+        rotate: 45
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { show: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index' as const,
-        intersect: false
+    yAxis: {
+      type: 'value',
+      name: 'Throughput (Mbps)',
+      nameLocation: 'middle',
+      nameGap: 50,
+      nameTextStyle: { color: '#9ca3af', fontSize: 11 },
+      min: 0,
+      axisLabel: { color: '#9ca3af', fontSize: 11 },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { lineStyle: { color: 'rgba(75, 85, 99, 0.2)' } }
+    },
+    series: [
+      {
+        name: 'Download (Mbps)',
+        type: 'line',
+        data: metrics.map((m) => m.throughputDL ?? 0),
+        itemStyle: { color: '#10b981' },
+        areaStyle: { color: 'rgba(16, 185, 129, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgb(156, 163, 175)',
-            usePointStyle: true,
-            padding: 15
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          callbacks: {
-            label: tooltipLabel
-          }
-        }
-      },
-      scales: {
-        y: {
-          title: {
-            display: true,
-            text: 'Throughput (Mbps)',
-            color: 'rgb(156, 163, 175)'
-          },
-          grid: {
-            color: 'rgba(75, 85, 99, 0.2)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)'
-          },
-          beginAtZero: true
-        },
-        x: {
-          grid: {
-            color: 'rgba(75, 85, 99, 0.1)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            maxRotation: 45,
-            minRotation: 45
-          }
-        }
+      {
+        name: 'Upload (Mbps)',
+        type: 'line',
+        data: metrics.map((m) => m.throughputUL ?? 0),
+        itemStyle: { color: '#3b82f6' },
+        areaStyle: { color: 'rgba(59, 130, 246, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
       }
-    }
-  } satisfies ChartConfiguration<'line'>;
+    ]
+  } satisfies EChartsOption;
 </script>
 
 <div class="chart-container">
   <h3 class="chart-title">Network Throughput</h3>
   <div class="chart-wrapper">
-    <Chart {config} height={300} />
+    <ECharts option={option} height={300} theme="dark" />
   </div>
 </div>
 
@@ -123,4 +108,3 @@
     position: relative;
   }
 </style>
-

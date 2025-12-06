@@ -1,7 +1,6 @@
 <script lang="ts">
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
-  import type { TooltipItem } from 'chart.js';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { formatUptime } from '../lib/tr069MetricsService';
 
@@ -13,98 +12,79 @@
     return m.uptime < metrics[i - 1].uptime;
   });
 
-  const tooltipLabel = (context: TooltipItem<'line'>): string => {
-    const hours = context.parsed.y;
-    const seconds = typeof hours === 'number' ? hours * 3600 : 0;
-    return `Uptime: ${formatUptime(seconds)}`;
-  };
-
-  const tooltipTitle = (contexts: TooltipItem<'line'>[]): string => {
-    const context = contexts[0];
-    const idx = context.dataIndex;
-    const baseLabel = context.label ?? '';
-    return reboots[idx] ? `${baseLabel} (Device Reboot)` : baseLabel;
-  };
-
-  const uptimeTickFormatter = (value: string | number): string => {
-    return `${value}h`;
-  };
-
-  $: config = {
-    type: 'line' as const,
-    data: {
-      labels: metrics.map((m, i) => {
+  $: option = {
+    grid: { top: 50, right: 30, bottom: 50, left: 70 },
+    legend: {
+      top: 10,
+      textStyle: { color: '#9ca3af' },
+      icon: 'circle'
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#cbd5e1' },
+      axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } },
+      formatter: (params: any) => {
+        if (Array.isArray(params) && params[0]) {
+          const idx = params[0].dataIndex;
+          const hours = params[0].value;
+          const seconds = hours * 3600;
+          const label = reboots[idx] ? `${params[0].axisValue} (Device Reboot)` : params[0].axisValue;
+          return `${label}<br/>Uptime: ${formatUptime(seconds)}`;
+        }
+        return '';
+      }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: metrics.map((m, i) => {
         const time = new Date(m.timestamp);
         const label = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         return reboots[i] ? `${label} ⚠️` : label;
       }),
-      datasets: [
-        {
-          label: 'Uptime (hours)',
-          data: metrics.map((m) => m.uptime / 3600),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.2)',
-          tension: 0.3,
-          fill: true,
-          pointRadius: reboots.map((r) => (r ? 6 : 2)),
-          pointBackgroundColor: reboots.map((r) => (r ? '#ef4444' : '#10b981')),
-          pointHoverRadius: 8
-        }
-      ]
+      axisLabel: {
+        color: '#9ca3af',
+        fontSize: 10,
+        rotate: 45
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { show: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index' as const,
-        intersect: false
+    yAxis: {
+      type: 'value',
+      name: 'Uptime (hours)',
+      nameLocation: 'middle',
+      nameGap: 50,
+      nameTextStyle: { color: '#9ca3af', fontSize: 11 },
+      min: 0,
+      axisLabel: { 
+        color: '#9ca3af', 
+        fontSize: 11,
+        formatter: '{value}h'
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgb(156, 163, 175)',
-            usePointStyle: true,
-            padding: 15
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          callbacks: {
-            label: tooltipLabel,
-            title: tooltipTitle
-          }
-        }
-      },
-      scales: {
-        y: {
-          title: {
-            display: true,
-            text: 'Uptime (hours)',
-            color: 'rgb(156, 163, 175)'
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { lineStyle: { color: 'rgba(75, 85, 99, 0.2)' } }
+    },
+    series: [
+      {
+        name: 'Uptime (hours)',
+        type: 'line',
+        data: metrics.map((m, i) => ({
+          value: m.uptime / 3600,
+          itemStyle: {
+            color: reboots[i] ? '#ef4444' : '#10b981'
           },
-          grid: {
-            color: 'rgba(75, 85, 99, 0.2)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            callback: uptimeTickFormatter
-          },
-          beginAtZero: true
-        },
-        x: {
-          grid: {
-            color: 'rgba(75, 85, 99, 0.1)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            maxRotation: 45,
-            minRotation: 45
-          }
-        }
+          symbolSize: reboots[i] ? 8 : 4
+        })),
+        areaStyle: { color: 'rgba(16, 185, 129, 0.2)' },
+        smooth: true,
+        lineStyle: { width: 2 }
       }
-    }
-  } satisfies ChartConfiguration<'line'>;
+    ]
+  } satisfies EChartsOption;
 
   $: rebootCount = reboots.filter(Boolean).length;
   $: currentUptime = metrics.length > 0 ? metrics[metrics.length - 1].uptime : 0;
@@ -120,7 +100,7 @@
     {/if}
   </div>
   <div class="chart-wrapper">
-    <Chart {config} height={300} />
+    <ECharts option={option} height={300} theme="dark" />
   </div>
   <div class="chart-info">
     <span class="info-item">⏱️ Current Uptime: {formatUptime(currentUptime)}</span>
@@ -179,4 +159,3 @@
     color: var(--text-secondary);
   }
 </style>
-

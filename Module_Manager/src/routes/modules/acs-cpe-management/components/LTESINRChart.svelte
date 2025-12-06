@@ -1,129 +1,113 @@
 <script lang="ts">
-  import Chart from '$lib/components/data-display/Chart.svelte';
-  import type { ChartConfiguration } from '$lib/chartSetup';
-  import type { TooltipItem } from 'chart.js';
+  import ECharts from '$lib/components/ECharts.svelte';
+  import type { EChartsOption } from 'echarts';
   import type { TR069CellularMetrics } from '../lib/tr069MetricsService';
 
   export let metrics: TR069CellularMetrics[] = [];
 
-  const tooltipLabel = (context: TooltipItem<'line'>): string => {
-    const label = context.dataset.label ?? '';
-    const value = context.parsed.y;
-    if (label === 'CQI') {
-      return `${label}: ${typeof value === 'number' ? Math.round(value) : 'N/A'}`;
-    }
-    return `${label}: ${typeof value === 'number' ? value.toFixed(1) : 'N/A'} dB`;
-  };
-
-  $: config = {
-    type: 'line' as const,
-    data: {
-      labels: metrics.map((m) => {
+  $: option = {
+    grid: { top: 50, right: 80, bottom: 50, left: 70 },
+    legend: {
+      top: 10,
+      textStyle: { color: '#9ca3af' },
+      icon: 'circle'
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+      borderColor: 'rgba(59, 130, 246, 0.3)',
+      borderWidth: 1,
+      textStyle: { color: '#cbd5e1' },
+      axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } },
+      formatter: (params: any) => {
+        if (Array.isArray(params)) {
+          return params.map((p: any) => {
+            if (p.seriesName === 'CQI') {
+              return `${p.seriesName}: ${Math.round(p.value)}`;
+            }
+            return `${p.seriesName}: ${typeof p.value === 'number' ? p.value.toFixed(1) : 'N/A'} dB`;
+          }).join('<br/>');
+        }
+        return '';
+      }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: metrics.map((m) => {
         const time = new Date(m.timestamp);
         return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
       }),
-      datasets: [
-        {
-          label: 'SINR (dB)',
-          data: metrics.map((m) => m.sinr),
-          borderColor: '#8b5cf6',
-          backgroundColor: 'rgba(139, 92, 246, 0.2)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 2,
-          pointHoverRadius: 6
-        },
-        {
-          label: 'CQI',
-          data: metrics.map((m) => m.cqi ?? 0),
-          borderColor: '#ec4899',
-          backgroundColor: 'rgba(236, 72, 153, 0.1)',
-          tension: 0.4,
-          fill: false,
-          pointRadius: 2,
-          pointHoverRadius: 6,
-          yAxisID: 'y1'
-        }
-      ]
+      axisLabel: {
+        color: '#9ca3af',
+        fontSize: 10,
+        rotate: 45
+      },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+      splitLine: { show: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index' as const,
-        intersect: false
+    yAxis: [
+      {
+        type: 'value',
+        name: 'SINR (dB)',
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: { color: '#8b5cf6', fontSize: 11 },
+        position: 'left',
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { lineStyle: { color: 'rgba(75, 85, 99, 0.2)' } }
       },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: 'rgb(156, 163, 175)',
-            usePointStyle: true,
-            padding: 15
-          }
+      {
+        type: 'value',
+        name: 'CQI',
+        nameLocation: 'middle',
+        nameGap: 60,
+        nameTextStyle: { color: '#ec4899', fontSize: 11 },
+        position: 'right',
+        min: 0,
+        max: 15,
+        axisLabel: { 
+          color: '#9ca3af', 
+          fontSize: 11,
+          interval: 1
         },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          callbacks: {
-            label: tooltipLabel
-          }
-        }
-      },
-      scales: {
-        y: {
-          type: 'linear',
-          display: true,
-          position: 'left',
-          title: {
-            display: true,
-            text: 'SINR (dB)',
-            color: '#8b5cf6'
-          },
-          grid: {
-            color: 'rgba(75, 85, 99, 0.2)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)'
-          }
-        },
-        y1: {
-          type: 'linear',
-          display: true,
-          position: 'right',
-          title: {
-            display: true,
-            text: 'CQI',
-            color: '#ec4899'
-          },
-          grid: {
-            drawOnChartArea: false
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            stepSize: 1
-          },
-          min: 0,
-          max: 15
-        },
-        x: {
-          grid: {
-            color: 'rgba(75, 85, 99, 0.1)'
-          },
-          ticks: {
-            color: 'rgb(156, 163, 175)',
-            maxRotation: 45,
-            minRotation: 45
-          }
-        }
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
       }
-    }
-  } satisfies ChartConfiguration<'line'>;
+    ],
+    series: [
+      {
+        name: 'SINR (dB)',
+        type: 'line',
+        yAxisIndex: 0,
+        data: metrics.map((m) => m.sinr),
+        itemStyle: { color: '#8b5cf6' },
+        areaStyle: { color: 'rgba(139, 92, 246, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      },
+      {
+        name: 'CQI',
+        type: 'line',
+        yAxisIndex: 1,
+        data: metrics.map((m) => m.cqi ?? 0),
+        itemStyle: { color: '#ec4899' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }
+    ]
+  } satisfies EChartsOption;
 </script>
 
 <div class="chart-container">
   <h3 class="chart-title">Signal Quality (SINR & CQI)</h3>
   <div class="chart-wrapper">
-    <Chart {config} height={300} />
+    <ECharts option={option} height={300} theme="dark" />
   </div>
 </div>
 
@@ -147,4 +131,3 @@
     position: relative;
   }
 </style>
-

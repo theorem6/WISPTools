@@ -7,9 +7,9 @@ export default defineConfig({
 		port: 5173,
 		strictPort: false,
 	},
-	// Ensure chart.js is included in SSR bundle
+	// Ensure echarts is included in SSR bundle
 	ssr: {
-		noExternal: ['chart.js']
+		noExternal: ['echarts']
 	},
 	build: {
 		rollupOptions: {
@@ -21,6 +21,6 @@ export default defineConfig({
 		}
 	},
 	optimizeDeps: {
-		include: ['chart.js']
+		include: ['echarts']
 	}
 });

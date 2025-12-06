@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Chart, registerables } from 'chart.js';
+  import Chart from '$lib/components/data-display/Chart.svelte';
+  import type { ChartConfiguration } from '$lib/chartSetup';
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { API_CONFIG } from '$lib/config/api';
-  
-  Chart.register(...registerables);
   
   export let epc: any = null;
   export let onClose: () => void = () => {};
@@ -17,13 +16,10 @@
   let statusHistory: any[] = [];
   let commandHistory: any[] = [];
   
-  // Chart references
-  let cpuChartCanvas: HTMLCanvasElement;
-  let memoryChartCanvas: HTMLCanvasElement;
-  let diskChartCanvas: HTMLCanvasElement;
-  let cpuChart: Chart | null = null;
-  let memoryChart: Chart | null = null;
-  let diskChart: Chart | null = null;
+  // Chart configs
+  let cpuChartConfig: ChartConfiguration | null = null;
+  let memoryChartConfig: ChartConfiguration | null = null;
+  let diskChartConfig: ChartConfiguration | null = null;
   
   // Required services
   const SERVICES = [
@@ -43,9 +39,7 @@
   });
   
   onDestroy(() => {
-    cpuChart?.destroy();
-    memoryChart?.destroy();
-    diskChart?.destroy();
+    // Charts are managed by Chart component
   });
   
   async function loadStatus() {
@@ -150,13 +144,12 @@
   }
   
   function initCharts() {
-    if (!cpuChartCanvas || !memoryChartCanvas || !diskChartCanvas) return;
-    if (statusHistory.length === 0) return;
-    
-    // Destroy existing charts before recreating
-    cpuChart?.destroy();
-    memoryChart?.destroy();
-    diskChart?.destroy();
+    if (statusHistory.length === 0) {
+      cpuChartConfig = null;
+      memoryChartConfig = null;
+      diskChartConfig = null;
+      return;
+    }
     
     const labels = statusHistory.map(s => {
       const d = new Date(s.timestamp);
@@ -193,8 +186,8 @@
       }
     };
     
-    cpuChart = new Chart(cpuChartCanvas, {
-      type: 'line',
+    cpuChartConfig = {
+      type: 'line' as const,
       data: {
         labels,
         datasets: [{
@@ -209,10 +202,10 @@
         }]
       },
       options: chartOptions
-    });
+    };
     
-    memoryChart = new Chart(memoryChartCanvas, {
-      type: 'line',
+    memoryChartConfig = {
+      type: 'line' as const,
       data: {
         labels,
         datasets: [{
@@ -227,10 +220,10 @@
         }]
       },
       options: chartOptions
-    });
+    };
     
-    diskChart = new Chart(diskChartCanvas, {
-      type: 'line',
+    diskChartConfig = {
+      type: 'line' as const,
       data: {
         labels,
         datasets: [{
@@ -245,7 +238,7 @@
         }]
       },
       options: chartOptions
-    });
+    };
   }
   
   async function refreshAll() {
@@ -500,7 +493,9 @@
         <div class="chart-card">
           <h4>CPU Usage</h4>
           <div class="chart-container">
-            <canvas bind:this={cpuChartCanvas}></canvas>
+            {#if cpuChartConfig}
+              <Chart config={cpuChartConfig} height={200} />
+            {/if}
           </div>
           <div class="chart-current">
             Current: {serviceStatus?.system?.cpu_percent ?? 'N/A'}%
@@ -509,7 +504,9 @@
         <div class="chart-card">
           <h4>Memory Usage</h4>
           <div class="chart-container">
-            <canvas bind:this={memoryChartCanvas}></canvas>
+            {#if memoryChartConfig}
+              <Chart config={memoryChartConfig} height={200} />
+            {/if}
           </div>
           <div class="chart-current">
             Current: {serviceStatus?.system?.memory_percent ?? 'N/A'}%
@@ -519,7 +516,9 @@
         <div class="chart-card">
           <h4>Disk Usage</h4>
           <div class="chart-container">
-            <canvas bind:this={diskChartCanvas}></canvas>
+            {#if diskChartConfig}
+              <Chart config={diskChartConfig} height={200} />
+            {/if}
           </div>
           <div class="chart-current">
             Current: {serviceStatus?.system?.disk_percent ?? 'N/A'}%

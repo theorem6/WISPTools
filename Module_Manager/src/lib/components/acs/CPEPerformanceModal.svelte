@@ -11,17 +11,14 @@
   export let onClose: () => void = () => {};
 
   let performanceData: CPEPerformanceData | null = null;
+  import Chart from '$lib/components/data-display/Chart.svelte';
+  import type { ChartConfiguration } from '$lib/chartSetup';
+
   let loading = false;
   let error: string | null = null;
-  let signalChart: HTMLCanvasElement;
-  let bandwidthChart: HTMLCanvasElement;
-  let latencyChart: HTMLCanvasElement;
-  let signalChartInstance: any = null;
-  let bandwidthChartInstance: any = null;
-  let latencyChartInstance: any = null;
-
-  // Chart.js will be loaded dynamically
-  let Chart: any = null;
+  let signalChartConfig: ChartConfiguration | null = null;
+  let bandwidthChartConfig: ChartConfiguration | null = null;
+  let latencyChartConfig: ChartConfiguration | null = null;
 
   // Watch for device changes
   $: if (cpeDevice && isOpen) {
@@ -32,16 +29,6 @@
   $: if (!isOpen) {
     cleanup();
   }
-
-  onMount(async () => {
-    // Dynamically import Chart.js
-    try {
-      const chartModule = await import('chart.js/auto');
-      Chart = chartModule.default ?? chartModule.Chart;
-    } catch (err) {
-      console.error('Failed to load Chart.js:', err);
-    }
-  });
 
   onDestroy(() => {
     cleanup();
@@ -66,10 +53,8 @@
         timestamp: cpeDevice.performanceMetrics.lastUpdate
       };
 
-      // Initialize charts after a short delay to ensure DOM is ready
-      setTimeout(() => {
-        initializeCharts();
-      }, 100);
+      // Initialize chart configs
+      initializeCharts();
 
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load performance data';
@@ -80,93 +65,93 @@
   }
 
   function initializeCharts() {
-    if (!Chart || !performanceData) return;
+    if (!performanceData) {
+      signalChartConfig = null;
+      bandwidthChartConfig = null;
+      latencyChartConfig = null;
+      return;
+    }
 
     // Initialize signal strength chart
-    if (signalChart && !signalChartInstance) {
-      signalChartInstance = new Chart(signalChart, {
-        type: 'line',
-        data: {
-          labels: ['Current'],
-          datasets: [{
-            label: 'Signal Strength (dBm)',
-            data: [performanceData.signalStrength],
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            tension: 0.1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: false,
-              title: {
-                display: true,
-                text: 'dBm'
-              }
-            }
-          },
-          plugins: {
-            legend: {
-              display: false
+    signalChartConfig = {
+      type: 'line' as const,
+      data: {
+        labels: ['Current'],
+        datasets: [{
+          label: 'Signal Strength (dBm)',
+          data: [performanceData.signalStrength],
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: 'dBm'
             }
           }
+        },
+        plugins: {
+          legend: {
+            display: false
+          }
         }
-      });
-    }
+      }
+    };
 
     // Initialize bandwidth chart
-    if (bandwidthChart && !bandwidthChartInstance) {
-      bandwidthChartInstance = new Chart(bandwidthChart, {
-        type: 'bar',
-        data: {
-          labels: ['Current'],
-          datasets: [{
-            label: 'Bandwidth (Mbps)',
-            data: [performanceData.bandwidth],
-            backgroundColor: 'rgba(34, 197, 94, 0.8)',
-            borderColor: 'rgb(34, 197, 94)',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Mbps'
-              }
-            }
-          },
-          plugins: {
-            legend: {
-              display: false
+    bandwidthChartConfig = {
+      type: 'bar' as const,
+      data: {
+        labels: ['Current'],
+        datasets: [{
+          label: 'Bandwidth (Mbps)',
+          data: [performanceData.bandwidth],
+          backgroundColor: 'rgba(34, 197, 94, 0.8)',
+          borderColor: 'rgb(34, 197, 94)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Mbps'
             }
           }
+        },
+        plugins: {
+          legend: {
+            display: false
+          }
         }
-      });
-    }
+      }
+    };
 
     // Initialize latency chart
-    if (latencyChart && !latencyChartInstance) {
-      latencyChartInstance = new Chart(latencyChart, {
-        type: 'line',
-        data: {
-          labels: ['Current'],
-          datasets: [{
-            label: 'Latency (ms)',
-            data: [performanceData.latency],
-            borderColor: 'rgb(245, 158, 11)',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-            tension: 0.1
-          }]
-        },
-        options: {
+    latencyChartConfig = {
+      type: 'line' as const,
+      data: {
+        labels: ['Current'],
+        datasets: [{
+          label: 'Latency (ms)',
+          data: [performanceData.latency],
+          borderColor: 'rgb(245, 158, 11)',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          tension: 0.1
+        }]
+      },
+      options: {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
@@ -184,23 +169,14 @@
             }
           }
         }
-      });
-    }
+      };
   }
 
   function cleanup() {
-    if (signalChartInstance) {
-      signalChartInstance.destroy();
-      signalChartInstance = null;
-    }
-    if (bandwidthChartInstance) {
-      bandwidthChartInstance.destroy();
-      bandwidthChartInstance = null;
-    }
-    if (latencyChartInstance) {
-      latencyChartInstance.destroy();
-      latencyChartInstance = null;
-    }
+    // Charts are managed by Chart component
+    signalChartConfig = null;
+    bandwidthChartConfig = null;
+    latencyChartConfig = null;
   }
 
   function formatUptime(uptimeSeconds: number): string {
@@ -422,7 +398,9 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4">
               <h3 class="text-lg font-medium text-gray-900 mb-4">Signal Strength Trend</h3>
               <div class="h-48">
-                <canvas bind:this={signalChart}></canvas>
+                {#if signalChartConfig}
+                  <Chart config={signalChartConfig} height={192} />
+                {/if}
               </div>
             </div>
 
@@ -430,7 +408,9 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4">
               <h3 class="text-lg font-medium text-gray-900 mb-4">Bandwidth Usage</h3>
               <div class="h-48">
-                <canvas bind:this={bandwidthChart}></canvas>
+                {#if bandwidthChartConfig}
+                  <Chart config={bandwidthChartConfig} height={192} />
+                {/if}
               </div>
             </div>
 
@@ -438,7 +418,9 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4">
               <h3 class="text-lg font-medium text-gray-900 mb-4">Latency Trend</h3>
               <div class="h-48">
-                <canvas bind:this={latencyChart}></canvas>
+                {#if latencyChartConfig}
+                  <Chart config={latencyChartConfig} height={192} />
+                {/if}
               </div>
             </div>
 
