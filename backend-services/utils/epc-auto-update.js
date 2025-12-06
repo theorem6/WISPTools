@@ -230,9 +230,9 @@ else
         git remote set-url origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     fi
     
-    # Verify remote URL is correct
+    # Verify remote URL is correct (for logging)
     VERIFIED_REMOTE=$(git remote get-url origin 2>/dev/null || echo "none")
-    log "Git remote URL: ${VERIFIED_REMOTE}"
+    log "Git remote URL configured: \\$VERIFIED_REMOTE"
     
     # Update sparse checkout paths if needed (in case new scripts are added)
     mkdir -p .git/info
