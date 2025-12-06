@@ -175,7 +175,8 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 # Set up git repository with sparse checkout (only downloads needed files)
-# Configure git to not prompt for credentials (public repo - no auth needed)
+# Repository is PRIVATE - token is embedded in GIT_REPO_URL for authentication
+# Configure git to not prompt for credentials (token is in URL)
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/echo
 
@@ -189,6 +190,7 @@ if [ ! -d "${GIT_REPO_DIR}" ]; then
     git config credential.helper "" 2>&1
     git config http.sslVerify true 2>&1
     git config http.postBuffer 524288000 2>&1
+    git config url."${GIT_REPO_URL}".insteadOf "https://github.com/theorem6/lte-pci-mapper.git" 2>&1 || true
     
     # Configure sparse checkout to only download the scripts we need
     mkdir -p .git/info
@@ -196,14 +198,14 @@ if [ ! -d "${GIT_REPO_DIR}" ]; then
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
     
-    # Add remote (remove if exists to avoid errors)
+    # Add remote with token-embedded URL (remove if exists to avoid errors)
     git remote remove origin >/dev/null 2>&1 || true
     git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
-    log "Fetching only required files from git (sparse checkout)..."
+    log "Fetching only required files from git (sparse checkout with authentication)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
     if [ $? -ne 0 ]; then
-        log "ERROR: Failed to fetch from git repository"
+        log "ERROR: Failed to fetch from git repository (check token authentication)"
         exit 1
     fi
     
@@ -217,9 +219,10 @@ else
     log "Updating git repository (sparse checkout)..."
     cd "${GIT_REPO_DIR}"
     
-    # Configure git to not prompt for credentials
+    # Configure git to not prompt for credentials (token is in URL)
     git config credential.helper "" 2>&1
     git config http.postBuffer 524288000 2>&1
+    git config url."${GIT_REPO_URL}".insteadOf "https://github.com/theorem6/lte-pci-mapper.git" 2>&1 || true
     export GIT_TERMINAL_PROMPT=0
     export GIT_ASKPASS=/bin/echo
     
@@ -229,18 +232,18 @@ else
 ${gitPaths.join('\n')}
 SPARSECHECKOUT
     
-    # Ensure remote is configured correctly (update URL if changed)
+    # Ensure remote is configured correctly with token-embedded URL
     git remote remove origin >/dev/null 2>&1 || true
     git remote add origin "${GIT_REPO_URL}" 2>&1 | while read line; do log "$line"; done
     
-    log "Fetching latest changes (sparse checkout)..."
+    log "Fetching latest changes (sparse checkout with authentication)..."
     git fetch --depth 1 origin "${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
     if [ $? -eq 0 ]; then
         log "Checking out updated files..."
         git checkout -f "origin/${GIT_REPO_BRANCH}" 2>&1 | while read line; do log "$line"; done
         git sparse-checkout reapply 2>&1 | while read line; do log "$line"; done
     else
-        log "WARNING: Git fetch failed, but continuing with existing files..."
+        log "WARNING: Git fetch failed (authentication may have failed), but continuing with existing files..."
     fi
 fi
 
