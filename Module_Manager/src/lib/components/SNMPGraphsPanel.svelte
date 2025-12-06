@@ -72,16 +72,22 @@
         isLoading = false;
         error = '';
         
+        console.log('[SNMPGraphsPanel] Loaded devices:', devices.length);
         if (!selectedDevice && devices.length > 0) {
+          console.log('[SNMPGraphsPanel] Auto-selecting first device:', devices[0].name || devices[0].id);
           selectDevice(devices[0]);
         } else if (selectedDevice) {
           const refreshed = devices.find((d: any) => d.id === selectedDevice.id);
           if (refreshed) {
+            console.log('[SNMPGraphsPanel] Refreshing selected device:', refreshed.name || refreshed.id);
             selectedDevice = refreshed;
             await loadDeviceMetrics();
           } else {
+            console.log('[SNMPGraphsPanel] Selected device not found, selecting first device');
             selectDevice(devices[0]);
           }
+        } else {
+          console.log('[SNMPGraphsPanel] No devices available to select');
         }
       } else {
         const errorText = await response.text();
@@ -101,7 +107,14 @@
   }
   
   async function selectDevice(device: any) {
+    console.log('[SNMPGraphsPanel] Selecting device:', device.name || device.id, 'hasPing:', device.hasPing, 'hasSNMP:', device.hasSNMP);
     selectedDevice = device;
+    // Reset chart options
+    pingUptimeOption = null;
+    pingResponseOption = null;
+    cpuOption = null;
+    memoryOption = null;
+    throughputOption = null;
     await loadDeviceMetrics();
   }
   
@@ -131,9 +144,18 @@
           
           if (pingResponse.ok) {
             const pingData = await pingResponse.json();
+            console.log('[SNMPGraphsPanel] Ping data received:', {
+              hasData: !!pingData.data,
+              labelsCount: pingData.data?.labels?.length || 0,
+              datasetsCount: pingData.data?.datasets?.length || 0,
+              stats: pingData.stats
+            });
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;
             updatePingCharts();
+          } else {
+            const errorText = await pingResponse.text();
+            console.error('[SNMPGraphsPanel] Ping metrics request failed:', pingResponse.status, errorText);
           }
         } catch (err) {
           console.error('Failed to load ping metrics:', err);
@@ -155,8 +177,16 @@
           
           if (snmpResponse.ok) {
             const snmpData = await snmpResponse.json();
+            console.log('[SNMPGraphsPanel] SNMP data received:', {
+              hasData: !!snmpData.data,
+              labelsCount: snmpData.data?.labels?.length || 0,
+              datasetsCount: snmpData.data?.datasets?.length || 0
+            });
             snmpMetrics = snmpData.data || null;
             updateSNMPCharts();
+          } else {
+            const errorText = await snmpResponse.text();
+            console.error('[SNMPGraphsPanel] SNMP metrics request failed:', snmpResponse.status, errorText);
           }
         } catch (err) {
           console.error('Failed to load SNMP metrics:', err);
@@ -168,7 +198,9 @@
   }
   
   function updatePingCharts() {
+    console.log('[SNMPGraphsPanel] updatePingCharts called, pingMetrics:', !!pingMetrics, 'labels:', pingMetrics?.labels?.length || 0);
     if (!pingMetrics || !pingMetrics.labels || pingMetrics.labels.length === 0) {
+      console.log('[SNMPGraphsPanel] No ping metrics data, clearing chart options');
       pingUptimeOption = null;
       pingResponseOption = null;
       return;
@@ -238,7 +270,9 @@
           lineStyle: { width: 2 }
         }]
       };
+      console.log('[SNMPGraphsPanel] Ping uptime chart option created');
     } else {
+      console.log('[SNMPGraphsPanel] No status dataset found, clearing uptime chart');
       pingUptimeOption = null;
     }
     
@@ -298,13 +332,17 @@
           lineStyle: { width: 2 }
         }]
       };
+      console.log('[SNMPGraphsPanel] Ping response time chart option created');
     } else {
+      console.log('[SNMPGraphsPanel] No response time dataset found, clearing response chart');
       pingResponseOption = null;
     }
   }
   
   function updateSNMPCharts() {
+    console.log('[SNMPGraphsPanel] updateSNMPCharts called, snmpMetrics:', !!snmpMetrics, 'labels:', snmpMetrics?.labels?.length || 0);
     if (!snmpMetrics || !snmpMetrics.labels || snmpMetrics.labels.length === 0) {
+      console.log('[SNMPGraphsPanel] No SNMP metrics data, clearing chart options');
       cpuOption = null;
       memoryOption = null;
       throughputOption = null;
@@ -370,7 +408,9 @@
           lineStyle: { width: 2 }
         }]
       };
+      console.log('[SNMPGraphsPanel] CPU chart option created');
     } else {
+      console.log('[SNMPGraphsPanel] No CPU dataset found, clearing CPU chart');
       cpuOption = null;
     }
     
@@ -431,7 +471,9 @@
           lineStyle: { width: 2 }
         }]
       };
+      console.log('[SNMPGraphsPanel] Memory chart option created');
     } else {
+      console.log('[SNMPGraphsPanel] No memory dataset found, clearing memory chart');
       memoryOption = null;
     }
     
@@ -500,7 +542,9 @@
         },
         series: series
       };
+      console.log('[SNMPGraphsPanel] Throughput chart option created with', series.length, 'series');
     } else {
+      console.log('[SNMPGraphsPanel] No throughput datasets found, clearing throughput chart');
       throughputOption = null;
     }
   }
@@ -624,7 +668,14 @@
                 <div class="chart-card">
                   <h4>🟢 Ping Uptime</h4>
                   <div class="chart-container">
-                    <ECharts option={pingUptimeOption} height={200} theme="dark" />
+                    <ECharts option={pingUptimeOption} height={200} theme="dark" loading={!pingMetrics} />
+                  </div>
+                </div>
+              {:else if isLoading}
+                <div class="chart-card">
+                  <h4>🟢 Ping Uptime</h4>
+                  <div class="chart-container">
+                    <div class="chart-loading">Loading ping data...</div>
                   </div>
                 </div>
               {/if}
@@ -632,7 +683,14 @@
                 <div class="chart-card">
                   <h4>⏱️ Ping Response Time</h4>
                   <div class="chart-container">
-                    <ECharts option={pingResponseOption} height={200} theme="dark" />
+                    <ECharts option={pingResponseOption} height={200} theme="dark" loading={!pingMetrics} />
+                  </div>
+                </div>
+              {:else if isLoading}
+                <div class="chart-card">
+                  <h4>⏱️ Ping Response Time</h4>
+                  <div class="chart-container">
+                    <div class="chart-loading">Loading ping data...</div>
                   </div>
                 </div>
               {/if}
@@ -643,7 +701,14 @@
                 <div class="chart-card">
                   <h4>💻 CPU Usage</h4>
                   <div class="chart-container">
-                    <ECharts option={cpuOption} height={200} theme="dark" />
+                    <ECharts option={cpuOption} height={200} theme="dark" loading={!snmpMetrics} />
+                  </div>
+                </div>
+              {:else if isLoading}
+                <div class="chart-card">
+                  <h4>💻 CPU Usage</h4>
+                  <div class="chart-container">
+                    <div class="chart-loading">Loading SNMP data...</div>
                   </div>
                 </div>
               {/if}
@@ -651,7 +716,14 @@
                 <div class="chart-card">
                   <h4>🧠 Memory Usage</h4>
                   <div class="chart-container">
-                    <ECharts option={memoryOption} height={200} theme="dark" />
+                    <ECharts option={memoryOption} height={200} theme="dark" loading={!snmpMetrics} />
+                  </div>
+                </div>
+              {:else if isLoading}
+                <div class="chart-card">
+                  <h4>🧠 Memory Usage</h4>
+                  <div class="chart-container">
+                    <div class="chart-loading">Loading SNMP data...</div>
                   </div>
                 </div>
               {/if}
@@ -659,7 +731,14 @@
                 <div class="chart-card wide">
                   <h4>🌐 Network Throughput</h4>
                   <div class="chart-container">
-                    <ECharts option={throughputOption} height={200} theme="dark" />
+                    <ECharts option={throughputOption} height={200} theme="dark" loading={!snmpMetrics} />
+                  </div>
+                </div>
+              {:else if isLoading}
+                <div class="chart-card wide">
+                  <h4>🌐 Network Throughput</h4>
+                  <div class="chart-container">
+                    <div class="chart-loading">Loading SNMP data...</div>
                   </div>
                 </div>
               {/if}
@@ -953,6 +1032,15 @@
   .chart-container {
     height: 200px;
     position: relative;
+  }
+  
+  .chart-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+    font-size: 0.875rem;
   }
   
   .no-data-message {

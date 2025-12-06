@@ -3,7 +3,7 @@
   import * as echarts from 'echarts';
   import type { EChartsOption } from 'echarts';
 
-  export let option: EChartsOption;
+  export let option: EChartsOption | null = null;
   export let height: number = 300;
   export let theme: string | object = 'dark'; // Can be 'light', 'dark', or custom theme object
   export let loading: boolean = false;
@@ -74,9 +74,16 @@
   $: if (chart && option && mounted) {
     try {
       chart.setOption(option, true);
+      console.log('[ECharts] Chart option updated successfully');
     } catch (error) {
       console.error('[ECharts] Failed to update chart:', error);
     }
+  }
+
+  // Re-initialize if chart doesn't exist but option is available
+  $: if (!chart && option && mounted && chartContainer) {
+    console.log('[ECharts] Option available but chart not initialized, initializing now...');
+    initChart();
   }
 
   // Handle loading state
