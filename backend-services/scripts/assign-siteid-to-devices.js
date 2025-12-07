@@ -3,8 +3,8 @@
  * Matches devices to the nearest site based on location coordinates
  */
 
-require('dotenv').config();
 const mongoose = require('mongoose');
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { UnifiedSite, NetworkEquipment, UnifiedCPE } = require('../models/network');
 
 // Calculate distance between two coordinates using Haversine formula
@@ -23,34 +23,32 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c; // Distance in meters
 }
 
-async function assignSiteIds() {
+async function connectDB() {
   try {
-    // Connect to MongoDB - use environment variable or check for common locations
-    let mongoUri = process.env.MONGODB_URI;
-    
-    if (!mongoUri) {
-      // Try to load from .env file in backend-services directory
-      const path = require('path');
-      const fs = require('fs');
-      const envPath = path.join(__dirname, '..', '.env');
-      
-      if (fs.existsSync(envPath)) {
-        const envContent = fs.readFileSync(envPath, 'utf8');
-        const mongoMatch = envContent.match(/MONGODB_URI=(.+)/);
-        if (mongoMatch) {
-          mongoUri = mongoMatch[1].trim();
-        }
-      }
+    let mongoUri;
+    try {
+      const appConfig = require('../config/app');
+      mongoUri = appConfig.mongodb.uri || process.env.MONGODB_URI;
+    } catch (e) {
+      mongoUri = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
     }
     
     if (!mongoUri) {
-      console.error('❌ MONGODB_URI not found in environment variables or .env file');
-      console.error('   Please set MONGODB_URI environment variable or add it to backend-services/.env');
+      console.error('❌ MONGODB_URI not found in config or environment variables');
       process.exit(1);
     }
     
     await mongoose.connect(mongoUri);
-    console.log('✅ Connected to MongoDB');
+    console.log('✅ Connected to MongoDB\n');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    process.exit(1);
+  }
+}
+
+async function assignSiteIds() {
+  try {
+    await connectDB();
 
     // Get all sites
     const sites = await UnifiedSite.find({
