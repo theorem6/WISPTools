@@ -1596,9 +1596,11 @@ export class CoverageMapController {
           if (customIcon) {
             symbol = new PictureMarkerSymbol(customIcon);
           } else {
+            // Use status-based color if status is provided, otherwise use type-based color
+            const color = getTowerColor(tower.type, tower.status);
             symbol = new SimpleMarkerSymbol({
               style: 'circle',
-              color: getTowerColor(tower.type),
+              color: color,
               size: symbolSize,
               outline: {
                 color: 'white',
@@ -2364,7 +2366,21 @@ function createSectorCone(lat: number, lon: number, azimuth: number, beamwidth: 
   };
 }
 
-function getTowerColor(type: string): string {
+function getTowerColor(type: string, status?: string): string {
+  // If status is provided, use status-based colors (for monitoring)
+  if (status) {
+    const statusColors: Record<string, string> = {
+      active: '#10b981',      // Green - healthy/online
+      inactive: '#ef4444',    // Red - down/offline
+      maintenance: '#f59e0b', // Yellow - degraded/warning
+      planned: '#6b7280'      // Gray - planned sites
+    };
+    if (statusColors[status]) {
+      return statusColors[status];
+    }
+  }
+  
+  // Fallback to type-based colors
   const colors: Record<string, string> = {
     tower: '#3b82f6',
     rooftop: '#8b5cf6',

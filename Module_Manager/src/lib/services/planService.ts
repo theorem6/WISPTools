@@ -81,7 +81,7 @@ export interface PlanProject {
   id: string;
   name: string;
   description: string;
-  status: 'draft' | 'active' | 'ready' | 'approved' | 'authorized' | 'rejected' | 'deployed' | 'cancelled';
+  status: 'draft' | 'active' | 'ready' | 'approved' | 'authorized' | 'rejected' | 'deployed' | 'archived' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;

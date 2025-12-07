@@ -693,7 +693,13 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         return [];
       });
 
-      projects = plans;
+      // Filter out approved and deployed projects - they should only appear in Deploy module
+      projects = plans.filter(plan => 
+        plan.status !== 'approved' && 
+        plan.status !== 'authorized' && 
+        plan.status !== 'deployed' &&
+        plan.status !== 'archived'
+      );
       loadedTenantId = tenantId;
       visiblePlans = new Set(projects.filter(p => p.showOnMap).map(p => p.id));
 

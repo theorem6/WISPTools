@@ -12,6 +12,7 @@
   import EPCMonitoringPanel from '$lib/components/EPCMonitoringPanel.svelte';
   import SNMPGraphsPanel from '$lib/components/SNMPGraphsPanel.svelte';
   import MikrotikDevicesPanel from './components/MikrotikDevicesPanel.svelte';
+  import SiteDevicesModal from './components/SiteDevicesModal.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
@@ -30,6 +31,11 @@
   let loading = true;
   let showMikrotikCredentialsModal = false;
   let selectedMikrotikDevice: any = null;
+  
+  // Site devices modal
+  let showSiteDevicesModal = false;
+  let selectedSite: any = null;
+  let selectedSiteDevices: any[] = [];
   
   // EPC Monitoring
   let epcDevices: any[] = [];
@@ -561,6 +567,14 @@
     console.log('[Monitoring] Alert clicked:', alert);
     showAlertDetails(alert);
   }
+  
+  function handleSiteSelected(event: CustomEvent) {
+    const { site, devices } = event.detail;
+    selectedSite = site;
+    selectedSiteDevices = devices || [];
+    showSiteDevicesModal = true;
+    console.log('[Monitoring] Site selected:', site, 'with', selectedSiteDevices.length, 'devices');
+  }
 
   function showAlertDetails(alert) {
     selectedAlert = alert;
@@ -615,6 +629,7 @@
             on:showAlertDetails={showAlertDetails}
             on:createTicketFromAlert={createTicketFromAlert}
             on:refreshData={loadDashboard}
+            on:siteSelected={handleSiteSelected}
           />
         {:else if mapView === 'topology'}
           <NetworkTopologyMap 
@@ -914,6 +929,18 @@
   </div>
 {/if}
 
+<!-- Site Devices Modal -->
+<SiteDevicesModal
+  site={selectedSite}
+  bind:open={showSiteDevicesModal}
+  {networkDevices}
+  {tenantId}
+  on:close={() => {
+    showSiteDevicesModal = false;
+    selectedSite = null;
+    selectedSiteDevices = [];
+  }}
+/>
 
 <style>
   /* App Container - Full Screen */

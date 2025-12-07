@@ -16,7 +16,7 @@ const PlanProjectSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'active', 'ready', 'approved', 'authorized', 'rejected', 'deployed', 'cancelled'],
+    enum: ['draft', 'active', 'ready', 'approved', 'authorized', 'rejected', 'deployed', 'archived', 'cancelled'],
     default: 'draft'
   },
   location: {

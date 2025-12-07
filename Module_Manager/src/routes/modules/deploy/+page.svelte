@@ -312,8 +312,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       // Get plan features
       const { features } = await planService.getPlanFeatures(plan.id);
       
-      // Mark plan as deployed (take over)
+      // Mark plan as deployed (take over) and then move to archived
       await planService.updatePlan(plan.id, { status: 'deployed' });
+      
+      // Move to archived status immediately after deployment
+      await planService.updatePlan(plan.id, { status: 'archived' });
       
       // Reload plans to update counts and status
       await loadReadyPlans();
@@ -368,8 +371,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         featureCount: features.length
       });
       
-      // Mark plan as deployed
+      // Mark plan as deployed, then move to archived
       await planService.updatePlan(plan.id, { status: 'deployed' });
+      
+      // Move to archived status immediately after deployment
+      await planService.updatePlan(plan.id, { status: 'archived' });
       
       // Reload plans to update counts and status
       await loadReadyPlans();

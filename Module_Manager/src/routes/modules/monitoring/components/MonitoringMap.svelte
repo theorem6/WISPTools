@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
+  import { currentTenant } from '$lib/stores/tenantStore';
   import CoverageMapView from '../../coverage-map/components/CoverageMapView.svelte';
+  import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
   import type { TowerSite, Sector, CPEDevice, NetworkEquipment, CoverageMapFilters } from '../../coverage-map/lib/models';
   
   const dispatch = createEventDispatcher();
@@ -16,6 +18,8 @@
   let towers: TowerSite[] = [];
   let sectors: Sector[] = [];
   let cpeDevices: CPEDevice[] = [];
+  
+  $: tenantId = $currentTenant?.id || '';
   
   // Monitoring-specific filters (show all network equipment)
   let filters: CoverageMapFilters = {
@@ -48,36 +52,35 @@
     return true;
   }
 
+  // Calculate system uptime percentage
+  function getSystemUptimePercent(): number {
+    if (!networkDevices || networkDevices.length === 0) return 0;
+    const onlineDevices = networkDevices.filter(d => d.status === 'online').length;
+    return Math.round((onlineDevices / networkDevices.length) * 100);
+  }
+
   // Convert devices to equipment format for the map
   function convertDevicesToEquipment() {
-    console.log('[MonitoringMap] Converting devices:', devices);
+    // Calculate system uptime first
+    const systemUptime = getSystemUptimePercent();
+    
+    // Filter devices: only show devices with valid coordinates (monitoring shows all devices, not just deployed)
+    let validDevices = 0;
+    let skippedDevices = 0;
     
     equipment = devices
       .filter(device => {
-        // Only include deployed devices with valid location coordinates
-        // Check if device is deployed (has siteId or isDeployed flag)
-        const isDeployed = device.isDeployed === true || !!device.siteId;
-        if (!isDeployed) {
-          console.log('[MonitoringMap] Skipping non-deployed device:', device.name || device.id, {
-            isDeployed: device.isDeployed,
-            siteId: device.siteId,
-            hasLocation: !!device.location
-          });
-          return false;
-        }
-        
         // Only include devices with valid location coordinates
         const lat = device.location?.coordinates?.latitude || device.location?.latitude;
         const lon = device.location?.coordinates?.longitude || device.location?.longitude;
         const hasValid = hasValidCoordinates(lat, lon);
-        if (!hasValid) {
-          console.log('[MonitoringMap] Skipping deployed device without valid coordinates:', device.name || device.id, {
-            lat,
-            lon,
-            hasLocation: !!device.location,
-            locationType: typeof device.location
-          });
+        
+        if (hasValid) {
+          validDevices++;
+        } else {
+          skippedDevices++;
         }
+        
         return hasValid;
       })
       .map(device => {
@@ -89,7 +92,6 @@
           name: device.name,
           type: getEquipmentType(device),
           status: device.status,
-          // Ensure location has the right structure with valid coordinates
           location: {
             latitude: lat,
             longitude: lon,
@@ -98,7 +100,6 @@
           ipAddress: device.ipAddress,
           lastSeen: new Date().toISOString(),
           metrics: device.metrics || {},
-          // Additional monitoring-specific fields
           monitoringData: {
             cpuUsage: device.metrics?.cpuUsage,
             memoryUsage: device.metrics?.memoryUsage,
@@ -109,41 +110,14 @@
           }
         };
         
-        console.log('[MonitoringMap] Converted device:', device.name, 'to equipment with location:', equipmentItem.location);
         return equipmentItem;
       });
     
-    // Also create some towers for devices that need them (only deployed devices with valid coordinates)
-    towers = devices
-      .filter(device => {
-        // Only deployed devices
-        const isDeployed = device.isDeployed !== false && (device.siteId || device.isDeployed === true);
-        if (!isDeployed) return false;
-        
-        const lat = device.location?.coordinates?.latitude || device.location?.latitude;
-        const lon = device.location?.coordinates?.longitude || device.location?.longitude;
-        return hasValidCoordinates(lat, lon) && (device.type === 'epc' || (device.type === 'mikrotik' && device.deviceType === 'router'));
-      })
-      .map(device => {
-        const lat = device.location?.coordinates?.latitude || device.location?.latitude || 0;
-        const lon = device.location?.coordinates?.longitude || device.location?.longitude || 0;
-        
-        return {
-          id: `tower-${device.id}`,
-          name: `${device.name} Site`,
-          type: 'tower',
-          status: device.status,
-          location: {
-            latitude: lat,
-            longitude: lon,
-            address: device.location?.address || 'Unknown Location'
-          },
-          height: 50,
-          equipment: [device.id]
-        };
-      });
-    
-    console.log('[MonitoringMap] Converted devices to equipment:', equipment.length, 'towers:', towers.length, '(filtered out devices without valid coordinates)');
+    // Summary log only
+    if (devices.length > 0) {
+      console.log(`[MonitoringMap] Processed ${devices.length} devices: ${validDevices} with valid locations, ${skippedDevices} skipped (no valid coordinates), system uptime: ${systemUptime}%`);
+    }
+    // Note: Towers are now loaded separately via loadSites() function
   }
   
   function getEquipmentType(device) {
@@ -166,8 +140,61 @@
   
   // Handle map events
   function handleMapEvent(event) {
-    console.log('[MonitoringMap] Map event:', event.type, event.detail);
     dispatch(event.type, event.detail);
+  }
+  
+  // Calculate distance between two coordinates (in kilometers)
+  function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+  
+  // Handle site click - find devices at this site and show modal
+  function handleSiteClick(site: any) {
+    const siteId = site.siteId || site.id;
+    const deviceId = site.deviceId || site.id?.replace('tower-', '');
+    
+    // Get site location
+    const siteLat = site.location?.latitude || site.location?.coordinates?.latitude;
+    const siteLon = site.location?.longitude || site.location?.coordinates?.longitude;
+    
+    const siteDevices = networkDevices.filter(device => {
+      // First try matching by siteId
+      const deviceSiteId = device.siteId || device.site_id;
+      if (siteId && deviceSiteId && String(deviceSiteId) === String(siteId)) {
+        return true;
+      }
+      
+      // Fallback to matching by deviceId (for device-based towers)
+      const dId = device.id || device._id;
+      if (deviceId && dId && String(dId) === String(deviceId)) {
+        return true;
+      }
+      
+      // Fallback to location proximity (within 0.5km / 500m)
+      if (siteLat && siteLon && hasValidCoordinates(siteLat, siteLon)) {
+        const deviceLat = device.location?.coordinates?.latitude || device.location?.latitude;
+        const deviceLon = device.location?.coordinates?.longitude || device.location?.longitude;
+        
+        if (hasValidCoordinates(deviceLat, deviceLon)) {
+          const distance = getDistance(siteLat, siteLon, deviceLat, deviceLon);
+          if (distance < 0.5) { // Within 500 meters
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    });
+    
+    // Dispatch event to parent to show devices modal
+    dispatch('siteSelected', { site, devices: siteDevices });
   }
 
   // Helper function to get alert severity color
@@ -240,10 +267,213 @@
     }
   }
   
+  // Calculate uptime percentage for a site based on devices
+  function calculateSiteUptime(siteId: string): number {
+    if (!networkDevices || networkDevices.length === 0) return 0;
+    
+    // Find all devices at this site
+    const siteDevices = networkDevices.filter(device => {
+      const deviceSiteId = device.siteId || device.site_id;
+      return deviceSiteId && (String(deviceSiteId) === String(siteId));
+    });
+    
+    if (siteDevices.length === 0) return 0;
+    
+    // Calculate uptime based on device statuses
+    const onlineDevices = siteDevices.filter(d => d.status === 'online').length;
+    return Math.round((onlineDevices / siteDevices.length) * 100);
+  }
+  
+  // Get worst alert severity for devices at a site
+  function getWorstAlertSeverity(siteId: string): 'critical' | 'error' | 'warning' | 'info' | null {
+    if (!alerts || alerts.length === 0) return null;
+    if (!networkDevices || networkDevices.length === 0) return null;
+    
+    // Find all devices at this site
+    const siteDevices = networkDevices.filter(device => {
+      const deviceSiteId = device.siteId || device.site_id;
+      return deviceSiteId && (String(deviceSiteId) === String(siteId));
+    });
+    
+    if (siteDevices.length === 0) return null;
+    
+    // Get device IDs at this site
+    const siteDeviceIds = new Set(siteDevices.map(d => String(d.id || d._id)));
+    
+    // Find alerts for devices at this site
+    const siteAlerts = alerts.filter((alert: any) => {
+      const alertDeviceId = alert.deviceId || alert.device_id;
+      return alertDeviceId && siteDeviceIds.has(String(alertDeviceId));
+    });
+    
+    if (siteAlerts.length === 0) return null;
+    
+    // Determine worst severity (critical > error > warning > info)
+    const severityOrder: Record<string, number> = { critical: 4, error: 3, warning: 2, info: 1 };
+    let worstSeverity: 'critical' | 'error' | 'warning' | 'info' | null = null;
+    let worstOrder = 0;
+    
+    siteAlerts.forEach((alert: any) => {
+      const severity = alert.severity?.toLowerCase();
+      const order = severityOrder[severity] || 0;
+      if (order > worstOrder) {
+        worstOrder = order;
+        worstSeverity = severity as 'critical' | 'error' | 'warning' | 'info';
+      }
+    });
+    
+    return worstSeverity;
+  }
+  
+  // Get site status based on uptime and alerts
+  function getSiteStatus(siteId: string, systemUptime: number): 'active' | 'inactive' | 'maintenance' {
+    const worstAlert = getWorstAlertSeverity(siteId);
+    
+    // Priority: alerts > system uptime > site-specific uptime
+    if (worstAlert === 'critical' || worstAlert === 'error') {
+      return 'inactive'; // Red
+    } else if (worstAlert === 'warning') {
+      return 'maintenance'; // Yellow
+    } else if (systemUptime === 100) {
+      return 'active'; // Green - system is 100% uptime
+    } else {
+      const siteUptime = calculateSiteUptime(siteId);
+      if (siteUptime === 100) return 'active';
+      if (siteUptime === 0) return 'inactive';
+      return 'maintenance';
+    }
+  }
+  
+  // Check if a site is a fake New York test site
+  function isFakeNewYorkSite(site: any): boolean {
+    if (!site || !site.location) return false;
+    
+    const lat = site.location.latitude || site.location.coordinates?.latitude;
+    const lon = site.location.longitude || site.location.coordinates?.longitude;
+    const name = (site.name || '').toLowerCase();
+    
+    // Check for New York coordinates (from test script)
+    const fakeCoords = [
+      { lat: 40.7128, lon: -74.0060 },
+      { lat: 40.7589, lon: -73.9851 },
+      { lat: 40.7505, lon: -73.9934 },
+      { lat: 40.7282, lon: -73.9942 },
+      { lat: 40.7614, lon: -73.9776 }
+    ];
+    
+    if (lat && lon) {
+      for (const coord of fakeCoords) {
+        if (Math.abs(lat - coord.lat) < 0.01 && Math.abs(lon - coord.lon) < 0.01) {
+          return true;
+        }
+      }
+    }
+    
+    // Check for fake site names
+    const fakeNames = ['main tower site', 'secondary tower', 'noc facility', 'customer site a', 'customer site b'];
+    if (fakeNames.some(n => name.includes(n))) {
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Load sites from database and merge with device-based towers
+  async function loadSites() {
+    if (!tenantId) {
+      towers = [];
+      return;
+    }
+    
+    try {
+      // Load actual sites from database
+      const loadedSites = await coverageMapService.getTowerSites(tenantId);
+      
+      // Filter out fake New York sites
+      const realSites = loadedSites.filter((site: any) => !isFakeNewYorkSite(site));
+      
+      // Calculate system uptime for status determination
+      const systemUptime = getSystemUptimePercent();
+      
+      // Process sites with status calculation
+      const processedSites = realSites.map((site: any) => {
+        const siteId = site.id || site._id;
+        const status = getSiteStatus(siteId, systemUptime);
+        
+        return {
+          ...site,
+          id: siteId,
+          status: status,
+          uptimePercent: calculateSiteUptime(siteId),
+          worstAlertSeverity: getWorstAlertSeverity(siteId)
+        };
+      });
+      
+      // Also create device-based towers (for devices without sites but with valid locations)
+      const deviceTowers = devices
+        .filter(device => {
+          // Only create tower if device doesn't already have a site in the database
+          const deviceSiteId = device.siteId || device.site_id;
+          if (deviceSiteId) {
+            // Check if site already exists in database
+            const existingSite = processedSites.find(s => String(s.id) === String(deviceSiteId));
+            if (existingSite) return false; // Site already exists, skip device tower
+          }
+          
+          // Only create towers for devices with valid coordinates
+          const lat = device.location?.coordinates?.latitude || device.location?.latitude;
+          const lon = device.location?.coordinates?.longitude || device.location?.longitude;
+          if (!hasValidCoordinates(lat, lon)) return false;
+          
+          // Only create towers for major devices (EPCs, routers) - not every device needs a tower
+          return device.type === 'epc' || (device.type === 'mikrotik' && device.deviceType === 'router');
+        })
+        .map(device => {
+          const lat = device.location?.coordinates?.latitude || device.location?.latitude || 0;
+          const lon = device.location?.coordinates?.longitude || device.location?.longitude || 0;
+          const systemUptime = getSystemUptimePercent();
+          const status = getSiteStatus(device.id, systemUptime);
+          
+          return {
+            id: `tower-${device.id}`,
+            name: `${device.name} Site`,
+            type: 'tower',
+            status: status,
+            location: {
+              latitude: lat,
+              longitude: lon,
+              address: device.location?.address || 'Unknown Location'
+            },
+            height: 50,
+            equipment: [device.id],
+            deviceId: device.id
+          };
+        });
+      
+      // Merge database sites with device-based towers
+      towers = [...processedSites, ...deviceTowers];
+    } catch (error) {
+      console.error('[MonitoringMap] Failed to load sites:', error);
+      towers = [];
+    }
+  }
+  
   // Watch for device changes
   $: if (devices) {
     convertDevicesToEquipment();
   }
+  
+  // Watch for tenant, devices, and alerts to reload sites with updated status
+  $: if (tenantId) {
+    loadSites();
+  }
+  
+  // Load sites on mount
+  onMount(() => {
+    if (tenantId) {
+      loadSites();
+    }
+  });
 </script>
 
 <div class="monitoring-map" style="height: {height};">
@@ -370,7 +600,24 @@
       isDeployMode={false}
       showFilterPanel={true}
       showMainMenu={false}
-      on:siteSelected={handleMapEvent}
+      on:siteSelected={(e) => {
+        const site = e.detail;
+        if (site) {
+          handleSiteClick(site);
+        }
+        handleMapEvent(e);
+      }}
+      on:asset-click={(e) => {
+        // Handle asset-click events from map (towers emit this)
+        const asset = e.detail;
+        if (asset && asset.type === 'tower' && asset.id) {
+          const site = towers.find(t => String(t.id) === String(asset.id));
+          if (site) {
+            handleSiteClick(site);
+          }
+        }
+        handleMapEvent(e);
+      }}
       on:sectorSelected={handleMapEvent}
       on:cpeSelected={handleMapEvent}
       on:equipmentSelected={handleMapEvent}
