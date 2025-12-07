@@ -253,25 +253,82 @@ router.get('/mikrotik/devices', async (req, res) => {
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
       status: 'active'
-    }).lean();
+    }).populate('siteId', 'name location').lean();
     
     // Get Mikrotik CPE devices
     const mikrotikCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
       status: 'active'
-    }).lean();
+    }).populate('siteId', 'name location').lean();
+    
+    // Get all sites for location lookup
+    const siteMap = new Map();
+    const allDevices = [...mikrotikEquipment, ...mikrotikCPE];
+    if (allDevices.length > 0) {
+      const siteIds = allDevices
+        .map(d => d.siteId)
+        .filter(id => id)
+        .map(id => typeof id === 'object' ? id._id || id : id);
+      
+      if (siteIds.length > 0) {
+        const sites = await UnifiedSite.find({
+          _id: { $in: siteIds },
+          tenantId: req.tenantId
+        }).select('_id name location').lean();
+        
+        sites.forEach(site => {
+          siteMap.set(site._id.toString(), site);
+        });
+      }
+    }
     
     const devices = [];
     
-    // Add Mikrotik equipment
+    // Add Mikrotik equipment with location from site if needed
     mikrotikEquipment.forEach(equipment => {
-      devices.push(formatDeviceForMonitoring(equipment, 'mikrotik', equipment.type));
+      const device = formatDeviceForMonitoring(equipment, 'mikrotik', equipment.type);
+      
+      // If device has siteId but no valid coordinates, get location from site
+      if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+        const siteIdStr = typeof equipment.siteId === 'object' ? equipment.siteId._id?.toString() || equipment.siteId.toString() : equipment.siteId.toString();
+        const site = siteMap.get(siteIdStr) || (typeof equipment.siteId === 'object' ? equipment.siteId : null);
+        
+        if (site && site.location) {
+          device.location = {
+            coordinates: {
+              latitude: site.location.latitude || 0,
+              longitude: site.location.longitude || 0
+            },
+            address: site.location.address || device.location?.address || 'Unknown Location'
+          };
+        }
+      }
+      
+      devices.push(device);
     });
     
-    // Add Mikrotik CPE
+    // Add Mikrotik CPE with location from site if needed
     mikrotikCPE.forEach(cpe => {
-      devices.push(formatDeviceForMonitoring(cpe, 'mikrotik', 'cpe'));
+      const device = formatDeviceForMonitoring(cpe, 'mikrotik', 'cpe');
+      
+      // If device has siteId but no valid coordinates, get location from site
+      if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+        const siteIdStr = typeof cpe.siteId === 'object' ? cpe.siteId._id?.toString() || cpe.siteId.toString() : cpe.siteId.toString();
+        const site = siteMap.get(siteIdStr) || (typeof cpe.siteId === 'object' ? cpe.siteId : null);
+        
+        if (site && site.location) {
+          device.location = {
+            coordinates: {
+              latitude: site.location.latitude || 0,
+              longitude: site.location.longitude || 0
+            },
+            address: site.location.address || device.location?.address || 'Unknown Location'
+          };
+        }
+      }
+      
+      devices.push(device);
     });
     
     console.log(`📊 Found ${devices.length} Mikrotik devices for tenant ${req.tenantId}`);
@@ -299,25 +356,82 @@ router.get('/snmp/devices', async (req, res) => {
         { notes: /snmp_community/i },
         { notes: /snmp_version/i }
       ]
-    }).lean();
+    }).populate('siteId', 'name location').lean();
     
     // Get CPE devices with SNMP modules enabled
     const snmpCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
       status: 'active',
       'modules.acs.enabled': true
-    }).lean();
+    }).populate('siteId', 'name location').lean();
+    
+    // Get all sites for location lookup
+    const siteMap = new Map();
+    const allDevices = [...snmpEquipment, ...snmpCPE];
+    if (allDevices.length > 0) {
+      const siteIds = allDevices
+        .map(d => d.siteId)
+        .filter(id => id)
+        .map(id => typeof id === 'object' ? id._id || id : id);
+      
+      if (siteIds.length > 0) {
+        const sites = await UnifiedSite.find({
+          _id: { $in: siteIds },
+          tenantId: req.tenantId
+        }).select('_id name location').lean();
+        
+        sites.forEach(site => {
+          siteMap.set(site._id.toString(), site);
+        });
+      }
+    }
     
     const devices = [];
     
-    // Add SNMP equipment
+    // Add SNMP equipment with location from site if needed
     snmpEquipment.forEach(equipment => {
-      devices.push(formatDeviceForMonitoring(equipment, 'snmp', equipment.type));
+      const device = formatDeviceForMonitoring(equipment, 'snmp', equipment.type);
+      
+      // If device has siteId but no valid coordinates, get location from site
+      if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+        const siteIdStr = typeof equipment.siteId === 'object' ? equipment.siteId._id?.toString() || equipment.siteId.toString() : equipment.siteId.toString();
+        const site = siteMap.get(siteIdStr) || (typeof equipment.siteId === 'object' ? equipment.siteId : null);
+        
+        if (site && site.location) {
+          device.location = {
+            coordinates: {
+              latitude: site.location.latitude || 0,
+              longitude: site.location.longitude || 0
+            },
+            address: site.location.address || device.location?.address || 'Unknown Location'
+          };
+        }
+      }
+      
+      devices.push(device);
     });
     
-    // Add SNMP CPE
+    // Add SNMP CPE with location from site if needed
     snmpCPE.forEach(cpe => {
-      devices.push(formatDeviceForMonitoring(cpe, 'snmp', 'cpe'));
+      const device = formatDeviceForMonitoring(cpe, 'snmp', 'cpe');
+      
+      // If device has siteId but no valid coordinates, get location from site
+      if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+        const siteIdStr = typeof cpe.siteId === 'object' ? cpe.siteId._id?.toString() || cpe.siteId.toString() : cpe.siteId.toString();
+        const site = siteMap.get(siteIdStr) || (typeof cpe.siteId === 'object' ? cpe.siteId : null);
+        
+        if (site && site.location) {
+          device.location = {
+            coordinates: {
+              latitude: site.location.latitude || 0,
+              longitude: site.location.longitude || 0
+            },
+            address: site.location.address || device.location?.address || 'Unknown Location'
+          };
+        }
+      }
+      
+      devices.push(device);
     });
     
     console.log(`📊 Found ${devices.length} SNMP devices for tenant ${req.tenantId}`);
@@ -347,7 +461,27 @@ router.get('/snmp/discovered', async (req, res) => {
         { 'notes.discovery_source': 'epc_snmp_agent' }, // If notes is an object (future-proofing)
         { notes: { $regex: 'epc_snmp_agent', $options: 'i' } } // If notes is a JSON string (current format)
       ]
-    }).lean();
+    }).populate('siteId', 'name location').lean();
+
+    // Get all sites for location lookup (in case populate didn't work)
+    const siteMap = new Map();
+    if (devices.length > 0) {
+      const siteIds = devices
+        .map(d => d.siteId)
+        .filter(id => id)
+        .map(id => typeof id === 'object' ? id._id || id : id);
+      
+      if (siteIds.length > 0) {
+        const sites = await UnifiedSite.find({
+          _id: { $in: siteIds },
+          tenantId: req.tenantId
+        }).select('_id name location').lean();
+        
+        sites.forEach(site => {
+          siteMap.set(site._id.toString(), site);
+        });
+      }
+    }
 
     // Parse notes and format for frontend
     const formattedDevices = devices.map(device => {
@@ -381,12 +515,26 @@ router.get('/snmp/discovered', async (req, res) => {
         ipAddress = 'Unknown';
       }
       
-      // Include location data from device record
-      const location = device.location || {};
-      const locationCoordinates = location.coordinates || {
+      // Include location data from device record, or populate from site if device has siteId
+      let location = device.location || {};
+      let locationCoordinates = location.coordinates || {
         latitude: location.latitude || 0,
         longitude: location.longitude || 0
       };
+      
+      // If device has siteId but no valid coordinates, get location from site
+      if (device.siteId && (locationCoordinates.latitude === 0 || locationCoordinates.longitude === 0)) {
+        const siteIdStr = typeof device.siteId === 'object' ? device.siteId._id?.toString() || device.siteId.toString() : device.siteId.toString();
+        const site = siteMap.get(siteIdStr) || (typeof device.siteId === 'object' ? device.siteId : null);
+        
+        if (site && site.location) {
+          location = site.location;
+          locationCoordinates = {
+            latitude: site.location.latitude || 0,
+            longitude: site.location.longitude || 0
+          };
+        }
+      }
 
       return {
         id: device._id.toString(),
