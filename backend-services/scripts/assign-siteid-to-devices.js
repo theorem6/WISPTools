@@ -73,7 +73,7 @@ async function assignSiteIds() {
       $or: [
         { siteId: { $exists: false } },
         { siteId: null },
-        { siteId: '' }
+        { siteId: { $in: [null, ''] } }
       ],
       location: {
         $exists: true,
@@ -130,7 +130,7 @@ async function assignSiteIds() {
       $or: [
         { siteId: { $exists: false } },
         { siteId: null },
-        { siteId: '' }
+        { siteId: { $in: [null, ''] } }
       ],
       location: {
         $exists: true,
