@@ -545,30 +545,19 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
     // Set up message listener FIRST, before iframe is found
     // This ensures we capture messages even if sent early
     const handleMessage = (event: MessageEvent) => {
-      // Log all messages to debug
-      console.log('[Plan] Message received from:', event.origin, {
-        source: event.data?.source,
-        type: event.data?.type,
-        hasDetail: !!event.data?.detail,
-        data: event.data
-      });
-      
       const { source, type, detail } = event.data || {};
       
       if (source === 'coverage-map') {
-        console.log('[Plan] Message is from coverage-map:', type);
+        // Handle known message types silently
         if (type === 'rectangle-drawn') {
-          console.log('[Plan] Processing rectangle-drawn message:', detail);
           if (detail && detail.boundingBox && detail.center) {
             handleRectangleDrawn(new CustomEvent('rectangle-drawn', { detail }));
           } else {
             console.error('[Plan] Invalid rectangle-drawn message - missing required fields:', detail);
           }
-        } else {
-          console.log('[Plan] Unknown message type from coverage-map:', type);
         }
-      } else if (source && (source.includes('coverage') || source.includes('map'))) {
-        console.log('[Plan] Message from related source:', source, type);
+        // Silently ignore expected message types: request-state, view-extent, etc.
+        // These are normal communication between SharedMap and coverage-map iframe
       }
     };
     

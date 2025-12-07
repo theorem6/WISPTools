@@ -852,8 +852,8 @@ export class CoverageMapController {
           enabled: false
         },
         browserTouchPanEnabled: true,
-        momentumEnabled: true,
-        mouseWheelZoomEnabled: true // Re-enable mouse wheel zoom
+        momentumEnabled: true
+        // Mouse wheel zoom is enabled by default in ArcGIS 4.x
       },
       popup: {
         dockEnabled: true,
