@@ -116,7 +116,15 @@ export class IframeCommunicationService {
     const { objectId, action, data } = message;
     if (!objectId || !action) return;
     
-    // Get object state to check permissions
+    // Read-only actions like view-details don't need permission checks
+    const readOnlyActions = ['view-details', 'view-inventory'];
+    if (readOnlyActions.includes(action)) {
+      // Immediately allow read-only actions
+      this.onObjectActionAllowed(objectId, action, data);
+      return;
+    }
+    
+    // Get object state to check permissions for other actions
     this.requestObjectState(objectId).then((state) => {
       if (objectStateManager.isActionAllowed({ id: objectId }, action, this.moduleContext)) {
         // Action is allowed, proceed

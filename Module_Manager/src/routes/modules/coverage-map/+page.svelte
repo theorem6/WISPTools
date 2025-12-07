@@ -1025,13 +1025,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         if (tower) {
           // If in iframe (deploy/plan mode), dispatch action to parent
           if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+            // Send message to parent in the format expected by iframeCommunicationService
             window.parent.postMessage({
-              source: 'coverage-map',
               type: 'object-action',
               objectId: tower.id,
               action: 'view-details',
               data: { tower }
             }, '*');
+            console.log('[CoverageMap] Sent view-details action to parent', { objectId: tower.id, tower });
           } else {
             // Standalone mode - just show message
             success = `Viewing ${tower.name}`;

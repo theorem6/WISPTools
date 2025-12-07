@@ -124,8 +124,10 @@
 
   // Get formatted site type name for menu labels
   function getSiteTypeLabel(siteType: string | undefined | null): string {
-    if (!siteType) return 'Tower';
+    // Handle null, undefined, or empty string
+    if (!siteType || typeof siteType !== 'string') return 'Tower';
     
+    const normalizedType = siteType.toLowerCase().trim();
     const typeMap: Record<string, string> = {
       'tower': 'Tower',
       'noc': 'NOC',
@@ -137,8 +139,11 @@
       'other': 'Site'
     };
     
-    return typeMap[siteType.toLowerCase()] || siteType.charAt(0).toUpperCase() + siteType.slice(1);
+    return typeMap[normalizedType] || siteType.charAt(0).toUpperCase() + siteType.slice(1);
   }
+  
+  // Reactive label that updates when tower changes
+  $: siteTypeLabel = getSiteTypeLabel(tower?.type);
 </script>
 
 <svelte:window onclick={handleClickOutside} />
@@ -163,7 +168,7 @@
     onclick={() => handleAction('edit-site')}
   >
     <span class="menu-icon">✏️</span>
-    <span>Edit {getSiteTypeLabel(tower?.type)}</span>
+    <span>Edit {siteTypeLabel}</span>
   </button>
   
   <button 
