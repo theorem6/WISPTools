@@ -193,7 +193,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     const readOnly = sharedCapabilities?.readOnly ?? false;
     const canAddTemporary = sharedCapabilities?.canAddTemporary ?? false;
 
-    planEditingEnabled = mapInPlanMode ? (Boolean(activePlanId) || canAddTemporary) && !readOnly : true;
+    // Enable plan editing if:
+    // 1. Not in plan mode (always enabled)
+    // 2. In plan mode AND (has active plan ID OR can add temporary OR has plan features) AND not read-only
+    // Check if we have plan features loaded (indicating a plan is active)
+    const hasActivePlan = Boolean(activePlanId);
+    const hasPlanFeatures = externalPlanFeatures.length > 0;
+    
+    planEditingEnabled = mapInPlanMode 
+      ? ((hasActivePlan || canAddTemporary || hasPlanFeatures) && !readOnly)
+      : true;
   }
 
   $: effectivePlanId = planId ?? sharedActivePlanId ?? null;
