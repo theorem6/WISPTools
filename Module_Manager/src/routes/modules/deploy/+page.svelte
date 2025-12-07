@@ -263,7 +263,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           
           // Helper function to identify fake/test sectors
           function isFakeSector(sector: any): boolean {
-            if (!sector || !sector.name) return false;
+            if (!sector || !sector.name) return true; // Treat sectors without names as fake
             const name = String(sector.name).toLowerCase();
             
             // Patterns that indicate fake/test sectors from test scripts
@@ -284,15 +284,27 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             return fakePatterns.some(pattern => pattern.test(name));
           }
           
+          // Reset counts first
+          lteSectorCount = 0;
+          frequencySectorCount = 0;
+          
           // Filter to only deployed/active sectors (exclude planned and fake)
           const deployedSectors = allSectors.filter((sector: any) => {
             // Exclude fake sectors
-            if (isFakeSector(sector)) return false;
+            if (isFakeSector(sector)) {
+              console.log(`[Deploy] Filtering out fake sector: ${sector.name}`);
+              return false;
+            }
             
             const status = (sector.status || '').toLowerCase();
-            // Only count active sectors, exclude planned/inactive/maintenance
-            return status === 'active' || status === 'deployed';
+            if (status !== 'active' && status !== 'deployed') {
+              console.log(`[Deploy] Filtering out non-deployed sector: ${sector.name} (status: ${status})`);
+              return false;
+            }
+            
+            return true;
           });
+          console.log(`[Deploy] Filtered to ${deployedSectors.length} deployed sectors (from ${allSectors.length} total, filtered ${allSectors.length - deployedSectors.length} fake/planned)`);
           
           // Count LTE sectors only (for PCI Planner)
           const lteSectors = deployedSectors.filter((sector: any) => {
@@ -300,7 +312,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
           });
           lteSectorCount = lteSectors.length;
-          console.log(`[Deploy] Found ${lteSectorCount} deployed LTE (ENB) sectors for PCI planner (out of ${deployedSectors.length} total deployed sectors, filtered ${allSectors.length - deployedSectors.length} fake/planned)`);
+          console.log(`[Deploy] Found ${lteSectorCount} deployed LTE (ENB) sectors for PCI planner`);
           
           // Count LTE + FWA sectors (for Frequency Planner)
           const frequencySectors = deployedSectors.filter((sector: any) => {

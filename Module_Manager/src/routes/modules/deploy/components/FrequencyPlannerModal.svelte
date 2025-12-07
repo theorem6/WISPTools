@@ -46,18 +46,20 @@
       console.warn('[FrequencyPlanner] No tenant ID provided');
       error = 'No tenant selected. Please select a tenant to use the Frequency Planner.';
       isLoading = false;
+      sectors = []; // Reset to empty
       return;
     }
 
     isLoading = true;
     error = '';
+    sectors = []; // Reset sectors array before loading
 
     try {
       console.log(`[FrequencyPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       
       // Helper function to identify fake/test sectors
       function isFakeSector(sector: any): boolean {
-        if (!sector || !sector.name) return false;
+        if (!sector || !sector.name) return true; // Treat sectors without names as fake
         const name = String(sector.name).toLowerCase();
         
         // Patterns that indicate fake/test sectors from test scripts
@@ -86,10 +88,18 @@
       // Filter to only deployed/active sectors (exclude planned and fake)
       const deployedSectors = allSectors.filter((sector: any) => {
         // Exclude fake sectors
-        if (isFakeSector(sector)) return false;
+        if (isFakeSector(sector)) {
+          console.log(`[FrequencyPlanner] Filtering out fake sector: ${sector.name}`);
+          return false;
+        }
         
         const status = (sector.status || '').toLowerCase();
-        return status === 'active' || status === 'deployed';
+        if (status !== 'active' && status !== 'deployed') {
+          console.log(`[FrequencyPlanner] Filtering out non-deployed sector: ${sector.name} (status: ${status})`);
+          return false;
+        }
+        
+        return true;
       });
       console.log(`[FrequencyPlanner] Found ${deployedSectors.length} deployed sectors (excluding planned and fake, filtered ${allSectors.length - deployedSectors.length} fake/planned)`);
       
@@ -249,6 +259,7 @@
     show = false;
     error = '';
     success = '';
+    sectors = []; // Reset sectors array
     conflicts = [];
     plan = null;
     optimizations = [];
