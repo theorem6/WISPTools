@@ -40,7 +40,8 @@ router.get('/ping/:deviceId', async (req, res) => {
     console.log(`[Monitoring Graphs] Fetching ping metrics for device ${deviceId}, tenant ${req.tenantId}, hours: ${validHours}`);
     console.log(`[Monitoring Graphs] Query details: startTime=${startTime.toISOString()}, currentTime=${new Date().toISOString()}, timeRange=${validHours}h`);
 
-    const metrics = await PingMetrics.find({
+    // Try query with device_id as string first
+    let metrics = await PingMetrics.find({
       device_id: deviceId,
       tenant_id: req.tenantId,
       timestamp: { $gte: startTime }
@@ -48,15 +49,54 @@ router.get('/ping/:deviceId', async (req, res) => {
     .sort({ timestamp: 1 })
     .lean();
 
+    // If no results, try with ObjectId format (in case device_id was stored as ObjectId)
+    if (metrics.length === 0) {
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(deviceId)) {
+        const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
+        metrics = await PingMetrics.find({
+          $or: [
+            { device_id: deviceId },
+            { device_id: objectIdDeviceId }
+          ],
+          tenant_id: req.tenantId,
+          timestamp: { $gte: startTime }
+        })
+        .sort({ timestamp: 1 })
+        .lean();
+        
+        if (metrics.length > 0) {
+          console.log(`[Monitoring Graphs] Found ${metrics.length} metrics using ObjectId format fallback`);
+        }
+      }
+    }
+
     console.log(`[Monitoring Graphs] Found ${metrics.length} ping metrics for device ${deviceId}`);
     if (metrics.length > 0) {
       console.log(`[Monitoring Graphs] First metric: ${metrics[0].timestamp}, Last metric: ${metrics[metrics.length - 1].timestamp}`);
     } else {
-      // Debug: Check if device_id exists at all
-      const anyMetrics = await PingMetrics.findOne({ device_id: deviceId, tenant_id: req.tenantId }).lean();
+      // Debug: Check if device_id exists at all (try both formats)
+      let anyMetrics = await PingMetrics.findOne({ device_id: deviceId, tenant_id: req.tenantId }).lean();
+      if (!anyMetrics) {
+        const mongoose = require('mongoose');
+        if (mongoose.Types.ObjectId.isValid(deviceId)) {
+          const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
+          anyMetrics = await PingMetrics.findOne({ 
+            $or: [
+              { device_id: deviceId },
+              { device_id: objectIdDeviceId }
+            ],
+            tenant_id: req.tenantId 
+          }).lean();
+        }
+      }
+      
       if (anyMetrics) {
         const ageHours = (Date.now() - anyMetrics.timestamp.getTime()) / (1000 * 60 * 60);
         console.log(`[Monitoring Graphs] Device has metrics but outside time range. Most recent: ${ageHours.toFixed(2)}h ago (${anyMetrics.timestamp})`);
+        console.log(`[Monitoring Graphs] Stored device_id format: ${typeof anyMetrics.device_id} = "${anyMetrics.device_id}"`);
+      } else {
+        console.log(`[Monitoring Graphs] No metrics found for device ${deviceId} at all (checked both string and ObjectId formats)`);
       }
     }
 
@@ -113,21 +153,57 @@ router.get('/ping/:deviceId', async (req, res) => {
     // Log sample of device_ids if no metrics found to help debug
     if (metrics.length === 0) {
       const allDeviceIds = await PingMetrics.distinct('device_id', { tenant_id: req.tenantId });
-      const sampleDevices = allDeviceIds.slice(0, 5);
+      const sampleDevices = allDeviceIds.slice(0, 10);
       console.log(`[Monitoring Graphs] No metrics found for device ${deviceId}. Looking for device_id: "${deviceId}"`);
-      console.log(`[Monitoring Graphs] Sample device_ids in database for tenant ${req.tenantId}:`, sampleDevices);
+      console.log(`[Monitoring Graphs] Sample device_ids in database for tenant ${req.tenantId}:`, sampleDevices.map(id => `"${id}" (type: ${typeof id})`));
       console.log(`[Monitoring Graphs] Total unique device_ids in database: ${allDeviceIds.length}`);
+      
+      // Check if our deviceId matches any in the database (fuzzy match)
+      const matchingIds = allDeviceIds.filter(id => {
+        const idStr = String(id);
+        const deviceIdStr = String(deviceId);
+        return idStr === deviceIdStr || idStr.includes(deviceIdStr) || deviceIdStr.includes(idStr);
+      });
+      
+      if (matchingIds.length > 0) {
+        console.log(`[Monitoring Graphs] ⚠️ Found similar device_ids: ${matchingIds.map(id => `"${id}"`).join(', ')}`);
+        console.log(`[Monitoring Graphs] ⚠️ This suggests a format mismatch - trying to query with matched IDs...`);
+        
+        // Try querying with the matched device_ids
+        for (const matchedId of matchingIds) {
+          const matchedMetrics = await PingMetrics.find({
+            device_id: matchedId,
+            tenant_id: req.tenantId,
+            timestamp: { $gte: startTime }
+          })
+          .sort({ timestamp: 1 })
+          .lean();
+          
+          if (matchedMetrics.length > 0) {
+            console.log(`[Monitoring Graphs] ✅ Found ${matchedMetrics.length} metrics using matched device_id: "${matchedId}"`);
+            metrics = matchedMetrics;
+            break;
+          }
+        }
+      }
       
       // Also check if there are any metrics at all for this tenant
       const totalMetrics = await PingMetrics.countDocuments({ tenant_id: req.tenantId });
       console.log(`[Monitoring Graphs] Total ping metrics in database for tenant: ${totalMetrics}`);
+      
+      // Check metrics in the requested time range for any device
+      const timeRangeMetrics = await PingMetrics.countDocuments({ 
+        tenant_id: req.tenantId,
+        timestamp: { $gte: startTime }
+      });
+      console.log(`[Monitoring Graphs] Ping metrics in last ${validHours}h for tenant (any device): ${timeRangeMetrics}`);
       
       // Check recent metrics (last 24 hours) for any device
       const recentMetrics = await PingMetrics.countDocuments({ 
         tenant_id: req.tenantId,
         timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
       });
-      console.log(`[Monitoring Graphs] Ping metrics in last 24 hours for tenant: ${recentMetrics}`);
+      console.log(`[Monitoring Graphs] Ping metrics in last 24 hours for tenant (any device): ${recentMetrics}`);
     }
     
     res.json(response);
