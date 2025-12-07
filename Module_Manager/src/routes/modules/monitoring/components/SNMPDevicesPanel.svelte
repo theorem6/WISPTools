@@ -4,6 +4,7 @@
   import { API_CONFIG } from '$lib/config/api';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { monitoringService } from '$lib/services/monitoringService';
+  import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
   
   export let tenantId: string = '';
   
@@ -14,12 +15,10 @@
   let error: string | null = null;
   let selectedDevice: any = null;
   let showPairModal = false;
-  let showAddHardwareModal = false;
-  let existingHardware: any[] = [];
+  let hardwareDeployments: any[] = [];
+  let hardwareDeploymentsBySite: Map<string, any[]> = new Map();
   let loadingHardware = false;
   let deployments: any[] = [];
-  let sites: any[] = [];
-  let loadingSites = false;
   
   $: if ($currentTenant?.id) {
     tenantId = $currentTenant.id;
@@ -181,29 +180,46 @@
     }
   }
   
-  async function loadExistingHardware() {
+  async function loadHardwareDeployments() {
     if (!tenantId) return;
     
     loadingHardware = true;
+    hardwareDeployments = [];
+    hardwareDeploymentsBySite = new Map();
     
     try {
-      const user = auth().currentUser;
-      if (!user) return;
+      // Load all hardware deployments for the tenant
+      const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
       
-      const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.INVENTORY}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
-        }
+      // Filter to only deployed hardware
+      hardwareDeployments = allDeployments.filter((d: any) => {
+        return d.status === 'deployed' || !d.status; // Include deployed or status undefined
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        existingHardware = data.items || [];
+      // Group by site - need to load sites to get site names
+      const sites = await coverageMapService.getTowerSites(tenantId);
+      const sitesMap = new Map(sites.map((s: any) => [String(s.id || s._id), s]));
+      
+      hardwareDeploymentsBySite = new Map();
+      for (const deployment of hardwareDeployments) {
+        const siteId = String(deployment.siteId?._id || deployment.siteId?.id || deployment.siteId || 'unknown');
+        const site = sitesMap.get(siteId);
+        const siteName = site?.name || deployment.siteId?.name || 'Unknown Site';
+        
+        if (!hardwareDeploymentsBySite.has(siteId)) {
+          hardwareDeploymentsBySite.set(siteId, []);
+        }
+        
+        hardwareDeploymentsBySite.get(siteId)!.push({
+          ...deployment,
+          siteName,
+          deploymentId: deployment._id || deployment.id
+        });
       }
+      
+      console.log(`[SNMP Devices] Loaded ${hardwareDeployments.length} hardware deployments across ${hardwareDeploymentsBySite.size} sites`);
     } catch (err: any) {
-      console.error('[SNMP Devices] Error loading hardware:', err);
+      console.error('[SNMP Devices] Error loading hardware deployments:', err);
     } finally {
       loadingHardware = false;
     }
@@ -212,97 +228,21 @@
   function handlePairDevice(device: any) {
     selectedDevice = device;
     showPairModal = true;
-    loadExistingHardware();
-  }
-  
-  function handleAddHardware(device: any) {
-    selectedDevice = device;
-    resetHardwareForm();
-    // Set default asset tag based on device
-    hardwareForm.assetTag = `SNMP-${device.ipAddress || device.id.substring(0, 8)}`;
-    hardwareForm.siteId = device.siteId || '';
-    loadSites();
-    showAddHardwareModal = true;
+    loadHardwareDeployments();
   }
 
-  // Helper function to identify fake sites
-  function isFakeSite(site: any): boolean {
-    if (!site || !site.name) return false;
-    const name = String(site.name).toLowerCase();
-    
-    // Patterns that indicate fake/demo sites
-    const fakePatterns = [
-      /customer.*cpe/i,
-      /customer.*lte/i,
-      /customer a/i,
-      /customer b/i,
-      /fake/i,
-      /demo/i,
-      /sample/i,
-      /^test$/i,
-      /mock/i,
-      /core router/i,
-      /core switch/i,
-      /epc core server/i,
-      /backhaul router/i
-    ];
-    
-    return fakePatterns.some(pattern => pattern.test(name));
-  }
-  
-  async function loadSites() {
-    if (!tenantId) return;
-    
-    loadingSites = true;
-    try {
-      const user = auth().currentUser;
-      if (!user) return;
-      
-      const token = await user.getIdToken();
-      const response = await fetch(`${API_CONFIG.PATHS.NETWORK}/sites`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const allSites = Array.isArray(data) ? data : [];
-        
-        // Filter out fake sites
-        sites = allSites.filter(site => !isFakeSite(site));
-        
-        const fakeCount = allSites.length - sites.length;
-        if (fakeCount > 0) {
-          console.log(`[SNMP Devices] Filtered out ${fakeCount} fake site(s)`);
-        }
-        console.log(`[SNMP Devices] Loaded ${sites.length} real site(s)`);
-      }
-    } catch (err: any) {
-      console.error('[SNMP Devices] Error loading sites:', err);
-    } finally {
-      loadingSites = false;
-    }
-  }
-  
   function closeModals() {
     showPairModal = false;
-    showAddHardwareModal = false;
     selectedDevice = null;
-    existingHardware = [];
+    hardwareDeploymentsBySite = new Map();
     pairError = null;
-    createError = null;
-    resetHardwareForm();
   }
   
   let pairingDevice = false;
-  let creatingHardware = false;
   let pairError: string | null = null;
-  let createError: string | null = null;
   
-  async function pairWithHardware(device: any, hardwareId: string) {
-    if (!device || !hardwareId) return;
+  async function pairWithHardware(device: any, deploymentId: string) {
+    if (!device || !deploymentId) return;
     
     pairingDevice = true;
     pairError = null;
@@ -315,7 +255,7 @@
       }
       
       const token = await user.getIdToken();
-      // Use relative path through Firebase Hosting rewrites
+      // Use relative path through Firebase Hosting rewrites - updated to use deploymentId
       const response = await fetch(`/api/snmp/discovered/${device.id}/pair`, {
         method: 'POST',
         headers: {
@@ -323,135 +263,36 @@
           'X-Tenant-ID': tenantId,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ hardwareId })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[SNMP Devices] Paired device:', data);
-        closeModals();
-        await loadDiscoveredDevices();
-        // Show success message
-        alert('Device paired successfully with hardware!');
-      } else {
-        const errorText = await response.text();
-        console.error('[SNMP Devices] Failed to pair:', response.status, errorText);
-        pairError = `Failed to pair: ${response.status}`;
-      }
-    } catch (err: any) {
-      console.error('[SNMP Devices] Error pairing device:', err);
-      pairError = err.message || 'Failed to pair device';
-    } finally {
-      pairingDevice = false;
-    }
-  }
-  
-  let hardwareForm = {
-    assetTag: '',
-    category: 'Networking Equipment',
-    siteId: ''
-  };
-  
-  async function createNewHardware(device: any) {
-    if (!device) return;
-    
-    // Set default asset tag if not provided
-    if (!hardwareForm.assetTag) {
-      hardwareForm.assetTag = `SNMP-${device.ipAddress || device.id.substring(0, 8)}`;
-    }
-    
-    creatingHardware = true;
-    createError = null;
-    
-    try {
-      const user = auth().currentUser;
-      if (!user) {
-        createError = 'Not authenticated';
-        return;
-      }
-      
-      const token = await user.getIdToken();
-      
-      // Look up site name from siteId
-      let siteName = '';
-      if (hardwareForm.siteId) {
-        const selectedSite = sites.find(s => (s._id || s.id) === hardwareForm.siteId);
-        siteName = selectedSite?.name || '';
-      }
-      
-      // Use relative path through Firebase Hosting rewrites
-      const response = await fetch(`/api/snmp/discovered/${device.id}/create-hardware`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-ID': tenantId,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          assetTag: hardwareForm.assetTag,
-          category: hardwareForm.category,
-          siteId: hardwareForm.siteId || null,
-          siteName: siteName || device.discoveredBy || 'Unknown Site',
-          location: device.location || {}
+        body: JSON.stringify({ 
+          deploymentId, // Send deploymentId instead of hardwareId
+          deviceIp: device.ipAddress || device.ip_address,
+          deviceMac: device.macAddress || device.mac_address
         })
       });
       
       if (response.ok) {
         const data = await response.json();
-        console.log('[SNMP Devices] Created hardware response - FULL OBJECT:', JSON.stringify(data, null, 2));
-        console.log('[SNMP Devices] Created hardware response summary:', {
-          success: data.success,
-          deviceId: data.deviceId,
-          hardwareId: data.hardwareId,
-          deviceSiteId: data.deviceSiteId,
-          attemptedSiteId: data.attemptedSiteId,
-          updateResultSiteId: data.updateResultSiteId,
-          message: data.message
-        });
-        
-        if (data.deviceSiteId) {
-          console.log(`[SNMP Devices] ✓ Device ${data.deviceId} has siteId: ${data.deviceSiteId}`);
-        } else {
-          console.warn(`[SNMP Devices] ⚠️ Device ${data.deviceId} does NOT have siteId in response. Message: ${data.message || 'No message'}`);
-          console.warn(`[SNMP Devices] Request details - siteId sent: ${hardwareForm.siteId || 'none'}, siteName: ${siteName || 'none'}`);
-        }
+        console.log('[SNMP Devices] Linked device:', data);
         closeModals();
-        hardwareForm = { assetTag: '', category: 'Networking Equipment', siteId: '' };
-        // Small delay to ensure backend has finished saving, then reload
-        await new Promise(resolve => setTimeout(resolve, 500));
         await loadDiscoveredDevices();
-        // Show success message - device should now show as deployed
-        console.log('[SNMP Devices] ✅ Hardware created successfully! Device should now show as deployed.');
+        // Show success message
+        alert('Device linked successfully! The monitoring map will now show the site status.');
       } else {
-        let errorText = '';
-        let errorData: any = null;
+        const errorText = await response.text();
+        console.error('[SNMP Devices] Failed to link:', response.status, errorText);
         try {
-          errorText = await response.text();
-          try {
-            errorData = JSON.parse(errorText);
-            createError = errorData.error || errorData.message || `Failed to create hardware: ${response.status}`;
-          } catch (e) {
-            createError = errorText || `Failed to create hardware: ${response.status}`;
-          }
+          const errorData = JSON.parse(errorText);
+          pairError = errorData.error || errorData.message || `Failed to link: ${response.status}`;
         } catch (e) {
-          createError = `Failed to create hardware: ${response.status}`;
+          pairError = `Failed to link: ${response.status}`;
         }
-        console.error('[SNMP Devices] Failed to create hardware:', response.status, errorText);
       }
     } catch (err: any) {
-      console.error('[SNMP Devices] Error creating hardware:', err);
-      createError = err.message || 'Failed to create hardware';
+      console.error('[SNMP Devices] Error linking device:', err);
+      pairError = err.message || 'Failed to link device';
     } finally {
-      creatingHardware = false;
+      pairingDevice = false;
     }
-  }
-  
-  function resetHardwareForm() {
-    hardwareForm = {
-      assetTag: '',
-      category: 'Networking Equipment',
-      siteId: ''
-    };
   }
   
   onMount(() => {
@@ -546,11 +387,8 @@
                 {/if}
               </td>
               <td class="actions-cell">
-                <button class="btn btn-sm btn-secondary" on:click={() => handlePairDevice(device)} title="Pair with Hardware">
-                  🔗
-                </button>
-                <button class="btn btn-sm btn-primary" on:click={() => handleAddHardware(device)} title="Deploy as Hardware">
-                  🚀 Deploy
+                <button class="btn btn-sm btn-secondary" on:click={() => handlePairDevice(device)} title="Link to Deployed Hardware">
+                  🔗 Link
                 </button>
               </td>
             </tr>
@@ -561,26 +399,50 @@
   {/if}
 </div>
 
-<!-- Pair with Hardware Modal -->
+<!-- Link Device to Hardware Deployment Modal -->
 {#if showPairModal && selectedDevice}
   <div class="modal-overlay" on:click={closeModals}>
-    <div class="modal-content" on:click|stopPropagation>
-      <h3>Pair Device with Existing Hardware</h3>
-      <p>Select hardware to pair with {selectedDevice.name || selectedDevice.ipAddress}</p>
+    <div class="modal-content large" on:click|stopPropagation>
+      <h3>Link Device to Deployed Hardware</h3>
+      <p>Select hardware at a site to link with <strong>{selectedDevice.name || selectedDevice.ipAddress}</strong></p>
       
       {#if loadingHardware}
-        <p>Loading hardware...</p>
-      {:else if existingHardware.length === 0}
-        <p>No existing hardware found. Create new hardware instead.</p>
+        <p>Loading hardware deployments...</p>
+      {:else if hardwareDeploymentsBySite.size === 0}
+        <p>No deployed hardware found at any sites. Hardware must be deployed first using the Deploy module.</p>
       {:else}
-        <div class="hardware-list">
-          {#each existingHardware as hardware}
-            <div class="hardware-item" on:click={() => !pairingDevice && pairWithHardware(selectedDevice, hardware.id || hardware._id)}>
-              <strong>{hardware.assetTag || hardware.name || 'Unnamed Hardware'}</strong>
-              <span>{hardware.equipmentType || hardware.subcategory || 'Unknown'}</span>
-              {#if hardware.model}
-                <span class="hardware-model">{hardware.manufacturer || ''} {hardware.model}</span>
-              {/if}
+        <div class="hardware-deployments-list">
+          {#each Array.from(hardwareDeploymentsBySite.entries()) as [siteId, deployments]}
+            <div class="site-section">
+              <h4 class="site-name">📍 {deployments[0]?.siteName || 'Unknown Site'}</h4>
+              <div class="deployments-grid">
+                {#each deployments as deployment}
+                  <div 
+                    class="deployment-item" 
+                    class:disabled={pairingDevice}
+                    on:click={() => !pairingDevice && pairWithHardware(selectedDevice, deployment.deploymentId)}
+                  >
+                    <div class="deployment-header">
+                      <strong>{deployment.name || 'Unnamed Hardware'}</strong>
+                      <span class="deployment-type-badge">{deployment.hardware_type || 'other'}</span>
+                    </div>
+                    <div class="deployment-details">
+                      {#if deployment.config?.ipAddress || deployment.config?.ip_address}
+                        <div class="detail-item">
+                          <span class="label">IP:</span>
+                          <span class="value">{deployment.config.ipAddress || deployment.config.ip_address}</span>
+                        </div>
+                      {/if}
+                      {#if deployment.config?.macAddress || deployment.config?.mac_address}
+                        <div class="detail-item">
+                          <span class="label">MAC:</span>
+                          <span class="value">{deployment.config.macAddress || deployment.config.mac_address}</span>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
             </div>
           {/each}
         </div>
@@ -593,75 +455,6 @@
       <div class="modal-actions">
         <button class="btn btn-secondary" on:click={closeModals} disabled={pairingDevice}>Cancel</button>
       </div>
-    </div>
-  </div>
-{/if}
-
-<!-- Add as New Hardware Modal -->
-{#if showAddHardwareModal && selectedDevice}
-  <div class="modal-overlay" on:click={closeModals}>
-    <div class="modal-content" on:click|stopPropagation>
-      <h3>Add as New Hardware</h3>
-      <p>Create new hardware entry for {selectedDevice.name || selectedDevice.ipAddress}</p>
-      
-      <form on:submit|preventDefault={() => createNewHardware(selectedDevice)}>
-        <div class="form-group">
-          <label for="assetTag">Asset Tag:</label>
-          <input 
-            id="assetTag"
-            type="text" 
-            bind:value={hardwareForm.assetTag}
-            placeholder={`SNMP-${selectedDevice.ipAddress || 'DEVICE'}`}
-            required
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="category">Category:</label>
-          <select id="category" bind:value={hardwareForm.category}>
-            <option value="Networking Equipment">Networking Equipment</option>
-            <option value="Radio Equipment">Radio Equipment</option>
-            <option value="Antennas">Antennas</option>
-            <option value="Power Systems">Power Systems</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label for="siteId">Site:</label>
-          {#if loadingSites}
-            <select id="siteId" disabled>
-              <option>Loading sites...</option>
-            </select>
-          {:else if sites.length === 0}
-            <select id="siteId" disabled>
-              <option>No sites available</option>
-            </select>
-          {:else}
-            <select id="siteId" bind:value={hardwareForm.siteId}>
-              <option value="">-- Select a Site (Optional) --</option>
-              {#each sites as site (site._id || site.id)}
-                <option value={site._id || site.id}>{site.name || 'Unnamed Site'}</option>
-              {/each}
-            </select>
-            <small style="color: var(--text-secondary, #6b7280); font-size: 0.75rem; margin-top: 0.25rem; display: block;">
-              Note: A site must be selected for the device to be marked as deployed
-            </small>
-          {/if}
-        </div>
-        
-        {#if createError}
-          <div class="error-message">{createError}</div>
-        {/if}
-        
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" on:click={closeModals} disabled={creatingHardware}>
-            Cancel
-          </button>
-          <button type="submit" class="btn btn-primary" disabled={creatingHardware}>
-            {creatingHardware ? 'Creating...' : 'Create Hardware'}
-          </button>
-        </div>
-      </form>
     </div>
   </div>
 {/if}
@@ -903,6 +696,10 @@
     overflow-y: auto;
   }
   
+  .modal-content.large {
+    max-width: 800px;
+  }
+  
   .modal-content h3 {
     margin-top: 0;
     color: var(--text-primary, #111827);
@@ -979,5 +776,98 @@
     font-size: 0.75rem;
     color: var(--text-secondary, #6b7280);
     margin-top: 0.25rem;
+  }
+  
+  .hardware-deployments-list {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin: 1rem 0;
+  }
+  
+  .site-section {
+    margin-bottom: 2rem;
+  }
+  
+  .site-section:last-child {
+    margin-bottom: 0;
+  }
+  
+  .site-name {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color, #e5e7eb);
+  }
+  
+  .deployments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+  
+  .deployment-item {
+    padding: 1rem;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-primary, #ffffff);
+  }
+  
+  .deployment-item:hover:not(.disabled) {
+    background: var(--bg-secondary, #f9fafb);
+    border-color: var(--primary, #3b82f6);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+  }
+  
+  .deployment-item.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .deployment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  
+  .deployment-header strong {
+    font-size: 0.9375rem;
+    color: var(--text-primary, #111827);
+  }
+  
+  .deployment-type-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-tertiary, #e5e7eb);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    text-transform: capitalize;
+  }
+  
+  .deployment-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .detail-item {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+  }
+  
+  .detail-item .label {
+    font-weight: 500;
+    color: var(--text-secondary, #6b7280);
+  }
+  
+  .detail-item .value {
+    color: var(--text-primary, #111827);
+    font-family: monospace;
   }
 </style>

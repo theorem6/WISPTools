@@ -185,6 +185,18 @@
                       <span class="label">Type:</span>
                       <span class="value">{deployment.hardware_type || 'Unknown'}</span>
                     </div>
+                    {#if deployment.config?.ipAddress || deployment.config?.ip_address}
+                      <div class="detail-row">
+                        <span class="label">IP Address:</span>
+                        <span class="value mono">{deployment.config.ipAddress || deployment.config.ip_address}</span>
+                      </div>
+                    {/if}
+                    {#if deployment.config?.macAddress || deployment.config?.mac_address}
+                      <div class="detail-row">
+                        <span class="label">MAC Address:</span>
+                        <span class="value mono">{deployment.config.macAddress || deployment.config.mac_address}</span>
+                      </div>
+                    {/if}
                     {#if deployment.deployedAt}
                       <div class="detail-row">
                         <span class="label">Deployed:</span>

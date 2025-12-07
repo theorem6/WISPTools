@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
-const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../../models/network');
+const { UnifiedSite, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../../models/network');
 // Use absolute path to avoid resolution issues - resolve from backend-services root
 const inventoryPath = path.join(__dirname, '../../models/inventory');
 const { InventoryItem } = require(inventoryPath);
@@ -80,17 +80,17 @@ router.put('/devices/:id/graphs', async (req, res) => {
   }
 });
 
-// POST /api/snmp/discovered/:deviceId/pair - Pair discovered device with existing hardware
+// POST /api/snmp/discovered/:deviceId/pair - Link discovered device to hardware deployment
 router.post('/discovered/:deviceId/pair', async (req, res) => {
   try {
     const { deviceId } = req.params;
-    const { hardwareId } = req.body;
+    const { deploymentId, deviceIp, deviceMac } = req.body;
     
-    if (!hardwareId) {
-      return res.status(400).json({ error: 'hardwareId is required' });
+    if (!deploymentId) {
+      return res.status(400).json({ error: 'deploymentId is required' });
     }
     
-    console.log(`🔗 [SNMP API] Pairing discovered device ${deviceId} with hardware ${hardwareId}`);
+    console.log(`🔗 [SNMP API] Linking discovered device ${deviceId} to hardware deployment ${deploymentId}`);
     
     // Get the discovered device
     const device = await NetworkEquipment.findOne({
@@ -102,15 +102,20 @@ router.post('/discovered/:deviceId/pair', async (req, res) => {
       return res.status(404).json({ error: 'Discovered device not found' });
     }
     
-    // Get the inventory item to pair with
-    // InventoryItem already imported at top level
-    const hardware = await InventoryItem.findOne({
-      _id: hardwareId,
+    // Get the hardware deployment
+    const deployment = await HardwareDeployment.findOne({
+      _id: deploymentId,
       tenantId: req.tenantId
-    });
+    }).populate('siteId');
     
-    if (!hardware) {
-      return res.status(404).json({ error: 'Hardware item not found' });
+    if (!deployment) {
+      return res.status(404).json({ error: 'Hardware deployment not found' });
+    }
+    
+    // Get site ID from deployment
+    const siteId = deployment.siteId?._id || deployment.siteId?.id || deployment.siteId;
+    if (!siteId) {
+      return res.status(400).json({ error: 'Hardware deployment has no associated site' });
     }
     
     // Parse device notes
@@ -123,45 +128,104 @@ router.post('/discovered/:deviceId/pair', async (req, res) => {
       }
     }
     
-    // Update NetworkEquipment to link to inventory
-    device.inventoryId = hardwareId.toString();
+    // Update NetworkEquipment to link to hardware deployment and set siteId
+    device.siteId = siteId;
+    device.status = 'active'; // Mark as active/deployed
+    
+    // Store deployment link in notes
     if (typeof device.notes === 'string') {
-      notes.inventory_id = hardwareId.toString();
+      notes.deployment_id = deploymentId.toString();
+      notes.hardware_deployment_id = deploymentId.toString();
       notes.paired_at = new Date().toISOString();
       device.notes = JSON.stringify(notes);
     } else {
-      device.notes = { ...notes, inventory_id: hardwareId.toString(), paired_at: new Date().toISOString() };
+      device.notes = { 
+        ...notes, 
+        deployment_id: deploymentId.toString(),
+        hardware_deployment_id: deploymentId.toString(),
+        paired_at: new Date().toISOString() 
+      };
     }
+    
     await device.save();
     
-    // Update InventoryItem to link to NetworkEquipment
-    hardware.serialNumber = notes.management_ip || device.serialNumber || hardware.serialNumber;
-    if (!hardware.networkConfig) hardware.networkConfig = {};
-    hardware.networkConfig.management_ip = notes.management_ip || device.serialNumber || null;
-    hardware.networkConfig.snmp_enabled = true;
-    hardware.networkConfig.snmp_community = notes.snmp_community || 'public';
-    hardware.networkConfig.snmp_version = notes.snmp_version || '2c';
+    // Update HardwareDeployment to store IP and MAC addresses in config
+    if (!deployment.config) {
+      deployment.config = {};
+    }
     
-    // Update modules to link to SNMP device
-    if (!hardware.modules) hardware.modules = {};
-    if (!hardware.modules.snmp) hardware.modules.snmp = {};
-    hardware.modules.snmp.deviceId = deviceId.toString();
-    hardware.modules.snmp.lastSync = new Date();
+    // Store IP address
+    const ipAddress = deviceIp || notes.management_ip || device.serialNumber || device.ipAddress || device.ip_address;
+    if (ipAddress) {
+      deployment.config.ipAddress = ipAddress;
+      deployment.config.ip_address = ipAddress; // Also store snake_case for compatibility
+    }
     
-    await hardware.save();
+    // Store MAC address
+    const macAddress = deviceMac || device.macAddress || device.mac_address || notes.mac_address;
+    if (macAddress) {
+      deployment.config.macAddress = macAddress;
+      deployment.config.mac_address = macAddress; // Also store snake_case for compatibility
+    }
     
-    console.log(`✅ [SNMP API] Paired device ${deviceId} with hardware ${hardwareId}`);
+    // Link discovered device to deployment
+    if (!deployment.config.discoveredDevice) {
+      deployment.config.discoveredDevice = {};
+    }
+    deployment.config.discoveredDevice.deviceId = deviceId.toString();
+    deployment.config.discoveredDevice.linkedAt = new Date().toISOString();
+    
+    // Store SNMP configuration if available
+    if (notes.snmp_community || device.community) {
+      deployment.config.snmp_community = notes.snmp_community || device.community || 'public';
+    }
+    if (notes.snmp_version || device.snmpVersion) {
+      deployment.config.snmp_version = notes.snmp_version || device.snmpVersion || '2c';
+    }
+    
+    await deployment.save();
+    
+    // If deployment has an inventory item, update it too
+    if (deployment.inventory_item_id) {
+      const inventoryItem = await InventoryItem.findOne({
+        _id: deployment.inventory_item_id,
+        tenantId: req.tenantId
+      });
+      
+      if (inventoryItem) {
+        // Update inventory item with IP and MAC
+        if (ipAddress) {
+          inventoryItem.ipAddress = ipAddress;
+          if (!inventoryItem.networkConfig) inventoryItem.networkConfig = {};
+          inventoryItem.networkConfig.management_ip = ipAddress;
+        }
+        if (macAddress) {
+          inventoryItem.macAddress = macAddress;
+        }
+        
+        // Link to discovered device
+        if (!inventoryItem.modules) inventoryItem.modules = {};
+        if (!inventoryItem.modules.snmp) inventoryItem.modules.snmp = {};
+        inventoryItem.modules.snmp.deviceId = deviceId.toString();
+        inventoryItem.modules.snmp.lastSync = new Date();
+        
+        await inventoryItem.save();
+      }
+    }
+    
+    console.log(`✅ [SNMP API] Linked device ${deviceId} to hardware deployment ${deploymentId} at site ${siteId}`);
     
     res.json({
       success: true,
       deviceId,
-      hardwareId,
-      message: 'Device paired successfully with hardware'
+      deploymentId,
+      siteId: siteId.toString(),
+      message: 'Device linked successfully to hardware deployment. The monitoring map will now show the site status.'
     });
   } catch (error) {
-    console.error('❌ [SNMP API] Error pairing device:', error);
+    console.error('❌ [SNMP API] Error linking device:', error);
     res.status(500).json({
-      error: 'Failed to pair device',
+      error: 'Failed to link device',
       message: error.message
     });
   }
