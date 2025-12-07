@@ -10,8 +10,9 @@
   import PCIPlannerModal from './components/PCIPlannerModal.svelte';
   import FrequencyPlannerModal from './components/FrequencyPlannerModal.svelte';
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';
-  import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
-  import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
+import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
+import SiteDetailsModal from './components/SiteDetailsModal.svelte';
+import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
   import SharedMap from '$lib/map/SharedMap.svelte';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
   import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
@@ -56,6 +57,10 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   let deployedCount = 0;
   let error = '';
   let deploymentMessage = '';
+  
+  // Site Details Modal
+  let showSiteDetailsModal = false;
+  let selectedSiteForDetails: any = null;
 
 
   // Map/Iframe coordination
@@ -132,16 +137,41 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   });
 
 
-  function handleIframeObjectAction(event: Event) {
+  async function handleIframeObjectAction(event: Event) {
     const detail = (event as CustomEvent).detail;
     if (!detail) return;
 
-    const { objectId, action, allowed, message } = detail;
+    const { objectId, action, allowed, message, data } = detail;
     if (!allowed) {
       error = message || `Action '${action}' is not allowed for this object.`;
       setTimeout(() => (error = ''), 5000);
     } else {
       console.log(`[Deploy] Action '${action}' allowed for object ${objectId}`, detail);
+      
+      // Handle view-details action - open site details modal
+      if (action === 'view-details' && objectId) {
+        try {
+          // Fetch the site data using the objectId
+          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+          const tenantId = $currentTenant?.id;
+          if (tenantId) {
+            const sites = await coverageMapService.getTowerSites(tenantId);
+            const site = sites.find((s: any) => String(s.id || s._id) === String(objectId));
+            if (site) {
+              selectedSiteForDetails = site;
+              showSiteDetailsModal = true;
+            } else if (data?.tower) {
+              // Use tower data if provided in the event
+              selectedSiteForDetails = data.tower;
+              showSiteDetailsModal = true;
+            }
+          }
+        } catch (err) {
+          console.error('Error loading site details:', err);
+          error = 'Failed to load site details';
+          setTimeout(() => (error = ''), 5000);
+        }
+      }
     }
   }
 
@@ -700,6 +730,19 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     tenantId={$currentTenant?.id || ''}
     on:close={() => showDeployedHardwareModal = false}
   />
+  
+  <!-- Site Details Modal -->
+  {#if showSiteDetailsModal && selectedSiteForDetails}
+    <SiteDetailsModal
+      show={showSiteDetailsModal}
+      site={selectedSiteForDetails}
+      tenantId={$currentTenant?.id || ''}
+      on:close={() => {
+        showSiteDetailsModal = false;
+        selectedSiteForDetails = null;
+      }}
+    />
+  {/if}
   
   <!-- EPC Deployment Modal -->
   {#if showEPCDeploymentModal}
