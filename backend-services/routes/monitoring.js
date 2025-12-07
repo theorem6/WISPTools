@@ -253,14 +253,14 @@ router.get('/mikrotik/devices', async (req, res) => {
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
       status: 'active'
-    }).populate('siteId', 'name location').lean();
+    }).lean();
     
     // Get Mikrotik CPE devices
     const mikrotikCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
       status: 'active'
-    }).populate('siteId', 'name location').lean();
+    }).lean();
     
     // Get all sites for location lookup
     const siteMap = new Map();
@@ -356,14 +356,14 @@ router.get('/snmp/devices', async (req, res) => {
         { notes: /snmp_community/i },
         { notes: /snmp_version/i }
       ]
-    }).populate('siteId', 'name location').lean();
+    }).lean();
     
     // Get CPE devices with SNMP modules enabled
     const snmpCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
       status: 'active',
       'modules.acs.enabled': true
-    }).populate('siteId', 'name location').lean();
+    }).lean();
     
     // Get all sites for location lookup
     const siteMap = new Map();
@@ -461,7 +461,7 @@ router.get('/snmp/discovered', async (req, res) => {
         { 'notes.discovery_source': 'epc_snmp_agent' }, // If notes is an object (future-proofing)
         { notes: { $regex: 'epc_snmp_agent', $options: 'i' } } // If notes is a JSON string (current format)
       ]
-    }).populate('siteId', 'name location').lean();
+    }).lean();
 
     // Get all sites for location lookup (in case populate didn't work)
     const siteMap = new Map();
