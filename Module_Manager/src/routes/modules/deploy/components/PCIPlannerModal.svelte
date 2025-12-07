@@ -65,39 +65,70 @@
     
     try {
       console.log(`[PCIPlanner] Loading network data for tenant: ${effectiveTenantId}`);
-      // Load tower sites and convert to cells
-      const sites = await coverageMapService.getTowerSites(effectiveTenantId);
-      console.log(`[PCIPlanner] Loaded ${sites.length} sites from coverage map service`);
       
-      cells = sites.map((site) => {
-        const metadata = (site as Record<string, any>).metadata ?? {};
-        const stats = (site as Record<string, any>).stats ?? {};
-        const location = site.location ?? { latitude: 0, longitude: 0 };
-
+      // Load actual LTE sectors (ENB sectors) instead of sites
+      const allSectors = await coverageMapService.getSectors(effectiveTenantId, { includePlanLayer: true });
+      console.log(`[PCIPlanner] Loaded ${allSectors.length} total sectors from coverage map service`);
+      
+      // Filter for LTE sectors only (ENB sectors)
+      const lteSectors = allSectors.filter((sector: any) => {
+        const tech = sector.technology?.toUpperCase();
+        return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
+      });
+      console.log(`[PCIPlanner] Found ${lteSectors.length} LTE (ENB) sectors`);
+      
+      // Load sites to get location and eNodeB info for each sector
+      const sites = await coverageMapService.getTowerSites(effectiveTenantId);
+      const sitesMap = new Map(sites.map((s: any) => [String(s.id || s._id), s]));
+      
+      // Convert LTE sectors to cells
+      cells = lteSectors.map((sector: any) => {
+        const sectorSiteId = String(sector.siteId?._id || sector.siteId?.id || sector.siteId || '');
+        const site = sitesMap.get(sectorSiteId);
+        const location = sector.location || site?.location || { latitude: 0, longitude: 0 };
+        
+        // Extract sector number from name or use a default
+        const sectorName = sector.name || '';
+        const sectorMatch = sectorName.match(/[Ss]ector\s*(\d+)/i) || sectorName.match(/[Ss]ec\s*(\d+)/i);
+        const sectorNumber = sectorMatch ? Number(sectorMatch[1]) : (sector.eNodeBLocalID || 1);
+        
+        // Get eNodeB from site metadata or sector
+        const siteMetadata = site?.metadata || {};
+        const siteStats = site?.stats || {};
+        const eNodeB = Number(
+          sector.eNodeBLocalID ||
+          siteMetadata.eNodeB ||
+          siteMetadata.enodeb ||
+          siteStats.eNodeB ||
+          0
+        );
+        
         return {
-          id: site.id,
-          name: site.name,
-          eNodeB: Number(metadata.eNodeB ?? metadata.enodeb ?? stats.eNodeB ?? 0),
-          sector: Number(metadata.sector ?? metadata.sectorNumber ?? 0),
-          pci: Number(metadata.pci ?? stats.pci ?? -1),
+          id: sector.id,
+          name: sector.name || `${site?.name || 'Unknown'} Sector ${sectorNumber}`,
+          eNodeB: eNodeB,
+          sector: sectorNumber,
+          pci: Number(sector.pci ?? -1),
           latitude: Number(location.latitude ?? 0),
           longitude: Number(location.longitude ?? 0),
-          frequency: Number(metadata.frequency ?? metadata.centerFreq ?? stats.frequency ?? 0),
-          rsPower: Number(metadata.rsPower ?? metadata.power ?? stats.rsPower ?? 0),
-          azimuth: metadata.azimuth ?? stats.azimuth,
-          beamwidth: metadata.beamwidth ?? stats.beamwidth,
-          heightAGL: metadata.height ?? site.height ?? undefined,
-          towerType: metadata.towerType ?? stats.towerType,
-          technology: metadata.technology ?? stats.technology,
-          earfcn: metadata.earfcn ?? stats.earfcn,
-          centerFreq: metadata.centerFreq ?? stats.centerFreq,
-          channelBandwidth: metadata.bandwidth ?? stats.bandwidth,
-          dlEarfcn: metadata.dlEarfcn ?? stats.dlEarfcn,
-          ulEarfcn: metadata.ulEarfcn ?? stats.ulEarfcn
+          frequency: Number(sector.frequency ?? sector.centerFreq ?? 0),
+          rsPower: Number(sector.transmitPower ?? sector.rsPower ?? 0),
+          azimuth: sector.azimuth,
+          beamwidth: sector.beamwidth,
+          heightAGL: sector.heightAGL ?? site?.height,
+          technology: sector.technology || 'LTE',
+          earfcn: sector.earfcn,
+          centerFreq: sector.frequency ?? sector.centerFreq,
+          channelBandwidth: sector.bandwidth,
+          dlEarfcn: sector.dlEarfcn,
+          ulEarfcn: sector.ulEarfcn
         } as Cell;
+      }).filter((cell: Cell) => {
+        // Filter out invalid cells (missing location or eNodeB)
+        return cell.latitude !== 0 && cell.longitude !== 0 && cell.eNodeB !== 0;
       });
       
-      console.log(`[PCIPlanner] Converted to ${cells.length} cells for PCI analysis`);
+      console.log(`[PCIPlanner] Converted ${cells.length} LTE sectors to cells for PCI analysis`);
     } catch (err) {
       console.error('[PCIPlanner] Failed to load network data:', err);
       const message = err instanceof Error ? err.message : String(err);

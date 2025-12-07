@@ -54,40 +54,69 @@
 
     try {
       console.log(`[FrequencyPlanner] Loading network data for tenant: ${effectiveTenantId}`);
+      
+      // Load actual LTE sectors (ENB sectors) instead of sites
+      const allSectors = await coverageMapService.getSectors(effectiveTenantId, { includePlanLayer: true });
+      console.log(`[FrequencyPlanner] Loaded ${allSectors.length} total sectors from coverage map service`);
+      
+      // Filter for LTE sectors only (ENB sectors)
+      const lteSectors = allSectors.filter((sector: any) => {
+        const tech = sector.technology?.toUpperCase();
+        return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
+      });
+      console.log(`[FrequencyPlanner] Found ${lteSectors.length} LTE (ENB) sectors`);
+      
+      // Load sites to get additional info for each sector
       const sites = await coverageMapService.getTowerSites(effectiveTenantId);
-      console.log(`[FrequencyPlanner] Loaded ${sites.length} sites from coverage map service`);
+      const sitesMap = new Map(sites.map((s: any) => [String(s.id || s._id), s]));
 
-      sectors = sites.map((site) => {
-        const siteRecord = site as Record<string, any>;
-        const metadata = siteRecord.metadata ?? {};
-        const stats = siteRecord.stats ?? {};
-        const height = Number(siteRecord.height ?? metadata.height ?? stats.height ?? 0);
-        const vendor = String(siteRecord.vendor ?? metadata.vendor ?? stats.vendor ?? 'Unknown');
-        const frequencyValue = Number(siteRecord.frequency ?? metadata.frequency ?? stats.frequency ?? 3550);
-        const bandwidthValue = Number(siteRecord.bandwidth ?? metadata.bandwidth ?? stats.bandwidth ?? 20);
-        const powerValue = Number(siteRecord.power ?? metadata.power ?? stats.power ?? 30);
+      // Convert LTE sectors to TowerSector format
+      sectors = lteSectors.map((sector: any) => {
+        const sectorSiteId = String(sector.siteId?._id || sector.siteId?.id || sector.siteId || '');
+        const site = sitesMap.get(sectorSiteId);
+        const location = sector.location || site?.location || { latitude: 0, longitude: 0 };
+        
+        // Get height from sector or site (convert feet to meters if needed)
+        const heightFeet = Number(sector.heightAGL || site?.height || 0);
+        const heightMeters = heightFeet > 100 ? heightFeet * 0.3048 : heightFeet; // Assume if > 100, it's in feet
+        
+        // Get vendor from sector or site
+        const vendor = String(
+          sector.antennaManufacturer ||
+          sector.radioManufacturer ||
+          site?.metadata?.vendor ||
+          'Unknown'
+        );
+        
+        // Get frequency info from sector
+        const frequencyValue = Number(sector.frequency || 3550); // Default to 3.5GHz if not specified
+        const bandwidthValue = Number(sector.bandwidth || 20);
+        const powerValue = Number(sector.transmitPower || sector.rsPower || 30);
 
         return {
-          id: site.id,
-          name: site.name,
-          latitude: site.location.latitude,
-          longitude: site.location.longitude,
-          azimuth: Number(siteRecord.azimuth ?? metadata.azimuth ?? stats.azimuth ?? 0),
-          antennaHeight: height,
-          vendor,
+          id: sector.id,
+          name: sector.name || `${site?.name || 'Unknown'} Sector`,
+          latitude: Number(location.latitude ?? 0),
+          longitude: Number(location.longitude ?? 0),
+          azimuth: Number(sector.azimuth ?? 0),
+          antennaHeight: heightMeters,
+          vendor: vendor,
           frequency: {
             frequency: frequencyValue,
             bandwidth: bandwidthValue,
-            vendor,
+            vendor: vendor,
             power: powerValue
           },
-          radCenterHeight: height + 2,
-          towerId: String(siteRecord.towerId ?? site.id),
-          sectorId: String(siteRecord.sectorId ?? site.id)
+          radCenterHeight: heightMeters + 2, // Add 2 meters for rad center
+          towerId: sectorSiteId,
+          sectorId: String(sector.id)
         } as TowerSector;
+      }).filter((sector: TowerSector) => {
+        // Filter out invalid sectors (missing location)
+        return sector.latitude !== 0 && sector.longitude !== 0;
       });
 
-      console.log(`[FrequencyPlanner] Converted to ${sectors.length} sectors for frequency analysis`);
+      console.log(`[FrequencyPlanner] Converted ${sectors.length} LTE sectors for frequency analysis`);
     } catch (err: any) {
       console.error('[FrequencyPlanner] Failed to load network data:', err);
       error = `Failed to load network data: ${err.message || 'Unknown error'}`;

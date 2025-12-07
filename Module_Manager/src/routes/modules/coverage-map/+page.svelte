@@ -1017,8 +1017,21 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       case 'change-site-type':
         // Change site type via edit modal
         if (tower) {
-          selectedSiteForEdit = tower;
-          showSiteEditModal = true;
+          // If in iframe (deploy/plan mode), dispatch action to parent
+          if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+            // Send message to parent in the format expected by iframeCommunicationService
+            window.parent.postMessage({
+              type: 'object-action',
+              objectId: tower.id,
+              action: 'change-site-type',
+              data: { tower }
+            }, '*');
+            console.log('[CoverageMap] Sent change-site-type action to parent', { objectId: tower.id });
+          } else {
+            // Standalone mode - open edit modal
+            selectedSiteForEdit = tower;
+            showSiteEditModal = true;
+          }
         }
         break;
       case 'view-details':

@@ -12,6 +12,7 @@
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';
 import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
 import SiteDetailsModal from './components/SiteDetailsModal.svelte';
+import SiteEditModal from '../coverage-map/components/SiteEditModal.svelte';
 import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
   import SharedMap from '$lib/map/SharedMap.svelte';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
@@ -61,6 +62,13 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   // Site Details Modal
   let showSiteDetailsModal = false;
   let selectedSiteForDetails: any = null;
+  
+  // Site Edit Modal
+  let showSiteEditModal = false;
+  let selectedSiteForEdit: any = null;
+  
+  // LTE Sector counts for planner buttons
+  let lteSectorCount = 0;
 
 
   // Map/Iframe coordination
@@ -176,6 +184,34 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           setTimeout(() => (error = ''), 5000);
         }
       }
+      
+      // Handle change-site-type action - open site edit modal
+      if (action === 'change-site-type' && objectId) {
+        try {
+          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+          const tenantId = $currentTenant?.id;
+          // First check if tower data is provided in the event
+          if (data?.tower) {
+            selectedSiteForEdit = data.tower;
+            showSiteEditModal = true;
+          } else if (tenantId) {
+            // Fall back to fetching from database
+            const sites = await coverageMapService.getTowerSites(tenantId);
+            const site = sites.find((s: any) => String(s.id || s._id) === String(objectId));
+            if (site) {
+              selectedSiteForEdit = site;
+              showSiteEditModal = true;
+            } else {
+              error = 'Site not found';
+              setTimeout(() => error = '', 5000);
+            }
+          }
+        } catch (err) {
+          console.error('Error loading site for editing:', err);
+          error = 'Failed to load site';
+          setTimeout(() => error = '', 5000);
+        }
+      }
     }
   }
 
@@ -215,6 +251,22 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           deployedCount = deployments.length;
         } catch (err) {
           console.error('Failed to load deployment count:', err);
+        }
+        
+        // Load and count LTE sectors for planner buttons
+        try {
+          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+          const allSectors = await coverageMapService.getSectors(tenantId, { includePlanLayer: true });
+          // Filter for LTE sectors only (ENB sectors)
+          const lteSectors = allSectors.filter((sector: any) => {
+            const tech = sector.technology?.toUpperCase();
+            return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
+          });
+          lteSectorCount = lteSectors.length;
+          console.log(`[Deploy] Found ${lteSectorCount} LTE (ENB) sectors for planners`);
+        } catch (err) {
+          console.error('Failed to load LTE sector count:', err);
+          lteSectorCount = 0;
         }
       }
     } catch (err) {
@@ -631,28 +683,28 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         </button>
         <button 
           class="module-control-btn" 
-          class:disabled={buttonsDisabled}
+          class:disabled={buttonsDisabled || lteSectorCount === 0}
           onclick={() => {
             console.log('[Deploy] PCI button clicked');
             openPCIPlanner();
           }} 
-          title={isAdmin ? "PCI Planner (Admin)" : ($currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)")}
+          title={lteSectorCount === 0 ? "PCI Planner - No LTE sectors found. Add LTE sectors to use this planner." : (isAdmin ? "PCI Planner (Admin)" : ($currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)"))}
         >
           <span class="control-icon">📊</span>
-          <span class="control-label">PCI</span>
+          <span class="control-label">PCI {lteSectorCount > 0 ? `(${lteSectorCount})` : ''}</span>
         </button>
 
         <button 
           class="module-control-btn" 
-          class:disabled={buttonsDisabled}
+          class:disabled={buttonsDisabled || lteSectorCount === 0}
           onclick={() => {
             console.log('[Deploy] Frequency button clicked');
             openFrequencyPlanner();
           }} 
-          title={isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)")}
+          title={lteSectorCount === 0 ? "Frequency Planner - No LTE sectors found. Add LTE sectors to use this planner." : (isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"))}
         >
           <span class="control-icon">📡</span>
-          <span class="control-label">Frequency</span>
+          <span class="control-label">Frequency {lteSectorCount > 0 ? `(${lteSectorCount})` : ''}</span>
         </button>
         <button 
           class="module-control-btn" 
@@ -771,6 +823,25 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       on:close={() => {
         showSiteDetailsModal = false;
         selectedSiteForDetails = null;
+      }}
+    />
+  {/if}
+  
+  <!-- Site Edit Modal -->
+  {#if showSiteEditModal && selectedSiteForEdit}
+    <SiteEditModal
+      show={showSiteEditModal}
+      site={selectedSiteForEdit}
+      tenantId={$currentTenant?.id || ''}
+      on:close={() => {
+        showSiteEditModal = false;
+        selectedSiteForEdit = null;
+        loadReadyPlans(); // Reload to refresh site list
+      }}
+      on:saved={() => {
+        showSiteEditModal = false;
+        selectedSiteForEdit = null;
+        loadReadyPlans(); // Reload to refresh site list
       }}
     />
   {/if}
