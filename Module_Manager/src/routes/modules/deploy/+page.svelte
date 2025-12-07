@@ -255,25 +255,34 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         }
         
         // Load and count sectors for planner buttons
+        // Only count deployed/active sectors (not planned ones)
         try {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-          const allSectors = await coverageMapService.getSectors(tenantId, { includePlanLayer: true });
+          // Don't include plan layer - only count actual deployed sectors
+          const allSectors = await coverageMapService.getSectors(tenantId);
+          
+          // Filter to only deployed/active sectors (exclude planned)
+          const deployedSectors = allSectors.filter((sector: any) => {
+            const status = (sector.status || '').toLowerCase();
+            // Only count active sectors, exclude planned/inactive/maintenance
+            return status === 'active' || status === 'deployed';
+          });
           
           // Count LTE sectors only (for PCI Planner)
-          const lteSectors = allSectors.filter((sector: any) => {
+          const lteSectors = deployedSectors.filter((sector: any) => {
             const tech = (sector.technology || '').toUpperCase();
             return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
           });
           lteSectorCount = lteSectors.length;
-          console.log(`[Deploy] Found ${lteSectorCount} LTE (ENB) sectors for PCI planner`);
+          console.log(`[Deploy] Found ${lteSectorCount} deployed LTE (ENB) sectors for PCI planner (out of ${deployedSectors.length} total deployed sectors)`);
           
           // Count LTE + FWA sectors (for Frequency Planner)
-          const frequencySectors = allSectors.filter((sector: any) => {
+          const frequencySectors = deployedSectors.filter((sector: any) => {
             const tech = (sector.technology || '').toUpperCase();
             return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS' || tech === 'FWA';
           });
           frequencySectorCount = frequencySectors.length;
-          console.log(`[Deploy] Found ${frequencySectorCount} LTE/FWA sectors for Frequency planner`);
+          console.log(`[Deploy] Found ${frequencySectorCount} deployed LTE/FWA sectors for Frequency planner`);
         } catch (err) {
           console.error('Failed to load sector counts:', err);
           lteSectorCount = 0;

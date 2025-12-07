@@ -66,16 +66,24 @@
     try {
       console.log(`[PCIPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       
-      // Load actual LTE sectors (ENB sectors) instead of sites
-      const allSectors = await coverageMapService.getSectors(effectiveTenantId, { includePlanLayer: true });
+      // Load actual deployed LTE sectors (ENB sectors) instead of sites
+      // Don't include plan layer - only load deployed sectors
+      const allSectors = await coverageMapService.getSectors(effectiveTenantId);
       console.log(`[PCIPlanner] Loaded ${allSectors.length} total sectors from coverage map service`);
       
+      // Filter to only deployed/active sectors (exclude planned)
+      const deployedSectors = allSectors.filter((sector: any) => {
+        const status = (sector.status || '').toLowerCase();
+        return status === 'active' || status === 'deployed';
+      });
+      console.log(`[PCIPlanner] Found ${deployedSectors.length} deployed sectors (excluding planned)`);
+      
       // Filter for LTE sectors only (ENB sectors)
-      const lteSectors = allSectors.filter((sector: any) => {
-        const tech = sector.technology?.toUpperCase();
+      const lteSectors = deployedSectors.filter((sector: any) => {
+        const tech = (sector.technology || '').toUpperCase();
         return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
       });
-      console.log(`[PCIPlanner] Found ${lteSectors.length} LTE (ENB) sectors`);
+      console.log(`[PCIPlanner] Found ${lteSectors.length} deployed LTE (ENB) sectors`);
       
       // Load sites to get location and eNodeB info for each sector
       const sites = await coverageMapService.getTowerSites(effectiveTenantId);

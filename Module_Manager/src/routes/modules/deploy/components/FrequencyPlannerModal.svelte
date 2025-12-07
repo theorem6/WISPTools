@@ -55,16 +55,24 @@
     try {
       console.log(`[FrequencyPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       
-      // Load actual LTE and FWA sectors instead of sites
-      const allSectors = await coverageMapService.getSectors(effectiveTenantId, { includePlanLayer: true });
+      // Load actual deployed LTE and FWA sectors instead of sites
+      // Don't include plan layer - only load deployed sectors
+      const allSectors = await coverageMapService.getSectors(effectiveTenantId);
       console.log(`[FrequencyPlanner] Loaded ${allSectors.length} total sectors from coverage map service`);
       
+      // Filter to only deployed/active sectors (exclude planned)
+      const deployedSectors = allSectors.filter((sector: any) => {
+        const status = (sector.status || '').toLowerCase();
+        return status === 'active' || status === 'deployed';
+      });
+      console.log(`[FrequencyPlanner] Found ${deployedSectors.length} deployed sectors (excluding planned)`);
+      
       // Filter for LTE or FWA sectors (Fixed Wireless Access)
-      const frequencySectors = allSectors.filter((sector: any) => {
+      const frequencySectors = deployedSectors.filter((sector: any) => {
         const tech = (sector.technology || '').toUpperCase();
         return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS' || tech === 'FWA';
       });
-      console.log(`[FrequencyPlanner] Found ${frequencySectors.length} LTE/FWA sectors for frequency planning`);
+      console.log(`[FrequencyPlanner] Found ${frequencySectors.length} deployed LTE/FWA sectors for frequency planning`);
       
       // Load sites to get additional info for each sector
       const sites = await coverageMapService.getTowerSites(effectiveTenantId);
