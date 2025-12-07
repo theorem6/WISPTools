@@ -66,17 +66,43 @@
     try {
       console.log(`[PCIPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       
+      // Helper function to identify fake/test sectors
+      function isFakeSector(sector: any): boolean {
+        if (!sector || !sector.name) return false;
+        const name = String(sector.name).toLowerCase();
+        
+        // Patterns that indicate fake/test sectors from test scripts
+        const fakePatterns = [
+          /main tower sector/i,
+          /secondary tower sector/i,
+          /customer.*cpe/i,
+          /customer.*lte/i,
+          /customer a/i,
+          /customer b/i,
+          /fake/i,
+          /demo/i,
+          /sample/i,
+          /^test$/i,
+          /mock/i
+        ];
+        
+        return fakePatterns.some(pattern => pattern.test(name));
+      }
+      
       // Load actual deployed LTE sectors (ENB sectors) instead of sites
       // Don't include plan layer - only load deployed sectors
       const allSectors = await coverageMapService.getSectors(effectiveTenantId);
       console.log(`[PCIPlanner] Loaded ${allSectors.length} total sectors from coverage map service`);
       
-      // Filter to only deployed/active sectors (exclude planned)
+      // Filter to only deployed/active sectors (exclude planned and fake)
       const deployedSectors = allSectors.filter((sector: any) => {
+        // Exclude fake sectors
+        if (isFakeSector(sector)) return false;
+        
         const status = (sector.status || '').toLowerCase();
         return status === 'active' || status === 'deployed';
       });
-      console.log(`[PCIPlanner] Found ${deployedSectors.length} deployed sectors (excluding planned)`);
+      console.log(`[PCIPlanner] Found ${deployedSectors.length} deployed sectors (excluding planned and fake, filtered ${allSectors.length - deployedSectors.length} fake/planned)`);
       
       // Filter for LTE sectors only (ENB sectors)
       const lteSectors = deployedSectors.filter((sector: any) => {
