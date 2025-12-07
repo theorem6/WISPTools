@@ -10,7 +10,7 @@
   let error = '';
   let devices: any[] = [];
   let selectedDevice: any = null;
-  let timeRange = '24h';
+  let timeRange = '7d'; // Changed from 24h to show historical data (data collection stopped 3+ days ago)
   let pingMetrics: any = null;
   let snmpMetrics: any = null;
   let pingStats: any = null;
@@ -150,7 +150,10 @@
               labelsCount: pingData.data?.labels?.length || 0,
               datasetsCount: pingData.data?.datasets?.length || 0,
               stats: pingData.stats,
-              hours: hours
+              hours: hours,
+              timeRange: timeRange,
+              url: `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`,
+              fullResponse: pingData
             });
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;

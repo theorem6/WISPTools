@@ -38,6 +38,7 @@ router.get('/ping/:deviceId', async (req, res) => {
     const startTime = new Date(Date.now() - validHours * 60 * 60 * 1000);
 
     console.log(`[Monitoring Graphs] Fetching ping metrics for device ${deviceId}, tenant ${req.tenantId}, hours: ${validHours}`);
+    console.log(`[Monitoring Graphs] Query details: startTime=${startTime.toISOString()}, currentTime=${new Date().toISOString()}, timeRange=${validHours}h`);
 
     const metrics = await PingMetrics.find({
       device_id: deviceId,
@@ -48,6 +49,16 @@ router.get('/ping/:deviceId', async (req, res) => {
     .lean();
 
     console.log(`[Monitoring Graphs] Found ${metrics.length} ping metrics for device ${deviceId}`);
+    if (metrics.length > 0) {
+      console.log(`[Monitoring Graphs] First metric: ${metrics[0].timestamp}, Last metric: ${metrics[metrics.length - 1].timestamp}`);
+    } else {
+      // Debug: Check if device_id exists at all
+      const anyMetrics = await PingMetrics.findOne({ device_id: deviceId, tenant_id: req.tenantId }).lean();
+      if (anyMetrics) {
+        const ageHours = (Date.now() - anyMetrics.timestamp.getTime()) / (1000 * 60 * 60);
+        console.log(`[Monitoring Graphs] Device has metrics but outside time range. Most recent: ${ageHours.toFixed(2)}h ago (${anyMetrics.timestamp})`);
+      }
+    }
 
     // Always return valid structure, even if empty
     const labels = metrics.length > 0 
