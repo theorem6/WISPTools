@@ -67,8 +67,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   let showSiteEditModal = false;
   let selectedSiteForEdit: any = null;
   
-  // LTE Sector counts for planner buttons
-  let lteSectorCount = 0;
+  // Sector counts for planner buttons
+  let lteSectorCount = 0; // For PCI Planner (LTE only)
+  let frequencySectorCount = 0; // For Frequency Planner (LTE + FWA)
 
 
   // Map/Iframe coordination
@@ -253,20 +254,30 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           console.error('Failed to load deployment count:', err);
         }
         
-        // Load and count LTE sectors for planner buttons
+        // Load and count sectors for planner buttons
         try {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           const allSectors = await coverageMapService.getSectors(tenantId, { includePlanLayer: true });
-          // Filter for LTE sectors only (ENB sectors)
+          
+          // Count LTE sectors only (for PCI Planner)
           const lteSectors = allSectors.filter((sector: any) => {
-            const tech = sector.technology?.toUpperCase();
+            const tech = (sector.technology || '').toUpperCase();
             return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
           });
           lteSectorCount = lteSectors.length;
-          console.log(`[Deploy] Found ${lteSectorCount} LTE (ENB) sectors for planners`);
+          console.log(`[Deploy] Found ${lteSectorCount} LTE (ENB) sectors for PCI planner`);
+          
+          // Count LTE + FWA sectors (for Frequency Planner)
+          const frequencySectors = allSectors.filter((sector: any) => {
+            const tech = (sector.technology || '').toUpperCase();
+            return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS' || tech === 'FWA';
+          });
+          frequencySectorCount = frequencySectors.length;
+          console.log(`[Deploy] Found ${frequencySectorCount} LTE/FWA sectors for Frequency planner`);
         } catch (err) {
-          console.error('Failed to load LTE sector count:', err);
+          console.error('Failed to load sector counts:', err);
           lteSectorCount = 0;
+          frequencySectorCount = 0;
         }
       }
     } catch (err) {
@@ -696,15 +707,15 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
         <button 
           class="module-control-btn" 
-          class:disabled={buttonsDisabled || lteSectorCount === 0}
+          class:disabled={buttonsDisabled || frequencySectorCount === 0}
           onclick={() => {
             console.log('[Deploy] Frequency button clicked');
             openFrequencyPlanner();
           }} 
-          title={lteSectorCount === 0 ? "Frequency Planner - No LTE sectors found. Add LTE sectors to use this planner." : (isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"))}
+          title={frequencySectorCount === 0 ? "Frequency Planner - No LTE or FWA sectors found. Add LTE or FWA sectors to use this planner." : (isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"))}
         >
           <span class="control-icon">📡</span>
-          <span class="control-label">Frequency {lteSectorCount > 0 ? `(${lteSectorCount})` : ''}</span>
+          <span class="control-label">Frequency {frequencySectorCount > 0 ? `(${frequencySectorCount})` : ''}</span>
         </button>
         <button 
           class="module-control-btn" 

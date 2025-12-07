@@ -55,23 +55,23 @@
     try {
       console.log(`[FrequencyPlanner] Loading network data for tenant: ${effectiveTenantId}`);
       
-      // Load actual LTE sectors (ENB sectors) instead of sites
+      // Load actual LTE and FWA sectors instead of sites
       const allSectors = await coverageMapService.getSectors(effectiveTenantId, { includePlanLayer: true });
       console.log(`[FrequencyPlanner] Loaded ${allSectors.length} total sectors from coverage map service`);
       
-      // Filter for LTE sectors only (ENB sectors)
-      const lteSectors = allSectors.filter((sector: any) => {
-        const tech = sector.technology?.toUpperCase();
-        return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
+      // Filter for LTE or FWA sectors (Fixed Wireless Access)
+      const frequencySectors = allSectors.filter((sector: any) => {
+        const tech = (sector.technology || '').toUpperCase();
+        return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS' || tech === 'FWA';
       });
-      console.log(`[FrequencyPlanner] Found ${lteSectors.length} LTE (ENB) sectors`);
+      console.log(`[FrequencyPlanner] Found ${frequencySectors.length} LTE/FWA sectors for frequency planning`);
       
       // Load sites to get additional info for each sector
       const sites = await coverageMapService.getTowerSites(effectiveTenantId);
       const sitesMap = new Map(sites.map((s: any) => [String(s.id || s._id), s]));
 
-      // Convert LTE sectors to TowerSector format
-      sectors = lteSectors.map((sector: any) => {
+      // Convert LTE/FWA sectors to TowerSector format
+      sectors = frequencySectors.map((sector: any) => {
         const sectorSiteId = String(sector.siteId?._id || sector.siteId?.id || sector.siteId || '');
         const site = sitesMap.get(sectorSiteId);
         const location = sector.location || site?.location || { latitude: 0, longitude: 0 };
@@ -116,7 +116,7 @@
         return sector.latitude !== 0 && sector.longitude !== 0;
       });
 
-      console.log(`[FrequencyPlanner] Converted ${sectors.length} LTE sectors for frequency analysis`);
+      console.log(`[FrequencyPlanner] Converted ${sectors.length} LTE/FWA sectors for frequency analysis`);
     } catch (err: any) {
       console.error('[FrequencyPlanner] Failed to load network data:', err);
       error = `Failed to load network data: ${err.message || 'Unknown error'}`;
