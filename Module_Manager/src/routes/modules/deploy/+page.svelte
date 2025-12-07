@@ -325,10 +325,71 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     }
   }
 
-  // Take over plan - mark approved plan as deployed
+  // Deploy plan - authorize and promote features to production
+  async function deployPlan(plan: PlanProject) {
+    if (plan.status !== 'approved') {
+      error = 'Only approved plans can be deployed.';
+      setTimeout(() => (error = ''), 5000);
+      return;
+    }
+
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) return;
+
+    if (!confirm(`Deploy plan "${plan.name}"? This will promote all plan features to production. This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      isLoadingPlans = true;
+      
+      // Get plan features count BEFORE authorization (for message)
+      const { features } = await planService.getPlanFeatures(plan.id);
+      
+      // Authorize the plan - this promotes features to production and sets status to 'authorized'
+      await planService.authorizePlan(plan.id);
+      
+      // Mark plan as deployed and then archived
+      await planService.updatePlan(plan.id, { status: 'deployed' });
+      await planService.updatePlan(plan.id, { status: 'archived' });
+      
+      // Reload production hardware to show the newly promoted features
+      await mapLayerManager.loadProductionHardware(tenantId);
+      
+      // Reload plans to update counts and status
+      await loadReadyPlans();
+      
+      // Update map state if plan was active
+      if (mapState?.activePlan?.id === plan.id) {
+        // Plan is now deployed, clear it from map
+        setMapData({
+          activePlan: null,
+          stagedFeatures: [],
+          stagedSummary: { total: 0, byType: {}, byStatus: {} }
+        });
+        
+        // Load a different approved plan if available
+        const nextApprovedPlan = approvedPlans.find(p => p.id !== plan.id && p.showOnMap);
+        if (nextApprovedPlan) {
+          await mapLayerManager.loadPlan(tenantId, nextApprovedPlan);
+        }
+      }
+      
+      deploymentMessage = `✅ Plan "${plan.name}" has been deployed! ${features.length} features promoted to production.`;
+      setTimeout(() => (deploymentMessage = ''), 8000);
+    } catch (err: any) {
+      error = err.message || 'Failed to deploy plan';
+      console.error('Error deploying plan:', err);
+      setTimeout(() => (error = ''), 8000);
+    } finally {
+      isLoadingPlans = false;
+    }
+  }
+
+  // Take over plan - mark authorized plan as deployed (legacy function, kept for compatibility)
   async function takeOverPlan(plan: PlanProject) {
-    if (plan.status !== 'approved' && plan.status !== 'authorized') {
-      error = 'Only approved or authorized plans can be taken over.';
+    if (plan.status !== 'authorized') {
+      error = 'Only authorized plans can be taken over.';
       setTimeout(() => (error = ''), 5000);
       return;
     }
@@ -344,8 +405,6 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       
       // Mark plan as deployed (take over) and then move to archived
       await planService.updatePlan(plan.id, { status: 'deployed' });
-      
-      // Move to archived status immediately after deployment
       await planService.updatePlan(plan.id, { status: 'archived' });
       
       // Reload plans to update counts and status
@@ -380,52 +439,20 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     const plan = mapState?.activePlan;
 
     if (!tenantId || !plan) {
-      deploymentMessage = 'Select an authorized plan to deploy.';
+      deploymentMessage = 'Select an approved plan to deploy.';
       setTimeout(() => (deploymentMessage = ''), 4000);
       return;
     }
 
-    // Only allow deploying approved or authorized plans
-    if (plan.status !== 'approved' && plan.status !== 'authorized') {
+    // Only allow deploying approved plans
+    if (plan.status !== 'approved') {
       deploymentMessage = 'Plan must be approved before deployment.';
       setTimeout(() => (deploymentMessage = ''), 4000);
       return;
     }
 
-    try {
-      const { features } = await planService.getPlanFeatures(plan.id);
-      console.log('[Deploy] Deploying plan', {
-        planId: plan.id,
-        planName: plan.name,
-        tenantId,
-        featureCount: features.length
-      });
-      
-      // Mark plan as deployed, then move to archived
-      await planService.updatePlan(plan.id, { status: 'deployed' });
-      
-      // Move to archived status immediately after deployment
-      await planService.updatePlan(plan.id, { status: 'archived' });
-      
-      // Reload plans to update counts and status
-      await loadReadyPlans();
-      
-      // Update map state if plan was active
-      if (mapState?.activePlan?.id === plan.id) {
-        // Plan is now deployed, so load a different approved plan if available
-        const nextApprovedPlan = approvedPlans.find(p => p.id !== plan.id && p.showOnMap) || approvedPlans[0];
-        if (nextApprovedPlan) {
-          await mapLayerManager.loadPlan(tenantId, nextApprovedPlan);
-        }
-      }
-      
-      deploymentMessage = `✅ Plan "${plan.name}" has been deployed (${features.length} items).`;
-      setTimeout(() => (deploymentMessage = ''), 6000);
-    } catch (err: any) {
-      console.error('Failed to deploy plan:', err);
-      deploymentMessage = err?.message || 'Failed to deploy plan.';
-      setTimeout(() => (deploymentMessage = ''), 6000);
-    }
+    // Call the deploy function which handles authorization and promotion
+    await deployPlan(plan);
   }
 
   // Plan approval functions
@@ -842,14 +869,23 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                         📋 {plan.status === 'approved' || plan.status === 'authorized' ? 'Review' : 'Approve'}
                       </button>
                     {/if}
-                    {#if (plan.status === 'approved' || plan.status === 'authorized') && plan.showOnMap}
+                    {#if plan.status === 'approved'}
+                      <button 
+                        class="btn-deploy" 
+                        onclick={() => deployPlan(plan)}
+                        disabled={isLoadingPlans}
+                        title="Deploy this plan - promotes all features to production"
+                      >
+                        🚀 Deploy
+                      </button>
+                    {:else if plan.status === 'authorized' && plan.showOnMap}
                       <button 
                         class="btn-takeover" 
                         onclick={() => takeOverPlan(plan)}
                         disabled={isLoadingPlans}
-                        title="Take over this plan and mark it as deployed"
+                        title="Mark this authorized plan as deployed"
                       >
-                        🚀 Take Over
+                        ✅ Take Over
                       </button>
                     {/if}
                   </div>
@@ -1130,7 +1166,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   .btn-finalize,
   .btn-action,
   .btn-activate,
-  .btn-takeover {
+  .btn-takeover,
+  .btn-deploy {
     padding: 0.5rem 1rem;
     border: none;
     border-radius: var(--border-radius-sm);
@@ -1191,10 +1228,22 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     transform: translateY(-1px);
   }
 
+  .btn-deploy {
+    background: var(--success, #22c55e);
+    color: white;
+  }
+
+  .btn-deploy:hover:not(:disabled) {
+    background: var(--success-hover, #16a34a);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  }
+
   .btn-activate:disabled,
   .btn-takeover:disabled,
   .btn-finalize:disabled,
-  .btn-action:disabled {
+  .btn-action:disabled,
+  .btn-deploy:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
