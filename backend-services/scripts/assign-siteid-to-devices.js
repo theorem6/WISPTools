@@ -68,13 +68,8 @@ async function assignSiteIds() {
       return;
     }
 
-    // Process NetworkEquipment
-    const equipmentWithoutSiteId = await NetworkEquipment.find({
-      $or: [
-        { siteId: { $exists: false } },
-        { siteId: null },
-        { siteId: { $in: [null, ''] } }
-      ],
+    // Process NetworkEquipment - find devices without valid siteId
+    const allEquipment = await NetworkEquipment.find({
       location: {
         $exists: true,
         $ne: null
@@ -82,6 +77,12 @@ async function assignSiteIds() {
       'location.latitude': { $exists: true, $ne: null, $ne: 0 },
       'location.longitude': { $exists: true, $ne: null, $ne: 0 }
     }).lean();
+    
+    // Filter to only devices without valid siteId
+    const equipmentWithoutSiteId = allEquipment.filter(device => {
+      const siteId = device.siteId;
+      return !siteId || siteId === '' || siteId === null || (typeof siteId === 'string' && siteId.trim() === '');
+    });
 
     console.log(`\n📡 Found ${equipmentWithoutSiteId.length} NetworkEquipment devices without siteId`);
 
@@ -125,13 +126,8 @@ async function assignSiteIds() {
       }
     }
 
-    // Process UnifiedCPE
-    const cpeWithoutSiteId = await UnifiedCPE.find({
-      $or: [
-        { siteId: { $exists: false } },
-        { siteId: null },
-        { siteId: { $in: [null, ''] } }
-      ],
+    // Process UnifiedCPE - find devices without valid siteId
+    const allCPE = await UnifiedCPE.find({
       location: {
         $exists: true,
         $ne: null
@@ -139,6 +135,12 @@ async function assignSiteIds() {
       'location.latitude': { $exists: true, $ne: null, $ne: 0 },
       'location.longitude': { $exists: true, $ne: null, $ne: 0 }
     }).lean();
+    
+    // Filter to only devices without valid siteId
+    const cpeWithoutSiteId = allCPE.filter(device => {
+      const siteId = device.siteId;
+      return !siteId || siteId === '' || siteId === null || (typeof siteId === 'string' && siteId.trim() === '');
+    });
 
     console.log(`\n📱 Found ${cpeWithoutSiteId.length} UnifiedCPE devices without siteId`);
 
