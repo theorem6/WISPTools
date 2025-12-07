@@ -132,8 +132,10 @@
       // Load ping metrics
       if (selectedDevice.hasPing && selectedDevice.ipAddress) {
         try {
+          const pingUrl = `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`;
+          console.log('[SNMPGraphsPanel] Requesting Ping metrics with:', { deviceId: deviceId, hours: hours, tenantId: $currentTenant.id, url: pingUrl });
           const pingResponse = await fetch(
-            `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`,
+            pingUrl,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -144,17 +146,20 @@
           
           if (pingResponse.ok) {
             const pingData = await pingResponse.json();
-            console.log('[SNMPGraphsPanel] Ping data received:', {
-              deviceId: deviceId,
-              hasData: !!pingData.data,
-              labelsCount: pingData.data?.labels?.length || 0,
-              datasetsCount: pingData.data?.datasets?.length || 0,
-              stats: pingData.stats,
-              hours: hours,
-              timeRange: timeRange,
-              url: `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`,
-              fullResponse: pingData
-            });
+            const requestUrl = `${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=${hours}`;
+            console.log('[SNMPGraphsPanel] ===== PING DATA DEBUG =====');
+            console.log('[SNMPGraphsPanel] Device ID:', deviceId);
+            console.log('[SNMPGraphsPanel] Hours requested:', hours);
+            console.log('[SNMPGraphsPanel] Time range:', timeRange);
+            console.log('[SNMPGraphsPanel] Request URL:', requestUrl);
+            console.log('[SNMPGraphsPanel] Labels count:', pingData.data?.labels?.length || 0);
+            console.log('[SNMPGraphsPanel] Datasets count:', pingData.data?.datasets?.length || 0);
+            console.log('[SNMPGraphsPanel] Stats:', JSON.stringify(pingData.stats, null, 2));
+            console.log('[SNMPGraphsPanel] Full response labels length:', pingData.data?.labels?.length || 0);
+            if (pingData.data?.labels && pingData.data.labels.length > 0) {
+              console.log('[SNMPGraphsPanel] First 3 labels:', pingData.data.labels.slice(0, 3));
+            }
+            console.log('[SNMPGraphsPanel] ============================');
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;
             updatePingCharts();
@@ -170,8 +175,10 @@
       // Load SNMP metrics
       if (selectedDevice.hasSNMP) {
         try {
+          const snmpUrl = `${API_CONFIG.PATHS.MONITORING_GRAPHS}/snmp/${deviceId}?hours=${hours}`;
+          console.log('[SNMPGraphsPanel] Requesting SNMP metrics with:', { deviceId: deviceId, hours: hours, tenantId: $currentTenant.id, url: snmpUrl });
           const snmpResponse = await fetch(
-            `${API_CONFIG.PATHS.MONITORING_GRAPHS}/snmp/${deviceId}?hours=${hours}`,
+            snmpUrl,
             {
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -182,11 +189,13 @@
           
           if (snmpResponse.ok) {
             const snmpData = await snmpResponse.json();
-            console.log('[SNMPGraphsPanel] SNMP data received:', {
-              hasData: !!snmpData.data,
-              labelsCount: snmpData.data?.labels?.length || 0,
-              datasetsCount: snmpData.data?.datasets?.length || 0
-            });
+            console.log('[SNMPGraphsPanel] ===== SNMP DATA DEBUG =====');
+            console.log('[SNMPGraphsPanel] Device ID:', deviceId);
+            console.log('[SNMPGraphsPanel] Hours requested:', hours);
+            console.log('[SNMPGraphsPanel] Time range:', timeRange);
+            console.log('[SNMPGraphsPanel] Labels count:', snmpData.data?.labels?.length || 0);
+            console.log('[SNMPGraphsPanel] Datasets count:', snmpData.data?.datasets?.length || 0);
+            console.log('[SNMPGraphsPanel] ============================');
             snmpMetrics = snmpData.data || null;
             updateSNMPCharts();
           } else {
