@@ -154,16 +154,20 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           // Fetch the site data using the objectId
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           const tenantId = $currentTenant?.id;
-          if (tenantId) {
+          // First check if tower data is provided in the event (more reliable)
+          if (data?.tower) {
+            selectedSiteForDetails = data.tower;
+            showSiteDetailsModal = true;
+          } else if (tenantId) {
+            // Fall back to fetching from database
             const sites = await coverageMapService.getTowerSites(tenantId);
             const site = sites.find((s: any) => String(s.id || s._id) === String(objectId));
             if (site) {
               selectedSiteForDetails = site;
               showSiteDetailsModal = true;
-            } else if (data?.tower) {
-              // Use tower data if provided in the event
-              selectedSiteForDetails = data.tower;
-              showSiteDetailsModal = true;
+            } else {
+              error = 'Site not found';
+              setTimeout(() => error = '', 5000);
             }
           }
         } catch (err) {
