@@ -248,18 +248,24 @@ router.get('/mikrotik/devices', async (req, res) => {
   try {
     console.log(`🔍 Fetching Mikrotik devices for tenant: ${req.tenantId}`);
     
-    // Get Mikrotik network equipment
+    // Get Mikrotik network equipment (include both active and planned/deployed devices)
     const mikrotikEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
-      status: 'active'
+      $or: [
+        { status: 'active' },
+        { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+      ]
     }).lean();
     
-    // Get Mikrotik CPE devices
+    // Get Mikrotik CPE devices (include both active and planned/deployed devices)
     const mikrotikCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
-      status: 'active'
+      $or: [
+        { status: 'active' },
+        { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+      ]
     }).lean();
     
     // Get all sites for location lookup
@@ -347,21 +353,34 @@ router.get('/snmp/devices', async (req, res) => {
   try {
     console.log(`🔍 Fetching SNMP devices for tenant: ${req.tenantId}`);
     
-    // Get all network equipment with SNMP enabled
+    // Get all network equipment with SNMP enabled (include both active and planned/deployed devices)
     const snmpEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      status: 'active',
-      $or: [
-        { notes: /snmp_enabled.*true/i },
-        { notes: /snmp_community/i },
-        { notes: /snmp_version/i }
+      $and: [
+        {
+          $or: [
+            { status: 'active' },
+            { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+          ]
+        },
+        {
+          $or: [
+            { notes: /snmp_enabled.*true/i },
+            { notes: /snmp_community/i },
+            { notes: /snmp_version/i }
+          ]
+        }
       ]
     }).lean();
     
     // Get CPE devices with SNMP modules enabled
+    // Include both active and planned/deployed CPE devices
     const snmpCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
-      status: 'active',
+      $or: [
+        { status: 'active' },
+        { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+      ],
       'modules.acs.enabled': true
     }).lean();
     
@@ -453,13 +472,23 @@ router.get('/snmp/discovered', async (req, res) => {
       return res.status(400).json({ error: 'X-Tenant-ID header is required' });
     }
 
-    // Get all network equipment that was discovered via SNMP
+    // Get all network equipment that was discovered via SNMP (include both active and planned/deployed devices)
     // Notes are stored as JSON strings, so we search for the discovery_source string
     const devices = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      $or: [
-        { 'notes.discovery_source': 'epc_snmp_agent' }, // If notes is an object (future-proofing)
-        { notes: { $regex: 'epc_snmp_agent', $options: 'i' } } // If notes is a JSON string (current format)
+      $and: [
+        {
+          $or: [
+            { 'notes.discovery_source': 'epc_snmp_agent' }, // If notes is an object (future-proofing)
+            { notes: { $regex: 'epc_snmp_agent', $options: 'i' } } // If notes is a JSON string (current format)
+          ]
+        },
+        {
+          $or: [
+            { status: 'active' },
+            { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+          ]
+        }
       ]
     }).lean();
 
@@ -595,14 +624,21 @@ router.get('/snmp/metrics/latest', async (req, res) => {
     console.log(`🔍 Fetching latest SNMP metrics for tenant: ${req.tenantId}`);
     
     // Get device list from database
+    // Include both active and planned/deployed devices
     const allEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      status: 'active'
+      $or: [
+        { status: 'active' },
+        { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+      ]
     }).lean();
     
     const allCPE = await UnifiedCPE.find({
       tenantId: req.tenantId,
-      status: 'active'
+      $or: [
+        { status: 'active' },
+        { status: 'planned', siteId: { $exists: true, $ne: null } } // Include planned devices that are deployed (have siteId)
+      ]
     }).lean();
     
     // Return real metrics (null if not available) - NO FAKE DATA
