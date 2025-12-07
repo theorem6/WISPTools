@@ -25,8 +25,30 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
 async function assignSiteIds() {
   try {
-    // Connect to MongoDB
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/lte-pci-mapper';
+    // Connect to MongoDB - use environment variable or check for common locations
+    let mongoUri = process.env.MONGODB_URI;
+    
+    if (!mongoUri) {
+      // Try to load from .env file in backend-services directory
+      const path = require('path');
+      const fs = require('fs');
+      const envPath = path.join(__dirname, '..', '.env');
+      
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        const mongoMatch = envContent.match(/MONGODB_URI=(.+)/);
+        if (mongoMatch) {
+          mongoUri = mongoMatch[1].trim();
+        }
+      }
+    }
+    
+    if (!mongoUri) {
+      console.error('❌ MONGODB_URI not found in environment variables or .env file');
+      console.error('   Please set MONGODB_URI environment variable or add it to backend-services/.env');
+      process.exit(1);
+    }
+    
     await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
 
