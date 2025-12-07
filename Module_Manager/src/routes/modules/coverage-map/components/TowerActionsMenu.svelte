@@ -121,6 +121,24 @@
       return false; // Default to enabled on error
     }
   }
+
+  // Get formatted site type name for menu labels
+  function getSiteTypeLabel(siteType: string | undefined | null): string {
+    if (!siteType) return 'Tower';
+    
+    const typeMap: Record<string, string> = {
+      'tower': 'Tower',
+      'noc': 'NOC',
+      'warehouse': 'Warehouse',
+      'building': 'Building',
+      'pole': 'Pole',
+      'internet-access': 'Internet Access',
+      'internet': 'Internet',
+      'other': 'Site'
+    };
+    
+    return typeMap[siteType.toLowerCase()] || siteType.charAt(0).toUpperCase() + siteType.slice(1);
+  }
 </script>
 
 <svelte:window onclick={handleClickOutside} />
@@ -145,7 +163,7 @@
     onclick={() => handleAction('edit-site')}
   >
     <span class="menu-icon">✏️</span>
-    <span>Edit Tower Site</span>
+    <span>Edit {getSiteTypeLabel(tower?.type)}</span>
   </button>
   
   <button 

@@ -1023,8 +1023,20 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         break;
       case 'view-details':
         if (tower) {
-          success = `Viewing ${tower.name}`;
-          setTimeout(() => success = '', 3000);
+          // If in iframe (deploy/plan mode), dispatch action to parent
+          if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              source: 'coverage-map',
+              type: 'object-action',
+              objectId: tower.id,
+              action: 'view-details',
+              data: { tower }
+            }, '*');
+          } else {
+            // Standalone mode - just show message
+            success = `Viewing ${tower.name}`;
+            setTimeout(() => success = '', 3000);
+          }
         }
         break;
       case 'delete-site':
