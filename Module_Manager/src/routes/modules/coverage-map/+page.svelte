@@ -675,14 +675,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       // SharedMap already filters by visibility, but double-check here for safety
       const isPlanVisible = !activePlanIdFromState || currentVisiblePlanIds.has(String(activePlanIdFromState));
       marketingLeads = (isPlanVisible && Array.isArray(inboundMarketing)) ? [...inboundMarketing] : [];
-      console.log('[CoverageMap] Marketing leads updated from state', {
-        count: marketingLeads.length,
-        inboundMarketingCount: inboundMarketing.length,
-        hasActivePlan: !!state.activePlan,
-        activePlanId: activePlanIdFromState,
-        isPlanVisible,
-        note: 'All addresses from plan should be displayed (not limited to discovery response)'
-      });
+      // Marketing leads logging removed - was too verbose in console
     } else if (source === 'shared-map' && type === 'center-map') {
       // Handle center-map message from parent
       const { lat, lon, zoom, features } = payload || {};
