@@ -196,6 +196,63 @@ async function createSiteFromFeature(feature, planId, tenantId, user, session) {
 }
 
 /**
+ * Calculate distance between two coordinates using Haversine formula
+ */
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
+
+/**
+ * Find nearest site to a given location
+ */
+async function findNearestSite(latitude, longitude, tenantId) {
+  if (!latitude || !longitude || latitude === 0 || longitude === 0) {
+    return null;
+  }
+
+  const sites = await UnifiedSite.find({
+    tenantId,
+    location: {
+      $exists: true,
+      $ne: null
+    },
+    'location.latitude': { $exists: true, $ne: null, $ne: 0 },
+    'location.longitude': { $exists: true, $ne: null, $ne: 0 }
+  }).lean();
+
+  let nearestSite = null;
+  let minDistance = Infinity;
+
+  for (const site of sites) {
+    const siteLat = site.location?.latitude;
+    const siteLon = site.location?.longitude;
+
+    if (!siteLat || !siteLon) continue;
+
+    const distance = getDistance(latitude, longitude, siteLat, siteLon);
+
+    // Only consider sites within 5km (5000 meters)
+    if (distance < 5000 && distance < minDistance) {
+      minDistance = distance;
+      nearestSite = site;
+    }
+  }
+
+  return nearestSite;
+}
+
+/**
  * Create equipment from a plan layer feature
  */
 async function createEquipmentFromFeature(feature, planId, tenantId, user, session) {
@@ -206,6 +263,16 @@ async function createEquipmentFromFeature(feature, planId, tenantId, user, sessi
 
   const properties = feature.properties || {};
   const equipmentType = properties.type || properties.equipmentType || 'other';
+
+  // If siteId is not provided, find the nearest site
+  let siteId = properties.siteId || null;
+  if (!siteId) {
+    const nearestSite = await findNearestSite(latitude, longitude, tenantId);
+    if (nearestSite) {
+      siteId = nearestSite._id;
+      console.log(`📍 Auto-assigned siteId ${siteId} (${nearestSite.name}) to equipment at (${latitude}, ${longitude})`);
+    }
+  }
 
   const equipment = new NetworkEquipment({
     tenantId,
@@ -221,7 +288,7 @@ async function createEquipmentFromFeature(feature, planId, tenantId, user, sessi
       longitude,
       address: properties.address || properties.location?.address || ''
     },
-    siteId: properties.siteId || null,
+    siteId: siteId,
     inventoryId: properties.inventoryId,
     notes: properties.notes,
     planId: null,
