@@ -6,7 +6,7 @@
  */
 
 const mongoose = require('mongoose');
-require('dotenv').config({ path: '../../.env' });
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const { UnifiedSite } = require('../models/network');
 
@@ -27,11 +27,22 @@ const FAKE_SITE_NAMES = [
   'Customer Site B'
 ];
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/wisptools';
-
 async function connectDB() {
   try {
-    await mongoose.connect(MONGODB_URI);
+    let mongoUri;
+    try {
+      const appConfig = require('../config/app');
+      mongoUri = appConfig.mongodb.uri || process.env.MONGODB_URI;
+    } catch (e) {
+      mongoUri = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+    }
+    
+    if (!mongoUri) {
+      console.error('❌ MONGODB_URI not found in config or environment variables');
+      process.exit(1);
+    }
+    
+    await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
