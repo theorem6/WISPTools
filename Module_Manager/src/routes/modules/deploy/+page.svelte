@@ -741,12 +741,12 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         </button>
         <button 
           class="module-control-btn" 
-          class:disabled={buttonsDisabled || lteSectorCount === 0}
+          class:disabled={buttonsDisabled}
           onclick={() => {
             console.log('[Deploy] PCI button clicked');
             openPCIPlanner();
           }} 
-          title={lteSectorCount === 0 ? "PCI Planner - No LTE sectors found. Add LTE sectors to use this planner." : (isAdmin ? "PCI Planner (Admin)" : ($currentTenant ? "PCI Planner" : "PCI Planner (No tenant selected)"))}
+          title={isAdmin ? `PCI Planner (Admin) - ${lteSectorCount} LTE sectors` : ($currentTenant ? `PCI Planner - ${lteSectorCount} LTE sectors` : "PCI Planner (No tenant selected)")}
         >
           <span class="control-icon">📊</span>
           <span class="control-label">PCI {lteSectorCount > 0 ? `(${lteSectorCount})` : ''}</span>
@@ -754,12 +754,12 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
         <button 
           class="module-control-btn" 
-          class:disabled={buttonsDisabled || frequencySectorCount === 0}
+          class:disabled={buttonsDisabled}
           onclick={() => {
             console.log('[Deploy] Frequency button clicked');
             openFrequencyPlanner();
           }} 
-          title={frequencySectorCount === 0 ? "Frequency Planner - No LTE or FWA sectors found. Add LTE or FWA sectors to use this planner." : (isAdmin ? "Frequency Planner (Admin)" : ($currentTenant ? "Frequency Planner" : "Frequency Planner (No tenant selected)"))}
+          title={isAdmin ? `Frequency Planner (Admin) - ${frequencySectorCount} LTE/FWA sectors` : ($currentTenant ? `Frequency Planner - ${frequencySectorCount} LTE/FWA sectors` : "Frequency Planner (No tenant selected)")}
         >
           <span class="control-icon">📡</span>
           <span class="control-label">Frequency {frequencySectorCount > 0 ? `(${frequencySectorCount})` : ''}</span>
