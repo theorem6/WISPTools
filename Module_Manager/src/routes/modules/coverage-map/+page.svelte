@@ -1035,36 +1035,28 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             
             if (typeof window !== 'undefined' && window.parent) {
               try {
-                // Try calling global handler directly first (most reliable)
-                const hasGlobalHandler = !!(window.parent as any).__deployHandleViewInventory;
-                console.log('[CoverageMap] 🔥 Checking for global handler:', {
-                  hasGlobalHandler,
-                  parentType: typeof window.parent,
-                  canAccess: window.parent !== window
-                });
-                
-                if (hasGlobalHandler) {
-                  console.log('[CoverageMap] 🔥🔥🔥 CALLING GLOBAL HANDLER DIRECTLY with tower:', tower);
-                  try {
+                // ALWAYS try calling global handler first (most reliable)
+                console.log('[CoverageMap] 🔥🔥🔥 Attempting to call global handler...');
+                try {
+                  // Try to call it - if it doesn't exist, catch the error
+                  if (typeof (window.parent as any).__deployHandleViewInventory === 'function') {
+                    console.log('[CoverageMap] 🔥🔥🔥 GLOBAL HANDLER EXISTS - CALLING IT NOW!');
                     (window.parent as any).__deployHandleViewInventory(tower);
-                    console.log('[CoverageMap] 🔥🔥🔥 Global handler call completed');
-                  } catch (err) {
-                    console.error('[CoverageMap] 🔥🔥🔥 Error calling global handler:', err);
+                    console.log('[CoverageMap] 🔥🔥🔥 Global handler call SUCCEEDED - modal should be open!');
+                    // Still send message as backup, but handler should have already opened modal
+                  } else {
+                    console.warn('[CoverageMap] ⚠️ Global handler not found or not a function');
                   }
-                } else {
-                  console.warn('[CoverageMap] ⚠️ Global handler NOT FOUND on window.parent');
+                } catch (handlerErr: any) {
+                  console.error('[CoverageMap] ❌ Error calling global handler:', handlerErr);
+                  // Continue to message fallback
                 }
                 
-                // Send to parent window
+                // Send to parent window as backup
                 window.parent.postMessage(message, '*');
-                console.log('[CoverageMap] ✅ Successfully sent view-inventory message to parent', { 
-                  objectId: tower.id, 
-                  tower,
-                  message,
-                  targetOrigin: '*',
-                  parentLocation: window.parent.location?.href || 'N/A',
-                  isSameOrigin: window.parent === window,
-                  hasGlobalHandler
+                console.log('[CoverageMap] ✅ Also sent view-inventory message to parent (backup)', { 
+                  objectId: tower.id,
+                  hasGlobalHandler: typeof (window.parent as any).__deployHandleViewInventory === 'function'
                 });
                 
                 // Also try sending to top window in case of nested iframes
