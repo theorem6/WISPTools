@@ -173,30 +173,53 @@
   }
   
   async function loadHardwareDeployments() {
-    if (!tenantId) return;
+    if (!tenantId) {
+      console.warn('[SNMP Devices] Cannot load hardware deployments: no tenantId');
+      return;
+    }
     
     loadingHardware = true;
     hardwareDeployments = [];
     hardwareDeploymentsBySite = new Map();
     
     try {
+      console.log(`[SNMP Devices] Loading hardware deployments for tenant: ${tenantId}`);
       // Load all hardware deployments for the tenant
       const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
-      console.log(`[SNMP Devices] Loaded ${allDeployments.length} total hardware deployments from API`);
+      console.log(`[SNMP Devices] API returned ${allDeployments?.length || 0} hardware deployments`, allDeployments);
       
       // Don't filter by status - include all hardware deployments
       // The user can link to any hardware deployment, not just "deployed" ones
-      hardwareDeployments = allDeployments;
+      hardwareDeployments = allDeployments || [];
       
       console.log(`[SNMP Devices] Using all ${hardwareDeployments.length} hardware deployments (no status filter)`);
       
+      if (hardwareDeployments.length === 0) {
+        console.warn('[SNMP Devices] No hardware deployments found. This could mean:');
+        console.warn('  1. No hardware has been deployed yet');
+        console.warn('  2. Hardware deployments exist but are not associated with this tenant');
+        console.warn('  3. The API endpoint is not returning data correctly');
+        loadingHardware = false;
+        return;
+      }
+      
       // Group by site - need to load sites to get site names
+      console.log(`[SNMP Devices] Loading sites to group hardware deployments...`);
       const sites = await coverageMapService.getTowerSites(tenantId);
-      const sitesMap = new Map(sites.map((s: any) => [String(s.id || s._id), s]));
+      console.log(`[SNMP Devices] Loaded ${sites?.length || 0} sites`);
+      const sitesMap = new Map((sites || []).map((s: any) => [String(s.id || s._id), s]));
       
       hardwareDeploymentsBySite = new Map();
+      let deploymentsWithoutSite = 0;
+      
       for (const deployment of hardwareDeployments) {
-        const siteId = String(deployment.siteId?._id || deployment.siteId?.id || deployment.siteId || 'unknown');
+        const siteId = String(deployment.siteId?._id || deployment.siteId?.id || deployment.siteId || '');
+        if (!siteId || siteId === 'unknown' || siteId === 'null' || siteId === 'undefined') {
+          deploymentsWithoutSite++;
+          console.warn('[SNMP Devices] Deployment without siteId:', deployment.name || deployment._id, deployment);
+          continue;
+        }
+        
         const site = sitesMap.get(siteId);
         const siteName = site?.name || deployment.siteId?.name || 'Unknown Site';
         
@@ -211,9 +234,21 @@
         });
       }
       
-      console.log(`[SNMP Devices] Loaded ${hardwareDeployments.length} hardware deployments across ${hardwareDeploymentsBySite.size} sites`);
+      if (deploymentsWithoutSite > 0) {
+        console.warn(`[SNMP Devices] ${deploymentsWithoutSite} deployments have no siteId and were skipped`);
+      }
+      
+      console.log(`[SNMP Devices] Grouped ${hardwareDeployments.length} hardware deployments across ${hardwareDeploymentsBySite.size} sites`);
+      if (hardwareDeploymentsBySite.size > 0) {
+        console.log(`[SNMP Devices] Sites with hardware:`, Array.from(hardwareDeploymentsBySite.keys()));
+      }
     } catch (err: any) {
       console.error('[SNMP Devices] Error loading hardware deployments:', err);
+      console.error('[SNMP Devices] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        tenantId
+      });
     } finally {
       loadingHardware = false;
     }
