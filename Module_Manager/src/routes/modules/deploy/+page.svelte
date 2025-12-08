@@ -218,25 +218,18 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         window.addEventListener('message', directMessageHandler, false);
         console.log('[Deploy] ✅ Direct message listener attached to WINDOW as fallback');
         
-        // Also try a global handler that we can call from anywhere
+        // Update the global handler to ensure it uses the latest component state
+        // The handler was already set at component load, but we update it here to ensure it has access to mapContainer
         (window as any).__deployHandleViewInventory = (tower: any) => {
-          console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED with tower:', tower);
-          console.log('[Deploy] 🔥🔥🔥 Tower data:', JSON.stringify(tower, null, 2));
+          console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED FROM ONMOUNT with tower:', tower);
           if (tower) {
-            console.log('[Deploy] 🔥🔥🔥 Setting modal state...');
-            selectedSiteForEquipment = { ...tower }; // Create copy for reactivity
+            selectedSiteForEquipment = { ...tower };
             showSiteEquipmentModal = true;
-            console.log('[Deploy] 🔥🔥🔥 Modal state set:', {
-              show: showSiteEquipmentModal,
-              hasSite: !!selectedSiteForEquipment,
-              siteName: selectedSiteForEquipment?.name,
-              siteId: selectedSiteForEquipment?.id
-            });
+            console.log('[Deploy] 🔥🔥🔥 Modal opened via onMount global handler');
             
-            // Also center map on location
+            // Center map on location
             const siteLocation = tower.location;
             if (siteLocation?.latitude && siteLocation?.longitude) {
-              console.log('[Deploy] 🔥🔥🔥 Centering map on site location');
               const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
               if (iframe?.contentWindow) {
                 iframe.contentWindow.postMessage({
@@ -250,11 +243,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                 }, '*');
               }
             }
-          } else {
-            console.error('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED BUT TOWER IS NULL/UNDEFINED!');
           }
         };
-        console.log('[Deploy] 🔥🔥🔥 Global handler __deployHandleViewInventory SET on window:', typeof (window as any).__deployHandleViewInventory);
+        console.log('[Deploy] 🔥🔥🔥 Global handler updated in onMount:', typeof (window as any).__deployHandleViewInventory);
         
         // Store handler for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;
