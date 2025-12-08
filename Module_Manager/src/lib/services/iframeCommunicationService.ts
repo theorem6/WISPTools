@@ -32,8 +32,12 @@ export class IframeCommunicationService {
     this.iframe = iframe;
     this.moduleContext = context;
     
+    // Bind the handler once and store it for cleanup
+    this.boundMessageHandler = this.handleMessage.bind(this);
+    
     // Listen for messages from the iframe
-    window.addEventListener('message', this.handleMessage.bind(this));
+    window.addEventListener('message', this.boundMessageHandler);
+    console.log('[IframeCommunicationService] Initialized and listening for messages from iframe:', iframe.src);
     
     // Send initial context to iframe
     this.sendMessage({
@@ -89,13 +93,24 @@ export class IframeCommunicationService {
    * Handle messages from iframe
    */
   private handleMessage(event: MessageEvent): void {
-    if (!event.data || typeof event.data !== 'object') return;
+    // Log all messages for debugging
+    if (event.data && typeof event.data === 'object' && event.data.type === 'object-action') {
+      console.log('[IframeCommunicationService] Received message event:', {
+        data: event.data,
+        origin: event.origin,
+        source: event.source
+      });
+    }
+    
+    if (!event.data || typeof event.data !== 'object') {
+      return;
+    }
     
     const message: IframeMessage = event.data;
     
     // Debug logging for object-action messages
     if (message.type === 'object-action') {
-      console.log('[IframeCommunicationService] Received object-action message:', message);
+      console.log('[IframeCommunicationService] Processing object-action message:', message);
     }
     
     switch (message.type) {
@@ -109,6 +124,7 @@ export class IframeCommunicationService {
         break;
         
       case 'object-action':
+        console.log('[IframeCommunicationService] Calling handleObjectAction with:', message);
         this.handleObjectAction(message);
         break;
     }
@@ -209,9 +225,13 @@ export class IframeCommunicationService {
    * Cleanup
    */
   destroy(): void {
-    window.removeEventListener('message', this.handleMessage.bind(this));
+    if (this.boundMessageHandler) {
+      window.removeEventListener('message', this.boundMessageHandler);
+      this.boundMessageHandler = null;
+    }
     this.messageHandlers.clear();
     this.iframe = null;
+    console.log('[IframeCommunicationService] Destroyed and removed message listener');
   }
 }
 
