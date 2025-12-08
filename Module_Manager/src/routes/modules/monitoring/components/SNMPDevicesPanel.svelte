@@ -42,17 +42,9 @@
       
       const token = await user.getIdToken();
       
-      // Load discovered devices and deployments in parallel
+      // Load discovered devices
       // Use monitoringService which handles routing through Firebase Hosting
-      const [discoveredResult, deploymentsResponse] = await Promise.all([
-        monitoringService.getDiscoveredDevices().catch(() => ({ success: false, data: { devices: [] } })),
-        fetch(`${API_CONFIG.PATHS.NETWORK}/deployments`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId
-          }
-        }).catch(() => ({ ok: false })) // Deployment API might not exist, that's ok
-      ]);
+      const discoveredResult = await monitoringService.getDiscoveredDevices().catch(() => ({ success: false, data: { devices: [] } }));
       
       if (discoveredResult.success && discoveredResult.data?.devices) {
         console.log('[SNMP Devices] Raw API response:', discoveredResult.data.devices.slice(0, 3)); // Log first 3 devices

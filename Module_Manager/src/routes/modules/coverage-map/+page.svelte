@@ -973,7 +973,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   function handleTowerAction(event: CustomEvent) {
     const { action, tower } = event.detail;
     
-    // console.log('[CoverageMap] handleTowerAction called', { action, tower });
+    console.log('[CoverageMap] handleTowerAction called', { action, tower, hasTower: !!tower });
     
     // Guard: ensure tower exists
     if (!tower && action !== 'add-site') {
