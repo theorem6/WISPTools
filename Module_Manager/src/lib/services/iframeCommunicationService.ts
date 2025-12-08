@@ -96,20 +96,28 @@ export class IframeCommunicationService {
    * Handle messages from iframe
    */
   private handleMessage(event: MessageEvent): void {
-    // Log ALL messages for debugging
-    console.log('[IframeCommunicationService] Received message event:', {
-      data: event.data,
-      type: event.data?.type,
-      origin: event.origin,
-      source: event.source
-    });
+    // Log ALL messages for debugging (but filter out noise)
+    if (event.data && typeof event.data === 'object' && 
+        (event.data.type === 'object-action' || event.data.source === 'coverage-map')) {
+      console.log('[IframeCommunicationService] 🔵 Received relevant message event:', {
+        data: event.data,
+        type: event.data?.type,
+        source: event.data?.source,
+        origin: event.origin,
+        hasSource: !!event.source
+      });
+    }
     
     if (!event.data || typeof event.data !== 'object') {
-      console.log('[IframeCommunicationService] Message data is not an object, ignoring');
       return;
     }
     
     const message: IframeMessage = event.data;
+    
+    // Accept messages from coverage-map source or messages with object-action type
+    if (message.source && message.source !== 'coverage-map' && message.source !== 'shared-map') {
+      return; // Ignore messages from other sources
+    }
     
     // Debug logging for object-action messages
     if (message.type === 'object-action') {

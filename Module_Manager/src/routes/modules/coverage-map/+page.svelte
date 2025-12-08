@@ -1024,17 +1024,24 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           if (isEmbedded) {
             // Send message to parent in the format expected by iframeCommunicationService
             const message = {
+              source: 'coverage-map', // Add source to help message routing
               type: 'object-action',
               objectId: tower.id,
               action: 'view-inventory',
               data: { tower }
             };
             console.log('[CoverageMap] 🔵 Embedded mode detected - sending message to parent:', message);
+            console.log('[CoverageMap] 🔵 Message will be sent to:', window.parent?.location?.href || 'parent window');
             
             if (typeof window !== 'undefined' && window.parent) {
               try {
                 window.parent.postMessage(message, '*');
-                console.log('[CoverageMap] ✅ Successfully sent view-inventory message to parent', { objectId: tower.id, tower });
+                console.log('[CoverageMap] ✅ Successfully sent view-inventory message to parent', { 
+                  objectId: tower.id, 
+                  tower,
+                  message,
+                  targetOrigin: '*'
+                });
                 // DO NOT navigate - we're in embedded mode, parent will handle it
                 return; // Exit early to prevent navigation
               } catch (err) {

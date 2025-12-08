@@ -140,10 +140,20 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         
         // Also add a direct message listener as a fallback
         const directMessageHandler = (event: MessageEvent) => {
-          console.log('[Deploy] 🔵 Direct message listener received:', event.data, event.origin);
+          // Only log messages that might be from the coverage map
+          if (event.data && typeof event.data === 'object' && 
+              (event.data.type === 'object-action' || event.data.source === 'coverage-map')) {
+            console.log('[Deploy] 🔵 Direct message listener received:', {
+              data: event.data,
+              type: event.data?.type,
+              source: event.data?.source,
+              origin: event.origin
+            });
+          }
+          
           // If the iframeCommunicationService doesn't catch it, handle it directly
           if (event.data && event.data.type === 'object-action' && event.data.action === 'view-inventory') {
-            console.log('[Deploy] 🔵 Directly handling view-inventory message');
+            console.log('[Deploy] 🔵 Directly handling view-inventory message via fallback listener');
             const fakeEvent = new CustomEvent('iframe-object-action', {
               detail: {
                 objectId: event.data.objectId,
@@ -157,6 +167,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         };
         window.addEventListener('message', directMessageHandler);
         console.log('[Deploy] ✅ Direct message listener attached as fallback');
+        
+        // Store handler for cleanup
+        (window as any).__deployDirectMessageHandler = directMessageHandler;
       } else {
         console.warn('[Deploy] ❌ Iframe not found in mapContainer');
       }
