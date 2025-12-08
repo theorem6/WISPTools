@@ -1002,18 +1002,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         break;
       case 'view-inventory':
         if (tower) {
+          console.log('[CoverageMap] Handling view-inventory action', { tower, isIframe: typeof window !== 'undefined' && window.parent && window.parent !== window });
           // If in iframe (deploy/plan mode), dispatch action to parent
           if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
             // Send message to parent in the format expected by iframeCommunicationService
-            window.parent.postMessage({
+            const message = {
               type: 'object-action',
               objectId: tower.id,
               action: 'view-inventory',
               data: { tower }
-            }, '*');
+            };
+            console.log('[CoverageMap] Sending view-inventory message to parent:', message);
+            window.parent.postMessage(message, '*');
             console.log('[CoverageMap] Sent view-inventory action to parent', { objectId: tower.id, tower });
           } else {
             // Standalone mode - navigate to inventory
+            console.log('[CoverageMap] Not in iframe, navigating to inventory');
             goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
           }
         }

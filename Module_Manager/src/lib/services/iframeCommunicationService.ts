@@ -138,10 +138,11 @@ export class IframeCommunicationService {
     const { objectId, action, data } = message;
     if (!objectId || !action) return;
     
-    // Read-only actions like view-details don't need permission checks
-    const readOnlyActions = ['view-details', 'view-inventory'];
+    // Read-only actions don't need permission checks
+    const readOnlyActions = ['view-details', 'view-inventory', 'view-all-equipment'];
     if (readOnlyActions.includes(action)) {
       // Immediately allow read-only actions
+      console.log(`[IframeCommunicationService] Allowing read-only action '${action}' for object ${objectId}`);
       this.onObjectActionAllowed(objectId, action, data);
       return;
     }

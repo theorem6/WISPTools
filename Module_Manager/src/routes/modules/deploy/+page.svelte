@@ -204,13 +204,16 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       
       // Handle view-inventory action - open site equipment modal
       if (action === 'view-inventory' && objectId) {
+        console.log('[Deploy] Handling view-inventory action for object:', objectId, 'with data:', data);
         try {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           const tenantId = $currentTenant?.id;
           // First check if tower data is provided in the event
           if (data?.tower) {
+            console.log('[Deploy] Using tower data from event for equipment modal:', data.tower);
             selectedSiteForEquipment = data.tower;
             showSiteEquipmentModal = true;
+            console.log('[Deploy] SiteEquipmentModal should now be visible:', showSiteEquipmentModal);
           } else if (tenantId) {
             // Fall back to fetching from database
             const sites = await coverageMapService.getTowerSites(tenantId);
