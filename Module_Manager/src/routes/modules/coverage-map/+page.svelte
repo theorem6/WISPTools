@@ -1002,9 +1002,24 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         break;
       case 'view-inventory':
         if (tower) {
-          console.log('[CoverageMap] Handling view-inventory action', { tower, isIframe: typeof window !== 'undefined' && window.parent && window.parent !== window });
-          // If in iframe (deploy/plan mode), dispatch action to parent
-          if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+          // Check if we're in deploy/plan mode (embedded in iframe)
+          const isIframe = typeof window !== 'undefined' && window.parent && window.parent !== window;
+          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+          const isDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+          const isPlanMode = urlParams?.get('planMode') === 'true' || urlParams?.get('mode') === 'plan';
+          const shouldSendToParent = isIframe || isDeployMode || isPlanMode;
+          
+          console.log('[CoverageMap] Handling view-inventory action', { 
+            tower, 
+            isIframe, 
+            isDeployMode, 
+            isPlanMode, 
+            shouldSendToParent,
+            url: typeof window !== 'undefined' ? window.location.href : 'N/A'
+          });
+          
+          // If in iframe or deploy/plan mode, dispatch action to parent
+          if (shouldSendToParent && typeof window !== 'undefined' && window.parent) {
             // Send message to parent in the format expected by iframeCommunicationService
             const message = {
               type: 'object-action',
@@ -1013,11 +1028,15 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
               data: { tower }
             };
             console.log('[CoverageMap] Sending view-inventory message to parent:', message);
-            window.parent.postMessage(message, '*');
-            console.log('[CoverageMap] Sent view-inventory action to parent', { objectId: tower.id, tower });
+            try {
+              window.parent.postMessage(message, '*');
+              console.log('[CoverageMap] ✅ Sent view-inventory action to parent', { objectId: tower.id, tower });
+            } catch (err) {
+              console.error('[CoverageMap] ❌ Failed to send message to parent:', err);
+            }
           } else {
             // Standalone mode - navigate to inventory
-            console.log('[CoverageMap] Not in iframe, navigating to inventory');
+            console.log('[CoverageMap] Not in iframe/deploy/plan mode, navigating to inventory');
             goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
           }
         }
