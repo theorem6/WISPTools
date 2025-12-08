@@ -167,6 +167,30 @@
         }, '*');
         console.log('[SharedMap] Rectangle-drawn message forwarded to parent window');
       }
+    } else if (type === 'object-action') {
+      // Forward object-action messages to parent window (Deploy/Plan module)
+      console.log('[SharedMap] 🔥 Forwarding object-action message to parent:', event.data);
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          source: 'coverage-map',
+          type: 'object-action',
+          objectId: event.data.objectId,
+          action: event.data.action,
+          data: event.data.data
+        }, '*');
+        console.log('[SharedMap] 🔥✅ Object-action message forwarded to parent window');
+        
+        // Also try calling global handler if it exists
+        if (typeof (window.parent as any).__deployHandleViewInventory === 'function' && event.data.action === 'view-inventory' && event.data.data?.tower) {
+          console.log('[SharedMap] 🔥🔥🔥 Also calling global handler directly');
+          try {
+            (window.parent as any).__deployHandleViewInventory(event.data.data.tower);
+            console.log('[SharedMap] 🔥🔥🔥 Global handler call succeeded');
+          } catch (err) {
+            console.error('[SharedMap] Error calling global handler:', err);
+          }
+        }
+      }
     }
   };
 
