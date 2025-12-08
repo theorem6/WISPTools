@@ -156,8 +156,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
 
   async function handleIframeObjectAction(event: Event) {
+    console.log('[Deploy] 🔵 handleIframeObjectAction EVENT RECEIVED:', event);
     const detail = (event as CustomEvent).detail;
-    console.log('[Deploy] handleIframeObjectAction called with:', detail);
+    console.log('[Deploy] 🔵 handleIframeObjectAction called with detail:', detail);
     if (!detail) {
       console.warn('[Deploy] handleIframeObjectAction called without detail');
       return;

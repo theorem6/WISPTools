@@ -94,16 +94,16 @@ export class IframeCommunicationService {
    * Handle messages from iframe
    */
   private handleMessage(event: MessageEvent): void {
-    // Log all messages for debugging
-    if (event.data && typeof event.data === 'object' && event.data.type === 'object-action') {
-      console.log('[IframeCommunicationService] Received message event:', {
-        data: event.data,
-        origin: event.origin,
-        source: event.source
-      });
-    }
+    // Log ALL messages for debugging
+    console.log('[IframeCommunicationService] Received message event:', {
+      data: event.data,
+      type: event.data?.type,
+      origin: event.origin,
+      source: event.source
+    });
     
     if (!event.data || typeof event.data !== 'object') {
+      console.log('[IframeCommunicationService] Message data is not an object, ignoring');
       return;
     }
     
@@ -111,7 +111,7 @@ export class IframeCommunicationService {
     
     // Debug logging for object-action messages
     if (message.type === 'object-action') {
-      console.log('[IframeCommunicationService] Processing object-action message:', message);
+      console.log('[IframeCommunicationService] ✅ Processing object-action message:', message);
     }
     
     switch (message.type) {
@@ -125,9 +125,12 @@ export class IframeCommunicationService {
         break;
         
       case 'object-action':
-        console.log('[IframeCommunicationService] Calling handleObjectAction with:', message);
+        console.log('[IframeCommunicationService] ✅ Calling handleObjectAction with:', message);
         this.handleObjectAction(message);
         break;
+        
+      default:
+        console.log('[IframeCommunicationService] Unknown message type:', message.type);
     }
   }
 
