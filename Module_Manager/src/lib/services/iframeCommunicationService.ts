@@ -30,6 +30,7 @@ export class IframeCommunicationService {
    * Initialize communication with the coverage map iframe
    */
   initialize(iframe: HTMLIFrameElement, context: ModuleContext): void {
+    console.log('[IframeCommunicationService] 🔵 Initializing with iframe:', iframe.src, 'context:', context);
     this.iframe = iframe;
     this.moduleContext = context;
     
@@ -38,7 +39,8 @@ export class IframeCommunicationService {
     
     // Listen for messages from the iframe
     window.addEventListener('message', this.boundMessageHandler);
-    console.log('[IframeCommunicationService] Initialized and listening for messages from iframe:', iframe.src);
+    console.log('[IframeCommunicationService] ✅ Message listener attached to window');
+    console.log('[IframeCommunicationService] ✅ Initialized and listening for messages from iframe:', iframe.src);
     
     // Send initial context to iframe
     this.sendMessage({

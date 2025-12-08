@@ -126,16 +126,39 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         return;
       }
 
+      // Wait a bit for iframe to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
-        console.log('[Deploy] Found iframe, initializing iframeCommunicationService:', iframe.src);
+        console.log('[Deploy] ✅ Found iframe, initializing iframeCommunicationService:', iframe.src);
         iframeCommunicationService.initialize(iframe, moduleContext);
         iframeReady = true;
         window.addEventListener('iframe-object-action', handleIframeObjectAction);
         iframeListenerAttached = true;
-        console.log('[Deploy] Iframe communication initialized and event listener attached');
+        console.log('[Deploy] ✅ Iframe communication initialized and event listener attached');
+        
+        // Also add a direct message listener as a fallback
+        const directMessageHandler = (event: MessageEvent) => {
+          console.log('[Deploy] 🔵 Direct message listener received:', event.data, event.origin);
+          // If the iframeCommunicationService doesn't catch it, handle it directly
+          if (event.data && event.data.type === 'object-action' && event.data.action === 'view-inventory') {
+            console.log('[Deploy] 🔵 Directly handling view-inventory message');
+            const fakeEvent = new CustomEvent('iframe-object-action', {
+              detail: {
+                objectId: event.data.objectId,
+                action: event.data.action,
+                data: event.data.data,
+                allowed: true
+              }
+            });
+            handleIframeObjectAction(fakeEvent);
+          }
+        };
+        window.addEventListener('message', directMessageHandler);
+        console.log('[Deploy] ✅ Direct message listener attached as fallback');
       } else {
-        console.warn('[Deploy] Iframe not found in mapContainer');
+        console.warn('[Deploy] ❌ Iframe not found in mapContainer');
       }
 
       mapLayerManager.setMode('deploy');
