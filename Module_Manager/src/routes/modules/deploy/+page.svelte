@@ -181,13 +181,41 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         
         // Also try a global handler that we can call from anywhere
         (window as any).__deployHandleViewInventory = (tower: any) => {
-          console.log('[Deploy] 🔥 GLOBAL HANDLER CALLED with tower:', tower);
+          console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED with tower:', tower);
+          console.log('[Deploy] 🔥🔥🔥 Tower data:', JSON.stringify(tower, null, 2));
           if (tower) {
-            selectedSiteForEquipment = tower;
+            console.log('[Deploy] 🔥🔥🔥 Setting modal state...');
+            selectedSiteForEquipment = { ...tower }; // Create copy for reactivity
             showSiteEquipmentModal = true;
-            console.log('[Deploy] 🔥 Modal opened via global handler');
+            console.log('[Deploy] 🔥🔥🔥 Modal state set:', {
+              show: showSiteEquipmentModal,
+              hasSite: !!selectedSiteForEquipment,
+              siteName: selectedSiteForEquipment?.name,
+              siteId: selectedSiteForEquipment?.id
+            });
+            
+            // Also center map on location
+            const siteLocation = tower.location;
+            if (siteLocation?.latitude && siteLocation?.longitude) {
+              console.log('[Deploy] 🔥🔥🔥 Centering map on site location');
+              const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+              if (iframe?.contentWindow) {
+                iframe.contentWindow.postMessage({
+                  source: 'shared-map',
+                  type: 'center-map-on-location',
+                  payload: {
+                    lat: siteLocation.latitude,
+                    lon: siteLocation.longitude,
+                    zoom: 14
+                  }
+                }, '*');
+              }
+            }
+          } else {
+            console.error('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED BUT TOWER IS NULL/UNDEFINED!');
           }
         };
+        console.log('[Deploy] 🔥🔥🔥 Global handler __deployHandleViewInventory SET on window:', typeof (window as any).__deployHandleViewInventory);
         
         // Store handler for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;

@@ -1036,9 +1036,23 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             if (typeof window !== 'undefined' && window.parent) {
               try {
                 // Try calling global handler directly first (most reliable)
-                if ((window.parent as any).__deployHandleViewInventory) {
-                  console.log('[CoverageMap] 🔥 Calling global handler directly');
-                  (window.parent as any).__deployHandleViewInventory(tower);
+                const hasGlobalHandler = !!(window.parent as any).__deployHandleViewInventory;
+                console.log('[CoverageMap] 🔥 Checking for global handler:', {
+                  hasGlobalHandler,
+                  parentType: typeof window.parent,
+                  canAccess: window.parent !== window
+                });
+                
+                if (hasGlobalHandler) {
+                  console.log('[CoverageMap] 🔥🔥🔥 CALLING GLOBAL HANDLER DIRECTLY with tower:', tower);
+                  try {
+                    (window.parent as any).__deployHandleViewInventory(tower);
+                    console.log('[CoverageMap] 🔥🔥🔥 Global handler call completed');
+                  } catch (err) {
+                    console.error('[CoverageMap] 🔥🔥🔥 Error calling global handler:', err);
+                  }
+                } else {
+                  console.warn('[CoverageMap] ⚠️ Global handler NOT FOUND on window.parent');
                 }
                 
                 // Send to parent window
@@ -1050,7 +1064,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
                   targetOrigin: '*',
                   parentLocation: window.parent.location?.href || 'N/A',
                   isSameOrigin: window.parent === window,
-                  hasGlobalHandler: !!(window.parent as any).__deployHandleViewInventory
+                  hasGlobalHandler
                 });
                 
                 // Also try sending to top window in case of nested iframes
