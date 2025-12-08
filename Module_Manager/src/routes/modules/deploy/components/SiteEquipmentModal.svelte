@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
+  import { auth } from '$lib/firebase';
+  import { API_CONFIG } from '$lib/config/api';
   import type { TowerSite } from '../../coverage-map/lib/models';
 
   export let show = false;
@@ -36,22 +38,128 @@
 
     try {
       const siteId = site.id || site._id;
+      console.log('[SiteEquipmentModal] Loading equipment for site:', {
+        siteName: site.name,
+        siteId: siteId,
+        siteObject: site
+      });
 
       // Load all deployed hardware at this site
       const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
-      hardwareDeployments = allDeployments.filter((d: any) => {
+      console.log('[SiteEquipmentModal] Loaded all deployments:', {
+        count: allDeployments?.length || 0,
+        deployments: allDeployments?.map((d: any) => ({
+          id: d._id || d.id,
+          name: d.name,
+          siteId: d.siteId,
+          siteIdType: typeof d.siteId,
+          siteId_id: d.siteId?._id,
+          siteId_id_type: typeof d.siteId?._id,
+          siteIdString: d.siteId ? String(d.siteId) : null
+        }))
+      });
+
+      // Also load EPC devices from RemoteEPC collection
+      let epcDevices: any[] = [];
+      const user = auth().currentUser;
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch(`${API_CONFIG.PATHS.HSS}/epc/remote/list`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Tenant-ID': tenantId
+            }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            epcDevices = (data.epcs || []).filter((epc: any) => {
+              // EPC devices have site_id or siteId field
+              const epcSiteId = epc.site_id || epc.siteId?._id || epc.siteId?.id || epc.siteId;
+              return String(epcSiteId) === String(siteId) || epc.site_name === site.name;
+            });
+            console.log('[SiteEquipmentModal] Loaded EPC devices:', {
+              count: data.epcs?.length || 0,
+              filteredCount: epcDevices.length,
+              epcDevices: epcDevices.map((e: any) => ({
+                name: e.site_name || e.name,
+                site_id: e.site_id,
+                siteId: e.siteId
+              }))
+            });
+          }
+        } catch (err) {
+          console.error('[SiteEquipmentModal] Error loading EPC devices:', err);
+        }
+      }
+
+      // Filter hardware deployments by site
+      const filteredDeployments = (allDeployments || []).filter((d: any) => {
+        // siteId can be:
+        // 1. An object with _id (populated from backend)
+        // 2. An object with id
+        // 3. A string/ObjectId
         const deploymentSiteId = d.siteId?._id || d.siteId?.id || d.siteId;
-        return String(deploymentSiteId) === String(siteId);
+        const matches = String(deploymentSiteId) === String(siteId);
+        
+        if (!matches && deploymentSiteId) {
+          console.log('[SiteEquipmentModal] Deployment does not match:', {
+            deploymentName: d.name,
+            deploymentSiteId: deploymentSiteId,
+            deploymentSiteIdType: typeof deploymentSiteId,
+            targetSiteId: siteId,
+            targetSiteIdType: typeof siteId,
+            siteIdObject: d.siteId
+          });
+        }
+        
+        return matches;
+      });
+
+      // Combine hardware deployments with EPC devices
+      hardwareDeployments = [
+        ...filteredDeployments,
+        ...epcDevices.map((epc: any) => ({
+          _id: epc.epcId || epc.id || epc._id,
+          id: epc.epcId || epc.id || epc._id,
+          name: epc.site_name || epc.name || 'EPC Device',
+          hardware_type: 'epc',
+          status: epc.status || 'deployed',
+          siteId: epc.site_id || epc.siteId,
+          config: {
+            ipAddress: epc.ipAddress,
+            device_code: epc.device_code
+          },
+          deployedAt: epc.createdAt || epc.deployedAt,
+          isEPC: true
+        }))
+      ];
+
+      console.log('[SiteEquipmentModal] Filtered hardware deployments:', {
+        count: hardwareDeployments.length,
+        deployments: hardwareDeployments.map((d: any) => ({
+          name: d.name,
+          siteId: d.siteId?._id || d.siteId?.id || d.siteId
+        }))
       });
 
       // Load equipment at this site
       const allEquipment = await coverageMapService.getEquipment(tenantId);
-      equipment = allEquipment.filter((eq: any) => {
+      console.log('[SiteEquipmentModal] Loaded all equipment:', {
+        count: allEquipment?.length || 0
+      });
+      
+      equipment = (allEquipment || []).filter((eq: any) => {
         const eqSiteId = eq.siteId?._id || eq.siteId?.id || eq.siteId;
         return String(eqSiteId) === String(siteId);
       });
+
+      console.log('[SiteEquipmentModal] Final results:', {
+        hardwareDeployments: hardwareDeployments.length,
+        equipment: equipment.length
+      });
     } catch (err: any) {
-      console.error('Error loading equipment:', err);
+      console.error('[SiteEquipmentModal] Error loading equipment:', err);
       error = err.message || 'Failed to load equipment';
     } finally {
       isLoading = false;
