@@ -1005,8 +1005,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           // Check if we're in deploy/plan mode (embedded in iframe)
           const isIframe = typeof window !== 'undefined' && window.parent && window.parent !== window;
           const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-          const checkDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy' || isDeployMode;
-          const checkPlanMode = urlParams?.get('planMode') === 'true' || urlParams?.get('mode') === 'plan' || isPlanMode;
+          // Use reactive variables from component scope
+          const checkDeployMode = isDeployMode || urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+          const checkPlanMode = isPlanMode || urlParams?.get('planMode') === 'true' || urlParams?.get('mode') === 'plan';
           const isEmbedded = isIframe || checkDeployMode || checkPlanMode;
           
           console.log('[CoverageMap] Handling view-inventory action', { 
