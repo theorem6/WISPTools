@@ -138,22 +138,27 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         iframeListenerAttached = true;
         console.log('[Deploy] ✅ Iframe communication initialized and event listener attached');
         
-        // Also add a direct message listener as a fallback
+        // Also add a direct message listener as a fallback - MUST be on window, not iframe
         const directMessageHandler = (event: MessageEvent) => {
-          // Only log messages that might be from the coverage map
-          if (event.data && typeof event.data === 'object' && 
-              (event.data.type === 'object-action' || event.data.source === 'coverage-map')) {
-            console.log('[Deploy] 🔵 Direct message listener received:', {
+          // Log ALL messages to see what we're getting
+          if (event.data && typeof event.data === 'object') {
+            console.log('[Deploy] 📨 Direct message listener received ANY message:', {
               data: event.data,
               type: event.data?.type,
               source: event.data?.source,
-              origin: event.origin
+              action: event.data?.action,
+              origin: event.origin,
+              hasSource: !!event.source
             });
           }
           
           // If the iframeCommunicationService doesn't catch it, handle it directly
-          if (event.data && event.data.type === 'object-action' && event.data.action === 'view-inventory') {
-            console.log('[Deploy] 🔵 Directly handling view-inventory message via fallback listener');
+          if (event.data && 
+              typeof event.data === 'object' &&
+              event.data.type === 'object-action' && 
+              event.data.action === 'view-inventory') {
+            console.log('[Deploy] ✅✅✅ DIRECTLY HANDLING view-inventory message via fallback listener');
+            // Call the handler directly with the correct format
             const fakeEvent = new CustomEvent('iframe-object-action', {
               detail: {
                 objectId: event.data.objectId,
@@ -162,11 +167,14 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                 allowed: true
               }
             });
+            console.log('[Deploy] ✅✅✅ Dispatching fake event:', fakeEvent.detail);
             handleIframeObjectAction(fakeEvent);
           }
         };
-        window.addEventListener('message', directMessageHandler);
-        console.log('[Deploy] ✅ Direct message listener attached as fallback');
+        
+        // CRITICAL: Add listener to window, not iframe
+        window.addEventListener('message', directMessageHandler, false);
+        console.log('[Deploy] ✅ Direct message listener attached to WINDOW as fallback');
         
         // Store handler for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;

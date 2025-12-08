@@ -1035,13 +1035,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             
             if (typeof window !== 'undefined' && window.parent) {
               try {
+                // Send to parent window
                 window.parent.postMessage(message, '*');
                 console.log('[CoverageMap] ✅ Successfully sent view-inventory message to parent', { 
                   objectId: tower.id, 
                   tower,
                   message,
-                  targetOrigin: '*'
+                  targetOrigin: '*',
+                  parentLocation: window.parent.location?.href || 'N/A',
+                  isSameOrigin: window.parent === window
                 });
+                
+                // Also try sending to top window in case of nested iframes
+                if (window.top && window.top !== window.parent) {
+                  console.log('[CoverageMap] 🔵 Also sending to top window');
+                  window.top.postMessage(message, '*');
+                }
                 // DO NOT navigate - we're in embedded mode, parent will handle it
                 return; // Exit early to prevent navigation
               } catch (err) {
