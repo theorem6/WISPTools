@@ -190,11 +190,13 @@
     try {
       // Load all hardware deployments for the tenant
       const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+      console.log(`[SNMP Devices] Loaded ${allDeployments.length} total hardware deployments from API`);
       
-      // Filter to only deployed hardware
-      hardwareDeployments = allDeployments.filter((d: any) => {
-        return d.status === 'deployed' || !d.status; // Include deployed or status undefined
-      });
+      // Don't filter by status - include all hardware deployments
+      // The user can link to any hardware deployment, not just "deployed" ones
+      hardwareDeployments = allDeployments;
+      
+      console.log(`[SNMP Devices] Using all ${hardwareDeployments.length} hardware deployments (no status filter)`);
       
       // Group by site - need to load sites to get site names
       const sites = await coverageMapService.getTowerSites(tenantId);

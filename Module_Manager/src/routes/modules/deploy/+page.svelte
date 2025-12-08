@@ -12,6 +12,7 @@
   import PlanApprovalModal from './components/PlanApprovalModal.svelte';
 import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
 import SiteDetailsModal from './components/SiteDetailsModal.svelte';
+import SiteEquipmentModal from './components/SiteEquipmentModal.svelte';
 import SiteEditModal from '../coverage-map/components/SiteEditModal.svelte';
 import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
   import SharedMap from '$lib/map/SharedMap.svelte';
@@ -66,6 +67,10 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   // Site Edit Modal
   let showSiteEditModal = false;
   let selectedSiteForEdit: any = null;
+  
+  // Site Equipment Modal
+  let showSiteEquipmentModal = false;
+  let selectedSiteForEquipment: any = null;
   
   // Sector counts for planner buttons
   let lteSectorCount = 0; // For PCI Planner (LTE only)
@@ -194,6 +199,34 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           console.error('Error loading site details:', err);
           error = 'Failed to load site details';
           setTimeout(() => (error = ''), 5000);
+        }
+      }
+      
+      // Handle view-inventory action - open site equipment modal
+      if (action === 'view-inventory' && objectId) {
+        try {
+          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+          const tenantId = $currentTenant?.id;
+          // First check if tower data is provided in the event
+          if (data?.tower) {
+            selectedSiteForEquipment = data.tower;
+            showSiteEquipmentModal = true;
+          } else if (tenantId) {
+            // Fall back to fetching from database
+            const sites = await coverageMapService.getTowerSites(tenantId);
+            const site = sites.find((s: any) => String(s.id || s._id) === String(objectId));
+            if (site) {
+              selectedSiteForEquipment = site;
+              showSiteEquipmentModal = true;
+            } else {
+              error = 'Site not found';
+              setTimeout(() => error = '', 5000);
+            }
+          }
+        } catch (err) {
+          console.error('Error loading site equipment:', err);
+          error = 'Failed to load site equipment';
+          setTimeout(() => error = '', 5000);
         }
       }
       
@@ -892,6 +925,18 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       on:close={() => {
         showSiteDetailsModal = false;
         selectedSiteForDetails = null;
+      }}
+    />
+  {/if}
+
+  {#if showSiteEquipmentModal && selectedSiteForEquipment}
+    <SiteEquipmentModal
+      show={showSiteEquipmentModal}
+      site={selectedSiteForEquipment}
+      tenantId={$currentTenant?.id || ''}
+      on:close={() => {
+        showSiteEquipmentModal = false;
+        selectedSiteForEquipment = null;
       }}
     />
   {/if}

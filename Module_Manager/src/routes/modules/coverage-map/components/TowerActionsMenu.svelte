@@ -226,11 +226,6 @@
   
   <div class="menu-divider"></div>
   
-  <button class="menu-item" onclick={() => handleAction('view-details')}>
-    <span class="menu-icon">ℹ️</span>
-    <span>View Details</span>
-  </button>
-  
   <button 
     class="menu-item danger" 
     class:disabled={isActionDisabled('delete-site')}

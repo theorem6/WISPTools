@@ -1002,7 +1002,20 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         break;
       case 'view-inventory':
         if (tower) {
-          goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+          // If in iframe (deploy/plan mode), dispatch action to parent
+          if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+            // Send message to parent in the format expected by iframeCommunicationService
+            window.parent.postMessage({
+              type: 'object-action',
+              objectId: tower.id,
+              action: 'view-inventory',
+              data: { tower }
+            }, '*');
+            console.log('[CoverageMap] Sent view-inventory action to parent', { objectId: tower.id, tower });
+          } else {
+            // Standalone mode - navigate to inventory
+            goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+          }
         }
         break;
       case 'deploy-hardware':
