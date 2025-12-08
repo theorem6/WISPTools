@@ -1035,6 +1035,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             
             if (typeof window !== 'undefined' && window.parent) {
               try {
+                // Try calling global handler directly first (most reliable)
+                if ((window.parent as any).__deployHandleViewInventory) {
+                  console.log('[CoverageMap] 🔥 Calling global handler directly');
+                  (window.parent as any).__deployHandleViewInventory(tower);
+                }
+                
                 // Send to parent window
                 window.parent.postMessage(message, '*');
                 console.log('[CoverageMap] ✅ Successfully sent view-inventory message to parent', { 
@@ -1043,12 +1049,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
                   message,
                   targetOrigin: '*',
                   parentLocation: window.parent.location?.href || 'N/A',
-                  isSameOrigin: window.parent === window
+                  isSameOrigin: window.parent === window,
+                  hasGlobalHandler: !!(window.parent as any).__deployHandleViewInventory
                 });
                 
                 // Also try sending to top window in case of nested iframes
                 if (window.top && window.top !== window.parent) {
                   console.log('[CoverageMap] 🔵 Also sending to top window');
+                  if ((window.top as any).__deployHandleViewInventory) {
+                    (window.top as any).__deployHandleViewInventory(tower);
+                  }
                   window.top.postMessage(message, '*');
                 }
                 // DO NOT navigate - we're in embedded mode, parent will handle it

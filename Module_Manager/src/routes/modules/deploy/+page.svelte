@@ -168,13 +168,26 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
               }
             });
             console.log('[Deploy] ✅✅✅ Dispatching fake event:', fakeEvent.detail);
-            handleIframeObjectAction(fakeEvent);
+            // Call handler directly - don't wait for event system
+            handleIframeObjectAction(fakeEvent).catch(err => {
+              console.error('[Deploy] Error in handleIframeObjectAction:', err);
+            });
           }
         };
         
         // CRITICAL: Add listener to window, not iframe
         window.addEventListener('message', directMessageHandler, false);
         console.log('[Deploy] ✅ Direct message listener attached to WINDOW as fallback');
+        
+        // Also try a global handler that we can call from anywhere
+        (window as any).__deployHandleViewInventory = (tower: any) => {
+          console.log('[Deploy] 🔥 GLOBAL HANDLER CALLED with tower:', tower);
+          if (tower) {
+            selectedSiteForEquipment = tower;
+            showSiteEquipmentModal = true;
+            console.log('[Deploy] 🔥 Modal opened via global handler');
+          }
+        };
         
         // Store handler for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;
