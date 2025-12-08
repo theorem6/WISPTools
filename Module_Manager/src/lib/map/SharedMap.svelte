@@ -168,8 +168,37 @@
         console.log('[SharedMap] Rectangle-drawn message forwarded to parent window');
       }
     } else if (type === 'object-action') {
-      // Forward object-action messages to parent window (Deploy/Plan module)
-      console.log('[SharedMap] 🔥 Forwarding object-action message to parent:', event.data);
+      // Handle object-action messages - we're already in the Deploy/Plan module context
+      console.log('[SharedMap] 🔥 Received object-action message from iframe:', event.data);
+      
+      // For view-inventory, directly call the global handler (most reliable)
+      if (event.data.action === 'view-inventory' && event.data.data?.tower) {
+        console.log('[SharedMap] 🔥🔥🔥 Calling global handler for view-inventory directly');
+        try {
+          if (typeof (window as any).__deployHandleViewInventory === 'function') {
+            (window as any).__deployHandleViewInventory(event.data.data.tower);
+            console.log('[SharedMap] 🔥🔥🔥✅ Global handler called successfully');
+          } else {
+            console.warn('[SharedMap] ❌ Global handler not found on window');
+          }
+        } catch (err) {
+          console.error('[SharedMap] ❌ Error calling global handler:', err);
+        }
+      }
+      
+      // Also dispatch a custom event for other handlers to catch
+      const customEvent = new CustomEvent('iframe-object-action', {
+        detail: {
+          objectId: event.data.objectId,
+          action: event.data.action,
+          data: event.data.data,
+          allowed: true
+        }
+      });
+      window.dispatchEvent(customEvent);
+      console.log('[SharedMap] 🔥✅ Dispatched iframe-object-action event');
+      
+      // Also forward to parent if we're in a nested iframe (fallback)
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({
           source: 'coverage-map',
@@ -178,18 +207,7 @@
           action: event.data.action,
           data: event.data.data
         }, '*');
-        console.log('[SharedMap] 🔥✅ Object-action message forwarded to parent window');
-        
-        // Also try calling global handler if it exists
-        if (typeof (window.parent as any).__deployHandleViewInventory === 'function' && event.data.action === 'view-inventory' && event.data.data?.tower) {
-          console.log('[SharedMap] 🔥🔥🔥 Also calling global handler directly');
-          try {
-            (window.parent as any).__deployHandleViewInventory(event.data.data.tower);
-            console.log('[SharedMap] 🔥🔥🔥 Global handler call succeeded');
-          } catch (err) {
-            console.error('[SharedMap] Error calling global handler:', err);
-          }
-        }
+        console.log('[SharedMap] 🔥✅ Also forwarded to parent window (nested iframe case)');
       }
     }
   };

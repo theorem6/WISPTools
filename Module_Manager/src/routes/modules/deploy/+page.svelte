@@ -73,25 +73,26 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   let selectedSiteForEquipment: any = null;
   
   // Set up global handler IMMEDIATELY - don't wait for onMount
+  // This function will be called directly from SharedMap when view-inventory action is received
   if (typeof window !== 'undefined') {
     (window as any).__deployHandleViewInventory = (tower: any) => {
-      console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED IMMEDIATELY with tower:', tower);
+      console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED with tower:', tower);
+      console.log('[Deploy] 🔥🔥🔥 Tower data:', JSON.stringify(tower, null, 2));
       if (tower) {
-        console.log('[Deploy] 🔥🔥🔥 Setting modal state IMMEDIATELY...');
-        // Use a function that will trigger reactivity
-        setTimeout(() => {
-          selectedSiteForEquipment = { ...tower };
-          showSiteEquipmentModal = true;
-          console.log('[Deploy] 🔥🔥🔥 Modal state set IMMEDIATELY:', {
-            show: showSiteEquipmentModal,
-            hasSite: !!selectedSiteForEquipment,
-            siteName: selectedSiteForEquipment?.name,
-            siteId: selectedSiteForEquipment?.id
-          });
-          
-          // Center map on location
-          const siteLocation = tower.location;
-          if (siteLocation?.latitude && siteLocation?.longitude) {
+        // Set state directly - Svelte will handle reactivity
+        selectedSiteForEquipment = { ...tower };
+        showSiteEquipmentModal = true;
+        console.log('[Deploy] 🔥🔥🔥 Modal state set:', {
+          show: showSiteEquipmentModal,
+          hasSite: !!selectedSiteForEquipment,
+          siteName: selectedSiteForEquipment?.name,
+          siteId: selectedSiteForEquipment?.id || selectedSiteForEquipment?._id
+        });
+        
+        // Center map on location
+        const siteLocation = tower.location;
+        if (siteLocation?.latitude && siteLocation?.longitude) {
+          setTimeout(() => {
             const iframe = document.querySelector('.map-fullscreen iframe') as HTMLIFrameElement | null;
             if (iframe?.contentWindow) {
               iframe.contentWindow.postMessage({
@@ -103,12 +104,15 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                   zoom: 14
                 }
               }, '*');
+              console.log('[Deploy] ✅ Sent center-map message to iframe');
             }
-          }
-        }, 0);
+          }, 100);
+        }
+      } else {
+        console.warn('[Deploy] ❌ Global handler called with no tower data');
       }
     };
-    console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER SET IMMEDIATELY on window:', typeof (window as any).__deployHandleViewInventory);
+    console.log('[Deploy] ✅ GLOBAL HANDLER SET on window');
   }
   
   // Sector counts for planner buttons
