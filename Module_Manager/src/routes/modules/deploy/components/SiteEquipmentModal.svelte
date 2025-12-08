@@ -16,7 +16,12 @@
   let error = '';
 
   $: if (show && site && tenantId) {
+    console.log('[SiteEquipmentModal] Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
     loadEquipment();
+  }
+  
+  $: if (show) {
+    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site);
   }
 
   async function loadEquipment() {

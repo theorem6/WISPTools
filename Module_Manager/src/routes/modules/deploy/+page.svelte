@@ -205,33 +205,53 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       // Handle view-inventory action - open site equipment modal
       if (action === 'view-inventory' && objectId) {
         console.log('[Deploy] ✅ Handling view-inventory action for object:', objectId, 'with data:', data);
+        
+        // Immediately prevent any default navigation
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        
         try {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           const tenantId = $currentTenant?.id;
           // First check if tower data is provided in the event
           if (data?.tower) {
             console.log('[Deploy] ✅ Using tower data from event for equipment modal:', data.tower);
-            selectedSiteForEquipment = data.tower;
+            selectedSiteForEquipment = { ...data.tower }; // Create a copy to ensure reactivity
             showSiteEquipmentModal = true;
-            console.log('[Deploy] ✅ SiteEquipmentModal opened:', { 
+            console.log('[Deploy] ✅ SiteEquipmentModal state set:', { 
               show: showSiteEquipmentModal, 
               site: selectedSiteForEquipment?.name,
-              siteId: selectedSiteForEquipment?.id 
+              siteId: selectedSiteForEquipment?.id,
+              hasSite: !!selectedSiteForEquipment
+            });
+            
+            // Force a small delay to ensure Svelte reactivity updates
+            await new Promise(resolve => setTimeout(resolve, 0));
+            console.log('[Deploy] ✅ After delay - Modal state:', { 
+              show: showSiteEquipmentModal, 
+              hasSite: !!selectedSiteForEquipment
             });
           } else if (tenantId) {
             // Fall back to fetching from database
+            console.log('[Deploy] Fetching site from database for objectId:', objectId);
             const sites = await coverageMapService.getTowerSites(tenantId);
             const site = sites.find((s: any) => String(s.id || s._id) === String(objectId));
             if (site) {
               selectedSiteForEquipment = site;
               showSiteEquipmentModal = true;
+              console.log('[Deploy] ✅ SiteEquipmentModal opened with fetched site:', site.name);
             } else {
+              console.error('[Deploy] Site not found for objectId:', objectId);
               error = 'Site not found';
               setTimeout(() => error = '', 5000);
             }
+          } else {
+            console.error('[Deploy] No tenantId available');
+            error = 'Tenant not available';
+            setTimeout(() => error = '', 5000);
           }
         } catch (err) {
-          console.error('Error loading site equipment:', err);
+          console.error('[Deploy] Error loading site equipment:', err);
           error = 'Failed to load site equipment';
           setTimeout(() => error = '', 5000);
         }

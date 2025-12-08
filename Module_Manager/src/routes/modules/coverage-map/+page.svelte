@@ -1005,21 +1005,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           // Check if we're in deploy/plan mode (embedded in iframe)
           const isIframe = typeof window !== 'undefined' && window.parent && window.parent !== window;
           const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-          const isDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
-          const isPlanMode = urlParams?.get('planMode') === 'true' || urlParams?.get('mode') === 'plan';
-          const shouldSendToParent = isIframe || isDeployMode || isPlanMode;
+          const checkDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy' || isDeployMode;
+          const checkPlanMode = urlParams?.get('planMode') === 'true' || urlParams?.get('mode') === 'plan' || isPlanMode;
+          const isEmbedded = isIframe || checkDeployMode || checkPlanMode;
           
           console.log('[CoverageMap] Handling view-inventory action', { 
             tower, 
             isIframe, 
-            isDeployMode, 
-            isPlanMode, 
-            shouldSendToParent,
+            checkDeployMode, 
+            checkPlanMode, 
+            isEmbedded,
+            hasParent: typeof window !== 'undefined' && !!window.parent,
             url: typeof window !== 'undefined' ? window.location.href : 'N/A'
           });
           
-          // If in iframe or deploy/plan mode, dispatch action to parent
-          if (shouldSendToParent && typeof window !== 'undefined' && window.parent) {
+          // If embedded (iframe or deploy/plan mode), ALWAYS send to parent and NEVER navigate
+          if (isEmbedded) {
             // Send message to parent in the format expected by iframeCommunicationService
             const message = {
               type: 'object-action',
@@ -1027,18 +1028,29 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
               action: 'view-inventory',
               data: { tower }
             };
-            console.log('[CoverageMap] Sending view-inventory message to parent:', message);
-            try {
-              window.parent.postMessage(message, '*');
-              console.log('[CoverageMap] ✅ Sent view-inventory action to parent', { objectId: tower.id, tower });
-            } catch (err) {
-              console.error('[CoverageMap] ❌ Failed to send message to parent:', err);
+            console.log('[CoverageMap] 🔵 Embedded mode detected - sending message to parent:', message);
+            
+            if (typeof window !== 'undefined' && window.parent) {
+              try {
+                window.parent.postMessage(message, '*');
+                console.log('[CoverageMap] ✅ Successfully sent view-inventory message to parent', { objectId: tower.id, tower });
+                // DO NOT navigate - we're in embedded mode, parent will handle it
+                return; // Exit early to prevent navigation
+              } catch (err) {
+                console.error('[CoverageMap] ❌ Failed to send message to parent:', err);
+                // Even if message fails, don't navigate in embedded mode
+                return;
+              }
+            } else {
+              console.warn('[CoverageMap] ⚠️ Embedded mode but no window.parent available');
+              // Don't navigate in embedded mode even if parent is unavailable
+              return;
             }
-          } else {
-            // Standalone mode - navigate to inventory
-            console.log('[CoverageMap] Not in iframe/deploy/plan mode, navigating to inventory');
-            goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
           }
+          
+          // Standalone mode - navigate to inventory (only if NOT embedded)
+          console.log('[CoverageMap] Standalone mode - navigating to inventory');
+          goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
         }
         break;
       case 'deploy-hardware':
