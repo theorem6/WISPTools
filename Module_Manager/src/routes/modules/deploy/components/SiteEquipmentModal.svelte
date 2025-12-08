@@ -16,12 +16,16 @@
   let error = '';
 
   $: if (show && site && tenantId) {
-    console.log('[SiteEquipmentModal] Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
+    console.log('[SiteEquipmentModal] ✅ Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
+    console.log('[SiteEquipmentModal] ✅ Site data:', JSON.stringify(site, null, 2));
     loadEquipment();
   }
   
   $: if (show) {
-    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site);
+    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site, 'hasSite:', !!site);
+    if (show && !site) {
+      console.warn('[SiteEquipmentModal] ⚠️ Modal is shown but site is null/undefined!');
+    }
   }
 
   async function loadEquipment() {
@@ -188,7 +192,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 10000; /* Increased to ensure it's above all other elements */
   }
 
   .modal-content {
