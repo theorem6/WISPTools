@@ -93,6 +93,11 @@ export class IframeCommunicationService {
     
     const message: IframeMessage = event.data;
     
+    // Debug logging for object-action messages
+    if (message.type === 'object-action') {
+      console.log('[IframeCommunicationService] Received object-action message:', message);
+    }
+    
     switch (message.type) {
       case 'object-state-response':
         if (message.data?.handlerId) {
@@ -140,11 +145,13 @@ export class IframeCommunicationService {
    * Called when an object action is allowed
    */
   private onObjectActionAllowed(objectId: string, action: string, data: any): void {
-    console.log(`Action '${action}' allowed for object ${objectId}`);
+    console.log(`[IframeCommunicationService] Action '${action}' allowed for object ${objectId}`, { objectId, action, data });
     // Emit custom event for parent modules to handle
-    window.dispatchEvent(new CustomEvent('iframe-object-action', {
+    const event = new CustomEvent('iframe-object-action', {
       detail: { objectId, action, data, allowed: true }
-    }));
+    });
+    console.log('[IframeCommunicationService] Dispatching iframe-object-action event:', event.detail);
+    window.dispatchEvent(event);
   }
 
   /**

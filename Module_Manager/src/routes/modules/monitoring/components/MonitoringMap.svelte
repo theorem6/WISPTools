@@ -613,7 +613,13 @@
         if (asset && asset.type === 'tower' && asset.id) {
           const site = towers.find(t => String(t.id) === String(asset.id));
           if (site) {
-            handleSiteClick(site);
+            // Right-click opens comprehensive site details modal
+            if (asset.isRightClick) {
+              dispatch('siteRightClick', { site });
+            } else {
+              // Left-click shows devices modal
+              handleSiteClick(site);
+            }
           }
         }
         handleMapEvent(e);

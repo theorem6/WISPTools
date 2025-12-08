@@ -148,7 +148,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
   async function handleIframeObjectAction(event: Event) {
     const detail = (event as CustomEvent).detail;
-    if (!detail) return;
+    console.log('[Deploy] handleIframeObjectAction called with:', detail);
+    if (!detail) {
+      console.warn('[Deploy] handleIframeObjectAction called without detail');
+      return;
+    }
 
     const { objectId, action, allowed, message, data } = detail;
     if (!allowed) {
@@ -159,14 +163,17 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       
       // Handle view-details action - open site details modal
       if (action === 'view-details' && objectId) {
+        console.log('[Deploy] Handling view-details action for object:', objectId, 'with data:', data);
         try {
           // Fetch the site data using the objectId
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           const tenantId = $currentTenant?.id;
           // First check if tower data is provided in the event (more reliable)
           if (data?.tower) {
+            console.log('[Deploy] Using tower data from event:', data.tower);
             selectedSiteForDetails = data.tower;
             showSiteDetailsModal = true;
+            console.log('[Deploy] SiteDetailsModal should now be visible:', showSiteDetailsModal);
           } else if (tenantId) {
             // Fall back to fetching from database
             const sites = await coverageMapService.getTowerSites(tenantId);

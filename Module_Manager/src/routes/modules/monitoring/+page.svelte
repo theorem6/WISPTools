@@ -13,6 +13,7 @@
   import SNMPGraphsPanel from '$lib/components/SNMPGraphsPanel.svelte';
   import MikrotikDevicesPanel from './components/MikrotikDevicesPanel.svelte';
   import SiteDevicesModal from './components/SiteDevicesModal.svelte';
+  import MonitoringSiteDetailsModal from './components/MonitoringSiteDetailsModal.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
   import { monitoringService } from '$lib/services/monitoringService';
@@ -36,6 +37,10 @@
   let showSiteDevicesModal = false;
   let selectedSite: any = null;
   let selectedSiteDevices: any[] = [];
+  
+  // Monitoring site details modal (with uptime)
+  let showMonitoringSiteDetailsModal = false;
+  let selectedSiteForDetails: any = null;
   
   // EPC Monitoring
   let epcDevices: any[] = [];
@@ -575,6 +580,13 @@
     showSiteDevicesModal = true;
     console.log('[Monitoring] Site selected:', site, 'with', selectedSiteDevices.length, 'devices');
   }
+  
+  function handleSiteRightClick(event: CustomEvent) {
+    const { site } = event.detail;
+    selectedSiteForDetails = site;
+    showMonitoringSiteDetailsModal = true;
+    console.log('[Monitoring] Site right-clicked for details:', site);
+  }
 
   function showAlertDetails(alert) {
     selectedAlert = alert;
@@ -630,6 +642,7 @@
             on:createTicketFromAlert={createTicketFromAlert}
             on:refreshData={loadDashboard}
             on:siteSelected={handleSiteSelected}
+            on:siteRightClick={handleSiteRightClick}
           />
         {:else if mapView === 'topology'}
           <NetworkTopologyMap 
@@ -941,6 +954,34 @@
     selectedSiteDevices = [];
   }}
 />
+
+<!-- Monitoring Site Details Modal (right-click on sites) -->
+{#if showMonitoringSiteDetailsModal && selectedSiteForDetails}
+  <MonitoringSiteDetailsModal
+    show={showMonitoringSiteDetailsModal}
+    site={selectedSiteForDetails}
+    {networkDevices}
+    tenantId={tenantId}
+    on:close={() => {
+      showMonitoringSiteDetailsModal = false;
+      selectedSiteForDetails = null;
+    }}
+  />
+{/if}
+
+<!-- Monitoring Site Details Modal (right-click on sites) -->
+{#if showMonitoringSiteDetailsModal && selectedSiteForDetails}
+  <MonitoringSiteDetailsModal
+    show={showMonitoringSiteDetailsModal}
+    site={selectedSiteForDetails}
+    {networkDevices}
+    tenantId={tenantId}
+    on:close={() => {
+      showMonitoringSiteDetailsModal = false;
+      selectedSiteForDetails = null;
+    }}
+  />
+{/if}
 
 <style>
   /* App Container - Full Screen */
