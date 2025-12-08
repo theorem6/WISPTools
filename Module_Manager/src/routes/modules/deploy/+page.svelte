@@ -249,6 +249,36 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
               hasSite: !!selectedSiteForEquipment
             });
             
+            // Center map on the site location
+            const siteLocation = data.tower.location;
+            if (siteLocation?.latitude && siteLocation?.longitude) {
+              console.log('[Deploy] 🔵 Centering map on site location:', siteLocation.latitude, siteLocation.longitude);
+              // Send message to map iframe to center on location
+              const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+              if (iframe?.contentWindow) {
+                iframe.contentWindow.postMessage({
+                  source: 'shared-map',
+                  type: 'center-map-on-location',
+                  payload: {
+                    lat: siteLocation.latitude,
+                    lon: siteLocation.longitude,
+                    zoom: 14
+                  }
+                }, '*');
+                console.log('[Deploy] ✅ Sent center-map message to iframe');
+              } else {
+                // Fallback: dispatch custom event
+                window.dispatchEvent(new CustomEvent('center-map-on-location', {
+                  detail: { 
+                    lat: siteLocation.latitude, 
+                    lon: siteLocation.longitude, 
+                    zoom: 14 
+                  }
+                }));
+                console.log('[Deploy] ✅ Dispatched center-map-on-location event');
+              }
+            }
+            
             // Force a small delay to ensure Svelte reactivity updates
             await new Promise(resolve => setTimeout(resolve, 0));
             console.log('[Deploy] ✅ After delay - Modal state:', { 
