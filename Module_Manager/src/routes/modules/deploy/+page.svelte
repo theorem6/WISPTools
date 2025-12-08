@@ -72,6 +72,45 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   let showSiteEquipmentModal = false;
   let selectedSiteForEquipment: any = null;
   
+  // Set up global handler IMMEDIATELY - don't wait for onMount
+  if (typeof window !== 'undefined') {
+    (window as any).__deployHandleViewInventory = (tower: any) => {
+      console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER CALLED IMMEDIATELY with tower:', tower);
+      if (tower) {
+        console.log('[Deploy] 🔥🔥🔥 Setting modal state IMMEDIATELY...');
+        // Use a function that will trigger reactivity
+        setTimeout(() => {
+          selectedSiteForEquipment = { ...tower };
+          showSiteEquipmentModal = true;
+          console.log('[Deploy] 🔥🔥🔥 Modal state set IMMEDIATELY:', {
+            show: showSiteEquipmentModal,
+            hasSite: !!selectedSiteForEquipment,
+            siteName: selectedSiteForEquipment?.name,
+            siteId: selectedSiteForEquipment?.id
+          });
+          
+          // Center map on location
+          const siteLocation = tower.location;
+          if (siteLocation?.latitude && siteLocation?.longitude) {
+            const iframe = document.querySelector('.map-fullscreen iframe') as HTMLIFrameElement | null;
+            if (iframe?.contentWindow) {
+              iframe.contentWindow.postMessage({
+                source: 'shared-map',
+                type: 'center-map-on-location',
+                payload: {
+                  lat: siteLocation.latitude,
+                  lon: siteLocation.longitude,
+                  zoom: 14
+                }
+              }, '*');
+            }
+          }
+        }, 0);
+      }
+    };
+    console.log('[Deploy] 🔥🔥🔥 GLOBAL HANDLER SET IMMEDIATELY on window:', typeof (window as any).__deployHandleViewInventory);
+  }
+  
   // Sector counts for planner buttons
   let lteSectorCount = 0; // For PCI Planner (LTE only)
   let frequencySectorCount = 0; // For Frequency Planner (LTE + FWA)
