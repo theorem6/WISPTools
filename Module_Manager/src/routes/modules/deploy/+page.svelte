@@ -123,10 +123,14 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
+        console.log('[Deploy] Found iframe, initializing iframeCommunicationService:', iframe.src);
         iframeCommunicationService.initialize(iframe, moduleContext);
         iframeReady = true;
         window.addEventListener('iframe-object-action', handleIframeObjectAction);
         iframeListenerAttached = true;
+        console.log('[Deploy] Iframe communication initialized and event listener attached');
+      } else {
+        console.warn('[Deploy] Iframe not found in mapContainer');
       }
 
       mapLayerManager.setMode('deploy');

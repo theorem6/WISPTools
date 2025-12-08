@@ -17,6 +17,7 @@ export class IframeCommunicationService {
   private iframe: HTMLIFrameElement | null = null;
   private moduleContext: ModuleContext = { module: 'coverage-map', userRole: 'admin' };
   private messageHandlers: Map<string, (data: any) => void> = new Map();
+  private boundMessageHandler: ((event: MessageEvent) => void) | null = null;
 
   public static getInstance(): IframeCommunicationService {
     if (!IframeCommunicationService.instance) {
