@@ -1031,7 +1031,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
               data: { tower }
             };
             console.log('[CoverageMap] 🔵 Embedded mode detected - sending message to parent:', message);
-            console.log('[CoverageMap] 🔵 Message will be sent to:', window.parent?.location?.href || 'parent window');
             
             if (typeof window !== 'undefined' && window.parent) {
               try {
