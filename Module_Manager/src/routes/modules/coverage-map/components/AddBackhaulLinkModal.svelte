@@ -343,6 +343,9 @@
                 <option value={site.id}>{site.name} ({site.type})</option>
               {/each}
             </select>
+            {#if backhaulToEdit}
+              <p class="help-text">⚠️ Sites cannot be changed when editing</p>
+            {/if}
           </div>
           
           <div class="form-group">
@@ -681,7 +684,7 @@
     <div class="modal-footer">
       <button class="btn-secondary" on:click={handleClose}>Cancel</button>
       <button class="btn-primary" on:click={handleSave} disabled={isSaving || !canCreateBackhaul}>
-        {isSaving ? 'Saving...' : '✅ Create Backhaul Link'}
+        {isSaving ? 'Saving...' : (backhaulToEdit ? '✅ Save Changes' : '✅ Create Backhaul Link')}
       </button>
     </div>
   </div>
