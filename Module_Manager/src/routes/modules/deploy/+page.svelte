@@ -201,19 +201,23 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           // Handle asset-click messages directly
           // Check if it's an asset-click message
           if (event.data && typeof event.data === 'object' && event.data.type === 'asset-click') {
-            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED! Full event.data:', event.data);
+            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED! Full event.data:', JSON.parse(JSON.stringify(event.data)));
             console.log('[Deploy] 🔵🔵🔵 event.data keys:', Object.keys(event.data));
+            console.log('[Deploy] 🔵🔵🔵 event.data.detail:', event.data.detail);
             console.log('[Deploy] 🔵🔵🔵 Checking source:', { 
               hasSource: 'source' in event.data, 
               source: event.data.source, 
               expected: 'coverage-map',
               matches: event.data.source === 'coverage-map',
               type: event.data.type,
-              detail: event.data.detail
+              hasDetail: !!event.data.detail,
+              detailType: typeof event.data.detail,
+              detailKeys: event.data.detail ? Object.keys(event.data.detail) : []
             });
             
             // Process if source matches OR if no source check (be more lenient)
             if (event.data.source === 'coverage-map' || !event.data.source) {
+              console.log('[Deploy] 🔵🔵🔵 Processing asset-click - source check passed');
             console.log('[Deploy] 🔵🔵🔵 Processing asset-click message, full data:', event.data);
             const detail = event.data.detail || event.data;
             console.log('[Deploy] 🔵🔵🔵 Extracted detail:', detail);

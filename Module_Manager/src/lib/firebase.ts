@@ -20,6 +20,11 @@ const getAuthDomain = (): string => {
     return 'wisptools.io';
   }
   
+  // If on Firebase hosting, use the Firebase domain
+  if (typeof window !== 'undefined' && window.location.hostname.includes('wisptools-production')) {
+    return 'wisptools-production.firebaseapp.com';
+  }
+  
   // Default Firebase domain (always authorized)
   return 'wisptools-production.firebaseapp.com';
 };
