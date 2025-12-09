@@ -593,6 +593,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       });
 
       equipment = loadedEquipment.filter((eq: any) => {
+        // In deploy mode, show all equipment regardless of planId (deployed hardware)
+        if (sharedMapMode === 'deploy' || mapMode === 'deploy') {
+          return true; // Show all equipment in deploy mode
+        }
+        // In plan mode, filter by planId
         if (!eq.planId) return true;
         if (isPlanMode && eq.planId === planId) return true;
         return visiblePlanIdSet.has(eq.planId);
