@@ -559,7 +559,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         return visiblePlanIdSet.has(eq.planId);
       });
 
-    // console.log(`Loaded: ${towers.length} towers, ${sectors.length} sectors, ${cpeDevices.length} CPE, ${equipment.length} equipment (mode=${mapMode}, planIds=${Array.from(visiblePlanIds).join(',') || 'none'})`);
+      console.log('[CoverageMap] 📊 Assets loaded:', {
+        towers: { loaded: loadedTowers.length, filtered: towers.length },
+        sectors: { loaded: loadedSectors.length, filtered: sectors.length },
+        cpe: { loaded: loadedCPE.length, filtered: cpeDevices.length },
+        equipment: { loaded: loadedEquipment.length, filtered: equipment.length },
+        productionHardware: externalProductionHardware.length,
+        visiblePlanIds: Array.from(visiblePlanIdSet),
+        isPlanMode,
+        planId
+      });
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';

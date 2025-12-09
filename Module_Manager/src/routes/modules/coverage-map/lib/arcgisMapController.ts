@@ -1792,7 +1792,25 @@ export class CoverageMapController {
       }
 
       const graphicsCount = this.graphicsLayer?.graphics?.length || 0;
-      console.log(`Rendered ${graphicsCount} assets on map`);
+      const towersCount = this.data.towers?.length || 0;
+      const sectorsCount = this.data.sectors?.length || 0;
+      const cpeCount = this.data.cpeDevices?.length || 0;
+      const equipmentCount = this.data.equipment?.length || 0;
+      console.log(`[CoverageMap] ✅ Rendered ${graphicsCount} graphics on map:`, {
+        totalGraphics: graphicsCount,
+        dataCounts: {
+          towers: towersCount,
+          sectors: sectorsCount,
+          cpe: cpeCount,
+          equipment: equipmentCount
+        },
+        filters: {
+          showTowers: this.filters.showTowers,
+          showSectors: this.filters.showSectors,
+          showCPE: this.filters.showCPE,
+          showEquipment: this.filters.showEquipment
+        }
+      });
     } catch (err) {
       console.error('Failed to render assets:', err);
       console.error('Error details:', err);
