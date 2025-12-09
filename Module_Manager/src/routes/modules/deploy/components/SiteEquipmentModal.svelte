@@ -20,18 +20,31 @@
 
   // Watch for modal opening and load equipment
   $: if (show && site && tenantId) {
-    console.log('[SiteEquipmentModal] ✅ Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
+    console.log('[SiteEquipmentModal] ✅✅✅ Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
     console.log('[SiteEquipmentModal] ✅ Site data:', JSON.stringify(site, null, 2));
-    loadEquipment();
+    // Use setTimeout to ensure reactive statement completes before calling loadEquipment
+    setTimeout(() => {
+      loadEquipment();
+    }, 0);
   }
   
   $: if (show) {
-    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site, 'hasSite:', !!site, 'tenantId:', tenantId);
+    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site?.name, 'hasSite:', !!site, 'tenantId:', tenantId);
     if (show && !site) {
       console.warn('[SiteEquipmentModal] ⚠️ Modal is shown but site is null/undefined!');
     }
     if (show && site && !tenantId) {
       console.warn('[SiteEquipmentModal] ⚠️ Modal is shown but tenantId is missing!');
+    }
+    // Fallback: if show is true and we have both site and tenantId, ensure loadEquipment is called
+    if (show && site && tenantId) {
+      // Double-check: if reactive statement didn't fire, call loadEquipment directly after a short delay
+      setTimeout(() => {
+        if (show && site && tenantId && !isLoading && equipment.length === 0 && hardwareDeployments.length === 0 && sectors.length === 0) {
+          console.log('[SiteEquipmentModal] 🔵 Fallback: calling loadEquipment from show watcher');
+          loadEquipment();
+        }
+      }, 150);
     }
   }
 
