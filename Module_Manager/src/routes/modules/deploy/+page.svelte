@@ -381,19 +381,39 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
   // Watch for tenant changes and load plans when tenant is available
   let hasLoadedPlans = false;
+  let lastTenantId: string | undefined = undefined;
+  
   $: {
     const tenantId = $currentTenant?.id;
-    // Only trigger if tenantId is a valid non-empty string
-    if (tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' && !isLoadingPlans && !hasLoadedPlans) {
-      console.log('[Deploy] ✅✅✅ Tenant available, loading ready plans:', tenantId);
+    const tenantIdString = tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' ? tenantId : undefined;
+    
+    // Reset hasLoadedPlans if tenant changes
+    if (tenantIdString !== lastTenantId) {
+      if (lastTenantId !== undefined) {
+        console.log('[Deploy] Tenant changed, resetting hasLoadedPlans:', { from: lastTenantId, to: tenantIdString });
+      }
+      hasLoadedPlans = false;
+      lastTenantId = tenantIdString;
+    }
+    
+    // Only trigger if tenantId is a valid non-empty string and we haven't loaded yet
+    if (tenantIdString && !isLoadingPlans && !hasLoadedPlans) {
+      console.log('[Deploy] ✅✅✅ Tenant available, loading ready plans:', tenantIdString);
       hasLoadedPlans = true; // Prevent multiple calls
       // Use setTimeout to ensure tenant store is fully settled
       setTimeout(() => {
-        loadReadyPlans().catch(err => {
-          console.error('[Deploy] Error in loadReadyPlans:', err);
-          hasLoadedPlans = false; // Reset on error so it can retry
-        });
-      }, 100); // Small delay to ensure tenant is fully initialized
+        // Double-check tenantId is still valid before calling
+        const currentTenantId = $currentTenant?.id;
+        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantIdString) {
+          loadReadyPlans().catch(err => {
+            console.error('[Deploy] Error in loadReadyPlans:', err);
+            hasLoadedPlans = false; // Reset on error so it can retry
+          });
+        } else {
+          console.warn('[Deploy] TenantId changed during delay, cancelling loadReadyPlans:', { expected: tenantIdString, actual: currentTenantId });
+          hasLoadedPlans = false; // Reset so it can retry with new tenant
+        }
+      }, 200); // Increased delay to ensure tenant is fully initialized
     }
   }
 
