@@ -354,8 +354,23 @@ export class CoverageMapService {
   }
   
   async getAllHardwareDeployments(tenantId: string, hardware_type?: string): Promise<any[]> {
+    // Validate tenantId before making the call
+    let resolvedTenantId = tenantId;
+    if (!resolvedTenantId || typeof resolvedTenantId !== 'string' || resolvedTenantId.trim() === '') {
+      // Try localStorage as fallback
+      if (typeof window !== 'undefined') {
+        resolvedTenantId = localStorage.getItem('selectedTenantId') || '';
+      }
+      if (!resolvedTenantId || typeof resolvedTenantId !== 'string' || resolvedTenantId.trim() === '') {
+        console.warn('[CoverageMapService] getAllHardwareDeployments called without valid tenantId:', { 
+          provided: tenantId, 
+          fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A' 
+        });
+        throw new Error('No tenant selected');
+      }
+    }
     const params = hardware_type ? `?hardware_type=${hardware_type}` : '';
-    return await this.apiCall(`hardware-deployments${params}`, {}, tenantId);
+    return await this.apiCall(`hardware-deployments${params}`, {}, resolvedTenantId);
   }
   
   async updateHardwareDeployment(tenantId: string, deploymentId: string, updates: any): Promise<any> {
