@@ -156,17 +156,62 @@
           radioSerialNumber: formData.radioSerialNumber || undefined
         };
 
-        await mapLayerManager.addFeature(planId, {
-          featureType: 'sector',
-          geometry: {
-            type: 'Point',
-            coordinates: [site.location.longitude, site.location.latitude]
-          },
-          properties,
-          status: 'draft'
-        });
-
-        dispatch('saved', { message: 'Sector staged in plan.' });
+        // Check if editing an existing sector in this plan
+        // If sectorToEdit exists and has planId matching current plan, update it
+        if (sectorToEdit && sectorToEdit.id && sectorToEdit.planId === planId) {
+          // Try to update as plan feature first (if it's a staged feature)
+          // If that fails, it might be a production sector with planId - update via coverageMapService
+          try {
+            await mapLayerManager.updateFeature(planId, sectorToEdit.id, {
+              properties,
+              geometry: {
+                type: 'Point',
+                coordinates: [site.location.longitude, site.location.latitude]
+              }
+            });
+            dispatch('saved', { message: 'Sector updated in plan.' });
+          } catch (planFeatureError) {
+            // If updateFeature fails, it's likely a production sector with planId
+            // Update via coverageMapService instead
+            const sectorData: any = {
+              siteId: formData.siteId,
+              name: formData.name,
+              location: {
+                latitude: site.location.latitude,
+                longitude: site.location.longitude
+              },
+              azimuth: formData.azimuth,
+              beamwidth: formData.beamwidth,
+              tilt: formData.tilt || undefined,
+              technology: formData.technology,
+              band: formData.band || undefined,
+              frequency: formData.frequency || undefined,
+              bandwidth: formData.bandwidth || undefined,
+              antennaModel: formData.antennaModel || undefined,
+              antennaManufacturer: formData.antennaManufacturer || undefined,
+              antennaSerialNumber: formData.antennaSerialNumber || undefined,
+              radioModel: formData.radioModel || undefined,
+              radioManufacturer: formData.radioManufacturer || undefined,
+              radioSerialNumber: formData.radioSerialNumber || undefined,
+              status: formData.status,
+              planId: planId // Keep the planId
+            };
+            await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+            dispatch('saved', { message: 'Sector updated successfully.' });
+          }
+        } else {
+          // Create new plan feature
+          await mapLayerManager.addFeature(planId, {
+            featureType: 'sector',
+            geometry: {
+              type: 'Point',
+              coordinates: [site.location.longitude, site.location.latitude]
+            },
+            properties,
+            status: 'draft'
+          });
+          dispatch('saved', { message: 'Sector staged in plan.' });
+        }
       } else {
         // Editing or creating production sector
         const sectorData: any = {
