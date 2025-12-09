@@ -1306,6 +1306,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     setTimeout(() => success = '', 3000);
     planDraftForSiteEdit = null;
     initialSiteType = null;
+    // Reload all data to show newly created sectors, sites, etc.
+    await loadAllData();
 
     try {
       if (effectivePlanId && (isPlanMode || sharedMapMode === 'plan')) {
