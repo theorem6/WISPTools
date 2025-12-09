@@ -381,13 +381,20 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
   // Watch for tenant changes and load plans when tenant is available
   let hasLoadedPlans = false;
-  $: if ($currentTenant?.id && !isLoadingPlans && !hasLoadedPlans) {
-    console.log('[Deploy] ✅✅✅ Tenant available, loading ready plans:', $currentTenant.id);
-    hasLoadedPlans = true; // Prevent multiple calls
-    loadReadyPlans().catch(err => {
-      console.error('[Deploy] Error in loadReadyPlans:', err);
-      hasLoadedPlans = false; // Reset on error so it can retry
-    });
+  $: {
+    const tenantId = $currentTenant?.id;
+    // Only trigger if tenantId is a valid non-empty string
+    if (tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' && !isLoadingPlans && !hasLoadedPlans) {
+      console.log('[Deploy] ✅✅✅ Tenant available, loading ready plans:', tenantId);
+      hasLoadedPlans = true; // Prevent multiple calls
+      // Use setTimeout to ensure tenant store is fully settled
+      setTimeout(() => {
+        loadReadyPlans().catch(err => {
+          console.error('[Deploy] Error in loadReadyPlans:', err);
+          hasLoadedPlans = false; // Reset on error so it can retry
+        });
+      }, 100); // Small delay to ensure tenant is fully initialized
+    }
   }
 
 
@@ -557,8 +564,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
   async function loadReadyPlans() {
     const tenantId = $currentTenant?.id;
-    if (!tenantId) {
-      console.warn('[Deploy] loadReadyPlans called but no tenantId available');
+    // Ensure tenantId is a valid non-empty string
+    if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') {
+      console.warn('[Deploy] loadReadyPlans called but no valid tenantId available:', tenantId);
       return;
     }
     
@@ -589,16 +597,21 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         
         // Load deployed hardware count
         try {
-          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-          if (tenantId) {
-            const deployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+          // Double-check tenantId is still valid before making the call
+          const currentTenantId = $currentTenant?.id;
+          if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '') {
+            const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+            const deployments = await coverageMapService.getAllHardwareDeployments(currentTenantId);
             deployedCount = deployments.length;
           } else {
-            console.warn('[Deploy] Skipping deployment count load - no tenantId');
+            console.warn('[Deploy] Skipping deployment count load - tenantId invalid:', currentTenantId);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Failed to load deployment count:', err);
-          // Don't throw - this is non-critical
+          // Don't throw - this is non-critical, but log the error
+          if (err?.message?.includes('No tenant selected')) {
+            console.warn('[Deploy] Tenant was lost during deployment count load, will retry on next tenant change');
+          }
         }
         
         // Load and count sectors for planner buttons
