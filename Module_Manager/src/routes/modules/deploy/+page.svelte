@@ -368,14 +368,25 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   
   // Reactive statement to watch for tenant availability
   $: {
-    // Force reactive statement to evaluate
+    // Force reactive statement to evaluate - access the store to trigger reactivity
     const tenant = $currentTenant;
     const tenantId = tenant?.id;
-    const tenantIdString = tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' ? tenantId : undefined;
+    
+    // Also check localStorage as fallback (for iframe scenarios)
+    let tenantIdString = tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' ? tenantId : undefined;
+    if (!tenantIdString && typeof window !== 'undefined') {
+      const storedTenantId = localStorage.getItem('selectedTenantId');
+      if (storedTenantId && storedTenantId.trim() !== '') {
+        tenantIdString = storedTenantId;
+        console.log('[Deploy] Using tenantId from localStorage:', tenantIdString);
+      }
+    }
     
     console.log('[Deploy] 🔍 Reactive statement evaluated:', { 
       hasTenant: !!tenant, 
       tenantId: tenantIdString, 
+      fromStore: tenantId,
+      fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
       lastTenantId, 
       isLoadingPlans, 
       hasLoadedPlans,
@@ -405,8 +416,14 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       hasLoadedPlans = true; // Prevent multiple calls
       // Use setTimeout to ensure tenant store is fully settled
       loadPlansTimeout = setTimeout(() => {
-        // Triple-check tenantId is still valid before calling
-        const currentTenantId = $currentTenant?.id;
+        // Triple-check tenantId is still valid before calling - check both store and localStorage
+        let currentTenantId = $currentTenant?.id;
+        if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
+          if (typeof window !== 'undefined') {
+            currentTenantId = localStorage.getItem('selectedTenantId') || null;
+          }
+        }
+        
         const validTenantId = currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '';
         if (validTenantId && currentTenantId === tenantIdString) {
           console.log('[Deploy] ✅✅✅ Executing loadReadyPlans with tenant:', currentTenantId);
@@ -418,6 +435,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           console.warn('[Deploy] ⚠️ TenantId validation failed, cancelling loadReadyPlans:', { 
             expected: tenantIdString, 
             actual: currentTenantId,
+            fromStore: $currentTenant?.id,
+            fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
             validTenantId,
             match: validTenantId && currentTenantId === tenantIdString
           });
@@ -431,6 +450,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         hasTenant: !!tenant, 
         hasTenantId: !!tenantId, 
         tenantIdValue: tenantId,
+        fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
         isLoadingPlans, 
         hasLoadedPlans 
       });
