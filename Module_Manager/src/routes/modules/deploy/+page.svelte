@@ -183,9 +183,98 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         
         // Also add a direct message listener as a fallback - MUST be on window, not iframe
         const directMessageHandler = (event: MessageEvent) => {
-          // Log ALL messages to see what we're getting
+          // Handle asset-click messages FIRST
+          if (event.data && typeof event.data === 'object' && event.data.type === 'asset-click') {
+            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED!');
+            console.log('[Deploy] 🔵🔵🔵 Full event.data:', event.data);
+            
+            // Process if source matches OR if no source check (be more lenient)
+            if (event.data.source === 'coverage-map' || !event.data.source) {
+              console.log('[Deploy] 🔵🔵🔵 Processing asset-click - source check passed');
+              
+              // The detail is in event.data.detail
+              const detail = event.data.detail;
+              
+              if (!detail || typeof detail !== 'object') {
+                console.error('[Deploy] ❌❌❌ Detail is missing or invalid:', { detail, type: typeof detail });
+                return;
+              }
+              
+              const { type, id, data, screenX, screenY, isRightClick } = detail;
+              
+              console.log('[Deploy] 🔵🔵🔵 Extracted values:', { type, id, isRightClick, screenX, screenY });
+              
+              if (!isRightClick) {
+                console.log('[Deploy] Ignoring left-click on asset');
+                return;
+              }
+              
+              console.log('[Deploy] 🔵🔵🔵 Right-click detected on asset:', { type, id, isRightClick });
+              
+              // Handle sector right-click - send message to iframe to show menu
+              if (type === 'sector' && id) {
+                console.log('[Deploy] 🔵🔵🔵 Handling sector right-click:', { id, type, screenX, screenY });
+                // Fetch sector data and send to iframe to show menu
+                (async () => {
+                  try {
+                    const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+                    const tenantId = $currentTenant?.id;
+                    if (!tenantId) {
+                      console.error('[Deploy] No tenant ID for sector lookup');
+                      return;
+                    }
+                    
+                    // Get all sectors and find the matching one
+                    const allSectors = await coverageMapService.getSectors(tenantId);
+                    let sector = allSectors.find((s: any) => s.id === id);
+                    if (!sector) {
+                      sector = allSectors.find((s: any) => s._id === id);
+                    }
+                    if (!sector) {
+                      sector = allSectors.find((s: any) => String(s.id) === String(id));
+                    }
+                    if (!sector) {
+                      sector = allSectors.find((s: any) => String(s._id) === String(id));
+                    }
+                    
+                    if (sector) {
+                      console.log('[Deploy] ✅✅✅ Found sector, sending to iframe:', { sectorId: sector.id, sectorName: sector.name });
+                      // Send message to iframe to show the menu
+                      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+                      if (iframe?.contentWindow) {
+                        iframe.contentWindow.postMessage({
+                          source: 'deploy-module',
+                          type: 'show-sector-menu',
+                          payload: {
+                            sector: sector,
+                            screenX: screenX || 0,
+                            screenY: screenY || 0
+                          }
+                        }, '*');
+                        console.log('[Deploy] ✅✅✅ Sent show-sector-menu message to iframe');
+                      } else {
+                        console.error('[Deploy] ❌ Iframe contentWindow not available');
+                      }
+                    } else {
+                      console.error('[Deploy] ❌ Sector not found:', { 
+                        id, 
+                        idType: typeof id,
+                        allSectorIds: allSectors.map((s: any) => ({ id: s.id, _id: s._id, name: s.name }))
+                      });
+                    }
+                  } catch (err) {
+                    console.error('[Deploy] Error handling sector right-click:', err);
+                  }
+                })();
+              }
+              return; // Don't process further
+            } else {
+              console.log('[Deploy] ⚠️ Asset-click from wrong source, ignoring:', event.data.source);
+            }
+          }
+          
+          // Log other messages (but not asset-click, view-extent, request-state to reduce noise)
           if (event.data && typeof event.data === 'object') {
-            // Only log non-asset-click messages to reduce noise
             if (event.data.type !== 'asset-click' && event.data.type !== 'view-extent' && event.data.type !== 'request-state') {
               console.log('[Deploy] 📨 Direct message listener received ANY message:', {
                 data: event.data,
@@ -195,76 +284,6 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                 origin: event.origin,
                 hasSource: !!event.source
               });
-            }
-          }
-          
-            
-            if (!isRightClick) {
-              console.log('[Deploy] Ignoring left-click on asset');
-              return;
-            }
-            
-            console.log('[Deploy] 🔵🔵🔵 Right-click detected on asset:', { type, id, isRightClick });
-            
-            // Handle sector right-click - send message to iframe to show menu
-            if (type === 'sector' && id) {
-              console.log('[Deploy] 🔵🔵🔵 Handling sector right-click:', { id, type, screenX, screenY });
-              // Fetch sector data and send to iframe to show menu
-              (async () => {
-                try {
-                  const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-                  const tenantId = $currentTenant?.id;
-                  if (!tenantId) {
-                    console.error('[Deploy] No tenant ID for sector lookup');
-                    return;
-                  }
-                  
-                  // Get all sectors and find the matching one
-                  const allSectors = await coverageMapService.getSectors(tenantId);
-                  let sector = allSectors.find((s: any) => s.id === id);
-                  if (!sector) {
-                    sector = allSectors.find((s: any) => s._id === id);
-                  }
-                  if (!sector) {
-                    sector = allSectors.find((s: any) => String(s.id) === String(id));
-                  }
-                  if (!sector) {
-                    sector = allSectors.find((s: any) => String(s._id) === String(id));
-                  }
-                  
-                  if (sector) {
-                    console.log('[Deploy] ✅✅✅ Found sector, sending to iframe:', { sectorId: sector.id, sectorName: sector.name });
-                    // Send message to iframe to show the menu
-                    const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
-                    if (iframe?.contentWindow) {
-                      iframe.contentWindow.postMessage({
-                        source: 'deploy-module',
-                        type: 'show-sector-menu',
-                        payload: {
-                          sector: sector,
-                          screenX: screenX || 0,
-                          screenY: screenY || 0
-                        }
-                      }, '*');
-                      console.log('[Deploy] ✅✅✅ Sent show-sector-menu message to iframe');
-                    } else {
-                      console.error('[Deploy] ❌ Iframe contentWindow not available');
-                    }
-                  } else {
-                    console.error('[Deploy] ❌ Sector not found:', { 
-                      id, 
-                      idType: typeof id,
-                      allSectorIds: allSectors.map((s: any) => ({ id: s.id, _id: s._id, name: s.name }))
-                    });
-                  }
-                } catch (err) {
-                  console.error('[Deploy] Error handling sector right-click:', err);
-                }
-              })();
-            }
-            return; // Don't process further
-            } else {
-              console.log('[Deploy] ⚠️ Asset-click from wrong source, ignoring:', event.data.source);
             }
           }
           
