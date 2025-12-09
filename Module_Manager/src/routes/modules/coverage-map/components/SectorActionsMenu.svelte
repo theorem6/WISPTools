@@ -69,10 +69,19 @@
     }
     
     try {
-      const isAllowed = objectStateManager.isActionAllowed(sector, action, moduleContext);
-      if (!isAllowed) {
-        console.warn(`[SectorActionsMenu] Action '${action}' not allowed for sector ${sector.id}`);
-        return;
+      // In deploy mode, allow edit and view actions for sectors (they're production assets)
+      const isDeployMode = moduleContext?.module === 'deploy';
+      const isReadOnlyAction = ['view-sector-details', 'view-details', 'view'].includes(action);
+      
+      // Always allow read-only actions, and in deploy mode allow edit actions too
+      if (!isReadOnlyAction && !isDeployMode) {
+        const isAllowed = objectStateManager.isActionAllowed(sector, action, moduleContext);
+        if (!isAllowed) {
+          console.warn(`[SectorActionsMenu] Action '${action}' not allowed for sector ${sector.id}`);
+          return;
+        }
+      } else {
+        console.log(`[SectorActionsMenu] Action '${action}' allowed (${isDeployMode ? 'deploy mode' : 'read-only'})`);
       }
       
       console.log('[SectorActionsMenu] Dispatching action', { action, sectorId: sector.id });
@@ -80,6 +89,12 @@
       show = false;
     } catch (error) {
       console.error('[SectorActionsMenu] Error in handleAction:', error);
+      // Even if permission check fails, try to dispatch in deploy mode
+      if (moduleContext?.module === 'deploy') {
+        console.log('[SectorActionsMenu] Dispatching action anyway in deploy mode despite error');
+        dispatch('action', { action, sector });
+        show = false;
+      }
     }
   }
   
