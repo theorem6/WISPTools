@@ -3,6 +3,7 @@ const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../../models/network');
 const { SNMPMetrics } = require('../../models/snmp-metrics-schema');
 const { formatSNMPDevice, isFakeDevice } = require('./snmp-helpers');
+const { InventoryItem } = require('../../models/inventory');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -114,32 +115,80 @@ router.get('/discovered', async (req, res) => {
     console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
     console.log(`📦 Found ${deployedEquipment.length} deployed equipment items from deploy module`);
     
-    // Combine discovered and deployed equipment (deployed will have initial "unknown" status)
-    const allDevicesToProcess = [...discoveredEquipment, ...deployedEquipment];
+    // Also get deployed InventoryItem records that should appear as devices
+    let deployedInventoryItems = [];
+    try {
+      if (InventoryItem) {
+        deployedInventoryItems = await InventoryItem.find({
+          tenantId: req.tenantId,
+          status: 'deployed',
+          // Only include items with IP addresses or site associations
+          $or: [
+            { ipAddress: { $exists: true, $ne: null, $ne: '' } },
+            { 'technicalSpecs.ipAddress': { $exists: true, $ne: null, $ne: '' } },
+            { 'currentLocation.siteId': { $exists: true, $ne: null } },
+            { 'modules.coverageMap.siteId': { $exists: true, $ne: null } }
+          ]
+        }).lean();
+        
+        console.log(`📦 Found ${deployedInventoryItems.length} deployed inventory items that should appear as devices`);
+      }
+    } catch (inventoryError) {
+      console.warn('[SNMP API] InventoryItem query failed, skipping inventory check:', inventoryError.message);
+    }
     
-    // Get deployments to check deployment status
-    let deployments = [];
+    // Also get HardwareDeployment records that should appear as devices
+    let hardwareDeployments = [];
     try {
       if (HardwareDeployment) {
-        deployments = await HardwareDeployment.find({
+        hardwareDeployments = await HardwareDeployment.find({
           tenantId: req.tenantId,
           status: 'deployed'
         }).lean();
+        
+        console.log(`🔧 Found ${hardwareDeployments.length} hardware deployments that should appear as devices`);
       }
     } catch (deploymentError) {
       console.warn('[SNMP API] HardwareDeployment query failed, skipping deployment check:', deploymentError.message);
     }
     
+    // Combine discovered and deployed equipment (deployed will have initial "unknown" status)
+    const allDevicesToProcess = [...discoveredEquipment, ...deployedEquipment];
+    
+    // Collect all siteIds from NetworkEquipment, InventoryItem, and HardwareDeployment
+    const allSiteIds = new Set();
+    
+    // From NetworkEquipment
+    allDevicesToProcess.forEach(eq => {
+      const siteId = eq.siteId;
+      if (siteId) {
+        const siteIdStr = typeof siteId === 'object' ? (siteId._id || siteId).toString() : String(siteId);
+        allSiteIds.add(siteIdStr);
+      }
+    });
+    
+    // From InventoryItem
+    deployedInventoryItems.forEach(item => {
+      const siteId = item.currentLocation?.siteId || item.modules?.coverageMap?.siteId;
+      if (siteId) {
+        allSiteIds.add(String(siteId));
+      }
+    });
+    
+    // From HardwareDeployment
+    hardwareDeployments.forEach(deployment => {
+      const siteId = deployment.siteId;
+      if (siteId) {
+        const siteIdStr = typeof siteId === 'object' ? (siteId._id || siteId).toString() : String(siteId);
+        allSiteIds.add(siteIdStr);
+      }
+    });
+    
     // Get all sites to look up locations for devices with siteId
     const sitesMap = new Map();
-    const siteIds = allDevicesToProcess
-      .map(eq => eq.siteId)
-      .filter(id => id)
-      .map(id => typeof id === 'object' ? id._id || id : id);
-    
-    if (siteIds.length > 0) {
+    if (allSiteIds.size > 0) {
       const sites = await UnifiedSite.find({
-        _id: { $in: siteIds },
+        _id: { $in: Array.from(allSiteIds) },
         tenantId: req.tenantId
       }).select('_id name location').lean();
       
@@ -224,8 +273,8 @@ router.get('/discovered', async (req, res) => {
         });
       }
       
-      // Check if device is deployed (has siteId or matches a deployment)
-      const isDeployed = !!siteIdString || deployments.some(d => {
+      // Check if device is deployed (has siteId or matches a hardware deployment)
+      const isDeployed = !!siteIdString || hardwareDeployments.some(d => {
         const deviceIP = notes.management_ip || equipment.serialNumber;
         return (d.config?.management_ip === deviceIP || d.name === equipment.name);
       });

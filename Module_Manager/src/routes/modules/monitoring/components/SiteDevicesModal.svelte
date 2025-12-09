@@ -20,7 +20,7 @@
   $: tenantId = $currentTenant?.id || '';
 
   async function loadSiteDevices() {
-    if (!site || !networkDevices) return;
+    if (!site) return;
 
     loading = true;
     
@@ -29,7 +29,8 @@
     const siteId = site.siteId || site.id || site._id;
     const deviceId = site.deviceId || site.id?.replace('tower-', '');
 
-    siteDevices = networkDevices.filter(device => {
+    // Get devices from networkDevices array
+    const devicesFromNetwork = (networkDevices || []).filter(device => {
       // First try matching by siteId - find ALL devices at this site
       const deviceSiteId = device.siteId || device.site_id;
       if (siteId && deviceSiteId && String(deviceSiteId) === String(siteId)) {
@@ -42,6 +43,64 @@
       }
       return false;
     });
+
+    // Also load hardware deployments and equipment for this site
+    let additionalDevices: any[] = [];
+    try {
+      const { coverageMapService } = await import('../../coverage-map/lib/coverageMapService.mongodb');
+      
+      // Load hardware deployments
+      const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+      const siteDeployments = allDeployments.filter((d: any) => {
+        const deploymentSiteId = d.siteId?._id || d.siteId?.id || d.siteId;
+        return siteId && deploymentSiteId && String(deploymentSiteId) === String(siteId);
+      });
+      
+      // Convert deployments to device format
+      additionalDevices.push(...siteDeployments.map((d: any) => ({
+        id: `deployment-${d._id || d.id}`,
+        name: d.name || 'Hardware Deployment',
+        type: d.hardware_type || 'other',
+        status: 'unknown',
+        ipAddress: d.config?.ipAddress || d.config?.ip_address || d.config?.management_ip || null,
+        siteId: String(siteId),
+        isHardwareDeployment: true
+      })));
+      
+      // Load equipment
+      const allEquipment = await coverageMapService.getEquipment(tenantId);
+      const siteEquipment = allEquipment.filter((eq: any) => {
+        const eqSiteId = eq.siteId?._id || eq.siteId?.id || eq.siteId;
+        return siteId && eqSiteId && String(eqSiteId) === String(siteId);
+      });
+      
+      // Convert equipment to device format
+      additionalDevices.push(...siteEquipment.map((eq: any) => {
+        let ipAddress = null;
+        if (eq.notes) {
+          try {
+            const notes = typeof eq.notes === 'string' ? JSON.parse(eq.notes) : eq.notes;
+            ipAddress = notes.management_ip || notes.ip_address || null;
+          } catch {
+            // Ignore parse errors
+          }
+        }
+        return {
+          id: eq.id || eq._id,
+          name: eq.name || 'Equipment',
+          type: eq.type || 'other',
+          status: 'unknown',
+          ipAddress: ipAddress,
+          siteId: String(siteId),
+          isEquipment: true
+        };
+      }));
+    } catch (err) {
+      console.error('[SiteDevicesModal] Error loading additional devices:', err);
+    }
+
+    // Combine all devices
+    siteDevices = [...devicesFromNetwork, ...additionalDevices];
 
     loading = false;
     await loadDeviceUptimes();

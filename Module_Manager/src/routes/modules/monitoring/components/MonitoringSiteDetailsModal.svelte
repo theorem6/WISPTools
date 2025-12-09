@@ -106,38 +106,73 @@
     const siteId = site.id || site._id;
     
     // Get all devices at this site from networkDevices prop
-    const siteDevices = networkDevices.filter((device: any) => {
-      const deviceSiteId = device.siteId || device.site_id;
-      return siteId && deviceSiteId && String(deviceSiteId) === String(siteId);
-    });
+    const siteDevices = getSiteDevices();
+    
+    // Also include devices from hardware deployments and equipment at this site
+    const allSiteDevices = [
+      ...siteDevices,
+      ...hardwareDeployments.map((d: any) => ({
+        id: `deployment-${d._id || d.id}`,
+        name: d.name,
+        type: d.hardware_type || 'other',
+        status: 'unknown',
+        ipAddress: d.config?.ipAddress || d.config?.ip_address || d.config?.management_ip || null,
+        siteId: String(siteId)
+      })),
+      ...equipment.map((eq: any) => ({
+        id: eq.id || eq._id,
+        name: eq.name,
+        type: eq.type || 'other',
+        status: 'unknown',
+        ipAddress: eq.notes ? (() => {
+          try {
+            const notes = typeof eq.notes === 'string' ? JSON.parse(eq.notes) : eq.notes;
+            return notes.management_ip || notes.ip_address || null;
+          } catch {
+            return null;
+          }
+        })() : null,
+        siteId: String(siteId)
+      }))
+    ];
 
     const newDeviceUptimes = new Map();
-    for (const device of siteDevices) {
-      if (device.ipAddress || device.id) {
+    for (const device of allSiteDevices) {
+      // Use device ID - could be network equipment ID, deployment ID, or equipment ID
+      const deviceId = device.id;
+      
+      if (device.ipAddress || deviceId) {
         try {
-          const response = await fetch(`${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${device.id}?hours=168`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'X-Tenant-ID': tenantId
+          // Try to get ping data if device has an ID that can be used
+          // Only try if it's a network equipment ID (not deployment- or inventory- prefix)
+          if (deviceId && !deviceId.startsWith('deployment-') && !deviceId.startsWith('inventory-')) {
+            const response = await fetch(`${API_CONFIG.PATHS.MONITORING_GRAPHS}/ping/${deviceId}?hours=168`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Tenant-ID': tenantId
+              }
+            });
+            if (response.ok) {
+              const data = await response.json();
+              newDeviceUptimes.set(deviceId, data.stats);
+            } else {
+              // If device status is "unknown", keep it as unknown instead of offline
+              const currentStatus = device.status === 'unknown' ? 'unknown' : 'offline';
+              newDeviceUptimes.set(deviceId, { uptime_percent: 0, current_status: currentStatus, message: 'No data' });
             }
-          });
-          if (response.ok) {
-            const data = await response.json();
-            newDeviceUptimes.set(device.id, data.stats);
           } else {
-            // If device status is "unknown", keep it as unknown instead of offline
-            const currentStatus = device.status === 'unknown' ? 'unknown' : 'offline';
-            newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: currentStatus, message: 'No data' });
+            // For deployment/inventory devices without monitoring data yet, show as unknown
+            newDeviceUptimes.set(deviceId, { uptime_percent: 0, current_status: 'unknown', message: 'Configure monitoring' });
           }
         } catch (error) {
-          console.error(`Error loading uptime for device ${device.id}:`, error);
+          console.error(`Error loading uptime for device ${deviceId}:`, error);
           // If device status is "unknown", keep it as unknown instead of offline
           const currentStatus = device.status === 'unknown' ? 'unknown' : 'offline';
-          newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: currentStatus, message: 'Error' });
+          newDeviceUptimes.set(deviceId, { uptime_percent: 0, current_status: currentStatus, message: 'Error' });
         }
       } else {
         // Device without IP - show as unknown (grey) not offline
-        newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: 'unknown', message: 'No IP - Configure IP address' });
+        newDeviceUptimes.set(deviceId, { uptime_percent: 0, current_status: 'unknown', message: 'No IP - Configure IP address' });
       }
     }
     deviceUptimes = newDeviceUptimes;
@@ -164,14 +199,60 @@
     }
   }
 
-  // Get all devices at this site (from networkDevices prop)
+  // Get all devices at this site (from networkDevices prop, hardware deployments, and equipment)
   function getSiteDevices(): any[] {
-    if (!site || !networkDevices) return [];
+    if (!site) return [];
     const siteId = site.id || site._id;
-    return networkDevices.filter((device: any) => {
+    
+    const devicesFromNetwork = (networkDevices || []).filter((device: any) => {
       const deviceSiteId = device.siteId || device.site_id;
       return siteId && deviceSiteId && String(deviceSiteId) === String(siteId);
     });
+    
+    // Also include hardware deployments at this site as devices
+    const devicesFromDeployments = hardwareDeployments.map((d: any) => {
+      const deploymentSiteId = d.siteId?._id || d.siteId?.id || d.siteId;
+      if (siteId && deploymentSiteId && String(deploymentSiteId) === String(siteId)) {
+        return {
+          id: `deployment-${d._id || d.id}`,
+          name: d.name || 'Hardware Deployment',
+          type: d.hardware_type || 'other',
+          status: 'unknown',
+          ipAddress: d.config?.ipAddress || d.config?.ip_address || d.config?.management_ip || null,
+          siteId: String(siteId),
+          isHardwareDeployment: true
+        };
+      }
+      return null;
+    }).filter(Boolean);
+    
+    // Also include equipment at this site as devices
+    const devicesFromEquipment = equipment.map((eq: any) => {
+      const eqSiteId = eq.siteId?._id || eq.siteId?.id || eq.siteId;
+      if (siteId && eqSiteId && String(eqSiteId) === String(siteId)) {
+        let ipAddress = null;
+        if (eq.notes) {
+          try {
+            const notes = typeof eq.notes === 'string' ? JSON.parse(eq.notes) : eq.notes;
+            ipAddress = notes.management_ip || notes.ip_address || null;
+          } catch {
+            // Ignore parse errors
+          }
+        }
+        return {
+          id: eq.id || eq._id,
+          name: eq.name || 'Equipment',
+          type: eq.type || 'other',
+          status: 'unknown',
+          ipAddress: ipAddress,
+          siteId: String(siteId),
+          isEquipment: true
+        };
+      }
+      return null;
+    }).filter(Boolean);
+    
+    return [...devicesFromNetwork, ...devicesFromDeployments, ...devicesFromEquipment];
   }
 </script>
 
