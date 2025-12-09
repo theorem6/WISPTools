@@ -200,10 +200,12 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
               typeof event.data === 'object' &&
               event.data.type === 'asset-click' &&
               event.data.source === 'coverage-map') {
+            console.log('[Deploy] 🔵🔵🔵 Processing asset-click message, full data:', event.data);
             const detail = event.data.detail || event.data;
+            console.log('[Deploy] 🔵🔵🔵 Extracted detail:', detail);
             const { type, id, data, screenX, screenY, isRightClick } = detail;
             
-            console.log('[Deploy] 🔵🔵🔵 Received asset-click message:', { type, id, isRightClick, screenX, screenY });
+            console.log('[Deploy] 🔵🔵🔵 Received asset-click message:', { type, id, isRightClick, screenX, screenY, hasDetail: !!detail });
             
             if (!isRightClick) {
               console.log('[Deploy] Ignoring left-click on asset');
