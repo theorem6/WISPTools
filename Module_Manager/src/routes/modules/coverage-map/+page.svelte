@@ -951,12 +951,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           console.error('[CoverageMap] Tower not found or missing id', { id, tower, towers });
         }
       } else if (type === 'sector') {
-        const sector = sectors.find(s => s.id === id);
+        console.log('[CoverageMap] Right-click on sector:', { id, type, sectorsCount: sectors.length, sectors: sectors.map(s => ({ id: s.id, name: s.name })) });
+        const sector = sectors.find(s => (s.id === id) || (s._id === id));
         if (sector) {
+          console.log('[CoverageMap] ✅ Found sector for menu:', sector);
           selectedSectorForMenu = sector;
           sectorMenuX = screenX;
           sectorMenuY = screenY;
           showSectorActionsMenu = true;
+        } else {
+          console.error('[CoverageMap] ❌ Sector not found:', { id, type, availableSectorIds: sectors.map(s => s.id || s._id) });
         }
       } else if (type === 'cpe') {
         const cpe = cpeDevices.find(c => c.id === id);

@@ -1574,8 +1574,12 @@ export class CoverageMapController {
         import('@arcgis/core/symbols/TextSymbol.js')
       ]);
 
-      this.graphicsLayer.removeAll();
-      if (this.backhaulLayer) this.backhaulLayer.removeAll();
+      if (this.graphicsLayer) {
+        this.graphicsLayer.removeAll();
+      }
+      if (this.backhaulLayer) {
+        this.backhaulLayer.removeAll();
+      }
 
       if (this.filters.showBackhaul && this.backhaulLayer) {
         await this.renderBackhaulLinks();
@@ -1629,48 +1633,51 @@ export class CoverageMapController {
         });
       }
 
-      if (this.filters.showSectors) {
+      if (this.filters.showSectors && this.graphicsLayer) {
         const filteredSectors = this.filterSectorsByBand(this.data.sectors || []);
 
-        filteredSectors.forEach(async sector => {
-          const sectorPolygon = createSectorCone(
-            sector.location.latitude,
-            sector.location.longitude,
-            sector.azimuth,
-            sector.beamwidth,
-            0.01
-          );
-
-          const color = getBandColor(sector.band || sector.technology);
-
-          const fillSymbol = new SimpleFillSymbol({
-            color: [...hexToRgb(color), 0.4],
-            outline: {
-              color: color,
-              width: 2
+        for (const sector of filteredSectors) {
+          try {
+            if (!sector.location?.latitude || !sector.location?.longitude) {
+              console.warn('[CoverageMap] Sector missing location:', sector.id, sector.name);
+              continue;
             }
-          });
 
-          const graphic = new Graphic({
-            geometry: sectorPolygon,
-            symbol: {
-              type: 'simple-fill',
-              color,
-              style: 'solid',
-              outline: {
-                color: '#ffffff',
-                width: 0.5
+            const sectorPolygon = createSectorCone(
+              sector.location.latitude,
+              sector.location.longitude,
+              sector.azimuth || 0,
+              sector.beamwidth || 60,
+              0.01
+            );
+
+            const color = getBandColor(sector.band || sector.technology);
+
+            const graphic = new Graphic({
+              geometry: sectorPolygon,
+              symbol: {
+                type: 'simple-fill',
+                color,
+                style: 'solid',
+                outline: {
+                  color: '#ffffff',
+                  width: 0.5
+                }
+              },
+              attributes: {
+                ...sector,
+                type: 'sector',
+                id: sector.id
               }
-            },
-            attributes: {
-              ...sector,
-              type: 'sector',
-              id: sector.id
-            }
-          });
+            });
 
-          this.graphicsLayer!.add(graphic);
-        });
+            if (this.graphicsLayer) {
+              this.graphicsLayer.add(graphic);
+            }
+          } catch (sectorError) {
+            console.error('[CoverageMap] Error rendering sector:', sector.id, sectorError);
+          }
+        }
       }
 
       if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
