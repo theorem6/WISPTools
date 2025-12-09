@@ -606,13 +606,28 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
 
   async function loadReadyPlans() {
-    const tenantId = $currentTenant?.id;
-    // Ensure tenantId is a valid non-empty string
+    // Get tenantId at the start and validate it
+    let tenantId = $currentTenant?.id;
+    
+    // If tenantId is not available from store, try localStorage as fallback
     if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') {
-      console.warn('[Deploy] loadReadyPlans called but no valid tenantId available:', tenantId);
+      if (typeof window !== 'undefined') {
+        tenantId = localStorage.getItem('selectedTenantId') || null;
+      }
+    }
+    
+    // Final validation - ensure tenantId is a valid non-empty string
+    if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') {
+      console.warn('[Deploy] loadReadyPlans called but no valid tenantId available:', { 
+        fromStore: $currentTenant?.id,
+        fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
+        tenantId 
+      });
+      isLoadingPlans = false;
       return;
     }
     
+    console.log('[Deploy] ✅ loadReadyPlans starting with tenantId:', tenantId);
     isLoadingPlans = true;
     try {
         // Get ALL projects (plans)
@@ -638,10 +653,16 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           await mapLayerManager.loadPlan(tenantId, planToLoad);
         }
         
-        // Load deployed hardware count - only if tenantId is still valid
+        // Load deployed hardware count - validate tenantId again before making the call
         try {
-          // Triple-check tenantId is still valid before making the call
-          const currentTenantId = $currentTenant?.id;
+          // Re-check tenantId from store and localStorage before making the call
+          let currentTenantId = $currentTenant?.id;
+          if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
+            if (typeof window !== 'undefined') {
+              currentTenantId = localStorage.getItem('selectedTenantId') || null;
+            }
+          }
+          
           if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantId) {
             const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
             console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
@@ -652,6 +673,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
               currentTenantId, 
               expectedTenantId: tenantId,
+              fromStore: $currentTenant?.id,
+              fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
               match: currentTenantId === tenantId 
             });
           }
