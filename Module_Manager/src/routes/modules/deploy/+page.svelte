@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
-  import { currentTenant } from '$lib/stores/tenantStore';
+  import { currentTenant, tenantReady } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { planService, type PlanProject } from '$lib/services/planService';
   // SettingsButton removed - now only on dashboard
@@ -368,7 +368,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   
   // Reactive statement to watch for tenant availability
   $: {
-    // Force reactive statement to evaluate - access the store to trigger reactivity
+    // Check if tenant store is ready
+    const isTenantReady = $tenantReady;
     const tenant = $currentTenant;
     const tenantId = tenant?.id;
     
@@ -383,6 +384,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     }
     
     console.log('[Deploy] 🔍 Reactive statement evaluated:', { 
+      isTenantReady,
       hasTenant: !!tenant, 
       tenantId: tenantIdString, 
       fromStore: tenantId,
@@ -411,7 +413,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     }
     
     // Only trigger if tenantId is a valid non-empty string and we haven't loaded yet
-    if (tenantIdString && !isLoadingPlans && !hasLoadedPlans) {
+    // Also wait for tenant store to be ready (or use localStorage if available)
+    if (tenantIdString && !isLoadingPlans && !hasLoadedPlans && (isTenantReady || tenantIdString)) {
       console.log('[Deploy] ✅✅✅ Tenant available, scheduling loadReadyPlans:', tenantIdString);
       hasLoadedPlans = true; // Prevent multiple calls
       // Use setTimeout to ensure tenant store is fully settled
@@ -447,6 +450,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     } else if (!tenantIdString) {
       // Tenant not ready yet
       console.log('[Deploy] ⏳ Waiting for tenant...', { 
+        isTenantReady,
         hasTenant: !!tenant, 
         hasTenantId: !!tenantId, 
         tenantIdValue: tenantId,
