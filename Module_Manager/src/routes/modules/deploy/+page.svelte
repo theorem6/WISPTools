@@ -359,7 +359,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       }
 
       mapLayerManager.setMode('deploy');
-      await loadReadyPlans();
+      // Don't call loadReadyPlans here - wait for tenant to be available via reactive statement
+      // await loadReadyPlans();
     })().catch((err) => {
       console.error('[Deploy] onMount initialization failed:', err);
     });
@@ -574,10 +575,15 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         // Load deployed hardware count
         try {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-          const deployments = await coverageMapService.getAllHardwareDeployments(tenantId);
-          deployedCount = deployments.length;
+          if (tenantId) {
+            const deployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+            deployedCount = deployments.length;
+          } else {
+            console.warn('[Deploy] Skipping deployment count load - no tenantId');
+          }
         } catch (err) {
           console.error('Failed to load deployment count:', err);
+          // Don't throw - this is non-critical
         }
         
         // Load and count sectors for planner buttons
