@@ -3,6 +3,7 @@
   import { browser, version as appVersion } from '$app/environment';
   import { get } from 'svelte/store';
   import { mapContext } from './mapContext';
+  import { currentTenant } from '$lib/stores/tenantStore';
   import type { MapModuleMode } from './MapCapabilities';
   import type { MapLayerState } from './mapContext';
 
@@ -101,12 +102,16 @@
           }
         : null;
 
+      // Get tenant ID from store to pass to iframe
+      const tenantId = get(currentTenant)?.id || null;
+      
       targetWindow.postMessage(
         {
           source: 'shared-map',
           type: 'state-update',
           payload: {
             mode,
+            tenantId, // Pass tenantId so iframe can set it in localStorage
             state: {
               mode: mapState.mode,
               activePlanId: mapState.activePlan?.id ?? null,

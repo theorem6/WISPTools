@@ -699,6 +699,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     
     if (source === 'shared-map' && type === 'state-update') {
       const state = payload?.state ?? {};
+      
+      // Set tenantId in localStorage if provided (for iframe context where tenant store might not be ready)
+      const tenantIdFromState = payload?.tenantId;
+      if (tenantIdFromState && typeof window !== 'undefined') {
+        const currentStoredTenant = localStorage.getItem('selectedTenantId');
+        if (currentStoredTenant !== tenantIdFromState) {
+          localStorage.setItem('selectedTenantId', tenantIdFromState);
+          console.log('[CoverageMap] Set tenantId from state-update:', tenantIdFromState);
+        }
+      }
 
       sharedMapMode = payload?.mode ?? state.mode ?? null;
       sharedCapabilities = state.capabilities ?? sharedCapabilities;
