@@ -1667,7 +1667,9 @@ export class CoverageMapController {
               attributes: {
                 ...sector,
                 type: 'sector',
-                id: sector.id
+                id: sector.id || sector._id,
+                name: sector.name,
+                siteId: sector.siteId
               }
             });
 
