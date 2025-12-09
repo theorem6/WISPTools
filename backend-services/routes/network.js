@@ -219,11 +219,15 @@ router.put('/sectors/:id', async (req, res) => {
     if (!existingSector) return res.status(404).json({ error: 'Sector not found' });
     
     // Authorization check
-    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
-    const isOwner = existingSector.createdBy === userEmail;
+    const userEmail = (req.user?.email || req.body.email || req.headers['x-user-email'] || '').trim();
+    const normalizedCreator = (existingSector.createdBy || '').trim();
+    const isOwner = normalizedCreator && userEmail && normalizedCreator.toLowerCase() === userEmail.toLowerCase();
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
     
-    if (!isOwner && !isAdmin && existingSector.createdBy) {
+    // Allow editing sectors created by system/auto/automated/unknown (adoptable)
+    const adoptableOwner = !normalizedCreator || ['system', 'auto', 'automated', 'unknown'].includes(normalizedCreator.toLowerCase());
+    
+    if (!isOwner && !isAdmin && !adoptableOwner) {
       return res.status(403).json({ 
         error: 'Forbidden', 
         message: 'You can only edit sectors you created' 
