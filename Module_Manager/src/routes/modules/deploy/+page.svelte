@@ -275,8 +275,22 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                     console.error('[Deploy] Error handling sector right-click:', err);
                   }
                 })();
+              } else if (type === 'backhaul' && id) {
+                // Handle backhaul right-click - let the iframe handle it directly
+                // The iframe (coverage-map) should handle backhaul clicks internally
+                // We just need to not block it - the iframe's handleAssetClick should process it
+                console.log('[Deploy] 🔵🔵🔵 Backhaul right-click detected - allowing iframe to handle:', { backhaulId: id });
+                // Don't return early - let the message pass through or be handled by iframe
+                // Actually, the iframe should have already processed it, but the message is being intercepted
+                // For now, don't block it - let it fall through
               }
-              return; // Don't process further
+              
+              // Only return early for sectors (they need special handling)
+              // For backhauls, the iframe should handle it directly, so we don't block
+              if (type === 'sector') {
+                return; // Don't process further for sectors (we handled it above)
+              }
+              // For other types (backhaul, tower, etc.), continue processing or let iframe handle
             } else {
               console.log('[Deploy] ⚠️ Asset-click from wrong source, ignoring:', event.data.source);
             }

@@ -1152,20 +1152,86 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           setTimeout(() => success = '', 3000);
         }
       } else if (type === 'backhaul') {
-        // Find the backhaul equipment
-        const backhaulEquipment = equipment.find(eq => eq.id === id && eq.type === 'backhaul');
+        console.log('[CoverageMap] 🔵🔵🔵 Right-click on backhaul detected:', { 
+          id, 
+          type, 
+          equipmentCount: equipment.length, 
+          equipmentIds: equipment.map(eq => ({ id: eq.id, _id: (eq as any)._id, type: eq.type, name: eq.name })),
+          searchingFor: id,
+          idType: typeof id,
+          dataFromEvent: data
+        });
+        
+        // Try multiple ways to find the backhaul (similar to sectors)
+        let backhaulEquipment = equipment.find(eq => eq.id === id && eq.type === 'backhaul');
+        if (!backhaulEquipment) {
+          backhaulEquipment = equipment.find(eq => (eq as any)._id === id && eq.type === 'backhaul');
+        }
+        if (!backhaulEquipment) {
+          backhaulEquipment = equipment.find(eq => String(eq.id) === String(id) && eq.type === 'backhaul');
+        }
+        if (!backhaulEquipment) {
+          backhaulEquipment = equipment.find(eq => String((eq as any)._id) === String(id) && eq.type === 'backhaul');
+        }
+        
+        // If still not found and we have data from the event, try to construct it
+        if (!backhaulEquipment && data && isRightClick) {
+          console.log('[CoverageMap] ⚠️ Backhaul not found in equipment array, using event data:', data);
+          // Use the data from the event to create a backhaul object
+          backhaulEquipment = {
+            id: data.id || id,
+            name: data.name || 'Unknown Backhaul',
+            type: 'backhaul' as const,
+            location: data.location || { latitude: 0, longitude: 0 },
+            locationType: 'tower' as const,
+            manufacturer: data.equipmentManufacturer || '',
+            model: data.equipmentModel || '',
+            serialNumber: data.equipmentSerialNumber || '',
+            status: data.status || 'active' as const,
+            tenantId: data.tenantId || tenantId || '',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            ...data
+          } as NetworkEquipment;
+        }
+        
         if (backhaulEquipment && isRightClick) {
           console.log('[CoverageMap] ✅✅✅ Found backhaul for menu:', { 
             backhaul: backhaulEquipment, 
             id: backhaulEquipment.id, 
-            name: backhaulEquipment.name
+            _id: (backhaulEquipment as any)._id,
+            name: backhaulEquipment.name,
+            type: backhaulEquipment.type
           });
           selectedBackhaulForMenu = backhaulEquipment;
           backhaulMenuX = screenX;
           backhaulMenuY = screenY;
           showBackhaulActionsMenu = true;
+          console.log('[CoverageMap] ✅✅✅ Backhaul menu state set:', { 
+            showBackhaulActionsMenu, 
+            backhaulMenuX, 
+            backhaulMenuY,
+            hasBackhaul: !!selectedBackhaulForMenu
+          });
+        } else if (!isRightClick) {
+          success = `Backhaul Link: ${data?.name || 'Unknown'}`;
+          setTimeout(() => success = '', 3000);
         } else {
-          success = `Backhaul Link: ${data.name || 'Unknown'}`;
+          console.error('[CoverageMap] ❌❌❌ Backhaul not found:', { 
+            id, 
+            type, 
+            idType: typeof id,
+            availableBackhaulIds: equipment
+              .filter(eq => eq.type === 'backhaul')
+              .map(eq => ({ 
+                id: eq.id, 
+                _id: (eq as any)._id, 
+                name: eq.name,
+                idString: String(eq.id),
+                _idString: String((eq as any)._id)
+              }))
+          });
+          success = `Backhaul Link: ${data?.name || 'Unknown'} - Right-click for options`;
           setTimeout(() => success = '', 3000);
         }
       } else {
@@ -1427,6 +1493,58 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   function handleSectorModalSaved() {
     selectedSectorForEdit = null; // Clear after save
     handleModalSaved();
+  }
+  
+  function handleBackhaulAction(event: CustomEvent) {
+    const { action, backhaul } = event.detail;
+    
+    console.log('[CoverageMap] handleBackhaulAction called', { action, backhaul, hasBackhaul: !!backhaul });
+    
+    if (!backhaul) {
+      console.error('❌ Backhaul action called without backhaul');
+      return;
+    }
+    
+    switch (action) {
+      case 'add-backhaul':
+        // Add new backhaul
+        console.log('[CoverageMap] Add backhaul');
+        selectedBackhaulForEdit = null; // Clear any backhaul being edited
+        showAddBackhaulModal = true;
+        console.log('[CoverageMap] Opening AddBackhaulLinkModal for adding new backhaul');
+        break;
+      case 'edit-backhaul':
+        // Open backhaul edit modal
+        console.log('[CoverageMap] Edit backhaul:', backhaul);
+        if (backhaul) {
+          selectedBackhaulForEdit = backhaul;
+          showAddBackhaulModal = true;
+          console.log('[CoverageMap] Opening AddBackhaulLinkModal for editing backhaul:', backhaul.name);
+        }
+        break;
+      case 'delete-backhaul':
+        // Delete backhaul
+        console.log('[CoverageMap] Delete backhaul:', backhaul);
+        if (confirm(`Are you sure you want to delete backhaul "${backhaul.name}"?`)) {
+          deleteBackhaul(backhaul.id || (backhaul as any)._id);
+        }
+        break;
+      default:
+        console.warn('[CoverageMap] Unknown backhaul action:', action);
+    }
+  }
+  
+  async function deleteBackhaul(backhaulId: string) {
+    try {
+      await coverageMapService.deleteEquipment(tenantId, backhaulId);
+      success = 'Backhaul deleted successfully.';
+      setTimeout(() => success = '', 3000);
+      await loadAllData();
+    } catch (err: any) {
+      console.error('[CoverageMap] Failed to delete backhaul:', err);
+      error = err?.message || 'Failed to delete backhaul';
+      setTimeout(() => error = '', 5000);
+    }
   }
   
   function handleBackhaulModalSaved() {
