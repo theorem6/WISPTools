@@ -111,11 +111,15 @@ router.put('/sites/:id', async (req, res) => {
     if (!existingSite) return res.status(404).json({ error: 'Site not found' });
     
     // Authorization check: Only allow updates if user created the site or is admin
-    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
-    const isOwner = existingSite.createdBy === userEmail;
+    const userEmail = (req.user?.email || req.body.email || req.headers['x-user-email'] || '').trim();
+    const normalizedCreator = (existingSite.createdBy || '').trim();
+    const isOwner = normalizedCreator && userEmail && normalizedCreator.toLowerCase() === userEmail.toLowerCase();
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
     
-    if (!isOwner && !isAdmin && existingSite.createdBy) {
+    // Allow editing sites created by system/auto/automated/unknown (adoptable)
+    const adoptableOwner = !normalizedCreator || ['system', 'auto', 'automated', 'unknown'].includes(normalizedCreator.toLowerCase());
+    
+    if (!isOwner && !isAdmin && !adoptableOwner) {
       return res.status(403).json({ 
         error: 'Forbidden', 
         message: 'You can only edit sites you created' 
@@ -440,11 +444,15 @@ router.put('/equipment/:id', async (req, res) => {
     if (!existingEquipment) return res.status(404).json({ error: 'Equipment not found' });
     
     // Authorization check
-    const userEmail = req.user?.email || req.body.email || req.headers['x-user-email'];
-    const isOwner = existingEquipment.createdBy === userEmail;
+    const userEmail = (req.user?.email || req.body.email || req.headers['x-user-email'] || '').trim();
+    const normalizedCreator = (existingEquipment.createdBy || '').trim();
+    const isOwner = normalizedCreator && userEmail && normalizedCreator.toLowerCase() === userEmail.toLowerCase();
     const isAdmin = req.user?.role === 'admin' || req.user?.role === 'owner';
     
-    if (!isOwner && !isAdmin && existingEquipment.createdBy) {
+    // Allow editing equipment created by system/auto/automated/unknown (adoptable)
+    const adoptableOwner = !normalizedCreator || ['system', 'auto', 'automated', 'unknown'].includes(normalizedCreator.toLowerCase());
+    
+    if (!isOwner && !isAdmin && !adoptableOwner) {
       return res.status(403).json({ 
         error: 'Forbidden', 
         message: 'You can only edit equipment you created' 
