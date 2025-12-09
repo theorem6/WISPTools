@@ -167,6 +167,20 @@
         }, '*');
         console.log('[SharedMap] Rectangle-drawn message forwarded to parent window');
       }
+    } else if (type === 'asset-click') {
+      // Forward asset-click messages (for right-click handling on sectors, towers, etc.)
+      console.log('[SharedMap] 🔵 Forwarding asset-click message:', event.data);
+      window.dispatchEvent(new CustomEvent('asset-click', {
+        detail: event.data
+      }));
+      // Also forward to parent if we're in a nested iframe
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          source: 'coverage-map',
+          type: 'asset-click',
+          ...event.data
+        }, '*');
+      }
     } else if (type === 'object-action') {
       // Handle object-action messages - we're already in the Deploy/Plan module context
       console.log('[SharedMap] 🔥 Received object-action message from iframe:', event.data);
