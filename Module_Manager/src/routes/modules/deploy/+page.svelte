@@ -196,6 +196,17 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           }
           
           // Handle asset-click messages directly
+          // Log the structure to debug
+          if (event.data && typeof event.data === 'object' && event.data.type === 'asset-click') {
+            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED! Full event.data:', JSON.stringify(event.data, null, 2));
+            console.log('[Deploy] 🔵🔵🔵 Checking source:', { 
+              hasSource: 'source' in event.data, 
+              source: event.data.source, 
+              expected: 'coverage-map',
+              matches: event.data.source === 'coverage-map'
+            });
+          }
+          
           if (event.data && 
               typeof event.data === 'object' &&
               event.data.type === 'asset-click' &&
