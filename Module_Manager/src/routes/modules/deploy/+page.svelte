@@ -218,12 +218,43 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             // Process if source matches OR if no source check (be more lenient)
             if (event.data.source === 'coverage-map' || !event.data.source) {
               console.log('[Deploy] 🔵🔵🔵 Processing asset-click - source check passed');
-            console.log('[Deploy] 🔵🔵🔵 Processing asset-click message, full data:', event.data);
-            const detail = event.data.detail || event.data;
-            console.log('[Deploy] 🔵🔵🔵 Extracted detail:', detail);
-            const { type, id, data, screenX, screenY, isRightClick } = detail;
-            
-            console.log('[Deploy] 🔵🔵🔵 Received asset-click message:', { type, id, isRightClick, screenX, screenY, hasDetail: !!detail });
+              console.log('[Deploy] 🔵🔵🔵 Full event.data structure:', JSON.parse(JSON.stringify(event.data)));
+              
+              // The detail might be nested or at the root level
+              let detail = event.data.detail;
+              if (!detail || typeof detail !== 'object') {
+                // If detail doesn't exist or is invalid, try using event.data itself
+                console.log('[Deploy] ⚠️ event.data.detail is invalid, trying event.data itself');
+                detail = event.data;
+              }
+              
+              console.log('[Deploy] 🔵🔵🔵 Extracted detail:', JSON.parse(JSON.stringify(detail)));
+              console.log('[Deploy] 🔵🔵🔵 Detail structure check:', {
+                isObject: typeof detail === 'object',
+                isNull: detail === null,
+                isUndefined: detail === undefined,
+                keys: detail ? Object.keys(detail) : 'N/A',
+                hasType: detail && 'type' in detail,
+                hasId: detail && 'id' in detail,
+                hasIsRightClick: detail && 'isRightClick' in detail
+              });
+              
+              if (!detail || typeof detail !== 'object') {
+                console.error('[Deploy] ❌❌❌ Detail is invalid after extraction:', { detail, type: typeof detail });
+                return;
+              }
+              
+              const { type, id, data, screenX, screenY, isRightClick } = detail;
+              
+              console.log('[Deploy] 🔵🔵🔵 Received asset-click message:', { 
+                type, 
+                id, 
+                isRightClick, 
+                screenX, 
+                screenY, 
+                hasDetail: !!detail,
+                detailKeys: Object.keys(detail)
+              });
             
             if (!isRightClick) {
               console.log('[Deploy] Ignoring left-click on asset');
