@@ -641,8 +641,13 @@
     }
   }
   
-  // Watch for device changes
-  $: if (devices) {
+  // Watch for device changes - wait for towers to be loaded so devices can get locations from sites
+  $: if (devices && towers.length > 0) {
+    convertDevicesToEquipment();
+  }
+  
+  // Also re-process devices when towers change (sites loaded)
+  $: if (devices && towers.length > 0) {
     convertDevicesToEquipment();
   }
   
