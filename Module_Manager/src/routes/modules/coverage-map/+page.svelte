@@ -162,7 +162,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
     storedTenantId = localStorage.getItem('selectedTenantId');
   }
-  $: tenantId = $currentTenant?.id || storedTenantId || '';
+  // Reactive tenantId - use store first, then localStorage fallback for iframe
+  $: tenantId = $currentTenant?.id || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null) || '';
   $: tenantName = $currentTenant?.displayName || 'Organization';
   
   // Check if stats should be hidden (for plan module)
@@ -741,12 +742,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         // Update storedTenantId to trigger reactive update
         storedTenantId = tenantIdFromState;
         
-        // If we're in an iframe and haven't loaded data yet, load it now
+        // If we're in an iframe, trigger data load now that we have tenantId
         if (window.parent && window.parent !== window) {
-          console.log('[CoverageMap] Received tenantId in iframe, will load data...');
-          // Trigger loadAllData via reactive statement by updating tenantId
+          console.log('[CoverageMap] Received tenantId in iframe, loading data...');
+          // Use the tenantId from state to load data
           setTimeout(() => {
-            if (tenantIdFromState && !tenantId) {
+            if (tenantIdFromState) {
               loadAllData().catch(err => {
                 console.error('[CoverageMap] Failed to load data after receiving tenantId:', err);
               });
