@@ -169,16 +169,26 @@
       }
     } else if (type === 'asset-click') {
       // Forward asset-click messages (for right-click handling on sectors, towers, etc.)
-      console.log('[SharedMap] 🔵 Forwarding asset-click message:', event.data);
+      // The detail is in event.data.detail (not event.data itself)
+      const assetClickDetail = event.data.detail || event.data;
+      console.log('[SharedMap] 🔵 Forwarding asset-click message:', { 
+        type, 
+        detail: assetClickDetail,
+        hasDetail: !!assetClickDetail,
+        detailKeys: assetClickDetail ? Object.keys(assetClickDetail) : []
+      });
+      
+      // Dispatch as a CustomEvent with the detail
       window.dispatchEvent(new CustomEvent('asset-click', {
-        detail: event.data
+        detail: assetClickDetail
       }));
+      
       // Also forward to parent if we're in a nested iframe
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({
           source: 'coverage-map',
           type: 'asset-click',
-          ...event.data
+          detail: assetClickDetail
         }, '*');
       }
     } else if (type === 'object-action') {
