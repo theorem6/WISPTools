@@ -967,21 +967,60 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           type, 
           sectorsCount: sectors.length, 
           sectors: sectors.map(s => ({ id: s.id, _id: s._id, name: s.name })),
-          searchingFor: id
+          searchingFor: id,
+          idType: typeof id
         });
-        const sector = sectors.find(s => (s.id === id) || (s._id === id));
+        
+        // Try multiple ways to find the sector
+        let sector = sectors.find(s => s.id === id);
+        if (!sector) {
+          sector = sectors.find(s => s._id === id);
+        }
+        if (!sector) {
+          sector = sectors.find(s => String(s.id) === String(id));
+        }
+        if (!sector) {
+          sector = sectors.find(s => String(s._id) === String(id));
+        }
+        
         if (sector) {
-          console.log('[CoverageMap] ✅✅✅ Found sector for menu:', { sector, id: sector.id, _id: sector._id });
+          console.log('[CoverageMap] ✅✅✅ Found sector for menu:', { 
+            sector, 
+            id: sector.id, 
+            _id: sector._id,
+            name: sector.name
+          });
           selectedSectorForMenu = sector;
           sectorMenuX = screenX;
           sectorMenuY = screenY;
           showSectorActionsMenu = true;
-          console.log('[CoverageMap] ✅✅✅ Sector menu state set:', { showSectorActionsMenu, sectorMenuX, sectorMenuY });
+          console.log('[CoverageMap] ✅✅✅ Sector menu state set:', { 
+            showSectorActionsMenu, 
+            sectorMenuX, 
+            sectorMenuY,
+            hasSector: !!selectedSectorForMenu,
+            sectorName: selectedSectorForMenu?.name
+          });
+          
+          // Force reactivity update
+          setTimeout(() => {
+            console.log('[CoverageMap] ✅✅✅ After timeout - Sector menu state:', { 
+              showSectorActionsMenu, 
+              hasSector: !!selectedSectorForMenu 
+            });
+          }, 100);
         } else {
           console.error('[CoverageMap] ❌❌❌ Sector not found:', { 
             id, 
             type, 
-            availableSectorIds: sectors.map(s => ({ id: s.id, _id: s._id, name: s.name }))
+            idType: typeof id,
+            availableSectorIds: sectors.map(s => ({ 
+              id: s.id, 
+              _id: s._id, 
+              name: s.name,
+              idString: String(s.id),
+              _idString: String(s._id)
+            }))
           });
         }
       } else if (type === 'cpe') {

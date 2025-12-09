@@ -251,8 +251,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         };
         console.log('[Deploy] 🔥🔥🔥 Global handler updated in onMount:', typeof (window as any).__deployHandleViewInventory);
         
-        // Store handler for cleanup
+        // Store handlers for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;
+        (window as any).__deployAssetClickHandler = assetClickHandler;
       } else {
         console.warn('[Deploy] ❌ Iframe not found in mapContainer');
       }
@@ -267,6 +268,14 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       if (iframeListenerAttached) {
         window.removeEventListener('iframe-object-action', handleIframeObjectAction);
         iframeListenerAttached = false;
+      }
+      if ((window as any).__deployAssetClickHandler) {
+        window.removeEventListener('asset-click', (window as any).__deployAssetClickHandler);
+        delete (window as any).__deployAssetClickHandler;
+      }
+      if ((window as any).__deployDirectMessageHandler) {
+        window.removeEventListener('message', (window as any).__deployDirectMessageHandler);
+        delete (window as any).__deployDirectMessageHandler;
       }
       iframeCommunicationService.destroy();
       iframeReady = false;
