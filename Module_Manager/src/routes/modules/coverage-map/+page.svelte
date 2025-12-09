@@ -895,7 +895,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   function handleAssetClick(event: CustomEvent) {
     const { type, id, data, screenX, screenY, isRightClick } = event.detail;
-    // console.log(`Clicked ${type}:`, id, data);
+    console.log('[CoverageMap] 🔵 handleAssetClick called:', { type, id, isRightClick, hasData: !!data });
 
     if (!type?.startsWith('plan-')) {
       showPlanDraftMenu = false;
@@ -904,6 +904,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
     const planningMode = isPlanMode || sharedMapMode === 'plan';
     if (planningMode && !planEditingEnabled && isRightClick) {
+      console.log('[CoverageMap] Planning mode but editing not enabled');
       if (!error) {
         error = 'Start a plan to edit or deploy assets.';
         setTimeout(() => error = '', 4000);
@@ -930,7 +931,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     }
     
     // Check if this is a read-only item from ACS or CBRS
-    if (data.modules?.acs || data.modules?.cbrs) {
+    if (data?.modules?.acs || data?.modules?.cbrs) {
       success = `This ${type} is managed by the ${data.modules.acs ? 'ACS' : 'CBRS'} module (read-only)`;
       setTimeout(() => success = '', 5000);
       return;
@@ -938,7 +939,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     
     // Only show menu for right-clicks
     if (isRightClick) {
-      // Handle all asset types - show actions menu
+      console.log('[CoverageMap] 🔵 Right-click detected, type:', type);
+      
       if (type === 'tower' || type === 'noc' || type === 'warehouse') {
         const tower = towers.find(t => t.id === id);
         if (tower && tower.id) {
@@ -951,16 +953,27 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           console.error('[CoverageMap] Tower not found or missing id', { id, tower, towers });
         }
       } else if (type === 'sector') {
-        console.log('[CoverageMap] Right-click on sector:', { id, type, sectorsCount: sectors.length, sectors: sectors.map(s => ({ id: s.id, name: s.name })) });
+        console.log('[CoverageMap] 🔵🔵🔵 Right-click on sector detected:', { 
+          id, 
+          type, 
+          sectorsCount: sectors.length, 
+          sectors: sectors.map(s => ({ id: s.id, _id: s._id, name: s.name })),
+          searchingFor: id
+        });
         const sector = sectors.find(s => (s.id === id) || (s._id === id));
         if (sector) {
-          console.log('[CoverageMap] ✅ Found sector for menu:', sector);
+          console.log('[CoverageMap] ✅✅✅ Found sector for menu:', { sector, id: sector.id, _id: sector._id });
           selectedSectorForMenu = sector;
           sectorMenuX = screenX;
           sectorMenuY = screenY;
           showSectorActionsMenu = true;
+          console.log('[CoverageMap] ✅✅✅ Sector menu state set:', { showSectorActionsMenu, sectorMenuX, sectorMenuY });
         } else {
-          console.error('[CoverageMap] ❌ Sector not found:', { id, type, availableSectorIds: sectors.map(s => s.id || s._id) });
+          console.error('[CoverageMap] ❌❌❌ Sector not found:', { 
+            id, 
+            type, 
+            availableSectorIds: sectors.map(s => ({ id: s.id, _id: s._id, name: s.name }))
+          });
         }
       } else if (type === 'cpe') {
         const cpe = cpeDevices.find(c => c.id === id);
@@ -977,7 +990,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       } else if (type === 'backhaul') {
         success = `Backhaul Link: ${data.name || 'Unknown'}`;
         setTimeout(() => success = '', 3000);
+      } else {
+        console.warn('[CoverageMap] ⚠️ Unknown asset type for right-click:', type);
       }
+    } else {
+      console.log('[CoverageMap] Left-click on asset:', type, id);
     }
   }
   
