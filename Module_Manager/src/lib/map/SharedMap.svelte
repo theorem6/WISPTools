@@ -67,6 +67,7 @@
     if (!iframeEl) return;
     currentUrl = nextUrl;
     iframeLoaded = false;
+    console.log('[SharedMap] 🔵🔵🔵 Setting iframe src to:', nextUrl);
     iframeEl.src = nextUrl;
   };
 
