@@ -159,9 +159,23 @@
         // Check if editing an existing sector in this plan
         // If sectorToEdit exists and has planId matching current plan, update it
         if (sectorToEdit && sectorToEdit.id && sectorToEdit.planId === planId) {
-          // Try to update as plan feature first (if it's a staged feature)
-          // If that fails, it might be a production sector with planId - update via coverageMapService
-          try {
+          // Check if this is a plan layer feature (staged) or production sector with planId
+          // Plan features typically have IDs starting with 'local-' or are in the staged features
+          // Production sectors have MongoDB ObjectIds
+          const isPlanFeature = (sectorToEdit as any).isPlanDraft === true || 
+                                String(sectorToEdit.id).startsWith('local-') ||
+                                (sectorToEdit as any).planDraft === true;
+          
+          console.log('[AddSectorModal] Saving sector in plan:', {
+            sectorId: sectorToEdit.id,
+            planId,
+            isPlanFeature,
+            sectorPlanId: sectorToEdit.planId
+          });
+          
+          if (isPlanFeature) {
+            // Update as plan layer feature (staged)
+            console.log('[AddSectorModal] Updating plan layer feature');
             await mapLayerManager.updateFeature(planId, sectorToEdit.id, {
               properties,
               geometry: {
@@ -170,9 +184,9 @@
               }
             });
             dispatch('saved', { message: 'Sector updated in plan.' });
-          } catch (planFeatureError) {
-            // If updateFeature fails, it's likely a production sector with planId
-            // Update via coverageMapService instead
+          } else {
+            // Update as production sector with planId
+            console.log('[AddSectorModal] Updating production sector with planId');
             const sectorData: any = {
               siteId: formData.siteId,
               name: formData.name,
