@@ -36,11 +36,12 @@
     status: 'active' as const
   };
   
-  // Track if we've initialized the form to prevent infinite loops
-  let formInitialized = false;
+  // Track last shown state to detect when modal opens
+  let lastShowState = false;
   
-  // Pre-fill form when modal opens with sectorToEdit
-  $: if (show && !formInitialized) {
+  // Pre-fill form when modal opens (only when show changes from false to true)
+  $: if (show && !lastShowState) {
+    // Modal just opened - initialize form
     if (sectorToEdit) {
       // Edit mode - pre-fill with existing data
       formData = {
@@ -82,15 +83,16 @@
         status: 'active' as const
       };
     }
-    formInitialized = true;
+    lastShowState = true;
+  } else if (!show && lastShowState) {
+    // Modal just closed - reset flag
+    lastShowState = false;
   }
   
-  // Reset initialization flag when modal closes
-  $: if (!show) {
-    formInitialized = false;
+  // Update siteId when selectedSite changes (only in create mode)
+  $: if (selectedSite && !sectorToEdit && show) {
+    formData.siteId = selectedSite.id;
   }
-  
-  $: if (selectedSite && !sectorToEdit) formData.siteId = selectedSite.id;
   
   // Update location when site changes
   $: selectedSiteData = sites.find(s => s.id === formData.siteId);
