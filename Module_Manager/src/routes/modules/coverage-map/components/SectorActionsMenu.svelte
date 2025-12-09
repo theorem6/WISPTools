@@ -69,27 +69,36 @@
     }
     
     try {
-      // In deploy mode, allow ALL actions for sectors (they're production assets)
-      const isDeployMode = moduleContext?.module === 'deploy';
+      // CRITICAL: In deploy mode, allow ALL actions for sectors (they're production assets)
+      // Check URL params as fallback in case moduleContext isn't set correctly
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+      const contextDeployMode = moduleContext?.module === 'deploy';
+      const isDeployMode = contextDeployMode || urlDeployMode;
+      
       const isReadOnlyAction = ['view-sector-details', 'view-details', 'view'].includes(action);
       
-      console.log('[SectorActionsMenu] Permission check:', { 
+      console.log('[SectorActionsMenu] 🔵🔵🔵 Permission check:', { 
         action, 
-        isDeployMode, 
+        contextDeployMode,
+        urlDeployMode,
+        isDeployMode,
         isReadOnlyAction, 
-        moduleContext: moduleContext?.module,
+        moduleContextModule: moduleContext?.module,
+        moduleContext: moduleContext,
         sectorId: sector.id 
       });
       
-      // Always allow read-only actions, and in deploy mode allow ALL actions (including edit)
+      // ALWAYS allow actions in deploy mode - skip all permission checks
       if (isDeployMode) {
-        console.log(`[SectorActionsMenu] ✅ Action '${action}' allowed in deploy mode`);
-        // In deploy mode, skip permission checks entirely
+        console.log(`[SectorActionsMenu] ✅✅✅ Action '${action}' ALLOWED in deploy mode (skipping permission check)`);
+        // Skip to dispatch - don't check permissions
       } else if (isReadOnlyAction) {
         console.log(`[SectorActionsMenu] ✅ Action '${action}' allowed (read-only)`);
         // Read-only actions are always allowed
       } else {
         // Only check permissions if NOT deploy mode and NOT read-only
+        console.log(`[SectorActionsMenu] Checking permissions for '${action}' (not deploy mode)`);
         const isAllowed = objectStateManager.isActionAllowed(sector, action, moduleContext);
         if (!isAllowed) {
           console.warn(`[SectorActionsMenu] ❌ Action '${action}' not allowed for sector ${sector.id}`);
@@ -98,14 +107,16 @@
         console.log(`[SectorActionsMenu] ✅ Action '${action}' allowed via permission check`);
       }
       
-      console.log('[SectorActionsMenu] Dispatching action', { action, sectorId: sector.id });
+      console.log('[SectorActionsMenu] ✅✅✅ Dispatching action', { action, sectorId: sector.id });
       dispatch('action', { action, sector });
       show = false;
     } catch (error) {
       console.error('[SectorActionsMenu] Error in handleAction:', error);
       // Even if permission check fails, try to dispatch in deploy mode
-      if (moduleContext?.module === 'deploy') {
-        console.log('[SectorActionsMenu] ✅ Dispatching action anyway in deploy mode despite error');
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const isDeployMode = moduleContext?.module === 'deploy' || urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+      if (isDeployMode) {
+        console.log('[SectorActionsMenu] ✅✅✅ Dispatching action anyway in deploy mode despite error');
         dispatch('action', { action, sector });
         show = false;
       }
