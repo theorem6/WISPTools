@@ -337,7 +337,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>From Site (A) *</label>
-            <select bind:value={formData.fromSiteId} disabled={!canCreateBackhaul}>
+            <select bind:value={formData.fromSiteId} disabled={!canCreateBackhaul || !!backhaulToEdit}>
               <option value="">-- Select site --</option>
               {#each sites as site}
                 <option value={site.id}>{site.name} ({site.type})</option>
@@ -347,7 +347,7 @@
           
           <div class="form-group">
             <label>To Site (B) *</label>
-            <select bind:value={formData.toSiteId} disabled={!canCreateBackhaul}>
+            <select bind:value={formData.toSiteId} disabled={!canCreateBackhaul || !!backhaulToEdit}>
               <option value="">-- Select site --</option>
               {#each availableToSites as site}
                 <option value={site.id}>{site.name} ({site.type})</option>

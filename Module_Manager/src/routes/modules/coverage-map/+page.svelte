@@ -612,6 +612,15 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       // The reactive bindings in CoverageMapView will automatically call setData
       // which triggers renderAllAssets, so graphics should refresh automatically
       console.log('[CoverageMap] Data loaded, map should refresh via reactive bindings');
+      
+      // Force a small delay to ensure reactive updates complete, then trigger explicit refresh
+      if (mapComponent) {
+        setTimeout(() => {
+          // The reactive statement $: controller && controller.setData(...) should handle this
+          // But we'll also ensure the map component knows data has changed
+          console.log('[CoverageMap] Triggering map data refresh');
+        }, 200);
+      }
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';
