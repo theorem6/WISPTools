@@ -1006,9 +1006,13 @@ export class CoverageMapController {
       event.stopPropagation();
     });
 
+    // Prevent browser context menu on right-click
     this.mapView.container.addEventListener('contextmenu', (e: MouseEvent) => {
       e.preventDefault();
-    });
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      return false;
+    }, true); // Use capture phase to catch it early
 
     this.mapView.on('pointer-down', async (event: any) => {
       if (event.button !== 2) {
