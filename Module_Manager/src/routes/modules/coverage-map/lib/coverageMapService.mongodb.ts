@@ -9,10 +9,28 @@ export class CoverageMapService {
   
   // Helper to get auth token
   private async getAuthToken(): Promise<string> {
+    // Try using authService first (more reliable in iframe context)
+    try {
+      const { authService } = await import('$lib/services/authService');
+      const token = await authService.getAuthToken();
+      if (token) {
+        return token;
+      }
+    } catch (err) {
+      console.warn('[CoverageMapService] authService.getAuthToken failed, trying direct Firebase auth:', err);
+    }
+    
+    // Fallback to direct Firebase auth
     const { auth } = await import('$lib/firebase');
     const currentUser = auth().currentUser;
     if (!currentUser) {
-      throw new Error('Not authenticated');
+      // Wait a bit for auth to initialize (iframe might be loading)
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const retryUser = auth().currentUser;
+      if (!retryUser) {
+        throw new Error('Not authenticated - no user found in Firebase auth');
+      }
+      return await retryUser.getIdToken();
     }
     return await currentUser.getIdToken();
   }
