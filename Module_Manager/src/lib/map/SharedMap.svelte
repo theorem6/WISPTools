@@ -27,9 +27,12 @@
       return envHost.replace(/\/$/, '');
     }
     
-    // Always use wisptools.io (it's already set up)
+    // FORCE wisptools.io - it's already set up as the frontend
+    console.log('[SharedMap] 🔵🔵🔵 Setting iframe host to wisptools.io');
     return 'https://wisptools.io';
   })();
+  
+  console.log('[SharedMap] 🔵🔵🔵 coverageMapHost:', coverageMapHost);
 
   const buildUrl = (state: MapLayerState = mapState) => {
     const params = new URLSearchParams();

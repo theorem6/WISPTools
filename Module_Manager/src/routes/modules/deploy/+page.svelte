@@ -183,10 +183,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         
         // Also add a direct message listener as a fallback - MUST be on window, not iframe
         const directMessageHandler = (event: MessageEvent) => {
-          // Handle asset-click messages FIRST
+          // Handle asset-click messages FIRST - CRITICAL: This must run
           if (event.data && typeof event.data === 'object' && event.data.type === 'asset-click') {
-            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED!');
-            console.log('[Deploy] 🔵🔵🔵 Full event.data:', event.data);
+            console.log('[Deploy] 🔵🔵🔵🔵🔵 ASSET-CLICK DETECTED! FORCE LOG');
+            console.log('[Deploy] 🔵🔵🔵 Full event.data:', JSON.stringify(event.data, null, 2));
+            console.log('[Deploy] 🔵🔵🔵 event.data.detail:', JSON.stringify(event.data.detail, null, 2));
             
             // Process if source matches OR if no source check (be more lenient)
             if (event.data.source === 'coverage-map' || !event.data.source) {
