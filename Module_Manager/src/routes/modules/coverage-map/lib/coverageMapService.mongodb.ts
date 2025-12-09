@@ -362,13 +362,13 @@ export class CoverageMapService {
     return await this.apiCall(`hardware-deployments/${deploymentId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
-    });
+    }, tenantId);
   }
   
   async removeHardwareDeployment(tenantId: string, deploymentId: string): Promise<void> {
     await this.apiCall(`hardware-deployments/${deploymentId}`, {
       method: 'DELETE'
-    });
+    }, tenantId);
   }
 }
 
