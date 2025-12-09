@@ -171,15 +171,7 @@
     onclick={() => handleAction('edit-sector')}
   >
     <span class="menu-icon">✏️</span>
-    <span>Edit Sector</span>
-  </button>
-  
-  <button 
-    class="menu-item" 
-    onclick={() => handleAction('view-sector-details')}
-  >
-    <span class="menu-icon">👁️</span>
-    <span>View Details</span>
+    <span>View / Edit Sector</span>
   </button>
   
   <div class="menu-divider"></div>

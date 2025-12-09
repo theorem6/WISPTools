@@ -1102,21 +1102,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         }
         break;
       case 'view-sector-details':
-        // Show sector details (use alert for now, or create a details modal)
-        console.log('[CoverageMap] View sector details:', sector);
+        // View details opens the same modal as edit (combined functionality)
+        console.log('[CoverageMap] View sector details (opening edit modal):', sector);
         if (sector) {
-          const details = [
-            `Name: ${sector.name}`,
-            `Technology: ${sector.technology || 'N/A'}`,
-            `Status: ${sector.status || 'N/A'}`,
-            `Band: ${sector.band || 'N/A'}`,
-            `Frequency: ${sector.frequency ? `${sector.frequency} MHz` : 'N/A'}`,
-            `Azimuth: ${sector.azimuth !== undefined ? `${sector.azimuth}°` : 'N/A'}`,
-            `Beamwidth: ${sector.beamwidth !== undefined ? `${sector.beamwidth}°` : 'N/A'}`,
-            `Power: ${sector.power !== undefined ? `${sector.power} dBm` : 'N/A'}`,
-            `Location: ${sector.location?.latitude ? `${sector.location.latitude.toFixed(6)}, ${sector.location.longitude.toFixed(6)}` : 'N/A'}`
-          ].join('\n');
-          alert(`Sector Details:\n\n${details}`);
+          // Find the site for this sector
+          const site = towers.find(t => t.id === sector.siteId || String(t.id) === String(sector.siteId));
+          selectedSiteForSector = site || null;
+          // Set the sector to edit - AddSectorModal will show details and allow editing
+          selectedSectorForEdit = sector;
+          showAddSectorModal = true;
+          console.log('[CoverageMap] Opening AddSectorModal for viewing/editing sector:', sector.name);
         }
         break;
       case 'delete-sector':

@@ -368,7 +368,7 @@
     <div class="modal-footer">
       <button class="btn-secondary" onclick={handleClose}>Cancel</button>
       <button class="btn-primary" onclick={handleSave} disabled={isSaving}>
-        {isSaving ? 'Saving...' : '✅ Create Sector'}
+        {isSaving ? 'Saving...' : (sectorToEdit ? '✅ Save Changes' : '✅ Create Sector')}
       </button>
     </div>
   </div>
