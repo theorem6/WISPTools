@@ -12,27 +12,39 @@ export class CoverageMapService {
     // Try using authService first (more reliable in iframe context)
     try {
       const { authService } = await import('$lib/services/authService');
-      const token = await authService.getAuthToken();
-      if (token) {
-        return token;
+      // Wait for auth to be ready (iframe might still be initializing)
+      let attempts = 0;
+      while (attempts < 5) {
+        const token = await authService.getAuthToken();
+        if (token) {
+          return token;
+        }
+        // Wait 200ms between attempts
+        await new Promise(resolve => setTimeout(resolve, 200));
+        attempts++;
       }
     } catch (err) {
-      console.warn('[CoverageMapService] authService.getAuthToken failed, trying direct Firebase auth:', err);
+      console.warn('[CoverageMapService] authService.getAuthToken failed after retries, trying direct Firebase auth:', err);
     }
     
     // Fallback to direct Firebase auth
     const { auth } = await import('$lib/firebase');
-    const currentUser = auth().currentUser;
-    if (!currentUser) {
-      // Wait a bit for auth to initialize (iframe might be loading)
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const retryUser = auth().currentUser;
-      if (!retryUser) {
-        throw new Error('Not authenticated - no user found in Firebase auth');
+    let attempts = 0;
+    while (attempts < 5) {
+      const currentUser = auth().currentUser;
+      if (currentUser) {
+        try {
+          return await currentUser.getIdToken();
+        } catch (err) {
+          console.warn('[CoverageMapService] getIdToken failed, retrying...', err);
+        }
       }
-      return await retryUser.getIdToken();
+      // Wait 200ms between attempts
+      await new Promise(resolve => setTimeout(resolve, 200));
+      attempts++;
     }
-    return await currentUser.getIdToken();
+    
+    throw new Error('Not authenticated - no user found after retries');
   }
   
   // Helper for API calls

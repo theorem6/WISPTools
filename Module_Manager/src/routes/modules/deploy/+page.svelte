@@ -223,31 +223,35 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
               // Handle sector right-click - send message to iframe to show menu
               if (type === 'sector' && id) {
                 console.log('[Deploy] 🔵🔵🔵 Handling sector right-click:', { id, type, screenX, screenY });
-                // Fetch sector data and send to iframe to show menu
+                // Use the sector data from the detail if available, otherwise fetch it
                 (async () => {
                   try {
-                    const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-                    const tenantId = $currentTenant?.id;
-                    if (!tenantId) {
-                      console.error('[Deploy] No tenant ID for sector lookup');
-                      return;
-                    }
+                    let sector = data; // Use the sector data from the event detail
+                    const tenantId = data?.tenantId || $currentTenant?.id;
                     
-                    // Get all sectors and find the matching one
-                    const allSectors = await coverageMapService.getSectors(tenantId);
-                    let sector = allSectors.find((s: any) => s.id === id);
-                    if (!sector) {
-                      sector = allSectors.find((s: any) => s._id === id);
-                    }
-                    if (!sector) {
-                      sector = allSectors.find((s: any) => String(s.id) === String(id));
-                    }
-                    if (!sector) {
-                      sector = allSectors.find((s: any) => String(s._id) === String(id));
+                    // If we don't have full sector data, fetch it
+                    if (!sector || !sector.name) {
+                      if (!tenantId) {
+                        console.error('[Deploy] No tenant ID for sector lookup - trying reactive store');
+                        // Wait a bit for reactive store to update
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        const retryTenantId = $currentTenant?.id;
+                        if (!retryTenantId) {
+                          console.error('[Deploy] Still no tenant ID after wait');
+                          return;
+                        }
+                        const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+                        const allSectors = await coverageMapService.getSectors(retryTenantId);
+                        sector = allSectors.find((s: any) => s.id === id || s._id === id);
+                      } else {
+                        const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+                        const allSectors = await coverageMapService.getSectors(tenantId);
+                        sector = allSectors.find((s: any) => s.id === id || s._id === id) || data;
+                      }
                     }
                     
                     if (sector) {
-                      console.log('[Deploy] ✅✅✅ Found sector, sending to iframe:', { sectorId: sector.id, sectorName: sector.name });
+                      console.log('[Deploy] ✅✅✅ Found sector, sending to iframe:', { sectorId: sector.id || sector._id, sectorName: sector.name });
                       // Send message to iframe to show the menu
                       const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
                       if (iframe?.contentWindow) {
@@ -265,11 +269,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
                         console.error('[Deploy] ❌ Iframe contentWindow not available');
                       }
                     } else {
-                      console.error('[Deploy] ❌ Sector not found:', { 
-                        id, 
-                        idType: typeof id,
-                        allSectorIds: allSectors.map((s: any) => ({ id: s.id, _id: s._id, name: s.name }))
-                      });
+                      console.error('[Deploy] ❌ Sector not found after lookup');
                     }
                   } catch (err) {
                     console.error('[Deploy] Error handling sector right-click:', err);
