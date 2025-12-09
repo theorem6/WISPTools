@@ -678,6 +678,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         }
         
         // Load deployed hardware count - validate tenantId again before making the call
+        // This is non-critical, so we wrap it in a try-catch and don't let it fail the entire load
         try {
           // Re-check tenantId from store and localStorage before making the call
           let currentTenantId = $currentTenant?.id;
@@ -687,12 +688,23 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             }
           }
           
+          // Final validation before making the API call
           if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantId) {
             const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
             console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
-            const deployments = await coverageMapService.getAllHardwareDeployments(currentTenantId);
-            deployedCount = deployments.length;
-            console.log('[Deploy] ✅ Loaded deployment count:', deployedCount);
+            try {
+              const deployments = await coverageMapService.getAllHardwareDeployments(currentTenantId);
+              deployedCount = deployments.length;
+              console.log('[Deploy] ✅ Loaded deployment count:', deployedCount);
+            } catch (deploymentErr: any) {
+              // If getAllHardwareDeployments fails, log but don't throw - it's non-critical
+              console.warn('[Deploy] ⚠️ Failed to load deployment count (non-critical):', deploymentErr?.message || deploymentErr);
+              if (deploymentErr?.message?.includes('No tenant selected')) {
+                console.warn('[Deploy] ⚠️ Tenant was lost during deployment count load, will retry on next tenant change');
+              }
+              // Set to 0 as fallback
+              deployedCount = 0;
+            }
           } else {
             console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
               currentTenantId, 
@@ -701,14 +713,13 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
               fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
               match: currentTenantId === tenantId 
             });
+            // Set to 0 as fallback
+            deployedCount = 0;
           }
         } catch (err: any) {
-          console.error('[Deploy] ❌ Failed to load deployment count:', err);
-          // Don't throw - this is non-critical, but log the error
-          if (err?.message?.includes('No tenant selected')) {
-            console.warn('[Deploy] ⚠️ Tenant was lost during deployment count load, will retry on next tenant change');
-            // Don't reset hasLoadedPlans here - let the reactive statement handle retry
-          }
+          // Outer catch for any unexpected errors
+          console.error('[Deploy] ❌ Unexpected error in deployment count load:', err);
+          deployedCount = 0; // Set to 0 as fallback
         }
         
         // Load and count sectors for planner buttons
