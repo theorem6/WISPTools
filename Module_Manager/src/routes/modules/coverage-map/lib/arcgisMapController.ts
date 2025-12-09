@@ -2404,7 +2404,10 @@ function getTowerColor(type: string, status?: string): string {
       active: '#10b981',      // Green - healthy/online
       inactive: '#ef4444',    // Red - down/offline
       maintenance: '#f59e0b', // Yellow - degraded/warning
-      planned: '#6b7280'      // Gray - planned sites
+      planned: '#6b7280',     // Gray - planned sites
+      online: '#10b981',      // Green - device is online
+      offline: '#ef4444',     // Red - device is offline
+      unknown: '#6b7280'      // Gray - unknown/unmonitored status (initial state)
     };
     if (statusColors[status]) {
       return statusColors[status];
@@ -2441,11 +2444,18 @@ function getBandColor(band: string): string {
 
 function getEquipmentColor(status: string): string {
   const colors: Record<string, string> = {
+    // Deployment statuses
     deployed: '#10b981',
     inventory: '#3b82f6',
     rma: '#f59e0b',
     retired: '#6b7280',
-    lost: '#ef4444'
+    lost: '#ef4444',
+    // Monitoring statuses (for devices in monitor module)
+    online: '#10b981',      // Green - device is online
+    offline: '#ef4444',     // Red - device is offline
+    unknown: '#6b7280',     // Gray - unknown/unmonitored status (initial state for devices from deploy)
+    active: '#10b981',      // Green - active/healthy
+    inactive: '#ef4444'     // Red - inactive/down
   };
   return colors[status] || colors.deployed;
 }

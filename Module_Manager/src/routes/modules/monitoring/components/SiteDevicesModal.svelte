@@ -76,14 +76,19 @@
             newDeviceUptimes.set(device.id, data.stats);
           } else {
             console.warn(`[SiteDevicesModal] Failed to load uptime for device ${device.id}:`, response.statusText);
-            newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: 'offline', message: 'No data' });
+            // If device status is "unknown", keep it as unknown instead of offline
+            const currentStatus = device.status === 'unknown' ? 'unknown' : 'offline';
+            newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: currentStatus, message: 'No data' });
           }
         } catch (error) {
           console.error(`[SiteDevicesModal] Error loading uptime for device ${device.id}:`, error);
-          newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: 'offline', message: 'Error' });
+          // If device status is "unknown", keep it as unknown instead of offline
+          const currentStatus = device.status === 'unknown' ? 'unknown' : 'offline';
+          newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: currentStatus, message: 'Error' });
         }
       } else {
-        newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: 'offline', message: 'No IP' });
+        // Device without IP - show as unknown (grey) not offline
+        newDeviceUptimes.set(device.id, { uptime_percent: 0, current_status: 'unknown', message: 'No IP - Configure IP address' });
       }
     }
     deviceUptimes = newDeviceUptimes;

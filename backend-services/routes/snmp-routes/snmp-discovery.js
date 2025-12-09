@@ -56,49 +56,66 @@ router.get('/discovery', async (req, res) => {
   }
 });
 
-// GET /api/snmp/discovered - Get discovered SNMP devices from EPC agents
+// GET /api/snmp/discovered - Get discovered SNMP devices from EPC agents AND all deployed devices
 router.get('/discovered', async (req, res) => {
   try {
     console.log(`🔍 [SNMP API] Fetching discovered SNMP devices for tenant: ${req.tenantId}`);
     
-    // Get devices that were discovered by EPC agents
-    // Notes can be stored as JSON string or object, and we need to search for discovery metadata
-    // Explicitly include siteId and inventoryId - with lean(), all fields should be included by default
-    // But we'll be explicit to ensure siteId is returned
+    // Get ALL active network equipment (including devices from deploy module)
+    // We want to show ALL deployed devices in monitor, not just discovered ones
     const allEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       status: 'active'
     }).lean();
     
-    // Filter devices that have discovery metadata in notes
-    const discoveredEquipment = allEquipment.filter(equipment => {
-      if (!equipment.notes) return false;
+    // Separate into discovered devices and deployed devices
+    const discoveredEquipment = [];
+    const deployedEquipment = [];
+    
+    allEquipment.forEach(equipment => {
+      // Check if device is deployed (has siteId - means it's from deploy module or has been deployed)
+      const hasSiteId = !!equipment.siteId;
       
-      // Try to parse as JSON first
-      let notes = null;
-      try {
-        notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
-      } catch (e) {
-        // If not JSON, check as plain string
-        const notesStr = String(equipment.notes).toLowerCase();
-        return notesStr.includes('discovered_by_epc') || 
-               notesStr.includes('discovery_source') || 
-               notesStr.includes('discovered_at') ||
-               notesStr.includes('epc_snmp_agent');
+      // Check if device has discovery metadata
+      let hasDiscoveryMetadata = false;
+      if (equipment.notes) {
+        try {
+          const notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
+          if (notes && typeof notes === 'object') {
+            hasDiscoveryMetadata = !!(notes.discovered_by_epc || 
+                                     notes.discovery_source === 'epc_snmp_agent' ||
+                                     notes.discovered_at ||
+                                     notes.last_discovered);
+          } else {
+            const notesStr = String(equipment.notes).toLowerCase();
+            hasDiscoveryMetadata = notesStr.includes('discovered_by_epc') || 
+                                   notesStr.includes('discovery_source') || 
+                                   notesStr.includes('discovered_at') ||
+                                   notesStr.includes('epc_snmp_agent');
+          }
+        } catch (e) {
+          const notesStr = String(equipment.notes).toLowerCase();
+          hasDiscoveryMetadata = notesStr.includes('discovered_by_epc') || 
+                                 notesStr.includes('discovery_source') || 
+                                 notesStr.includes('discovered_at') ||
+                                 notesStr.includes('epc_snmp_agent');
+        }
       }
       
-      // Check if it's an object with discovery metadata
-      if (notes && typeof notes === 'object') {
-        return notes.discovered_by_epc || 
-               notes.discovery_source === 'epc_snmp_agent' ||
-               notes.discovered_at ||
-               notes.last_discovered;
+      // Include if discovered OR if deployed (has siteId)
+      if (hasDiscoveryMetadata) {
+        discoveredEquipment.push(equipment);
+      } else if (hasSiteId) {
+        // Device from deploy module - include it even if not discovered
+        deployedEquipment.push(equipment);
       }
-      
-      return false;
     });
     
     console.log(`📡 Found ${discoveredEquipment.length} discovered SNMP equipment items`);
+    console.log(`📦 Found ${deployedEquipment.length} deployed equipment items from deploy module`);
+    
+    // Combine discovered and deployed equipment (deployed will have initial "unknown" status)
+    const allDevicesToProcess = [...discoveredEquipment, ...deployedEquipment];
     
     // Get deployments to check deployment status
     let deployments = [];
@@ -113,9 +130,28 @@ router.get('/discovered', async (req, res) => {
       console.warn('[SNMP API] HardwareDeployment query failed, skipping deployment check:', deploymentError.message);
     }
     
+    // Get all sites to look up locations for devices with siteId
+    const sitesMap = new Map();
+    const siteIds = allDevicesToProcess
+      .map(eq => eq.siteId)
+      .filter(id => id)
+      .map(id => typeof id === 'object' ? id._id || id : id);
+    
+    if (siteIds.length > 0) {
+      const sites = await UnifiedSite.find({
+        _id: { $in: siteIds },
+        tenantId: req.tenantId
+      }).select('_id name location').lean();
+      
+      sites.forEach(site => {
+        sitesMap.set(String(site._id), site);
+      });
+    }
+    
     const devices = [];
     
-    discoveredEquipment.forEach(equipment => {
+    // Process all devices (both discovered and deployed)
+    allDevicesToProcess.forEach(equipment => {
       // Parse notes to get discovery info
       let notes = {};
       if (equipment.notes) {
@@ -123,6 +159,32 @@ router.get('/discovered', async (req, res) => {
           notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
         } catch (e) {
           notes = {};
+        }
+      }
+      
+      // Check if this device has discovery metadata (determined in the loop above)
+      let hasDiscoveryMetadata = false;
+      if (equipment.notes) {
+        try {
+          const parsedNotes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
+          if (parsedNotes && typeof parsedNotes === 'object') {
+            hasDiscoveryMetadata = !!(parsedNotes.discovered_by_epc || 
+                                     parsedNotes.discovery_source === 'epc_snmp_agent' ||
+                                     parsedNotes.discovered_at ||
+                                     parsedNotes.last_discovered);
+          } else {
+            const notesStr = String(equipment.notes).toLowerCase();
+            hasDiscoveryMetadata = notesStr.includes('discovered_by_epc') || 
+                                   notesStr.includes('discovery_source') || 
+                                   notesStr.includes('discovered_at') ||
+                                   notesStr.includes('epc_snmp_agent');
+          }
+        } catch (e) {
+          const notesStr = String(equipment.notes).toLowerCase();
+          hasDiscoveryMetadata = notesStr.includes('discovered_by_epc') || 
+                                 notesStr.includes('discovery_source') || 
+                                 notesStr.includes('discovered_at') ||
+                                 notesStr.includes('epc_snmp_agent');
         }
       }
       
@@ -171,12 +233,38 @@ router.get('/discovered', async (req, res) => {
       // Get enable_graphs flag from notes (default true for deployed devices)
       const enableGraphs = isDeployed && (notes.enable_graphs !== false);
       
+      // Determine initial status:
+      // - If device has monitoring data (ping/SNMP), use that status
+      // - If device is deployed but has no monitoring data yet, use "unknown" (grey)
+      // - Otherwise use device status
+      let deviceStatus = 'unknown'; // Default to unknown (grey) for new deployed devices
+      
+      // Check if device has monitoring data (ping results or SNMP metrics)
+      const hasMonitoringData = notes.last_ping_result || 
+                                notes.last_snmp_poll || 
+                                notes.monitoring_status ||
+                                equipment.metrics;
+      
+      if (hasMonitoringData) {
+        // Use monitoring status if available
+        deviceStatus = notes.monitoring_status || 
+                      (notes.last_ping_result === 'success' ? 'online' : 
+                       notes.last_ping_result === 'failed' ? 'offline' : 
+                       equipment.status === 'active' ? 'online' : 'offline');
+      } else if (isDeployed) {
+        // Deployed but no monitoring data yet - show as unknown (grey)
+        deviceStatus = 'unknown';
+      } else {
+        // Not deployed or discovered - use device status
+        deviceStatus = equipment.status === 'active' ? 'online' : 'offline';
+      }
+      
       const device = {
         id: equipment._id.toString(),
         name: equipment.name || notes.sysName || notes.management_ip || 'Unknown Device',
         type: 'snmp',
         deviceType: equipment.type || notes.device_type || 'other',
-        status: equipment.status === 'active' ? 'online' : 'offline',
+        status: deviceStatus,
         manufacturer: notes.manufacturer_detected_via_oui || 
                       notes.oui_detection?.manufacturer || 
                       equipment.manufacturer || 
@@ -186,20 +274,41 @@ router.get('/discovered', async (req, res) => {
         siteId: siteIdString,
         isDeployed: !!isDeployed,
         enableGraphs: enableGraphs,
-        location: {
-          coordinates: {
-            latitude: equipment.location?.latitude || equipment.location?.coordinates?.latitude || 0,
-            longitude: equipment.location?.longitude || equipment.location?.coordinates?.longitude || 0
-          },
-          address: equipment.location?.address || 'Unknown Location'
-        },
-        ipAddress: notes.management_ip || equipment.serialNumber || 'Unknown',
+        location: (() => {
+          // First try device's own location
+          let lat = equipment.location?.latitude || equipment.location?.coordinates?.latitude;
+          let lon = equipment.location?.longitude || equipment.location?.coordinates?.longitude;
+          let address = equipment.location?.address;
+          
+          // If device has siteId but no valid coordinates, get location from site
+          if (siteIdString && (!lat || lat === 0) && sitesMap.has(siteIdString)) {
+            const site = sitesMap.get(siteIdString);
+            if (site && site.location) {
+              lat = site.location.latitude || site.location.coordinates?.latitude || 0;
+              lon = site.location.longitude || site.location.coordinates?.longitude || 0;
+              address = site.location.address || site.name || 'Unknown Location';
+            }
+          }
+          
+          return {
+            coordinates: {
+              latitude: lat || 0,
+              longitude: lon || 0
+            },
+            address: address || 'Unknown Location'
+          };
+        })(),
+        ipAddress: notes.management_ip || notes.ip_address || notes.ipAddress || equipment.serialNumber || 'Unknown',
         snmp: {
-          enabled: true,
+          enabled: !!(notes.snmp_community || notes.snmp_version || notes.snmp_enabled),
           version: notes.snmp_version || 'v2c',
           community: notes.snmp_community || 'public',
           port: notes.snmp_port || 161
         },
+        // Flag to indicate if device has monitoring configured
+        hasMonitoringConfigured: !!(notes.snmp_community || notes.management_ip || equipment.metrics),
+        // Flag to indicate if this is a deployed device (from deploy module)
+        isDeployedDevice: isDeployed && !hasDiscoveryMetadata,
         discoveredBy: notes.discovered_by_epc || 'Unknown EPC',
         discoveredAt: notes.discovered_at || equipment.createdAt || new Date().toISOString(),
         lastSeen: notes.last_discovered || equipment.updatedAt || new Date().toISOString(),
@@ -217,10 +326,15 @@ router.get('/discovered', async (req, res) => {
       devices.push(device);
     });
     
-    // Count deployed devices for debugging
+    // Count devices by status for debugging
     const deployedCount = devices.filter(d => d.isDeployed).length;
     const withSiteIdCount = devices.filter(d => d.siteId).length;
-    console.log(`📊 Returning ${devices.length} discovered SNMP devices for tenant ${req.tenantId} (${deployedCount} deployed, ${withSiteIdCount} with siteId)`);
+    const unknownStatusCount = devices.filter(d => d.status === 'unknown').length;
+    const onlineStatusCount = devices.filter(d => d.status === 'online').length;
+    const offlineStatusCount = devices.filter(d => d.status === 'offline').length;
+    console.log(`📊 Returning ${devices.length} devices for tenant ${req.tenantId}:`);
+    console.log(`   - ${deployedCount} deployed (${withSiteIdCount} with siteId)`);
+    console.log(`   - Status: ${unknownStatusCount} unknown (grey), ${onlineStatusCount} online, ${offlineStatusCount} offline`);
     
     res.json({
       devices,

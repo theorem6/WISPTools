@@ -22,11 +22,43 @@ router.use(requireTenant);
 
 // Helper function to convert network devices to monitoring format
 const formatDeviceForMonitoring = (device, type, deviceType = null) => {
+  // Determine device status based on monitoring data
+  let deviceStatus = 'unknown'; // Default to unknown (grey) for devices without monitoring data
+  
+  let notes = {};
+  if (device.notes) {
+    try {
+      notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
+    } catch (e) {
+      notes = {};
+    }
+  }
+  
+  // Check if device has monitoring data (ping/SNMP results)
+  const hasMonitoringData = notes.last_ping_result || 
+                            notes.last_snmp_poll || 
+                            notes.monitoring_status ||
+                            device.metrics;
+  
+  if (hasMonitoringData) {
+    // Use monitoring status if available
+    deviceStatus = notes.monitoring_status || 
+                  (notes.last_ping_result === 'success' ? 'online' : 
+                   notes.last_ping_result === 'failed' ? 'offline' : 
+                   device.status === 'active' ? 'online' : 'offline');
+  } else if (device.siteId) {
+    // Deployed device but no monitoring data yet - show as unknown (grey)
+    deviceStatus = 'unknown';
+  } else {
+    // Use device status for non-deployed devices
+    deviceStatus = device.status === 'active' ? 'online' : 'offline';
+  }
+  
   const baseDevice = {
     id: device._id.toString(),
     name: device.name,
     type: type,
-    status: device.status === 'active' ? 'online' : 'offline',
+    status: deviceStatus,
     location: {
       coordinates: {
         latitude: device.location?.latitude || 0,
@@ -98,6 +130,28 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
         portUtilization: null,
         temperature: null
       }
+    };
+  }
+  
+  // Handle network equipment from deploy module (default type)
+  if (type === 'network_equipment' || !type) {
+    let equipmentNotes = {};
+    if (device.notes) {
+      try {
+        equipmentNotes = typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes;
+      } catch (e) {
+        equipmentNotes = {};
+      }
+    }
+    
+    return {
+      ...baseDevice,
+      deviceType: deviceType || device.type || 'other',
+      ipAddress: equipmentNotes.management_ip || equipmentNotes.ip_address || equipmentNotes.ipAddress || null,
+      manufacturer: device.manufacturer || equipmentNotes.manufacturer_detected_via_oui || 'Generic',
+      model: device.model || 'Unknown',
+      serialNumber: device.serialNumber,
+      metrics: device.metrics || {}
     };
   }
 
