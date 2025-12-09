@@ -2,13 +2,14 @@
   import { createEventDispatcher } from 'svelte';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
-  import type { TowerSite } from '../lib/models';
+  import type { TowerSite, Sector } from '../lib/models';
   
   export let show = false;
   export let sites: TowerSite[] = [];
   export let selectedSite: TowerSite | null = null;
   export let tenantId: string;
   export let planId: string | null = null; // Plan ID if creating sector within a plan
+  export let sectorToEdit: Sector | null = null; // Sector to edit (null = create mode)
   
   const dispatch = createEventDispatcher();
   
@@ -35,7 +36,49 @@
     status: 'active' as const
   };
   
-  $: if (selectedSite) formData.siteId = selectedSite.id;
+  // Pre-fill form when sectorToEdit changes
+  $: if (sectorToEdit && show) {
+    formData = {
+      siteId: sectorToEdit.siteId || selectedSite?.id || '',
+      name: sectorToEdit.name || '',
+      azimuth: sectorToEdit.azimuth || 0,
+      beamwidth: sectorToEdit.beamwidth || 65,
+      tilt: sectorToEdit.tilt || 0,
+      technology: (sectorToEdit.technology as any) || 'LTE',
+      band: sectorToEdit.band || '',
+      frequency: sectorToEdit.frequency || 0,
+      bandwidth: sectorToEdit.bandwidth || 10,
+      antennaModel: sectorToEdit.antennaModel || '',
+      antennaManufacturer: sectorToEdit.antennaManufacturer || '',
+      antennaSerialNumber: sectorToEdit.antennaSerialNumber || '',
+      radioModel: sectorToEdit.radioModel || '',
+      radioManufacturer: sectorToEdit.radioManufacturer || '',
+      radioSerialNumber: sectorToEdit.radioSerialNumber || '',
+      status: (sectorToEdit.status as any) || 'active'
+    };
+  } else if (!sectorToEdit && show) {
+    // Reset form when opening in create mode
+    formData = {
+      siteId: selectedSite?.id || '',
+      name: '',
+      azimuth: 0,
+      beamwidth: 65,
+      tilt: 0,
+      technology: 'LTE' as const,
+      band: '',
+      frequency: 0,
+      bandwidth: 10,
+      antennaModel: '',
+      antennaManufacturer: '',
+      antennaSerialNumber: '',
+      radioModel: '',
+      radioManufacturer: '',
+      radioSerialNumber: '',
+      status: 'active' as const
+    };
+  }
+  
+  $: if (selectedSite && !sectorToEdit) formData.siteId = selectedSite.id;
   
   // Update location when site changes
   $: selectedSiteData = sites.find(s => s.id === formData.siteId);
@@ -111,6 +154,7 @@
 
         dispatch('saved', { message: 'Sector staged in plan.' });
       } else {
+        // Editing or creating production sector
         const sectorData: any = {
           siteId: formData.siteId,
           name: formData.name,
@@ -134,12 +178,19 @@
           status: formData.status
         };
 
-        await coverageMapService.createSector(tenantId, sectorData);
-        dispatch('saved', { message: 'Sector created successfully.' });
+        if (sectorToEdit && sectorToEdit.id) {
+          // Update existing sector
+          await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+          dispatch('saved', { message: 'Sector updated successfully.' });
+        } else {
+          // Create new sector
+          await coverageMapService.createSector(tenantId, sectorData);
+          dispatch('saved', { message: 'Sector created successfully.' });
+        }
       }
       handleClose();
     } catch (err: any) {
-      error = err.message || 'Failed to create sector';
+      error = err.message || (sectorToEdit ? 'Failed to update sector' : 'Failed to create sector');
     } finally {
       isSaving = false;
     }
@@ -148,6 +199,7 @@
   function handleClose() {
     show = false;
     error = '';
+    // Don't reset sectorToEdit here - let parent handle it
   }
 </script>
 
@@ -155,7 +207,7 @@
 <div class="modal-overlay" onclick={handleClose}>
   <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
-      <h2>📶 Add Sector</h2>
+      <h2>📶 {sectorToEdit ? 'Edit Sector' : 'Add Sector'}</h2>
       <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
@@ -169,12 +221,15 @@
         <h3>📡 Tower Site</h3>
         <div class="form-group">
           <label>Select Site *</label>
-          <select bind:value={formData.siteId}>
+          <select bind:value={formData.siteId} disabled={!!sectorToEdit}>
             <option value="">-- Select a tower site --</option>
             {#each sites as site}
               <option value={site.id}>{site.name} ({site.type})</option>
             {/each}
           </select>
+          {#if sectorToEdit}
+            <p class="help-text">⚠️ Site cannot be changed when editing</p>
+          {/if}
           {#if selectedSiteData}
             <p class="help-text">
               📍 {selectedSiteData.location.latitude.toFixed(4)}, {selectedSiteData.location.longitude.toFixed(4)}

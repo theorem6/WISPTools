@@ -58,6 +58,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showAddVehicleModal = false;
   let showAddRMAModal = false;
   let showAddSectorModal = false;
+  let selectedSectorForEdit: Sector | null = null;
   let showAddCPEModal = false;
   let showAddBackhaulModal = false;
   let showAddInventoryModal = false;
@@ -996,7 +997,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           id, 
           type, 
           sectorsCount: sectors.length, 
-          sectors: sectors.map(s => ({ id: s.id, _id: s._id, name: s.name })),
+          sectors: sectors.map(s => ({ id: s.id, _id: (s as any)._id, name: s.name })),
           searchingFor: id,
           idType: typeof id
         });
@@ -1004,20 +1005,20 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         // Try multiple ways to find the sector
         let sector = sectors.find(s => s.id === id);
         if (!sector) {
-          sector = sectors.find(s => s._id === id);
+          sector = sectors.find(s => (s as any)._id === id);
         }
         if (!sector) {
           sector = sectors.find(s => String(s.id) === String(id));
         }
         if (!sector) {
-          sector = sectors.find(s => String(s._id) === String(id));
+          sector = sectors.find(s => String((s as any)._id) === String(id));
         }
         
         if (sector) {
           console.log('[CoverageMap] ✅✅✅ Found sector for menu:', { 
             sector, 
             id: sector.id, 
-            _id: sector._id,
+            _id: (sector as any)._id,
             name: sector.name
           });
           selectedSectorForMenu = sector;
@@ -1046,7 +1047,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             idType: typeof id,
             availableSectorIds: sectors.map(s => ({ 
               id: s.id, 
-              _id: s._id, 
+              _id: (s as any)._id, 
               name: s.name,
               idString: String(s.id),
               _idString: String(s._id)
@@ -1094,8 +1095,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           // Find the site for this sector
           const site = towers.find(t => t.id === sector.siteId || String(t.id) === String(sector.siteId));
           selectedSiteForSector = site || null;
-          // Set the sector to edit (AddSectorModal should handle editing if sector is provided)
-          // For now, just open the modal - we'll need to enhance AddSectorModal to support editing
+          // Set the sector to edit - AddSectorModal will pre-fill the form
+          selectedSectorForEdit = sector;
           showAddSectorModal = true;
           console.log('[CoverageMap] Opening AddSectorModal for editing sector:', sector.name);
         }
@@ -1124,9 +1125,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             .then(() => {
               success = `Sector "${sector.name}" deleted`;
               setTimeout(() => success = '', 3000);
-              loadSectors();
+              loadAllData(); // Reload all data to refresh the map
             })
-            .catch(err => {
+            .catch((err: any) => {
               error = `Failed to delete sector: ${err.message}`;
               setTimeout(() => error = '', 5000);
             });
@@ -1313,7 +1314,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   function handleAddSector(site: TowerSite | null = null) {
     planDraftForSiteEdit = null;
     selectedSiteForSector = site;
+    selectedSectorForEdit = null; // Clear any sector being edited
     showAddSectorModal = true;
+  }
+  
+  function handleSectorModalSaved() {
+    selectedSectorForEdit = null; // Clear after save
+    handleModalSaved();
   }
   
   function handleAddCPE() {
@@ -1685,9 +1692,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   bind:show={showAddSectorModal}
   sites={combinedSites}
   selectedSite={selectedSiteForSector}
+  sectorToEdit={selectedSectorForEdit}
   {tenantId}
   planId={effectivePlanId}
-  on:saved={handleModalSaved}
+  on:saved={handleSectorModalSaved}
 />
 
 <AddCPEModal 
@@ -1722,8 +1730,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   bind:show={showContextMenu}
   x={contextMenuX}
   y={contextMenuY}
-  latitude={contextMenuLat}
-  longitude={contextMenuLon}
+  latitude={contextMenuLat ?? undefined}
+  longitude={contextMenuLon ?? undefined}
   planMode={isPlanMode || sharedMapMode === 'plan'}
   planName={activePlanName}
   disabled={(isPlanMode || sharedMapMode === 'plan') && !planEditingEnabled}
