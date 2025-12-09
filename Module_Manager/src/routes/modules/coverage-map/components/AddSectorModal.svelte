@@ -116,30 +116,44 @@
   }
   
   async function handleSave() {
-    console.log('[AddSectorModal] handleSave called', { 
+    console.log('[AddSectorModal] 🔵🔵🔵 handleSave called', { 
       hasSectorToEdit: !!sectorToEdit, 
       sectorId: sectorToEdit?.id, 
       planId,
       sectorPlanId: sectorToEdit?.planId,
-      formDataName: formData.name
+      formDataName: formData.name,
+      tenantId,
+      hasTenantId: !!tenantId,
+      formDataSiteId: formData.siteId
     });
+    
+    if (!tenantId) {
+      const errorMsg = 'Tenant ID is required. Please refresh the page.';
+      console.error('[AddSectorModal] ❌', errorMsg);
+      error = errorMsg;
+      return;
+    }
     
     if (!formData.name.trim()) {
       error = 'Sector name is required';
+      console.warn('[AddSectorModal] ❌ Validation failed: Sector name is required');
       return;
     }
     
     if (!formData.siteId) {
       error = 'Please select a site';
+      console.warn('[AddSectorModal] ❌ Validation failed: No site selected');
       return;
     }
     
     const site = sites.find(s => s.id === formData.siteId);
     if (!site) {
       error = 'Selected site not found';
+      console.error('[AddSectorModal] ❌ Selected site not found:', formData.siteId);
       return;
     }
     
+    console.log('[AddSectorModal] ✅ Validation passed, starting save...');
     isSaving = true;
     error = '';
     
@@ -311,11 +325,22 @@
           dispatch('saved', { message: 'Sector created successfully.' });
         }
       }
+      console.log('[AddSectorModal] ✅✅✅ Save completed successfully, closing modal');
       handleClose();
     } catch (err: any) {
-      error = err.message || (sectorToEdit ? 'Failed to update sector' : 'Failed to create sector');
+      const errorMsg = err.message || (sectorToEdit ? 'Failed to update sector' : 'Failed to create sector');
+      console.error('[AddSectorModal] ❌❌❌ Error saving sector:', err);
+      console.error('[AddSectorModal] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name,
+        fullError: err
+      });
+      error = errorMsg;
+      // Don't close modal on error - let user see the error and try again
     } finally {
       isSaving = false;
+      console.log('[AddSectorModal] Save operation finished, isSaving set to false');
     }
   }
   
@@ -476,7 +501,22 @@
     
     <div class="modal-footer">
       <button class="btn-secondary" on:click={handleClose}>Cancel</button>
-      <button class="btn-primary" on:click={handleSave} disabled={isSaving}>
+      <button 
+        class="btn-primary" 
+        on:click={(e) => {
+          console.log('[AddSectorModal] 🔵🔵🔵 Save button clicked!', { 
+            isSaving, 
+            hasTenantId: !!tenantId,
+            tenantId,
+            hasSectorToEdit: !!sectorToEdit,
+            formDataName: formData.name
+          });
+          e.preventDefault();
+          e.stopPropagation();
+          handleSave();
+        }} 
+        disabled={isSaving}
+      >
         {isSaving ? 'Saving...' : (sectorToEdit ? '✅ Save Changes' : '✅ Create Sector')}
       </button>
     </div>
