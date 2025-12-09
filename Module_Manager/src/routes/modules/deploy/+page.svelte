@@ -185,32 +185,35 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         const directMessageHandler = (event: MessageEvent) => {
           // Log ALL messages to see what we're getting
           if (event.data && typeof event.data === 'object') {
-            console.log('[Deploy] 📨 Direct message listener received ANY message:', {
-              data: event.data,
-              type: event.data?.type,
-              source: event.data?.source,
-              action: event.data?.action,
-              origin: event.origin,
-              hasSource: !!event.source
-            });
+            // Only log non-asset-click messages to reduce noise
+            if (event.data.type !== 'asset-click' && event.data.type !== 'view-extent' && event.data.type !== 'request-state') {
+              console.log('[Deploy] 📨 Direct message listener received ANY message:', {
+                data: event.data,
+                type: event.data?.type,
+                source: event.data?.source,
+                action: event.data?.action,
+                origin: event.origin,
+                hasSource: !!event.source
+              });
+            }
           }
           
           // Handle asset-click messages directly
-          // Log the structure to debug
+          // Check if it's an asset-click message
           if (event.data && typeof event.data === 'object' && event.data.type === 'asset-click') {
-            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED! Full event.data:', JSON.stringify(event.data, null, 2));
+            console.log('[Deploy] 🔵🔵🔵 ASSET-CLICK DETECTED! Full event.data:', event.data);
+            console.log('[Deploy] 🔵🔵🔵 event.data keys:', Object.keys(event.data));
             console.log('[Deploy] 🔵🔵🔵 Checking source:', { 
               hasSource: 'source' in event.data, 
               source: event.data.source, 
               expected: 'coverage-map',
-              matches: event.data.source === 'coverage-map'
+              matches: event.data.source === 'coverage-map',
+              type: event.data.type,
+              detail: event.data.detail
             });
-          }
-          
-          if (event.data && 
-              typeof event.data === 'object' &&
-              event.data.type === 'asset-click' &&
-              event.data.source === 'coverage-map') {
+            
+            // Process if source matches OR if no source check (be more lenient)
+            if (event.data.source === 'coverage-map' || !event.data.source) {
             console.log('[Deploy] 🔵🔵🔵 Processing asset-click message, full data:', event.data);
             const detail = event.data.detail || event.data;
             console.log('[Deploy] 🔵🔵🔵 Extracted detail:', detail);
@@ -282,6 +285,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
               })();
             }
             return; // Don't process further
+            } else {
+              console.log('[Deploy] ⚠️ Asset-click from wrong source, ignoring:', event.data.source);
+            }
           }
           
           // If the iframeCommunicationService doesn't catch it, handle it directly
