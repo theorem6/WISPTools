@@ -148,10 +148,8 @@ export class IframeCommunicationService {
         
       default:
         // Silently ignore unknown message types (already filtered at the start, but just in case)
-        if (!ignoredTypes.includes(message.type)) {
-          // Only log if not in the ignored list
-          // console.log('[IframeCommunicationService] Unknown message type:', message.type);
-        }
+        // No action needed for unknown types
+        break;
     }
   }
 
