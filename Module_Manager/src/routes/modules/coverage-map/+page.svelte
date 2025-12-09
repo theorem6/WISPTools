@@ -459,6 +459,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     if (!tenantId) {
       return;
     }
+    
+    console.log('[CoverageMap] loadAllData called');
 
     isLoading = true;
     error = '';
@@ -600,6 +602,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         isPlanMode,
         planId
       });
+      
+      // The reactive bindings in CoverageMapView will automatically call setData
+      // which triggers renderAllAssets, so graphics should refresh automatically
+      console.log('[CoverageMap] Data loaded, map should refresh via reactive bindings');
     } catch (err: any) {
       console.error('Failed to load data:', err);
       error = err.message || 'Failed to load network data';
@@ -1144,6 +1150,18 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     }
     
     switch (action) {
+      case 'add-sector':
+        // Add new sector to the same site as this sector
+        console.log('[CoverageMap] Add sector to site:', sector);
+        if (sector) {
+          // Find the site for this sector
+          const site = towers.find(t => t.id === sector.siteId || String(t.id) === String(sector.siteId));
+          selectedSiteForSector = site || null;
+          selectedSectorForEdit = null; // Clear any sector being edited
+          showAddSectorModal = true;
+          console.log('[CoverageMap] Opening AddSectorModal for adding new sector to site:', site?.name);
+        }
+        break;
       case 'edit-sector':
         // Open sector edit modal (use AddSectorModal in edit mode)
         console.log('[CoverageMap] Edit sector:', sector);
