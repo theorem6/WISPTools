@@ -96,6 +96,13 @@ export class IframeCommunicationService {
    * Handle messages from iframe
    */
   private handleMessage(event: MessageEvent): void {
+    // Silently ignore known informational message types from the map
+    const ignoredTypes = ['view-extent', 'asset-click', 'request-state'];
+    if (event.data?.type && ignoredTypes.includes(event.data.type)) {
+      // These are informational messages from the map, no action needed
+      return;
+    }
+    
     // Log ALL messages for debugging (but filter out noise)
     if (event.data && typeof event.data === 'object' && 
         (event.data.type === 'object-action' || event.data.source === 'coverage-map')) {
@@ -140,7 +147,11 @@ export class IframeCommunicationService {
         break;
         
       default:
-        console.log('[IframeCommunicationService] Unknown message type:', message.type);
+        // Silently ignore unknown message types (already filtered at the start, but just in case)
+        if (!ignoredTypes.includes(message.type)) {
+          // Only log if not in the ignored list
+          // console.log('[IframeCommunicationService] Unknown message type:', message.type);
+        }
     }
   }
 

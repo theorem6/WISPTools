@@ -456,7 +456,7 @@ export class CoverageMapController {
       }
 
       // Only clear drawing graphics if requested (e.g., after discovery completes)
-      if (clearGraphics && this.drawingGraphicsLayer) {
+      if (clearGraphics && this.drawingGraphicsLayer && this.drawingGraphicsLayer.graphics) {
         this.drawingGraphicsLayer.removeAll();
       }
 
@@ -468,7 +468,7 @@ export class CoverageMapController {
   }
 
   public clearDrawingGraphics(): void {
-    if (this.drawingGraphicsLayer) {
+    if (this.drawingGraphicsLayer && this.drawingGraphicsLayer.graphics) {
       this.drawingGraphicsLayer.removeAll();
       console.log('[CoverageMap] Drawing graphics cleared');
     }
@@ -507,7 +507,7 @@ export class CoverageMapController {
     this.filters = filters;
     
     // Clear marketing layer when filter is turned off
-    if (this.mapReady && previousShowMarketing && !filters.showMarketing && this.marketingLayer) {
+    if (this.mapReady && previousShowMarketing && !filters.showMarketing && this.marketingLayer && this.marketingLayer.graphics) {
       this.marketingLayer.removeAll();
       console.log('[CoverageMap] Marketing layer cleared (filter hidden)');
     }
@@ -537,7 +537,7 @@ export class CoverageMapController {
   public setPlanFeaturesVisibility(visible: boolean): void {
     if (this.planDraftLayer && this.mapReady) {
       this.planDraftLayer.visible = visible;
-      if (!visible) {
+      if (!visible && this.planDraftLayer.graphics) {
         this.planDraftLayer.removeAll();
         console.log('[CoverageMap] Plan features layer hidden and cleared');
       } else {
@@ -570,7 +570,7 @@ export class CoverageMapController {
     
     // Clear layer if leads changed (visibility toggle, project deleted, etc.)
     // This ensures markers from hidden projects are removed
-    if (leadsChanged && this.marketingLayer && this.mapReady) {
+    if (leadsChanged && this.marketingLayer && this.marketingLayer.graphics && this.mapReady) {
       this.marketingLayer.removeAll();
       console.log('[CoverageMap] Marketing layer cleared (leads changed)', {
         previousCount,
@@ -622,7 +622,7 @@ export class CoverageMapController {
   public clearMarketingLeads(): void {
     // Clear marketing leads data and layer
     this.marketingLeads = [];
-    if (this.marketingLayer) {
+    if (this.marketingLayer && this.marketingLayer.graphics) {
       this.marketingLayer.removeAll();
     }
     console.log('[CoverageMap] Marketing leads cleared');
@@ -1849,7 +1849,7 @@ export class CoverageMapController {
 
       // Track which markers are already on the map to avoid duplicates
       const existingGraphicHashes = new Set<string>();
-      if (this.marketingLayer.graphics?.length > 0) {
+      if (this.marketingLayer && this.marketingLayer.graphics?.length > 0) {
         this.marketingLayer.graphics.forEach((graphic: any) => {
           const attrs = graphic.attributes || {};
           const lat = attrs.latitude;
@@ -1926,7 +1926,7 @@ export class CoverageMapController {
         newMarkersAdded++;
       });
 
-      console.log(`[CoverageMap] Added ${newMarkersAdded} new marketing leads (${this.marketingLayer.graphics?.length ?? 0} total on map)`);
+      console.log(`[CoverageMap] Added ${newMarkersAdded} new marketing leads (${this.marketingLayer?.graphics?.length ?? 0} total on map)`);
     } catch (err) {
       console.error('[CoverageMap] Failed to render marketing leads:', err);
     }
@@ -1950,7 +1950,9 @@ export class CoverageMapController {
       }
 
       if (this.filters.showMarketing && this.marketingLayer?.graphics?.length) {
-        this.marketingLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+        if (this.marketingLayer?.graphics) {
+          this.marketingLayer.graphics.forEach((graphic: any) => graphics.push(graphic));
+        }
       }
     }
 
@@ -2078,7 +2080,9 @@ export class CoverageMapController {
         import('@arcgis/core/symbols/TextSymbol.js')
       ]);
 
-      this.planDraftLayer.removeAll();
+      if (this.planDraftLayer && this.planDraftLayer.graphics) {
+        this.planDraftLayer.removeAll();
+      }
       this.planDraftGraphics.clear();
 
       const isMobile = window.innerWidth <= 768;

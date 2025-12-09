@@ -118,8 +118,11 @@ router.get('/epc/remote/list', async (req, res) => {
       return {
         id: epc._id?.toString() || epc.epc_id,
         epcId: epc.epc_id,
+        epc_id: epc.epc_id, // Support both formats
         name: epc.site_name,
         site_name: epc.site_name,
+        site_id: epc.site_id, // Include site_id for filtering
+        siteId: epc.site_id, // Support both formats
         type: 'epc',
         status: epc.status === 'online' || isOnline ? 'online' : 
                 epc.status === 'registered' ? 'pending' : 'offline',

@@ -1034,36 +1034,21 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             
             if (typeof window !== 'undefined' && window.parent) {
               try {
-                // ALWAYS try calling global handler first (most reliable)
-                console.log('[CoverageMap] 🔥🔥🔥 Attempting to call global handler...');
+                // Send message - SharedMap will handle calling the global handler
+                // Don't try to access window.parent directly due to cross-origin restrictions
+                console.log('[CoverageMap] Sending message to parent (SharedMap will handle)');
                 try {
-                  // Try to call it - if it doesn't exist, catch the error
-                  if (typeof (window.parent as any).__deployHandleViewInventory === 'function') {
-                    console.log('[CoverageMap] 🔥🔥🔥 GLOBAL HANDLER EXISTS - CALLING IT NOW!');
-                    (window.parent as any).__deployHandleViewInventory(tower);
-                    console.log('[CoverageMap] 🔥🔥🔥 Global handler call SUCCEEDED - modal should be open!');
-                    // Still send message as backup, but handler should have already opened modal
-                  } else {
-                    console.warn('[CoverageMap] ⚠️ Global handler not found or not a function');
-                  }
-                } catch (handlerErr: any) {
                   console.error('[CoverageMap] ❌ Error calling global handler:', handlerErr);
                   // Continue to message fallback
                 }
                 
-                // Send to parent window as backup
+                // Send to parent window - SharedMap will handle calling the global handler
                 window.parent.postMessage(message, '*');
-                console.log('[CoverageMap] ✅ Also sent view-inventory message to parent (backup)', { 
-                  objectId: tower.id,
-                  hasGlobalHandler: typeof (window.parent as any).__deployHandleViewInventory === 'function'
-                });
+                console.log('[CoverageMap] ✅ Sent view-inventory message to parent');
                 
                 // Also try sending to top window in case of nested iframes
                 if (window.top && window.top !== window.parent) {
                   console.log('[CoverageMap] 🔵 Also sending to top window');
-                  if ((window.top as any).__deployHandleViewInventory) {
-                    (window.top as any).__deployHandleViewInventory(tower);
-                  }
                   window.top.postMessage(message, '*');
                 }
                 // DO NOT navigate - we're in embedded mode, parent will handle it

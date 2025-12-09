@@ -73,16 +73,37 @@
           });
           if (response.ok) {
             const data = await response.json();
-            epcDevices = (data.epcs || []).filter((epc: any) => {
-              // EPC devices have site_id or siteId field
+            const allEPCs = data.epcs || [];
+            console.log('[SiteEquipmentModal] All EPC devices from API:', {
+              count: allEPCs.length,
+              devices: allEPCs.map((e: any) => ({
+                name: e.site_name || e.name,
+                epc_id: e.epcId || e.epc_id,
+                site_id: e.site_id,
+                siteId: e.siteId,
+                site_name: e.site_name
+              }))
+            });
+            
+            epcDevices = allEPCs.filter((epc: any) => {
+              // EPC devices can have site_id as a string (MongoDB ObjectId as string) or ObjectId
+              // Also match by site name as fallback
               const epcSiteId = epc.site_id || epc.siteId?._id || epc.siteId?.id || epc.siteId;
-              return String(epcSiteId) === String(siteId) || epc.site_name === site.name;
+              const siteIdStr = String(siteId);
+              const epcSiteIdStr = epcSiteId ? String(epcSiteId) : '';
+              const matchesById = epcSiteIdStr && (epcSiteIdStr === siteIdStr || epcSiteIdStr === siteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, ''));
+              const matchesByName = epc.site_name && site.name && epc.site_name.toLowerCase() === site.name.toLowerCase();
+              
+              return matchesById || matchesByName;
             });
             console.log('[SiteEquipmentModal] Loaded EPC devices:', {
-              count: data.epcs?.length || 0,
+              count: allEPCs.length,
               filteredCount: epcDevices.length,
+              siteId: siteId,
+              siteName: site.name,
               epcDevices: epcDevices.map((e: any) => ({
                 name: e.site_name || e.name,
+                epc_id: e.epcId || e.epc_id,
                 site_id: e.site_id,
                 siteId: e.siteId
               }))
