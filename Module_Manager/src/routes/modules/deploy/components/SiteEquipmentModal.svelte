@@ -18,6 +18,7 @@
   let isLoading = false;
   let error = '';
 
+  // Watch for modal opening and load equipment
   $: if (show && site && tenantId) {
     console.log('[SiteEquipmentModal] ✅ Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
     console.log('[SiteEquipmentModal] ✅ Site data:', JSON.stringify(site, null, 2));
@@ -25,15 +26,22 @@
   }
   
   $: if (show) {
-    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site, 'hasSite:', !!site);
+    console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site, 'hasSite:', !!site, 'tenantId:', tenantId);
     if (show && !site) {
       console.warn('[SiteEquipmentModal] ⚠️ Modal is shown but site is null/undefined!');
+    }
+    if (show && site && !tenantId) {
+      console.warn('[SiteEquipmentModal] ⚠️ Modal is shown but tenantId is missing!');
     }
   }
 
   async function loadEquipment() {
-    if (!site || !tenantId) return;
+    if (!site || !tenantId) {
+      console.warn('[SiteEquipmentModal] loadEquipment called but missing data:', { hasSite: !!site, hasTenantId: !!tenantId, siteName: site?.name, tenantId });
+      return;
+    }
 
+    console.log('[SiteEquipmentModal] 🔵🔵🔵 loadEquipment called', { siteName: site.name, siteId: site.id || site._id, tenantId });
     isLoading = true;
     error = '';
 
