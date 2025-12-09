@@ -122,7 +122,7 @@ export class CoverageMapService {
   }
   
   async getSectorsBySite(tenantId: string, siteId: string): Promise<Sector[]> {
-    const sectors = await this.apiCall(`tower-sites/${siteId}/sectors`);
+    const sectors = await this.apiCall(`sites/${siteId}/sectors`, {}, tenantId);
     return sectors.map((s: any) => ({ ...s, id: s._id }));
   }
   

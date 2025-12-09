@@ -214,19 +214,26 @@
       });
 
       // Load sectors at this site
-      const allSectors = await coverageMapService.getSectorsBySite(tenantId, siteId);
-      console.log('[SiteEquipmentModal] Loaded sectors:', {
-        count: allSectors?.length || 0,
-        targetSiteId: siteId,
-        sectors: (allSectors || []).slice(0, 3).map((s: any) => ({
-          id: s.id || s._id,
-          name: s.name,
-          siteId: s.siteId,
-          technology: s.technology
-        }))
-      });
-      
-      sectors = allSectors || [];
+      try {
+        const allSectors = await coverageMapService.getSectorsBySite(tenantId, siteId);
+        console.log('[SiteEquipmentModal] Loaded sectors:', {
+          count: allSectors?.length || 0,
+          targetSiteId: siteId,
+          siteIdType: typeof siteId,
+          sectors: (allSectors || []).slice(0, 3).map((s: any) => ({
+            id: s.id || s._id,
+            name: s.name,
+            siteId: s.siteId,
+            siteIdType: typeof s.siteId,
+            technology: s.technology
+          }))
+        });
+        
+        sectors = allSectors || [];
+      } catch (sectorError: any) {
+        console.error('[SiteEquipmentModal] Error loading sectors:', sectorError);
+        sectors = [];
+      }
       
       // Load equipment at this site
       const allEquipment = await coverageMapService.getEquipment(tenantId);
