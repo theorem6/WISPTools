@@ -378,10 +378,12 @@
     return false;
   }
   
-  // Load sites from database and merge with device-based towers
+  // Load sites, sectors, backhauls, and CPE from database with uptime data
   async function loadSites() {
     if (!tenantId) {
       towers = [];
+      sectors = [];
+      cpeDevices = [];
       return;
     }
     
@@ -452,9 +454,183 @@
       
       // Merge database sites with device-based towers
       towers = [...processedSites, ...deviceTowers];
+      
+      // Load sectors from database
+      try {
+        const allSectors = await coverageMapService.getSectors(tenantId);
+        
+        // Process sectors with uptime calculation based on associated devices
+        sectors = allSectors.map((sector: any) => {
+          const sectorSiteId = sector.towerId?._id || sector.towerId?.id || sector.towerId || 
+                               sector.siteId?._id || sector.siteId?.id || sector.siteId;
+          
+          // Calculate uptime for this sector based on devices at its site
+          let sectorStatus = sector.status || 'active';
+          let uptimePercent = 100;
+          
+          if (sectorSiteId && networkDevices) {
+            const siteDevices = networkDevices.filter((device: any) => {
+              const deviceSiteId = device.siteId || device.site_id;
+              return deviceSiteId && String(deviceSiteId) === String(sectorSiteId);
+            });
+            
+            if (siteDevices.length > 0) {
+              const onlineDevices = siteDevices.filter((d: any) => d.status === 'online').length;
+              uptimePercent = Math.round((onlineDevices / siteDevices.length) * 100);
+              
+              // Set status based on uptime
+              if (uptimePercent === 100) {
+                sectorStatus = 'active';
+              } else if (uptimePercent === 0) {
+                sectorStatus = 'inactive';
+              } else {
+                sectorStatus = 'maintenance';
+              }
+            }
+          }
+          
+          return {
+            ...sector,
+            id: sector.id || sector._id,
+            status: sectorStatus,
+            uptimePercent: uptimePercent
+          };
+        });
+        
+        console.log(`[MonitoringMap] Loaded ${sectors.length} sectors with uptime data`);
+      } catch (error) {
+        console.error('[MonitoringMap] Failed to load sectors:', error);
+        sectors = [];
+      }
+      
+      // Load backhauls from equipment (type: 'backhaul')
+      // Backhauls are already included in equipment from convertDevicesToEquipment()
+      // But we enhance them with uptime data here
+      try {
+        const allEquipment = await coverageMapService.getEquipment(tenantId);
+        const backhaulEquipment = allEquipment.filter((eq: any) => eq.type === 'backhaul');
+        
+        // Update equipment array to include backhauls with uptime data
+        if (backhaulEquipment.length > 0) {
+          backhaulEquipment.forEach((backhaul: any) => {
+            // Find if this backhaul is already in the equipment array
+            const existingIndex = equipment.findIndex((eq: any) => 
+              String(eq.id) === String(backhaul.id || backhaul._id)
+            );
+            
+            // Get IP address from backhaul notes or config
+            let ipAddress = null;
+            if (backhaul.notes) {
+              try {
+                const notes = typeof backhaul.notes === 'string' ? JSON.parse(backhaul.notes) : backhaul.notes;
+                ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
+              } catch {
+                // Ignore parse errors
+              }
+            }
+            
+            // Find matching device in networkDevices for uptime
+            let backhaulStatus = backhaul.status || 'active';
+            let uptimePercent = 100;
+            
+            if (networkDevices) {
+              const matchingDevice = networkDevices.find((device: any) => {
+                return (device.id === String(backhaul.id || backhaul._id)) ||
+                       (ipAddress && device.ipAddress === ipAddress) ||
+                       (backhaul.serialNumber && device.serialNumber === backhaul.serialNumber);
+              });
+              
+              if (matchingDevice) {
+                backhaulStatus = matchingDevice.status || 'unknown';
+                // Status-based uptime estimation
+                if (backhaulStatus === 'online') {
+                  uptimePercent = 100;
+                } else if (backhaulStatus === 'offline') {
+                  uptimePercent = 0;
+                } else {
+                  uptimePercent = 50; // Unknown status
+                }
+              }
+            }
+            
+            const backhaulWithUptime = {
+              ...backhaul,
+              id: backhaul.id || backhaul._id,
+              type: 'backhaul',
+              status: backhaulStatus,
+              uptimePercent: uptimePercent,
+              ipAddress: ipAddress,
+              location: backhaul.location || {
+                latitude: 0,
+                longitude: 0,
+                address: 'Unknown Location'
+              }
+            };
+            
+            if (existingIndex >= 0) {
+              // Update existing equipment entry
+              equipment[existingIndex] = { ...equipment[existingIndex], ...backhaulWithUptime };
+            } else {
+              // Add new backhaul equipment
+              equipment.push(backhaulWithUptime);
+            }
+          });
+        }
+        
+        console.log(`[MonitoringMap] Processed ${backhaulEquipment.length} backhaul equipment items with uptime data`);
+      } catch (error) {
+        console.error('[MonitoringMap] Failed to load backhaul equipment:', error);
+      }
+      
+      // Load CPE devices from database if the method exists
+      // Note: CPE devices might be loaded differently, check if getCPEDevices exists
+      try {
+        // CPE devices are typically loaded as part of equipment or separately
+        // For now, we'll include CPE devices from networkDevices that have type 'cpe'
+        if (networkDevices) {
+          const cpeFromDevices = networkDevices.filter((device: any) => 
+            device.type === 'cpe' || device.deviceType === 'cpe'
+          );
+          
+          cpeDevices = cpeFromDevices.map((cpe: any) => {
+            let cpeStatus = cpe.status || 'active';
+            let uptimePercent = 100;
+            
+            if (cpeStatus === 'online') {
+              uptimePercent = 100;
+            } else if (cpeStatus === 'offline') {
+              uptimePercent = 0;
+            } else {
+              uptimePercent = 50; // Unknown status
+            }
+            
+            return {
+              id: cpe.id || cpe._id,
+              name: cpe.name || 'CPE Device',
+              serialNumber: cpe.serialNumber,
+              status: cpeStatus,
+              uptimePercent: uptimePercent,
+              location: cpe.location || {
+                latitude: 0,
+                longitude: 0,
+                address: 'Unknown Location'
+              },
+              siteId: cpe.siteId || cpe.site_id,
+              technology: cpe.technology || 'LTE'
+            };
+          });
+        }
+        
+        console.log(`[MonitoringMap] Loaded ${cpeDevices.length} CPE devices with uptime data`);
+      } catch (error) {
+        console.error('[MonitoringMap] Failed to load CPE devices:', error);
+        cpeDevices = [];
+      }
     } catch (error) {
       console.error('[MonitoringMap] Failed to load sites:', error);
       towers = [];
+      sectors = [];
+      cpeDevices = [];
     }
   }
   
