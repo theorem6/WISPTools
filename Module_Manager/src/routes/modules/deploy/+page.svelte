@@ -545,10 +545,14 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
 
 
   async function loadReadyPlans() {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) {
+      console.warn('[Deploy] loadReadyPlans called but no tenantId available');
+      return;
+    }
+    
     isLoadingPlans = true;
     try {
-      const tenantId = $currentTenant?.id;
-      if (tenantId) {
         // Get ALL projects (plans)
         const allProjects = await planService.getPlans(tenantId);
         
