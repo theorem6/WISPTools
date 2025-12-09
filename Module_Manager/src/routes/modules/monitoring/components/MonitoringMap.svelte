@@ -450,6 +450,13 @@
       // Merge database sites with device-based towers
       towers = [...processedSites, ...deviceTowers];
       
+      console.log(`[MonitoringMap] Loaded ${towers.length} sites (${processedSites.length} from DB, ${deviceTowers.length} device-based)`);
+      
+      // Re-process devices now that sites are loaded so they can get locations from sites
+      if (devices && devices.length > 0) {
+        convertDevicesToEquipment();
+      }
+      
       // Load sectors from database
       try {
         const allSectors = await coverageMapService.getSectors(tenantId);
