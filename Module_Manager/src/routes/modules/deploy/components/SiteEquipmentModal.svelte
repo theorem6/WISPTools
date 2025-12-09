@@ -76,11 +76,16 @@
             const allEPCs = data.epcs || [];
             console.log('[SiteEquipmentModal] All EPC devices from API:', {
               count: allEPCs.length,
+              targetSiteId: siteId,
+              targetSiteIdType: typeof siteId,
+              targetSiteName: site.name,
               devices: allEPCs.map((e: any) => ({
                 name: e.site_name || e.name,
                 epc_id: e.epcId || e.epc_id,
                 site_id: e.site_id,
+                site_id_type: typeof e.site_id,
                 siteId: e.siteId,
+                siteId_type: typeof e.siteId,
                 site_name: e.site_name
               }))
             });
@@ -91,8 +96,37 @@
               const epcSiteId = epc.site_id || epc.siteId?._id || epc.siteId?.id || epc.siteId;
               const siteIdStr = String(siteId);
               const epcSiteIdStr = epcSiteId ? String(epcSiteId) : '';
-              const matchesById = epcSiteIdStr && (epcSiteIdStr === siteIdStr || epcSiteIdStr === siteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, ''));
-              const matchesByName = epc.site_name && site.name && epc.site_name.toLowerCase() === site.name.toLowerCase();
+              
+              // Normalize both IDs for comparison (remove ObjectId wrapper if present)
+              const normalizedSiteId = siteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+              const normalizedEpcSiteId = epcSiteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+              
+              const matchesById = normalizedEpcSiteId && normalizedSiteId && (
+                normalizedEpcSiteId === normalizedSiteId ||
+                normalizedEpcSiteId.toString() === normalizedSiteId.toString()
+              );
+              
+              // For name matching, check if site_name contains the site name or vice versa
+              const matchesByName = epc.site_name && site.name && (
+                epc.site_name.toLowerCase() === site.name.toLowerCase() ||
+                epc.site_name.toLowerCase().startsWith(site.name.toLowerCase()) ||
+                site.name.toLowerCase().startsWith(epc.site_name.toLowerCase())
+              );
+              
+              if (epcSiteId || epc.site_name) {
+                console.log('[SiteEquipmentModal] EPC filtering check:', {
+                  epcName: epc.site_name,
+                  epcSiteId: epcSiteId,
+                  epcSiteIdStr: epcSiteIdStr,
+                  normalizedEpcSiteId: normalizedEpcSiteId,
+                  targetSiteId: siteId,
+                  targetSiteIdStr: siteIdStr,
+                  normalizedSiteId: normalizedSiteId,
+                  matchesById: matchesById,
+                  matchesByName: matchesByName,
+                  siteName: site.name
+                });
+              }
               
               return matchesById || matchesByName;
             });
@@ -121,15 +155,27 @@
         // 2. An object with id
         // 3. A string/ObjectId
         const deploymentSiteId = d.siteId?._id || d.siteId?.id || d.siteId;
-        const matches = String(deploymentSiteId) === String(siteId);
+        const siteIdStr = String(siteId);
+        const deploymentSiteIdStr = deploymentSiteId ? String(deploymentSiteId) : '';
         
-        if (!matches && deploymentSiteId) {
+        // Normalize both IDs for comparison
+        const normalizedSiteId = siteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+        const normalizedDeploymentSiteId = deploymentSiteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+        
+        const matches = normalizedDeploymentSiteId && normalizedSiteId && (
+          normalizedDeploymentSiteId === normalizedSiteId ||
+          normalizedDeploymentSiteId.toString() === normalizedSiteId.toString()
+        );
+        
+        if (deploymentSiteId && !matches) {
           console.log('[SiteEquipmentModal] Deployment does not match:', {
             deploymentName: d.name,
             deploymentSiteId: deploymentSiteId,
-            deploymentSiteIdType: typeof deploymentSiteId,
+            deploymentSiteIdStr: deploymentSiteIdStr,
+            normalizedDeploymentSiteId: normalizedDeploymentSiteId,
             targetSiteId: siteId,
-            targetSiteIdType: typeof siteId,
+            targetSiteIdStr: siteIdStr,
+            normalizedSiteId: normalizedSiteId,
             siteIdObject: d.siteId
           });
         }
@@ -167,16 +213,138 @@
       // Load equipment at this site
       const allEquipment = await coverageMapService.getEquipment(tenantId);
       console.log('[SiteEquipmentModal] Loaded all equipment:', {
-        count: allEquipment?.length || 0
+        count: allEquipment?.length || 0,
+        targetSiteId: siteId,
+        targetSiteIdType: typeof siteId,
+        equipment: (allEquipment || []).slice(0, 3).map((eq: any) => ({
+          name: eq.name,
+          siteId: eq.siteId,
+          siteIdType: typeof eq.siteId,
+          siteId_id: eq.siteId?._id,
+          siteId_id_type: typeof eq.siteId?._id,
+          siteIdString: eq.siteId ? String(eq.siteId) : null
+        }))
       });
       
       equipment = (allEquipment || []).filter((eq: any) => {
         const eqSiteId = eq.siteId?._id || eq.siteId?.id || eq.siteId;
-        return String(eqSiteId) === String(siteId);
+        const siteIdStr = String(siteId);
+        const eqSiteIdStr = eqSiteId ? String(eqSiteId) : '';
+        
+        // Normalize both IDs for comparison
+        const normalizedSiteId = siteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+        const normalizedEqSiteId = eqSiteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+        
+        const matches = normalizedEqSiteId && normalizedSiteId && (
+          normalizedEqSiteId === normalizedSiteId ||
+          normalizedEqSiteId.toString() === normalizedSiteId.toString()
+        );
+        
+        if (eqSiteId && !matches) {
+          console.log('[SiteEquipmentModal] Equipment does not match:', {
+            equipmentName: eq.name,
+            eqSiteId: eqSiteId,
+            eqSiteIdStr: eqSiteIdStr,
+            normalizedEqSiteId: normalizedEqSiteId,
+            targetSiteId: siteId,
+            targetSiteIdStr: siteIdStr,
+            normalizedSiteId: normalizedSiteId,
+            siteIdObject: eq.siteId
+          });
+        }
+        
+        return matches;
       });
 
+      // If no equipment found by siteId, try location-based matching as fallback
+      if (equipment.length === 0 && site.location?.latitude && site.location?.longitude) {
+        console.log('[SiteEquipmentModal] No equipment found by siteId, trying location-based matching');
+        const siteLat = site.location.latitude;
+        const siteLon = site.location.longitude;
+        
+        equipment = (allEquipment || []).filter((eq: any) => {
+          const eqLat = eq.location?.latitude || eq.location?.coordinates?.latitude;
+          const eqLon = eq.location?.longitude || eq.location?.coordinates?.longitude;
+          
+          if (!eqLat || !eqLon) return false;
+          
+          // Calculate distance in kilometers
+          const R = 6371; // Earth's radius in km
+          const dLat = (eqLat - siteLat) * Math.PI / 180;
+          const dLon = (eqLon - siteLon) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(siteLat * Math.PI / 180) * Math.cos(eqLat * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c; // Distance in km
+          
+          // Match if within 100 meters (0.1 km)
+          return distance < 0.1;
+        });
+        
+        console.log('[SiteEquipmentModal] Location-based equipment matching:', {
+          found: equipment.length,
+          siteLocation: { lat: siteLat, lon: siteLon }
+        });
+      }
+      
+      // If no EPC devices found by siteId/name, try location-based matching as fallback
+      if (epcDevices.length === 0 && allEPCs.length > 0 && site.location?.latitude && site.location?.longitude) {
+        console.log('[SiteEquipmentModal] No EPC devices found by siteId/name, trying location-based matching');
+        const siteLat = site.location.latitude;
+        const siteLon = site.location.longitude;
+        
+        epcDevices = allEPCs.filter((epc: any) => {
+          const epcLat = epc.location?.coordinates?.latitude || epc.location?.latitude;
+          const epcLon = epc.location?.coordinates?.longitude || epc.location?.longitude;
+          
+          if (!epcLat || !epcLon) return false;
+          
+          // Calculate distance in kilometers
+          const R = 6371;
+          const dLat = (epcLat - siteLat) * Math.PI / 180;
+          const dLon = (epcLon - siteLon) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(siteLat * Math.PI / 180) * Math.cos(epcLat * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+          
+          // Match if within 100 meters (0.1 km)
+          return distance < 0.1;
+        });
+        
+        if (epcDevices.length > 0) {
+          // Update hardwareDeployments to include location-matched EPCs
+          hardwareDeployments = [
+            ...filteredDeployments,
+            ...epcDevices.map((epc: any) => ({
+              _id: epc.epcId || epc.id || epc._id,
+              id: epc.epcId || epc.id || epc._id,
+              name: epc.site_name || epc.name || 'EPC Device',
+              hardware_type: 'epc',
+              status: epc.status || 'deployed',
+              siteId: epc.site_id || epc.siteId,
+              config: {
+                ipAddress: epc.ipAddress || epc.ip_address,
+                macAddress: epc.macAddress || epc.mac_address,
+                device_code: epc.device_code
+              },
+              deployedAt: epc.createdAt || epc.created_at || epc.deployedAt,
+              isEPC: true
+            }))
+          ];
+          
+          console.log('[SiteEquipmentModal] Location-based EPC matching:', {
+            found: epcDevices.length,
+            siteLocation: { lat: siteLat, lon: siteLon }
+          });
+        }
+      }
+      
       console.log('[SiteEquipmentModal] Final results:', {
         hardwareDeployments: hardwareDeployments.length,
+        epcDevices: epcDevices.length,
         equipment: equipment.length
       });
     } catch (err: any) {
