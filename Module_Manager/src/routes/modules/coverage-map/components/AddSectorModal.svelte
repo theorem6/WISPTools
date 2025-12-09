@@ -242,7 +242,7 @@
                 status: formData.status,
                 planId: planId // Keep/set the planId
               };
-              await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+              await coverageMapService.updateSector(finalTenantId, sectorToEdit.id, sectorData);
               console.log('[AddSectorModal] ✅ Successfully updated production sector');
               dispatch('saved', { message: 'Sector updated successfully.' });
             }
@@ -269,11 +269,11 @@
               radioModel: formData.radioModel || undefined,
               radioManufacturer: formData.radioManufacturer || undefined,
               radioSerialNumber: formData.radioSerialNumber || undefined,
-                     status: formData.status,
-                     planId: planId // Keep/set the planId
-                   };
-                   console.log('[AddSectorModal] Calling coverageMapService.updateSector', { tenantId: finalTenantId, sectorId: sectorToEdit.id, sectorData });
-                   await coverageMapService.updateSector(finalTenantId, sectorToEdit.id, sectorData);
+              status: formData.status,
+              planId: planId // Keep/set the planId
+            };
+            console.log('[AddSectorModal] Calling coverageMapService.updateSector', { tenantId: finalTenantId, sectorId: sectorToEdit.id, sectorData });
+            await coverageMapService.updateSector(finalTenantId, sectorToEdit.id, sectorData);
             console.log('[AddSectorModal] ✅ Successfully updated production sector');
             dispatch('saved', { message: 'Sector updated successfully.' });
           }
@@ -317,11 +317,11 @@
 
         if (sectorToEdit && sectorToEdit.id) {
           // Update existing sector
-          await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+          await coverageMapService.updateSector(finalTenantId, sectorToEdit.id, sectorData);
           dispatch('saved', { message: 'Sector updated successfully.' });
         } else {
           // Create new sector
-          await coverageMapService.createSector(tenantId, sectorData);
+          await coverageMapService.createSector(finalTenantId, sectorData);
           dispatch('saved', { message: 'Sector created successfully.' });
         }
       }
