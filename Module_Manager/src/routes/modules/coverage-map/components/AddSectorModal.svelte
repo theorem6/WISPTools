@@ -213,6 +213,7 @@
   function handleClose() {
     show = false;
     error = '';
+    lastShowState = false; // Reset flag when closing
     // Don't reset sectorToEdit here - let parent handle it
   }
 </script>
