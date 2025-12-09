@@ -379,6 +379,17 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     };
   });
 
+  // Watch for tenant changes and load plans when tenant is available
+  let hasLoadedPlans = false;
+  $: if ($currentTenant?.id && !isLoadingPlans && !hasLoadedPlans) {
+    console.log('[Deploy] ✅✅✅ Tenant available, loading ready plans:', $currentTenant.id);
+    hasLoadedPlans = true; // Prevent multiple calls
+    loadReadyPlans().catch(err => {
+      console.error('[Deploy] Error in loadReadyPlans:', err);
+      hasLoadedPlans = false; // Reset on error so it can retry
+    });
+  }
+
 
   async function handleIframeObjectAction(event: Event) {
     console.log('[Deploy] 🔵 handleIframeObjectAction EVENT RECEIVED:', event);
