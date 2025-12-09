@@ -36,46 +36,58 @@
     status: 'active' as const
   };
   
-  // Pre-fill form when sectorToEdit changes
-  $: if (sectorToEdit && show) {
-    formData = {
-      siteId: sectorToEdit.siteId || selectedSite?.id || '',
-      name: sectorToEdit.name || '',
-      azimuth: sectorToEdit.azimuth || 0,
-      beamwidth: sectorToEdit.beamwidth || 65,
-      tilt: sectorToEdit.tilt || 0,
-      technology: (sectorToEdit.technology as any) || 'LTE',
-      band: sectorToEdit.band || '',
-      frequency: sectorToEdit.frequency || 0,
-      bandwidth: sectorToEdit.bandwidth || 10,
-      antennaModel: sectorToEdit.antennaModel || '',
-      antennaManufacturer: sectorToEdit.antennaManufacturer || '',
-      antennaSerialNumber: sectorToEdit.antennaSerialNumber || '',
-      radioModel: sectorToEdit.radioModel || '',
-      radioManufacturer: sectorToEdit.radioManufacturer || '',
-      radioSerialNumber: sectorToEdit.radioSerialNumber || '',
-      status: (sectorToEdit.status as any) || 'active'
-    };
-  } else if (!sectorToEdit && show) {
-    // Reset form when opening in create mode
-    formData = {
-      siteId: selectedSite?.id || '',
-      name: '',
-      azimuth: 0,
-      beamwidth: 65,
-      tilt: 0,
-      technology: 'LTE' as const,
-      band: '',
-      frequency: 0,
-      bandwidth: 10,
-      antennaModel: '',
-      antennaManufacturer: '',
-      antennaSerialNumber: '',
-      radioModel: '',
-      radioManufacturer: '',
-      radioSerialNumber: '',
-      status: 'active' as const
-    };
+  // Track if we've initialized the form to prevent infinite loops
+  let formInitialized = false;
+  
+  // Pre-fill form when modal opens with sectorToEdit
+  $: if (show && !formInitialized) {
+    if (sectorToEdit) {
+      // Edit mode - pre-fill with existing data
+      formData = {
+        siteId: sectorToEdit.siteId || selectedSite?.id || '',
+        name: sectorToEdit.name || '',
+        azimuth: sectorToEdit.azimuth || 0,
+        beamwidth: sectorToEdit.beamwidth || 65,
+        tilt: sectorToEdit.tilt || 0,
+        technology: (sectorToEdit.technology as any) || 'LTE',
+        band: sectorToEdit.band || '',
+        frequency: sectorToEdit.frequency || 0,
+        bandwidth: sectorToEdit.bandwidth || 10,
+        antennaModel: sectorToEdit.antennaModel || '',
+        antennaManufacturer: sectorToEdit.antennaManufacturer || '',
+        antennaSerialNumber: sectorToEdit.antennaSerialNumber || '',
+        radioModel: sectorToEdit.radioModel || '',
+        radioManufacturer: sectorToEdit.radioManufacturer || '',
+        radioSerialNumber: sectorToEdit.radioSerialNumber || '',
+        status: (sectorToEdit.status as any) || 'active'
+      };
+    } else {
+      // Create mode - reset to defaults
+      formData = {
+        siteId: selectedSite?.id || '',
+        name: '',
+        azimuth: 0,
+        beamwidth: 65,
+        tilt: 0,
+        technology: 'LTE' as const,
+        band: '',
+        frequency: 0,
+        bandwidth: 10,
+        antennaModel: '',
+        antennaManufacturer: '',
+        antennaSerialNumber: '',
+        radioModel: '',
+        radioManufacturer: '',
+        radioSerialNumber: '',
+        status: 'active' as const
+      };
+    }
+    formInitialized = true;
+  }
+  
+  // Reset initialization flag when modal closes
+  $: if (!show) {
+    formInitialized = false;
   }
   
   $: if (selectedSite && !sectorToEdit) formData.siteId = selectedSite.id;
