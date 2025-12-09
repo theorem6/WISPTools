@@ -116,6 +116,14 @@
   }
   
   async function handleSave() {
+    console.log('[AddSectorModal] handleSave called', { 
+      hasSectorToEdit: !!sectorToEdit, 
+      sectorId: sectorToEdit?.id, 
+      planId,
+      sectorPlanId: sectorToEdit?.planId,
+      formDataName: formData.name
+    });
+    
     if (!formData.name.trim()) {
       error = 'Sector name is required';
       return;
@@ -156,34 +164,74 @@
           radioSerialNumber: formData.radioSerialNumber || undefined
         };
 
-        // Check if editing an existing sector in this plan
-        // If sectorToEdit exists and has planId matching current plan, update it
-        if (sectorToEdit && sectorToEdit.id && sectorToEdit.planId === planId) {
-          // Check if this is a plan layer feature (staged) or production sector with planId
+        // Check if editing an existing sector
+        // If sectorToEdit exists, we're editing (either plan feature or production sector)
+        if (sectorToEdit && sectorToEdit.id) {
+          // Check if this is a plan layer feature (staged) or production sector
           // Plan features typically have IDs starting with 'local-' or are in the staged features
-          // Production sectors have MongoDB ObjectIds
+          // Production sectors have MongoDB ObjectIds (24 hex characters)
+          const sectorIdStr = String(sectorToEdit.id);
           const isPlanFeature = (sectorToEdit as any).isPlanDraft === true || 
-                                String(sectorToEdit.id).startsWith('local-') ||
+                                sectorIdStr.startsWith('local-') ||
                                 (sectorToEdit as any).planDraft === true;
+          
+          // Check if sector has planId matching current plan, or if we're in plan mode editing any sector
+          const sectorPlanId = sectorToEdit.planId || (sectorToEdit as any).planId;
+          const isInCurrentPlan = sectorPlanId === planId;
           
           console.log('[AddSectorModal] Saving sector in plan:', {
             sectorId: sectorToEdit.id,
             planId,
             isPlanFeature,
-            sectorPlanId: sectorToEdit.planId
+            sectorPlanId,
+            isInCurrentPlan,
+            sectorIdStr,
+            sectorKeys: Object.keys(sectorToEdit)
           });
           
+          // Try plan feature update first if it looks like a plan feature
           if (isPlanFeature) {
-            // Update as plan layer feature (staged)
-            console.log('[AddSectorModal] Updating plan layer feature');
-            await mapLayerManager.updateFeature(planId, sectorToEdit.id, {
-              properties,
-              geometry: {
-                type: 'Point',
-                coordinates: [site.location.longitude, site.location.latitude]
-              }
-            });
-            dispatch('saved', { message: 'Sector updated in plan.' });
+            console.log('[AddSectorModal] Attempting to update as plan layer feature');
+            try {
+              await mapLayerManager.updateFeature(planId, sectorToEdit.id, {
+                properties,
+                geometry: {
+                  type: 'Point',
+                  coordinates: [site.location.longitude, site.location.latitude]
+                }
+              });
+              console.log('[AddSectorModal] ✅ Successfully updated plan layer feature');
+              dispatch('saved', { message: 'Sector updated in plan.' });
+            } catch (planFeatureError: any) {
+              console.warn('[AddSectorModal] Failed to update as plan feature, trying production sector:', planFeatureError);
+              // Fall through to production sector update
+              const sectorData: any = {
+                siteId: formData.siteId,
+                name: formData.name,
+                location: {
+                  latitude: site.location.latitude,
+                  longitude: site.location.longitude
+                },
+                azimuth: formData.azimuth,
+                beamwidth: formData.beamwidth,
+                tilt: formData.tilt || undefined,
+                technology: formData.technology,
+                band: formData.band || undefined,
+                frequency: formData.frequency || undefined,
+                bandwidth: formData.bandwidth || undefined,
+                antennaModel: formData.antennaModel || undefined,
+                antennaManufacturer: formData.antennaManufacturer || undefined,
+                antennaSerialNumber: formData.antennaSerialNumber || undefined,
+                radioModel: formData.radioModel || undefined,
+                radioManufacturer: formData.radioManufacturer || undefined,
+                radioSerialNumber: formData.radioSerialNumber || undefined,
+                status: formData.status,
+                planId: planId // Keep/set the planId
+              };
+              await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+              console.log('[AddSectorModal] ✅ Successfully updated production sector');
+              dispatch('saved', { message: 'Sector updated successfully.' });
+            }
           } else {
             // Update as production sector with planId
             console.log('[AddSectorModal] Updating production sector with planId');
@@ -208,9 +256,11 @@
               radioManufacturer: formData.radioManufacturer || undefined,
               radioSerialNumber: formData.radioSerialNumber || undefined,
               status: formData.status,
-              planId: planId // Keep the planId
+              planId: planId // Keep/set the planId
             };
+            console.log('[AddSectorModal] Calling coverageMapService.updateSector', { tenantId, sectorId: sectorToEdit.id, sectorData });
             await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+            console.log('[AddSectorModal] ✅ Successfully updated production sector');
             dispatch('saved', { message: 'Sector updated successfully.' });
           }
         } else {
