@@ -85,7 +85,7 @@ export class CoverageMapService {
     return await this.apiCall('sites', {
       method: 'POST',
       body: JSON.stringify(site)
-    });
+    }, tenantId);
   }
   
   async getTowerSites(
@@ -106,7 +106,7 @@ export class CoverageMapService {
   
   async getTowerSite(tenantId: string, siteId: string): Promise<TowerSite | null> {
     try {
-      const site = await this.apiCall(`sites/${siteId}`);
+      const site = await this.apiCall(`sites/${siteId}`, {}, tenantId);
       return { ...site, id: site._id };
     } catch {
       return null;
@@ -117,13 +117,13 @@ export class CoverageMapService {
     await this.apiCall(`sites/${siteId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
-    });
+    }, tenantId);
   }
   
   async deleteTowerSite(tenantId: string, siteId: string): Promise<void> {
     await this.apiCall(`sites/${siteId}`, {
       method: 'DELETE'
-    });
+    }, tenantId);
   }
   
   // ========== Sectors ==========
@@ -132,7 +132,7 @@ export class CoverageMapService {
     return await this.apiCall('sectors', {
       method: 'POST',
       body: JSON.stringify(sector)
-    });
+    }, tenantId);
   }
   
   async getSectors(
@@ -157,7 +157,7 @@ export class CoverageMapService {
   }
   
   async getSectorsByBand(tenantId: string, band: string): Promise<Sector[]> {
-    const sectors = await this.apiCall(`sectors?band=${encodeURIComponent(band)}`);
+    const sectors = await this.apiCall(`sectors?band=${encodeURIComponent(band)}`, {}, tenantId);
     return sectors.map((s: any) => ({ ...s, id: s._id }));
   }
   
@@ -165,13 +165,13 @@ export class CoverageMapService {
     await this.apiCall(`sectors/${sectorId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
-    });
+    }, tenantId);
   }
   
   async deleteSector(tenantId: string, sectorId: string): Promise<void> {
     await this.apiCall(`sectors/${sectorId}`, {
       method: 'DELETE'
-    });
+    }, tenantId);
   }
   
   // ========== Unified CPE ==========
@@ -180,7 +180,7 @@ export class CoverageMapService {
     return await this.apiCall('cpe', {
       method: 'POST',
       body: JSON.stringify(cpe)
-    });
+    }, tenantId);
   }
   
   async getCPEDevices(
@@ -203,13 +203,13 @@ export class CoverageMapService {
     await this.apiCall(`cpe/${cpeId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
-    });
+    }, tenantId);
   }
   
   async deleteCPE(tenantId: string, cpeId: string): Promise<void> {
     await this.apiCall(`cpe/${cpeId}`, {
       method: 'DELETE'
-    });
+    }, tenantId);
   }
   
   // ========== Network Equipment ==========
@@ -218,7 +218,7 @@ export class CoverageMapService {
     return await this.apiCall('equipment', {
       method: 'POST',
       body: JSON.stringify(equipment)
-    });
+    }, tenantId);
   }
   
   async getEquipment(
@@ -238,7 +238,7 @@ export class CoverageMapService {
   }
   
   async getEquipmentByLocation(tenantId: string, locationType: string): Promise<NetworkEquipment[]> {
-    const equipment = await this.apiCall(`equipment?locationType=${encodeURIComponent(locationType)}`);
+    const equipment = await this.apiCall(`equipment?locationType=${encodeURIComponent(locationType)}`, {}, tenantId);
     return equipment.map((e: any) => ({ ...e, id: e._id }));
   }
   
@@ -246,13 +246,13 @@ export class CoverageMapService {
     await this.apiCall(`equipment/${equipmentId}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
-    });
+    }, tenantId);
   }
   
   async deleteEquipment(tenantId: string, equipmentId: string): Promise<void> {
     await this.apiCall(`equipment/${equipmentId}`, {
       method: 'DELETE'
-    });
+    }, tenantId);
   }
   
   // ========== Geocoding ==========

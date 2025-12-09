@@ -269,11 +269,11 @@
               radioModel: formData.radioModel || undefined,
               radioManufacturer: formData.radioManufacturer || undefined,
               radioSerialNumber: formData.radioSerialNumber || undefined,
-              status: formData.status,
-              planId: planId // Keep/set the planId
-            };
-            console.log('[AddSectorModal] Calling coverageMapService.updateSector', { tenantId, sectorId: sectorToEdit.id, sectorData });
-            await coverageMapService.updateSector(tenantId, sectorToEdit.id, sectorData);
+                     status: formData.status,
+                     planId: planId // Keep/set the planId
+                   };
+                   console.log('[AddSectorModal] Calling coverageMapService.updateSector', { tenantId: finalTenantId, sectorId: sectorToEdit.id, sectorData });
+                   await coverageMapService.updateSector(finalTenantId, sectorToEdit.id, sectorData);
             console.log('[AddSectorModal] ✅ Successfully updated production sector');
             dispatch('saved', { message: 'Sector updated successfully.' });
           }
