@@ -1088,12 +1088,35 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     
     switch (action) {
       case 'edit-sector':
-        // TODO: Open sector edit modal when implemented
+        // Open sector edit modal (use AddSectorModal in edit mode)
         console.log('[CoverageMap] Edit sector:', sector);
+        if (sector) {
+          // Find the site for this sector
+          const site = towers.find(t => t.id === sector.siteId || String(t.id) === String(sector.siteId));
+          selectedSiteForSector = site || null;
+          // Set the sector to edit (AddSectorModal should handle editing if sector is provided)
+          // For now, just open the modal - we'll need to enhance AddSectorModal to support editing
+          showAddSectorModal = true;
+          console.log('[CoverageMap] Opening AddSectorModal for editing sector:', sector.name);
+        }
         break;
       case 'view-sector-details':
-        // TODO: Open sector details modal when implemented
+        // Show sector details (use alert for now, or create a details modal)
         console.log('[CoverageMap] View sector details:', sector);
+        if (sector) {
+          const details = [
+            `Name: ${sector.name}`,
+            `Technology: ${sector.technology || 'N/A'}`,
+            `Status: ${sector.status || 'N/A'}`,
+            `Band: ${sector.band || 'N/A'}`,
+            `Frequency: ${sector.frequency ? `${sector.frequency} MHz` : 'N/A'}`,
+            `Azimuth: ${sector.azimuth !== undefined ? `${sector.azimuth}°` : 'N/A'}`,
+            `Beamwidth: ${sector.beamwidth !== undefined ? `${sector.beamwidth}°` : 'N/A'}`,
+            `Power: ${sector.power !== undefined ? `${sector.power} dBm` : 'N/A'}`,
+            `Location: ${sector.location?.latitude ? `${sector.location.latitude.toFixed(6)}, ${sector.location.longitude.toFixed(6)}` : 'N/A'}`
+          ].join('\n');
+          alert(`Sector Details:\n\n${details}`);
+        }
         break;
       case 'delete-sector':
         if (confirm(`Are you sure you want to delete sector "${sector.name}"?`)) {

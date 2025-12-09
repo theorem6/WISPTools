@@ -69,19 +69,33 @@
     }
     
     try {
-      // In deploy mode, allow edit and view actions for sectors (they're production assets)
+      // In deploy mode, allow ALL actions for sectors (they're production assets)
       const isDeployMode = moduleContext?.module === 'deploy';
       const isReadOnlyAction = ['view-sector-details', 'view-details', 'view'].includes(action);
       
-      // Always allow read-only actions, and in deploy mode allow edit actions too
-      if (!isReadOnlyAction && !isDeployMode) {
+      console.log('[SectorActionsMenu] Permission check:', { 
+        action, 
+        isDeployMode, 
+        isReadOnlyAction, 
+        moduleContext: moduleContext?.module,
+        sectorId: sector.id 
+      });
+      
+      // Always allow read-only actions, and in deploy mode allow ALL actions (including edit)
+      if (isDeployMode) {
+        console.log(`[SectorActionsMenu] ✅ Action '${action}' allowed in deploy mode`);
+        // In deploy mode, skip permission checks entirely
+      } else if (isReadOnlyAction) {
+        console.log(`[SectorActionsMenu] ✅ Action '${action}' allowed (read-only)`);
+        // Read-only actions are always allowed
+      } else {
+        // Only check permissions if NOT deploy mode and NOT read-only
         const isAllowed = objectStateManager.isActionAllowed(sector, action, moduleContext);
         if (!isAllowed) {
-          console.warn(`[SectorActionsMenu] Action '${action}' not allowed for sector ${sector.id}`);
+          console.warn(`[SectorActionsMenu] ❌ Action '${action}' not allowed for sector ${sector.id}`);
           return;
         }
-      } else {
-        console.log(`[SectorActionsMenu] Action '${action}' allowed (${isDeployMode ? 'deploy mode' : 'read-only'})`);
+        console.log(`[SectorActionsMenu] ✅ Action '${action}' allowed via permission check`);
       }
       
       console.log('[SectorActionsMenu] Dispatching action', { action, sectorId: sector.id });
@@ -91,7 +105,7 @@
       console.error('[SectorActionsMenu] Error in handleAction:', error);
       // Even if permission check fails, try to dispatch in deploy mode
       if (moduleContext?.module === 'deploy') {
-        console.log('[SectorActionsMenu] Dispatching action anyway in deploy mode despite error');
+        console.log('[SectorActionsMenu] ✅ Dispatching action anyway in deploy mode despite error');
         dispatch('action', { action, sector });
         show = false;
       }
