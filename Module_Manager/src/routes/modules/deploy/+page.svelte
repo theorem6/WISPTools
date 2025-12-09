@@ -366,12 +366,26 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   let lastTenantId: string | undefined = undefined;
   let loadPlansTimeout: ReturnType<typeof setTimeout> | null = null;
   
+  // Reactive statement to watch for tenant availability
   $: {
-    const tenantId = $currentTenant?.id;
+    // Force reactive statement to evaluate
+    const tenant = $currentTenant;
+    const tenantId = tenant?.id;
     const tenantIdString = tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' ? tenantId : undefined;
+    
+    console.log('[Deploy] 🔍 Reactive statement evaluated:', { 
+      hasTenant: !!tenant, 
+      tenantId: tenantIdString, 
+      lastTenantId, 
+      isLoadingPlans, 
+      hasLoadedPlans,
+      tenantIdType: typeof tenantId,
+      tenantIdLength: tenantId ? tenantId.length : 0
+    });
     
     // Clear any pending timeout
     if (loadPlansTimeout) {
+      console.log('[Deploy] Clearing pending loadPlansTimeout');
       clearTimeout(loadPlansTimeout);
       loadPlansTimeout = null;
     }
@@ -410,10 +424,16 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           hasLoadedPlans = false; // Reset so it can retry with new tenant
         }
         loadPlansTimeout = null;
-      }, 300); // Delay to ensure tenant store is fully initialized
+      }, 500); // Increased delay to 500ms to ensure tenant store is fully initialized
     } else if (!tenantIdString) {
       // Tenant not ready yet
-      console.log('[Deploy] ⏳ Waiting for tenant...', { hasTenantId: !!tenantId, isLoadingPlans, hasLoadedPlans });
+      console.log('[Deploy] ⏳ Waiting for tenant...', { 
+        hasTenant: !!tenant, 
+        hasTenantId: !!tenantId, 
+        tenantIdValue: tenantId,
+        isLoadingPlans, 
+        hasLoadedPlans 
+      });
     }
   }
 
