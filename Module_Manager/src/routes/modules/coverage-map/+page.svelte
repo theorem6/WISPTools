@@ -157,7 +157,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let mapComponent: any;
   
   // Tenant info
-  $: tenantId = $currentTenant?.id || '';
+  // In iframe context, also check localStorage for tenantId (set by parent)
+  let storedTenantId: string | null = null;
+  if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+    storedTenantId = localStorage.getItem('selectedTenantId');
+  }
+  $: tenantId = $currentTenant?.id || storedTenantId || '';
   $: tenantName = $currentTenant?.displayName || 'Organization';
   
   // Check if stats should be hidden (for plan module)
@@ -399,14 +404,38 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   onMount(async () => {
     window.addEventListener('message', handleSharedMapMessage);
 
-    if (window.parent && window.parent !== window) {
+    // Check if we're in an iframe
+    const isInIframe = window.parent && window.parent !== window;
+    
+    if (isInIframe) {
+      // Request state immediately
       window.parent.postMessage({ source: 'coverage-map', type: 'request-state' }, '*');
+      
+      // Check localStorage for tenantId (might have been set by parent)
+      const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null;
+      if (storedTenantId && !tenantId) {
+        console.log('[CoverageMap] Found tenantId in localStorage from parent:', storedTenantId);
+        // Wait a bit for state-update message, then load data
+        setTimeout(async () => {
+          if (tenantId || storedTenantId) {
+            await loadAllData();
+          }
+          isLoading = false;
+        }, 500);
+      } else if (tenantId) {
+        await loadAllData();
+        isLoading = false;
+      } else {
+        // Wait for state-update message with tenantId
+        isLoading = false;
+      }
+    } else {
+      // Not in iframe, proceed normally
+      if (tenantId) {
+        await loadAllData();
+      }
+      isLoading = false;
     }
-
-    if (tenantId) {
-      await loadAllData();
-    }
-    isLoading = false;
   });
   
   onDestroy(() => {
@@ -707,6 +736,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         if (currentStoredTenant !== tenantIdFromState) {
           localStorage.setItem('selectedTenantId', tenantIdFromState);
           console.log('[CoverageMap] Set tenantId from state-update:', tenantIdFromState);
+        }
+        
+        // Update storedTenantId to trigger reactive update
+        storedTenantId = tenantIdFromState;
+        
+        // If we're in an iframe and haven't loaded data yet, load it now
+        if (window.parent && window.parent !== window) {
+          console.log('[CoverageMap] Received tenantId in iframe, will load data...');
+          // Trigger loadAllData via reactive statement by updating tenantId
+          setTimeout(() => {
+            if (tenantIdFromState && !tenantId) {
+              loadAllData().catch(err => {
+                console.error('[CoverageMap] Failed to load data after receiving tenantId:', err);
+              });
+            }
+          }, 100);
         }
       }
 
