@@ -355,7 +355,7 @@ export class CoverageMapService {
   
   async getAllHardwareDeployments(tenantId: string, hardware_type?: string): Promise<any[]> {
     const params = hardware_type ? `?hardware_type=${hardware_type}` : '';
-    return await this.apiCall(`hardware-deployments${params}`);
+    return await this.apiCall(`hardware-deployments${params}`, {}, tenantId);
   }
   
   async updateHardwareDeployment(tenantId: string, deploymentId: string, updates: any): Promise<any> {
