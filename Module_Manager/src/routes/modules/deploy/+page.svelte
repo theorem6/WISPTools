@@ -579,6 +579,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         }
       }
     }
+    
+    // Always reset handling flag at end
+    handlingAction = false;
   }
 
 
