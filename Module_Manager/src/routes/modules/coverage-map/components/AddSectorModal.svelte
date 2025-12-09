@@ -127,12 +127,33 @@
       formDataSiteId: formData.siteId
     });
     
-    if (!tenantId) {
-      const errorMsg = 'Tenant ID is required. Please refresh the page.';
-      console.error('[AddSectorModal] ❌', errorMsg);
-      error = errorMsg;
-      return;
+    // Validate tenantId - check prop, then try store, then localStorage
+    let resolvedTenantId = tenantId;
+    if (!resolvedTenantId || typeof resolvedTenantId !== 'string' || resolvedTenantId.trim() === '') {
+      // Try getting from store
+      try {
+        const { currentTenant } = await import('$lib/stores/tenantStore');
+        const { get } = await import('svelte/store');
+        resolvedTenantId = get(currentTenant)?.id;
+      } catch (e) {
+        console.warn('[AddSectorModal] Could not access tenant store:', e);
+      }
+      
+      // Fallback to localStorage
+      if (!resolvedTenantId && typeof window !== 'undefined') {
+        resolvedTenantId = localStorage.getItem('selectedTenantId') || null;
+      }
+      
+      if (!resolvedTenantId || typeof resolvedTenantId !== 'string' || resolvedTenantId.trim() === '') {
+        const errorMsg = 'Tenant ID is required. Please refresh the page.';
+        console.error('[AddSectorModal] ❌ Save failed: No tenantId available from prop, store, or localStorage.');
+        error = errorMsg;
+        return;
+      }
     }
+    
+    // Use resolved tenantId for all API calls
+    const finalTenantId = resolvedTenantId;
     
     if (!formData.name.trim()) {
       error = 'Sector name is required';
@@ -153,7 +174,7 @@
       return;
     }
     
-    console.log('[AddSectorModal] ✅ Validation passed, starting save...');
+    console.log('[AddSectorModal] ✅ Validation passed, starting save with tenantId:', finalTenantId);
     isSaving = true;
     error = '';
     
