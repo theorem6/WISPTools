@@ -932,19 +932,6 @@
   </div>
 {/if}
 
-<!-- Site Devices Modal -->
-<SiteDevicesModal
-  site={selectedSite}
-  bind:open={showSiteDevicesModal}
-  {networkDevices}
-  {tenantId}
-  on:close={() => {
-    showSiteDevicesModal = false;
-    selectedSite = null;
-    selectedSiteDevices = [];
-  }}
-/>
-
 <!-- Monitoring Site Details Modal (right-click on sites) -->
 {#if showMonitoringSiteDetailsModal && selectedSiteForDetails}
   <MonitoringSiteDetailsModal

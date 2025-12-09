@@ -779,8 +779,6 @@
       externalPlanFeatures={[]}
       marketingLeads={[]}
       planId={null}
-      showFilterPanel={true}
-      showMainMenu={false}
       on:asset-click={(e) => {
         // Handle asset-click events from map (towers emit this)
         // Only right-click opens the modal - no left-click functionality
