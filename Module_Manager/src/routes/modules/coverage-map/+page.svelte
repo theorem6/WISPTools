@@ -1037,10 +1037,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
                 // Send message - SharedMap will handle calling the global handler
                 // Don't try to access window.parent directly due to cross-origin restrictions
                 console.log('[CoverageMap] Sending message to parent (SharedMap will handle)');
-                try {
-                  console.error('[CoverageMap] ❌ Error calling global handler:', handlerErr);
-                  // Continue to message fallback
-                }
                 
                 // Send to parent window - SharedMap will handle calling the global handler
                 window.parent.postMessage(message, '*');

@@ -61,6 +61,7 @@
 
       // Also load EPC devices from RemoteEPC collection
       let epcDevices: any[] = [];
+      let allEPCs: any[] = []; // Store for location-based fallback
       const user = auth().currentUser;
       if (user) {
         try {
@@ -73,7 +74,7 @@
           });
           if (response.ok) {
             const data = await response.json();
-            const allEPCs = data.epcs || [];
+            allEPCs = data.epcs || [];
             console.log('[SiteEquipmentModal] All EPC devices from API:', {
               count: allEPCs.length,
               targetSiteId: siteId,
@@ -183,7 +184,7 @@
         return matches;
       });
 
-      // Combine hardware deployments with EPC devices
+      // Initial combination of hardware deployments with EPC devices (will be updated if location matching finds more)
       hardwareDeployments = [
         ...filteredDeployments,
         ...epcDevices.map((epc: any) => ({
@@ -194,15 +195,16 @@
           status: epc.status || 'deployed',
           siteId: epc.site_id || epc.siteId,
           config: {
-            ipAddress: epc.ipAddress,
+            ipAddress: epc.ipAddress || epc.ip_address,
+            macAddress: epc.macAddress || epc.mac_address,
             device_code: epc.device_code
           },
-          deployedAt: epc.createdAt || epc.deployedAt,
+          deployedAt: epc.createdAt || epc.created_at || epc.deployedAt,
           isEPC: true
         }))
       ];
 
-      console.log('[SiteEquipmentModal] Filtered hardware deployments:', {
+      console.log('[SiteEquipmentModal] Initial filtered hardware deployments:', {
         count: hardwareDeployments.length,
         deployments: hardwareDeployments.map((d: any) => ({
           name: d.name,
