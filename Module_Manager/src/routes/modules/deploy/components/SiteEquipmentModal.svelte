@@ -14,6 +14,7 @@
 
   let hardwareDeployments: any[] = [];
   let equipment: any[] = [];
+  let sectors: any[] = [];
   let isLoading = false;
   let error = '';
 
@@ -212,6 +213,21 @@
         }))
       });
 
+      // Load sectors at this site
+      const allSectors = await coverageMapService.getSectorsBySite(tenantId, siteId);
+      console.log('[SiteEquipmentModal] Loaded sectors:', {
+        count: allSectors?.length || 0,
+        targetSiteId: siteId,
+        sectors: (allSectors || []).slice(0, 3).map((s: any) => ({
+          id: s.id || s._id,
+          name: s.name,
+          siteId: s.siteId,
+          technology: s.technology
+        }))
+      });
+      
+      sectors = allSectors || [];
+      
       // Load equipment at this site
       const allEquipment = await coverageMapService.getEquipment(tenantId);
       console.log('[SiteEquipmentModal] Loaded all equipment:', {
@@ -347,7 +363,8 @@
       console.log('[SiteEquipmentModal] Final results:', {
         hardwareDeployments: hardwareDeployments.length,
         epcDevices: epcDevices.length,
-        equipment: equipment.length
+        equipment: equipment.length,
+        sectors: sectors.length
       });
     } catch (err: any) {
       console.error('[SiteEquipmentModal] Error loading equipment:', err);
@@ -415,6 +432,63 @@
                         <div class="detail-row">
                           <span class="label">Deployed:</span>
                           <span class="value">{new Date(deployment.deployedAt).toLocaleDateString()}</span>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Sectors -->
+          <div class="section">
+            <h3>📶 Sectors ({sectors.length})</h3>
+            {#if sectors.length === 0}
+              <div class="empty-state">
+                <p>No sectors found at this site</p>
+              </div>
+            {:else}
+              <div class="items-list">
+                {#each sectors as sector}
+                  <div class="item-card">
+                    <div class="item-header">
+                      <h4>{sector.name || 'Unnamed Sector'}</h4>
+                      <span class="status-badge {sector.status || 'active'}">{sector.status || 'active'}</span>
+                    </div>
+                    <div class="item-details">
+                      <div class="detail-row">
+                        <span class="label">Technology:</span>
+                        <span class="value">{sector.technology || 'Unknown'}</span>
+                      </div>
+                      {#if sector.band}
+                        <div class="detail-row">
+                          <span class="label">Band:</span>
+                          <span class="value">{sector.band}</span>
+                        </div>
+                      {/if}
+                      {#if sector.frequency}
+                        <div class="detail-row">
+                          <span class="label">Frequency:</span>
+                          <span class="value">{sector.frequency} MHz</span>
+                        </div>
+                      {/if}
+                      {#if sector.azimuth !== undefined && sector.azimuth !== null}
+                        <div class="detail-row">
+                          <span class="label">Azimuth:</span>
+                          <span class="value">{sector.azimuth}°</span>
+                        </div>
+                      {/if}
+                      {#if sector.beamwidth}
+                        <div class="detail-row">
+                          <span class="label">Beamwidth:</span>
+                          <span class="value">{sector.beamwidth}°</span>
+                        </div>
+                      {/if}
+                      {#if sector.power}
+                        <div class="detail-row">
+                          <span class="label">Power:</span>
+                          <span class="value">{sector.power} dBm</span>
                         </div>
                       {/if}
                     </div>

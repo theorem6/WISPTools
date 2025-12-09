@@ -20,6 +20,7 @@
   import AddInventoryModal from './components/AddInventoryModal.svelte';
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
+  import SectorActionsMenu from './components/SectorActionsMenu.svelte';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import HardwareDeploymentModal from './components/HardwareDeploymentModal.svelte';
@@ -62,6 +63,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showAddInventoryModal = false;
   let showContextMenu = false;
   let showTowerActionsMenu = false;
+  let showSectorActionsMenu = false;
   let showEPCDeploymentModal = false;
   let showHSSRegistrationModal = false;
   let showHardwareDeploymentModal = false;
@@ -74,10 +76,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let selectedSiteForBackhaul: TowerSite | null = null;
   let selectedSiteForInventory: TowerSite | null = null;
   let selectedTowerForMenu: TowerSite | null = null;
+  let selectedSectorForMenu: Sector | null = null;
   let selectedTowerForEPC: TowerSite | null = null;
   let selectedSiteForEdit: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
+  let sectorMenuX = 0;
+  let sectorMenuY = 0;
   let initialSiteType: TowerSite['type'] | null = null;
   let selectedPlanDraft: PlanLayerFeature | null = null;
   let showPlanDraftMenu = false;
@@ -948,8 +953,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       } else if (type === 'sector') {
         const sector = sectors.find(s => s.id === id);
         if (sector) {
-          success = `Sector: ${data.name || 'Unknown'} - Right-click for options`;
-          setTimeout(() => success = '', 3000);
+          selectedSectorForMenu = sector;
+          sectorMenuX = screenX;
+          sectorMenuY = screenY;
+          showSectorActionsMenu = true;
         }
       } else if (type === 'cpe') {
         const cpe = cpeDevices.find(c => c.id === id);
@@ -967,6 +974,44 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         success = `Backhaul Link: ${data.name || 'Unknown'}`;
         setTimeout(() => success = '', 3000);
       }
+    }
+  }
+  
+  function handleSectorAction(event: CustomEvent) {
+    const { action, sector } = event.detail;
+    
+    console.log('[CoverageMap] handleSectorAction called', { action, sector, hasSector: !!sector });
+    
+    if (!sector) {
+      console.error('❌ Sector action called without sector');
+      return;
+    }
+    
+    switch (action) {
+      case 'edit-sector':
+        // TODO: Open sector edit modal when implemented
+        console.log('[CoverageMap] Edit sector:', sector);
+        break;
+      case 'view-sector-details':
+        // TODO: Open sector details modal when implemented
+        console.log('[CoverageMap] View sector details:', sector);
+        break;
+      case 'delete-sector':
+        if (confirm(`Are you sure you want to delete sector "${sector.name}"?`)) {
+          coverageMapService.deleteSector(tenantId, sector.id)
+            .then(() => {
+              success = `Sector "${sector.name}" deleted`;
+              setTimeout(() => success = '', 3000);
+              loadSectors();
+            })
+            .catch(err => {
+              error = `Failed to delete sector: ${err.message}`;
+              setTimeout(() => error = '', 5000);
+            });
+        }
+        break;
+      default:
+        console.warn(`[CoverageMap] Unknown sector action: ${action}`);
     }
   }
   
@@ -1568,6 +1613,15 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   y={towerMenuY}
   moduleContext={moduleContext}
   on:action={handleTowerAction}
+/>
+
+<SectorActionsMenu 
+  bind:show={showSectorActionsMenu}
+  sector={selectedSectorForMenu}
+  x={sectorMenuX}
+  y={sectorMenuY}
+  moduleContext={moduleContext}
+  on:action={handleSectorAction}
 />
 
 <!-- EPC Deployment Modal -->
