@@ -9,6 +9,7 @@
   export let fromSite: TowerSite | null = null;
   export let tenantId: string;
   export let planId: string | null = null; // Plan ID if creating backhaul within a plan
+  export let backhaulToEdit: any | null = null; // Backhaul equipment to edit (null = create mode)
   
   const dispatch = createEventDispatcher();
   
@@ -18,6 +19,9 @@
   // Check if we have enough sites
   $: canCreateBackhaul = sites.length >= 2;
   $: availableToSites = fromSite ? sites.filter(s => s.id !== fromSite.id) : sites;
+  
+  // Track last shown state to detect when modal opens
+  let lastShowState = false;
   
   // Form data
   let formData = {
@@ -277,8 +281,17 @@
           })
         };
 
-        await coverageMapService.createEquipment(tenantId, backhaulData);
-        dispatch('saved', { message: 'Backhaul link created successfully.' });
+        if (backhaulToEdit && backhaulToEdit.id) {
+          // Update existing backhaul
+          console.log('[AddBackhaulLinkModal] Updating existing backhaul:', backhaulToEdit.id);
+          await coverageMapService.updateEquipment(tenantId, backhaulToEdit.id, backhaulData);
+          dispatch('saved', { message: 'Backhaul link updated successfully.' });
+        } else {
+          // Create new backhaul
+          console.log('[AddBackhaulLinkModal] Creating new backhaul');
+          await coverageMapService.createEquipment(tenantId, backhaulData);
+          dispatch('saved', { message: 'Backhaul link created successfully.' });
+        }
       }
 
       handleClose();
@@ -292,6 +305,7 @@
   function handleClose() {
     show = false;
     error = '';
+    lastShowState = false; // Reset flag when closing
   }
   
   $: fromSiteName = sites.find(s => s.id === formData.fromSiteId)?.name || 'Site A';
@@ -299,11 +313,11 @@
 </script>
 
 {#if show}
-<div class="modal-overlay" onclick={handleClose}>
-  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+<div class="modal-overlay" on:click={handleClose}>
+  <div class="modal-content" on:click={(e) => e.stopPropagation()}>
     <div class="modal-header">
-      <h2>🔗 Add Backhaul Link</h2>
-      <button class="close-btn" onclick={handleClose}>✕</button>
+      <h2>🔗 {backhaulToEdit ? 'Edit Backhaul Link' : 'Add Backhaul Link'}</h2>
+      <button class="close-btn" on:click={handleClose}>✕</button>
     </div>
     
     {#if error}
@@ -665,8 +679,8 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" onclick={handleClose}>Cancel</button>
-      <button class="btn-primary" onclick={handleSave} disabled={isSaving || !canCreateBackhaul}>
+      <button class="btn-secondary" on:click={handleClose}>Cancel</button>
+      <button class="btn-primary" on:click={handleSave} disabled={isSaving || !canCreateBackhaul}>
         {isSaving ? 'Saving...' : '✅ Create Backhaul Link'}
       </button>
     </div>

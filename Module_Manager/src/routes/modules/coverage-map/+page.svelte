@@ -21,6 +21,7 @@
   import MapContextMenu from './components/MapContextMenu.svelte';
   import TowerActionsMenu from './components/TowerActionsMenu.svelte';
   import SectorActionsMenu from './components/SectorActionsMenu.svelte';
+  import BackhaulActionsMenu from './components/BackhaulActionsMenu.svelte';
   import EPCDeploymentModal from '../deploy/components/EPCDeploymentModal.svelte';
   import HSSRegistrationModal from './components/HSSRegistrationModal.svelte';
   import HardwareDeploymentModal from './components/HardwareDeploymentModal.svelte';
@@ -65,6 +66,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showContextMenu = false;
   let showTowerActionsMenu = false;
   let showSectorActionsMenu = false;
+  let showBackhaulActionsMenu = false;
   let showEPCDeploymentModal = false;
   let showHSSRegistrationModal = false;
   let showHardwareDeploymentModal = false;
@@ -78,12 +80,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let selectedSiteForInventory: TowerSite | null = null;
   let selectedTowerForMenu: TowerSite | null = null;
   let selectedSectorForMenu: Sector | null = null;
+  let selectedBackhaulForMenu: NetworkEquipment | null = null;
   let selectedTowerForEPC: TowerSite | null = null;
   let selectedSiteForEdit: TowerSite | null = null;
   let towerMenuX = 0;
   let towerMenuY = 0;
   let sectorMenuX = 0;
   let sectorMenuY = 0;
+  let backhaulMenuX = 0;
+  let backhaulMenuY = 0;
+  let selectedBackhaulForEdit: NetworkEquipment | null = null;
   let initialSiteType: TowerSite['type'] | null = null;
   let selectedPlanDraft: PlanLayerFeature | null = null;
   let showPlanDraftMenu = false;
@@ -1129,8 +1135,22 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           setTimeout(() => success = '', 3000);
         }
       } else if (type === 'backhaul') {
-        success = `Backhaul Link: ${data.name || 'Unknown'}`;
-        setTimeout(() => success = '', 3000);
+        // Find the backhaul equipment
+        const backhaulEquipment = equipment.find(eq => eq.id === id && eq.type === 'backhaul');
+        if (backhaulEquipment && isRightClick) {
+          console.log('[CoverageMap] ✅✅✅ Found backhaul for menu:', { 
+            backhaul: backhaulEquipment, 
+            id: backhaulEquipment.id, 
+            name: backhaulEquipment.name
+          });
+          selectedBackhaulForMenu = backhaulEquipment;
+          backhaulMenuX = screenX;
+          backhaulMenuY = screenY;
+          showBackhaulActionsMenu = true;
+        } else {
+          success = `Backhaul Link: ${data.name || 'Unknown'}`;
+          setTimeout(() => success = '', 3000);
+        }
       } else {
         console.warn('[CoverageMap] ⚠️ Unknown asset type for right-click:', type);
       }
@@ -1389,6 +1409,11 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   function handleSectorModalSaved() {
     selectedSectorForEdit = null; // Clear after save
+    handleModalSaved();
+  }
+  
+  function handleBackhaulModalSaved() {
+    selectedBackhaulForEdit = null; // Clear after save
     handleModalSaved();
   }
   
@@ -1781,9 +1806,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   bind:show={showAddBackhaulModal}
   fromSite={selectedSiteForBackhaul}
   sites={combinedSites}
+  backhaulToEdit={selectedBackhaulForEdit}
   {tenantId}
   planId={effectivePlanId}
-  on:saved={handleModalSaved}
+  on:saved={handleBackhaulModalSaved}
 />
 
 <AddInventoryModal 
@@ -1823,6 +1849,15 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   y={sectorMenuY}
   moduleContext={moduleContext}
   on:action={handleSectorAction}
+/>
+
+<BackhaulActionsMenu 
+  bind:show={showBackhaulActionsMenu}
+  backhaul={selectedBackhaulForMenu as any}
+  x={backhaulMenuX}
+  y={backhaulMenuY}
+  moduleContext={moduleContext}
+  on:action={handleBackhaulAction}
 />
 
 <!-- EPC Deployment Modal -->
