@@ -28,7 +28,7 @@
 
     const origin = window.location.origin;
     if (origin.includes('wisptools.io')) {
-      return 'https://wisptools-production.web.app';
+      return 'https://wisptools.io';
     }
 
     return origin;

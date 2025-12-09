@@ -15,18 +15,8 @@ const getAuthDomain = (): string => {
     return env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
   }
   
-  // If on custom domain, use it (will work if authorized)
-  if (typeof window !== 'undefined' && window.location.hostname === 'wisptools.io') {
-    return 'wisptools.io';
-  }
-  
-  // If on Firebase hosting, use the Firebase domain
-  if (typeof window !== 'undefined' && window.location.hostname.includes('wisptools-production')) {
-    return 'wisptools-production.firebaseapp.com';
-  }
-  
-  // Default Firebase domain (always authorized)
-  return 'wisptools-production.firebaseapp.com';
+  // Always use wisptools.io as the auth domain (it's already set up)
+  return 'wisptools.io';
 };
 
 const firebaseConfig = {
