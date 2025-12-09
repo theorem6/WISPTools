@@ -36,10 +36,10 @@
     showCoverage: false,
     showLabels: true,
     showConnections: true,
-    towerTypes: [],
-    sectorTypes: [],
-    equipmentTypes: [],
-    statusFilter: 'all'
+    towerTypes: [] as string[],
+    sectorTypes: [] as string[],
+    equipmentTypes: [] as string[],
+    statusFilter: 'all' as 'all' | 'active' | 'inactive' | 'maintenance'
   };
   
   // Helper function to check if coordinates are valid (not 0,0 or null)
@@ -183,7 +183,7 @@
         const deviceLon = device.location?.coordinates?.longitude || device.location?.longitude;
         
         if (hasValidCoordinates(deviceLat, deviceLon)) {
-          const distance = getDistance(siteLat, siteLon, deviceLat, deviceLon);
+          const distance = getDistance(siteLat || 0, siteLon || 0, deviceLat || 0, deviceLon || 0);
           if (distance < 0.5) { // Within 500 meters
             return true;
           }
@@ -582,46 +582,58 @@
         console.error('[MonitoringMap] Failed to load backhaul equipment:', error);
       }
       
-      // Load CPE devices from database if the method exists
-      // Note: CPE devices might be loaded differently, check if getCPEDevices exists
+      // Load CPE devices from database
       try {
-        // CPE devices are typically loaded as part of equipment or separately
-        // For now, we'll include CPE devices from networkDevices that have type 'cpe'
-        if (networkDevices) {
-          const cpeFromDevices = networkDevices.filter((device: any) => 
-            device.type === 'cpe' || device.deviceType === 'cpe'
-          );
-          
-          cpeDevices = cpeFromDevices.map((cpe: any) => {
-            let cpeStatus = cpe.status || 'active';
-            let uptimePercent = 100;
-            
-            if (cpeStatus === 'online') {
-              uptimePercent = 100;
-            } else if (cpeStatus === 'offline') {
-              uptimePercent = 0;
-            } else {
-              uptimePercent = 50; // Unknown status
-            }
-            
-            return {
-              id: cpe.id || cpe._id,
-              name: cpe.name || 'CPE Device',
-              serialNumber: cpe.serialNumber,
-              status: cpeStatus,
-              uptimePercent: uptimePercent,
-              location: cpe.location || {
-                latitude: 0,
-                longitude: 0,
-                address: 'Unknown Location'
-              },
-              siteId: cpe.siteId || cpe.site_id,
-              technology: cpe.technology || 'LTE'
-            };
-          });
-        }
+        const allCPE = await coverageMapService.getCPEDevices(tenantId);
         
-        console.log(`[MonitoringMap] Loaded ${cpeDevices.length} CPE devices with uptime data`);
+        // Process CPE with uptime from networkDevices
+        cpeDevices = allCPE.map((cpe: any) => {
+          const cpeSiteId = cpe.siteId?._id || cpe.siteId?.id || cpe.siteId;
+          
+          // Find matching device in networkDevices for uptime
+          let cpeStatus = cpe.status || 'active';
+          let uptimePercent = 100;
+          
+          if (networkDevices) {
+            const matchingDevice = networkDevices.find((device: any) => {
+              return (device.id === String(cpe.id || cpe._id)) ||
+                     (device.serialNumber === cpe.serialNumber) ||
+                     (cpeSiteId && (device.siteId || device.site_id) && 
+                      String(device.siteId || device.site_id) === String(cpeSiteId) && 
+                      (device.type === 'cpe' || device.deviceType === 'cpe'));
+            });
+            
+            if (matchingDevice) {
+              cpeStatus = matchingDevice.status || 'unknown';
+              // Status-based uptime
+              if (cpeStatus === 'online') {
+                uptimePercent = 100;
+              } else if (cpeStatus === 'offline') {
+                uptimePercent = 0;
+              } else {
+                uptimePercent = 0; // Unknown status - grey
+              }
+            } else {
+              // No matching device - show as unknown (grey)
+              cpeStatus = 'unknown';
+              uptimePercent = 0;
+            }
+          }
+          
+          return {
+            ...cpe,
+            id: cpe.id || cpe._id,
+            status: cpeStatus,
+            uptimePercent: uptimePercent,
+            location: cpe.location || {
+              latitude: 0,
+              longitude: 0,
+              address: 'Unknown Location'
+            }
+          };
+        });
+        
+        console.log(`[MonitoringMap] Loaded ${cpeDevices.length} CPE devices from database with uptime data`);
       } catch (error) {
         console.error('[MonitoringMap] Failed to load CPE devices:', error);
         cpeDevices = [];
@@ -772,8 +784,6 @@
       externalPlanFeatures={[]}
       marketingLeads={[]}
       planId={null}
-      isPlanMode={false}
-      isDeployMode={false}
       showFilterPanel={true}
       showMainMenu={false}
       on:siteSelected={(e) => {
