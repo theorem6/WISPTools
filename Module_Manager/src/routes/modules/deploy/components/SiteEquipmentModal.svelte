@@ -45,6 +45,58 @@
         siteObject: site
       });
 
+      // Load sectors FIRST - before other equipment
+      try {
+        console.log('[SiteEquipmentModal] 🔵 Fetching sectors for site:', { siteId, tenantId, siteName: site.name });
+        const allSectors = await coverageMapService.getSectorsBySite(tenantId, siteId);
+        console.log('[SiteEquipmentModal] ✅ Loaded sectors from API:', {
+          count: allSectors?.length || 0,
+          targetSiteId: siteId,
+          siteIdType: typeof siteId,
+          rawSectors: allSectors || []
+        });
+        
+        // Normalize siteId matching - sectors may have siteId as string or ObjectId
+        const normalizedSiteId = String(siteId);
+        sectors = (allSectors || []).filter((s: any) => {
+          const sectorSiteId = s.siteId?._id || s.siteId?.id || s.siteId;
+          const sectorSiteIdStr = sectorSiteId ? String(sectorSiteId) : '';
+          const normalizedSectorSiteId = sectorSiteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
+          
+          const matches = normalizedSectorSiteId && normalizedSiteId && (
+            normalizedSectorSiteId === normalizedSiteId ||
+            normalizedSectorSiteId.toString() === normalizedSiteId.toString()
+          );
+          
+          if (!matches && sectorSiteId) {
+            console.log('[SiteEquipmentModal] Sector does not match site:', {
+              sectorName: s.name,
+              sectorSiteId: sectorSiteId,
+              normalizedSectorSiteId: normalizedSectorSiteId,
+              targetSiteId: siteId,
+              normalizedSiteId: normalizedSiteId
+            });
+          }
+          
+          return matches;
+        });
+        
+        console.log('[SiteEquipmentModal] ✅ Filtered sectors for site:', {
+          total: allSectors?.length || 0,
+          filtered: sectors.length,
+          siteId: siteId
+        });
+      } catch (sectorError: any) {
+        console.error('[SiteEquipmentModal] ❌ Error loading sectors:', sectorError);
+        console.error('[SiteEquipmentModal] Error details:', {
+          message: sectorError.message,
+          stack: sectorError.stack,
+          siteId: siteId,
+          tenantId: tenantId
+        });
+        sectors = [];
+      }
+
       // Load all deployed hardware at this site
       const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
       console.log('[SiteEquipmentModal] Loaded all deployments:', {
@@ -213,66 +265,7 @@
         }))
       });
 
-      // Load sectors at this site
-      try {
-        console.log('[SiteEquipmentModal] Fetching sectors for site:', { siteId, tenantId });
-        const allSectors = await coverageMapService.getSectorsBySite(tenantId, siteId);
-        console.log('[SiteEquipmentModal] ✅ Loaded sectors:', {
-          count: allSectors?.length || 0,
-          targetSiteId: siteId,
-          siteIdType: typeof siteId,
-          sectors: (allSectors || []).slice(0, 5).map((s: any) => ({
-            id: s.id || s._id,
-            name: s.name,
-            siteId: s.siteId,
-            siteIdType: typeof s.siteId,
-            siteIdObject: typeof s.siteId === 'object' ? s.siteId : null,
-            siteId_id: s.siteId?._id || s.siteId?.id,
-            technology: s.technology,
-            status: s.status
-          }))
-        });
-        
-        // Normalize siteId matching - sectors may have siteId as string or ObjectId
-        const normalizedSiteId = String(siteId);
-        sectors = (allSectors || []).filter((s: any) => {
-          const sectorSiteId = s.siteId?._id || s.siteId?.id || s.siteId;
-          const sectorSiteIdStr = sectorSiteId ? String(sectorSiteId) : '';
-          const normalizedSectorSiteId = sectorSiteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
-          
-          const matches = normalizedSectorSiteId && normalizedSiteId && (
-            normalizedSectorSiteId === normalizedSiteId ||
-            normalizedSectorSiteId.toString() === normalizedSiteId.toString()
-          );
-          
-          if (sectorSiteId && !matches) {
-            console.log('[SiteEquipmentModal] Sector does not match site:', {
-              sectorName: s.name,
-              sectorSiteId: sectorSiteId,
-              normalizedSectorSiteId: normalizedSectorSiteId,
-              targetSiteId: siteId,
-              normalizedSiteId: normalizedSiteId
-            });
-          }
-          
-          return matches;
-        });
-        
-        console.log('[SiteEquipmentModal] ✅ Filtered sectors for site:', {
-          total: allSectors?.length || 0,
-          filtered: sectors.length,
-          siteId: siteId
-        });
-      } catch (sectorError: any) {
-        console.error('[SiteEquipmentModal] ❌ Error loading sectors:', sectorError);
-        console.error('[SiteEquipmentModal] Error details:', {
-          message: sectorError.message,
-          stack: sectorError.stack,
-          siteId: siteId,
-          tenantId: tenantId
-        });
-        sectors = [];
-      }
+      // Sectors already loaded above (moved earlier for better error visibility)
       
       // Load equipment at this site
       const allEquipment = await coverageMapService.getEquipment(tenantId);
