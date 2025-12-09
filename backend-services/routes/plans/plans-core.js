@@ -220,8 +220,10 @@ router.put('/:id', async (req, res) => {
     
     // When project is deployed, ensure addresses are converted to permanent leads
     // and clear them from plan (they're now in customer leads as permanent addresses)
+    // Also clear planId from all assets so they become regular production assets
     if (statusChangingToDeployed) {
       const planMarketingLeadService = require('../../services/planMarketingLeadService');
+      const planId = existingPlan._id?.toString?.() ?? existingPlan.id;
       
       // Ensure all addresses are converted to permanent customer leads
       try {
@@ -231,7 +233,7 @@ router.put('/:id', async (req, res) => {
           req.user?.email || req.user?.name || 'System'
         );
         console.log('Marketing leads synced for plan deployment:', {
-          planId: existingPlan._id?.toString?.() ?? existingPlan.id
+          planId
         });
         
         // Clear addresses from plan since they're now permanent (in customer leads)
@@ -244,6 +246,72 @@ router.put('/:id', async (req, res) => {
       } catch (leadError) {
         console.error('Failed to sync marketing leads during plan deployment:', leadError);
         // Don't fail the deployment if lead sync fails - addresses may already be synced
+      }
+      
+      // Clear planId from all assets with this plan's originPlanId or planId
+      // This ensures deployed assets become regular production assets (not linked to plan)
+      // They keep originPlanId for traceability but planId is cleared so they show in device lists
+      try {
+        const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment } = require('../../models/network');
+        const timestamp = new Date();
+        
+        const clearPlanIdUpdate = {
+          $set: {
+            planId: null,
+            status: 'active', // Ensure status is active for deployed assets
+            updatedAt: timestamp
+          }
+        };
+        
+        // Clear planId from assets that have this plan as originPlanId or planId
+        const updateResults = await Promise.all([
+          UnifiedSite.updateMany(
+            { 
+              tenantId: req.tenantId, 
+              $or: [
+                { originPlanId: planId },
+                { planId: planId }
+              ]
+            }, 
+            clearPlanIdUpdate
+          ),
+          UnifiedSector.updateMany(
+            { 
+              tenantId: req.tenantId, 
+              $or: [
+                { originPlanId: planId },
+                { planId: planId }
+              ]
+            }, 
+            clearPlanIdUpdate
+          ),
+          UnifiedCPE.updateMany(
+            { 
+              tenantId: req.tenantId, 
+              $or: [
+                { originPlanId: planId },
+                { planId: planId }
+              ]
+            }, 
+            clearPlanIdUpdate
+          ),
+          NetworkEquipment.updateMany(
+            { 
+              tenantId: req.tenantId, 
+              $or: [
+                { originPlanId: planId },
+                { planId: planId }
+              ]
+            }, 
+            clearPlanIdUpdate
+          )
+        ]);
+        
+        const totalUpdated = updateResults.reduce((sum, result) => sum + (result.modifiedCount || 0), 0);
+        console.log(`✅ Cleared planId from ${totalUpdated} assets for deployed plan ${planId} - assets are now production hardware`);
+      } catch (assetError) {
+        console.error('Failed to clear planId from assets during deployment:', assetError);
+        // Don't fail the deployment if asset update fails - they may already be cleared
       }
     }
     
