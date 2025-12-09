@@ -18,20 +18,17 @@
   let unsubscribe: (() => void) | undefined;
   const dispatch = createEventDispatcher();
 
+  // Always use wisptools.io for iframe URLs
   const coverageMapHost = (() => {
     if (!browser) return '';
-
+    
     const envHost = import.meta.env.VITE_COVERAGE_MAP_HOST;
     if (envHost && typeof envHost === 'string') {
       return envHost.replace(/\/$/, '');
     }
-
-    const origin = window.location.origin;
-    if (origin.includes('wisptools.io')) {
-      return 'https://wisptools.io';
-    }
-
-    return origin;
+    
+    // Always use wisptools.io (it's already set up)
+    return 'https://wisptools.io';
   })();
 
   const buildUrl = (state: MapLayerState = mapState) => {
