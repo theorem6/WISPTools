@@ -574,29 +574,32 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       const visiblePlanIdSet = new Set(planIdsForFetch);
       currentVisiblePlanIds.forEach(id => visiblePlanIdSet.add(id));
 
+      // In deploy mode, show all hardware regardless of planId (deployed hardware)
+      const isDeployMode = sharedMapMode === 'deploy' || mapMode === 'deploy';
+      
       towers = loadedTowers.filter((site: any) => {
+        if (isDeployMode) return true; // Show all towers in deploy mode
         if (!site.planId) return true;
         if (isPlanMode && site.planId === planId) return true;
         return visiblePlanIdSet.has(site.planId);
       });
 
       sectors = loadedSectors.filter((sector: any) => {
+        if (isDeployMode) return true; // Show all sectors in deploy mode
         if (!sector.planId) return true;
         if (isPlanMode && sector.planId === planId) return true;
         return visiblePlanIdSet.has(sector.planId);
       });
 
       cpeDevices = loadedCPE.filter((cpe: any) => {
+        if (isDeployMode) return true; // Show all CPE in deploy mode
         if (!cpe.planId) return true;
         if (isPlanMode && cpe.planId === planId) return true;
         return visiblePlanIdSet.has(cpe.planId);
       });
 
       equipment = loadedEquipment.filter((eq: any) => {
-        // In deploy mode, show all equipment regardless of planId (deployed hardware)
-        if (sharedMapMode === 'deploy' || mapMode === 'deploy') {
-          return true; // Show all equipment in deploy mode
-        }
+        if (isDeployMode) return true; // Show all equipment (including backhauls) in deploy mode
         // In plan mode, filter by planId
         if (!eq.planId) return true;
         if (isPlanMode && eq.planId === planId) return true;
