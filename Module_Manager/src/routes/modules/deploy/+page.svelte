@@ -1220,6 +1220,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         showSiteEquipmentModal = false;
         selectedSiteForEquipment = null;
       }}
+      on:add-equipment={(e) => {
+        // Open AddInventoryModal for this site
+        const site = e.detail.site;
+        goto(`/modules/inventory/add?siteId=${site.id}&siteName=${encodeURIComponent(site.name)}`);
+      }}
     />
   {/if}
   

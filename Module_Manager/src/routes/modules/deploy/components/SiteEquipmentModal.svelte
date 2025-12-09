@@ -403,8 +403,23 @@
         hardwareDeployments: hardwareDeployments.length,
         epcDevices: epcDevices.length,
         equipment: equipment.length,
-        sectors: sectors.length
+        sectors: sectors.length,
+        allEquipmentCount: allEquipment?.length || 0,
+        siteId: siteId,
+        siteIdType: typeof siteId
       });
+      
+      // Log first few equipment items for debugging
+      if (allEquipment && allEquipment.length > 0) {
+        console.log('[SiteEquipmentModal] Sample equipment siteIds:', allEquipment.slice(0, 3).map((eq: any) => ({
+          name: eq.name,
+          siteId: eq.siteId,
+          siteIdType: typeof eq.siteId,
+          siteId_id: eq.siteId?._id,
+          siteId_id_type: typeof eq.siteId?._id,
+          siteIdString: eq.siteId ? String(eq.siteId) : null
+        })));
+      }
     } catch (err: any) {
       console.error('[SiteEquipmentModal] Error loading equipment:', err);
       error = err.message || 'Failed to load equipment';
@@ -417,6 +432,11 @@
     show = false;
     dispatch('close');
   }
+  
+  function handleAddEquipment() {
+    // Dispatch event to parent to open AddInventoryModal
+    dispatch('add-equipment', { site });
+  }
 </script>
 
 {#if show && site}
@@ -424,7 +444,12 @@
     <div class="modal-content large" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h2>📦 Equipment at {site.name}</h2>
-        <button class="close-btn" onclick={closeModal}>✕</button>
+        <div class="header-actions">
+          <button class="btn-add" on:click={handleAddEquipment} title="Add Equipment">
+            ➕ Add Equipment
+          </button>
+          <button class="close-btn" on:click={closeModal}>✕</button>
+        </div>
       </div>
       
       {#if error}
@@ -539,10 +564,16 @@
 
           <!-- Network Equipment -->
           <div class="section">
-            <h3>📡 Network Equipment ({equipment.length})</h3>
+            <div class="section-header">
+              <h3>📡 Network Equipment ({equipment.length})</h3>
+              <button class="btn-add-small" on:click={handleAddEquipment} title="Add Equipment">
+                ➕ Add
+              </button>
+            </div>
             {#if equipment.length === 0}
               <div class="empty-state">
                 <p>No network equipment found at this site</p>
+                <button class="btn-add" on:click={handleAddEquipment}>➕ Add Equipment</button>
               </div>
             {:else}
               <div class="items-list">
