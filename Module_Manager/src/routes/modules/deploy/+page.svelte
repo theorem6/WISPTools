@@ -296,27 +296,9 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             }
           }
           
-          // If the iframeCommunicationService doesn't catch it, handle it directly
-          if (event.data && 
-              typeof event.data === 'object' &&
-              event.data.type === 'object-action' && 
-              event.data.action === 'view-inventory') {
-            console.log('[Deploy] ✅✅✅ DIRECTLY HANDLING view-inventory message via fallback listener');
-            // Call the handler directly with the correct format
-            const fakeEvent = new CustomEvent('iframe-object-action', {
-              detail: {
-                objectId: event.data.objectId,
-                action: event.data.action,
-                data: event.data.data,
-                allowed: true
-              }
-            });
-            console.log('[Deploy] ✅✅✅ Dispatching fake event:', fakeEvent.detail);
-            // Call handler directly - don't wait for event system
-            handleIframeObjectAction(fakeEvent).catch(err => {
-              console.error('[Deploy] Error in handleIframeObjectAction:', err);
-            });
-          }
+          // REMOVED: Duplicate handler - iframeCommunicationService already dispatches iframe-object-action event
+          // This was causing handleIframeObjectAction to be called multiple times
+          // The iframeCommunicationService will handle object-action messages and dispatch the event
         };
         
         // CRITICAL: Add listener to window, not iframe
@@ -382,15 +364,22 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   // Watch for tenant changes and load plans when tenant is available
   let hasLoadedPlans = false;
   let lastTenantId: string | undefined = undefined;
+  let loadPlansTimeout: ReturnType<typeof setTimeout> | null = null;
   
   $: {
     const tenantId = $currentTenant?.id;
     const tenantIdString = tenantId && typeof tenantId === 'string' && tenantId.trim() !== '' ? tenantId : undefined;
     
+    // Clear any pending timeout
+    if (loadPlansTimeout) {
+      clearTimeout(loadPlansTimeout);
+      loadPlansTimeout = null;
+    }
+    
     // Reset hasLoadedPlans if tenant changes
     if (tenantIdString !== lastTenantId) {
       if (lastTenantId !== undefined) {
-        console.log('[Deploy] Tenant changed, resetting hasLoadedPlans:', { from: lastTenantId, to: tenantIdString });
+        console.log('[Deploy] 🔄 Tenant changed, resetting hasLoadedPlans:', { from: lastTenantId, to: tenantIdString });
       }
       hasLoadedPlans = false;
       lastTenantId = tenantIdString;
@@ -398,22 +387,33 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     
     // Only trigger if tenantId is a valid non-empty string and we haven't loaded yet
     if (tenantIdString && !isLoadingPlans && !hasLoadedPlans) {
-      console.log('[Deploy] ✅✅✅ Tenant available, loading ready plans:', tenantIdString);
+      console.log('[Deploy] ✅✅✅ Tenant available, scheduling loadReadyPlans:', tenantIdString);
       hasLoadedPlans = true; // Prevent multiple calls
       // Use setTimeout to ensure tenant store is fully settled
-      setTimeout(() => {
-        // Double-check tenantId is still valid before calling
+      loadPlansTimeout = setTimeout(() => {
+        // Triple-check tenantId is still valid before calling
         const currentTenantId = $currentTenant?.id;
-        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantIdString) {
+        const validTenantId = currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '';
+        if (validTenantId && currentTenantId === tenantIdString) {
+          console.log('[Deploy] ✅✅✅ Executing loadReadyPlans with tenant:', currentTenantId);
           loadReadyPlans().catch(err => {
-            console.error('[Deploy] Error in loadReadyPlans:', err);
+            console.error('[Deploy] ❌ Error in loadReadyPlans:', err);
             hasLoadedPlans = false; // Reset on error so it can retry
           });
         } else {
-          console.warn('[Deploy] TenantId changed during delay, cancelling loadReadyPlans:', { expected: tenantIdString, actual: currentTenantId });
+          console.warn('[Deploy] ⚠️ TenantId validation failed, cancelling loadReadyPlans:', { 
+            expected: tenantIdString, 
+            actual: currentTenantId,
+            validTenantId,
+            match: validTenantId && currentTenantId === tenantIdString
+          });
           hasLoadedPlans = false; // Reset so it can retry with new tenant
         }
-      }, 200); // Increased delay to ensure tenant is fully initialized
+        loadPlansTimeout = null;
+      }, 300); // Delay to ensure tenant store is fully initialized
+    } else if (!tenantIdString) {
+      // Tenant not ready yet
+      console.log('[Deploy] ⏳ Waiting for tenant...', { hasTenantId: !!tenantId, isLoadingPlans, hasLoadedPlans });
     }
   }
 
@@ -615,22 +615,29 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           await mapLayerManager.loadPlan(tenantId, planToLoad);
         }
         
-        // Load deployed hardware count
+        // Load deployed hardware count - only if tenantId is still valid
         try {
-          // Double-check tenantId is still valid before making the call
+          // Triple-check tenantId is still valid before making the call
           const currentTenantId = $currentTenant?.id;
-          if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '') {
+          if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantId) {
             const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+            console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
             const deployments = await coverageMapService.getAllHardwareDeployments(currentTenantId);
             deployedCount = deployments.length;
+            console.log('[Deploy] ✅ Loaded deployment count:', deployedCount);
           } else {
-            console.warn('[Deploy] Skipping deployment count load - tenantId invalid:', currentTenantId);
+            console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
+              currentTenantId, 
+              expectedTenantId: tenantId,
+              match: currentTenantId === tenantId 
+            });
           }
         } catch (err: any) {
-          console.error('Failed to load deployment count:', err);
+          console.error('[Deploy] ❌ Failed to load deployment count:', err);
           // Don't throw - this is non-critical, but log the error
           if (err?.message?.includes('No tenant selected')) {
-            console.warn('[Deploy] Tenant was lost during deployment count load, will retry on next tenant change');
+            console.warn('[Deploy] ⚠️ Tenant was lost during deployment count load, will retry on next tenant change');
+            // Don't reset hasLoadedPlans here - let the reactive statement handle retry
           }
         }
         
