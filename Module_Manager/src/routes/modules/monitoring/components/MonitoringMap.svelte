@@ -60,19 +60,53 @@
   }
 
   // Convert devices to equipment format for the map
+  // Enhance devices with location from their siteId if missing
   function convertDevicesToEquipment() {
     // Calculate system uptime first
     const systemUptime = getSystemUptimePercent();
     
-    // Filter devices: only show devices with valid coordinates (monitoring shows all devices, not just deployed)
+    // Create a map of siteId -> site location for quick lookup
+    const siteLocationMap = new Map();
+    towers.forEach(site => {
+      const siteId = site.id || site._id;
+      if (siteId && site.location) {
+        const lat = site.location.latitude || site.location.coordinates?.latitude;
+        const lon = site.location.longitude || site.location.coordinates?.longitude;
+        if (hasValidCoordinates(lat, lon)) {
+          siteLocationMap.set(String(siteId), {
+            latitude: lat,
+            longitude: lon,
+            address: site.location.address || site.name || 'Unknown Location'
+          });
+        }
+      }
+    });
+    
+    // Filter devices: only show devices with valid coordinates (get from site if needed)
     let validDevices = 0;
     let skippedDevices = 0;
     
     equipment = devices
-      .filter(device => {
-        // Only include devices with valid location coordinates
-        const lat = device.location?.coordinates?.latitude || device.location?.latitude;
-        const lon = device.location?.coordinates?.longitude || device.location?.longitude;
+      .map(device => {
+        // Try to get location from device first
+        let lat = device.location?.coordinates?.latitude || device.location?.latitude;
+        let lon = device.location?.coordinates?.longitude || device.location?.longitude;
+        let address = device.location?.address || device.location?.coordinates?.address;
+        
+        // If device doesn't have valid location, try to get it from siteId
+        if (!hasValidCoordinates(lat, lon)) {
+          const deviceSiteId = device.siteId || device.site_id;
+          if (deviceSiteId) {
+            const siteLocation = siteLocationMap.get(String(deviceSiteId));
+            if (siteLocation) {
+              lat = siteLocation.latitude;
+              lon = siteLocation.longitude;
+              address = siteLocation.address || address;
+              console.log(`[MonitoringMap] Device ${device.name || device.id} got location from site ${deviceSiteId}`);
+            }
+          }
+        }
+        
         const hasValid = hasValidCoordinates(lat, lon);
         
         if (hasValid) {
@@ -81,11 +115,10 @@
           skippedDevices++;
         }
         
-        return hasValid;
-      })
-      .map(device => {
-        const lat = device.location?.coordinates?.latitude || device.location?.latitude || 0;
-        const lon = device.location?.coordinates?.longitude || device.location?.longitude || 0;
+        // Only include devices with valid coordinates
+        if (!hasValid) {
+          return null;
+        }
         
         const equipmentItem = {
           id: device.id,
@@ -95,9 +128,10 @@
           location: {
             latitude: lat,
             longitude: lon,
-            address: device.location?.address || 'Unknown Location'
+            address: address || 'Unknown Location'
           },
           ipAddress: device.ipAddress,
+          siteId: device.siteId || device.site_id,
           lastSeen: new Date().toISOString(),
           metrics: device.metrics || {},
           monitoringData: {
@@ -111,7 +145,8 @@
         };
         
         return equipmentItem;
-      });
+      })
+      .filter(item => item !== null); // Remove null entries (devices without valid locations)
     
     // Summary log only
     if (devices.length > 0) {
@@ -155,47 +190,7 @@
     return R * c;
   }
   
-  // Handle site click - find devices at this site and show modal
-  function handleSiteClick(site: any) {
-    const siteId = site.siteId || site.id;
-    const deviceId = site.deviceId || site.id?.replace('tower-', '');
-    
-    // Get site location
-    const siteLat = site.location?.latitude || site.location?.coordinates?.latitude;
-    const siteLon = site.location?.longitude || site.location?.coordinates?.longitude;
-    
-    const siteDevices = networkDevices.filter(device => {
-      // First try matching by siteId
-      const deviceSiteId = device.siteId || device.site_id;
-      if (siteId && deviceSiteId && String(deviceSiteId) === String(siteId)) {
-        return true;
-      }
-      
-      // Fallback to matching by deviceId (for device-based towers)
-      const dId = device.id || device._id;
-      if (deviceId && dId && String(dId) === String(deviceId)) {
-        return true;
-      }
-      
-      // Fallback to location proximity (within 0.5km / 500m)
-      if (siteLat && siteLon && hasValidCoordinates(siteLat, siteLon)) {
-        const deviceLat = device.location?.coordinates?.latitude || device.location?.latitude;
-        const deviceLon = device.location?.coordinates?.longitude || device.location?.longitude;
-        
-        if (hasValidCoordinates(deviceLat, deviceLon)) {
-          const distance = getDistance(siteLat || 0, siteLon || 0, deviceLat || 0, deviceLon || 0);
-          if (distance < 0.5) { // Within 500 meters
-            return true;
-          }
-        }
-      }
-      
-      return false;
-    });
-    
-    // Dispatch event to parent to show devices modal
-    dispatch('siteSelected', { site, devices: siteDevices });
-  }
+  // Note: Left-click functionality removed - only right-click opens modal
 
   // Helper function to get alert severity color
   function getAlertSeverityColor(severity) {
@@ -786,26 +781,15 @@
       planId={null}
       showFilterPanel={true}
       showMainMenu={false}
-      on:siteSelected={(e) => {
-        const site = e.detail;
-        if (site) {
-          handleSiteClick(site);
-        }
-        handleMapEvent(e);
-      }}
       on:asset-click={(e) => {
         // Handle asset-click events from map (towers emit this)
+        // Only right-click opens the modal - no left-click functionality
         const asset = e.detail;
-        if (asset && asset.type === 'tower' && asset.id) {
+        if (asset && asset.type === 'tower' && asset.id && asset.isRightClick) {
           const site = towers.find(t => String(t.id) === String(asset.id));
           if (site) {
             // Right-click opens comprehensive site details modal
-            if (asset.isRightClick) {
-              dispatch('siteRightClick', { site });
-            } else {
-              // Left-click shows devices modal
-              handleSiteClick(site);
-            }
+            dispatch('siteRightClick', { site });
           }
         }
         handleMapEvent(e);

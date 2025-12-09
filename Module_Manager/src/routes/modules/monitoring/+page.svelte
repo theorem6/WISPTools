@@ -12,7 +12,6 @@
   import EPCMonitoringPanel from '$lib/components/EPCMonitoringPanel.svelte';
   import SNMPGraphsPanel from '$lib/components/SNMPGraphsPanel.svelte';
   import MikrotikDevicesPanel from './components/MikrotikDevicesPanel.svelte';
-  import SiteDevicesModal from './components/SiteDevicesModal.svelte';
   import MonitoringSiteDetailsModal from './components/MonitoringSiteDetailsModal.svelte';
   
   import { API_CONFIG } from '$lib/config/api';
@@ -573,14 +572,6 @@
     showAlertDetails(alert);
   }
   
-  function handleSiteSelected(event: CustomEvent) {
-    const { site, devices } = event.detail;
-    selectedSite = site;
-    selectedSiteDevices = devices || [];
-    showSiteDevicesModal = true;
-    console.log('[Monitoring] Site selected:', site, 'with', selectedSiteDevices.length, 'devices');
-  }
-  
   function handleSiteRightClick(event: CustomEvent) {
     const { site } = event.detail;
     selectedSiteForDetails = site;
@@ -641,7 +632,6 @@
             on:showAlertDetails={showAlertDetails}
             on:createTicketFromAlert={createTicketFromAlert}
             on:refreshData={loadDashboard}
-            on:siteSelected={handleSiteSelected}
             on:siteRightClick={handleSiteRightClick}
           />
         {:else if mapView === 'topology'}
