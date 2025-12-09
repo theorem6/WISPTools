@@ -677,6 +677,25 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   function handleSharedMapMessage(event: MessageEvent) {
     const { source, type, payload } = event.data || {};
     
+    // Handle messages from deploy/plan modules
+    if (source === 'deploy-module' || source === 'plan-module') {
+      if (type === 'show-sector-menu') {
+        console.log('[CoverageMap] 🔵 Received show-sector-menu message from parent:', payload);
+        const { sector, screenX, screenY } = payload?.payload || payload || {};
+        if (sector) {
+          console.log('[CoverageMap] ✅✅✅ Opening sector menu from parent message:', { sectorName: sector.name, screenX, screenY });
+          selectedSectorForMenu = sector;
+          sectorMenuX = screenX || 0;
+          sectorMenuY = screenY || 0;
+          showSectorActionsMenu = true;
+          console.log('[CoverageMap] ✅✅✅ Sector menu state set from message:', { showSectorActionsMenu, sectorMenuX, sectorMenuY });
+        } else {
+          console.error('[CoverageMap] ❌ No sector in show-sector-menu message');
+        }
+        return; // Don't process further
+      }
+    }
+    
     if (source === 'shared-map' && type === 'state-update') {
       const state = payload?.state ?? {};
 
@@ -715,6 +734,17 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         }
       } else {
         console.warn('[CoverageMap] Map component not ready for centering');
+      }
+    } else if (source === 'deploy-module' && type === 'show-sector-menu') {
+      // Handle show-sector-menu message from deploy module (fallback)
+      console.log('[CoverageMap] 🔵 Received show-sector-menu message:', payload);
+      const { sector, screenX, screenY } = payload || {};
+      if (sector) {
+        selectedSectorForMenu = sector;
+        sectorMenuX = screenX || 0;
+        sectorMenuY = screenY || 0;
+        showSectorActionsMenu = true;
+        console.log('[CoverageMap] ✅✅✅ Sector menu opened via message:', { showSectorActionsMenu, sectorName: sector.name });
       }
     } else if (source === 'plan-page') {
       // Handle messages from plan page
