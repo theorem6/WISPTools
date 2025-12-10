@@ -55,7 +55,7 @@
       if (discoveredResult.success && discoveredResult.data?.devices) {
         console.log('[SNMP Devices] Raw API response:', discoveredResult.data.devices.slice(0, 3)); // Log first 3 devices
         
-        discoveredDevices = (discoveredResult.data.devices || []).map(device => {
+        discoveredDevices = (discoveredResult.data.devices || []).map((device: any) => {
           // Ensure device has proper structure with normalized IP address
           const ipAddress = device.ipAddress || device.ip_address || device.management_ip || device.serialNumber || 'Unknown';
           
@@ -116,28 +116,13 @@
           }
         }
         
-        // Load deployment info if available (for additional deployment matching, but don't override siteId-based deployment)
-        if (deploymentsResponse.ok) {
-          try {
-            const text = await deploymentsResponse.text();
-            // Check for HTML before parsing
-            if (text.trim().toLowerCase().startsWith('<!doctype') || text.trim().toLowerCase().startsWith('<html')) {
-              console.warn('[SNMP Devices] Deployments API returned HTML, skipping');
-            } else {
-              const deploymentsData = JSON.parse(text);
-              deployments = deploymentsData.deployments || deploymentsData || [];
-            }
-          } catch (e) {
-            console.warn('[SNMP Devices] Failed to parse deployments response:', e);
-          }
-        }
-        
         console.log('[SNMP Devices] Loaded', discoveredDevices.length, 'discovered devices');
       } else {
-        console.warn('[SNMP Devices] No devices found or request failed:', discoveredResult.error || 'Unknown error');
+        const errorMsg = (discoveredResult as any).error || 'Unknown error';
+        console.warn('[SNMP Devices] No devices found or request failed:', errorMsg);
         discoveredDevices = [];
-        if (discoveredResult.error) {
-          error = discoveredResult.error;
+        if ((discoveredResult as any).error) {
+          error = (discoveredResult as any).error;
         }
       }
     } catch (err: any) {
