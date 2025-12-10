@@ -55,16 +55,32 @@ async function fixDevicesWithoutSiteId() {
     console.log('🔌 Connecting to MongoDB...');
     await connectDB();
 
-    // Get all NetworkEquipment without siteId
-    const devicesWithoutSiteId = await NetworkEquipment.find({
+    // Get all NetworkEquipment - we'll filter in JavaScript to avoid ObjectId casting issues
+    // Query for devices where siteId doesn't exist or is null (MongoDB can handle these)
+    const allDevices = await NetworkEquipment.find({
       $or: [
         { siteId: { $exists: false } },
-        { siteId: null },
-        { siteId: '' }
+        { siteId: null }
       ]
     }).lean();
+    
+    // Also get devices with empty string siteId using raw query to avoid ObjectId casting
+    const devicesWithEmptyString = await NetworkEquipment.find({
+      siteId: { $type: 'string', $eq: '' }
+    }).lean().catch(() => []);
+    
+    // Combine and filter to ensure we only get devices without valid siteId
+    const filteredDevices = [...allDevices, ...devicesWithEmptyString].filter((device, index, self) => {
+      // Remove duplicates by _id
+      const isDuplicate = self.findIndex(d => d._id.toString() === device._id.toString()) !== index;
+      if (isDuplicate) return false;
+      
+      // Check if siteId is invalid
+      const siteId = device.siteId;
+      return !siteId || siteId === '' || siteId === null || (typeof siteId === 'string' && siteId.trim() === '');
+    });
 
-    console.log(`\n📡 Found ${devicesWithoutSiteId.length} NetworkEquipment devices without siteId`);
+    console.log(`\n📡 Found ${devicesWithoutSiteId.length} NetworkEquipment devices without siteId (after filtering: ${filteredDevices.length})`);
 
     // Get all EPCs to map discovered_by_epc to siteId
     const allEPCs = await RemoteEPC.find({}).lean();
@@ -111,7 +127,7 @@ async function fixDevicesWithoutSiteId() {
     let deletedCount = 0;
     let skippedCount = 0;
 
-    for (const device of devicesWithoutSiteId) {
+    for (const device of filteredDevices) {
       let assignedSiteId = null;
       let assignmentMethod = null;
 
