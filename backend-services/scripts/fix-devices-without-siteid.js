@@ -80,7 +80,7 @@ async function fixDevicesWithoutSiteId() {
       return !siteId || siteId === '' || siteId === null || (typeof siteId === 'string' && siteId.trim() === '');
     });
 
-    console.log(`\n📡 Found ${devicesWithoutSiteId.length} NetworkEquipment devices without siteId (after filtering: ${filteredDevices.length})`);
+    console.log(`\n📡 Found ${filteredDevices.length} NetworkEquipment devices without siteId`);
 
     // Get all EPCs to map discovered_by_epc to siteId
     const allEPCs = await RemoteEPC.find({}).lean();
