@@ -41,6 +41,7 @@ export class MonitoringService {
 
   /**
    * Get current tenant ID from localStorage
+   * Note: Components should ensure tenantId is synced to localStorage
    */
   private getTenantId(): string | null {
     if (!browser) return null;

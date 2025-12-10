@@ -20,15 +20,21 @@
   let loadingHardware = false;
   let deployments: any[] = [];
   
-  $: if ($currentTenant?.id) {
-    tenantId = $currentTenant.id;
-    if (tenantId) {
-      loadDiscoveredDevices();
-    }
+  // Use prop tenantId if provided, otherwise get from store
+  $: resolvedTenantId = tenantId || $currentTenant?.id || '';
+  
+  // Ensure tenantId is synced to localStorage for monitoringService
+  $: if (resolvedTenantId && typeof window !== 'undefined') {
+    localStorage.setItem('selectedTenantId', resolvedTenantId);
+  }
+  
+  // Watch for tenantId changes and load data
+  $: if (resolvedTenantId) {
+    loadDiscoveredDevices();
   }
   
   async function loadDiscoveredDevices() {
-    if (!tenantId) return;
+    if (!resolvedTenantId) return;
     
     loading = true;
     error = null;
@@ -160,7 +166,7 @@
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': tenantId,
+            'X-Tenant-ID': resolvedTenantId,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ enabled: device.enableGraphs })
@@ -173,7 +179,7 @@
   }
   
   async function loadHardwareDeployments() {
-    if (!tenantId) {
+    if (!resolvedTenantId) {
       console.warn('[SNMP Devices] Cannot load hardware deployments: no tenantId');
       return;
     }
@@ -183,9 +189,9 @@
     hardwareDeploymentsBySite = new Map();
     
     try {
-      console.log(`[SNMP Devices] Loading hardware deployments for tenant: ${tenantId}`);
+      console.log(`[SNMP Devices] Loading hardware deployments for tenant: ${resolvedTenantId}`);
       // Load all hardware deployments for the tenant
-      const allDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+      const allDeployments = await coverageMapService.getAllHardwareDeployments(resolvedTenantId);
       console.log(`[SNMP Devices] API returned ${allDeployments?.length || 0} hardware deployments`, allDeployments);
       
       // Don't filter by status - include all hardware deployments
@@ -205,7 +211,7 @@
       
       // Group by site - need to load sites to get site names
       console.log(`[SNMP Devices] Loading sites to group hardware deployments...`);
-      const sites = await coverageMapService.getTowerSites(tenantId);
+      const sites = await coverageMapService.getTowerSites(resolvedTenantId);
       console.log(`[SNMP Devices] Loaded ${sites?.length || 0} sites`);
       const sitesMap = new Map((sites || []).map((s: any) => [String(s.id || s._id), s]));
       
@@ -325,7 +331,7 @@
   }
   
   onMount(() => {
-    if (tenantId) {
+    if (resolvedTenantId) {
       loadDiscoveredDevices();
     }
   });
