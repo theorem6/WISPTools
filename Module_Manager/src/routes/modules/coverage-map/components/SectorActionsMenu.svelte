@@ -168,7 +168,7 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('add-sector')}
-    on:click={() => handleAction('add-sector')}
+      onclick={() => handleAction('add-sector')}
   >
     <span class="menu-icon">➕</span>
     <span>Add Sector</span>
@@ -177,7 +177,7 @@
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('edit-sector')}
-    on:click={() => handleAction('edit-sector')}
+    onclick={() => handleAction('edit-sector')}
   >
     <span class="menu-icon">✏️</span>
     <span>Edit Sector</span>
@@ -188,7 +188,7 @@
   <button 
     class="menu-item danger" 
     class:disabled={isActionDisabled('delete-sector')}
-    on:click={() => handleAction('delete-sector')}
+    onclick={() => handleAction('delete-sector')}
   >
     <span class="menu-icon">🗑️</span>
     <span>Delete Sector</span>

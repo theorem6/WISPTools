@@ -62,12 +62,21 @@ router.get('/discovered', async (req, res) => {
   try {
     console.log(`🔍 [SNMP API] Fetching discovered SNMP devices for tenant: ${req.tenantId}`);
     
-    // Get ALL active network equipment (including devices from deploy module)
-    // We want to show ALL deployed devices in monitor, not just discovered ones
+    // Get ALL network equipment - include active, deployed, and any with discovery metadata
+    // We want to show ALL devices that could be monitored, not just active ones
     const allEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      status: 'active'
+      // Include multiple statuses - active, deployed, and any device with discovery metadata
+      $or: [
+        { status: 'active' },
+        { status: 'deployed' },
+        { status: { $exists: false } }, // Devices without status field
+        // Also include devices with discovery metadata regardless of status
+        { 'notes': { $regex: /discovered_by_epc|discovery_source|discovered_at|epc_snmp_agent/i } }
+      ]
     }).lean();
+    
+    console.log(`🔍 [SNMP API] Query returned ${allEquipment.length} total NetworkEquipment records for tenant ${req.tenantId}`);
     
     // Separate into discovered devices and deployed devices
     const discoveredEquipment = [];
@@ -77,8 +86,10 @@ router.get('/discovered', async (req, res) => {
       // Check if device is deployed (has siteId - means it's from deploy module or has been deployed)
       const hasSiteId = !!equipment.siteId;
       
-      // Check if device has discovery metadata
+      // Check if device has discovery metadata or SNMP-related fields
       let hasDiscoveryMetadata = false;
+      let hasSNMPMetadata = false;
+      
       if (equipment.notes) {
         try {
           const notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
@@ -87,12 +98,22 @@ router.get('/discovered', async (req, res) => {
                                      notes.discovery_source === 'epc_snmp_agent' ||
                                      notes.discovered_at ||
                                      notes.last_discovered);
+            // Also check for SNMP metadata (management_ip, snmp_community, etc.)
+            hasSNMPMetadata = !!(notes.management_ip || 
+                                notes.snmp_community || 
+                                notes.snmp_version ||
+                                notes.sysDescr ||
+                                notes.sysName);
           } else {
             const notesStr = String(equipment.notes).toLowerCase();
             hasDiscoveryMetadata = notesStr.includes('discovered_by_epc') || 
                                    notesStr.includes('discovery_source') || 
                                    notesStr.includes('discovered_at') ||
                                    notesStr.includes('epc_snmp_agent');
+            hasSNMPMetadata = notesStr.includes('management_ip') || 
+                             notesStr.includes('snmp_community') ||
+                             notesStr.includes('sysdescr') ||
+                             notesStr.includes('sysname');
           }
         } catch (e) {
           const notesStr = String(equipment.notes).toLowerCase();
@@ -100,15 +121,26 @@ router.get('/discovered', async (req, res) => {
                                  notesStr.includes('discovery_source') || 
                                  notesStr.includes('discovered_at') ||
                                  notesStr.includes('epc_snmp_agent');
+          hasSNMPMetadata = notesStr.includes('management_ip') || 
+                           notesStr.includes('snmp_community') ||
+                           notesStr.includes('sysdescr') ||
+                           notesStr.includes('sysname');
         }
       }
       
-      // Include if discovered OR if deployed (has siteId)
-      if (hasDiscoveryMetadata) {
-        discoveredEquipment.push(equipment);
-      } else if (hasSiteId) {
-        // Device from deploy module - include it even if not discovered
-        deployedEquipment.push(equipment);
+      // Include if:
+      // 1. Has discovery metadata (discovered by EPC agent), OR
+      // 2. Has SNMP metadata (looks like an SNMP device), OR
+      // 3. Has siteId (deployed device), OR
+      // 4. Has an IP address in serialNumber (often used for discovered devices)
+      const hasIPInSerial = equipment.serialNumber && /^\d+\.\d+\.\d+\.\d+$/.test(String(equipment.serialNumber));
+      
+      if (hasDiscoveryMetadata || hasSNMPMetadata || hasSiteId || hasIPInSerial) {
+        if (hasDiscoveryMetadata || hasSNMPMetadata || hasIPInSerial) {
+          discoveredEquipment.push(equipment);
+        } else if (hasSiteId) {
+          deployedEquipment.push(equipment);
+        }
       }
     });
     

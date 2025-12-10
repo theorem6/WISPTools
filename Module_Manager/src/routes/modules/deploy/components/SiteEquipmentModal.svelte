@@ -466,10 +466,10 @@
       <div class="modal-header">
         <h2>📦 Equipment at {site.name}</h2>
         <div class="header-actions">
-          <button class="btn-add" on:click={handleAddEquipment} title="Add Equipment">
+          <button class="btn-add" onclick={handleAddEquipment} title="Add Equipment">
             ➕ Add Equipment
           </button>
-          <button class="close-btn" on:click={closeModal}>✕</button>
+          <button class="close-btn" onclick={closeModal}>✕</button>
         </div>
       </div>
       
@@ -587,14 +587,14 @@
           <div class="section">
             <div class="section-header">
               <h3>📡 Network Equipment ({equipment.length})</h3>
-              <button class="btn-add-small" on:click={handleAddEquipment} title="Add Equipment">
+              <button class="btn-add-small" onclick={handleAddEquipment} title="Add Equipment">
                 ➕ Add
               </button>
             </div>
             {#if equipment.length === 0}
               <div class="empty-state">
                 <p>No network equipment found at this site</p>
-                <button class="btn-add" on:click={handleAddEquipment}>➕ Add Equipment</button>
+                <button class="btn-add" onclick={handleAddEquipment}>➕ Add Equipment</button>
               </div>
             {:else}
               <div class="items-list">

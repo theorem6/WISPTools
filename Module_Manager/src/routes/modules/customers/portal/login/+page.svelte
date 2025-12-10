@@ -53,7 +53,7 @@
       <p class="login-subtitle">Access your account to view tickets and service information</p>
     </div>
     
-    <form on:submit={handleLogin} class="login-form">
+      <form onsubmit={handleLogin} class="login-form">
       {#if error}
         <div class="error-message">{error}</div>
       {/if}
@@ -88,9 +88,9 @@
       
       <div class="login-links">
         <a href="/modules/customers/portal/signup" class="link">Don't have an account? Sign up</a>
-        <a href="#" class="link" on:click|preventDefault={() => alert('Password reset coming soon')}>
+        <button type="button" class="link" onclick={() => alert('Password reset coming soon')}>
           Forgot password?
-        </a>
+        </button>
       </div>
     </form>
   </div>

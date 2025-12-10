@@ -668,146 +668,145 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     console.log('[Deploy] ✅ loadReadyPlans starting with tenantId:', tenantId);
     isLoadingPlans = true;
     try {
-        // Get ALL projects (plans)
-        const allProjects = await planService.getPlans(tenantId);
-        
-        // Separate projects by status for accurate menu counts
-        draftPlans = allProjects.filter(project => project.status === 'draft' || project.status === 'active');
-        approvedPlans = allProjects.filter(project => project.status === 'approved' || project.status === 'authorized');
-        deployedPlans = allProjects.filter(project => project.status === 'deployed');
-        
-        // Show ALL projects in the list (for the projects modal)
-        readyPlans = allProjects;
-        
-        // Initialize visible plan IDs from ALL plans with showOnMap = true (not just approved)
-        visiblePlanIds = new Set(
-          allProjects.filter(p => p.showOnMap).map(p => p.id)
-        );
-        
-        await mapLayerManager.loadProductionHardware(tenantId);
-        // Load first activated plan (any status) or first approved plan
-        const planToLoad = allProjects.find(p => p.showOnMap) || approvedPlans[0];
-        if (planToLoad) {
-          await mapLayerManager.loadPlan(tenantId, planToLoad);
+      // Get ALL projects (plans)
+      const allProjects = await planService.getPlans(tenantId);
+      
+      // Separate projects by status for accurate menu counts
+      draftPlans = allProjects.filter(project => project.status === 'draft' || project.status === 'active');
+      approvedPlans = allProjects.filter(project => project.status === 'approved' || project.status === 'authorized');
+      deployedPlans = allProjects.filter(project => project.status === 'deployed');
+      
+      // Show ALL projects in the list (for the projects modal)
+      readyPlans = allProjects;
+      
+      // Initialize visible plan IDs from ALL plans with showOnMap = true (not just approved)
+      visiblePlanIds = new Set(
+        allProjects.filter(p => p.showOnMap).map(p => p.id)
+      );
+      
+      await mapLayerManager.loadProductionHardware(tenantId);
+      // Load first activated plan (any status) or first approved plan
+      const planToLoad = allProjects.find(p => p.showOnMap) || approvedPlans[0];
+      if (planToLoad) {
+        await mapLayerManager.loadPlan(tenantId, planToLoad);
+      }
+      
+      // Load deployed hardware count - validate tenantId again before making the call
+      // This is non-critical, so we wrap it in a try-catch and don't let it fail the entire load
+      try {
+        // Re-check tenantId from store and localStorage before making the call
+        let currentTenantId = $currentTenant?.id;
+        if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
+          if (typeof window !== 'undefined') {
+            currentTenantId = localStorage.getItem('selectedTenantId') || null;
+          }
         }
         
-        // Load deployed hardware count - validate tenantId again before making the call
-        // This is non-critical, so we wrap it in a try-catch and don't let it fail the entire load
-        try {
-          // Re-check tenantId from store and localStorage before making the call
-          let currentTenantId = $currentTenant?.id;
-          if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
-            if (typeof window !== 'undefined') {
-              currentTenantId = localStorage.getItem('selectedTenantId') || null;
+        // Final validation before making the API call
+        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantId) {
+          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+          console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
+          try {
+            const deployments = await coverageMapService.getAllHardwareDeployments(currentTenantId);
+            deployedCount = deployments.length;
+            console.log('[Deploy] ✅ Loaded deployment count:', deployedCount);
+          } catch (deploymentErr: any) {
+            // If getAllHardwareDeployments fails, log but don't throw - it's non-critical
+            console.warn('[Deploy] ⚠️ Failed to load deployment count (non-critical):', deploymentErr?.message || deploymentErr);
+            if (deploymentErr?.message?.includes('No tenant selected')) {
+              console.warn('[Deploy] ⚠️ Tenant was lost during deployment count load, will retry on next tenant change');
             }
-          }
-          
-          // Final validation before making the API call
-          if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantId) {
-            const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-            console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
-            try {
-              const deployments = await coverageMapService.getAllHardwareDeployments(currentTenantId);
-              deployedCount = deployments.length;
-              console.log('[Deploy] ✅ Loaded deployment count:', deployedCount);
-            } catch (deploymentErr: any) {
-              // If getAllHardwareDeployments fails, log but don't throw - it's non-critical
-              console.warn('[Deploy] ⚠️ Failed to load deployment count (non-critical):', deploymentErr?.message || deploymentErr);
-              if (deploymentErr?.message?.includes('No tenant selected')) {
-                console.warn('[Deploy] ⚠️ Tenant was lost during deployment count load, will retry on next tenant change');
-              }
-              // Set to 0 as fallback
-              deployedCount = 0;
-            }
-          } else {
-            console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
-              currentTenantId, 
-              expectedTenantId: tenantId,
-              fromStore: $currentTenant?.id,
-              fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
-              match: currentTenantId === tenantId 
-            });
             // Set to 0 as fallback
             deployedCount = 0;
           }
-        } catch (err: any) {
-          // Outer catch for any unexpected errors
-          console.error('[Deploy] ❌ Unexpected error in deployment count load:', err);
-          deployedCount = 0; // Set to 0 as fallback
+        } else {
+          console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
+            currentTenantId, 
+            expectedTenantId: tenantId,
+            fromStore: $currentTenant?.id,
+            fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
+            match: currentTenantId === tenantId 
+          });
+          // Set to 0 as fallback
+          deployedCount = 0;
+        }
+      } catch (err: any) {
+        // Outer catch for any unexpected errors
+        console.error('[Deploy] ❌ Unexpected error in deployment count load:', err);
+        deployedCount = 0; // Set to 0 as fallback
+      }
+      
+      // Load and count sectors for planner buttons
+      // Only count deployed/active sectors (not planned ones)
+      try {
+        const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+        // Don't include plan layer - only count actual deployed sectors
+        const allSectors = await coverageMapService.getSectors(tenantId);
+        
+        // Helper function to identify fake/test sectors
+        function isFakeSector(sector: any): boolean {
+          if (!sector || !sector.name) return true; // Treat sectors without names as fake
+          const name = String(sector.name).toLowerCase();
+          
+          // Patterns that indicate fake/test sectors from test scripts
+          const fakePatterns = [
+            /main tower sector/i,
+            /secondary tower sector/i,
+            /customer.*cpe/i,
+            /customer.*lte/i,
+            /customer a/i,
+            /customer b/i,
+            /fake/i,
+            /demo/i,
+            /sample/i,
+            /^test$/i,
+            /mock/i
+          ];
+          
+          return fakePatterns.some(pattern => pattern.test(name));
         }
         
-        // Load and count sectors for planner buttons
-        // Only count deployed/active sectors (not planned ones)
-        try {
-          const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-          // Don't include plan layer - only count actual deployed sectors
-          const allSectors = await coverageMapService.getSectors(tenantId);
-          
-          // Helper function to identify fake/test sectors
-          function isFakeSector(sector: any): boolean {
-            if (!sector || !sector.name) return true; // Treat sectors without names as fake
-            const name = String(sector.name).toLowerCase();
-            
-            // Patterns that indicate fake/test sectors from test scripts
-            const fakePatterns = [
-              /main tower sector/i,
-              /secondary tower sector/i,
-              /customer.*cpe/i,
-              /customer.*lte/i,
-              /customer a/i,
-              /customer b/i,
-              /fake/i,
-              /demo/i,
-              /sample/i,
-              /^test$/i,
-              /mock/i
-            ];
-            
-            return fakePatterns.some(pattern => pattern.test(name));
+        // Reset counts first
+        lteSectorCount = 0;
+        frequencySectorCount = 0;
+        
+        // Filter to only deployed/active sectors (exclude planned and fake)
+        const deployedSectors = allSectors.filter((sector: any) => {
+          // Exclude fake sectors
+          if (isFakeSector(sector)) {
+            console.log(`[Deploy] Filtering out fake sector: ${sector.name}`);
+            return false;
           }
           
-          // Reset counts first
-          lteSectorCount = 0;
-          frequencySectorCount = 0;
+          const status = (sector.status || '').toLowerCase();
+          if (status !== 'active' && status !== 'deployed') {
+            console.log(`[Deploy] Filtering out non-deployed sector: ${sector.name} (status: ${status})`);
+            return false;
+          }
           
-          // Filter to only deployed/active sectors (exclude planned and fake)
-          const deployedSectors = allSectors.filter((sector: any) => {
-            // Exclude fake sectors
-            if (isFakeSector(sector)) {
-              console.log(`[Deploy] Filtering out fake sector: ${sector.name}`);
-              return false;
-            }
-            
-            const status = (sector.status || '').toLowerCase();
-            if (status !== 'active' && status !== 'deployed') {
-              console.log(`[Deploy] Filtering out non-deployed sector: ${sector.name} (status: ${status})`);
-              return false;
-            }
-            
-            return true;
-          });
-          console.log(`[Deploy] Filtered to ${deployedSectors.length} deployed sectors (from ${allSectors.length} total, filtered ${allSectors.length - deployedSectors.length} fake/planned)`);
-          
-          // Count LTE sectors only (for PCI Planner)
-          const lteSectors = deployedSectors.filter((sector: any) => {
-            const tech = (sector.technology || '').toUpperCase();
-            return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
-          });
-          lteSectorCount = lteSectors.length;
-          console.log(`[Deploy] Found ${lteSectorCount} deployed LTE (ENB) sectors for PCI planner`);
-          
-          // Count LTE + FWA sectors (for Frequency Planner)
-          const frequencySectors = deployedSectors.filter((sector: any) => {
-            const tech = (sector.technology || '').toUpperCase();
-            return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS' || tech === 'FWA';
-          });
-          frequencySectorCount = frequencySectors.length;
-          console.log(`[Deploy] Found ${frequencySectorCount} deployed LTE/FWA sectors for Frequency planner`);
-        } catch (err) {
-          console.error('Failed to load sector counts:', err);
-          lteSectorCount = 0;
-          frequencySectorCount = 0;
-        }
+          return true;
+        });
+        console.log(`[Deploy] Filtered to ${deployedSectors.length} deployed sectors (from ${allSectors.length} total, filtered ${allSectors.length - deployedSectors.length} fake/planned)`);
+        
+        // Count LTE sectors only (for PCI Planner)
+        const lteSectors = deployedSectors.filter((sector: any) => {
+          const tech = (sector.technology || '').toUpperCase();
+          return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS';
+        });
+        lteSectorCount = lteSectors.length;
+        console.log(`[Deploy] Found ${lteSectorCount} deployed LTE (ENB) sectors for PCI planner`);
+        
+        // Count LTE + FWA sectors (for Frequency Planner)
+        const frequencySectors = deployedSectors.filter((sector: any) => {
+          const tech = (sector.technology || '').toUpperCase();
+          return tech === 'LTE' || tech === 'LTECBRS' || tech === 'LTE+CBRS' || tech === 'FWA';
+        });
+        frequencySectorCount = frequencySectors.length;
+        console.log(`[Deploy] Found ${frequencySectorCount} deployed LTE/FWA sectors for Frequency planner`);
+      } catch (err) {
+        console.error('Failed to load sector counts:', err);
+        lteSectorCount = 0;
+        frequencySectorCount = 0;
       }
     } catch (err) {
       console.error('Failed to load projects:', err);

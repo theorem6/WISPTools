@@ -374,11 +374,11 @@
 </script>
 
 {#if show}
-<div class="modal-overlay" on:click={handleClose}>
-  <div class="modal-content" on:click={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" onclick={handleClose}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-header">
       <h2>📶 {sectorToEdit ? 'Edit Sector' : 'Add Sector'}</h2>
-      <button class="close-btn" on:click={handleClose}>✕</button>
+      <button class="close-btn" onclick={handleClose}>✕</button>
     </div>
     
     {#if error}
@@ -521,10 +521,10 @@
     </div>
     
     <div class="modal-footer">
-      <button class="btn-secondary" on:click={handleClose}>Cancel</button>
+      <button class="btn-secondary" onclick={handleClose}>Cancel</button>
       <button 
         class="btn-primary" 
-        on:click={(e) => {
+        onclick={(e) => {
           console.log('[AddSectorModal] 🔵🔵🔵 Save button clicked!', { 
             isSaving, 
             hasTenantId: !!tenantId,
