@@ -7,7 +7,8 @@
 const express = require('express');
 const router = express.Router();
 const { RemoteEPC } = require('../models/distributed-epc-schema');
-const { NetworkEquipment } = require('../models/network');
+const { NetworkEquipment, UnifiedSite } = require('../models/network');
+const mongoose = require('mongoose');
 
 // Try to load OUI lookup utility for Mikrotik detection
 let ouiLookup = null;
@@ -243,6 +244,7 @@ router.post('/discovered', async (req, res, next) => {
           model: device_model,
           serialNumber: device_serial,
           status: 'active',
+          siteId: epcSiteId, // CRITICAL: Assign siteId from EPC's site
           location: {
             latitude: epc.location?.coordinates?.latitude || epc.location?.latitude || 0,
             longitude: epc.location?.coordinates?.longitude || epc.location?.longitude || 0,
@@ -323,20 +325,29 @@ router.post('/discovered', async (req, res, next) => {
         };
         
         if (existingDevice) {
-          // Update existing device - ensure all profiling fields are updated
+          // Update existing device - ensure all profiling fields are updated AND siteId is set
+          // Always update siteId if EPC has a site (even if device already has one, use EPC's site)
+          const updateData = { ...deviceData };
+          if (epcSiteId) {
+            updateData.siteId = epcSiteId;
+          }
+          
           await NetworkEquipment.updateOne(
             { _id: existingDevice._id },
             { 
-              $set: deviceData
+              $set: updateData
             }
           );
-          console.log(`[SNMP Discovery] Updated device: ${ip_address} (Manufacturer: ${deviceData.manufacturer}, Model: ${deviceData.model}, Type: ${deviceData.type})`);
+          console.log(`[SNMP Discovery] Updated device: ${ip_address} (Manufacturer: ${deviceData.manufacturer}, Model: ${deviceData.model}, Type: ${deviceData.type}, siteId: ${epcSiteId || 'NONE'})`);
         } else {
-          // Create new device
+          // Create new device - MUST have siteId if EPC has a site
+          if (!epcSiteId) {
+            console.warn(`[SNMP Discovery] ⚠️ WARNING: Creating device ${ip_address} without siteId because EPC ${epc.epc_id} has no associated site`);
+          }
           deviceData.createdAt = new Date();
           const newDevice = new NetworkEquipment(deviceData);
           await newDevice.save();
-          console.log(`[SNMP Discovery] Created device: ${ip_address} (Manufacturer: ${deviceData.manufacturer}, Model: ${deviceData.model}, Type: ${deviceData.type})`);
+          console.log(`[SNMP Discovery] Created device: ${ip_address} (Manufacturer: ${deviceData.manufacturer}, Model: ${deviceData.model}, Type: ${deviceData.type}, siteId: ${epcSiteId || 'NONE'})`);
         }
         
         processedDevices.push({
