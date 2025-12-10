@@ -10,11 +10,9 @@
  */
 
 const mongoose = require('mongoose');
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { NetworkEquipment, UnifiedSite } = require('../models/network');
 const { RemoteEPC } = require('../models/distributed-epc-schema');
-
-// MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/wisptools';
 
 // Distance calculation (Haversine formula)
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -29,11 +27,33 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+async function connectDB() {
+  try {
+    let mongoUri;
+    try {
+      const appConfig = require('../config/app');
+      mongoUri = appConfig.mongodb.uri || process.env.MONGODB_URI;
+    } catch (e) {
+      mongoUri = process.env.MONGODB_URI || 'mongodb+srv://genieacs-user:Aezlf1N3Z568EwL9@cluster0.1radgkw.mongodb.net/hss_management?retryWrites=true&w=majority&appName=Cluster0';
+    }
+    
+    if (!mongoUri) {
+      console.error('❌ MONGODB_URI not found in config or environment variables');
+      process.exit(1);
+    }
+    
+    await mongoose.connect(mongoUri);
+    console.log('✅ Connected to MongoDB');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    process.exit(1);
+  }
+}
+
 async function fixDevicesWithoutSiteId() {
   try {
     console.log('🔌 Connecting to MongoDB...');
-    await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB');
+    await connectDB();
 
     // Get all NetworkEquipment without siteId
     const devicesWithoutSiteId = await NetworkEquipment.find({
