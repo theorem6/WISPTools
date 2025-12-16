@@ -461,13 +461,13 @@ router.get('/snmp/:deviceId', async (req, res) => {
             load_average: status.system?.load_average || null
           },
           network: {
-            interface_name: status.network?.primary_interface || 'eth0',
+            interface_name: status.network?.primary_interface || status.network?.interfaces?.[0]?.name || 'eth0',
             interface_in_octets: status.network?.interface_in_octets || null,
             interface_out_octets: status.network?.interface_out_octets || null,
             interface_in_errors: status.network?.interface_in_errors || null,
             interface_out_errors: status.network?.interface_out_errors || null,
             interface_speed: status.network?.interface_speed || null,
-            interface_status: status.network?.interface_status || 'up'
+            interface_status: status.network?.interface_status || status.network?.interfaces?.[0]?.status || 'up'
           },
           collection_method: 'epc_checkin'
         }));
