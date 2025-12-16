@@ -404,14 +404,18 @@ router.get('/devices', async (req, res) => {
     .select('_id assetTag equipmentType manufacturer model ipAddress technicalSpecs.ipAddress currentLocation')
     .lean();
 
-    // Get only deployed network equipment (must have siteId to be considered deployed)
-    // Only show graphs for devices that are actually deployed at sites
+    // Get network equipment with IP addresses (can be monitored)
+    // Include devices that are active/deployed OR have IP addresses (can ping for uptime)
     const networkEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
-      status: 'active',
-      siteId: { $exists: true, $ne: null } // Only deployed devices (have a siteId)
+      $or: [
+        // Active deployed devices (have siteId)
+        { status: 'active', siteId: { $exists: true, $ne: null } },
+        // Or devices with discovery metadata (have IPs from SNMP discovery)
+        { 'notes': { $regex: /management_ip|ip_address|discovered_by_epc/i } }
+      ]
     })
-    .select('_id name type manufacturer model notes siteId')
+    .select('_id name type manufacturer model notes siteId status')
     .lean();
 
     const devices = [];
