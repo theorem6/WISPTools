@@ -45,6 +45,15 @@ export let isPlanMode = false;
       marketingLeads
     });
     mapView = view;
+    
+    // Wait for map view to be ready before exposing it
+    if (view) {
+      view.when(() => {
+        // Map view is ready, can be accessed by parent components
+      }).catch((err: any) => {
+        console.warn('[CoverageMapView] Map view initialization warning:', err);
+      });
+    }
   });
 
   onDestroy(() => {

@@ -255,6 +255,17 @@
         deployment._id || deployment.id
       );
       await loadDeployments();
+      
+      // Trigger refresh in monitoring module
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('monitoring-refresh-needed', 'true');
+        // Also trigger storage event for other tabs
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'monitoring-refresh-needed',
+          newValue: 'true',
+          storageArea: localStorage
+        }));
+      }
     } catch (err: any) {
       console.error('Error deleting deployment:', err);
       error = err.message || 'Failed to delete deployment';

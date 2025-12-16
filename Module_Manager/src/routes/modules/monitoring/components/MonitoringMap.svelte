@@ -19,6 +19,10 @@
   let sectors: Sector[] = [];
   let cpeDevices: CPEDevice[] = [];
   
+  // Map component reference for preserving zoom/center
+  let mapComponent: any = null;
+  let savedViewState: { center?: [number, number], zoom?: number } | null = null;
+  
   $: tenantId = $currentTenant?.id || '';
   
   // Monitoring-specific filters (show all network equipment)
@@ -505,6 +509,9 @@
       if (devices && devices.length > 0) {
         convertDevicesToEquipment();
       }
+      
+      // Restore map view state after loading (preserve zoom/center)
+      setTimeout(() => restoreMapViewState(), 100); // Small delay to ensure map updates first
       
       // Load sectors from database
       try {

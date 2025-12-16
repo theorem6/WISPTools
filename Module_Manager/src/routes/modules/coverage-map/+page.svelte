@@ -1468,6 +1468,17 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       success = 'Tower site deleted';
       setTimeout(() => success = '', 3000);
       await loadAllData();
+      
+      // Trigger refresh in monitoring module
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('monitoring-refresh-needed', 'true');
+        // Also trigger storage event for other tabs
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'monitoring-refresh-needed',
+          newValue: 'true',
+          storageArea: localStorage
+        }));
+      }
     } catch (err: any) {
       error = err.message || 'Failed to delete site';
       setTimeout(() => error = '', 5000);

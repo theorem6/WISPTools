@@ -118,6 +118,55 @@
         ]).catch(err => console.error('[Monitoring] Auto-refresh error:', err));
       }
     }, 30000);
+    
+    // Listen for storage events (when sites/hardware are deleted in other tabs/modules)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'monitoring-refresh-needed' && tenantId) {
+        console.log('[Monitoring] Storage event detected - refreshing data');
+        loadDashboard();
+        loadNetworkDevices();
+        loadSNMPData();
+        loadEPCDevices();
+        // Clear the flag
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('monitoring-refresh-needed');
+        }
+      }
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange);
+    }
+    
+    // Also check for refresh flag on focus (for same-tab changes)
+    const handleFocus = () => {
+      if (tenantId && typeof window !== 'undefined') {
+        const needsRefresh = localStorage.getItem('monitoring-refresh-needed');
+        if (needsRefresh) {
+          console.log('[Monitoring] Focus detected with refresh flag - refreshing data');
+          loadDashboard();
+          loadNetworkDevices();
+          loadSNMPData();
+          loadEPCDevices();
+          localStorage.removeItem('monitoring-refresh-needed');
+        }
+      }
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+    }
+    
+    // Cleanup on destroy
+    onDestroy(() => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('focus', handleFocus);
+      }
+    });
   });
   
   let loadingEPCDevices = false;
