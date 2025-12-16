@@ -439,15 +439,15 @@ router.get('/devices', async (req, res) => {
       try {
         const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
         const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
-        // Default to true if not explicitly set to false (consistent with discovered devices)
-        const enableGraphs = notes.enable_graphs !== false;
+        // Default to true if device has IP address (can be pinged) - all devices with IPs should have graphs
+        const enableGraphs = ipAddress && ipAddress.trim() ? (notes.enable_graphs !== false) : false;
         
         // All devices returned here are already deployed (have siteId from query filter)
-        // Only include if they have an IP address and graphs are enabled
+        // Include if they have an IP address (they can be pinged for uptime monitoring)
         if (ipAddress && ipAddress.trim()) {
           const hasSNMPConfig = notes.snmp_community || notes.snmp_version || notes.enable_graphs === true;
           
-          // Include deployed device if graphs are enabled (default true)
+          // Include deployed device with IP address (will have ping graphs at minimum)
           if (enableGraphs || hasSNMPConfig) {
             devices.push({
               id: equipment._id.toString(),

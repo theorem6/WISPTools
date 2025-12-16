@@ -358,6 +358,17 @@
                       </div>
                     {/if}
                   </div>
+                  {#if device.ipAddress && !device.isHardwareDeployment && !device.isEquipment}
+                    <div class="item-actions">
+                      <button 
+                        class="btn btn-sm btn-primary" 
+                        on:click={() => { closeModal(); window.location.href = `/modules/monitoring?deviceId=${device.id}&tab=graphs`; }}
+                        title="View Graphs"
+                      >
+                        📊 View Graphs
+                      </button>
+                    </div>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -709,6 +720,35 @@
 
   .text-red-500 {
     color: #ef4444;
+  }
+
+  .item-actions {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .btn-primary {
+    background: var(--primary, #3b82f6);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-dark, #2563eb);
   }
 </style>
 

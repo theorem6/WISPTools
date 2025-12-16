@@ -407,6 +407,19 @@
                 {/if}
               </td>
               <td class="actions-cell">
+                {#if device.isDeployed && device.enableGraphs && device.ipAddress}
+                  <button 
+                    class="btn btn-sm btn-primary" 
+                    on:click={() => window.location.href = `/modules/monitoring?deviceId=${device.id}&tab=graphs`}
+                    title="View Graphs"
+                  >
+                    📊 View
+                  </button>
+                {:else if device.isDeployed && device.ipAddress}
+                  <span class="text-muted" title="Enable graphs toggle above to view">Enable graphs</span>
+                {/if}
+              </td>
+              <td class="actions-cell">
                 <button class="btn btn-sm btn-secondary" on:click={() => handlePairDevice(device)} title="Link to Deployed Hardware">
                   🔗 Link
                 </button>

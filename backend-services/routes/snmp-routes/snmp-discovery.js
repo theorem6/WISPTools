@@ -311,8 +311,13 @@ router.get('/discovered', async (req, res) => {
         return (d.config?.management_ip === deviceIP || d.name === equipment.name);
       });
       
-      // Get enable_graphs flag from notes (default true for deployed devices)
-      const enableGraphs = isDeployed && (notes.enable_graphs !== false);
+      // Get enable_graphs flag from notes
+      // Default to true if device has an IP address (can be pinged) OR is deployed
+      // This ensures all devices with IPs automatically get ping uptime graphs
+      const hasIPAddress = !!(notes.management_ip || notes.ip_address || notes.ipAddress || 
+                              (equipment.serialNumber && /^\d+\.\d+\.\d+\.\d+$/.test(String(equipment.serialNumber))));
+      // Default enableGraphs to true for devices with IP addresses (can monitor ping) or deployed devices
+      const enableGraphs = (hasIPAddress || isDeployed) && (notes.enable_graphs !== false);
       
       // Determine initial status:
       // - If device has monitoring data (ping/SNMP), use that status

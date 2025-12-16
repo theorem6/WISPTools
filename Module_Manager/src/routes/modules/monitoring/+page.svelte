@@ -76,6 +76,19 @@
   }
   
   onMount(async () => {
+    // Check URL parameters for device selection and tab
+    if (browser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const deviceIdParam = urlParams.get('deviceId');
+      const tabParam = urlParams.get('tab');
+      
+      if (tabParam === 'graphs') {
+        mapView = 'graphs';
+      }
+      
+      // deviceId will be handled by SNMPGraphsPanel after it loads devices
+    }
+    
     if (tenantId) {
       // Initialize with empty arrays to prevent undefined errors
       epcDevices = [];

@@ -318,7 +318,7 @@ router.post('/discovered', async (req, res, next) => {
               }
             } : {}),
             // Include device type-specific flags
-            enable_graphs: true, // Default to enabled
+            enable_graphs: true, // Default to enabled for all discovered devices with IP
             graphs_enabled: ['interfaces', 'arp', 'routes', 'cpu', 'memory', 'throughput']
           }),
           updatedAt: new Date()

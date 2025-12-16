@@ -73,6 +73,21 @@
         error = '';
         
         console.log('[SNMPGraphsPanel] Loaded devices:', devices.length);
+        
+        // Check URL for deviceId parameter
+        if (typeof window !== 'undefined' && !selectedDevice) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const deviceIdParam = urlParams.get('deviceId');
+          if (deviceIdParam && devices.length > 0) {
+            const deviceFromUrl = devices.find((d: any) => d.id === deviceIdParam);
+            if (deviceFromUrl) {
+              console.log('[SNMPGraphsPanel] Selecting device from URL:', deviceFromUrl.name || deviceFromUrl.id);
+              selectDevice(deviceFromUrl);
+              return; // Exit early since we selected device from URL
+            }
+          }
+        }
+        
         if (!selectedDevice && devices.length > 0) {
           console.log('[SNMPGraphsPanel] Auto-selecting first device:', devices[0].name || devices[0].id);
           selectDevice(devices[0]);
