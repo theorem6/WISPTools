@@ -445,28 +445,24 @@ router.get('/devices', async (req, res) => {
       try {
         const notes = equipment.notes ? (typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes) : {};
         const ipAddress = notes.management_ip || notes.ip_address || notes.ipAddress;
-        // Default to true if device has IP address (can be pinged) - all devices with IPs should have graphs
-        const enableGraphs = ipAddress && ipAddress.trim() ? (notes.enable_graphs !== false) : false;
         
-        // All devices returned here are already deployed (have siteId from query filter)
-        // Include if they have an IP address (they can be pinged for uptime monitoring)
+        // If device has an IP address, include it (can show ping uptime graphs)
+        // Don't require enableGraphs or SNMP config - ping monitoring should work for all devices with IPs
         if (ipAddress && ipAddress.trim()) {
-          const hasSNMPConfig = notes.snmp_community || notes.snmp_version || notes.enable_graphs === true;
+          const hasSNMPConfig = !!(notes.snmp_community || notes.snmp_version);
           
-          // Include deployed device with IP address (will have ping graphs at minimum)
-          if (enableGraphs || hasSNMPConfig) {
-            devices.push({
-              id: equipment._id.toString(),
-              name: equipment.name || notes.sysName || notes.sysDescr || ipAddress || 'Unknown',
-              type: 'network_equipment',
-              manufacturer: equipment.manufacturer || notes.manufacturer_detected_via_oui || notes.oui_detection?.manufacturer || 'Unknown',
-              model: equipment.model || notes.mikrotik?.board_name || notes.sysDescr || 'Unknown',
-              ipAddress: ipAddress.trim(),
-              location: 'Unknown',
-              hasPing: true,
-              hasSNMP: hasSNMPConfig
-            });
-          }
+          // Always include devices with IP addresses - they can show ping uptime even without SNMP
+          devices.push({
+            id: equipment._id.toString(),
+            name: equipment.name || notes.sysName || notes.sysDescr || ipAddress || 'Unknown',
+            type: 'network_equipment',
+            manufacturer: equipment.manufacturer || notes.manufacturer_detected_via_oui || notes.oui_detection?.manufacturer || 'Unknown',
+            model: equipment.model || notes.mikrotik?.board_name || notes.sysDescr || 'Unknown',
+            ipAddress: ipAddress.trim(),
+            location: 'Unknown',
+            hasPing: true, // All devices with IPs can be pinged
+            hasSNMP: hasSNMPConfig // Only true if SNMP is configured
+          });
         }
       } catch (e) {
         // Invalid JSON in notes, skip
