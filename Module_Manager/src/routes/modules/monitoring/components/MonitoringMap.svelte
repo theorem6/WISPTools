@@ -896,6 +896,7 @@
   <!-- Coverage Map with hidden plan/deploy elements -->
   <div class="map-wrapper">
     <CoverageMapView
+      bind:this={mapComponent}
       {towers}
       {sectors}
       {cpeDevices}
