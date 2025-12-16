@@ -993,7 +993,7 @@
   /* SNMP Graphs View */
   .graphs-overlay {
     position: absolute;
-    top: 0;
+    top: 80px; /* Start below the module header menu */
     left: 0;
     right: 0;
     bottom: 0;

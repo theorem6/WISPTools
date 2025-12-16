@@ -156,7 +156,10 @@ router.get('/ping/:deviceId', async (req, res) => {
       ? metrics.map(m => m.response_time_ms || null)
       : [];
     const success = metrics.length > 0
-      ? metrics.map(m => m.success ? 1 : 0) // 1 for success, 0 for failure
+      ? metrics.map(m => {
+          // A ping is successful if success === true OR if it has a response_time (got a response)
+          return (m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined)) ? 1 : 0;
+        })
       : [];
 
     // Build ECharts option format
@@ -271,22 +274,27 @@ router.get('/ping/:deviceId', async (req, res) => {
     };
 
     // Calculate current_status based on recent successful pings (last 15 minutes)
-    // This is more accurate than just checking the last metric
+    // A ping is considered successful if:
+    // 1. success === true, OR
+    // 2. response_time_ms exists (got a response, even if success flag is wrong)
     let current_status = 'offline';
     if (metrics.length > 0) {
       const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
       const recentMetrics = metrics.filter(m => new Date(m.timestamp).getTime() >= fifteenMinutesAgo);
       
       if (recentMetrics.length > 0) {
-        // Check if any recent ping was successful
-        const recentSuccessful = recentMetrics.filter(m => m.success);
+        // Check if any recent ping was successful (success === true OR has response_time)
+        const recentSuccessful = recentMetrics.filter(m => 
+          m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined)
+        );
         if (recentSuccessful.length > 0) {
           current_status = 'online';
         } else {
           // No successful pings in last 15 minutes, but check if last metric was recent
           const lastMetric = metrics[metrics.length - 1];
           const lastMetricAge = Date.now() - new Date(lastMetric.timestamp).getTime();
-          if (lastMetricAge < 15 * 60 * 1000 && lastMetric.success) {
+          if (lastMetricAge < 15 * 60 * 1000 && 
+              (lastMetric.success === true || (lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined))) {
             current_status = 'online';
           }
         }
@@ -294,8 +302,9 @@ router.get('/ping/:deviceId', async (req, res) => {
         // No recent metrics, check last metric
         const lastMetric = metrics[metrics.length - 1];
         const lastMetricAge = Date.now() - new Date(lastMetric.timestamp).getTime();
-        // If last metric is within 30 minutes and was successful, consider online
-        if (lastMetricAge < 30 * 60 * 1000 && lastMetric.success) {
+        // If last metric is within 30 minutes and was successful (or has response_time), consider online
+        if (lastMetricAge < 30 * 60 * 1000 && 
+            (lastMetric.success === true || (lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined))) {
           current_status = 'online';
         }
       }
@@ -311,10 +320,10 @@ router.get('/ping/:deviceId', async (req, res) => {
       data: chartjsFormat,
       stats: {
         total: metrics.length,
-        successful: metrics.filter(m => m.success).length,
-        failed: metrics.filter(m => !m.success).length,
+        successful: metrics.filter(m => m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined)).length,
+        failed: metrics.filter(m => m.success === false && (m.response_time_ms === null || m.response_time_ms === undefined)).length,
         uptime_percent: metrics.length > 0 
-          ? Math.round((metrics.filter(m => m.success).length / metrics.length) * 10000) / 100
+          ? Math.round((metrics.filter(m => m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined)).length / metrics.length) * 10000) / 100
           : 0,
         current_status: current_status,
         avg_response_time_ms: metrics.filter(m => m.response_time_ms).length > 0
