@@ -154,11 +154,17 @@ const formatDeviceForMonitoring = async (device, type, deviceType = null, tenant
     }
   }
   
+  // Extract siteId from device (handle ObjectId objects)
+  const deviceSiteId = device.siteId?._id || device.siteId?.id || device.siteId || null;
+  const normalizedSiteId = deviceSiteId ? (typeof deviceSiteId === 'object' ? deviceSiteId.toString() : String(deviceSiteId)) : null;
+  
   const baseDevice = {
     id: device._id.toString(),
     name: device.name,
     type: type,
     status: deviceStatus,
+    siteId: normalizedSiteId, // CRITICAL: Include siteId so devices can be matched to sites
+    site_id: normalizedSiteId, // Also include snake_case for compatibility
     location: {
       coordinates: {
         latitude: device.location?.latitude || 0,
