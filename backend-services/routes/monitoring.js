@@ -193,7 +193,6 @@ router.get('/epc/list', async (req, res) => {
     console.log(`📡 [Monitoring] Found ${remoteEPCs.length} RemoteEPCs`);
     
     // Get all sites to populate EPC locations from site_id
-    const { UnifiedSite } = require('../models/site');
     const siteIds = remoteEPCs.map(epc => epc.site_id).filter(Boolean);
     const sites = await UnifiedSite.find({
       tenantId: req.tenantId,
