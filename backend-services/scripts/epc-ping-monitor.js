@@ -294,7 +294,8 @@ async function getSNMPSubnets(deviceCode) {
 // Send ping metrics to backend
 async function sendPingMetrics(deviceCode, pingMetrics) {
   if (!pingMetrics || pingMetrics.length === 0) {
-    return;
+    log('INFO', 'No ping metrics to send');
+    return false;
   }
   
   try {
@@ -303,6 +304,8 @@ async function sendPingMetrics(deviceCode, pingMetrics) {
       device_code: deviceCode,
       ping_metrics: pingMetrics
     });
+    
+    log('INFO', `Sending ${pingMetrics.length} ping metrics to backend...`);
     
     return new Promise((resolve, reject) => {
       const client = url.protocol === 'https:' ? https : http;
@@ -324,10 +327,16 @@ async function sendPingMetrics(deviceCode, pingMetrics) {
         
         res.on('end', () => {
           if (res.statusCode === 200 || res.statusCode === 201) {
-            log('INFO', `Sent ${pingMetrics.length} ping metrics successfully`);
-            resolve(true);
+            try {
+              const response = JSON.parse(data);
+              log('INFO', `Successfully sent ${pingMetrics.length} ping metrics (stored: ${response.stored || pingMetrics.length})`);
+              resolve(true);
+            } catch (e) {
+              log('INFO', `Sent ${pingMetrics.length} ping metrics successfully (HTTP ${res.statusCode})`);
+              resolve(true);
+            }
           } else {
-            log('WARN', `Failed to send ping metrics: HTTP ${res.statusCode} - ${data}`);
+            log('ERROR', `Failed to send ping metrics: HTTP ${res.statusCode} - ${data.substring(0, 200)}`);
             resolve(false);
           }
         });
@@ -335,12 +344,13 @@ async function sendPingMetrics(deviceCode, pingMetrics) {
       
       req.on('error', (error) => {
         log('ERROR', `Error sending ping metrics: ${error.message}`);
+        log('ERROR', `Error details: ${error.stack || 'No stack trace'}`);
         resolve(false);
       });
       
       req.setTimeout(30000, () => {
         req.destroy();
-        log('WARN', 'Timeout sending ping metrics');
+        log('ERROR', 'Timeout sending ping metrics (30s)');
         resolve(false);
       });
       
@@ -349,6 +359,7 @@ async function sendPingMetrics(deviceCode, pingMetrics) {
     });
   } catch (error) {
     log('ERROR', `Error in sendPingMetrics: ${error.message}`);
+    log('ERROR', `Error stack: ${error.stack || 'No stack trace'}`);
     return false;
   }
 }
