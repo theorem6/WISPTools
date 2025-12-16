@@ -253,15 +253,42 @@
     if (!site) return [];
     const siteId = site.id || site._id;
     
-    console.log('[MonitoringSiteDetailsModal] Getting devices for site:', site.name, 'siteId:', siteId);
+    console.log('[MonitoringSiteDetailsModal] Getting devices for site:', site.name, 'siteId:', siteId, 'siteId type:', typeof siteId);
+    
+    // Debug: Log all networkDevices and their siteIds
+    if (networkDevices && networkDevices.length > 0) {
+      console.log('[MonitoringSiteDetailsModal] All networkDevices:', networkDevices.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        siteId: d.siteId,
+        site_id: d.site_id,
+        siteIdType: typeof d.siteId,
+        site_idType: typeof d.site_id
+      })));
+    } else {
+      console.log('[MonitoringSiteDetailsModal] No networkDevices available');
+    }
     
     // Get devices from networkDevices prop
     const devicesFromNetwork = (networkDevices || []).filter((device: any) => {
-      const deviceSiteId = device.siteId || device.site_id;
-      const matches = siteId && deviceSiteId && String(deviceSiteId) === String(siteId);
+      // Try multiple ways to get siteId from device
+      const deviceSiteId = device.siteId?._id || device.siteId?.id || device.siteId || 
+                          device.site_id?._id || device.site_id?.id || device.site_id;
+      
+      // Normalize both IDs to strings for comparison
+      const normalizedSiteId = String(siteId);
+      const normalizedDeviceSiteId = deviceSiteId ? String(deviceSiteId) : null;
+      
+      const matches = normalizedSiteId && normalizedDeviceSiteId && normalizedSiteId === normalizedDeviceSiteId;
+      
       if (matches) {
-        console.log('[MonitoringSiteDetailsModal] Found device from networkDevices:', device.name, 'siteId:', deviceSiteId);
+        console.log('[MonitoringSiteDetailsModal] ✅ Found device from networkDevices:', device.name, 
+          'deviceSiteId:', normalizedDeviceSiteId, 'matches siteId:', normalizedSiteId);
+      } else if (deviceSiteId) {
+        console.log('[MonitoringSiteDetailsModal] ❌ Device', device.name, 'has siteId', normalizedDeviceSiteId, 
+          'but site is', normalizedSiteId, '- NO MATCH');
       }
+      
       return matches;
     });
     
@@ -382,7 +409,7 @@
         {/if}
         <div class="info-row">
           <span class="label">Status:</span>
-          <span class="value status-badge {site.status || 'active'}">{site.status || 'active'}</span>
+          <span class="value status-badge {getSiteStatus()}">{getSiteStatus()}</span>
         </div>
       </div>
 

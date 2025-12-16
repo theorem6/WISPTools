@@ -268,8 +268,15 @@
     
     // Find all devices at this site
     const siteDevices = networkDevices.filter(device => {
-      const deviceSiteId = device.siteId || device.site_id;
-      return deviceSiteId && (String(deviceSiteId) === String(siteId));
+      // Try multiple ways to get siteId from device (handle ObjectId objects)
+      const deviceSiteId = device.siteId?._id || device.siteId?.id || device.siteId || 
+                          device.site_id?._id || device.site_id?.id || device.site_id;
+      
+      // Normalize both IDs to strings for comparison
+      const normalizedSiteId = String(siteId);
+      const normalizedDeviceSiteId = deviceSiteId ? String(deviceSiteId) : null;
+      
+      return normalizedSiteId && normalizedDeviceSiteId && normalizedSiteId === normalizedDeviceSiteId;
     });
     
     if (siteDevices.length === 0) return 0;
@@ -355,8 +362,15 @@
       
       // Check if site has any devices at all
       const siteDevices = networkDevices?.filter(device => {
-        const deviceSiteId = device.siteId || device.site_id;
-        return deviceSiteId && (String(deviceSiteId) === String(siteId));
+        // Try multiple ways to get siteId from device (handle ObjectId objects)
+        const deviceSiteId = device.siteId?._id || device.siteId?.id || device.siteId || 
+                            device.site_id?._id || device.site_id?.id || device.site_id;
+        
+        // Normalize both IDs to strings for comparison
+        const normalizedSiteId = String(siteId);
+        const normalizedDeviceSiteId = deviceSiteId ? String(deviceSiteId) : null;
+        
+        return normalizedSiteId && normalizedDeviceSiteId && normalizedSiteId === normalizedDeviceSiteId;
       }) || [];
       
       // If site has devices but all are unknown (no monitoring data yet), show as maintenance not inactive
