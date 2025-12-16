@@ -187,11 +187,76 @@ get_system_metrics() {
     echo "{\"uptime_seconds\":$uptime_sec,\"load_average\":[$load1,$load5,$load15],\"cpu_percent\":$cpu_percent,\"memory_percent\":$mem_percent,\"memory_total_mb\":$mem_total,\"memory_used_mb\":$mem_used,\"disk_percent\":$disk_percent,\"disk_total_gb\":$disk_total,\"disk_used_gb\":$disk_used}"
 }
 
-# Get network info - simple JSON without jq dependency issues
+# Get network info - collect interface statistics for SNMP monitoring
 get_network_info() {
     local ip=$(get_ip_address)
     [ -z "$ip" ] && ip="unknown"
-    echo "{\"ip_address\":\"$ip\",\"interfaces\":[]}"
+    
+    # Get primary interface (first non-loopback interface with IP)
+    local primary_interface=""
+    if [ -d /sys/class/net ]; then
+        for iface in /sys/class/net/*; do
+            local ifname=$(basename "$iface")
+            # Skip loopback
+            if [ "$ifname" = "lo" ]; then
+                continue
+            fi
+            # Check if interface is up
+            if [ -f "$iface/operstate" ] && [ "$(cat "$iface/operstate" 2>/dev/null)" = "up" ]; then
+                # Check if interface has an IP
+                if ip addr show "$ifname" 2>/dev/null | grep -q "inet "; then
+                    primary_interface="$ifname"
+                    break
+                fi
+            fi
+        done
+    fi
+    
+    # If no primary interface found, try to get from IP route
+    if [ -z "$primary_interface" ]; then
+        primary_interface=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'dev \K\S+' | head -1)
+    fi
+    
+    # Get interface statistics from /proc/net/dev
+    local interface_in_octets=0
+    local interface_out_octets=0
+    local interface_in_errors=0
+    local interface_out_errors=0
+    local interface_speed=0
+    local interface_status="down"
+    
+    if [ -n "$primary_interface" ] && [ -f /proc/net/dev ]; then
+        # Get interface stats from /proc/net/dev
+        local if_stats=$(grep "^[[:space:]]*${primary_interface}:" /proc/net/dev 2>/dev/null)
+        if [ -n "$if_stats" ]; then
+            # Format: interface: bytes packets errs drop fifo frame compressed multicast bytes packets errs drop fifo colls carrier compressed
+            interface_in_octets=$(echo "$if_stats" | awk '{print $2}')
+            interface_in_errors=$(echo "$if_stats" | awk '{print $4}')
+            interface_out_octets=$(echo "$if_stats" | awk '{print $10}')
+            interface_out_errors=$(echo "$if_stats" | awk '{print $12}')
+        fi
+        
+        # Get interface speed from /sys/class/net
+        if [ -f "/sys/class/net/${primary_interface}/speed" ]; then
+            interface_speed=$(cat "/sys/class/net/${primary_interface}/speed" 2>/dev/null || echo "0")
+            # Convert from Mbps to bps for consistency
+            interface_speed=$((interface_speed * 1000000))
+        fi
+        
+        # Get interface status
+        if [ -f "/sys/class/net/${primary_interface}/operstate" ]; then
+            interface_status=$(cat "/sys/class/net/${primary_interface}/operstate" 2>/dev/null || echo "down")
+        fi
+    fi
+    
+    # Build interfaces array (just primary interface for now)
+    local interfaces_json="[]"
+    if [ -n "$primary_interface" ]; then
+        interfaces_json="[{\"name\":\"$primary_interface\",\"ip\":\"$ip\",\"status\":\"$interface_status\"}]"
+    fi
+    
+    # Return comprehensive network info
+    echo "{\"ip_address\":\"$ip\",\"primary_interface\":\"$primary_interface\",\"interface_in_octets\":$interface_in_octets,\"interface_out_octets\":$interface_out_octets,\"interface_in_errors\":$interface_in_errors,\"interface_out_errors\":$interface_out_errors,\"interface_speed\":$interface_speed,\"interface_status\":\"$interface_status\",\"interfaces\":$interfaces_json}"
 }
 
 # Get file hash (SHA256) if sha256sum is available, otherwise use md5sum
