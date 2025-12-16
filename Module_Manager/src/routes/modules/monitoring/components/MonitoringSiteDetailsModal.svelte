@@ -360,11 +360,11 @@
                   </div>
                   {#if device.ipAddress && !device.isHardwareDeployment && !device.isEquipment}
                     <div class="item-actions">
-                      <button 
-                        class="btn btn-sm btn-primary" 
-                        on:click={() => { closeModal(); window.location.href = `/modules/monitoring?deviceId=${device.id}&tab=graphs`; }}
-                        title="View Graphs"
-                      >
+                        <button 
+                          class="btn btn-sm btn-primary" 
+                          onclick={() => { closeModal(); window.location.href = `/modules/monitoring?deviceId=${device.id}&tab=graphs`; }}
+                          title="View Graphs"
+                        >
                         📊 View Graphs
                       </button>
                     </div>
