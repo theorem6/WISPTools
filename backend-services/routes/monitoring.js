@@ -194,12 +194,22 @@ router.get('/epc/list', async (req, res) => {
     
     // Get all sites to populate EPC locations from site_id
     const siteIds = remoteEPCs.map(epc => epc.site_id).filter(Boolean);
-    const sites = await UnifiedSite.find({
+    const mongoose = require('mongoose');
+    
+    // Convert site_ids to ObjectIds if they're strings
+    const siteObjectIds = siteIds.map(siteId => {
+      if (typeof siteId === 'string' && mongoose.Types.ObjectId.isValid(siteId)) {
+        return new mongoose.Types.ObjectId(siteId);
+      }
+      return siteId;
+    }).filter(Boolean);
+    
+    const sites = siteObjectIds.length > 0 ? await UnifiedSite.find({
       tenantId: req.tenantId,
-      _id: { $in: siteIds }
+      _id: { $in: siteObjectIds }
     })
     .select('_id name location')
-    .lean();
+    .lean() : [];
     
     const siteMap = new Map();
     sites.forEach(site => {
@@ -264,8 +274,16 @@ router.get('/epc/list', async (req, res) => {
       
       // If EPC has site_id but no valid coordinates, get location from site
       if (epc.site_id && (!location.coordinates.latitude || location.coordinates.latitude === 0)) {
+        // Try multiple formats for site_id matching
         const siteIdStr = typeof epc.site_id === 'object' ? epc.site_id.toString() : String(epc.site_id);
-        const site = siteMap.get(siteIdStr);
+        let site = siteMap.get(siteIdStr);
+        
+        // If not found, try ObjectId format
+        if (!site && mongoose.Types.ObjectId.isValid(siteIdStr)) {
+          const siteObjId = new mongoose.Types.ObjectId(siteIdStr);
+          site = siteMap.get(siteObjId.toString());
+        }
+        
         if (site && site.location) {
           location = {
             coordinates: {
@@ -275,6 +293,8 @@ router.get('/epc/list', async (req, res) => {
             address: site.location.address || site.name || epc.site_name || 'Unknown Location'
           };
           console.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) got location from site ${siteIdStr}: ${location.coordinates.latitude}, ${location.coordinates.longitude}`);
+        } else if (epc.site_id) {
+          console.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) has site_id ${siteIdStr} but site not found in ${siteMap.size} loaded sites`);
         }
       }
       
