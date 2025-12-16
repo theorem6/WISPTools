@@ -405,14 +405,16 @@ router.get('/devices', async (req, res) => {
     .lean();
 
     // Get network equipment with IP addresses (can be monitored)
-    // Include devices that are active/deployed OR have IP addresses (can ping for uptime)
+    // Include ALL network equipment - we'll filter by IP address in processing
+    // This ensures discovered devices (even without siteId) are included
     const networkEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       $or: [
-        // Active deployed devices (have siteId)
-        { status: 'active', siteId: { $exists: true, $ne: null } },
-        // Or devices with discovery metadata (have IPs from SNMP discovery)
-        { 'notes': { $regex: /management_ip|ip_address|discovered_by_epc/i } }
+        { status: 'active' },
+        { status: 'deployed' },
+        { status: { $exists: false } }, // Devices without status field
+        // Include devices with notes (might have IP addresses)
+        { notes: { $exists: true, $ne: null } }
       ]
     })
     .select('_id name type manufacturer model notes siteId status')
