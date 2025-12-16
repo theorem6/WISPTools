@@ -10,6 +10,7 @@ const { PingMetrics } = require('../models/ping-metrics-schema');
 const { SNMPMetrics } = require('../models/snmp-metrics-schema');
 const { InventoryItem } = require('../models/inventory');
 const { NetworkEquipment } = require('../models/network');
+const { RemoteEPC, EPCServiceStatus } = require('../models/distributed-epc-schema');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -405,13 +406,75 @@ router.get('/snmp/:deviceId', async (req, res) => {
 
     const startTime = new Date(Date.now() - validHours * 60 * 60 * 1000);
 
-    const metrics = await SNMPMetrics.find({
+    // First, try to get SNMP metrics from SNMPMetrics collection
+    let metrics = await SNMPMetrics.find({
       device_id: deviceId,
       tenant_id: req.tenantId,
       timestamp: { $gte: startTime }
     })
     .sort({ timestamp: 1 })
     .lean();
+
+    // If no SNMP metrics found, check if this is a RemoteEPC and convert EPCServiceStatus to SNMP format
+    if (metrics.length === 0) {
+      // Check if deviceId is a RemoteEPC _id
+      let epc = null;
+      if (mongoose.Types.ObjectId.isValid(deviceId)) {
+        epc = await RemoteEPC.findOne({ _id: deviceId, tenant_id: req.tenantId }).lean();
+      }
+      
+      // If not found by _id, try by epc_id
+      if (!epc) {
+        epc = await RemoteEPC.findOne({ epc_id: deviceId, tenant_id: req.tenantId }).lean();
+      }
+      
+      if (epc) {
+        // Get EPCServiceStatus records and convert to SNMPMetrics format
+        const epcStatuses = await EPCServiceStatus.find({
+          epc_id: epc.epc_id,
+          tenant_id: req.tenantId,
+          timestamp: { $gte: startTime }
+        })
+        .sort({ timestamp: 1 })
+        .lean();
+        
+        // Convert EPCServiceStatus to SNMPMetrics format
+        metrics = epcStatuses.map(status => ({
+          device_id: epc._id.toString(),
+          tenant_id: req.tenantId,
+          timestamp: status.timestamp,
+          system: {
+            uptime_seconds: status.system?.uptime_seconds || null,
+            hostname: status.system?.hostname || epc.site_name || null,
+            sys_descr: `Remote EPC: ${epc.site_name || epc.epc_id}`,
+            sys_location: epc.location?.address || null
+          },
+          resources: {
+            cpu_percent: status.system?.cpu_percent || null,
+            memory_percent: status.system?.memory_percent || null,
+            memory_total_mb: status.system?.memory_total_mb || null,
+            memory_used_mb: status.system?.memory_used_mb || null,
+            memory_free_mb: status.system?.memory_free_mb || null,
+            disk_percent: status.system?.disk_percent || null,
+            disk_total_gb: status.system?.disk_total_gb || null,
+            disk_used_gb: status.system?.disk_used_gb || null,
+            load_average: status.system?.load_average || null
+          },
+          network: {
+            interface_name: status.network?.primary_interface || 'eth0',
+            interface_in_octets: status.network?.interface_in_octets || null,
+            interface_out_octets: status.network?.interface_out_octets || null,
+            interface_in_errors: status.network?.interface_in_errors || null,
+            interface_out_errors: status.network?.interface_out_errors || null,
+            interface_speed: status.network?.interface_speed || null,
+            interface_status: status.network?.interface_status || 'up'
+          },
+          collection_method: 'epc_checkin'
+        }));
+        
+        console.log(`[Monitoring Graphs] Converted ${metrics.length} EPCServiceStatus records to SNMPMetrics format for EPC ${epc.epc_id}`);
+      }
+    }
 
     if (metrics.length === 0) {
       return res.json({
@@ -641,6 +704,31 @@ router.get('/devices', async (req, res) => {
       } catch (e) {
         // Invalid JSON in notes, skip
         continue;
+      }
+    }
+
+    // Add RemoteEPC devices (EPCs send system metrics via check-in)
+    const remoteEPCs = await RemoteEPC.find({
+      tenant_id: req.tenantId
+    })
+    .select('_id epc_id site_name site_id ip_address location status')
+    .lean();
+
+    for (const epc of remoteEPCs) {
+      const ipAddress = epc.ip_address;
+      if (ipAddress && ipAddress.trim()) {
+        devices.push({
+          id: epc._id.toString(),
+          name: epc.site_name || epc.epc_id || 'Remote EPC',
+          type: 'remote_epc',
+          manufacturer: 'EPC',
+          model: 'Remote EPC',
+          ipAddress: ipAddress.trim(),
+          location: epc.location?.address || epc.site_name || 'Unknown',
+          siteId: epc.site_id ? (typeof epc.site_id === 'object' ? epc.site_id.toString() : epc.site_id) : null,
+          hasPing: true, // EPCs can be pinged
+          hasSNMP: true  // EPCs send system metrics via check-in (converted to SNMP format)
+        });
       }
     }
 

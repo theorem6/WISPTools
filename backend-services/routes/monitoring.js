@@ -192,6 +192,21 @@ router.get('/epc/list', async (req, res) => {
     const remoteEPCs = await RemoteEPC.find({ tenant_id: req.tenantId }).lean();
     console.log(`📡 [Monitoring] Found ${remoteEPCs.length} RemoteEPCs`);
     
+    // Get all sites to populate EPC locations from site_id
+    const { UnifiedSite } = require('../models/site');
+    const siteIds = remoteEPCs.map(epc => epc.site_id).filter(Boolean);
+    const sites = await UnifiedSite.find({
+      tenantId: req.tenantId,
+      _id: { $in: siteIds }
+    })
+    .select('_id name location')
+    .lean();
+    
+    const siteMap = new Map();
+    sites.forEach(site => {
+      siteMap.set(String(site._id), site);
+    });
+    
     // Get latest service status for all EPCs to populate metrics - use efficient aggregation
     const epcIds = remoteEPCs.map(epc => epc.epc_id);
     const latestStatuses = await EPCServiceStatus.aggregate([
@@ -239,6 +254,31 @@ router.get('/epc/list', async (req, res) => {
         uptime: null
       });
       
+      // Get location from site if EPC doesn't have coordinates
+      let location = {
+        coordinates: {
+          latitude: epc.location?.coordinates?.latitude || epc.location?.latitude || 0,
+          longitude: epc.location?.coordinates?.longitude || epc.location?.longitude || 0
+        },
+        address: epc.location?.address || 'Unknown Location'
+      };
+      
+      // If EPC has site_id but no valid coordinates, get location from site
+      if (epc.site_id && (!location.coordinates.latitude || location.coordinates.latitude === 0)) {
+        const siteIdStr = typeof epc.site_id === 'object' ? epc.site_id.toString() : String(epc.site_id);
+        const site = siteMap.get(siteIdStr);
+        if (site && site.location) {
+          location = {
+            coordinates: {
+              latitude: site.location.latitude || site.location.coordinates?.latitude || 0,
+              longitude: site.location.longitude || site.location.coordinates?.longitude || 0
+            },
+            address: site.location.address || site.name || epc.site_name || 'Unknown Location'
+          };
+          console.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) got location from site ${siteIdStr}: ${location.coordinates.latitude}, ${location.coordinates.longitude}`);
+        }
+      }
+      
       epcs.push({
         id: epc._id?.toString() || epc.epc_id,
         epcId: epc.epc_id,
@@ -250,13 +290,8 @@ router.get('/epc/list', async (req, res) => {
         hardware_id: epc.hardware_id,
         ipAddress: epc.ip_address || null,
         deployment_type: epc.deployment_type,
-        location: {
-          coordinates: {
-            latitude: epc.location?.coordinates?.latitude || epc.location?.latitude || 0,
-            longitude: epc.location?.coordinates?.longitude || epc.location?.longitude || 0
-          },
-          address: epc.location?.address || 'Unknown Location'
-        },
+        siteId: epc.site_id ? (typeof epc.site_id === 'object' ? epc.site_id.toString() : epc.site_id) : null,
+        location: location,
         metrics: metrics,
         last_seen: lastSeen,
         createdAt: epc.created_at,
