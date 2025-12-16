@@ -177,6 +177,18 @@
             console.log('[SNMPGraphsPanel] ============================');
             pingMetrics = pingData.data || null;
             pingStats = pingData.stats || null;
+            
+            // Debug: Log the actual structure
+            if (pingMetrics) {
+              console.log('[SNMPGraphsPanel] pingMetrics structure:', {
+                hasLabels: !!pingMetrics.labels,
+                labelsLength: pingMetrics.labels?.length || 0,
+                hasDatasets: !!pingMetrics.datasets,
+                datasetsLength: pingMetrics.datasets?.length || 0,
+                datasetLabels: pingMetrics.datasets?.map((d: any) => d.label) || []
+              });
+            }
+            
             updatePingCharts();
           } else {
             const errorText = await pingResponse.text();

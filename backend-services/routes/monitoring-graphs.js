@@ -70,6 +70,54 @@ router.get('/ping/:deviceId', async (req, res) => {
         }
       }
     }
+    
+    // If still no results, try to find device by IP address (fallback for devices where device_id might not match)
+    if (metrics.length === 0) {
+      // Get device info to find IP address
+      const { NetworkEquipment } = require('../models/network');
+      const { InventoryItem } = require('../models/inventory');
+      
+      let deviceIP = null;
+      
+      // Try NetworkEquipment first
+      if (mongoose.Types.ObjectId.isValid(deviceId)) {
+        const deviceObjId = new mongoose.Types.ObjectId(deviceId);
+        const equipment = await NetworkEquipment.findOne({ _id: deviceObjId, tenantId: req.tenantId }).lean();
+        if (equipment && equipment.notes) {
+          try {
+            const notes = typeof equipment.notes === 'string' ? JSON.parse(equipment.notes) : equipment.notes;
+            deviceIP = notes.management_ip || notes.ip_address || notes.ipAddress;
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+      
+      // Try InventoryItem if not found
+      if (!deviceIP && mongoose.Types.ObjectId.isValid(deviceId)) {
+        const deviceObjId = new mongoose.Types.ObjectId(deviceId);
+        const item = await InventoryItem.findOne({ _id: deviceObjId, tenantId: req.tenantId }).lean();
+        if (item) {
+          deviceIP = item.ipAddress || item.technicalSpecs?.ipAddress;
+        }
+      }
+      
+      // If we found an IP, query by IP address
+      if (deviceIP) {
+        console.log(`[Monitoring Graphs] No metrics found by device_id, trying IP address fallback: ${deviceIP}`);
+        metrics = await PingMetrics.find({
+          ip_address: deviceIP.trim(),
+          tenant_id: req.tenantId,
+          timestamp: { $gte: startTime }
+        })
+        .sort({ timestamp: 1 })
+        .lean();
+        
+        if (metrics.length > 0) {
+          console.log(`[Monitoring Graphs] Found ${metrics.length} metrics using IP address fallback: ${deviceIP}`);
+        }
+      }
+    }
 
     console.log(`[Monitoring Graphs] Found ${metrics.length} ping metrics for device ${deviceId}`);
     if (metrics.length > 0) {
