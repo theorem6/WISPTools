@@ -254,7 +254,69 @@
   }
   
   function updatePingCharts() {
-    console.log('[SNMPGraphsPanel] updatePingCharts called, pingMetrics:', !!pingMetrics, 'labels:', pingMetrics?.labels?.length || 0);
+    console.log('[SNMPGraphsPanel] updatePingCharts called, pingMetrics:', !!pingMetrics);
+    
+    // If ECharts format is available, use it directly
+    if (pingMetrics?.echarts) {
+      console.log('[SNMPGraphsPanel] Using ECharts format directly from backend');
+      const echartsData = pingMetrics.echarts;
+      
+      // Split into separate charts (uptime and response time)
+      // Uptime chart (Status series)
+      const statusSeries = echartsData.series?.find((s: any) => s.name === 'Status');
+      if (statusSeries && statusSeries.data && statusSeries.data.length > 0) {
+        pingUptimeOption = {
+          ...echartsData,
+          series: [{
+            ...statusSeries,
+            yAxisIndex: 0, // Use single axis for status
+            itemStyle: {
+              color: (params: any) => {
+                const value = statusSeries.data[params.dataIndex]?.[1];
+                return value === 1 ? '#22c55e' : '#ef4444';
+              }
+            },
+            areaStyle: {
+              color: (params: any) => {
+                const value = statusSeries.data[params.dataIndex]?.[1];
+                return value === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+              }
+            }
+          }],
+          yAxis: [{
+            type: 'value',
+            min: 0,
+            max: 1,
+            interval: 1,
+            axisLabel: {
+              color: '#9ca3af',
+              fontSize: 11,
+              formatter: (value: number) => value === 1 ? 'Online' : 'Offline'
+            },
+            axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+            splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+          }]
+        };
+      } else {
+        pingUptimeOption = null;
+      }
+      
+      // Response time chart
+      const responseSeries = echartsData.series?.find((s: any) => s.name === 'Response Time');
+      if (responseSeries && responseSeries.data && responseSeries.data.length > 0) {
+        pingResponseOption = {
+          ...echartsData,
+          series: [responseSeries],
+          yAxis: [echartsData.yAxis?.[0]]
+        };
+      } else {
+        pingResponseOption = null;
+      }
+      
+      return;
+    }
+    
+    // Fallback to Chart.js format conversion
     if (!pingMetrics || !pingMetrics.labels || pingMetrics.labels.length === 0) {
       console.log('[SNMPGraphsPanel] No ping metrics data, clearing chart options');
       pingUptimeOption = null;
