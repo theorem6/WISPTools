@@ -22,6 +22,7 @@
   // Map component reference for preserving zoom/center
   let mapComponent: any = null;
   let savedViewState: { center?: [number, number], zoom?: number } | null = null;
+  let isRefreshing = false; // Flag to prevent multiple simultaneous refreshes
   
   $: tenantId = $currentTenant?.id || '';
   
