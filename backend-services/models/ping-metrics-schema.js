@@ -39,8 +39,8 @@ PingMetricsSchema.index({ ip_address: 1, timestamp: -1 });
 PingMetricsSchema.index({ timestamp: 1 }); // For general time queries
 PingMetricsSchema.index({ success: 1, timestamp: -1 }); // For failure analysis
 
-// TTL Index - Keep metrics for 90 days
-PingMetricsSchema.index({ timestamp: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
+// TTL Index - Keep metrics for 7 days (reduced from 90 to save space on free tier)
+PingMetricsSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 }); // 7 days
 
 // Compound index for common queries
 PingMetricsSchema.index({ tenant_id: 1, device_id: 1, timestamp: -1 });

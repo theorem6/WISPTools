@@ -67,8 +67,8 @@ SNMPMetricsSchema.index({ device_id: 1, timestamp: -1 });
 SNMPMetricsSchema.index({ tenant_id: 1, timestamp: -1 });
 SNMPMetricsSchema.index({ timestamp: 1 }); // For general time queries
 
-// TTL Index - Keep metrics for 90 days (similar to EPCServiceStatus)
-SNMPMetricsSchema.index({ timestamp: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
+// TTL Index - Keep metrics for 7 days (reduced from 90 to save space on free tier)
+SNMPMetricsSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 }); // 7 days
 
 // Compound index for common queries
 SNMPMetricsSchema.index({ tenant_id: 1, device_id: 1, timestamp: -1 });

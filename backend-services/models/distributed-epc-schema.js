@@ -490,7 +490,7 @@ const EPCServiceStatusSchema = new mongoose.Schema({
 });
 
 EPCServiceStatusSchema.index({ epc_id: 1, timestamp: -1 });
-EPCServiceStatusSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 }); // Keep 7 days
+EPCServiceStatusSchema.index({ timestamp: 1 }, { expireAfterSeconds: 259200 }); // Keep 3 days (reduced from 7 to save space)
 
 /**
  * EPC Log Schema
