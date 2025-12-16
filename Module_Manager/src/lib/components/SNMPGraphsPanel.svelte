@@ -1073,19 +1073,26 @@
     background: rgba(0,0,0,0.3);
     border-right: 1px solid rgba(255,255,255,0.1);
     padding: 1rem;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
   }
   
   .device-sidebar h3 {
     margin: 0 0 1rem;
     font-size: 1rem;
     color: #94a3b8;
+    flex-shrink: 0;
   }
   
   .device-list {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
   }
   
   .device-item {
