@@ -21,7 +21,97 @@ const requireTenant = (req, res, next) => {
 router.use(requireTenant);
 
 // Helper function to convert network devices to monitoring format
-const formatDeviceForMonitoring = (device, type, deviceType = null) => {
+// Helper function to get device status from recent ping metrics
+async function getDeviceStatusFromPingMetrics(deviceId, tenantId) {
+  try {
+    const { PingMetrics } = require('../models/ping-metrics-schema');
+    const mongoose = require('mongoose');
+    
+    // Check for recent successful pings (last 15 minutes)
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    
+    // Try with device_id as string
+    let recentMetrics = await PingMetrics.find({
+      device_id: deviceId,
+      tenant_id: tenantId,
+      timestamp: { $gte: fifteenMinutesAgo }
+    })
+    .sort({ timestamp: -1 })
+    .limit(10)
+    .lean();
+    
+    // If no results, try with ObjectId format
+    if (recentMetrics.length === 0 && mongoose.Types.ObjectId.isValid(deviceId)) {
+      const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
+      recentMetrics = await PingMetrics.find({
+        $or: [
+          { device_id: deviceId },
+          { device_id: objectIdDeviceId }
+        ],
+        tenant_id: tenantId,
+        timestamp: { $gte: fifteenMinutesAgo }
+      })
+      .sort({ timestamp: -1 })
+      .limit(10)
+      .lean();
+    }
+    
+    if (recentMetrics.length > 0) {
+      // Check if any recent ping was successful (success === true OR has response_time)
+      const successfulPings = recentMetrics.filter(m => 
+        m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined)
+      );
+      if (successfulPings.length > 0) {
+        return 'online';
+      }
+    }
+    
+    // Check last metric within 30 minutes as fallback
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    let lastMetric = await PingMetrics.findOne({
+      device_id: deviceId,
+      tenant_id: tenantId,
+      timestamp: { $gte: thirtyMinutesAgo }
+    })
+    .sort({ timestamp: -1 })
+    .lean();
+    
+    if (!lastMetric && mongoose.Types.ObjectId.isValid(deviceId)) {
+      const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
+      lastMetric = await PingMetrics.findOne({
+        $or: [
+          { device_id: deviceId },
+          { device_id: objectIdDeviceId }
+        ],
+        tenant_id: tenantId,
+        timestamp: { $gte: thirtyMinutesAgo }
+      })
+      .sort({ timestamp: -1 })
+      .lean();
+    }
+    
+    if (lastMetric && (lastMetric.success === true || (lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined))) {
+      return 'online';
+    }
+    
+    // If we have any ping metrics at all (even old ones), mark as offline
+    const anyMetrics = await PingMetrics.findOne({
+      device_id: deviceId,
+      tenant_id: tenantId
+    }).lean();
+    
+    if (anyMetrics) {
+      return 'offline'; // Has monitoring data but not recently online
+    }
+    
+    return null; // No ping metrics found
+  } catch (error) {
+    console.error(`[formatDeviceForMonitoring] Error checking ping metrics for device ${deviceId}:`, error);
+    return null;
+  }
+}
+
+const formatDeviceForMonitoring = async (device, type, deviceType = null, tenantId = null) => {
   // Determine device status based on monitoring data
   let deviceStatus = 'unknown'; // Default to unknown (grey) for devices without monitoring data
   
@@ -34,24 +124,34 @@ const formatDeviceForMonitoring = (device, type, deviceType = null) => {
     }
   }
   
-  // Check if device has monitoring data (ping/SNMP results)
-  const hasMonitoringData = notes.last_ping_result || 
-                            notes.last_snmp_poll || 
-                            notes.monitoring_status ||
-                            device.metrics;
+  // First, try to get status from recent ping metrics (if tenantId is provided)
+  if (tenantId && device._id) {
+    const pingStatus = await getDeviceStatusFromPingMetrics(device._id.toString(), tenantId);
+    if (pingStatus) {
+      deviceStatus = pingStatus;
+    }
+  }
   
-  if (hasMonitoringData) {
-    // Use monitoring status if available
-    deviceStatus = notes.monitoring_status || 
-                  (notes.last_ping_result === 'success' ? 'online' : 
-                   notes.last_ping_result === 'failed' ? 'offline' : 
-                   device.status === 'active' ? 'online' : 'offline');
-  } else if (device.siteId) {
-    // Deployed device but no monitoring data yet - show as unknown (grey)
-    deviceStatus = 'unknown';
-  } else {
-    // Use device status for non-deployed devices
-    deviceStatus = device.status === 'active' ? 'online' : 'offline';
+  // If no ping status found, check device notes for monitoring data
+  if (deviceStatus === 'unknown') {
+    const hasMonitoringData = notes.last_ping_result || 
+                              notes.last_snmp_poll || 
+                              notes.monitoring_status ||
+                              device.metrics;
+    
+    if (hasMonitoringData) {
+      // Use monitoring status if available
+      deviceStatus = notes.monitoring_status || 
+                    (notes.last_ping_result === 'success' ? 'online' : 
+                     notes.last_ping_result === 'failed' ? 'offline' : 
+                     device.status === 'active' ? 'online' : 'offline');
+    } else if (device.siteId) {
+      // Deployed device but no monitoring data yet - show as unknown (grey)
+      deviceStatus = 'unknown';
+    } else {
+      // Use device status for non-deployed devices
+      deviceStatus = device.status === 'active' ? 'online' : 'offline';
+    }
   }
   
   const baseDevice = {
@@ -326,9 +426,9 @@ router.get('/epc/list', async (req, res) => {
       status: 'deployed'
     }).populate('siteId', 'name location').lean();
     
-    epcDeployments.forEach(deployment => {
+    for (const deployment of epcDeployments) {
       if (!seenIds.has(deployment._id.toString())) {
-        epcs.push(formatDeviceForMonitoring({
+        epcs.push(await formatDeviceForMonitoring({
           _id: deployment._id,
           name: deployment.name,
           status: deployment.status,
@@ -336,9 +436,9 @@ router.get('/epc/list', async (req, res) => {
           config: deployment.config || {},
           createdAt: deployment.createdAt,
           updatedAt: deployment.updatedAt
-        }, 'epc'));
+        }, 'epc', null, req.tenantId));
       }
-    });
+    }
     
     console.log(`📊 [Monitoring] Total ${epcs.length} EPC devices for tenant ${req.tenantId}`);
     
@@ -400,8 +500,8 @@ router.get('/mikrotik/devices', async (req, res) => {
     const devices = [];
     
     // Add Mikrotik equipment with location from site if needed
-    mikrotikEquipment.forEach(equipment => {
-      const device = formatDeviceForMonitoring(equipment, 'mikrotik', equipment.type);
+    for (const equipment of mikrotikEquipment) {
+      const device = await formatDeviceForMonitoring(equipment, 'mikrotik', equipment.type, req.tenantId);
       
       // If device has siteId but no valid coordinates, get location from site
       if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
@@ -420,11 +520,11 @@ router.get('/mikrotik/devices', async (req, res) => {
       }
       
       devices.push(device);
-    });
+    }
     
     // Add Mikrotik CPE with location from site if needed
-    mikrotikCPE.forEach(cpe => {
-      const device = formatDeviceForMonitoring(cpe, 'mikrotik', 'cpe');
+    for (const cpe of mikrotikCPE) {
+      const device = await formatDeviceForMonitoring(cpe, 'mikrotik', 'cpe', req.tenantId);
       
       // If device has siteId but no valid coordinates, get location from site
       if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
@@ -443,7 +543,7 @@ router.get('/mikrotik/devices', async (req, res) => {
       }
       
       devices.push(device);
-    });
+    }
     
     console.log(`📊 Found ${devices.length} Mikrotik devices for tenant ${req.tenantId}`);
     
@@ -516,8 +616,8 @@ router.get('/snmp/devices', async (req, res) => {
     const devices = [];
     
     // Add SNMP equipment with location from site if needed
-    snmpEquipment.forEach(equipment => {
-      const device = formatDeviceForMonitoring(equipment, 'snmp', equipment.type);
+    for (const equipment of snmpEquipment) {
+      const device = await formatDeviceForMonitoring(equipment, 'snmp', equipment.type, req.tenantId);
       
       // If device has siteId but no valid coordinates, get location from site
       if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
@@ -536,11 +636,11 @@ router.get('/snmp/devices', async (req, res) => {
       }
       
       devices.push(device);
-    });
+    }
     
     // Add SNMP CPE with location from site if needed
-    snmpCPE.forEach(cpe => {
-      const device = formatDeviceForMonitoring(cpe, 'snmp', 'cpe');
+    for (const cpe of snmpCPE) {
+      const device = await formatDeviceForMonitoring(cpe, 'snmp', 'cpe', req.tenantId);
       
       // If device has siteId but no valid coordinates, get location from site
       if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
@@ -559,7 +659,7 @@ router.get('/snmp/devices', async (req, res) => {
       }
       
       devices.push(device);
-    });
+    }
     
     console.log(`📊 Found ${devices.length} SNMP devices for tenant ${req.tenantId}`);
     
