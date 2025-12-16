@@ -224,7 +224,7 @@ function buildCheckinResponse(epc, commands, config) {
     epc_id: epc.epc_id,
     tenant_id: epc.tenant_id,
     site_name: epc.site_name,
-    checkin_interval: epc.metrics_config?.update_interval_seconds || 60,
+    checkin_interval: epc.metrics_config?.update_interval_seconds || 600, // Default 10 minutes (600 seconds) - best practice for production systems
     commands: commands.map(c => ({
       id: c._id.toString(),
       type: c.command_type,

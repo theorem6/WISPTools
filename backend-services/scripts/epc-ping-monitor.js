@@ -4,7 +4,7 @@
  * 
  * This script:
  * 1. Hourly subnet ping sweep - pings all subnets in SNMP settings
- * 2. Every minute before check-in - pings all monitored devices and reports
+ * 2. Before each check-in (default 10 minutes) - pings all monitored devices and reports
  * 3. Sends ping metrics to backend for storage and graphing
  * 
  * Usage:
