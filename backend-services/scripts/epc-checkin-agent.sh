@@ -1106,7 +1106,8 @@ install_agent() {
         echo "Installing npm packages for SNMP discovery..."
         cd /opt/wisptools
         npm init -y >/dev/null 2>&1 || true
-        npm install --no-save ping-scanner net-snmp >/dev/null 2>&1 || echo "Warning: Failed to install npm packages, will use fallback methods"
+        # Only install net-snmp - use native ping command (no npm package needed)
+        npm install --no-save net-snmp >/dev/null 2>&1 || echo "Warning: Failed to install net-snmp, SNMP discovery may use system commands"
     fi
     
     # Create systemd service with robust restart configuration

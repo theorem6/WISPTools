@@ -150,8 +150,10 @@ app.use('/api/snmp', require('./routes/snmp'));
 //   console.warn('⚠️ SNMP polling service disabled:', error.message);
 // }
 console.log('⚠️ SNMP polling service DISABLED - cloud backend should not perform SNMP polling');
+console.log('   → SNMP polling runs ONLY on remote EPC/SNMP agents');
 
 // Initialize Ping monitoring service - DISABLED (should only run on remote EPC agents)
+// IMPORTANT: Backend should NEVER run ping or SNMP sweeps - only remote agents do this
 // try {
 //   const { getPingMonitoringService } = require('./services/ping-monitoring-service');
 //   const pingMonitoringService = getPingMonitoringService();
@@ -163,6 +165,8 @@ console.log('⚠️ SNMP polling service DISABLED - cloud backend should not per
 //   console.warn('⚠️ Ping monitoring service disabled:', error.message);
 // }
 console.log('⚠️ Ping monitoring service DISABLED - cloud backend should not perform ping sweeps');
+console.log('   → Ping monitoring runs ONLY on remote EPC/SNMP agents');
+console.log('   → Backend only receives and stores metrics from remote agents');
 
 // EPC management routes (includes delete endpoint)
 app.use('/api/epc-management', require('./routes/epc-management'));

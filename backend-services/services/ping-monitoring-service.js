@@ -85,6 +85,8 @@ class PingMonitoringService {
 
   /**
    * Ping a single IP address
+   * NOTE: This service should NOT be used on the backend for private network devices.
+   * It only pings public IPs. Private network devices are pinged by remote EPC agents.
    * Returns: { success: boolean, responseTime: number (ms) | null, error: string | null }
    */
   async pingIP(ipAddress) {

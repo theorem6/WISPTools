@@ -37,16 +37,16 @@ if [ ! -f "package.json" ]; then
 fi
 
 # Install packages
-log "Installing ping-scanner..."
-npm install --no-save ping-scanner >> "$LOG_FILE" 2>&1 || {
-    log "WARNING: Failed to install ping-scanner, will use native ping fallback"
-}
+# Note: We use native 'ping' command for ping monitoring (no npm package needed)
+# Only install net-snmp for SNMP queries
 
-log "Installing net-snmp..."
+log "Installing net-snmp (SNMP library)..."
 npm install --no-save net-snmp >> "$LOG_FILE" 2>&1 || {
     log "ERROR: Failed to install net-snmp"
     exit 1
 }
+
+log "Note: Using native 'ping' command for ping monitoring (no npm package required)"
 
 log "npm packages installed successfully"
 
