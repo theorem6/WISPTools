@@ -792,7 +792,7 @@
       <div class="status-section">
         <div class="section-header">
           <h3>📊 System Status</h3>
-          <button class="refresh-btn" on:click={() => dispatch('refreshData')} title="Refresh Data">
+          <button class="refresh-btn" on:click={handleInternalRefresh} title="Refresh Data">
             🔄
           </button>
         </div>
