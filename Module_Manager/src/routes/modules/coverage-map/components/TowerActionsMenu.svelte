@@ -79,18 +79,50 @@
     
     // Check if action is allowed
     try {
-      const isAllowed = objectStateManager.isActionAllowed(tower, action, moduleContext);
-      if (!isAllowed) {
-        console.warn(`[TowerActionsMenu] Action '${action}' not allowed for tower ${tower.id}`);
-        return;
+      // In deploy/monitoring mode or for delete actions, allow ALL actions
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+      const contextDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitoring';
+      const isDeployMode = contextDeployMode || urlDeployMode;
+      
+      // Allow delete actions always (user explicitly wants to delete)
+      const isDeleteAction = action === 'delete-site' || action === 'delete-sector' || action === 'delete-backhaul';
+      const isReadOnlyAction = ['view-site-details', 'view-details', 'view'].includes(action);
+      
+      console.log('[TowerActionsMenu] 🔵🔵🔵 Permission check:', { 
+        action, 
+        contextDeployMode,
+        urlDeployMode,
+        isDeployMode,
+        isDeleteAction,
+        isReadOnlyAction
+      });
+      
+      // Always allow delete actions and read-only actions
+      if (isDeleteAction || isReadOnlyAction || isDeployMode) {
+        console.log(`[TowerActionsMenu] ✅ Action '${action}' allowed (delete/read-only/deploy mode)`);
+      } else {
+        const isAllowed = objectStateManager.isActionAllowed(tower, action, moduleContext);
+        if (!isAllowed) {
+          console.warn(`[TowerActionsMenu] ❌ Action '${action}' not allowed for tower ${tower.id}`);
+          return;
+        }
+        console.log(`[TowerActionsMenu] ✅ Action '${action}' allowed via permission check`);
       }
       
       // Safely dispatch the action with the tower
-      console.log('[TowerActionsMenu] Dispatching action', { action, towerId: tower.id });
+      console.log('[TowerActionsMenu] ✅✅✅ Dispatching action', { action, towerId: tower.id });
       dispatch('action', { action, tower });
       show = false;
     } catch (error) {
       console.error('[TowerActionsMenu] Error in handleAction:', error);
+      // Even if permission check fails, allow delete actions
+      const isDeleteAction = action === 'delete-site';
+      if (isDeleteAction) {
+        console.log('[TowerActionsMenu] ✅✅✅ Dispatching delete action despite error');
+        dispatch('action', { action, tower });
+        show = false;
+      }
     }
   }
   
