@@ -175,12 +175,27 @@
               console.log('[SNMPGraphsPanel] First 3 labels:', pingData.data.labels.slice(0, 3));
             }
             console.log('[SNMPGraphsPanel] ============================');
-            pingMetrics = pingData.data || null;
+            // Use ECharts format if available, fallback to Chart.js format
+            if (pingData.echarts) {
+              console.log('[SNMPGraphsPanel] Using ECharts format from backend');
+              // For ECharts format, we need to extract data for updatePingCharts
+              // Store both formats for compatibility
+              pingMetrics = {
+                echarts: pingData.echarts,
+                // Also extract Chart.js format for updatePingCharts function
+                labels: pingData.data?.labels || [],
+                datasets: pingData.data?.datasets || []
+              };
+            } else {
+              console.log('[SNMPGraphsPanel] Using Chart.js format (backward compatibility)');
+              pingMetrics = pingData.data || null;
+            }
             pingStats = pingData.stats || null;
             
             // Debug: Log the actual structure
             if (pingMetrics) {
               console.log('[SNMPGraphsPanel] pingMetrics structure:', {
+                hasEcharts: !!pingMetrics.echarts,
                 hasLabels: !!pingMetrics.labels,
                 labelsLength: pingMetrics.labels?.length || 0,
                 hasDatasets: !!pingMetrics.datasets,

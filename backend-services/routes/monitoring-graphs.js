@@ -5,6 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { PingMetrics } = require('../models/ping-metrics-schema');
 const { SNMPMetrics } = require('../models/snmp-metrics-schema');
 const { InventoryItem } = require('../models/inventory');
@@ -51,7 +52,6 @@ router.get('/ping/:deviceId', async (req, res) => {
 
     // If no results, try with ObjectId format (in case device_id was stored as ObjectId)
     if (metrics.length === 0) {
-      const mongoose = require('mongoose');
       if (mongoose.Types.ObjectId.isValid(deviceId)) {
         const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
         metrics = await PingMetrics.find({
@@ -122,12 +122,11 @@ router.get('/ping/:deviceId', async (req, res) => {
     console.log(`[Monitoring Graphs] Found ${metrics.length} ping metrics for device ${deviceId}`);
     if (metrics.length > 0) {
       console.log(`[Monitoring Graphs] First metric: ${metrics[0].timestamp}, Last metric: ${metrics[metrics.length - 1].timestamp}`);
-    } else {
-      // Debug: Check if device_id exists at all (try both formats)
-      let anyMetrics = await PingMetrics.findOne({ device_id: deviceId, tenant_id: req.tenantId }).lean();
-      if (!anyMetrics) {
-        const mongoose = require('mongoose');
-        if (mongoose.Types.ObjectId.isValid(deviceId)) {
+      } else {
+        // Debug: Check if device_id exists at all (try both formats)
+        let anyMetrics = await PingMetrics.findOne({ device_id: deviceId, tenant_id: req.tenantId }).lean();
+        if (!anyMetrics) {
+          if (mongoose.Types.ObjectId.isValid(deviceId)) {
           const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
           anyMetrics = await PingMetrics.findOne({ 
             $or: [
@@ -148,9 +147,9 @@ router.get('/ping/:deviceId', async (req, res) => {
       }
     }
 
-    // Always return valid structure, even if empty
-    const labels = metrics.length > 0 
-      ? metrics.map(m => new Date(m.timestamp).toISOString())
+    // Convert to ECharts format (time series data)
+    const timestamps = metrics.length > 0 
+      ? metrics.map(m => new Date(m.timestamp).getTime())
       : [];
     const responseTimes = metrics.length > 0
       ? metrics.map(m => m.response_time_ms || null)
@@ -159,32 +158,125 @@ router.get('/ping/:deviceId', async (req, res) => {
       ? metrics.map(m => m.success ? 1 : 0) // 1 for success, 0 for failure
       : [];
 
+    // Build ECharts option format
+    const echartsOption = {
+      xAxis: {
+        type: 'time',
+        boundaryGap: false,
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 10,
+          rotate: 45
+        },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: 'Response Time (ms)',
+          position: 'left',
+          nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+          nameLocation: 'middle',
+          nameGap: 50,
+          axisLabel: { color: '#9ca3af', fontSize: 11 },
+          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+          splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        {
+          type: 'value',
+          name: 'Status',
+          position: 'right',
+          min: 0,
+          max: 1,
+          interval: 1,
+          axisLabel: {
+            color: '#9ca3af',
+            fontSize: 11
+            // Note: formatter functions cannot be serialized in JSON, will be handled by frontend
+          },
+          nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+          nameLocation: 'middle',
+          nameGap: 50,
+          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+          splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+        }
+      ],
+      series: [
+        {
+          name: 'Response Time',
+          type: 'line',
+          yAxisIndex: 0,
+          data: timestamps.map((time, idx) => [time, responseTimes[idx]]),
+          itemStyle: { color: '#4bc0c0' },
+          areaStyle: { color: 'rgba(75, 192, 192, 0.2)' },
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 4,
+          lineStyle: { width: 2 }
+        },
+        {
+          name: 'Status',
+          type: 'line',
+          yAxisIndex: 1,
+          data: timestamps.map((time, idx) => [time, success[idx]]),
+          itemStyle: { 
+            // Color will be set per-point in frontend based on success array
+            color: '#22c55e'
+          },
+          areaStyle: { 
+            // Color will be set per-point in frontend based on success array
+            color: 'rgba(34, 197, 94, 0.2)'
+          },
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 4,
+          lineStyle: { width: 2 }
+        }
+      ],
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        borderWidth: 1,
+        textStyle: { color: '#cbd5e1' },
+        axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } }
+      },
+      grid: { top: 20, right: 30, bottom: 40, left: 50 }
+    };
+
+    // Also provide Chart.js compatible format for backward compatibility
+    const chartjsFormat = {
+      labels: metrics.length > 0 
+        ? metrics.map(m => new Date(m.timestamp).toISOString())
+        : [],
+      datasets: [
+        {
+          label: 'Response Time (ms)',
+          data: responseTimes,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          yAxisID: 'y'
+        },
+        {
+          label: 'Status',
+          data: success,
+          borderColor: 'rgb(34, 197, 94)',
+          backgroundColor: 'rgba(34, 197, 94, 0.2)',
+          yAxisID: 'y1'
+        }
+      ],
+      raw_metrics_count: metrics.length
+    };
+
     const response = {
       success: true,
       deviceId,
       hours: validHours,
-      data: {
-        labels,
-        datasets: [
-          {
-            label: 'Response Time (ms)',
-            data: responseTimes,
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            yAxisID: 'y'
-          },
-          {
-            label: 'Status',
-            data: success,
-            borderColor: 'rgb(34, 197, 94)',
-            backgroundColor: 'rgba(34, 197, 94, 0.2)',
-            yAxisID: 'y1'
-          }
-        ],
-        // Also include raw data for easier debugging
-        raw_metrics_count: metrics.length
-        ]
-      },
+      // Primary format: ECharts option
+      echarts: echartsOption,
+      // Backward compatibility: Chart.js format
+      data: chartjsFormat,
       stats: {
         total: metrics.length,
         successful: metrics.filter(m => m.success).length,
