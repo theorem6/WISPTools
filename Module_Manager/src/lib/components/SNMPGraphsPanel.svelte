@@ -253,6 +253,112 @@
     }
   }
   
+  // Create a default "no data" chart showing device as offline
+  function createEmptyPingUptimeChart(): EChartsOption {
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000);
+    
+    return {
+      grid: { top: 20, right: 30, bottom: 40, left: 50 },
+      xAxis: {
+        type: 'time',
+        boundaryGap: false,
+        min: oneHourAgo,
+        max: now,
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 10,
+          rotate: 45
+        },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 1,
+        interval: 1,
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 11,
+          formatter: (value: number) => value === 1 ? 'Online' : 'Offline'
+        },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        borderWidth: 1,
+        textStyle: { color: '#cbd5e1' },
+        axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } }
+      },
+      series: [{
+        name: 'Status',
+        type: 'line',
+        data: [[oneHourAgo, 0], [now, 0]], // Show as offline (0)
+        itemStyle: { color: '#ef4444' },
+        areaStyle: { color: 'rgba(239, 68, 68, 0.2)' },
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }]
+    };
+  }
+  
+  function createEmptyPingResponseChart(): EChartsOption {
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000);
+    
+    return {
+      grid: { top: 20, right: 30, bottom: 40, left: 60 },
+      xAxis: {
+        type: 'time',
+        boundaryGap: false,
+        min: oneHourAgo,
+        max: now,
+        axisLabel: {
+          color: '#9ca3af',
+          fontSize: 10,
+          rotate: 45
+        },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Response Time (ms)',
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+        axisLabel: { color: '#9ca3af', fontSize: 11 },
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        borderWidth: 1,
+        textStyle: { color: '#cbd5e1' },
+        axisPointer: { lineStyle: { color: 'rgba(59, 130, 246, 0.5)' } }
+      },
+      series: [{
+        name: 'Response Time',
+        type: 'line',
+        data: [], // Empty data
+        itemStyle: { color: '#4bc0c0' },
+        areaStyle: { color: 'rgba(75, 192, 192, 0.2)' },
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { width: 2 }
+      }]
+    };
+  }
+
   function updatePingCharts() {
     console.log('[SNMPGraphsPanel] updatePingCharts called, pingMetrics:', !!pingMetrics);
     
@@ -298,7 +404,9 @@
           }]
         };
       } else {
-        pingUptimeOption = null;
+        // No data - show empty chart with device as offline
+        console.log('[SNMPGraphsPanel] No status data, showing empty chart with device offline');
+        pingUptimeOption = createEmptyPingUptimeChart();
       }
       
       // Response time chart
@@ -310,7 +418,9 @@
           yAxis: [echartsData.yAxis?.[0]]
         };
       } else {
-        pingResponseOption = null;
+        // No data - show empty chart
+        console.log('[SNMPGraphsPanel] No response time data, showing empty chart');
+        pingResponseOption = createEmptyPingResponseChart();
       }
       
       return;
@@ -318,9 +428,10 @@
     
     // Fallback to Chart.js format conversion
     if (!pingMetrics || !pingMetrics.labels || pingMetrics.labels.length === 0) {
-      console.log('[SNMPGraphsPanel] No ping metrics data, clearing chart options');
-      pingUptimeOption = null;
-      pingResponseOption = null;
+      console.log('[SNMPGraphsPanel] No ping metrics data, showing empty charts with device offline');
+      // Always show charts, even with no data
+      pingUptimeOption = createEmptyPingUptimeChart();
+      pingResponseOption = createEmptyPingResponseChart();
       return;
     }
     
@@ -390,8 +501,8 @@
       };
       console.log('[SNMPGraphsPanel] Ping uptime chart option created');
     } else {
-      console.log('[SNMPGraphsPanel] No status dataset found, clearing uptime chart');
-      pingUptimeOption = null;
+      console.log('[SNMPGraphsPanel] No status dataset found, showing empty chart with device offline');
+      pingUptimeOption = createEmptyPingUptimeChart();
     }
     
     // Ping Response Time Chart
@@ -452,8 +563,8 @@
       };
       console.log('[SNMPGraphsPanel] Ping response time chart option created');
     } else {
-      console.log('[SNMPGraphsPanel] No response time dataset found, clearing response chart');
-      pingResponseOption = null;
+      console.log('[SNMPGraphsPanel] No response time dataset found, showing empty chart');
+      pingResponseOption = createEmptyPingResponseChart();
     }
   }
   
@@ -782,33 +893,31 @@
           
           <div class="charts-grid">
             {#if selectedDevice.hasPing}
-              {#if pingUptimeOption}
+              {#if selectedDevice.hasPing}
                 <div class="chart-card">
                   <h4>🟢 Ping Uptime</h4>
                   <div class="chart-container">
-                    <ECharts option={pingUptimeOption} height={200} theme="dark" loading={!pingMetrics} />
-                  </div>
-                </div>
-              {:else if isLoading}
-                <div class="chart-card">
-                  <h4>🟢 Ping Uptime</h4>
-                  <div class="chart-container">
-                    <div class="chart-loading">Loading ping data...</div>
+                    {#if pingUptimeOption}
+                      <ECharts option={pingUptimeOption} height={200} theme="dark" />
+                    {:else if isLoading}
+                      <div class="chart-loading">Loading ping data...</div>
+                    {:else}
+                      <ECharts option={createEmptyPingUptimeChart()} height={200} theme="dark" />
+                    {/if}
                   </div>
                 </div>
               {/if}
-              {#if pingResponseOption}
+              {#if selectedDevice.hasPing}
                 <div class="chart-card">
                   <h4>⏱️ Ping Response Time</h4>
                   <div class="chart-container">
-                    <ECharts option={pingResponseOption} height={200} theme="dark" loading={!pingMetrics} />
-                  </div>
-                </div>
-              {:else if isLoading}
-                <div class="chart-card">
-                  <h4>⏱️ Ping Response Time</h4>
-                  <div class="chart-container">
-                    <div class="chart-loading">Loading ping data...</div>
+                    {#if pingResponseOption}
+                      <ECharts option={pingResponseOption} height={200} theme="dark" />
+                    {:else if isLoading}
+                      <div class="chart-loading">Loading ping data...</div>
+                    {:else}
+                      <ECharts option={createEmptyPingResponseChart()} height={200} theme="dark" />
+                    {/if}
                   </div>
                 </div>
               {/if}
