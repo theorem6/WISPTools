@@ -712,6 +712,19 @@
     loadSites();
   }
   
+  // Handle refreshData event from parent - reload sites when data refreshes
+  export function handleRefresh() {
+    if (tenantId) {
+      loadSites();
+    }
+  }
+  
+  // Also listen to refreshData event dispatched by this component's refresh button
+  function handleInternalRefresh() {
+    handleRefresh();
+    dispatch('refreshData'); // Forward to parent
+  }
+  
   // Load sites on mount
   onMount(() => {
     if (tenantId) {

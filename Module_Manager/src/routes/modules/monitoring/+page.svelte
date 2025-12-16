@@ -556,8 +556,11 @@
   }
 
   function handleRefreshData() {
+    // Refresh all data including sites
     loadNetworkDevices();
     loadSNMPData();
+    loadEPCDevices();
+    // Sites will be reloaded when MonitoringMap receives updated data
   }
 
   function calculateUptime() {

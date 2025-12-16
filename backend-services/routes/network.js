@@ -139,11 +139,73 @@ router.put('/sites/:id', async (req, res) => {
 
 router.delete('/sites/:id', async (req, res) => {
   try {
-    const site = await UnifiedSite.findOneAndDelete({ _id: req.params.id, tenantId: req.tenantId });
-    if (!site) return res.status(404).json({ error: 'Site not found' });
-    res.json({ success: true });
+    const siteId = req.params.id;
+    
+    // Find the site first
+    const site = await UnifiedSite.findOne({ _id: siteId, tenantId: req.tenantId });
+    if (!site) {
+      return res.status(404).json({ error: 'Site not found' });
+    }
+    
+    // Clean up related records:
+    // 1. Delete sectors at this site
+    await UnifiedSector.deleteMany({ 
+      $or: [
+        { siteId: siteId },
+        { towerId: siteId }
+      ],
+      tenantId: req.tenantId 
+    });
+    
+    // 2. Remove siteId from hardware deployments (undeploy hardware)
+    const { HardwareDeployment } = require('../models/network');
+    await HardwareDeployment.updateMany(
+      { siteId: siteId, tenantId: req.tenantId },
+      { $unset: { siteId: '' }, status: 'planned' } // Set status back to planned
+    );
+    
+    // 3. Remove siteId from network equipment
+    const { NetworkEquipment } = require('../models/network');
+    await NetworkEquipment.updateMany(
+      { siteId: siteId, tenantId: req.tenantId },
+      { $unset: { siteId: '' } }
+    );
+    
+    // 4. Remove siteId from inventory items' currentLocation
+    const { InventoryItem } = require('../models/inventory');
+    await InventoryItem.updateMany(
+      { 
+        'currentLocation.siteId': siteId, 
+        tenantId: req.tenantId 
+      },
+      { 
+        $unset: { 'currentLocation.siteId': '', 'currentLocation.siteName': '' },
+        $set: { status: 'available' } // Mark inventory as available again
+      }
+    );
+    
+    // 5. Remove siteId from CPE devices
+    const { UnifiedCPE } = require('../models/network');
+    await UnifiedCPE.updateMany(
+      { siteId: siteId, tenantId: req.tenantId },
+      { $unset: { siteId: '' } }
+    );
+    
+    // 6. Remove site_id from RemoteEPC devices
+    const { RemoteEPC } = require('../models/distributed-epc-schema');
+    await RemoteEPC.updateMany(
+      { site_id: siteId, tenant_id: req.tenantId },
+      { $unset: { site_id: '', site_name: '' } }
+    );
+    
+    // Finally, delete the site itself
+    await UnifiedSite.findOneAndDelete({ _id: siteId, tenantId: req.tenantId });
+    
+    console.log(`✅ [Network API] Deleted site ${siteId} and cleaned up related records`);
+    res.json({ success: true, message: 'Site deleted and related records cleaned up' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete site' });
+    console.error('[Network API] Error deleting site:', error);
+    res.status(500).json({ error: 'Failed to delete site', message: error.message });
   }
 });
 
