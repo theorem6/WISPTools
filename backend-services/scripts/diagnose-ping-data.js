@@ -41,8 +41,28 @@ async function diagnosePingData() {
     const tenantId = process.argv[2] || process.env.TENANT_ID;
     
     if (!tenantId) {
-      console.error('❌ Please provide tenantId as argument or set TENANT_ID env var');
-      process.exit(1);
+      // List all available tenants
+      console.log('📋 Available Tenants:\n');
+      const tenants = await PingMetrics.distinct('tenant_id');
+      if (tenants.length === 0) {
+        console.log('   No tenants found in PingMetrics');
+        // Try NetworkEquipment
+        const { NetworkEquipment } = require('../models/network');
+        const equipmentTenants = await NetworkEquipment.distinct('tenantId');
+        if (equipmentTenants.length > 0) {
+          console.log('\n   Tenants from NetworkEquipment:');
+          equipmentTenants.forEach(t => console.log(`     - ${t}`));
+          console.log('\n   Usage: node diagnose-ping-data.js <TENANT_ID>');
+        } else {
+          console.log('   No tenants found in NetworkEquipment either');
+        }
+      } else {
+        tenants.forEach(t => console.log(`   - ${t}`));
+        console.log('\n   Usage: node diagnose-ping-data.js <TENANT_ID>');
+        console.log(`   Example: node diagnose-ping-data.js ${tenants[0]}`);
+      }
+      await mongoose.disconnect();
+      process.exit(0);
     }
     
     console.log(`🔍 Diagnosing ping data for tenant: ${tenantId}\n`);
