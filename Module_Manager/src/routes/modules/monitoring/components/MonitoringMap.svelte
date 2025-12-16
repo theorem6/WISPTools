@@ -427,6 +427,46 @@
     return false;
   }
   
+  // Save current map view state before refreshing
+  async function saveMapViewState() {
+    if (mapComponent && mapComponent.mapView) {
+      try {
+        const view = mapComponent.mapView;
+        await view.when();
+        const center = view.center;
+        const zoom = view.zoom;
+        if (center && zoom !== undefined) {
+          savedViewState = {
+            center: [center.longitude, center.latitude],
+            zoom: zoom
+          };
+          console.log('[MonitoringMap] Saved map view state:', savedViewState);
+        }
+      } catch (error) {
+        console.warn('[MonitoringMap] Error saving map view state:', error);
+      }
+    }
+  }
+  
+  // Restore map view state after refreshing
+  async function restoreMapViewState() {
+    if (savedViewState && mapComponent && mapComponent.mapView) {
+      try {
+        const view = mapComponent.mapView;
+        await view.when();
+        if (savedViewState.center && savedViewState.zoom !== undefined) {
+          await view.goTo({
+            center: savedViewState.center,
+            zoom: savedViewState.zoom
+          }, { animate: false });
+          console.log('[MonitoringMap] Restored map view state:', savedViewState);
+        }
+      } catch (error) {
+        console.warn('[MonitoringMap] Error restoring map view state:', error);
+      }
+    }
+  }
+  
   // Load sites, sectors, backhauls, and CPE from database with uptime data
   async function loadSites() {
     if (!tenantId) {
@@ -435,6 +475,9 @@
       cpeDevices = [];
       return;
     }
+    
+    // Save map view state before refreshing (preserve zoom/center)
+    await saveMapViewState();
     
     try {
       // Load actual sites from database
