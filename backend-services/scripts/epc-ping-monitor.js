@@ -378,12 +378,19 @@ async function pingCycle(deviceCode, devices) {
         return;
       }
       
-      log('INFO', `Pinging ${ip_address} (device_id: ${device_id})`);
-      const pingResult = await pingDevice(ip_address);
+      // Skip invalid IP addresses (0.0.0.0, 127.0.0.1, etc.)
+      const trimmedIP = ip_address.trim();
+      if (trimmedIP === '0.0.0.0' || trimmedIP === '127.0.0.1' || trimmedIP === 'localhost' || !trimmedIP) {
+        log('WARN', `Skipping device with invalid IP address: ${trimmedIP} (device_id: ${device_id})`);
+        return;
+      }
+      
+      log('INFO', `Pinging ${trimmedIP} (device_id: ${device_id})`);
+      const pingResult = await pingDevice(trimmedIP);
       
       pingMetrics.push({
         device_id: device_id.toString(),
-        ip_address: ip_address.trim(),
+        ip_address: trimmedIP,
         success: pingResult.success,
         response_time_ms: pingResult.response_time_ms,
         error: pingResult.error
@@ -404,7 +411,13 @@ async function pingCycle(deviceCode, devices) {
   
   // Send metrics to backend
   if (pingMetrics.length > 0) {
-    await sendPingMetrics(deviceCode, pingMetrics);
+    const sent = await sendPingMetrics(deviceCode, pingMetrics);
+    if (!sent) {
+      log('ERROR', 'Failed to send ping metrics to backend - metrics will be lost');
+      return 0; // Return 0 to indicate failure
+    }
+  } else {
+    log('WARN', 'No ping metrics collected - nothing to send');
   }
   
   return pingMetrics.length;
