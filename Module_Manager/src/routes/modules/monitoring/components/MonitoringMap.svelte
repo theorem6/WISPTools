@@ -771,9 +771,13 @@
   }
   
   // Also listen to refreshData event dispatched by this component's refresh button
-  function handleInternalRefresh() {
+  async function handleInternalRefresh() {
+    if (isRefreshing) return; // Prevent multiple simultaneous refreshes
+    isRefreshing = true;
+    await saveMapViewState(); // Save before refresh
     handleRefresh();
     dispatch('refreshData'); // Forward to parent
+    setTimeout(() => { isRefreshing = false; }, 500); // Reset flag after a delay
   }
   
   // Load sites on mount
