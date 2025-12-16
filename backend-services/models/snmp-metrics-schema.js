@@ -52,6 +52,8 @@ const SNMPMetricsSchema = new mongoose.Schema({
   temperature: Number,
   
   // Raw SNMP OID values (for extensibility)
+  // NOTE: Only store raw_oids for recent metrics (< 24 hours) to save space
+  // Older metrics should have raw_oids removed by optimization script
   raw_oids: mongoose.Schema.Types.Mixed,
   
   // Collection metadata
