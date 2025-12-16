@@ -511,7 +511,7 @@ const EPCLogSchema = new mongoose.Schema({
 
 EPCLogSchema.index({ epc_id: 1, timestamp: -1 });
 EPCLogSchema.index({ tenant_id: 1, timestamp: -1 });
-EPCLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 2592000 }); // Keep 30 days
+EPCLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 604800 }); // Keep 7 days (reduced from 30 to save space on free tier)
 
 // Models
 const RemoteEPC = mongoose.model('RemoteEPC', RemoteEPCSchema);

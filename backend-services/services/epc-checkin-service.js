@@ -34,7 +34,24 @@ async function storeLogs(epc, logs, ipAddress, deviceCode) {
   }
 
   try {
-    for (const logEntry of logs) {
+    // Filter logs to only store ERROR and WARNING level logs to reduce database growth
+    // INFO and DEBUG logs are too verbose and not critical for troubleshooting
+    const importantLogs = logs.filter(log => {
+      const level = log.level || (log.message && log.message.toLowerCase().includes('error') ? 'error' : 
+                                  log.message && log.message.toLowerCase().includes('warn') ? 'warning' : 'info');
+      return level === 'error' || level === 'warning';
+    });
+    
+    // Limit to last 20 important log entries to prevent excessive storage
+    const logsToStore = importantLogs.slice(-20);
+    
+    if (logsToStore.length === 0) {
+      return; // No important logs to store
+    }
+    
+    console.log(`[EPC Check-in Service] Storing ${logsToStore.length} important log entries (filtered from ${logs.length} total)`);
+    
+    for (const logEntry of logsToStore) {
       // Parse log message if it's a pipe-separated string
       if (logEntry.message && typeof logEntry.message === 'string' && logEntry.message.includes('|')) {
         const logLines = logEntry.message.split('|').filter(l => l && l.trim());
