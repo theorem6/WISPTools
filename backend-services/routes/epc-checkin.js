@@ -490,9 +490,15 @@ router.get('/checkin/monitoring-devices', async (req, res) => {
 
     // Also get ALL network equipment with IPs for this tenant (not just discovered by this EPC)
     // This ensures manually added devices or devices discovered by other means are also monitored
+    // Include all statuses: active, deployed, planned - any device with an IP should be monitored
     const allNetworkEquipment = await NetworkEquipment.find({
       tenantId,
-      status: 'active'
+      $or: [
+        { status: 'active' },
+        { status: 'deployed' },
+        { status: 'planned' },
+        { status: { $exists: false } } // Also include devices without status field
+      ]
     })
     .select('_id name type notes status')
     .lean();

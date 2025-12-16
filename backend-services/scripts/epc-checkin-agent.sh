@@ -15,7 +15,7 @@ CENTRAL_SERVER="hss.wisptools.io"
 API_URL="https://${CENTRAL_SERVER}/api/epc"
 CONFIG_DIR="/etc/wisptools"
 LOG_FILE="/var/log/wisptools-checkin.log"
-CHECKIN_INTERVAL=600  # Default 10 minutes (600 seconds) - Best practice for production systems
+CHECKIN_INTERVAL=300  # Default 5 minutes (300 seconds) - User requested more frequent sweeps
 
 # Git repository configuration
 GIT_REPO_URL="https://github.com/theorem6/lte-pci-mapper.git"
@@ -716,7 +716,7 @@ do_checkin() {
         # Run hourly subnet ping sweep (separate from regular ping cycle)
         # Best practice: Hourly is appropriate for network discovery sweeps
         local last_sweep_file="/tmp/last-ping-sweep"
-        local sweep_interval=${SUBNET_SWEEP_INTERVAL:-3600}  # Default 1 hour (3600 seconds)
+        local sweep_interval=${SUBNET_SWEEP_INTERVAL:-300}  # Default 5 minutes (300 seconds) - User requested more frequent sweeps
         local should_sweep=true
         if [ -f "$last_sweep_file" ]; then
             local last_sweep=$(cat "$last_sweep_file" 2>/dev/null || echo "0")
@@ -932,7 +932,7 @@ do_checkin() {
         # Best practice: Network topology doesn't change frequently, hourly is too frequent
         # Prefer Node.js version, fallback to bash script
         local last_discovery_file="/tmp/last-snmp-discovery"
-        local discovery_interval=${SNMP_DISCOVERY_INTERVAL:-14400}  # Default 4 hours (14400 seconds)
+        local discovery_interval=${SNMP_DISCOVERY_INTERVAL:-300}  # Default 5 minutes (300 seconds) - User requested more frequent sweeps
         local should_discover=true
         if [ -f "$last_discovery_file" ]; then
             local last_discovery=$(cat "$last_discovery_file" 2>/dev/null || echo "0")

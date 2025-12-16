@@ -269,6 +269,37 @@ router.get('/ping/:deviceId', async (req, res) => {
       raw_metrics_count: metrics.length
     };
 
+    // Calculate current_status based on recent successful pings (last 15 minutes)
+    // This is more accurate than just checking the last metric
+    let current_status = 'offline';
+    if (metrics.length > 0) {
+      const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
+      const recentMetrics = metrics.filter(m => new Date(m.timestamp).getTime() >= fifteenMinutesAgo);
+      
+      if (recentMetrics.length > 0) {
+        // Check if any recent ping was successful
+        const recentSuccessful = recentMetrics.filter(m => m.success);
+        if (recentSuccessful.length > 0) {
+          current_status = 'online';
+        } else {
+          // No successful pings in last 15 minutes, but check if last metric was recent
+          const lastMetric = metrics[metrics.length - 1];
+          const lastMetricAge = Date.now() - new Date(lastMetric.timestamp).getTime();
+          if (lastMetricAge < 15 * 60 * 1000 && lastMetric.success) {
+            current_status = 'online';
+          }
+        }
+      } else {
+        // No recent metrics, check last metric
+        const lastMetric = metrics[metrics.length - 1];
+        const lastMetricAge = Date.now() - new Date(lastMetric.timestamp).getTime();
+        // If last metric is within 30 minutes and was successful, consider online
+        if (lastMetricAge < 30 * 60 * 1000 && lastMetric.success) {
+          current_status = 'online';
+        }
+      }
+    }
+
     const response = {
       success: true,
       deviceId,
@@ -284,7 +315,7 @@ router.get('/ping/:deviceId', async (req, res) => {
         uptime_percent: metrics.length > 0 
           ? Math.round((metrics.filter(m => m.success).length / metrics.length) * 10000) / 100
           : 0,
-        current_status: metrics.length > 0 && metrics[metrics.length - 1]?.success ? 'online' : 'offline',
+        current_status: current_status,
         avg_response_time_ms: metrics.filter(m => m.response_time_ms).length > 0
           ? Math.round(metrics.filter(m => m.response_time_ms).reduce((sum, m) => sum + m.response_time_ms, 0) / metrics.filter(m => m.response_time_ms).length * 100) / 100
           : null
