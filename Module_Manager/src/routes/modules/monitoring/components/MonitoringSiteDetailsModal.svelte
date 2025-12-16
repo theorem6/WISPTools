@@ -199,15 +199,53 @@
     }
   }
 
-  // Get all devices at this site (from networkDevices prop, hardware deployments, and equipment)
+  // Get all devices at this site (from networkDevices prop, hardware deployments, equipment, and EPC devices)
   function getSiteDevices(): any[] {
     if (!site) return [];
     const siteId = site.id || site._id;
     
+    console.log('[MonitoringSiteDetailsModal] Getting devices for site:', site.name, 'siteId:', siteId);
+    
+    // Get devices from networkDevices prop
     const devicesFromNetwork = (networkDevices || []).filter((device: any) => {
       const deviceSiteId = device.siteId || device.site_id;
-      return siteId && deviceSiteId && String(deviceSiteId) === String(siteId);
+      const matches = siteId && deviceSiteId && String(deviceSiteId) === String(siteId);
+      if (matches) {
+        console.log('[MonitoringSiteDetailsModal] Found device from networkDevices:', device.name, 'siteId:', deviceSiteId);
+      }
+      return matches;
     });
+    
+    // Include EPC devices at this site
+    const devicesFromEPC = epcDevices.map((epc: any) => {
+      const epcSiteId = epc.siteId?._id || epc.siteId?.id || epc.siteId || epc.site_id;
+      if (siteId && epcSiteId && String(epcSiteId) === String(siteId)) {
+        console.log('[MonitoringSiteDetailsModal] Found EPC device:', epc.name || epc.epcId, 'siteId:', epcSiteId);
+        return {
+          id: epc.id || epc._id || epc.epcId,
+          name: epc.name || epc.site_name || epc.epcId || 'EPC Device',
+          type: 'epc',
+          status: epc.status || 'unknown',
+          ipAddress: epc.ipAddress || epc.ip_address || null,
+          siteId: String(siteId),
+          isEPC: true
+        };
+      }
+      // Also try matching by site name as fallback
+      if (epc.site_name && site.name && epc.site_name.toLowerCase() === site.name.toLowerCase()) {
+        console.log('[MonitoringSiteDetailsModal] Found EPC device by name match:', epc.site_name);
+        return {
+          id: epc.id || epc._id || epc.epcId,
+          name: epc.name || epc.site_name || epc.epcId || 'EPC Device',
+          type: 'epc',
+          status: epc.status || 'unknown',
+          ipAddress: epc.ipAddress || epc.ip_address || null,
+          siteId: String(siteId),
+          isEPC: true
+        };
+      }
+      return null;
+    }).filter(Boolean);
     
     // Also include hardware deployments at this site as devices
     const devicesFromDeployments = hardwareDeployments.map((d: any) => {
@@ -252,7 +290,14 @@
       return null;
     }).filter(Boolean);
     
-    return [...devicesFromNetwork, ...devicesFromDeployments, ...devicesFromEquipment];
+    const allDevices = [...devicesFromNetwork, ...devicesFromEPC, ...devicesFromDeployments, ...devicesFromEquipment];
+    console.log('[MonitoringSiteDetailsModal] Total devices found:', allDevices.length, 
+      '(network:', devicesFromNetwork.length, 
+      'epc:', devicesFromEPC.length,
+      'deployments:', devicesFromDeployments.length,
+      'equipment:', devicesFromEquipment.length, ')');
+    
+    return allDevices;
   }
 </script>
 

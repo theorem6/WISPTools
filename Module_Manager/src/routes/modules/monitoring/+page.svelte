@@ -946,19 +946,6 @@
 {/if}
 
 <!-- Monitoring Site Details Modal (right-click on sites) -->
-{#if showMonitoringSiteDetailsModal && selectedSiteForDetails}
-  <MonitoringSiteDetailsModal
-    show={showMonitoringSiteDetailsModal}
-    site={selectedSiteForDetails}
-    {networkDevices}
-    tenantId={tenantId}
-    on:close={() => {
-      showMonitoringSiteDetailsModal = false;
-      selectedSiteForDetails = null;
-    }}
-  />
-{/if}
-
 <!-- Monitoring Site Details Modal (right-click on sites) -->
 {#if showMonitoringSiteDetailsModal && selectedSiteForDetails}
   <MonitoringSiteDetailsModal
