@@ -180,6 +180,9 @@ router.get('/ping/:deviceId', async (req, res) => {
             backgroundColor: 'rgba(34, 197, 94, 0.2)',
             yAxisID: 'y1'
           }
+        ],
+        // Also include raw data for easier debugging
+        raw_metrics_count: metrics.length
         ]
       },
       stats: {
