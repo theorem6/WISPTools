@@ -198,6 +198,55 @@
       default: return '⚪ Unknown';
     }
   }
+  
+  // Calculate site status based on devices at this site
+  function getSiteStatus(): 'active' | 'inactive' | 'maintenance' {
+    const siteDevices = getSiteDevices();
+    
+    if (siteDevices.length === 0) {
+      // No devices at site - check if site has hardware/equipment
+      if (hardwareDeployments.length > 0 || equipment.length > 0 || epcDevices.length > 0) {
+        return 'maintenance'; // Has hardware but no monitoring devices yet
+      }
+      return 'inactive'; // Truly no devices
+    }
+    
+    // Count device statuses
+    const onlineDevices = siteDevices.filter(d => {
+      const uptimeStats = deviceUptimes.get(d.id);
+      return d.status === 'online' || uptimeStats?.current_status === 'online';
+    }).length;
+    
+    const offlineDevices = siteDevices.filter(d => {
+      const uptimeStats = deviceUptimes.get(d.id);
+      return d.status === 'offline' || uptimeStats?.current_status === 'offline';
+    }).length;
+    
+    const unknownDevices = siteDevices.filter(d => {
+      const uptimeStats = deviceUptimes.get(d.id);
+      const status = uptimeStats?.current_status || d.status || 'unknown';
+      return status === 'unknown';
+    }).length;
+    
+    // If we have online devices, calculate based on online vs offline
+    if (onlineDevices > 0 || offlineDevices > 0) {
+      const monitoredDevices = onlineDevices + offlineDevices;
+      if (monitoredDevices > 0) {
+        const uptimePercent = Math.round((onlineDevices / monitoredDevices) * 100);
+        if (uptimePercent === 100) return 'active';
+        if (uptimePercent === 0) return 'inactive';
+        return 'maintenance';
+      }
+    }
+    
+    // If all devices are unknown but we have devices, show as maintenance
+    if (unknownDevices === siteDevices.length && siteDevices.length > 0) {
+      return 'maintenance'; // Devices exist but monitoring hasn't started
+    }
+    
+    // Default: if we have devices but no clear status, show as maintenance
+    return 'maintenance';
+  }
 
   // Get all devices at this site (from networkDevices prop, hardware deployments, equipment, and EPC devices)
   function getSiteDevices(): any[] {

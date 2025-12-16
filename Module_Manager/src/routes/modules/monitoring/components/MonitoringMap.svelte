@@ -275,8 +275,27 @@
     if (siteDevices.length === 0) return 0;
     
     // Calculate uptime based on device statuses
+    // Count online devices, and don't penalize unknown devices (they might just not have monitoring data yet)
     const onlineDevices = siteDevices.filter(d => d.status === 'online').length;
-    return Math.round((onlineDevices / siteDevices.length) * 100);
+    const offlineDevices = siteDevices.filter(d => d.status === 'offline').length;
+    const unknownDevices = siteDevices.filter(d => d.status === 'unknown' || !d.status).length;
+    
+    // If we have online devices, calculate based on online vs offline (ignore unknown)
+    if (onlineDevices > 0 || offlineDevices > 0) {
+      const monitoredDevices = onlineDevices + offlineDevices;
+      if (monitoredDevices > 0) {
+        return Math.round((onlineDevices / monitoredDevices) * 100);
+      }
+    }
+    
+    // If all devices are unknown but we have devices, assume 50% (maintenance) rather than 0% (inactive)
+    // This prevents sites from showing as inactive just because monitoring hasn't started yet
+    if (unknownDevices === siteDevices.length && siteDevices.length > 0) {
+      return 50; // Show as maintenance (yellow) rather than inactive (red)
+    }
+    
+    // Default: if we have devices but no clear status, return 0 (will show as inactive)
+    return 0;
   }
   
   // Get worst alert severity for devices at a site
@@ -333,9 +352,25 @@
       return 'active'; // Green - system is 100% uptime
     } else {
       const siteUptime = calculateSiteUptime(siteId);
+      
+      // Check if site has any devices at all
+      const siteDevices = networkDevices?.filter(device => {
+        const deviceSiteId = device.siteId || device.site_id;
+        return deviceSiteId && (String(deviceSiteId) === String(siteId));
+      }) || [];
+      
+      // If site has devices but all are unknown (no monitoring data yet), show as maintenance not inactive
+      if (siteDevices.length > 0) {
+        const allUnknown = siteDevices.every(d => d.status === 'unknown' || !d.status);
+        if (allUnknown && siteUptime === 50) {
+          return 'maintenance'; // Yellow - devices exist but monitoring hasn't started
+        }
+      }
+      
       if (siteUptime === 100) return 'active';
-      if (siteUptime === 0) return 'inactive';
-      return 'maintenance';
+      if (siteUptime === 0 && siteDevices.length === 0) return 'inactive'; // No devices = inactive
+      if (siteUptime === 0 && siteDevices.length > 0) return 'maintenance'; // Has devices but all offline = maintenance
+      return 'maintenance'; // Partial uptime = maintenance
     }
   }
   
