@@ -118,6 +118,23 @@ sudo chmod 755 /tmp/iso-downloads
 sudo chmod 755 /opt/epc-iso-builder
 print_success "ISO directories created"
 
+# Step 9b: Deploy EPC scripts to downloads directory
+print_status "Step 9b: Deploying EPC scripts to downloads directory..."
+sudo mkdir -p /var/www/html/downloads/scripts
+if [ -f "$REPO_DIR/backend-services/scripts/deploy-scripts-to-downloads.sh" ]; then
+    sudo bash "$REPO_DIR/backend-services/scripts/deploy-scripts-to-downloads.sh"
+    print_success "EPC scripts deployed"
+else
+    # Fallback: manually copy scripts
+    sudo cp "$REPO_DIR/backend-services/scripts/epc-checkin-agent.sh" /var/www/html/downloads/scripts/ 2>/dev/null || true
+    sudo cp "$REPO_DIR/backend-services/scripts/epc-snmp-discovery.sh" /var/www/html/downloads/scripts/ 2>/dev/null || true
+    sudo cp "$REPO_DIR/backend-services/scripts/epc-snmp-discovery.js" /var/www/html/downloads/scripts/ 2>/dev/null || true
+    sudo cp "$REPO_DIR/backend-services/scripts/epc-ping-monitor.js" /var/www/html/downloads/scripts/ 2>/dev/null || true
+    sudo chmod +x /var/www/html/downloads/scripts/*.sh /var/www/html/downloads/scripts/*.js 2>/dev/null || true
+    sudo chown www-data:www-data /var/www/html/downloads/scripts/* 2>/dev/null || true
+    print_success "EPC scripts copied (fallback method)"
+fi
+
 # Step 10: Create systemd service
 print_status "Step 10: Creating systemd service..."
 sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
