@@ -980,8 +980,8 @@
                   {#if selectedDevice.hasPing && selectedDevice.hasSNMP}
                     {#if !pingUptimeOption && !pingResponseOption && !cpuOption && !memoryOption}
                       <span>Waiting for ping and SNMP data collection...</span><br/>
-                      <span style="font-size: 0.85rem; opacity: 0.8;">• Ping data: Collected every 60 seconds</span><br/>
-                      <span style="font-size: 0.85rem; opacity: 0.8;">• SNMP data: Collected every 5 minutes</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">• Ping data: Collected every 10 minutes</span><br/>
+                      <span style="font-size: 0.85rem; opacity: 0.8;">• SNMP data: Collected every 10 minutes</span><br/>
                       <span style="font-size: 0.85rem; opacity: 0.8;">• Check back in a few minutes for data to appear</span>
                     {:else if !pingUptimeOption && !pingResponseOption}
                       <span>Ping monitoring is collecting data...</span><br/>
@@ -992,12 +992,12 @@
                     {/if}
                   {:else if selectedDevice.hasPing && !pingUptimeOption && !pingResponseOption}
                     <span>Ping monitoring is collecting data...</span><br/>
-                    <span style="font-size: 0.85rem; opacity: 0.8;">• Devices are pinged every 60 seconds</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• Devices are pinged every 10 minutes</span><br/>
                     <span style="font-size: 0.85rem; opacity: 0.8;">• Data will appear within the next few minutes</span><br/>
                     <span style="font-size: 0.85rem; opacity: 0.8;">• If no data appears, verify the IP address is reachable</span>
                   {:else if selectedDevice.hasSNMP && !cpuOption && !memoryOption && !throughputOption}
                     <span>SNMP metrics are being collected...</span><br/>
-                    <span style="font-size: 0.85rem; opacity: 0.8;">• SNMP polling occurs every 5 minutes</span><br/>
+                    <span style="font-size: 0.85rem; opacity: 0.8;">• SNMP polling occurs every 10 minutes</span><br/>
                     <span style="font-size: 0.85rem; opacity: 0.8;">• Data will appear once the next poll completes</span><br/>
                     <span style="font-size: 0.85rem; opacity: 0.8;">• Verify SNMP community and version are configured correctly</span>
                   {:else}
