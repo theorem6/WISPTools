@@ -56,17 +56,36 @@
       e.preventDefault();
       e.stopPropagation();
     }
-    console.log('[HardwareDeploymentModal] handleDeploy called, showing inventory list');
+    console.log('[HardwareDeploymentModal] handleDeploy called, showing inventory list', { 
+      hasTenantId: !!tenantId, 
+      tenantId, 
+      currentShowInventoryList: showInventoryList 
+    });
+    
     // Show inventory list instead of navigating
+    // Force the update to ensure reactivity triggers
     showInventoryList = true;
     console.log('[HardwareDeploymentModal] showInventoryList set to:', showInventoryList);
+    
+    // Use setTimeout to ensure state update propagates before loading
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    console.log('[HardwareDeploymentModal] About to load inventory items, showInventoryList:', showInventoryList);
     await loadInventoryItems();
     console.log('[HardwareDeploymentModal] After loadInventoryItems, showInventoryList:', showInventoryList, 'items count:', inventoryItems.length);
   }
   
   async function loadInventoryItems() {
-    if (isLoadingInventory || !tenantId) {
-      console.log('[HardwareDeploymentModal] Skipping loadInventoryItems:', { isLoadingInventory, tenantId });
+    console.log('[HardwareDeploymentModal] loadInventoryItems called:', { isLoadingInventory, tenantId, showInventoryList });
+    
+    if (isLoadingInventory) {
+      console.log('[HardwareDeploymentModal] Already loading, skipping');
+      return;
+    }
+    
+    if (!tenantId) {
+      console.error('[HardwareDeploymentModal] No tenantId available, cannot load inventory');
+      error = 'Tenant ID is missing. Please refresh the page.';
       return;
     }
     
@@ -79,16 +98,19 @@
         status: 'available', // Only show available items
         limit: 200
       }, tenantId);
-      console.log('[HardwareDeploymentModal] Loaded inventory items:', result.items?.length || 0);
+      console.log('[HardwareDeploymentModal] Loaded inventory items:', result.items?.length || 0, 'result:', result);
       inventoryItems = result.items || [];
+      console.log('[HardwareDeploymentModal] Inventory items set:', inventoryItems.length, 'items');
       if (inventoryItems.length === 0) {
         error = 'No available inventory items found';
+        console.warn('[HardwareDeploymentModal] No available inventory items');
       }
     } catch (err: any) {
       console.error('[HardwareDeploymentModal] Failed to load inventory:', err);
       error = err.message || 'Failed to load inventory items';
     } finally {
       isLoadingInventory = false;
+      console.log('[HardwareDeploymentModal] loadInventoryItems completed, isLoadingInventory:', isLoadingInventory);
     }
   }
   
@@ -319,9 +341,12 @@
             <li>📦 Other Equipment</li>
           </ul>
         </div>
-      {:else}
+      {:else if showInventoryList}
         <!-- Inventory Selection View -->
         <div class="inventory-selection">
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Select hardware from your inventory to deploy to <strong>{tower?.name}</strong>
+          </p>
           <button class="btn btn-secondary" onclick={handleBackToOptions} style="margin-bottom: 1rem;">
             ← Back to Options
           </button>
