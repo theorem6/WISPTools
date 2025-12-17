@@ -76,53 +76,88 @@ function log(level, message) {
 // Ping a single device
 async function pingDevice(ipAddress) {
   try {
-    const { stdout } = await execAsync(`ping -c 3 -W 2 ${ipAddress} 2>&1 || true`);
+    const { stdout, stderr } = await execAsync(`ping -c 3 -W 2 ${ipAddress} 2>&1 || true`);
+    const fullOutput = stdout + (stderr || '');
     
-    // Parse ping output for Linux
-    const timeMatch = stdout.match(/min\/avg\/max\/mdev = ([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/);
-    if (timeMatch) {
-      const avgTime = parseFloat(timeMatch[2]);
-      return {
-        success: true,
-        response_time_ms: Math.round(avgTime),
-        error: null
-      };
-    }
-    
-    // Check if host is unreachable
-    if (stdout.includes('100% packet loss') || stdout.includes('Unreachable') || stdout.includes('Name or service not known')) {
+    // Check for explicit failure indicators first
+    if (fullOutput.includes('100% packet loss') || 
+        fullOutput.includes('Network is unreachable') ||
+        fullOutput.includes('Name or service not known') ||
+        fullOutput.includes('ping: unknown host') ||
+        (fullOutput.includes('0 received') && fullOutput.includes('transmitted'))) {
       return {
         success: false,
         response_time_ms: null,
-        error: 'Host unreachable'
+        error: 'Host unreachable or no response'
       };
     }
     
-    // Try to extract time from different format
-    const simpleTimeMatch = stdout.match(/time=([\d.]+)\s*ms/);
-    if (simpleTimeMatch) {
-      return {
-        success: true,
-        response_time_ms: Math.round(parseFloat(simpleTimeMatch[1])),
-        error: null
-      };
+    // Parse ping output for Linux (summary line format)
+    // Format: rtt min/avg/max/mdev = 0.123/0.456/0.789/0.123 ms
+    const timeMatch = fullOutput.match(/min\/avg\/max\/mdev\s*=\s*([\d.]+)\/([\d.]+)\/([\d.]+)\/([\d.]+)/);
+    if (timeMatch) {
+      const avgTime = parseFloat(timeMatch[2]);
+      if (!isNaN(avgTime) && avgTime > 0) {
+        return {
+          success: true,
+          response_time_ms: Math.round(avgTime * 100) / 100, // Round to 2 decimal places
+          error: null
+        };
+      }
     }
     
-    // If we got here, ping might have succeeded but we couldn't parse it
-    if (!stdout.includes('100% packet loss')) {
-      return {
-        success: true,
-        response_time_ms: null,
-        error: null
-      };
+    // Try to extract time from individual ping lines (time=123.456 ms format)
+    const simpleTimeMatches = fullOutput.match(/time=([\d.]+)\s*ms/g);
+    if (simpleTimeMatches && simpleTimeMatches.length > 0) {
+      // Extract all times and calculate average
+      const times = simpleTimeMatches.map(m => parseFloat(m.match(/time=([\d.]+)/)[1]));
+      const validTimes = times.filter(t => !isNaN(t) && t > 0);
+      if (validTimes.length > 0) {
+        const avgTime = validTimes.reduce((sum, t) => sum + t, 0) / validTimes.length;
+        return {
+          success: true,
+          response_time_ms: Math.round(avgTime * 100) / 100,
+          error: null
+        };
+      }
     }
     
+    // Check if we got any responses (look for "1 received" or "2 received" or "3 received")
+    const receivedMatch = fullOutput.match(/(\d+)\s+received/);
+    if (receivedMatch) {
+      const received = parseInt(receivedMatch[1], 10);
+      if (received > 0) {
+        // Got at least one response, but couldn't parse time - estimate or use a default
+        // Try one more time to find any number that looks like milliseconds
+        const anyTimeMatch = fullOutput.match(/([\d.]+)\s*ms/);
+        if (anyTimeMatch) {
+          const time = parseFloat(anyTimeMatch[1]);
+          if (!isNaN(time) && time > 0) {
+            return {
+              success: true,
+              response_time_ms: Math.round(time),
+              error: null
+            };
+          }
+        }
+        // Got responses but can't parse time - mark as success with estimated time
+        log('WARN', `Ping to ${ipAddress} succeeded but couldn't parse time, marking as success with estimated time`);
+        return {
+          success: true,
+          response_time_ms: 10, // Estimated average time when we can't parse
+          error: null
+        };
+      }
+    }
+    
+    // No responses received - definitely failed
     return {
       success: false,
       response_time_ms: null,
-      error: 'Ping failed'
+      error: 'Ping failed - no responses received'
     };
   } catch (error) {
+    log('ERROR', `Error pinging ${ipAddress}: ${error.message}`);
     return {
       success: false,
       response_time_ms: null,
