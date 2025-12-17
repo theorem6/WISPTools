@@ -1254,37 +1254,6 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
           <span class="control-label">Hardware ({deployedCount})</span>
         </button>
         
-        <!-- Add Hardware Dropdown -->
-        <div class="dropdown-container">
-          <button 
-            class="module-control-btn add-hardware-btn" 
-            onclick={() => showAddHardwareMenu = !showAddHardwareMenu}
-            title="Deploy New Hardware"
-          >
-            <span class="control-icon">➕</span>
-            <span class="control-label">Add Hardware</span>
-          </button>
-          {#if showAddHardwareMenu}
-            <div class="dropdown-menu" onclick={() => showAddHardwareMenu = false}>
-              <button class="dropdown-item" onclick={() => { showEPCDeploymentModal = true; showAddHardwareMenu = false; }}>
-                📡 EPC/SNMP Server
-              </button>
-              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add?type=sector'); showAddHardwareMenu = false; }}>
-                📶 Sector/Antenna
-              </button>
-              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add?type=radio'); showAddHardwareMenu = false; }}>
-                📻 Radio/eNB
-              </button>
-              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add?type=router'); showAddHardwareMenu = false; }}>
-                🌐 Router/Switch
-              </button>
-              <button class="dropdown-item" onclick={() => { goto('/modules/inventory/add'); showAddHardwareMenu = false; }}>
-                🔧 Other Hardware
-              </button>
-            </div>
-          {/if}
-        </div>
-        
         <button 
           class="module-control-btn deploy-btn" 
           class:disabled={!mapState?.activePlan}
@@ -1942,13 +1911,6 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     position: relative;
   }
   
-  .add-hardware-btn {
-    background: var(--success, #22c55e) !important;
-  }
-  
-  .add-hardware-btn:hover {
-    background: var(--success-hover, #16a34a) !important;
-  }
   
   .dropdown-menu {
     position: absolute;

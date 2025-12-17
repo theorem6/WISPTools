@@ -178,10 +178,13 @@
   $: siteTypeLabel = getSiteTypeLabel(tower?.type);
   
   // Check if we're in deploy mode - hide "add-inventory" in deploy mode
-  $: isDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor';
-  
-  // Check if site is NOC or Tower type
-  $: isNOCOrTower = tower?.type?.toLowerCase() === 'noc' || tower?.type?.toLowerCase() === 'tower' || !tower?.type;
+  // Check both moduleContext and URL parameters for robustness
+  $: isDeployMode = (() => {
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+    const contextDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor';
+    return contextDeployMode || urlDeployMode;
+  })();
 </script>
 
 <svelte:window onclick={handleClickOutside} />
