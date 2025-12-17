@@ -79,10 +79,10 @@
     
     // Check if action is allowed
     try {
-      // In deploy/monitoring mode or for delete actions, allow ALL actions
+      // In deploy/monitor mode or for delete actions, allow ALL actions
       const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const urlDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
-      const contextDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitoring';
+      const contextDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor';
       const isDeployMode = contextDeployMode || urlDeployMode;
       
       // Allow delete actions always (user explicitly wants to delete)
@@ -176,6 +176,12 @@
   
   // Reactive label that updates when tower changes
   $: siteTypeLabel = getSiteTypeLabel(tower?.type);
+  
+  // Check if we're in deploy mode - hide "add-inventory" in deploy mode
+  $: isDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor';
+  
+  // Check if site is NOC or Tower type
+  $: isNOCOrTower = tower?.type?.toLowerCase() === 'noc' || tower?.type?.toLowerCase() === 'tower' || !tower?.type;
 </script>
 
 <svelte:window onclick={handleClickOutside} />
@@ -221,6 +227,9 @@
     <span>Add Backhaul Link</span>
   </button>
   
+  {#if !isDeployMode}
+  <!-- Only show "Add Equipment Inventory" when NOT in deploy mode -->
+  <!-- In deploy mode, adding inventory should be done in the Inventory module -->
   <button 
     class="menu-item" 
     class:disabled={isActionDisabled('add-inventory')}
@@ -229,6 +238,7 @@
     <span class="menu-icon">📦</span>
     <span>Add Equipment Inventory</span>
   </button>
+  {/if}
   
   <button class="menu-item" onclick={() => handleAction('view-inventory')}>
     <span class="menu-icon">📋</span>
