@@ -30,11 +30,13 @@
   let searchQuery = '';
   
   function handleClose() {
+    console.log('[HardwareDeploymentModal] handleClose called');
     show = false;
     showInventoryList = false;
     selectedInventoryItem = null;
     searchQuery = '';
     error = '';
+    isLoadingInventory = false; // Reset loading state
     dispatch('close');
   }
   
@@ -59,8 +61,16 @@
     console.log('[HardwareDeploymentModal] handleDeploy called, showing inventory list', { 
       hasTenantId: !!tenantId, 
       tenantId, 
-      currentShowInventoryList: showInventoryList 
+      currentShowInventoryList: showInventoryList,
+      show,
+      hasTower: !!tower
     });
+    
+    // Ensure modal stays open
+    if (!show || !tower) {
+      console.error('[HardwareDeploymentModal] Cannot show inventory list - modal not open or no tower');
+      return;
+    }
     
     // Show inventory list instead of navigating
     // Force the update to ensure reactivity triggers
@@ -68,11 +78,16 @@
     console.log('[HardwareDeploymentModal] showInventoryList set to:', showInventoryList);
     
     // Use setTimeout to ensure state update propagates before loading
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    console.log('[HardwareDeploymentModal] About to load inventory items, showInventoryList:', showInventoryList);
-    await loadInventoryItems();
-    console.log('[HardwareDeploymentModal] After loadInventoryItems, showInventoryList:', showInventoryList, 'items count:', inventoryItems.length);
+    console.log('[HardwareDeploymentModal] About to load inventory items, showInventoryList:', showInventoryList, 'show:', show);
+    try {
+      await loadInventoryItems();
+      console.log('[HardwareDeploymentModal] After loadInventoryItems, showInventoryList:', showInventoryList, 'items count:', inventoryItems.length);
+    } catch (err) {
+      console.error('[HardwareDeploymentModal] Error loading inventory:', err);
+      // Don't close modal on error - show error message instead
+    }
   }
   
   async function loadInventoryItems() {
@@ -363,7 +378,13 @@
           </div>
           
           {#if isLoadingInventory}
-            <div class="loading-state">Loading inventory...</div>
+            <div class="loading-state">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                <div style="font-size: 1.5rem;">⏳</div>
+                <div>Loading inventory items...</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">Please wait</div>
+              </div>
+            </div>
           {:else if filteredInventoryItems.length === 0}
             <div class="empty-state">
               {#if searchQuery}
