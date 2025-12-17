@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import type { TowerSite } from '../lib/models';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
+  import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
   
   export let show = false;
   export let tower: TowerSite | null = null;
@@ -16,53 +17,91 @@
   let selectedSiteId: string = '';
   let isLoadingSites = false;
   
+  // Inventory selection
+  let showInventoryList = false;
+  let inventoryItems: InventoryItem[] = [];
+  let isLoadingInventory = false;
+  let selectedInventoryItem: InventoryItem | null = null;
+  let searchQuery = '';
+  
   function handleClose() {
     show = false;
     dispatch('close');
   }
   
-  function handleDeploy() {
-    if (!tower) {
+  async function handleDeploy() {
+    // Show inventory list instead of navigating
+    showInventoryList = true;
+    await loadInventoryItems();
+  }
+  
+  async function loadInventoryItems() {
+    if (isLoadingInventory || !tenantId) return;
+    
+    isLoadingInventory = true;
+    error = '';
+    try {
+      // Load available inventory items (status: available, reserved, or in-transit)
+      const result = await inventoryService.getInventory({
+        status: 'available', // Only show available items
+        limit: 200
+      }, tenantId);
+      inventoryItems = result.items || [];
+    } catch (err: any) {
+      console.error('Failed to load inventory:', err);
+      error = 'Failed to load inventory items';
+    } finally {
+      isLoadingInventory = false;
+    }
+  }
+  
+  async function handleSelectInventoryItem(item: InventoryItem) {
+    if (!tower || !tower.id) {
       error = 'No tower selected';
       return;
     }
     
-    // Guard: ensure tower has required properties
-    if (!tower.id || !tower.name) {
-      error = 'Tower data incomplete';
-      console.error('Tower missing required properties:', tower);
-      return;
+    selectedInventoryItem = item;
+    
+    // Deploy the inventory item to the tower
+    try {
+      isDeploying = true;
+      error = '';
+      
+      // Update inventory item status and location
+      await inventoryService.deployItem(item._id || '', {
+        siteId: tower.id,
+        siteName: tower.name,
+        location: tower.location
+      });
+      
+      // Also create a hardware deployment record
+      await coverageMapService.deployHardware(tenantId, tower.id, {
+        hardware_type: item.equipmentType || 'other',
+        name: item.model || item.equipmentType || 'Hardware',
+        inventory_item_id: item._id,
+        config: {
+          manufacturer: item.manufacturer,
+          model: item.model,
+          serialNumber: item.serialNumber
+        }
+      });
+      
+      // Dispatch success event
+      dispatch('deployed', { item, tower });
+      handleClose();
+    } catch (err: any) {
+      console.error('Failed to deploy hardware:', err);
+      error = err.message || 'Failed to deploy hardware';
+    } finally {
+      isDeploying = false;
     }
-    
-    // Capture values before closing
-    const towerId = tower.id;
-    const towerName = tower.name;
-    
-    // Close modal first
-    handleClose();
-    
-    // Check if we're in an iframe (embedded mode)
-    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    
-    if (isInIframe) {
-      // In iframe - send message to parent to navigate to inventory
-      // Don't navigate within iframe as it would reload it
-      console.log('[HardwareDeploymentModal] In iframe, sending message to parent to navigate to inventory');
-      if (window.parent) {
-        window.parent.postMessage({
-          source: 'coverage-map',
-          type: 'navigate-to-inventory',
-          payload: {
-            siteId: towerId,
-            siteName: towerName,
-            action: 'select-hardware'
-          }
-        }, '*');
-      }
-    } else {
-      // Standalone mode - navigate normally
-      goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}&action=select-hardware`);
-    }
+  }
+  
+  function handleBackToOptions() {
+    showInventoryList = false;
+    selectedInventoryItem = null;
+    searchQuery = '';
   }
   
   function handleInventory() {
@@ -124,6 +163,20 @@
   $: if (tower && availableSites.length > 0) {
     selectedSiteId = tower.id;
   }
+  
+  // Filter inventory items by search query
+  $: filteredInventoryItems = inventoryItems.filter(item => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      (item.manufacturer?.toLowerCase().includes(query)) ||
+      (item.model?.toLowerCase().includes(query)) ||
+      (item.serialNumber?.toLowerCase().includes(query)) ||
+      (item.equipmentType?.toLowerCase().includes(query)) ||
+      (item.category?.toLowerCase().includes(query)) ||
+      (item.assetTag?.toLowerCase().includes(query))
+    );
+  });
 
   async function loadAvailableSites() {
     if (isLoadingSites || !tenantId) return;
@@ -194,32 +247,90 @@
         </div>
       {/if}
 
-      <div class="button-group">
-        <button class="btn btn-primary" onclick={handleEPCDeployment}>
-          🚀 Deploy EPC to Site
-        </button>
+      {#if !showInventoryList}
+        <div class="button-group">
+          <button class="btn btn-primary" onclick={handleEPCDeployment}>
+            🚀 Deploy EPC to Site
+          </button>
+          
+          <button class="btn btn-primary" onclick={handleDeploy}>
+            📦 Select Hardware from Inventory
+          </button>
+          
+          <button class="btn btn-secondary" onclick={handleInventory}>
+            📋 View Current Inventory
+          </button>
+        </div>
         
-        <button class="btn btn-primary" onclick={handleDeploy}>
-          📦 Select Hardware from Inventory
-        </button>
-        
-        <button class="btn btn-secondary" onclick={handleInventory}>
-          📋 View Current Inventory
-        </button>
-      </div>
-      
-      <div class="info-section">
-        <h3>Available Hardware Types:</h3>
-        <ul>
-          <li>📡 Radio Equipment (eNodeB, gNodeB, RRH)</li>
-          <li>🛰️ Antennas (Sector, Panel, MIMO)</li>
-          <li>🔌 Power Systems (Batteries, UPS, Solar)</li>
-          <li>🌐 Networking Equipment (Routers, Switches)</li>
-          <li>📡 EPC Equipment (MME, SGW, PGW)</li>
-          <li>🔧 Test Equipment</li>
-          <li>📦 Other Equipment</li>
-        </ul>
-      </div>
+        <div class="info-section">
+          <h3>Available Hardware Types:</h3>
+          <ul>
+            <li>📡 Radio Equipment (eNodeB, gNodeB, RRH)</li>
+            <li>🛰️ Antennas (Sector, Panel, MIMO)</li>
+            <li>🔌 Power Systems (Batteries, UPS, Solar)</li>
+            <li>🌐 Networking Equipment (Routers, Switches)</li>
+            <li>📡 EPC Equipment (MME, SGW, PGW)</li>
+            <li>🔧 Test Equipment</li>
+            <li>📦 Other Equipment</li>
+          </ul>
+        </div>
+      {:else}
+        <!-- Inventory Selection View -->
+        <div class="inventory-selection">
+          <button class="btn btn-secondary" onclick={handleBackToOptions} style="margin-bottom: 1rem;">
+            ← Back to Options
+          </button>
+          
+          <div class="form-group">
+            <label for="searchInventory">Search Inventory:</label>
+            <input 
+              id="searchInventory"
+              type="text" 
+              class="form-control" 
+              placeholder="Search by manufacturer, model, serial number..."
+              bind:value={searchQuery}
+            />
+          </div>
+          
+          {#if isLoadingInventory}
+            <div class="loading-state">Loading inventory...</div>
+          {:else if filteredInventoryItems.length === 0}
+            <div class="empty-state">
+              {#if searchQuery}
+                No inventory items found matching "{searchQuery}"
+              {:else}
+                No available inventory items found
+              {/if}
+            </div>
+          {:else}
+            <div class="inventory-list">
+              {#each filteredInventoryItems as item}
+                <div 
+                  class="inventory-item" 
+                  class:selected={selectedInventoryItem?._id === item._id}
+                  onclick={() => handleSelectInventoryItem(item)}
+                >
+                  <div class="item-header">
+                    <strong>{item.model || item.equipmentType || 'Unknown'}</strong>
+                    <span class="item-status status-{item.status}">{item.status}</span>
+                  </div>
+                  <div class="item-details">
+                    {#if item.manufacturer}
+                      <span>Manufacturer: {item.manufacturer}</span>
+                    {/if}
+                    {#if item.serialNumber}
+                      <span>Serial: {item.serialNumber}</span>
+                    {/if}
+                    {#if item.category}
+                      <span>Category: {item.category}</span>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
     
     <div class="modal-footer">
@@ -396,6 +507,82 @@
   .form-control:focus {
     outline: none;
     border-color: var(--primary);
+  }
+
+  .inventory-selection {
+    margin-top: 1rem;
+  }
+
+  .loading-state,
+  .empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  .inventory-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 1rem;
+  }
+
+  .inventory-item {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .inventory-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .inventory-item.selected {
+    background: var(--primary);
+    color: white;
+  }
+
+  .inventory-item:last-child {
+    border-bottom: none;
+  }
+
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .item-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-available {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  }
+
+  .inventory-item.selected .item-status.status-available {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
+
+  .item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .inventory-item.selected .item-details {
+    color: rgba(255, 255, 255, 0.9);
   }
 </style>
 
