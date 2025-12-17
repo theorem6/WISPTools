@@ -183,22 +183,23 @@
   // Check if we're in deploy mode - hide "add-inventory" in deploy mode
   // Check both moduleContext and URL parameters for robustness
   // This MUST be reactive to moduleContext changes
-  $: {
+  $: shouldHideAddInventory = (() => {
     const contextModule = moduleContext?.module;
     const contextDeploy = contextModule === 'deploy' || contextModule === 'monitor';
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const urlDeploy = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
-    isDeployMode = contextDeploy || urlDeploy;
-    console.log('[TowerActionsMenu] 🔍 isDeployMode reactive update:', { 
+    const result = contextDeploy || urlDeploy;
+    console.log('[TowerActionsMenu] 🔍 shouldHideAddInventory computed:', { 
       contextModule, 
       contextDeploy, 
       urlDeploy, 
-      isDeployMode,
+      result,
       show,
       hasTower: !!tower,
       moduleContextFull: moduleContext
     });
-  }
+    return result;
+  })();
 </script>
 
 <svelte:window onclick={handleClickOutside} />
@@ -244,21 +245,7 @@
     <span>Add Backhaul Link</span>
   </button>
   
-  {#if (() => {
-    const contextModule = moduleContext?.module;
-    const isDeploy = contextModule === 'deploy' || contextModule === 'monitor';
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const urlDeploy = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
-    const shouldHide = isDeploy || urlDeploy;
-    console.log('[TowerActionsMenu] 🔍 Template conditional check:', { 
-      contextModule, 
-      isDeploy, 
-      urlDeploy, 
-      shouldHide,
-      willShow: !shouldHide
-    });
-    return !shouldHide;
-  })()}
+  {#if !shouldHideAddInventory}
   <!-- Only show "Add Equipment Inventory" when NOT in deploy mode -->
   <!-- In deploy mode, adding inventory should be done in the Inventory module -->
   <button 
