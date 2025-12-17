@@ -71,6 +71,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   // Site Equipment Modal
   let showSiteEquipmentModal = false;
   let selectedSiteForEquipment: any = null;
+  let handlingAction = false;
   
   // Set up global handler IMMEDIATELY - don't wait for onMount
   // This function will be called directly from SharedMap when view-inventory action is received
@@ -451,10 +452,12 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       // Use setTimeout to ensure tenant store is fully settled
       loadPlansTimeout = setTimeout(() => {
         // Triple-check tenantId is still valid before calling - check both store and localStorage
-        let currentTenantId = $currentTenant?.id;
+        let currentTenantId: string | undefined = $currentTenant?.id;
         if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
           if (typeof window !== 'undefined') {
-            currentTenantId = localStorage.getItem('selectedTenantId') || null;
+            currentTenantId = localStorage.getItem('selectedTenantId') || undefined;
+          } else {
+            currentTenantId = undefined;
           }
         }
         
@@ -665,14 +668,17 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
     let tenantId = $currentTenant?.id;
     
     // If tenantId is not available from store, try localStorage as fallback
-    if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') {
+    let finalTenantId: string | undefined = tenantId;
+    if (!finalTenantId || typeof finalTenantId !== 'string' || finalTenantId.trim() === '') {
       if (typeof window !== 'undefined') {
-        tenantId = localStorage.getItem('selectedTenantId') || null;
+        finalTenantId = localStorage.getItem('selectedTenantId') || undefined;
+      } else {
+        finalTenantId = undefined;
       }
     }
     
     // Final validation - ensure tenantId is a valid non-empty string
-    if (!tenantId || typeof tenantId !== 'string' || tenantId.trim() === '') {
+    if (!finalTenantId || typeof finalTenantId !== 'string' || finalTenantId.trim() === '') {
       console.warn('[Deploy] loadReadyPlans called but no valid tenantId available:', { 
         fromStore: $currentTenant?.id,
         fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
@@ -682,11 +688,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       return;
     }
     
-    console.log('[Deploy] ✅ loadReadyPlans starting with tenantId:', tenantId);
+    console.log('[Deploy] ✅ loadReadyPlans starting with tenantId:', finalTenantId);
     isLoadingPlans = true;
     try {
       // Get ALL projects (plans)
-      const allProjects = await planService.getPlans(tenantId);
+      const allProjects = await planService.getPlans(finalTenantId);
       
       // Separate projects by status for accurate menu counts
       draftPlans = allProjects.filter(project => project.status === 'draft' || project.status === 'active');
@@ -701,26 +707,28 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         allProjects.filter(p => p.showOnMap).map(p => p.id)
       );
       
-      await mapLayerManager.loadProductionHardware(tenantId);
+      await mapLayerManager.loadProductionHardware(finalTenantId);
       // Load first activated plan (any status) or first approved plan
       const planToLoad = allProjects.find(p => p.showOnMap) || approvedPlans[0];
       if (planToLoad) {
-        await mapLayerManager.loadPlan(tenantId, planToLoad);
+        await mapLayerManager.loadPlan(finalTenantId, planToLoad);
       }
       
       // Load deployed hardware count - validate tenantId again before making the call
       // This is non-critical, so we wrap it in a try-catch and don't let it fail the entire load
       try {
         // Re-check tenantId from store and localStorage before making the call
-        let currentTenantId = $currentTenant?.id;
+        let currentTenantId: string | undefined = $currentTenant?.id;
         if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
           if (typeof window !== 'undefined') {
-            currentTenantId = localStorage.getItem('selectedTenantId') || null;
+            currentTenantId = localStorage.getItem('selectedTenantId') || undefined;
+          } else {
+            currentTenantId = undefined;
           }
         }
         
         // Final validation before making the API call
-        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === tenantId) {
+        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === finalTenantId) {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
           try {
@@ -739,10 +747,10 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         } else {
           console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
             currentTenantId, 
-            expectedTenantId: tenantId,
+            expectedTenantId: finalTenantId,
             fromStore: $currentTenant?.id,
             fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
-            match: currentTenantId === tenantId 
+            match: currentTenantId === finalTenantId 
           });
           // Set to 0 as fallback
           deployedCount = 0;
@@ -758,7 +766,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       try {
         const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
         // Don't include plan layer - only count actual deployed sectors
-        const allSectors = await coverageMapService.getSectors(tenantId);
+        const allSectors = await coverageMapService.getSectors(finalTenantId);
         
         // Helper function to identify fake/test sectors
         function isFakeSector(sector: any): boolean {
@@ -1353,10 +1361,11 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   {/if}
 
   {#if showSiteEquipmentModal && selectedSiteForEquipment}
+    {@const effectiveTenantId = $currentTenant?.id || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null) || ''}
     <SiteEquipmentModal
       show={showSiteEquipmentModal}
       site={selectedSiteForEquipment}
-      tenantId={$currentTenant?.id || ''}
+      tenantId={effectiveTenantId}
       on:close={() => {
         showSiteEquipmentModal = false;
         selectedSiteForEquipment = null;
