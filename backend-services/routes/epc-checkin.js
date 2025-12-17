@@ -327,14 +327,18 @@ router.post('/checkin/ping-metrics', async (req, res) => {
           continue;
         }
 
+        // Store the actual values received (don't convert 0 to null, but handle undefined)
+        const storedSuccess = success !== undefined ? success : true; // Default to true only if undefined
+        const storedResponseTime = response_time_ms !== undefined ? response_time_ms : null;
+        
         const pingMetric = new PingMetrics({
           device_id,
           tenant_id: tenantId,
           timestamp: new Date(),
           ip_address,
-          success: success !== false, // Default to true if not specified
-          response_time_ms: response_time_ms || null,
-          packet_loss: success === false ? 100 : 0,
+          success: storedSuccess,
+          response_time_ms: storedResponseTime,
+          packet_loss: storedSuccess === false ? 100 : 0,
           error: error || null,
           ping_method: 'icmp',
           source: 'remote_epc_agent',
@@ -342,6 +346,11 @@ router.post('/checkin/ping-metrics', async (req, res) => {
         });
 
         await pingMetric.save();
+        
+        // Debug log first few metrics to verify storage
+        if (storedCount < 3) {
+          console.log(`[Ping Metrics] Stored metric ${storedCount + 1}: device_id=${device_id}, success=${storedSuccess} (type: ${typeof storedSuccess}), response_time_ms=${storedResponseTime} (type: ${typeof storedResponseTime})`);
+        }
         storedCount++;
       } catch (metricError) {
         console.error(`[Ping Metrics] Error storing metric:`, metricError);

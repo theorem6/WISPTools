@@ -157,23 +157,37 @@ router.get('/ping/:deviceId', async (req, res) => {
       : [];
     const success = metrics.length > 0
       ? metrics.map(m => {
-          // A ping is successful if success === true OR if it has a response_time (got a response)
-          // Also consider it successful if response_time_ms > 0 (even if success flag is wrong)
-          const isSuccessful = m.success === true || 
-                              (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0);
+          // A ping is successful if:
+          // 1. success flag is explicitly true (handle both boolean true and string "true")
+          // 2. OR if it has a valid response_time > 0 (got a response, even if success flag is wrong)
+          const successFlag = m.success === true || m.success === 'true' || m.success === 1;
+          const hasValidResponseTime = m.response_time_ms !== null && 
+                                      m.response_time_ms !== undefined && 
+                                      m.response_time_ms > 0;
+          const isSuccessful = successFlag || hasValidResponseTime;
           return isSuccessful ? 1 : 0;
         })
       : [];
     
     // Debug: Log first few success values to understand what we're working with
     if (metrics.length > 0) {
-      console.log(`[Monitoring Graphs] Sample ping data (first 5):`, metrics.slice(0, 5).map(m => ({
+      console.log(`[Monitoring Graphs] Sample ping data (first 10):`, metrics.slice(0, 10).map(m => ({
         timestamp: m.timestamp,
         success: m.success,
+        success_type: typeof m.success,
         response_time_ms: m.response_time_ms,
-        computed_success: (m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0)) ? 1 : 0
+        response_time_type: typeof m.response_time_ms,
+        computed_success: (m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0)) ? 1 : 0,
+        raw: { success: m.success, response_time_ms: m.response_time_ms }
       })));
       console.log(`[Monitoring Graphs] Success array summary: total=${success.length}, successful=${success.filter(s => s === 1).length}, failed=${success.filter(s => s === 0).length}`);
+      
+      // Check distribution of success values
+      const successTrue = metrics.filter(m => m.success === true).length;
+      const successFalse = metrics.filter(m => m.success === false).length;
+      const hasResponseTime = metrics.filter(m => m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0).length;
+      const noResponseTime = metrics.filter(m => m.response_time_ms === null || m.response_time_ms === undefined || m.response_time_ms === 0).length;
+      console.log(`[Monitoring Graphs] Data distribution: success=true: ${successTrue}, success=false: ${successFalse}, has response_time>0: ${hasResponseTime}, no response_time: ${noResponseTime}`);
     }
 
     // Build ECharts option format
@@ -297,18 +311,21 @@ router.get('/ping/:deviceId', async (req, res) => {
       const recentMetrics = metrics.filter(m => new Date(m.timestamp).getTime() >= fifteenMinutesAgo);
       
       if (recentMetrics.length > 0) {
-        // Check if any recent ping was successful (success === true OR has response_time > 0)
-        const recentSuccessful = recentMetrics.filter(m => 
-          m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0)
-        );
+        // Check if any recent ping was successful
+        const recentSuccessful = recentMetrics.filter(m => {
+          const successFlag = m.success === true || m.success === 'true' || m.success === 1;
+          const hasValidResponseTime = m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0;
+          return successFlag || hasValidResponseTime;
+        });
         if (recentSuccessful.length > 0) {
           current_status = 'online';
         } else {
           // No successful pings in last 15 minutes, but check if last metric was recent
           const lastMetric = metrics[metrics.length - 1];
           const lastMetricAge = Date.now() - new Date(lastMetric.timestamp).getTime();
-          if (lastMetricAge < 15 * 60 * 1000 && 
-              (lastMetric.success === true || (lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined && lastMetric.response_time_ms > 0))) {
+          const lastMetricSuccess = lastMetric.success === true || lastMetric.success === 'true' || lastMetric.success === 1;
+          const lastMetricHasResponse = lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined && lastMetric.response_time_ms > 0;
+          if (lastMetricAge < 15 * 60 * 1000 && (lastMetricSuccess || lastMetricHasResponse)) {
             current_status = 'online';
           }
         }
@@ -317,8 +334,9 @@ router.get('/ping/:deviceId', async (req, res) => {
         const lastMetric = metrics[metrics.length - 1];
         const lastMetricAge = Date.now() - new Date(lastMetric.timestamp).getTime();
         // If last metric is within 30 minutes and was successful (or has response_time > 0), consider online
-        if (lastMetricAge < 30 * 60 * 1000 && 
-            (lastMetric.success === true || (lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined && lastMetric.response_time_ms > 0))) {
+        const lastMetricSuccess = lastMetric.success === true || lastMetric.success === 'true' || lastMetric.success === 1;
+        const lastMetricHasResponse = lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined && lastMetric.response_time_ms > 0;
+        if (lastMetricAge < 30 * 60 * 1000 && (lastMetricSuccess || lastMetricHasResponse)) {
           current_status = 'online';
         }
       }
@@ -334,10 +352,22 @@ router.get('/ping/:deviceId', async (req, res) => {
       data: chartjsFormat,
       stats: {
         total: metrics.length,
-        successful: metrics.filter(m => m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0)).length,
-        failed: metrics.filter(m => !(m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0))).length,
+        successful: metrics.filter(m => {
+          const successFlag = m.success === true || m.success === 'true' || m.success === 1;
+          const hasValidResponseTime = m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0;
+          return successFlag || hasValidResponseTime;
+        }).length,
+        failed: metrics.filter(m => {
+          const successFlag = m.success === true || m.success === 'true' || m.success === 1;
+          const hasValidResponseTime = m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0;
+          return !(successFlag || hasValidResponseTime);
+        }).length,
         uptime_percent: metrics.length > 0 
-          ? Math.round((metrics.filter(m => m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0)).length / metrics.length) * 10000) / 100
+          ? Math.round((metrics.filter(m => {
+              const successFlag = m.success === true || m.success === 'true' || m.success === 1;
+              const hasValidResponseTime = m.response_time_ms !== null && m.response_time_ms !== undefined && m.response_time_ms > 0;
+              return successFlag || hasValidResponseTime;
+            }).length / metrics.length) * 10000) / 100
           : 0,
         current_status: current_status,
         avg_response_time_ms: metrics.filter(m => m.response_time_ms).length > 0
