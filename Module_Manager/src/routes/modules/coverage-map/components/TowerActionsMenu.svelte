@@ -180,9 +180,22 @@
   // Check if we're in deploy mode - hide "add-inventory" in deploy mode
   // Check both moduleContext and URL parameters for robustness
   // This MUST be reactive to moduleContext changes
-  $: isDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor' || 
-    (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('deployMode') === 'true' || 
-     new URLSearchParams(window.location.search).get('mode') === 'deploy'));
+  $: {
+    const contextModule = moduleContext?.module;
+    const contextDeploy = contextModule === 'deploy' || contextModule === 'monitor';
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlDeploy = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+    isDeployMode = contextDeploy || urlDeploy;
+    console.log('[TowerActionsMenu] 🔍 isDeployMode reactive update:', { 
+      contextModule, 
+      contextDeploy, 
+      urlDeploy, 
+      isDeployMode,
+      show,
+      hasTower: !!tower
+    });
+  }
+  let isDeployMode = false;
 </script>
 
 <svelte:window onclick={handleClickOutside} />
@@ -228,7 +241,7 @@
     <span>Add Backhaul Link</span>
   </button>
   
-  {#if !isDeployMode}
+  {#if !isDeployMode && moduleContext?.module !== 'deploy' && moduleContext?.module !== 'monitor'}
   <!-- Only show "Add Equipment Inventory" when NOT in deploy mode -->
   <!-- In deploy mode, adding inventory should be done in the Inventory module -->
   <button 
