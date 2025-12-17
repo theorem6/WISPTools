@@ -41,8 +41,28 @@
     // Close modal first
     handleClose();
     
-    // Navigate to deploy module with this tower pre-selected
-    goto(`/modules/deploy?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
+    // Check if we're in an iframe (embedded mode)
+    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+    
+    if (isInIframe) {
+      // In iframe - send message to parent to navigate to inventory
+      // Don't navigate within iframe as it would reload it
+      console.log('[HardwareDeploymentModal] In iframe, sending message to parent to navigate to inventory');
+      if (window.parent) {
+        window.parent.postMessage({
+          source: 'coverage-map',
+          type: 'navigate-to-inventory',
+          payload: {
+            siteId: towerId,
+            siteName: towerName,
+            action: 'select-hardware'
+          }
+        }, '*');
+      }
+    } else {
+      // Standalone mode - navigate normally
+      goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}&action=select-hardware`);
+    }
   }
   
   function handleInventory() {
@@ -65,8 +85,27 @@
     // Close modal first
     handleClose();
     
-    // Navigate to inventory page with filters for this tower
-    goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
+    // Check if we're in an iframe (embedded mode)
+    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+    
+    if (isInIframe) {
+      // In iframe - send message to parent to navigate to inventory
+      console.log('[HardwareDeploymentModal] In iframe, sending message to parent to navigate to inventory');
+      if (window.parent) {
+        window.parent.postMessage({
+          source: 'coverage-map',
+          type: 'navigate-to-inventory',
+          payload: {
+            siteId: towerId,
+            siteName: towerName,
+            action: 'view'
+          }
+        }, '*');
+      }
+    } else {
+      // Standalone mode - navigate normally
+      goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
+    }
   }
 
   onMount(async () => {

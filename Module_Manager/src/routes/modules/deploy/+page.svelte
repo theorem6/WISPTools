@@ -348,6 +348,19 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         };
         console.log('[Deploy] 🔥🔥🔥 Global handler updated in onMount:', typeof (window as any).__deployHandleViewInventory);
         
+        // Handle navigation messages from iframe
+        const navigationHandler = (event: MessageEvent) => {
+          if (event.data?.source === 'coverage-map' && event.data?.type === 'navigate-to-inventory') {
+            const { siteId, siteName, action } = event.data.payload || {};
+            console.log('[Deploy] Received navigate-to-inventory message:', { siteId, siteName, action });
+            if (siteId) {
+              goto(`/modules/inventory?siteId=${siteId}&siteName=${encodeURIComponent(siteName || '')}&action=${action || 'view'}`);
+            }
+          }
+        };
+        window.addEventListener('message', navigationHandler);
+        (window as any).__deployNavigationHandler = navigationHandler;
+        
         // Store handler for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;
       } else {
