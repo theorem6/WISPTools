@@ -33,21 +33,30 @@
     dispatch('close');
   }
   
-  // Reset state when modal opens
-  $: if (show) {
-    // Reset inventory selection state when modal opens
-    if (!showInventoryList) {
+  // Reset state when modal closes (not when it opens)
+  let previousShowState = false;
+  $: {
+    // Only reset when modal transitions from open to closed
+    if (previousShowState && !show) {
       showInventoryList = false;
       selectedInventoryItem = null;
       searchQuery = '';
       inventoryItems = [];
     }
+    previousShowState = show;
   }
   
-  async function handleDeploy() {
+  async function handleDeploy(e?: Event) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('[HardwareDeploymentModal] handleDeploy called, showing inventory list');
     // Show inventory list instead of navigating
     showInventoryList = true;
+    console.log('[HardwareDeploymentModal] showInventoryList set to:', showInventoryList);
     await loadInventoryItems();
+    console.log('[HardwareDeploymentModal] After loadInventoryItems, showInventoryList:', showInventoryList, 'items count:', inventoryItems.length);
   }
   
   async function loadInventoryItems() {
@@ -276,7 +285,15 @@
             🚀 Deploy EPC to Site
           </button>
           
-          <button class="btn btn-primary" onclick={handleDeploy}>
+          <button 
+            class="btn btn-primary" 
+            onclick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDeploy(e);
+            }}
+            type="button"
+          >
             📦 Select Hardware from Inventory
           </button>
           
