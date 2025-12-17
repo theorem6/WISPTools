@@ -26,7 +26,22 @@
   
   function handleClose() {
     show = false;
+    showInventoryList = false;
+    selectedInventoryItem = null;
+    searchQuery = '';
+    error = '';
     dispatch('close');
+  }
+  
+  // Reset state when modal opens
+  $: if (show) {
+    // Reset inventory selection state when modal opens
+    if (!showInventoryList) {
+      showInventoryList = false;
+      selectedInventoryItem = null;
+      searchQuery = '';
+      inventoryItems = [];
+    }
   }
   
   async function handleDeploy() {
@@ -36,20 +51,28 @@
   }
   
   async function loadInventoryItems() {
-    if (isLoadingInventory || !tenantId) return;
+    if (isLoadingInventory || !tenantId) {
+      console.log('[HardwareDeploymentModal] Skipping loadInventoryItems:', { isLoadingInventory, tenantId });
+      return;
+    }
     
+    console.log('[HardwareDeploymentModal] Loading inventory items for tenant:', tenantId);
     isLoadingInventory = true;
     error = '';
     try {
-      // Load available inventory items (status: available, reserved, or in-transit)
+      // Load available inventory items (status: available)
       const result = await inventoryService.getInventory({
         status: 'available', // Only show available items
         limit: 200
       }, tenantId);
+      console.log('[HardwareDeploymentModal] Loaded inventory items:', result.items?.length || 0);
       inventoryItems = result.items || [];
+      if (inventoryItems.length === 0) {
+        error = 'No available inventory items found';
+      }
     } catch (err: any) {
-      console.error('Failed to load inventory:', err);
-      error = 'Failed to load inventory items';
+      console.error('[HardwareDeploymentModal] Failed to load inventory:', err);
+      error = err.message || 'Failed to load inventory items';
     } finally {
       isLoadingInventory = false;
     }
