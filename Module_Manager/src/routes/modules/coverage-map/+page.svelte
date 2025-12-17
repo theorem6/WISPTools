@@ -1412,8 +1412,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
           return;
         }
         
+        console.log('[CoverageMap] 🔧 Setting up HardwareDeploymentModal:', { towerName: tower.name, towerId: tower.id, hasTower: !!tower });
         selectedTowerForEPC = tower;
         showHardwareDeploymentModal = true;
+        console.log('[CoverageMap] 🔧 HardwareDeploymentModal state set:', { show: showHardwareDeploymentModal, selectedTower: selectedTowerForEPC?.name });
         break;
       case 'change-site-type':
         // Change site type via edit modal

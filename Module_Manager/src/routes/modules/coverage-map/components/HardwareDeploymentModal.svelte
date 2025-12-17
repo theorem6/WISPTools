@@ -9,6 +9,11 @@
   export let tower: TowerSite | null = null;
   export let tenantId: string;
   
+  // Debug logging
+  $: if (show) {
+    console.log('[HardwareDeploymentModal] 🔧 Modal show state changed to true:', { show, hasTower: !!tower, towerName: tower?.name, tenantId });
+  }
+  
   const dispatch = createEventDispatcher();
   
   let isDeploying = false;
