@@ -192,7 +192,7 @@
             }
             pingStats = pingData.stats || null;
             
-            // Debug: Log the actual structure
+            // Debug: Log the actual structure and stats
             if (pingMetrics) {
               console.log('[SNMPGraphsPanel] pingMetrics structure:', {
                 hasEcharts: !!pingMetrics.echarts,
@@ -201,6 +201,16 @@
                 hasDatasets: !!pingMetrics.datasets,
                 datasetsLength: pingMetrics.datasets?.length || 0,
                 datasetLabels: pingMetrics.datasets?.map((d: any) => d.label) || []
+              });
+            }
+            if (pingStats) {
+              console.log('[SNMPGraphsPanel] pingStats:', {
+                current_status: pingStats.current_status,
+                uptime_percent: pingStats.uptime_percent,
+                total: pingStats.total,
+                successful: pingStats.successful,
+                failed: pingStats.failed,
+                avg_response_time_ms: pingStats.avg_response_time_ms
               });
             }
             
