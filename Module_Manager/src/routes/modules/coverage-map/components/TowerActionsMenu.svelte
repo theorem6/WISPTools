@@ -179,12 +179,10 @@
   
   // Check if we're in deploy mode - hide "add-inventory" in deploy mode
   // Check both moduleContext and URL parameters for robustness
-  $: isDeployMode = (() => {
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const urlDeployMode = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
-    const contextDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor';
-    return contextDeployMode || urlDeployMode;
-  })();
+  // This MUST be reactive to moduleContext changes
+  $: isDeployMode = moduleContext?.module === 'deploy' || moduleContext?.module === 'monitor' || 
+    (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('deployMode') === 'true' || 
+     new URLSearchParams(window.location.search).get('mode') === 'deploy'));
 </script>
 
 <svelte:window onclick={handleClickOutside} />
