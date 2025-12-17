@@ -11,6 +11,9 @@
   
   const dispatch = createEventDispatcher();
   
+  // Track if we're in deploy mode - must be declared before reactive statement
+  let isDeployMode = false;
+  
   // Get object permissions - with comprehensive null safety
   $: objectPermissions = (() => {
     // Early return if tower is null or undefined
@@ -192,10 +195,10 @@
       urlDeploy, 
       isDeployMode,
       show,
-      hasTower: !!tower
+      hasTower: !!tower,
+      moduleContextFull: moduleContext
     });
   }
-  let isDeployMode = false;
 </script>
 
 <svelte:window onclick={handleClickOutside} />
