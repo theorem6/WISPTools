@@ -444,7 +444,21 @@
     
     if (statusDataset && statusDataset.data && statusDataset.data.length > 0) {
       const data = labels.map((time: number, idx: number) => [time, statusDataset.data[idx]]);
-      const colors = statusDataset.data.map((v: number) => v === 1 ? '#22c55e' : '#ef4444');
+      const colors = statusDataset.data.map((v: number) => {
+        // Handle both numeric (1/0) and boolean (true/false) values
+        const isOnline = v === 1 || v === true;
+        return isOnline ? '#22c55e' : '#ef4444';
+      });
+      
+      // Debug: Log status data to understand what we're working with
+      console.log('[SNMPGraphsPanel] Status dataset:', {
+        label: statusDataset.label,
+        dataLength: statusDataset.data.length,
+        sampleData: statusDataset.data.slice(0, 10),
+        onlineCount: statusDataset.data.filter((v: number) => v === 1 || v === true).length,
+        offlineCount: statusDataset.data.filter((v: number) => v === 0 || v === false).length,
+        pingStats: pingStats
+      });
       
       pingUptimeOption = {
         grid: { top: 20, right: 30, bottom: 40, left: 50 },
@@ -490,7 +504,9 @@
           areaStyle: {
             color: (params: any) => {
               const value = statusDataset.data[params.dataIndex];
-              return value === 1 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+              // Handle both numeric (1/0) and boolean (true/false) values
+              const isOnline = value === 1 || value === true;
+              return isOnline ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)';
             }
           },
           smooth: true,
