@@ -404,7 +404,7 @@ async function sendSNMPMetrics(deviceCode, snmpMetrics) {
               log('INFO', `Successfully sent ${snmpMetrics.length} SNMP metrics (stored: ${response.stored || snmpMetrics.length})`);
               resolve(true);
             } catch (e) {
-              log('INFO', `Sent ${snMPMetrics.length} SNMP metrics successfully (HTTP ${res.statusCode})`);
+              log('INFO', `Sent ${snmpMetrics.length} SNMP metrics successfully (HTTP ${res.statusCode})`);
               resolve(true);
             }
           } else {
