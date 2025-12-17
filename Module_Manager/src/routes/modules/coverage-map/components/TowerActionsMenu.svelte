@@ -244,7 +244,21 @@
     <span>Add Backhaul Link</span>
   </button>
   
-  {#if !isDeployMode && moduleContext?.module !== 'deploy' && moduleContext?.module !== 'monitor'}
+  {#if (() => {
+    const contextModule = moduleContext?.module;
+    const isDeploy = contextModule === 'deploy' || contextModule === 'monitor';
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlDeploy = urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+    const shouldHide = isDeploy || urlDeploy;
+    console.log('[TowerActionsMenu] 🔍 Template conditional check:', { 
+      contextModule, 
+      isDeploy, 
+      urlDeploy, 
+      shouldHide,
+      willShow: !shouldHide
+    });
+    return !shouldHide;
+  })()}
   <!-- Only show "Add Equipment Inventory" when NOT in deploy mode -->
   <!-- In deploy mode, adding inventory should be done in the Inventory module -->
   <button 
