@@ -71,7 +71,6 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   // Site Equipment Modal
   let showSiteEquipmentModal = false;
   let selectedSiteForEquipment: any = null;
-  let handlingAction = false;
   
   // Set up global handler IMMEDIATELY - don't wait for onMount
   // This function will be called directly from SharedMap when view-inventory action is received
@@ -657,9 +656,6 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         }
       }
     }
-    
-    // Always reset handling flag at end
-    handlingAction = false;
   }
 
 
@@ -718,17 +714,22 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
       // This is non-critical, so we wrap it in a try-catch and don't let it fail the entire load
       try {
         // Re-check tenantId from store and localStorage before making the call
-        let currentTenantId: string | undefined = $currentTenant?.id;
+        // Use finalTenantId as the source of truth (it already has the fallback logic)
+        let currentTenantId: string | undefined = finalTenantId;
+        
+        // If finalTenantId is not available, try one more time to get it
         if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
-          if (typeof window !== 'undefined') {
-            currentTenantId = localStorage.getItem('selectedTenantId') || undefined;
-          } else {
-            currentTenantId = undefined;
+          currentTenantId = $currentTenant?.id;
+          if (!currentTenantId || typeof currentTenantId !== 'string' || currentTenantId.trim() === '') {
+            if (typeof window !== 'undefined') {
+              const stored = localStorage.getItem('selectedTenantId');
+              currentTenantId = (stored && typeof stored === 'string' && stored.trim() !== '') ? stored : undefined;
+            }
           }
         }
         
-        // Final validation before making the API call
-        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '' && currentTenantId === finalTenantId) {
+        // Final validation - just check if we have a valid tenantId (no need to match exactly)
+        if (currentTenantId && typeof currentTenantId === 'string' && currentTenantId.trim() !== '') {
           const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
           console.log('[Deploy] ✅ Loading deployment count with tenant:', currentTenantId);
           try {
@@ -745,12 +746,10 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
             deployedCount = 0;
           }
         } else {
-          console.warn('[Deploy] ⚠️ Skipping deployment count load - tenantId validation failed:', { 
-            currentTenantId, 
-            expectedTenantId: finalTenantId,
+          console.warn('[Deploy] ⚠️ Skipping deployment count load - no valid tenantId available:', { 
+            finalTenantId,
             fromStore: $currentTenant?.id,
-            fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A',
-            match: currentTenantId === finalTenantId 
+            fromLocalStorage: typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : 'N/A'
           });
           // Set to 0 as fallback
           deployedCount = 0;
@@ -1361,7 +1360,8 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   {/if}
 
   {#if showSiteEquipmentModal && selectedSiteForEquipment}
-    {@const effectiveTenantId = $currentTenant?.id || (typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null) || ''}
+    {@const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null}
+    {@const effectiveTenantId = ($currentTenant?.id || (storedTenantId && typeof storedTenantId === 'string' && storedTenantId.trim() !== '' ? storedTenantId : null)) || ''}
     <SiteEquipmentModal
       show={showSiteEquipmentModal}
       site={selectedSiteForEquipment}
