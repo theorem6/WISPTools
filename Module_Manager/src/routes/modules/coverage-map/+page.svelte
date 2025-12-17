@@ -2042,6 +2042,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     showHardwareDeploymentModal = false;
     showEPCDeploymentModal = true;
   }}
+  on:deployed={async (e) => {
+    console.log('[CoverageMap] Hardware deployed:', e.detail);
+    success = `Hardware deployed to ${e.detail.tower?.name || 'site'} successfully`;
+    setTimeout(() => success = '', 5000);
+    await loadAllData();
+  }}
 />
 
 <!-- Site Edit Modal -->

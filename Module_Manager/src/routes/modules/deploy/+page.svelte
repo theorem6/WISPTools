@@ -169,10 +169,14 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         return;
       }
 
-      // Wait a bit for iframe to load
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for iframe to load - retry a few times
+      let iframe: HTMLIFrameElement | null = null;
+      for (let i = 0; i < 10; i++) {
+        iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
+        if (iframe) break;
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
       
-      const iframe = mapContainer?.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
         console.log('[Deploy] ✅ Found iframe, initializing iframeCommunicationService:', iframe.src);
         iframeCommunicationService.initialize(iframe, moduleContext);
