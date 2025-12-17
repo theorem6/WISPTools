@@ -182,8 +182,8 @@
   
   // Check if we're in deploy mode - hide "add-inventory" in deploy mode
   // Check both moduleContext and URL parameters for robustness
-  // This MUST be reactive to moduleContext changes
-  $: shouldHideAddInventory = (() => {
+  // Make it reactive to both moduleContext AND show so it re-evaluates when menu opens
+  $: shouldHideAddInventory = (show && tower) ? (() => {
     const contextModule = moduleContext?.module;
     const contextDeploy = contextModule === 'deploy' || contextModule === 'monitor';
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -196,10 +196,11 @@
       result,
       show,
       hasTower: !!tower,
-      moduleContextFull: moduleContext
+      moduleContextFull: moduleContext,
+      url: typeof window !== 'undefined' ? window.location.href : 'N/A'
     });
     return result;
-  })();
+  })() : false;
 </script>
 
 <svelte:window onclick={handleClickOutside} />
