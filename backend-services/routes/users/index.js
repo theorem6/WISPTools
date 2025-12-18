@@ -881,19 +881,38 @@ router.post('/bulk-import', requireAdmin, async (req, res) => {
           const userRecord = await auth.getUserByEmail(email);
           userId = userRecord.uid;
         } catch (authError) {
-          // User doesn't exist in Firebase Auth - create them
+          // User doesn't exist in Firebase Auth
+          // For Google domain accounts, don't create password accounts - let them sign in with Google OAuth first
+          const isGoogleDomain = email.endsWith('@gmail.com') || email.endsWith('@googlemail.com') || 
+                                 email.includes('@') && email.split('@')[1].includes('google');
+          
+          if (isGoogleDomain && !userData.password) {
+            // Google domain user - don't create account, they should sign in with Google OAuth first
+            throw new Error(`Google domain user ${email} should sign in with Google OAuth first. Account will be created automatically on first Google sign-in.`);
+          }
+          
+          // Create Firebase Auth user (only for non-Google domains or if password explicitly provided)
           try {
-            const newUser = await auth.createUser({
+            const userDataToCreate = {
               email,
               displayName: userData.displayName || userData.name || '',
-              password: userData.password || `TempPassword${Date.now()}`, // Temporary password - should be changed
               emailVerified: userData.emailVerified || false,
               disabled: userData.status === 'suspended' || userData.disabled || false
-            });
+            };
+            
+            // Only add password if provided (not for Google OAuth users)
+            if (userData.password) {
+              userDataToCreate.password = userData.password;
+            } else if (!isGoogleDomain) {
+              // Non-Google domain without password - create with temporary password
+              userDataToCreate.password = `TempPassword${Date.now()}`;
+            }
+            
+            const newUser = await auth.createUser(userDataToCreate);
             userId = newUser.uid;
             
-            // Set a temporary password and require password reset
-            if (!userData.password) {
+            // For non-Google domains without password, set temporary password
+            if (!userData.password && !isGoogleDomain) {
               await auth.updateUser(userId, {
                 password: `TempPassword${Date.now()}` // User will need to reset
               });
