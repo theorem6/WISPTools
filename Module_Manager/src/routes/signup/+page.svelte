@@ -22,6 +22,7 @@
   let tenantName = '';
   let displayName = '';
   let contactPhone = '';
+  let subdomain = '';
 
   // Step 2: Payment Information
   let paymentMethodType: 'paypal' | 'credit_card' = 'paypal'; // Auto-select PayPal
@@ -154,6 +155,27 @@
       return;
     }
 
+    // Validate and auto-generate subdomain if needed
+    if (!subdomain) {
+      subdomain = tenantName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    // Validate subdomain format
+    if (!/^[a-z0-9-]+$/.test(subdomain)) {
+      error = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+      return;
+    }
+
+    if (subdomain.length < 3) {
+      error = 'Subdomain must be at least 3 characters long';
+      return;
+    }
+
+    if (subdomain.length > 63) {
+      error = 'Subdomain must be 63 characters or less';
+      return;
+    }
+
     isLoading = true;
     error = '';
 
@@ -199,7 +221,7 @@
         displayName,
         email,
         firebaseUser.uid,
-        undefined, // subdomain - not used
+        subdomain,
         true, // createOwnerAssociation
         email // ownerEmail
       );
@@ -483,6 +505,22 @@
               disabled={isLoading}
               required
             />
+          </div>
+
+          <div class="form-group">
+            <label for="subdomain">Subdomain <span class="required">*</span></label>
+            <input
+              id="subdomain"
+              type="text"
+              bind:value={subdomain}
+              placeholder="acme-wisp"
+              disabled={isLoading}
+              pattern="[a-z0-9-]+"
+              minlength="3"
+              maxlength="63"
+              required
+            />
+            <p class="help-text">Unique subdomain for your organization (lowercase letters, numbers, and hyphens only). Will be auto-generated from tenant name if left blank.</p>
           </div>
 
           <div class="form-group">
