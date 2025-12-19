@@ -38,6 +38,7 @@
 
   // Created tenant ID
   let createdTenantId: string = '';
+  let isCreatingTenant = false; // Guard to prevent double creation
 
   onMount(() => {
     if (!browser) return;
@@ -151,12 +152,20 @@
   // Tenant Setup Functions
   async function handleTenantSubmit() {
     // Prevent double submission
-    if (isLoading) {
+    if (isLoading || isCreatingTenant) {
+      console.log('[Signup] Tenant creation already in progress, ignoring duplicate call');
       return;
     }
 
     if (!tenantName || !displayName || !contactPhone) {
       error = 'Please fill in all required fields';
+      return;
+    }
+
+    // Prevent if tenant already created
+    if (createdTenantId) {
+      console.log('[Signup] Tenant already created, redirecting to success');
+      step = 4;
       return;
     }
 
@@ -182,6 +191,7 @@
     }
 
     isLoading = true;
+    isCreatingTenant = true;
     error = '';
 
     let userCreated = false;
