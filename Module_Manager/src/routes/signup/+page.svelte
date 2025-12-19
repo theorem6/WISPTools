@@ -6,7 +6,7 @@
   import { tenantService } from '$lib/services/tenantService';
   import { createPaymentMethod } from '$lib/services/billingService';
 
-  let step = 1; // 1: Email Verification, 2: Tenant Info, 3: Payment, 4: Success
+  let step = 1; // 1: Email Verification, 2: Payment Option, 3: Tenant Info, 4: Success
   let isLoading = false;
   let error = '';
   let success = '';
@@ -24,8 +24,8 @@
   let contactPhone = '';
   let subdomain = '';
 
-  // Step 3: Payment Information
-  let paymentMethodType: 'paypal' | 'credit_card' | null = null;
+  // Step 2: Payment Information
+  let paymentMethodType: 'paypal' | 'credit_card' = 'paypal'; // Auto-select PayPal
   let paypalEmail = '';
   let creditCardInfo = {
     email: '',
@@ -136,7 +136,9 @@
 
       // Code verified - create Firebase account and move to next step
       // For now, we'll create the account in step 2, so just move forward
-      step = 2;
+      // Auto-select payment method (PayPal) and proceed
+      paymentMethodType = 'paypal';
+      step = 2; // Move to payment option step
       success = 'Email verified successfully!';
       setTimeout(() => success = '', 3000);
     } catch (err: any) {
@@ -219,8 +221,23 @@
 
       createdTenantId = createResult.tenantId;
 
+      // Create payment method if one was selected (but skip actual payment processing)
+      if (paymentMethodType && paymentMethodCreated) {
+        try {
+          await createPaymentMethod(
+            createdTenantId,
+            paymentMethodType,
+            paymentMethodType === 'paypal' ? (paypalEmail || email) : undefined,
+            paymentMethodType === 'credit_card' ? creditCardInfo : undefined
+          );
+        } catch (paymentErr: any) {
+          console.warn('Payment method creation failed (continuing anyway):', paymentErr);
+          // Continue anyway - payment can be added later
+        }
+      }
+
       success = 'Tenant created successfully!';
-      step = 3; // Move to payment step
+      step = 4; // Move to success step
     } catch (err: any) {
       // If we created a Firebase user but tenant creation failed, delete the user
       if (userCreated && firebaseUser) {
@@ -255,49 +272,12 @@
     }
   }
 
-  // Payment Functions
+  // Payment Functions - Simplified, just select and proceed without actual payment
   async function handlePaymentSubmit() {
-    if (!paymentMethodType) {
-      error = 'Please select a payment method';
-      return;
-    }
-
-    if (paymentMethodType === 'paypal' && !paypalEmail) {
-      error = 'Please enter your PayPal email address';
-      return;
-    }
-
-    if (paymentMethodType === 'credit_card') {
-      if (!creditCardInfo.cardNumber || !creditCardInfo.expiryDate || !creditCardInfo.cvv || !creditCardInfo.name || !creditCardInfo.email) {
-        error = 'Please fill in all credit card fields';
-        return;
-      }
-    }
-
-    isLoading = true;
-    error = '';
-
-    try {
-      if (!createdTenantId) {
-        throw new Error('Tenant ID not found. Please go back and complete tenant setup.');
-      }
-
-      // Create payment method
-      await createPaymentMethod(
-        createdTenantId,
-        paymentMethodType,
-        paymentMethodType === 'paypal' ? paypalEmail : undefined,
-        paymentMethodType === 'credit_card' ? creditCardInfo : undefined
-      );
-
-      paymentMethodCreated = true;
-      step = 4; // Success step
-    } catch (err: any) {
-      error = err.message || 'Failed to create payment method';
-      console.error('Payment method creation error:', err);
-    } finally {
-      isLoading = false;
-    }
+    // Payment method is auto-selected (PayPal), just proceed to tenant creation
+    // No actual payment processing needed for now
+    paymentMethodCreated = true;
+    step = 3; // Move to tenant creation step
   }
 
 </script>
@@ -413,7 +393,70 @@
       <!-- Step 2: Tenant Information -->
       {:else if step === 2}
         <div class="step-content">
-          <h2>Step 2: Organization Information</h2>
+          <h2>Step 2: Payment Option</h2>
+          <p class="step-description">Select your preferred payment method. No charges will be made at this time.</p>
+
+          <div class="form-group">
+            <label>Payment Method <span class="required">*</span></label>
+            <div class="payment-method-options">
+              <label class="payment-option">
+                <input 
+                  type="radio" 
+                  name="paymentMethod" 
+                  value="paypal"
+                  bind:group={paymentMethodType}
+                  disabled={isLoading}
+                />
+                <div class="payment-option-content">
+                  <div class="payment-icon">💳</div>
+                  <div>
+                    <strong>PayPal</strong>
+                    <p>Pay with PayPal account</p>
+                  </div>
+                </div>
+              </label>
+              <label class="payment-option">
+                <input 
+                  type="radio" 
+                  name="paymentMethod" 
+                  value="credit_card"
+                  bind:group={paymentMethodType}
+                  disabled={isLoading}
+                />
+                <div class="payment-option-content">
+                  <div class="payment-icon">💳</div>
+                  <div>
+                    <strong>Credit Card</strong>
+                    <p>Pay with credit or debit card</p>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button 
+              type="button" 
+              class="btn-secondary" 
+              onclick={() => step = 1}
+              disabled={isLoading}
+            >
+              ← Back
+            </button>
+            <button 
+              type="button" 
+              class="btn-primary" 
+              onclick={handlePaymentSubmit}
+              disabled={isLoading || !paymentMethodType}
+            >
+              Continue →
+            </button>
+          </div>
+        </div>
+
+      {:else if step === 3}
+        <div class="step-content">
+          <h2>Step 3: Organization Information</h2>
           <p class="step-description">Tell us about your organization.</p>
 
           <div class="form-group">
@@ -497,182 +540,6 @@
         </div>
 
       <!-- Step 3: Payment Information -->
-      {:else if step === 3}
-        <div class="step-content">
-          <h2>Step 3: Payment Method</h2>
-          <p class="step-description">Add a payment method for your account (required)</p>
-
-          <div class="beta-disclaimer">
-            <div class="beta-badge">BETA</div>
-            <p><strong>WISPTools.io is currently in beta.</strong> No charges will be made without prior notice. Adding a payment method now ensures uninterrupted service when billing begins.</p>
-          </div>
-
-          <div class="form-group">
-            <label>Payment Method <span class="required">*</span></label>
-            <div class="payment-method-options">
-              <label class="payment-option">
-                <input 
-                  type="radio" 
-                  name="paymentMethod" 
-                  value="paypal"
-                  bind:group={paymentMethodType}
-                  disabled={isLoading}
-                />
-                <div class="payment-option-content">
-                  <div class="payment-icon">💳</div>
-                  <div>
-                    <strong>PayPal</strong>
-                    <p>Pay with PayPal account</p>
-                  </div>
-                </div>
-              </label>
-              <label class="payment-option">
-                <input 
-                  type="radio" 
-                  name="paymentMethod" 
-                  value="credit_card"
-                  bind:group={paymentMethodType}
-                  disabled={isLoading}
-                />
-                <div class="payment-option-content">
-                  <div class="payment-icon">💳</div>
-                  <div>
-                    <strong>Credit Card</strong>
-                    <p>Pay with credit or debit card</p>
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {#if paymentMethodType === 'paypal'}
-            <div class="form-group">
-              <label for="paypalEmail">
-                PayPal Email Address <span class="required">*</span>
-              </label>
-              <input
-                id="paypalEmail"
-                type="email"
-                bind:value={paypalEmail}
-                placeholder="your-email@example.com"
-                disabled={isLoading}
-                required
-              />
-              <p class="help-text">The email address associated with your PayPal account</p>
-            </div>
-          {/if}
-
-          {#if paymentMethodType === 'credit_card'}
-            <div class="form-group">
-              <label for="cardEmail">
-                Billing Email <span class="required">*</span>
-              </label>
-              <input
-                id="cardEmail"
-                type="email"
-                bind:value={creditCardInfo.email}
-                placeholder="billing@example.com"
-                disabled={isLoading}
-                required
-              />
-            </div>
-            <div class="form-group">
-              <label for="cardNumber">
-                Card Number <span class="required">*</span>
-              </label>
-              <input
-                id="cardNumber"
-                type="text"
-                bind:value={creditCardInfo.cardNumber}
-                placeholder="XXXX XXXX XXXX XXXX"
-                disabled={isLoading}
-                maxlength="19"
-                oninput={(e) => {
-                  let value = e.currentTarget.value.replace(/\s/g, '');
-                  if (value.length > 16) value = value.substring(0, 16);
-                  value = value.replace(/(.{4})/g, '$1 ').trim();
-                  creditCardInfo.cardNumber = value;
-                }}
-                required
-              />
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="expiryDate">
-                  Expiry Date <span class="required">*</span>
-                </label>
-                <input
-                  id="expiryDate"
-                  type="text"
-                  bind:value={creditCardInfo.expiryDate}
-                  placeholder="MM/YY"
-                  disabled={isLoading}
-                  maxlength="5"
-                  oninput={(e) => {
-                    let value = e.currentTarget.value.replace(/\D/g, '');
-                    if (value.length >= 2) {
-                      value = value.substring(0, 2) + '/' + value.substring(2, 4);
-                    }
-                    creditCardInfo.expiryDate = value;
-                  }}
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="cvv">
-                  CVV <span class="required">*</span>
-                </label>
-                <input
-                  id="cvv"
-                  type="text"
-                  bind:value={creditCardInfo.cvv}
-                  placeholder="XXX"
-                  disabled={isLoading}
-                  maxlength="4"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="cardName">
-                Name on Card <span class="required">*</span>
-              </label>
-              <input
-                id="cardName"
-                type="text"
-                bind:value={creditCardInfo.name}
-                placeholder="John Doe"
-                disabled={isLoading}
-                required
-              />
-            </div>
-          {/if}
-
-          <div class="form-actions">
-            <button 
-              type="button" 
-              class="btn-secondary" 
-              onclick={() => step = 2}
-              disabled={isLoading}
-            >
-              ← Back
-            </button>
-            <button 
-              type="button" 
-              class="btn-primary" 
-              onclick={handlePaymentSubmit}
-              disabled={isLoading || !paymentMethodType || (paymentMethodType === 'paypal' && !paypalEmail) || (paymentMethodType === 'credit_card' && (!creditCardInfo.cardNumber || !creditCardInfo.expiryDate || !creditCardInfo.cvv || !creditCardInfo.name || !creditCardInfo.email))}
-            >
-              {#if isLoading}
-                <span class="spinner"></span>
-                Saving...
-              {:else}
-                Complete Setup
-              {/if}
-            </button>
-          </div>
-        </div>
-
       <!-- Step 4: Success -->
       {:else if step === 4}
         <div class="step-content success-step">
