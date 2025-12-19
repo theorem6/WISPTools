@@ -242,4 +242,7 @@ router.get('/status', (req, res) => {
   });
 });
 
+// Email verification routes
+router.use('/verification', require('./verification'));
+
 module.exports = router;
