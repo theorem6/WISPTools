@@ -25,7 +25,7 @@
   let subdomain = '';
 
   // Step 2: Payment Information
-  let paymentMethodType: 'paypal' | 'credit_card' = 'paypal'; // Auto-select PayPal
+  let paymentMethodType: 'beta' | 'paypal' | 'credit_card' = 'beta'; // Default to Beta (Free)
   let paypalEmail = '';
   let creditCardInfo = {
     email: '',
@@ -136,8 +136,8 @@
 
       // Code verified - create Firebase account and move to next step
       // For now, we'll create the account in step 2, so just move forward
-      // Auto-select payment method (PayPal) and proceed
-      paymentMethodType = 'paypal';
+      // Auto-select payment method (Beta Free) and proceed
+      paymentMethodType = 'beta';
       step = 2; // Move to payment option step
       success = 'Email verified successfully!';
       setTimeout(() => success = '', 3000);
@@ -232,8 +232,8 @@
 
       createdTenantId = createResult.tenantId;
 
-      // Create payment method if one was selected (but skip actual payment processing)
-      if (paymentMethodType && paymentMethodCreated) {
+      // Create payment method only if a paid option was selected (skip for beta/free)
+      if (paymentMethodType && paymentMethodCreated && paymentMethodType !== 'beta') {
         try {
           await createPaymentMethod(
             createdTenantId,
@@ -285,9 +285,10 @@
 
   // Payment Functions - Simplified, just select and proceed without actual payment
   async function handlePaymentSubmit() {
-    // Payment method is auto-selected (PayPal), just proceed to tenant creation
-    // No actual payment processing needed for now
-    paymentMethodCreated = true;
+    // Payment method is selected, proceed to tenant creation
+    // For beta/free, no payment method will be created
+    // For paid options, payment method will be created after tenant creation
+    paymentMethodCreated = paymentMethodType !== 'beta';
     step = 3; // Move to tenant creation step
   }
 
@@ -407,9 +408,31 @@
           <h2>Step 2: Payment Option</h2>
           <p class="step-description">Select your preferred payment method. No charges will be made at this time.</p>
 
+          <div class="beta-disclaimer">
+            <div class="beta-badge">BETA</div>
+            <p><strong>WISPTools.io is currently in beta.</strong> Start with our free beta option - no payment required. You can upgrade to a paid plan later from your account settings.</p>
+          </div>
+
           <div class="form-group">
-            <label>Payment Method <span class="required">*</span></label>
+            <label>Payment Option <span class="required">*</span></label>
             <div class="payment-method-options">
+              <label class="payment-option">
+                <input 
+                  type="radio" 
+                  name="paymentMethod" 
+                  value="beta"
+                  bind:group={paymentMethodType}
+                  checked
+                  disabled={isLoading}
+                />
+                <div class="payment-option-content">
+                  <div class="payment-icon">🎉</div>
+                  <div>
+                    <strong>Beta (Free)</strong>
+                    <p>Free access during beta period - No payment required</p>
+                  </div>
+                </div>
+              </label>
               <label class="payment-option">
                 <input 
                   type="radio" 
@@ -422,7 +445,7 @@
                   <div class="payment-icon">💳</div>
                   <div>
                     <strong>PayPal</strong>
-                    <p>Pay with PayPal account</p>
+                    <p>Pay with PayPal account (set up now, charges begin after beta)</p>
                   </div>
                 </div>
               </label>
@@ -438,7 +461,7 @@
                   <div class="payment-icon">💳</div>
                   <div>
                     <strong>Credit Card</strong>
-                    <p>Pay with credit or debit card</p>
+                    <p>Pay with credit or debit card (set up now, charges begin after beta)</p>
                   </div>
                 </div>
               </label>
@@ -565,7 +588,9 @@
           <div class="success-details">
             <p><strong>Organization:</strong> {displayName}</p>
             <p><strong>Email:</strong> {email}</p>
-            {#if paymentMethodCreated}
+            {#if paymentMethodType === 'beta'}
+              <p><strong>Payment Option:</strong> Beta (Free) - No payment required ✓</p>
+            {:else if paymentMethodCreated}
               <p><strong>Payment Method:</strong> {paymentMethodType === 'paypal' ? 'PayPal' : 'Credit Card'} ✓</p>
             {/if}
           </div>
