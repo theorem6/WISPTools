@@ -39,7 +39,8 @@ router.post('/', verifyAuth, async (req, res) => {
       name, 
       displayName, 
       contactEmail, 
-      subdomain 
+      subdomain,
+      primaryLocation 
     } = req.body;
     
     if (!name || !displayName || !contactEmail) {
@@ -76,7 +77,7 @@ router.post('/', verifyAuth, async (req, res) => {
     const cwmpUrl = `https://${finalSubdomain}.lte-pci-mapper-65450042-bbf71.us-east4.hosted.app`;
     
     // Create tenant
-    const tenant = new Tenant({
+    const tenantData = {
       name,
       displayName,
       subdomain: finalSubdomain,
@@ -103,8 +104,17 @@ router.post('/', verifyAuth, async (req, res) => {
         maxNetworks: 10,
         maxTowerSites: 100
       }
-    });
+    };
     
+    // Add primary location if provided
+    if (primaryLocation?.siteId) {
+      tenantData.primaryLocation = {
+        siteId: primaryLocation.siteId,
+        siteName: primaryLocation.siteName || null
+      };
+    }
+    
+    const tenant = new Tenant(tenantData);
     await tenant.save();
     
     // Create owner association for the user
@@ -183,6 +193,59 @@ router.post('/', verifyAuth, async (req, res) => {
       });
     }
     
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/tenants/:tenantId
+ * Update tenant (limited fields - mainly for primary location)
+ */
+router.put('/:tenantId', verifyAuth, async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const userId = req.user.uid;
+    
+    // Verify user has access to this tenant
+    const userTenant = await UserTenant.findOne({
+      userId,
+      tenantId,
+      status: 'active'
+    });
+    
+    if (!userTenant) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have access to this tenant'
+      });
+    }
+    
+    // Only allow updating primaryLocation for now
+    const { primaryLocation } = req.body;
+    
+    const tenant = await Tenant.findOne({ _id: tenantId });
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Tenant not found'
+      });
+    }
+    
+    if (primaryLocation) {
+      tenant.primaryLocation = {
+        siteId: primaryLocation.siteId || null,
+        siteName: primaryLocation.siteName || null
+      };
+    }
+    
+    await tenant.save();
+    
+    res.json({ tenant });
+  } catch (error) {
+    console.error('Error updating tenant:', error);
     res.status(500).json({
       error: 'Internal Server Error',
       message: error.message

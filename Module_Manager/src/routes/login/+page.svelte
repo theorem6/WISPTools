@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { browser } from '$app/environment';
   import { get } from 'svelte/store';
   import { authService } from '$lib/services/authService';
@@ -13,15 +13,153 @@
   let password = '';
   let isLoading = false;
   let error = '';
-  let mode: 'signin' | 'signup' = 'signin';
+  let success = '';
+  let showPasswordReset = false;
+  let passwordResetEmail = '';
+  let passwordResetSent = false;
+
+  // Listen for Google sign-in completion via auth state listener
+  let googleSignInHandler: ((e: CustomEvent) => void) | null = null;
 
   onMount(async () => {
     if (!browser) return;
     
-    console.log('[Login Page] Checking authentication...');
+    console.log('[Login Page] 🔄 Page mounted, checking authentication...');
+    console.log('[Login Page] Current URL:', window.location.href);
+    console.log('[Login Page] URL search:', window.location.search);
+    console.log('[Login Page] URL hash:', window.location.hash);
+    console.log('[Login Page] Full URL:', window.location.toString());
     
-    // Wait for auth service to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Check if we have a stored redirect URL (indicates we just came back from Google)
+    const storedRedirectUrl = typeof window !== 'undefined' ? sessionStorage.getItem('google_signin_redirect_url') : null;
+    const signInInitiated = typeof window !== 'undefined' ? sessionStorage.getItem('google_signin_initiated') : null;
+    
+    if (storedRedirectUrl || signInInitiated) {
+      console.log('[Login Page] 🔵 Detected return from Google sign-in!', {
+        storedRedirectUrl,
+        signInInitiated: signInInitiated ? new Date(parseInt(signInInitiated)).toISOString() : null,
+        timeSinceInitiated: signInInitiated ? Date.now() - parseInt(signInInitiated) + 'ms' : null
+      });
+      
+      // Don't remove these yet - we'll remove them after successful login
+      // This helps us detect if we're in a redirect flow
+    }
+    
+    // Listen for Google sign-in completion event from auth service
+    // This is a fallback when getRedirectResult() doesn't work
+    googleSignInHandler = (e: CustomEvent) => {
+      console.log('[Login Page] 🔵✅ Received google-signin-complete event!', e.detail);
+      if (e.detail?.user) {
+        console.log('[Login Page] Processing Google sign-in from event...');
+        // Clear the stored redirect indicators
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('google_signin_redirect_url');
+          sessionStorage.removeItem('google_signin_initiated');
+        }
+        handleGoogleRedirectSuccess(e.detail.user);
+      } else {
+        console.warn('[Login Page] Event received but no user data:', e.detail);
+      }
+    };
+    window.addEventListener('google-signin-complete', googleSignInHandler as EventListener);
+    console.log('[Login Page] ✅ Registered listener for google-signin-complete event');
+    
+    // CRITICAL: Check redirect result IMMEDIATELY, synchronously, before ANY delays
+    // getRedirectResult() must be called before auth state listener processes the redirect
+    // Firebase redirects back to the same page, so check immediately
+    let redirectResult: any = null;
+    try {
+      console.log('[Login Page] 🔍 Checking for Google redirect result (SYNCHRONOUS, must be first!)...');
+      redirectResult = await authService.checkRedirectResult();
+      console.log('[Login Page] 📋 Redirect result:', redirectResult);
+    } catch (err: any) {
+      console.error('[Login Page] ❌ Error checking redirect result:', err);
+      error = err.message || 'Error processing Google sign-in';
+    }
+    
+    // Process redirect result if found
+    if (redirectResult && redirectResult.success && redirectResult.data) {
+      console.log('[Login Page] ✅ Google redirect sign-in successful! Processing...');
+      // Handle the successful redirect sign-in
+      await handleGoogleRedirectSuccess(redirectResult.data);
+      return; // Exit early - redirect will happen
+    } else if (redirectResult && !redirectResult.success) {
+      error = redirectResult.error || 'Google sign-in failed';
+      console.error('[Login Page] ❌ Google redirect sign-in failed:', error);
+      isLoading = false;
+    } else {
+      console.log('[Login Page] ℹ️ No redirect result found (normal for non-redirect visits)');
+    }
+    
+    // Wait a moment for auth service to fully initialize (only if no redirect)
+    if (!redirectResult || !redirectResult.success) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    // FALLBACK: If no redirect result but user is authenticated, they might have signed in via redirect
+    // The auth state listener might have processed the redirect before we checked
+    // Wait and check multiple times for the user to appear
+    let currentUser = authService.getCurrentUser();
+    console.log('[Login Page] 🔍 Checking for authenticated user (fallback, attempt 1):', {
+      hasUser: !!currentUser,
+      userEmail: currentUser?.email,
+      providerData: currentUser?.providerData?.map(p => p.providerId) || []
+    });
+    
+    // If we detected a return from Google (stored redirect URL or sign-in initiated), 
+    // wait more aggressively for the auth state to update
+    const isReturnFromGoogle = storedRedirectUrl || signInInitiated;
+    if (!currentUser && isReturnFromGoogle) {
+      console.log('[Login Page] 🔄 Detected return from Google but no user yet - waiting aggressively for auth state...');
+      console.log('[Login Page] This might take a moment as Firebase processes the redirect...');
+      
+      // Wait longer and check more times (up to 3 seconds)
+      for (let i = 0; i < 15; i++) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        currentUser = authService.getCurrentUser();
+        if (currentUser) {
+          console.log('[Login Page] ✅ User found after waiting:', {
+            attempt: i + 1,
+            email: currentUser.email,
+            providerData: currentUser.providerData.map(p => p.providerId)
+          });
+          break;
+        }
+        if (i % 5 === 0) {
+          console.log(`[Login Page] Still waiting for auth state... (attempt ${i + 1}/15)`);
+        }
+      }
+    }
+    
+    if (currentUser && !redirectResult) {
+      // Check if this user signed in with Google (has Google provider)
+      const isGoogleUser = currentUser.providerData.some(p => p.providerId === 'google.com');
+      if (isGoogleUser) {
+        console.log('[Login Page] 🔵✅ User authenticated with Google (redirect completed via fallback, processing...)');
+        // Clear the stored redirect indicators
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('google_signin_redirect_url');
+          sessionStorage.removeItem('google_signin_initiated');
+        }
+        await handleGoogleRedirectSuccess({ email: currentUser.email, uid: currentUser.uid });
+        return;
+      } else {
+        console.log('[Login Page] ℹ️ User found but not Google user:', currentUser.providerData.map(p => p.providerId));
+      }
+    } else if (!currentUser && isReturnFromGoogle) {
+      console.warn('[Login Page] ⚠️ Detected return from Google but no user found after waiting 3 seconds');
+      console.warn('[Login Page] This suggests Firebase redirect flow may not be completing properly');
+      console.warn('[Login Page] Possible causes:');
+      console.warn('[Login Page] 1. Firebase Auth domain configuration issue');
+      console.warn('[Login Page] 2. Custom domain redirect not properly configured');
+      console.warn('[Login Page] 3. Browser blocking third-party cookies/storage');
+      
+      // Clear the stored redirect indicators to prevent infinite loops
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('google_signin_redirect_url');
+        sessionStorage.removeItem('google_signin_initiated');
+      }
+    }
     
     // Check for error in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -41,17 +179,32 @@
       userEmail: user?.email || 'none'
     });
     
-    if (isAuthenticated) {
-      console.log('[Login Page] Already authenticated, redirecting to dashboard');
-      await goto('/dashboard', { replaceState: true });
-    } else {
+        if (isAuthenticated) {
+          const userEmail = authService.getCurrentUser()?.email;
+          const isPlatformAdminUser = isPlatformAdmin(userEmail || null);
+          if (isPlatformAdminUser) {
+            console.log('[Login Page] Already authenticated as platform admin, redirecting to admin pages');
+            await goto('/admin/management', { replaceState: true });
+          } else {
+            console.log('[Login Page] Already authenticated, redirecting to dashboard');
+            await goto('/dashboard', { replaceState: true });
+          }
+        } else {
       console.log('[Login Page] Not authenticated, showing login form');
+    }
+  });
+
+  onDestroy(() => {
+    // Clean up event listener
+    if (googleSignInHandler && typeof window !== 'undefined') {
+      window.removeEventListener('google-signin-complete', googleSignInHandler as EventListener);
     }
   });
 
   async function handleSubmit() {
     isLoading = true;
     error = '';
+    success = '';
 
     // Basic validation
     if (!email || !password) {
@@ -60,27 +213,13 @@
       return;
     }
 
-    if (mode === 'signup' && password.length < 6) {
-      error = 'Password must be at least 6 characters';
-      isLoading = false;
-      return;
-    }
-
     try {
-      console.log('[Login Page] Form submitted:', { email, mode });
+      console.log('[Login Page] Form submitted:', { email });
       console.log('[Login Page] Calling authService.signIn...');
       
-      let result;
-      
-      if (mode === 'signin') {
-        console.log('[Login Page] Attempting sign in...');
-        result = await authService.signIn(email, password);
-        console.log('[Login Page] Sign in result:', result);
-      } else {
-        console.log('[Login Page] Attempting sign up...');
-        result = await authService.signUp(email, password);
-        console.log('[Login Page] Sign up result:', result);
-      }
+      console.log('[Login Page] Attempting sign in...');
+      const result = await authService.signIn(email, password);
+      console.log('[Login Page] Sign in result:', result);
 
       if (result.success) {
         console.log('[Login Page] Authentication successful, waiting for auth state...');
@@ -129,21 +268,39 @@
         // This is critical for tenant API calls to work
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Robust tenant connection for ALL logins (signin and signup)
-        const userRole = await ensureTenantConnection(user, email, mode === 'signup');
+        // Check if platform admin - redirect to admin management page
+        const userIsPlatformAdmin = isPlatformAdmin(email);
         
-        console.log('[Login Page] User role:', userRole);
-        
-        // Redirect based on user role
-        if (userRole === 'support') {
-          console.log('[Login Page] Redirecting support user to support dashboard');
-          await goto('/support-dashboard', { replaceState: true });
+        if (userIsPlatformAdmin) {
+          console.log('[Login Page] Platform admin login, redirecting to admin pages');
+          await goto('/admin/management', { replaceState: true });
         } else {
-          console.log('[Login Page] Redirecting to dashboard');
-          await goto('/dashboard', { replaceState: true });
+        // Robust tenant connection for logins
+        const userRole = await ensureTenantConnection(user, email, false);
+          
+          console.log('[Login Page] User role:', userRole);
+          
+          // Redirect based on user role
+          if (userRole === 'support') {
+            console.log('[Login Page] Redirecting support user to support dashboard');
+            await goto('/support-dashboard', { replaceState: true });
+          } else {
+            console.log('[Login Page] Redirecting to dashboard');
+            await goto('/dashboard', { replaceState: true });
+          }
         }
       } else {
-        error = result.error || 'Authentication failed';
+        // Provide more helpful error messages
+        const errorMsg = result.error || 'Authentication failed';
+        
+        // Check if this might be a platform admin account issue
+        const isAdminEmail = email.toLowerCase() === 'admin@wisptools.io';
+        if (isAdminEmail && errorMsg.includes('Invalid')) {
+          error = 'Invalid credentials. If this is a platform admin account, ensure it exists in Firebase Authentication. You may need to create the account first or use Google Sign-In.';
+        } else {
+          error = errorMsg;
+        }
+        
         console.error('[Login Page] Authentication failed:', error);
       }
     } catch (err: any) {
@@ -189,39 +346,32 @@
         }
       }
       
+      // Check if user is platform admin
+      const userIsPlatformAdmin = isPlatformAdmin(email);
+      
+      // Platform admins don't need tenants - allow them to proceed
+      if (userIsPlatformAdmin) {
+        console.log('[Login Page] Platform admin detected, allowing login without tenant');
+        // Platform admins can proceed without a tenant
+        return 'platform_admin';
+      }
+      
       // If no current tenant set yet, try auto-selection
       if (!currentTenant && tenants.length > 0) {
         // Auto-select single tenant for non-admin users
-        const userIsPlatformAdmin = isPlatformAdmin(email);
-        if (tenants.length === 1 && !userIsPlatformAdmin) {
+        if (tenants.length === 1) {
           console.log('[Login Page] Auto-selecting single tenant:', tenants[0].displayName);
           currentTenant = tenants[0];
           tenantStore.setCurrentTenant(currentTenant);
         } else if (tenants.length > 0) {
-          // Multiple tenants or admin - use first tenant as default if none selected
+          // Multiple tenants - use first tenant as default if none selected
           console.log('[Login Page] Multiple tenants available, using first as default');
           currentTenant = tenants[0];
           tenantStore.setCurrentTenant(currentTenant);
         }
       }
       
-      // For new users, create tenant if none exists
-      if (isNewUser && tenants.length === 0) {
-        console.log('[Login Page] New user with no tenants, creating automatic tenant...');
-        try {
-          await createAutomaticTenant(user, email);
-          // Reload tenants after creation
-          const updatedTenants = await tenantStore.loadUserTenants(user.uid, email);
-          if (updatedTenants.length > 0) {
-            currentTenant = updatedTenants[0];
-            tenantStore.setCurrentTenant(currentTenant);
-            console.log('[Login Page] Automatic tenant created and set:', currentTenant.displayName);
-          }
-        } catch (tenantError: any) {
-          console.error('[Login Page] Error creating automatic tenant:', tenantError);
-          // Don't block login - user can create tenant manually later
-        }
-      }
+      // Note: New users should use the signup wizard which handles tenant creation
       
       // Ensure tenantId is in localStorage for services
       const finalTenant = get(tenantStore).currentTenant;
@@ -306,91 +456,138 @@
     }
   }
 
-  async function handleGoogleSignIn() {
+  async function handlePasswordReset() {
+    if (!passwordResetEmail || !passwordResetEmail.includes('@')) {
+      error = 'Please enter a valid email address';
+      return;
+    }
+
     isLoading = true;
     error = '';
+    success = '';
 
     try {
-      console.log('[Login Page] Attempting Google sign in...');
-      const result = await authService.signInWithGoogle();
-
+      const result = await authService.resetPassword(passwordResetEmail);
       if (result.success) {
-        console.log('[Login Page] Google authentication successful, waiting for auth state...');
-        
-        // Wait for Firebase auth state to fully update before redirecting
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Verify auth state is ready
-        let user = authService.getCurrentUser();
-        let retries = 0;
-        while (!user && retries < 10) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          user = authService.getCurrentUser();
-          retries++;
-        }
-        
-        if (!user) {
-          console.error('[Login Page] Auth state not ready after Google login');
-          error = 'Authentication state not ready. Please try again.';
-          isLoading = false;
-          return;
-        }
-        
-        console.log('[Login Page] Google auth state ready');
-
-        const emailLower = (user.email || '').toLowerCase();
-        if (!emailLower.endsWith('@wisptools.io')) {
-          console.warn('[Login Page] Google login blocked for non-domain email:', user.email);
-          error = 'Only Google accounts under the wisptools.io domain are allowed.';
-          await authService.signOut();
-          isLoading = false;
-          return;
-        }
-        
-        // Store user info in localStorage for compatibility
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userEmail', user.email || '');
-        
-        // Ensure token is ready before making API calls
-        // Force token refresh to ensure it's valid for backend
-        try {
-          const token = await user.getIdToken(true);
-          console.log('[Login Page] Google token ready:', { 
-            hasToken: !!token, 
-            tokenLength: token?.length,
-            userId: user.uid 
-          });
-        } catch (tokenError: any) {
-          console.warn('[Login Page] Google token refresh warning:', tokenError);
-          // Continue anyway - getAuthHeaders will retry
-        }
-        
-        // Wait a bit more to ensure Firebase auth state is fully propagated
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Robust tenant connection for Google sign-in
-        await ensureTenantConnection(user, user.email || '', true);
-        
-        console.log('[Login Page] Redirecting to dashboard');
-        
-        // Redirect to dashboard
-        await goto('/dashboard', { replaceState: true });
+        passwordResetSent = true;
+        success = 'Password reset email sent! Check your inbox for instructions.';
       } else {
-        error = result.error || 'Google authentication failed';
-        console.error('[Login Page] Google authentication failed:', error);
+        error = result.error || 'Failed to send password reset email';
       }
     } catch (err: any) {
-      error = err.message || 'Google authentication error';
-      console.error('[Login Page] Google authentication error:', err);
+      error = err.message || 'Failed to send password reset email';
     } finally {
       isLoading = false;
     }
   }
 
-  function toggleMode() {
-    mode = mode === 'signin' ? 'signup' : 'signin';
+  async function handleGoogleSignIn() {
+    isLoading = true;
     error = '';
+
+    try {
+      console.log('[Login Page] Initiating Google sign in with redirect...');
+      const result = await authService.signInWithGoogle();
+
+      if (result.success) {
+        // Redirect will happen automatically - user will be redirected to Google
+        // Then back to login page where handleGoogleRedirectSuccess will be called
+        console.log('[Login Page] Redirecting to Google for sign-in...');
+        // Don't set isLoading = false here - redirect is happening
+        return;
+      } else {
+        error = result.error || 'Google authentication failed';
+        console.error('[Login Page] Google authentication failed:', error);
+        isLoading = false;
+      }
+    } catch (err: any) {
+      error = err.message || 'Google authentication error';
+      console.error('[Login Page] Google authentication error:', err);
+      isLoading = false;
+    }
   }
+
+  /**
+   * Handle successful Google Sign-In redirect
+   */
+  async function handleGoogleRedirectSuccess(userProfile: any) {
+    isLoading = true;
+    error = '';
+
+    try {
+      console.log('[Login Page] Processing Google redirect sign-in...');
+      
+      // Wait for Firebase auth state to fully update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Get the actual user from Firebase
+      let finalUser = authService.getCurrentUser();
+      if (!finalUser) {
+        // Wait a bit more
+        let retries = 0;
+        while (!finalUser && retries < 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          finalUser = authService.getCurrentUser();
+          retries++;
+        }
+      }
+      if (!finalUser) {
+        console.error('[Login Page] Auth state not ready after Google redirect');
+        error = 'Authentication state not ready. Please try again.';
+        isLoading = false;
+        return;
+      }
+      
+      console.log('[Login Page] Google redirect auth state ready');
+
+      // Check if platform admin (admin@wisptools.io)
+      const isPlatformAdminUser = isPlatformAdmin(finalUser.email);
+      
+      // Allow all email domains - no restriction
+      console.log('[Login Page] User authenticated:', { 
+        email: finalUser.email, 
+        isPlatformAdmin: isPlatformAdminUser 
+      });
+      
+      // Store user info in localStorage for compatibility
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userEmail', finalUser.email || '');
+      
+      // Ensure token is ready before making API calls
+      try {
+        const token = await finalUser.getIdToken(true);
+        console.log('[Login Page] Google token ready:', { 
+          hasToken: !!token, 
+          tokenLength: token?.length,
+          userId: finalUser.uid 
+        });
+      } catch (tokenError: any) {
+        console.warn('[Login Page] Google token refresh warning:', tokenError);
+      }
+      
+      // Wait a bit more to ensure Firebase auth state is fully propagated
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+          // Check if platform admin - redirect to admin management page
+          if (isPlatformAdminUser) {
+            console.log('[Login Page] Platform admin Google login, redirecting to admin pages');
+            await goto('/admin/management', { replaceState: true });
+          } else {
+        // Robust tenant connection for Google sign-in
+        const userRole = await ensureTenantConnection(finalUser, finalUser.email || '', true);
+        
+        console.log('[Login Page] Google login tenant connection complete, role:', userRole);
+        
+        // Redirect to dashboard
+        await goto('/dashboard', { replaceState: true });
+      }
+    } catch (err: any) {
+      error = err.message || 'Error processing Google sign-in';
+      console.error('[Login Page] Error processing Google redirect:', err);
+      isLoading = false;
+    }
+  }
+
 </script>
 
 <div class="login-page">
@@ -404,11 +601,9 @@
 
     <!-- Login Form -->
     <div class="login-card">
-      <h2>{mode === 'signin' ? 'Welcome Back' : 'Create Account'}</h2>
+      <h2>Welcome Back</h2>
       <p class="subtitle">
-        {mode === 'signin' 
-          ? 'Sign in to access your network management tools' 
-          : 'Get started with professional network planning'}
+        Sign in to access your network management tools
       </p>
 
       {#if error}
@@ -418,7 +613,74 @@
         </div>
       {/if}
 
-      <form on:submit|preventDefault={handleSubmit}>
+      {#if success}
+        <div class="success-message" style="background-color: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); color: #22c55e; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>✅</span>
+          {success}
+        </div>
+      {/if}
+
+      {#if showPasswordReset}
+        <div class="password-reset-form" style="background: rgba(0, 217, 255, 0.1); border: 1px solid rgba(0, 217, 255, 0.3); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;">
+          <h3 style="margin-top: 0; margin-bottom: 1rem; color: #00d9ff;">Reset Password</h3>
+          {#if !passwordResetSent}
+            <p style="color: #a0d9e8; margin-bottom: 1rem; font-size: 0.875rem;">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+            <div class="form-group">
+              <label for="passwordResetEmail">Email Address</label>
+              <input
+                id="passwordResetEmail"
+                type="email"
+                bind:value={passwordResetEmail}
+                placeholder="your@email.com"
+                disabled={isLoading}
+                required
+              />
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+              <button 
+                type="button" 
+                class="btn-primary" 
+                onclick={handlePasswordReset}
+                disabled={isLoading || !passwordResetEmail}
+                style="flex: 1;"
+              >
+                {#if isLoading}
+                  <span class="spinner"></span>
+                  Sending...
+                {:else}
+                  Send Reset Link
+                {/if}
+              </button>
+              <button 
+                type="button" 
+                class="link-btn" 
+                onclick={() => { showPasswordReset = false; passwordResetEmail = ''; passwordResetSent = false; error = ''; success = ''; }}
+                disabled={isLoading}
+                style="background: rgba(0, 217, 255, 0.2); border: 1px solid rgba(0, 217, 255, 0.3); color: #00d9ff; padding: 0.875rem 1rem; border-radius: 0.5rem;"
+              >
+                Cancel
+              </button>
+            </div>
+          {:else}
+            <p style="color: #a0d9e8; margin-bottom: 1rem;">
+              ✅ Password reset email sent! Please check your inbox and follow the instructions to reset your password.
+            </p>
+            <button 
+              type="button" 
+              class="link-btn" 
+              onclick={() => { showPasswordReset = false; passwordResetEmail = ''; passwordResetSent = false; success = ''; }}
+              style="background: rgba(0, 217, 255, 0.2); border: 1px solid rgba(0, 217, 255, 0.3); color: #00d9ff; padding: 0.875rem 1rem; border-radius: 0.5rem; width: 100%;"
+            >
+              Back to Sign In
+            </button>
+          {/if}
+        </div>
+      {/if}
+
+      {#if !showPasswordReset}
+      <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         <div class="form-group">
           <label for="email">Email Address</label>
           <input
@@ -432,7 +694,17 @@
         </div>
 
         <div class="form-group">
-          <label for="password">Password</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label for="password">Password</label>
+            <button 
+              type="button" 
+              class="link-btn" 
+              style="font-size: 0.875rem; padding: 0;"
+              onclick={() => showPasswordReset = true}
+            >
+              Forgot password?
+            </button>
+          </div>
           <input
             id="password"
             type="password"
@@ -446,19 +718,25 @@
         <button type="submit" class="btn-primary" disabled={isLoading}>
           {#if isLoading}
             <span class="spinner"></span>
-            {mode === 'signin' ? 'Signing in...' : 'Creating account...'}
+            Signing in...
           {:else}
-            {mode === 'signin' ? 'Sign In' : 'Create Account'}
+            Sign In
           {/if}
         </button>
       </form>
+      {/if}
 
       <div class="form-footer">
-        <button type="button" class="link-btn" on:click={toggleMode}>
-          {mode === 'signin' 
-            ? "Don't have an account? Sign up" 
-            : 'Already have an account? Sign in'}
-        </button>
+        <a 
+          href="/signup" 
+          class="link-btn"
+          onclick={(e) => {
+            e.preventDefault();
+            goto('/signup');
+          }}
+        >
+          Don't have an account? Create one
+        </a>
       </div>
 
       <div class="login-divider">
@@ -467,7 +745,7 @@
         <span></span>
       </div>
 
-      <button type="button" class="btn-google" on:click={handleGoogleSignIn} disabled={isLoading}>
+      <button type="button" class="btn-google" onclick={handleGoogleSignIn} disabled={isLoading}>
         <svg aria-hidden="true" viewBox="0 0 533.5 544.3">
           <path fill="#4285f4" d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.2H272v95h147.5c-6.4 34-25 62.8-53.4 82v68h86.1c50.4-46.5 80.3-115.1 80.3-194.8z"/>
           <path fill="#34a853" d="M272 544.3c72.2 0 132.8-23.9 177-64.7l-86.1-68c-23.9 16.1-54.5 25.7-90.9 25.7-69.9 0-129.2-47.2-150.4-110.5h-90.7v69.8c44 87.4 134.5 148.7 241.1 148.7z"/>
@@ -477,11 +755,11 @@
         <span>Sign in with Google</span>
       </button>
 
-      <p class="domain-note">Use your <strong>@wisptools.io</strong> Google account to sign in.</p>
+      <p class="domain-note">Sign in with your Google account. No password needed - Google handles authentication.</p>
 
       <div class="demo-notice">
-        <p><strong>Firebase Authentication:</strong> Use your Firebase account to access your saved networks and data.</p>
-        <p>Don't have an account? Click "Sign up" to create one.</p>
+        <p><strong>Google Sign-In:</strong> Uses Google's secure authentication - no password required for Google accounts.</p>
+        <p>Email/Password accounts can be created for non-Google email addresses.</p>
       </div>
     </div>
 

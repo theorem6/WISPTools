@@ -95,10 +95,6 @@
         "function": "apiProxy"
       },
       {
-        "source": "/admin/**",
-        "function": "apiProxy"
-      },
-      {
         "source": "**",
         "destination": "/index.html"
       }

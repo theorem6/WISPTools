@@ -552,6 +552,11 @@
   }
   
   .btn-primary {
+    background: var(--primary-light, #dbeafe);
+    color: var(--primary-dark, #1e40af);
+  }
+  
+  .btn-primary:hover {
     background: var(--brand-primary);
     color: white;
   }

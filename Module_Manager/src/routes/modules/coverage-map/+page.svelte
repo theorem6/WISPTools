@@ -2044,6 +2044,33 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     showHardwareDeploymentModal = false;
     showEPCDeploymentModal = true;
   }}
+  on:view-inventory={(e) => {
+    const tower = e.detail.tower;
+    if (!tower) return;
+    
+    // Check if we're in embedded mode (iframe)
+    const isIframe = typeof window !== 'undefined' && window.parent && window.parent !== window;
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const checkDeployMode = isDeployMode || urlParams?.get('deployMode') === 'true' || urlParams?.get('mode') === 'deploy';
+    const checkPlanMode = isPlanMode || urlParams?.get('planMode') === 'true' || urlParams?.get('mode') === 'plan';
+    const isEmbedded = isIframe || checkDeployMode || checkPlanMode;
+    
+    if (isEmbedded && typeof window !== 'undefined' && window.parent) {
+      // Send message to parent (deploy module) to show SiteEquipmentModal
+      const message = {
+        source: 'coverage-map',
+        type: 'object-action',
+        objectId: tower.id,
+        action: 'view-inventory',
+        data: { tower }
+      };
+      console.log('[CoverageMap] HardwareDeploymentModal view-inventory - sending to parent:', message);
+      window.parent.postMessage(message, '*');
+    } else {
+      // Standalone mode - navigate to inventory
+      goto(`/modules/inventory?siteId=${tower.id}&siteName=${encodeURIComponent(tower.name)}`);
+    }
+  }}
   on:deployed={async (e) => {
     console.log('[CoverageMap] Hardware deployed:', e.detail);
     success = `Hardware deployed to ${e.detail.tower?.name || 'site'} successfully`;

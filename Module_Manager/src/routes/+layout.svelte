@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
+  import { page } from '$app/stores';
   import { authService } from '$lib/services/authService';
   import { tenantStore } from '$lib/stores/tenantStore';
   import { themeManager } from '$lib/stores/themeStore';
@@ -10,6 +11,9 @@
   let isInitializing = true;
   let isAuthenticated = false;
   let currentUser: any = null;
+  
+  // Check if we're on an admin route
+  $: isAdminRoute = $page.url.pathname.startsWith('/admin');
   
   onMount(async () => {
     if (!browser) return;
@@ -41,6 +45,7 @@
     
     isInitializing = false;
   });
+  
   
   // Simple auth state listener for basic protection
   // TenantGuard will handle the complex logic

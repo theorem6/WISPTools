@@ -166,9 +166,12 @@
     isLoading = true;
     error = '';
 
+    let userCreated = false;
+    let firebaseUser: any = null;
+
     try {
       // First, check if user is already authenticated or try to create account
-      let firebaseUser = authService.getCurrentUser();
+      firebaseUser = authService.getCurrentUser();
       if (!firebaseUser) {
         // Create account with temporary password - user will set password later
         const tempPassword = `Temp${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
@@ -177,7 +180,7 @@
         if (!signUpResult.success || !signUpResult.data) {
           // Check if error is due to email already existing
           if (signUpResult.error && signUpResult.error.includes('already in use')) {
-            throw new Error('This email address is already registered. Please sign in instead. If you forgot your password, use the password reset option on the login page.');
+            throw new Error('This email address is already registered. Please <a href="/login" style="color: #00d9ff; text-decoration: underline;">sign in instead</a>. If you forgot your password, use the "Forgot password?" link on the login page.');
           }
           throw new Error(signUpResult.error || 'Failed to create account');
         }
@@ -187,30 +190,50 @@
           throw new Error('Account created but user not found');
         }
 
+        userCreated = true; // Track that we created this user
+
         // Send password reset email so user can set their own password
-        await authService.sendPasswordResetEmail(email);
+        const resetResult = await authService.resetPassword(email);
+        if (!resetResult.success) {
+          console.warn('Failed to send password reset email:', resetResult.error);
+          // Continue anyway - user can reset password later
+        }
       }
 
       // Create tenant
-      const tenantData: any = {
-        name: tenantName,
+      // Note: createTenant expects individual parameters, not an object
+      // The backend automatically creates the user-tenant association as owner
+      const createResult = await tenantService.createTenant(
+        tenantName,
         displayName,
-        contactEmail: email,
-        contactPhone,
-        subdomain
-      };
+        email,
+        firebaseUser.uid,
+        subdomain,
+        true, // createOwnerAssociation
+        email // ownerEmail
+      );
 
-      // Primary location can be set up later from the coverage map
+      if (!createResult.success || !createResult.tenantId) {
+        throw new Error(createResult.error || 'Failed to create tenant');
+      }
 
-      const tenant = await tenantService.createTenant(tenantData);
-      createdTenantId = tenant.id;
-
-      // Associate user with tenant as owner
-      await tenantService.addUserToTenant(firebaseUser.uid, tenant.id, 'owner');
+      createdTenantId = createResult.tenantId;
 
       success = 'Tenant created successfully!';
       step = 3; // Move to payment step
     } catch (err: any) {
+      // If we created a Firebase user but tenant creation failed, delete the user
+      if (userCreated && firebaseUser) {
+        console.log('Tenant creation failed, cleaning up Firebase user...');
+        try {
+          await authService.deleteCurrentUser();
+          console.log('Firebase user deleted successfully');
+        } catch (deleteError: any) {
+          console.error('Failed to delete Firebase user:', deleteError);
+          // Continue with error handling
+        }
+      }
+
       // Handle email already exists error specially
       if (err.message && err.message.includes('already in use')) {
         error = 'This email address is already registered. Please sign in to your existing account instead.';

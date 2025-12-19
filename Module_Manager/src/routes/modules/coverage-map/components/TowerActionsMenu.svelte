@@ -158,14 +158,39 @@
   }
 
   // Get formatted site type name for menu labels
-  function getSiteTypeLabel(siteType: string | undefined | null): string {
-    // Handle null, undefined, or empty string
-    if (!siteType || typeof siteType !== 'string') return 'Tower';
+  function getSiteTypeLabel(siteType: string | string[] | undefined | null): string {
+    // Handle null, undefined, or empty
+    if (!siteType) return 'Tower';
+    
+    // Handle array of types
+    if (Array.isArray(siteType)) {
+      if (siteType.length === 0) return 'Tower';
+      if (siteType.length === 1) {
+        return getSiteTypeLabel(siteType[0]);
+      }
+      // Multiple types - format as "Type1 + Type2 + Type3"
+      const typeMap: Record<string, string> = {
+        'tower': 'Tower',
+        'noc': 'NOC',
+        'hq': 'HQ',
+        'warehouse': 'Warehouse',
+        'building': 'Building',
+        'pole': 'Pole',
+        'internet-access': 'Internet Access',
+        'internet': 'Internet',
+        'other': 'Other'
+      };
+      return siteType.map(t => typeMap[t.toLowerCase()] || t.charAt(0).toUpperCase() + t.slice(1)).join(' + ');
+    }
+    
+    // Handle single string type
+    if (typeof siteType !== 'string') return 'Tower';
     
     const normalizedType = siteType.toLowerCase().trim();
     const typeMap: Record<string, string> = {
       'tower': 'Tower',
       'noc': 'NOC',
+      'hq': 'HQ',
       'warehouse': 'Warehouse',
       'building': 'Building',
       'pole': 'Pole',

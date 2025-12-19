@@ -6,7 +6,6 @@
   import { isCurrentUserPlatformAdmin, isPlatformAdminByUid } from '$lib/services/adminService';
   import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
-  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import type { Tenant } from '$lib/models/tenant';
 
   let isLoading = true;
@@ -168,8 +167,8 @@
   }
 </script>
 
-<TenantGuard adminOnly={true}>
-  <div class="system-admin-page">
+<div class="system-admin-page">
+    <AdminBreadcrumb items={[{ label: 'System Administration' }]} />
     <div class="admin-header">
       <h1>🔧 System Administration</h1>
       <p>Manage all tenants and system settings</p>
@@ -371,13 +370,15 @@
       </div>
     {/if}
   </div>
-</TenantGuard>
 
 <style>
   .system-admin-page {
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
   }
 
   .admin-header {
@@ -396,10 +397,10 @@
   }
 
   .tenants-list {
-    background: white;
-    border-radius: 8px;
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
     padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-sm);
   }
 
   .tenants-list h2 {
@@ -417,21 +418,22 @@
   }
 
   thead {
-    background: #f5f5f5;
+    background: var(--bg-secondary);
   }
 
   th, td {
     padding: 0.75rem;
     text-align: left;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
   }
 
   tr.selected {
-    background: #e3f2fd;
+    background: var(--primary-light);
   }
 
   tr:hover {
-    background: #f9f9f9;
+    background: var(--hover-bg);
   }
 
   .status-badge {
@@ -442,18 +444,18 @@
   }
 
   .status-active {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
   }
 
   .status-suspended {
-    background: #fff3e0;
-    color: #ef6c00;
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
   }
 
   .status-deleted {
-    background: #ffebee;
-    color: #c62828;
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
   }
 
   .actions {
@@ -476,30 +478,31 @@
   }
 
   .btn-secondary {
-    background: #757575;
-    color: white;
+    background: var(--text-secondary);
+    color: var(--text-inverse);
   }
 
   .btn-secondary:hover {
-    background: #616161;
+    background: var(--text-secondary);
+    opacity: 0.9;
   }
 
   .btn-warning {
-    background: #ff9800;
-    color: white;
+    background: var(--warning-color);
+    color: var(--text-inverse);
   }
 
   .btn-warning:hover {
-    background: #f57c00;
+    background: var(--warning-hover);
   }
 
   .btn-danger {
-    background: #f44336;
-    color: white;
+    background: var(--danger-color);
+    color: var(--text-inverse);
   }
 
   .btn-danger:hover {
-    background: #d32f2f;
+    background: var(--danger-hover);
   }
 
   .btn:disabled {
@@ -508,10 +511,10 @@
   }
 
   .tenant-details {
-    background: white;
-    border-radius: 8px;
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
     padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-sm);
   }
 
   .details-card {
@@ -522,7 +525,7 @@
     display: flex;
     justify-content: space-between;
     padding: 0.75rem 0;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .detail-row:last-child {
@@ -540,7 +543,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.5);
+    background: var(--overlay-bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -548,8 +551,8 @@
   }
 
   .modal {
-    background: white;
-    border-radius: 8px;
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
     padding: 2rem;
     max-width: 500px;
     width: 90%;
@@ -557,11 +560,11 @@
 
   .modal h2 {
     margin-bottom: 1rem;
-    color: #f44336;
+    color: var(--danger-dark, #991b1b);
   }
 
   .warning-text {
-    color: #d32f2f;
+    color: var(--danger-dark, #991b1b);
     font-weight: 500;
     margin: 1rem 0;
   }
@@ -585,13 +588,13 @@
   }
 
   .error-message {
-    background: #ffebee;
-    color: #c62828;
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
   }
 
   .success-message {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
   }
 
   .loading {
@@ -602,7 +605,7 @@
   .empty-state {
     text-align: center;
     padding: 3rem;
-    color: #757575;
+    color: var(--text-secondary);
   }
 </style>
 

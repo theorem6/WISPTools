@@ -13,10 +13,23 @@
   let searchAddress = '';
   let isSearching = false;
   
+  // Available site types
+  const siteTypes: Array<{ value: string; label: string; icon: string }> = [
+    { value: 'tower', label: 'Tower', icon: '📡' },
+    { value: 'noc', label: 'NOC', icon: '🖥️' },
+    { value: 'hq', label: 'HQ', icon: '🏢' },
+    { value: 'warehouse', label: 'Warehouse', icon: '🏭' },
+    { value: 'building', label: 'Building / Rooftop', icon: '🏗️' },
+    { value: 'pole', label: 'Pole / Monopole', icon: '📡' },
+    { value: 'internet-access', label: 'Internet Access Point', icon: '🌐' },
+    { value: 'internet', label: 'Internet', icon: '🌍' },
+    { value: 'other', label: 'Other', icon: '📍' }
+  ];
+
   // Form data - comprehensive for all site types
   let formData = {
     name: '',
-    type: 'tower' as 'tower' | 'building' | 'noc' | 'warehouse' | 'pole' | 'internet-access' | 'internet' | 'other',
+    types: ['tower'] as string[], // Array of selected types
     status: 'active' as 'active' | 'inactive' | 'maintenance' | 'planned',
     
     // Location
@@ -77,7 +90,14 @@
   $: if (show && site) {
     // Editing existing site
     formData.name = site.name || '';
-    formData.type = site.type || 'tower';
+    // Handle both old single type and new array type format
+    if (Array.isArray(site.type)) {
+      formData.types = site.type.length > 0 ? [...site.type] : ['tower'];
+    } else if (site.type) {
+      formData.types = [site.type];
+    } else {
+      formData.types = ['tower'];
+    }
     formData.status = site.status || 'active';
     formData.latitude = site.location?.latitude || 0;
     formData.longitude = site.location?.longitude || 0;
@@ -124,7 +144,7 @@
     // New site - reset to defaults
     formData = {
       name: '',
-      type: 'tower',
+      types: ['tower'],
       status: 'active',
       latitude: 0,
       longitude: 0,
@@ -188,9 +208,16 @@
     error = '';
     
     try {
+      // Ensure at least one type is selected
+      if (formData.types.length === 0) {
+        error = 'Please select at least one site type';
+        isSaving = false;
+        return;
+      }
+      
       const siteData: any = {
         name: formData.name.trim(),
-        type: formData.type,
+        type: formData.types, // Send as array
         status: formData.status,
         location: {
           latitude: formData.latitude,
@@ -335,17 +362,39 @@
             <input type="text" bind:value={formData.name} placeholder="Main Tower Site" required />
           </div>
           
-          <div class="form-group">
-            <label>Site Type *</label>
-            <select bind:value={formData.type}>
-              <option value="tower">📡 Tower</option>
-              <option value="building">🏢 Building / Rooftop</option>
-              <option value="noc">🖥️ NOC (Network Operations Center)</option>
-              <option value="internet-access">🌐 Internet Access Point</option>
-              <option value="warehouse">🏭 Warehouse</option>
-              <option value="pole">📡 Pole / Monopole</option>
-              <option value="other">📍 Other</option>
-            </select>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Site Types * (Select all that apply)</label>
+            <div class="type-checkboxes">
+              {#each siteTypes as siteType}
+                <label class="type-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={formData.types.includes(siteType.value)}
+                    onchange={(e) => {
+                      if (e.currentTarget.checked) {
+                        if (!formData.types.includes(siteType.value)) {
+                          formData.types = [...formData.types, siteType.value];
+                        }
+                      } else {
+                        // Prevent unchecking if it's the only one selected
+                        if (formData.types.length > 1) {
+                          formData.types = formData.types.filter(t => t !== siteType.value);
+                        } else {
+                          e.currentTarget.checked = true;
+                          error = 'At least one site type must be selected';
+                          setTimeout(() => error = '', 3000);
+                        }
+                      }
+                    }}
+                  />
+                  <span class="type-label">
+                    <span class="type-icon">{siteType.icon}</span>
+                    {siteType.label}
+                  </span>
+                </label>
+              {/each}
+            </div>
+            <p class="help-text">Small operators can select multiple types (e.g., NOC + Tower, HQ + NOC)</p>
           </div>
           
           <div class="form-group">
@@ -358,7 +407,7 @@
             </select>
           </div>
           
-          {#if formData.type === 'tower' || formData.type === 'pole'}
+          {#if formData.types.includes('tower') || formData.types.includes('pole')}
           <div class="form-group">
             <label>Height (feet)</label>
             <input type="number" bind:value={formData.height} placeholder="100" min="0" />
@@ -711,6 +760,59 @@
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-top: 0.25rem;
+  }
+  
+  .type-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+  
+  .type-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-secondary);
+  }
+  
+  .type-checkbox:hover {
+    border-color: var(--brand-primary);
+    background: var(--bg-hover);
+  }
+  
+  .type-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--brand-primary);
+  }
+  
+  .type-checkbox input[type="checkbox"]:checked + .type-label {
+    color: var(--brand-primary);
+    font-weight: 600;
+  }
+  
+  .type-checkbox:has(input[type="checkbox"]:checked) {
+    border-color: var(--brand-primary);
+    background: rgba(var(--brand-primary-rgb, 59, 130, 246), 0.1);
+  }
+  
+  .type-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    cursor: pointer;
+  }
+  
+  .type-icon {
+    font-size: 1.2rem;
   }
   
   .modal-footer {

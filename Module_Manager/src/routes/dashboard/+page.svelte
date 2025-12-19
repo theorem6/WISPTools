@@ -125,6 +125,13 @@
         isAdmin = isPlatformAdmin(currentUser?.email || null);
       }
       isLoggedIn = !!currentUser;
+      
+      // Redirect platform admins to admin pages instead of dashboard
+      if (isAdmin) {
+        console.log('[Dashboard] Platform admin detected, redirecting to admin pages');
+        await goto('/admin/management', { replaceState: true });
+        return;
+      }
     }
   });
 

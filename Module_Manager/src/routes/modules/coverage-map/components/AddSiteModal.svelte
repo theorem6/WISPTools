@@ -141,9 +141,12 @@
     
     try {
       if (planId) {
+        // Normalize type to array (handle both single and array)
+        const siteType = Array.isArray(formData.type) ? formData.type : [formData.type];
+        
         const properties: Record<string, any> = {
           name: formData.name.trim(),
-          siteType: formData.type,
+          siteType: siteType.length === 1 ? siteType[0] : siteType, // Keep single for plan drafts, array for multiple
           address: formData.address?.trim() || undefined,
           city: formData.city?.trim() || undefined,
           state: formData.state?.trim() || undefined,
@@ -193,9 +196,12 @@
           dispatch('saved', { message: 'Site staged in plan.' });
         }
       } else {
+        // Normalize type to array for backend
+        const siteType = Array.isArray(formData.type) ? formData.type : [formData.type];
+        
         const siteData: any = {
           name: formData.name,
-          type: formData.type,
+          type: siteType,
           location: {
             latitude: formData.latitude,
             longitude: formData.longitude

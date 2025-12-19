@@ -19,7 +19,7 @@ class EmailService {
     }
     
     // Default platform sender
-    this.platformFromEmail = process.env.ALERT_FROM_EMAIL || 'alerts@4gengineer.com';
+    this.platformFromEmail = process.env.ALERT_FROM_EMAIL || 'alerts@wisptools.io';
     this.platformFromName = process.env.ALERT_FROM_NAME || 'LTE WISP Alerts';
   }
 

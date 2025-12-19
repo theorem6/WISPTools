@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { auth } from '$lib/firebase';
   import { goto } from '$app/navigation';
+  import AdminBreadcrumb from '$lib/components/admin/AdminBreadcrumb.svelte';
   import { isCurrentUserPlatformAdmin, isPlatformAdminByUid } from '$lib/services/adminService';
-  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   
   let loading = true;
   let error = '';
@@ -14,9 +14,12 @@
   let showEditModal = false;
   let showDeleteModal = false;
   let showAssignOwnerModal = false;
+  let showUsersModal = false;
   
   let selectedTenant: any = null;
   let processing = false;
+  let tenantUsers: any[] = [];
+  let loadingUsers = false;
   
   // Form data for create/edit
   let formData = {
@@ -242,22 +245,79 @@
     }
   }
   
+  // Toggle tenant status (enable/disable)
+  async function toggleTenantStatus(tenant: any, enabled: boolean) {
+    if (!tenant) return;
+    
+    processing = true;
+    
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/admin/tenants/${tenant.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          status: enabled ? 'active' : 'suspended'
+        })
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to update tenant status');
+      }
+      
+      // Update local state
+      tenant.status = enabled ? 'active' : 'suspended';
+      await loadTenants();
+    } catch (err: any) {
+      alert(`❌ Error: ${err.message}`);
+      console.error('Error toggling tenant status:', err);
+      // Reload to reset UI state
+      await loadTenants();
+    } finally {
+      processing = false;
+    }
+  }
+  
+  // View tenant users
+  async function openUsersModal(tenant: any) {
+    selectedTenant = tenant;
+    showUsersModal = true;
+    loadingUsers = true;
+    tenantUsers = [];
+    
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/admin/tenants/${tenant.id}/users`, { headers });
+      
+      if (!response.ok) {
+        throw new Error('Failed to load users');
+      }
+      
+      tenantUsers = await response.json();
+    } catch (err: any) {
+      console.error('Error loading tenant users:', err);
+      alert(`Failed to load users: ${err.message}`);
+    } finally {
+      loadingUsers = false;
+    }
+  }
+  
   function closeModals() {
     showCreateModal = false;
     showEditModal = false;
     showDeleteModal = false;
     showAssignOwnerModal = false;
+    showUsersModal = false;
     selectedTenant = null;
+    tenantUsers = [];
   }
 </script>
 
-<TenantGuard adminOnly={true} requireTenant={false}>
 <div class="admin-page">
   <header>
+    <AdminBreadcrumb items={[{ label: 'Tenant Management' }]} />
     <div class="header-content">
-      <button class="back-btn" on:click={() => goto('/dashboard')}>
-        ← Back to Dashboard
-      </button>
       <div class="header-title">
         <h1>🏢 Platform Admin - Tenant Management</h1>
         <p>Create and manage organization tenants</p>
@@ -315,9 +375,27 @@
                 <span class="label">Users:</span>
                 <span class="value">{tenant.userCount || 0}</span>
               </div>
+              <div class="detail-row">
+                <span class="label">Status:</span>
+                <span class="value">
+                  <label class="status-toggle">
+                    <input 
+                      type="checkbox" 
+                      checked={tenant.status === 'active'} 
+                      on:change={(e) => toggleTenantStatus(tenant, e.currentTarget.checked)}
+                      disabled={processing}
+                    />
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">{tenant.status === 'active' ? 'Active' : 'Suspended'}</span>
+                  </label>
+                </span>
+              </div>
             </div>
             
             <div class="tenant-actions">
+              <button class="btn-action btn-users" on:click={() => openUsersModal(tenant)}>
+                👥 View Users ({tenant.userCount || 0})
+              </button>
               <button class="btn-action btn-owner" on:click={() => openAssignOwnerModal(tenant)}>
                 👤 Assign Owner
               </button>
@@ -477,16 +555,64 @@
   </div>
 {/if}
 
+<!-- Users Modal -->
+{#if showUsersModal && selectedTenant}
+  <div class="modal-overlay" on:click={closeModals}>
+    <div class="modal-content modal-large" on:click|stopPropagation>
+      <div class="modal-header">
+        <h2>👥 Users in {selectedTenant.displayName}</h2>
+        <button class="close-btn" on:click={closeModals}>✕</button>
+      </div>
+      
+      <div class="modal-body">
+        {#if loadingUsers}
+          <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading users...</p>
+          </div>
+        {:else if tenantUsers.length === 0}
+          <div class="empty-state">
+            <p>No users found for this tenant</p>
+          </div>
+        {:else}
+          <div class="users-list">
+            {#each tenantUsers as user}
+              <div class="user-item">
+                <div class="user-info">
+                  <div class="user-name">{user.displayName || 'No name'}</div>
+                  <div class="user-email">{user.email}</div>
+                </div>
+                <div class="user-role-badge badge-{user.role}">
+                  {user.role}
+                </div>
+                <div class="user-status-badge badge-{user.status}">
+                  {user.status}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn-secondary" on:click={closeModals}>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .admin-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-primary);
   }
   
   header {
-    background: white;
-    border-bottom: 2px solid #e5e7eb;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: var(--card-bg);
+    border-bottom: 2px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
   }
   
   .header-content {
@@ -499,19 +625,7 @@
     gap: 2rem;
   }
   
-  .back-btn {
-    background: #f3f4f6;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    white-space: nowrap;
-  }
-  
-  .back-btn:hover {
-    background: #e5e7eb;
-  }
+  /* Removed .back-btn styles - using breadcrumb instead */
   
   .header-title {
     flex: 1;
@@ -519,34 +633,34 @@
   
   .header-title h1 {
     margin: 0;
-    color: #1f2937;
+    color: var(--text-primary);
     font-size: 1.6rem;
   }
   
   .header-title p {
     margin: 0.25rem 0 0 0;
-    color: #6b7280;
+    color: var(--text-secondary);
     font-size: 0.9rem;
   }
   
   .btn-create {
-    background: #10b981;
-    color: white;
+    background: var(--success-color);
+    color: var(--text-inverse);
     border: none;
     padding: 0.75rem 1.5rem;
-    border-radius: 8px;
+    border-radius: var(--border-radius-md);
     cursor: pointer;
     font-size: 1rem;
     font-weight: 600;
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
   }
   
   .btn-create:hover {
-    background: #059669;
+    background: var(--success-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    box-shadow: var(--shadow-md);
   }
   
   main {
@@ -558,18 +672,18 @@
   .loading, .empty-state {
     text-align: center;
     padding: 4rem 2rem;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
   }
   
   .loading {
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .spinner {
-    border: 4px solid #f3f4f6;
-    border-top: 4px solid #667eea;
+    border: 4px solid var(--border-color);
+    border-top: 4px solid var(--primary-color);
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -583,11 +697,11 @@
   }
   
   .error-banner {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
     padding: 1.5rem;
-    border-radius: 12px;
-    border-left: 4px solid #dc2626;
+    border-radius: var(--border-radius-lg);
+    border-left: 4px solid var(--danger-color);
     font-weight: 500;
   }
   
@@ -598,19 +712,20 @@
   }
   
   .tenant-card {
-    background: white;
-    border-radius: 12px;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
     padding: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    border: 1px solid var(--border-color);
   }
   
   .tenant-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-md);
   }
   
   .tenant-header {
@@ -618,28 +733,28 @@
     justify-content: space-between;
     align-items: center;
     padding-bottom: 1rem;
-    border-bottom: 2px solid #f3f4f6;
+    border-bottom: 2px solid var(--border-color);
   }
   
   .tenant-header h3 {
     margin: 0;
-    color: #1f2937;
+    color: var(--text-primary);
     font-size: 1.25rem;
   }
   
   .tenant-status {
     padding: 0.25rem 0.75rem;
-    border-radius: 12px;
+    border-radius: var(--border-radius-md);
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
-    background: #f3f4f6;
-    color: #6b7280;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
   }
   
   .tenant-status.active {
-    background: #d1fae5;
-    color: #065f46;
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
   }
   
   .tenant-details {
@@ -656,12 +771,12 @@
   }
   
   .detail-row .label {
-    color: #6b7280;
+    color: var(--text-secondary);
     font-weight: 500;
   }
   
   .detail-row .value {
-    color: #1f2937;
+    color: var(--text-primary);
     text-align: right;
   }
   
@@ -674,46 +789,164 @@
     display: flex;
     gap: 0.5rem;
     padding-top: 1rem;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid var(--border-color);
   }
   
   .btn-action {
     flex: 1;
     padding: 0.5rem;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--border-radius-sm);
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: var(--transition);
   }
   
   .btn-owner {
-    background: #dbeafe;
-    color: #1e40af;
+    background: var(--info-light);
+    color: var(--info-dark, #1e40af);
   }
   
   .btn-owner:hover {
-    background: #bfdbfe;
+    background: var(--info-color);
+    color: var(--text-inverse);
   }
   
   .btn-edit {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
   }
   
   .btn-edit:hover {
-    background: #fde68a;
+    background: var(--warning-color);
+    color: var(--text-inverse);
   }
   
   .btn-delete {
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
   }
   
   .btn-delete:hover {
-    background: #fecaca;
+    background: var(--danger-color);
+    color: var(--text-inverse);
   }
+  
+  .btn-users {
+    background: var(--primary-light);
+    color: var(--primary-dark, #1e40af);
+  }
+  
+  .btn-users:hover {
+    background: var(--primary-color);
+    color: var(--text-inverse);
+  }
+  
+  /* Status Toggle */
+  .status-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  
+  .status-toggle input[type="checkbox"] {
+    display: none;
+  }
+  
+  .toggle-slider {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--border-color);
+    border-radius: 12px;
+    transition: background var(--transition);
+  }
+  
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--text-inverse);
+    top: 2px;
+    left: 2px;
+    transition: transform var(--transition);
+    box-shadow: var(--shadow-xs);
+  }
+  
+  .status-toggle input[type="checkbox"]:checked + .toggle-slider {
+    background: var(--success-color);
+  }
+  
+  .status-toggle input[type="checkbox"]:checked + .toggle-slider::before {
+    transform: translateX(20px);
+  }
+  
+  .toggle-label {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  
+  /* Users Modal */
+  .modal-large {
+    max-width: 800px;
+  }
+  
+  .users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .user-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+  }
+  
+  .user-info {
+    flex: 1;
+  }
+  
+  .user-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+  }
+  
+  .user-email {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+  
+  .user-role-badge,
+  .user-status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  
+  .badge-owner { background: var(--primary-light, rgba(59, 130, 246, 0.1)); color: var(--primary-dark, #1e40af); }
+  .badge-admin { background: var(--secondary-light, rgba(107, 114, 128, 0.1)); color: var(--secondary-dark, #374151); }
+  .badge-engineer { background: var(--info-light, rgba(59, 130, 246, 0.1)); color: var(--info-dark, #1e40af); }
+  .badge-installer { background: var(--warning-light); color: var(--warning-dark, #92400e); }
+  .badge-helpdesk { background: var(--success-light); color: var(--success-dark, #065f46); }
+  .badge-viewer { background: var(--bg-secondary); color: var(--text-primary); }
+  
+  .badge-active { background: var(--success-light); color: var(--success-dark, #065f46); }
+  .badge-suspended { background: var(--danger-light); color: var(--danger-dark, #991b1b); }
+  .badge-pending_invitation { background: var(--warning-light); color: var(--warning-dark, #92400e); }
   
   /* Modal styles */
   .modal-overlay {
@@ -727,35 +960,35 @@
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    padding: 1rem;
+    padding: var(--spacing-md);
   }
   
   .modal-content {
-    background: white;
-    border-radius: 12px;
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
     max-width: 600px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: var(--shadow-xl);
   }
   
   .modal-danger {
-    border-top: 4px solid #dc2626;
+    border-top: 4px solid var(--danger-color);
   }
   
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e5e7eb;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
   }
   
   .modal-header h2 {
     margin: 0;
     font-size: 1.5rem;
-    color: #1f2937;
+    color: var(--text-primary);
   }
   
   .close-btn {
@@ -763,41 +996,42 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: #6b7280;
+    color: var(--text-secondary);
     padding: 0;
     width: 32px;
     height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition);
   }
   
   .close-btn:hover {
-    background: #f3f4f6;
+    background: var(--bg-secondary);
   }
   
   .modal-body {
-    padding: 1.5rem;
+    padding: var(--spacing-lg);
   }
   
   .modal-body p {
     margin: 0 0 1rem 0;
-    color: #374151;
+    color: var(--text-primary);
   }
   
   .tenant-name-delete {
     font-size: 1.1rem;
-    color: #dc2626;
+    color: var(--danger-color);
     text-align: center;
-    padding: 1rem;
-    background: #fee2e2;
-    border-radius: 8px;
+    padding: var(--spacing-md);
+    background: var(--danger-light);
+    border-radius: var(--border-radius-md);
   }
   
   .help-text {
     font-size: 0.9rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .form-group {
@@ -808,29 +1042,31 @@
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 500;
-    color: #374151;
+    color: var(--text-primary);
   }
   
   .required {
-    color: #dc2626;
+    color: var(--danger-color);
   }
   
   .form-group input {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
     font-size: 1rem;
+    background: var(--input-bg);
+    color: var(--text-primary);
   }
   
   .form-group input:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-light);
   }
   
   .form-group input:disabled {
-    background: #f9fafb;
+    background: var(--bg-secondary);
     cursor: not-allowed;
   }
   
@@ -838,34 +1074,34 @@
     display: block;
     margin-top: 0.25rem;
     font-size: 0.85rem;
-    color: #6b7280;
+    color: var(--text-secondary);
   }
   
   .modal-footer {
-    padding: 1.5rem;
-    border-top: 1px solid #e5e7eb;
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
-    gap: 1rem;
+    gap: var(--spacing-md);
   }
   
   .btn-primary, .btn-secondary, .btn-danger {
     padding: 0.75rem 1.5rem;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--border-radius-sm);
     cursor: pointer;
     font-size: 0.95rem;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: var(--transition);
   }
   
   .btn-primary {
-    background: #667eea;
-    color: white;
+    background: var(--primary-color);
+    color: var(--text-inverse);
   }
   
   .btn-primary:hover:not(:disabled) {
-    background: #5568d3;
+    background: var(--primary-hover);
   }
   
   .btn-primary:disabled {
@@ -874,21 +1110,21 @@
   }
   
   .btn-secondary {
-    background: #f3f4f6;
-    color: #1f2937;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
   
   .btn-secondary:hover:not(:disabled) {
-    background: #e5e7eb;
+    background: var(--bg-tertiary);
   }
   
   .btn-danger {
-    background: #dc2626;
-    color: white;
+    background: var(--danger-color);
+    color: var(--text-inverse);
   }
   
   .btn-danger:hover:not(:disabled) {
-    background: #b91c1c;
+    background: var(--danger-hover);
   }
   
   .empty-state .btn-primary {
@@ -910,4 +1146,3 @@
     }
   }
 </style>
-</TenantGuard>

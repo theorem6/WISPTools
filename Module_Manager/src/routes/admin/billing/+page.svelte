@@ -2,16 +2,19 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
-  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
+  import AdminBreadcrumb from '$lib/components/admin/AdminBreadcrumb.svelte';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
   import { 
     getBillingAnalytics, 
     getAllSubscriptions, 
     getSubscriptionPlans,
+    getAllInvoices,
+    getAllPaymentMethods,
     type Subscription,
     type SubscriptionPlan,
-    type Invoice
+    type Invoice,
+    type PaymentMethod
   } from '$lib/services/billingService';
 
   let isAdmin = false;
@@ -28,6 +31,9 @@
   
   let subscriptions: Subscription[] = [];
   let plans: SubscriptionPlan[] = [];
+  let invoices: Invoice[] = [];
+  let paymentMethods: PaymentMethod[] = [];
+  let tenants: any[] = []; // Store tenant info for display
   let loading = true;
   let error = '';
   let refreshInterval: NodeJS.Timeout | null = null;
@@ -59,15 +65,27 @@
       error = '';
       
       // Load billing data in parallel
-      const [analyticsData, subscriptionsData, plansData] = await Promise.all([
+      const [analyticsData, subscriptionsData, plansData, invoicesData, paymentMethodsData] = await Promise.all([
         getBillingAnalytics().catch(() => analytics),
         getAllSubscriptions().catch(() => []),
-        getSubscriptionPlans().catch(() => [])
+        getSubscriptionPlans().catch(() => []),
+        getAllInvoices().catch(() => []),
+        getAllPaymentMethods().catch(() => [])
       ]);
       
       analytics = analyticsData;
       subscriptions = subscriptionsData;
       plans = plansData;
+      invoices = invoicesData;
+      paymentMethods = paymentMethodsData;
+      
+      // Load tenant info for display
+      try {
+        const allTenants = await tenantService.getAllTenants();
+        tenants = allTenants;
+      } catch (err) {
+        console.error('Error loading tenants:', err);
+      }
       
     } catch (err: any) {
       console.error('Error loading billing data:', err);
@@ -75,6 +93,15 @@
     } finally {
       loading = false;
     }
+  }
+
+  function getTenantName(tenantId: string): string {
+    const tenant = tenants.find(t => t.id === tenantId || t._id === tenantId);
+    return tenant?.displayName || tenant?.name || tenantId;
+  }
+
+  function getFailedPayments(): Invoice[] {
+    return invoices.filter(inv => inv.status === 'failed');
   }
 
   function goBack() {
@@ -99,12 +126,15 @@
   function getStatusBadgeClass(status: string): string {
     switch (status) {
       case 'active':
+      case 'paid':
         return 'badge-success';
       case 'cancelled':
+      case 'failed':
         return 'badge-error';
       case 'past_due':
         return 'badge-warning';
       case 'trialing':
+      case 'pending':
         return 'badge-info';
       case 'incomplete':
         return 'badge-neutral';
@@ -114,15 +144,11 @@
   }
 </script>
 
-<TenantGuard requireTenant={false} adminOnly={true}>
-  <div class="billing-module">
+<div class="billing-module">
     <!-- Header -->
     <div class="module-header">
+      <AdminBreadcrumb items={[{ label: 'Billing Management' }]} />
       <div class="header-content">
-        <button class="back-btn" on:click={goBack}>
-          <span class="back-icon">←</span>
-          Back to Admin Management
-        </button>
         <div class="module-title">
           <h1>💳 Billing Management</h1>
           <p>Manage subscriptions, payments, and billing analytics</p>
@@ -213,6 +239,106 @@
         </div>
       </div>
 
+      <!-- Failed Payment Alerts -->
+      {#if !loading && getFailedPayments().length > 0}
+        <div class="alerts-section">
+          <h2>⚠️ Failed Payment Alerts</h2>
+          <div class="failed-payments-list">
+            {#each getFailedPayments() as invoice}
+              <div class="alert-card alert-error">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-content">
+                  <strong>Failed Payment</strong>
+                  <p>Tenant: {getTenantName(invoice.tenantId)}</p>
+                  <p>Amount: {formatCurrency(invoice.amount)} {invoice.currency}</p>
+                  <p>Invoice ID: {invoice.id}</p>
+                  <p class="alert-date">Date: {formatDate(invoice.createdAt)}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      <!-- Payment History Section -->
+      <div class="payments-section">
+        <h2>💳 Payment History</h2>
+        {#if loading}
+          <div class="loading">Loading payments...</div>
+        {:else if invoices.length === 0}
+          <div class="empty-state">
+            <p>No payment transactions found</p>
+          </div>
+        {:else}
+          <div class="payments-table">
+            <div class="table-header">
+              <div class="col-invoice">Invoice ID</div>
+              <div class="col-tenant">Tenant</div>
+              <div class="col-amount">Amount</div>
+              <div class="col-status">Status</div>
+              <div class="col-date">Date</div>
+            </div>
+            {#each invoices as invoice}
+              <div class="table-row">
+                <div class="col-invoice">
+                  <span class="invoice-id">{invoice.id}</span>
+                </div>
+                <div class="col-tenant">
+                  <span class="tenant-name">{getTenantName(invoice.tenantId)}</span>
+                </div>
+                <div class="col-amount">
+                  <span class="amount">{formatCurrency(invoice.amount)} {invoice.currency}</span>
+                </div>
+                <div class="col-status">
+                  <span class="badge {getStatusBadgeClass(invoice.status)}">
+                    {invoice.status}
+                  </span>
+                </div>
+                <div class="col-date">
+                  <span class="date">{formatDate(invoice.createdAt)}</span>
+                  {#if invoice.paidAt}
+                    <span class="paid-date">Paid: {formatDate(invoice.paidAt)}</span>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Payment Methods Section -->
+      <div class="payment-methods-section">
+        <h2>💳 Payment Methods & Billing Details</h2>
+        {#if loading}
+          <div class="loading">Loading payment methods...</div>
+        {:else if paymentMethods.length === 0}
+          <div class="empty-state">
+            <p>No payment methods found</p>
+          </div>
+        {:else}
+          <div class="payment-methods-grid">
+            {#each paymentMethods as method}
+              <div class="payment-method-card">
+                <div class="method-header">
+                  <div class="method-type">
+                    <span class="method-icon">💳</span>
+                    <strong>{method.type === 'paypal' ? 'PayPal' : 'Credit Card'}</strong>
+                  </div>
+                  {#if method.isDefault}
+                    <span class="default-badge">Default</span>
+                  {/if}
+                </div>
+                <div class="method-details">
+                  <p><strong>Tenant:</strong> {getTenantName(method.tenantId)}</p>
+                  <p><strong>Email:</strong> {method.paypalEmail}</p>
+                  <p><strong>Added:</strong> {formatDate(method.createdAt)}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
       <!-- Active Subscriptions -->
       <div class="subscriptions-section">
         <h2>Active Subscriptions</h2>
@@ -259,14 +385,13 @@
           </div>
         {/if}
       </div>
+      </div>
     </div>
-  </div>
-</TenantGuard>
-
-<style>
+  
+  <style>
   .billing-module {
     min-height: 100vh;
-    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    background: var(--bg-primary);
   }
 
   .module-header {
@@ -364,8 +489,8 @@
   }
 
   .retry-btn {
-    background: #dc2626;
-    color: white;
+    background: var(--danger-light, #fee2e2);
+    color: var(--danger-dark, #991b1b);
     border: none;
     border-radius: 0.5rem;
     padding: 0.5rem 1rem;
@@ -376,14 +501,239 @@
   }
 
   .retry-btn:hover {
-    background: #b91c1c;
+    background: var(--danger-color, #dc2626);
+    color: white;
     transform: translateY(-1px);
   }
 
   .analytics-section,
   .plans-section,
-  .subscriptions-section {
+  .subscriptions-section,
+  .payments-section,
+  .payment-methods-section,
+  .alerts-section {
     margin-bottom: 3rem;
+  }
+
+  .alerts-section h2,
+  .payment-methods-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .failed-payments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .alert-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    border-left: 4px solid;
+  }
+
+  .alert-error {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+  }
+
+  .alert-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .alert-content {
+    flex: 1;
+  }
+
+  .alert-content strong {
+    display: block;
+    font-size: 1.125rem;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+  }
+
+  .alert-content p {
+    margin: 0.25rem 0;
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
+
+  .alert-date {
+    color: #9ca3af;
+    font-size: 0.75rem;
+    margin-top: 0.5rem !important;
+  }
+
+  .payments-table {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .payments-table .table-header {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr 2fr;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .payments-table .table-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr 2fr;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    align-items: center;
+  }
+
+  .payments-table .table-row:last-child {
+    border-bottom: none;
+  }
+
+  .payments-table .table-row:hover {
+    background: #f9fafb;
+  }
+
+  .invoice-id {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
+  .amount {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .paid-date {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.25rem;
+  }
+
+  .payment-methods-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+
+  .payment-method-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease;
+  }
+
+  .payment-method-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #3b82f6;
+  }
+
+  .method-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .method-type {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .method-icon {
+    font-size: 1.5rem;
+  }
+
+  .default-badge {
+    background: #dcfce7;
+    color: #166534;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .method-details p {
+    margin: 0.5rem 0;
+    color: #374151;
+    font-size: 0.875rem;
+  }
+
+  .method-details strong {
+    color: #1f2937;
+  }
+  
+  .payments-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .payments-placeholder {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.75rem;
+    padding: 3rem;
+    text-align: center;
+  }
+  
+  .placeholder-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+  
+  .payments-placeholder h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+  }
+  
+  .payments-placeholder p {
+    color: #6b7280;
+    margin: 1rem 0;
+    line-height: 1.6;
+  }
+  
+  .features-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem auto;
+    max-width: 400px;
+    text-align: left;
+  }
+  
+  .features-list li {
+    padding: 0.5rem 0;
+    color: #374151;
+    font-size: 0.95rem;
+  }
+  
+  .note {
+    font-size: 0.875rem;
+    font-style: italic;
+    color: #9ca3af;
+    margin-top: 1.5rem;
   }
 
   .analytics-section h2,
@@ -391,9 +741,8 @@
   .subscriptions-section h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: white;
+    color: var(--text-primary, #111827);
     margin: 0 0 1.5rem 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .analytics-grid {
@@ -468,8 +817,8 @@
     top: -10px;
     left: 50%;
     transform: translateX(-50%);
-    background: #3b82f6;
-    color: white;
+    background: var(--primary-light, #dbeafe);
+    color: var(--primary-dark, #1e40af);
     padding: 0.5rem 1rem;
     border-radius: 9999px;
     font-size: 0.75rem;
@@ -620,8 +969,8 @@
   }
 
   .action-btn {
-    background: #3b82f6;
-    color: white;
+    background: var(--primary-light, #dbeafe);
+    color: var(--primary-dark, #1e40af);
     border: none;
     border-radius: 0.5rem;
     padding: 0.5rem 1rem;
@@ -632,7 +981,8 @@
   }
 
   .action-btn:hover {
-    background: #2563eb;
+    background: var(--primary-color, #3b82f6);
+    color: white;
     transform: translateY(-1px);
   }
 
@@ -640,7 +990,7 @@
   .empty-state {
     text-align: center;
     padding: 3rem;
-    color: white;
+    color: var(--text-primary, #111827);
     font-size: 1.125rem;
   }
 
@@ -664,7 +1014,9 @@
     }
 
     .table-header,
-    .table-row {
+    .table-row,
+    .payments-table .table-header,
+    .payments-table .table-row {
       grid-template-columns: 1fr;
       gap: 0.5rem;
     }
@@ -673,8 +1025,15 @@
     .col-plan,
     .col-status,
     .col-period,
-    .col-actions {
+    .col-actions,
+    .col-invoice,
+    .col-amount,
+    .col-date {
       text-align: center;
+    }
+
+    .payment-methods-grid {
+      grid-template-columns: 1fr;
     }
   }
 </style>

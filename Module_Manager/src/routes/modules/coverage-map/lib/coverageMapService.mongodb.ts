@@ -101,13 +101,29 @@ export class CoverageMapService {
     }
     const endpoint = params.toString() ? `sites?${params.toString()}` : 'sites';
     const sites = await this.apiCall(endpoint, {}, tenantId);
-    return sites.map((s: any) => ({ ...s, id: s._id }));
+    // Normalize type field: ensure it's always an array (backward compatibility)
+    return sites.map((s: any) => {
+      const normalizedSite = { ...s, id: s._id };
+      if (normalizedSite.type && !Array.isArray(normalizedSite.type)) {
+        normalizedSite.type = [normalizedSite.type];
+      } else if (!normalizedSite.type || normalizedSite.type.length === 0) {
+        normalizedSite.type = ['tower'];
+      }
+      return normalizedSite;
+    });
   }
   
   async getTowerSite(tenantId: string, siteId: string): Promise<TowerSite | null> {
     try {
       const site = await this.apiCall(`sites/${siteId}`, {}, tenantId);
-      return { ...site, id: site._id };
+      const normalizedSite = { ...site, id: site._id };
+      // Normalize type field: ensure it's always an array (backward compatibility)
+      if (normalizedSite.type && !Array.isArray(normalizedSite.type)) {
+        normalizedSite.type = [normalizedSite.type];
+      } else if (!normalizedSite.type || normalizedSite.type.length === 0) {
+        normalizedSite.type = ['tower'];
+      }
+      return normalizedSite;
     } catch {
       return null;
     }

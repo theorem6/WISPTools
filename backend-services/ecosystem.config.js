@@ -25,7 +25,7 @@ module.exports = {
         SMTP_HOST: 'smtp.gmail.com',
         SMTP_PORT: '587',
         SMTP_SECURE: 'false',
-        SMTP_USER: 'david@4gengineer.com',
+        SMTP_USER: process.env.SMTP_USER || 'noreply@wisptools.io',
         SMTP_PASS: 'gaej lyex xydt efyp',
         FROM_EMAIL: 'noreply@wisptools.io',
         FROM_NAME: 'WISPTools'

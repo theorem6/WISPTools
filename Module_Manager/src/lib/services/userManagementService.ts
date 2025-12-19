@@ -157,19 +157,24 @@ export async function getAllUsers(): Promise<TenantUser[]> {
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
-      // Note: No X-Tenant-ID header for admin requests
+      // Note: No X-Tenant-ID header for platform admin requests
     };
     
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
+    // For platform admin users, use /users endpoint (not /users/all)
     const apiPath = getApiPath();
-    const response = await fetch(`${apiPath}/users/all`, {
+    const response = await fetch(`${apiPath}/users`, {
       method: 'GET',
       headers
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch all users');
+      const errorData = await response.json().catch(() => ({ message: 'Failed to fetch all users' }));
+      // Check if error is about missing tenant ID - this should not happen for platform admins
+      if (errorData.message && errorData.message.includes('tenant ID')) {
+        throw new Error('Platform admin access error: ' + errorData.message);
+      }
+      throw new Error(errorData.message || errorData.error || 'Failed to fetch all users');
     }
 
     return await response.json();

@@ -7,16 +7,17 @@ import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
 
 // Firebase configuration with fallbacks
-// authDomain: Can be any authorized domain - Firebase will work with any domain in the authorized list
-// Using the default Firebase domain as fallback, but it will work with wisptools.io once authorized
+// authDomain: Must be the Firebase project's default domain (not custom domain)
+// Custom domains work via authorized domains list, but authDomain must be Firebase hosting domain
 const getAuthDomain = (): string => {
   // Check if we have an explicit authDomain override
   if (env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN) {
     return env.PUBLIC_FIREBASE_AUTH_DOMAIN || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
   }
   
-  // Always use wisptools.io as the auth domain (it's already set up)
-  return 'wisptools.io';
+  // Use Firebase project's default domain (required for OAuth redirect URIs)
+  // wisptools.io is added to authorized domains, but authDomain must be Firebase domain
+  return 'wisptools-production.firebaseapp.com';
 };
 
 const firebaseConfig = {

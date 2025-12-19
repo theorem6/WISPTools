@@ -82,6 +82,12 @@ router.get('/sites/:id', async (req, res) => {
   try {
     const site = await UnifiedSite.findOne({ _id: req.params.id, tenantId: req.tenantId }).lean();
     if (!site) return res.status(404).json({ error: 'Site not found' });
+    
+    // Normalize type field for backward compatibility: convert single string to array
+    if (site.type && !Array.isArray(site.type)) {
+      site.type = [site.type];
+    }
+    
     res.json(site);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch site' });
@@ -92,8 +98,18 @@ router.post('/sites', async (req, res) => {
   try {
     // Ensure createdBy is set
     const createdBy = req.body.createdBy || req.body.email || req.user?.email || 'System';
+    
+    // Normalize type field: convert single string to array for backward compatibility
+    let normalizedType = req.body.type;
+    if (normalizedType && !Array.isArray(normalizedType)) {
+      normalizedType = [normalizedType];
+    } else if (!normalizedType || normalizedType.length === 0) {
+      normalizedType = ['tower']; // Default
+    }
+    
     const site = new UnifiedSite({ 
-      ...req.body, 
+      ...req.body,
+      type: normalizedType,
       tenantId: req.tenantId,
       createdBy: createdBy
     });
@@ -126,9 +142,19 @@ router.put('/sites/:id', async (req, res) => {
       });
     }
     
+    // Normalize type field: convert single string to array for backward compatibility
+    let updateData = { ...req.body };
+    if (updateData.type !== undefined) {
+      if (!Array.isArray(updateData.type)) {
+        updateData.type = [updateData.type];
+      } else if (updateData.type.length === 0) {
+        updateData.type = ['tower']; // Ensure at least one type
+      }
+    }
+    
     const site = await UnifiedSite.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.tenantId },
-      { ...req.body, updatedAt: new Date(), updatedBy: userEmail || 'System' },
+      { ...updateData, updatedAt: new Date(), updatedBy: userEmail || 'System' },
       { new: true, runValidators: true }
     );
     res.json(site);

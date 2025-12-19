@@ -197,14 +197,26 @@ function createTenantStore() {
         // Wait a bit more to ensure token is fully propagated
         await new Promise(resolve => setTimeout(resolve, 300));
         
+        // Check if platform admin - they don't need tenants
+        const userIsPlatformAdmin = isPlatformAdmin(userEmail ?? null);
+        
+        if (userIsPlatformAdmin) {
+          console.log('[TenantStore] Platform admin detected, skipping tenant loading');
+          update(state => ({
+            ...state,
+            userTenants: [],
+            isLoading: false,
+            error: null
+          }));
+          return [];
+        }
+        
         const { tenantService } = await import('../services/tenantService');
         console.log('[TenantStore] Calling tenantService.getUserTenants...');
         const tenants = await tenantService.getUserTenants(userId);
         console.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
         
         // Auto-select tenant for non-admin users to ensure data isolation
-        // Platform admin (admin@wisptools.io) has master tenant rights and doesn't need auto-selection
-        const userIsPlatformAdmin = isPlatformAdmin(userEmail ?? null);
         const currentState = get({ subscribe });
         
         console.log('[TenantStore] Auto-selection check:', { 
@@ -214,7 +226,7 @@ function createTenantStore() {
           userEmail 
         });
         
-        if (tenants.length === 1 && !userIsPlatformAdmin && !currentState.currentTenant) {
+        if (tenants.length === 1 && !currentState.currentTenant) {
           // Regular user with one tenant - auto-select it (enforces data isolation)
           const tenant = tenants[0];
           console.log('[TenantStore] Auto-selecting single tenant:', tenant.displayName);

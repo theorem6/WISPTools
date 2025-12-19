@@ -64,6 +64,78 @@
     
     <!-- Main Content -->
     <div class="content-grid">
+      <!-- System Overview -->
+      <div class="section full-width">
+        <h2>🌐 System Overview</h2>
+        <div class="systems-grid">
+          <!-- Frontend -->
+          <div class="system-card frontend">
+            <div class="system-header">
+              <h3>🌐 Frontend</h3>
+              <span class="status-badge status-online">🟢 Online</span>
+            </div>
+            <div class="system-details">
+              <div class="detail-item">
+                <span class="label">Platform:</span>
+                <span class="value">Firebase Hosting</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">URL:</span>
+                <span class="value"><a href="https://wisptools.io" target="_blank">wisptools.io</a></span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Status:</span>
+                <span class="value">Deployed & Active</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Backend -->
+          <div class="system-card backend">
+            <div class="system-header">
+              <h3>🖥️ Backend API</h3>
+              <span class="status-badge status-online">🟢 Online</span>
+            </div>
+            <div class="system-details">
+              <div class="detail-item">
+                <span class="label">Platform:</span>
+                <span class="value">Google Cloud Functions</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Region:</span>
+                <span class="value">us-central1</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Status:</span>
+                <span class="value">Running</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Services -->
+          <div class="system-card services">
+            <div class="system-header">
+              <h3>⚙️ Services</h3>
+              <span class="status-badge status-online">🟢 Monitoring</span>
+            </div>
+            <div class="system-details">
+              <div class="detail-item">
+                <span class="label">Backend Server:</span>
+                <span class="value">136.112.111.167</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Services:</span>
+                <span class="value">PM2 + systemd</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Status:</span>
+                <span class="value">See below</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <!-- Service Status -->
       <div class="section full-width">
         <ServiceStatus />
@@ -237,8 +309,102 @@
     box-shadow: var(--shadow-md);
   }
   
+  .systems-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-xl);
+    margin-top: var(--spacing-lg);
+  }
+  
+  .system-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-xl);
+    transition: var(--transition);
+  }
+  
+  .system-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  .system-card.frontend {
+    border-color: #3b82f6;
+  }
+  
+  .system-card.backend {
+    border-color: #10b981;
+  }
+  
+  .system-card.services {
+    border-color: #8b5cf6;
+  }
+  
+  .system-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .system-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+  }
+  
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  
+  .status-online {
+    background: #d1fae5;
+    color: #065f46;
+  }
+  
+  .system-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  
+  .detail-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+  }
+  
+  .detail-item .label {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  
+  .detail-item .value {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  
+  .detail-item a {
+    color: var(--primary-color);
+    text-decoration: none;
+  }
+  
+  .detail-item a:hover {
+    text-decoration: underline;
+  }
+  
   @media (max-width: 1024px) {
     .content-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .systems-grid {
       grid-template-columns: 1fr;
     }
   }

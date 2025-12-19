@@ -209,7 +209,8 @@ class InventoryService {
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || error.message || 'Request failed');
+      // Prefer message field for user-friendly errors, fallback to error field
+      throw new Error(error.message || error.error || 'Request failed');
     }
     
     return await response.json();

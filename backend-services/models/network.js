@@ -32,9 +32,16 @@ const UnifiedSiteSchema = new mongoose.Schema({
     trim: true
   },
   type: {
-    type: String,
-    enum: ['tower', 'noc', 'warehouse', 'building', 'pole', 'internet-access', 'internet', 'other'],
-    default: 'tower'
+    type: [String],
+    enum: ['tower', 'noc', 'warehouse', 'building', 'pole', 'internet-access', 'internet', 'hq', 'other'],
+    default: ['tower'],
+    validate: {
+      validator: function(types) {
+        // Ensure at least one type is selected
+        return Array.isArray(types) && types.length > 0;
+      },
+      message: 'Site must have at least one type'
+    }
   },
   status: {
     type: String,

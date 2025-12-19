@@ -26,7 +26,7 @@ export class TenantService {
     
     // Use centralized API configuration
     this.apiBaseUrl = API_CONFIG.PATHS.TENANTS.split('/tenants')[0] || '/api';
-    this.adminBaseUrl = API_CONFIG.PATHS.ADMIN;
+    this.adminBaseUrl = `${this.apiBaseUrl}${API_CONFIG.PATHS.ADMIN}`; // /api/admin
   }
 
   /**
@@ -191,12 +191,18 @@ export class TenantService {
     try {
       const headers = await this.getAuthHeaders();
       
+      // Use /api/admin/tenants for platform admin access (goes through Firebase Hosting rewrite)
       const response = await fetch(`${this.adminBaseUrl}/tenants`, {
         method: 'GET',
         headers
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        // If we got HTML, it's a routing issue
+        if (errorText.trim().startsWith('<!')) {
+          throw new Error('API route not found - received HTML instead of JSON');
+        }
         throw new Error(`Failed to get tenants: ${response.statusText}`);
       }
 

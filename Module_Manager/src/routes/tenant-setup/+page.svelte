@@ -4,13 +4,16 @@
   import { browser } from '$app/environment';
   import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
-  import { tenantStore } from '$lib/stores/tenantStore';
+  import { tenantStore, currentTenant } from '$lib/stores/tenantStore';
   import { isPlatformAdmin } from '$lib/services/adminService';
+  import { coverageMapService } from '../modules/coverage-map/lib/coverageMapService.mongodb';
+  import SiteEditModal from '../modules/coverage-map/components/SiteEditModal.svelte';
+  import type { TowerSite } from '../modules/coverage-map/lib/models';
 
   let isLoading = false;
   let error = '';
   let success = '';
-  let step = 1;
+  let step = 1; // 1: Organization Details, 2: Payment Method, 3: Primary Location, 4: Success
 
   // Tenant details
   let tenantName = '';
@@ -19,6 +22,13 @@
   let contactPhone = '';
   let subdomain = '';
   let currentUser: any = null;
+  
+  // Primary location
+  let primaryLocationOption: 'create' | 'skip' = 'create';
+  let showSiteModal = false;
+  let createdSite: TowerSite | null = null;
+  let selectedSiteId: string = '';
+  let availableSites: TowerSite[] = [];
 
   onMount(async () => {
     if (!browser) return;
@@ -61,7 +71,191 @@
 
     console.log('[Tenant Setup] Platform admin access confirmed');
     contactEmail = currentUser.email || '';
+    
+    // Initialize credit card email with user email
+    if (currentUser.email) {
+      creditCardInfo.email = currentUser.email;
+    }
   });
+
+  // Payment method state
+  let paymentMethodType: 'paypal' | 'credit_card' | null = null;
+  let paypalEmail = '';
+  let creditCardInfo = {
+    email: currentUser?.email || '',
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    name: ''
+  };
+  let paymentMethodCreated = false;
+
+  async function handlePaymentMethodSubmit() {
+    if (isLoading) return;
+    
+    error = '';
+    isLoading = true;
+
+    try {
+      const tenantId = tenantStore.getCurrentTenant()?.id;
+      if (!tenantId) {
+        error = 'Tenant not found. Please go back and complete organization setup.';
+        isLoading = false;
+        return;
+      }
+
+      if (!paymentMethodType) {
+        error = 'Please select a payment method';
+        isLoading = false;
+        return;
+      }
+
+      if (paymentMethodType === 'paypal' && !paypalEmail.trim()) {
+        error = 'Please enter your PayPal email address';
+        isLoading = false;
+        return;
+      }
+
+      if (paymentMethodType === 'credit_card') {
+        // Basic validation (in production, use proper card validation)
+        if (!creditCardInfo.cardNumber.trim() || !creditCardInfo.expiryDate.trim() || !creditCardInfo.cvv.trim()) {
+          error = 'Please enter all credit card information';
+          isLoading = false;
+          return;
+        }
+      }
+
+      // Get auth token
+      const token = await authService.getAuthToken();
+      
+      // Create payment method
+      const response = await fetch('/api/billing/payment-methods', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          tenantId,
+          type: paymentMethodType,
+          paypalEmail: paymentMethodType === 'paypal' ? paypalEmail.trim() : undefined,
+          creditCard: paymentMethodType === 'credit_card' ? {
+            email: creditCardInfo.email,
+            // In production, don't send full card details - use a payment processor
+            // For now, we'll just store the email and indicate card was provided
+            cardProvided: true
+          } : undefined
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save payment method');
+      }
+
+      paymentMethodCreated = true;
+      
+      // Move to step 3 for primary location setup
+      step = 3;
+      
+    } catch (err: any) {
+      error = err.message || 'Failed to save payment method';
+      console.error('Error saving payment method:', err);
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function handleSkipPayment() {
+    // Allow skipping payment for now (beta), but warn user
+    if (confirm('⚠️ Warning: You are skipping payment method setup. You may need to add a payment method later to continue using the service. Continue anyway?')) {
+      step = 3; // Skip to primary location
+    }
+  }
+  
+  async function loadSites() {
+    // This will only work after tenant is created, so we'll handle it in step 2
+    try {
+      if (currentUser?.uid) {
+        // For now, sites will be empty until tenant is created
+        availableSites = [];
+      }
+    } catch (err) {
+      console.error('Error loading sites:', err);
+      availableSites = [];
+    }
+  }
+  
+  async function handleSiteCreated(event: CustomEvent) {
+    const { siteId } = event.detail;
+    if (siteId) {
+      // Fetch the created site
+      try {
+        const tenantId = tenantStore.getCurrentTenant()?.id;
+        if (tenantId) {
+          const site = await coverageMapService.getTowerSite(tenantId, siteId);
+          if (site) {
+            createdSite = site;
+            selectedSiteId = siteId;
+            showSiteModal = false;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching created site:', err);
+      }
+    }
+  }
+  
+  async function handleCompleteSetup() {
+    if (isLoading) return;
+    
+    isLoading = true;
+    error = '';
+    
+    try {
+      const tenantId = tenantStore.getCurrentTenant()?.id;
+      if (!tenantId) {
+        error = 'Tenant not found';
+        isLoading = false;
+        return;
+      }
+      
+      // Update tenant with primary location if created
+      if (primaryLocationOption === 'create' && createdSite) {
+        // Update tenant with primary location
+        // This will be done via a PUT request to update tenant
+        const response = await fetch(`/api/tenants/${tenantId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${await authService.getAuthToken()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            primaryLocation: {
+              siteId: createdSite.id,
+              siteName: createdSite.name
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to update tenant with primary location');
+        }
+      }
+      
+      // Move to success step
+      step = 4;
+      
+      // Redirect after a moment
+      setTimeout(() => {
+        goto('/dashboard', { replaceState: true });
+      }, 2000);
+    } catch (err: any) {
+      error = err.message || 'Failed to complete setup';
+    } finally {
+      isLoading = false;
+    }
+  }
 
   function generateSubdomain() {
     if (tenantName) {
@@ -120,13 +314,8 @@
           console.log('[Tenant Setup] Tenant set in store:', newTenant.displayName);
         }
         
+        // Move to step 2 for payment method setup
         step = 2;
-        
-        // Wait a moment for user to see success message
-        setTimeout(() => {
-          console.log('[Tenant Setup] Redirecting to dashboard');
-          goto('/dashboard', { replaceState: true });
-        }, 2000);
       } else {
         error = result.error || 'Failed to create tenant';
       }
@@ -170,7 +359,7 @@
           </div>
         {/if}
 
-        <form on:submit|preventDefault={handleSubmit}>
+        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
           <div class="form-group">
             <label for="tenantName">
               Organization Name <span class="required">*</span>
@@ -260,19 +449,290 @@
         </form>
       </div>
     {:else if step === 2}
+      <div class="setup-card">
+        <div class="progress-bar">
+          <div class="progress" style="width: 66%"></div>
+        </div>
+
+        <h2>Payment Method Setup</h2>
+        <p class="subtitle">Add a payment method for your account (required)</p>
+
+        <div class="beta-disclaimer">
+          <div class="beta-badge">BETA</div>
+          <p><strong>WISPTools.io is currently in beta.</strong> No charges will be made without prior notice. Adding a payment method now ensures uninterrupted service when billing begins.</p>
+        </div>
+
+        {#if error}
+          <div class="error-message">
+            <span class="error-icon">⚠️</span>
+            {error}
+          </div>
+        {/if}
+
+        <div class="form-group">
+          <label>Payment Method <span class="required">*</span></label>
+          <div class="payment-method-options">
+            <label class="payment-option">
+              <input 
+                type="radio" 
+                name="paymentMethod" 
+                value="paypal"
+                bind:group={paymentMethodType}
+                disabled={isLoading}
+              />
+              <div class="payment-option-content">
+                <div class="payment-icon">💳</div>
+                <div>
+                  <strong>PayPal</strong>
+                  <p>Pay with PayPal account</p>
+                </div>
+              </div>
+            </label>
+            <label class="payment-option">
+              <input 
+                type="radio" 
+                name="paymentMethod" 
+                value="credit_card"
+                bind:group={paymentMethodType}
+                disabled={isLoading}
+              />
+              <div class="payment-option-content">
+                <div class="payment-icon">💳</div>
+                <div>
+                  <strong>Credit Card</strong>
+                  <p>Pay with credit or debit card</p>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {#if paymentMethodType === 'paypal'}
+          <div class="form-group">
+            <label for="paypalEmail">
+              PayPal Email Address <span class="required">*</span>
+            </label>
+            <input
+              id="paypalEmail"
+              type="email"
+              bind:value={paypalEmail}
+              placeholder="your-email@example.com"
+              disabled={isLoading}
+              required
+            />
+            <p class="help-text">The email address associated with your PayPal account</p>
+          </div>
+        {/if}
+
+        {#if paymentMethodType === 'credit_card'}
+          <div class="form-group">
+            <label for="cardEmail">
+              Billing Email <span class="required">*</span>
+            </label>
+            <input
+              id="cardEmail"
+              type="email"
+              bind:value={creditCardInfo.email}
+              placeholder="billing@example.com"
+              disabled={isLoading}
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="cardNumber">
+              Card Number <span class="required">*</span>
+            </label>
+            <input
+              id="cardNumber"
+              type="text"
+              bind:value={creditCardInfo.cardNumber}
+              placeholder="1234 5678 9012 3456"
+              disabled={isLoading}
+              maxlength="19"
+              oninput={(e) => {
+                // Format card number with spaces
+                const target = e.currentTarget as HTMLInputElement;
+                let value = target.value.replace(/\s/g, '');
+                if (value.length > 16) value = value.substring(0, 16);
+                value = value.replace(/(.{4})/g, '$1 ').trim();
+                creditCardInfo.cardNumber = value;
+              }}
+              required
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="expiryDate">
+                Expiry Date (MM/YY) <span class="required">*</span>
+              </label>
+              <input
+                id="expiryDate"
+                type="text"
+                bind:value={creditCardInfo.expiryDate}
+                placeholder="12/25"
+                disabled={isLoading}
+                maxlength="5"
+                oninput={(e) => {
+                  const target = e.currentTarget as HTMLInputElement;
+                  let value = target.value.replace(/\D/g, '');
+                  if (value.length >= 2) {
+                    value = value.substring(0, 2) + '/' + value.substring(2, 4);
+                  }
+                  creditCardInfo.expiryDate = value;
+                }}
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="cvv">
+                CVV <span class="required">*</span>
+              </label>
+              <input
+                id="cvv"
+                type="text"
+                bind:value={creditCardInfo.cvv}
+                placeholder="123"
+                disabled={isLoading}
+                maxlength="4"
+                pattern="\d{3,4}"
+                required
+              />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="cardName">
+              Cardholder Name <span class="required">*</span>
+            </label>
+            <input
+              id="cardName"
+              type="text"
+              bind:value={creditCardInfo.name}
+              placeholder="John Doe"
+              disabled={isLoading}
+              required
+            />
+          </div>
+        {/if}
+
+        <div class="form-actions">
+          <button 
+            type="button" 
+            class="btn-secondary" 
+            onclick={handleSkipPayment}
+            disabled={isLoading}
+          >
+            Skip for Now
+          </button>
+          <button 
+            type="button" 
+            class="btn-primary" 
+            onclick={handlePaymentMethodSubmit}
+            disabled={isLoading || !paymentMethodType}
+          >
+            {#if isLoading}
+              <span class="spinner"></span>
+              Saving...
+            {:else}
+              Continue
+            {/if}
+          </button>
+        </div>
+      </div>
+    {:else if step === 3}
+      <div class="setup-card">
+        <div class="progress-bar">
+          <div class="progress" style="width: 100%"></div>
+        </div>
+
+        <h2>Primary Location Setup</h2>
+        <p class="subtitle">Set up your primary NOC/HQ/Tower location for inventory management</p>
+
+        <div class="info-message">
+          <span class="info-icon">ℹ️</span>
+          <strong>Note:</strong> Hardware scanned in will automatically be assigned to this location. You can change this later in settings.
+        </div>
+
+        {#if error}
+          <div class="error-message">
+            <span class="error-icon">⚠️</span>
+            {error}
+          </div>
+        {/if}
+
+        <div class="form-group">
+          <label>Primary Location</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" bind:group={primaryLocationOption} value="create" />
+              <span>Create New Location</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" bind:group={primaryLocationOption} value="skip" />
+              <span>Skip for Now</span>
+            </label>
+          </div>
+        </div>
+
+        {#if primaryLocationOption === 'create'}
+          <div class="form-group">
+            <button 
+              type="button" 
+              class="btn-secondary" 
+              onclick={() => showSiteModal = true}
+              disabled={isLoading}
+            >
+              ➕ Create Primary Location
+            </button>
+            {#if createdSite}
+              <p class="success-text">✅ Created: {createdSite.name}</p>
+            {/if}
+          </div>
+        {/if}
+
+        <div class="form-actions">
+          <button 
+            type="button" 
+            class="btn-secondary" 
+            onclick={async () => {
+              // Skip location setup and go to dashboard
+              await goto('/dashboard', { replaceState: true });
+            }}
+            disabled={isLoading}
+          >
+            Skip
+          </button>
+          <button 
+            type="button" 
+            class="btn-primary" 
+            onclick={async () => {
+              await handleCompleteSetup();
+            }}
+            disabled={isLoading || (primaryLocationOption === 'create' && !createdSite)}
+          >
+            {#if isLoading}
+              <span class="spinner"></span>
+              Saving...
+            {:else}
+              Complete Setup
+            {/if}
+          </button>
+        </div>
+      </div>
+    {:else if step === 4}
       <div class="setup-card success-card">
         <div class="success-icon">✅</div>
-        <h2>Tenant Created Successfully!</h2>
+        <h2>Setup Complete!</h2>
         <p>Your organization is ready to go.</p>
         
         <div class="success-details">
           <div class="detail-item">
             <strong>Organization:</strong> {displayName}
           </div>
-          <div class="detail-item">
-            <strong>CWMP URL:</strong>
-            <code>http://your-domain.com/cwmp/{subdomain}</code>
-          </div>
+          {#if createdSite}
+            <div class="detail-item">
+              <strong>Primary Location:</strong> {createdSite.name}
+            </div>
+          {/if}
           <div class="detail-item">
             <strong>Your Role:</strong> Owner (Full Access)
           </div>
@@ -282,6 +742,20 @@
       </div>
     {/if}
   </div>
+  
+  <!-- Site Creation Modal -->
+  {#if showSiteModal}
+    {@const tenantId = tenantStore.getCurrentTenant()?.id}
+    {#if tenantId}
+      <SiteEditModal
+        show={showSiteModal}
+        site={null}
+        {tenantId}
+        on:close={() => showSiteModal = false}
+        on:saved={handleSiteCreated}
+      />
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -528,6 +1002,175 @@
     margin-top: 1.5rem;
     color: var(--text-secondary);
     font-style: italic;
+  }
+  
+  .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .radio-option:hover {
+    border-color: var(--brand-primary);
+    background-color: rgba(37, 99, 235, 0.05);
+  }
+  
+  .radio-option input[type="radio"] {
+    margin: 0;
+    accent-color: var(--brand-primary);
+  }
+  
+  .btn-secondary {
+    padding: 0.875rem 1.5rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    border-color: var(--brand-primary);
+  }
+  
+  .btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .success-text {
+    margin-top: 0.5rem;
+    color: #10b981;
+    font-size: 0.875rem;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+  }
+
+  .beta-disclaimer {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);
+    border: 2px solid rgba(251, 191, 36, 0.3);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    text-align: center;
+  }
+
+  .beta-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: #1f2937;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .beta-disclaimer p {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .beta-disclaimer strong {
+    color: #f59e0b;
+    font-weight: 600;
+  }
+
+  .payment-method-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .payment-option {
+    display: block;
+    border: 2px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card-bg);
+  }
+
+  .payment-option:hover {
+    border-color: var(--brand-primary);
+    background: rgba(37, 99, 235, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .payment-option input[type="radio"] {
+    display: none;
+  }
+
+  .payment-option input[type="radio"]:checked + .payment-option-content {
+    color: var(--brand-primary);
+  }
+
+  .payment-option:has(input[type="radio"]:checked) {
+    border-color: var(--brand-primary);
+    background: rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .payment-option-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .payment-icon {
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  .payment-option-content strong {
+    display: block;
+    font-size: 1.125rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-primary);
+  }
+
+  .payment-option-content p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 768px) {

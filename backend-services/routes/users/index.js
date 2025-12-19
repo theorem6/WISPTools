@@ -32,9 +32,40 @@ const router = express.Router();
 // MIDDLEWARE
 // ============================================================================
 
-// All routes require authentication and tenant context
+// All routes require authentication
 router.use(verifyAuth);
-router.use(extractTenantId);
+
+// Extract tenant ID, but allow platform admins to skip tenant requirement for admin endpoints
+// This middleware runs BEFORE route handlers, so req.path is relative to the router mount point
+router.use((req, res, next) => {
+  const userEmail = req.user?.email;
+  const isPlatformAdmin = isPlatformAdminEmail(userEmail);
+  
+  // Admin endpoints that don't require tenant ID:
+  // - GET / (GET /api/users - list all users)
+  // - GET /all (if it exists)
+  const isAdminEndpoint = req.method === 'GET' && (req.path === '/' || req.path === '/all');
+  
+  console.log('[Users Route] Middleware check:', {
+    path: req.path,
+    method: req.method,
+    originalUrl: req.originalUrl,
+    isAdminEndpoint,
+    isPlatformAdmin,
+    userEmail
+  });
+  
+  if (isPlatformAdmin && isAdminEndpoint) {
+    // Platform admin accessing admin endpoint - tenant ID not required
+    console.log('[Users Route] Platform admin accessing admin endpoint, skipping tenant ID requirement');
+    req.tenantId = null; // Explicitly set to null for admin endpoints
+    req.isPlatformAdminRequest = true; // Flag to indicate this is an admin request
+    next();
+  } else {
+    // Regular users or non-admin endpoints - tenant ID is required
+    extractTenantId(req, res, next);
+  }
+});
 
 // Most routes require admin privileges
 const requireAdmin = requireRole(['owner', 'admin']);
@@ -46,6 +77,7 @@ const requireAdmin = requireRole(['owner', 'admin']);
 /**
  * GET /api/users
  * Get all users across all tenants (platform admin only)
+ * NOTE: This endpoint does NOT require a tenant ID for platform admins
  */
 router.get('/', async (req, res) => {
   try {
@@ -58,7 +90,9 @@ router.get('/', async (req, res) => {
       });
     }
     
-    // Get all user-tenant records from MongoDB
+    console.log('[Users API] Platform admin accessing /users endpoint, tenant ID not required');
+    
+    // Get all user-tenant records from MongoDB (no tenant filtering for platform admin)
     const userTenants = await UserTenant.find().lean();
     
     // Get unique user IDs

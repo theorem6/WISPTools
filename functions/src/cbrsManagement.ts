@@ -426,7 +426,7 @@ export const getSASUserIDs = onCall(async (request) => {
         stack: apiError.stack
       });
       
-      console.log('[getSASUserIDs] Returning fallback User IDs for david@4gengineer.com');
+      console.log('[getSASUserIDs] Returning fallback User IDs');
       
       // Return user's actual SAS User IDs (fallback)
       // TODO: Replace with actual Google SAS API call when endpoint is confirmed

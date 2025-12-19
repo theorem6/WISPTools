@@ -1,6 +1,5 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import type { TowerSite } from '../lib/models';
   import { coverageMapService } from '../lib/coverageMapService.mongodb';
   import { inventoryService, type InventoryItem } from '$lib/services/inventoryService';
@@ -191,34 +190,9 @@
       return;
     }
     
-    // Capture values before closing
-    const towerId = tower.id;
-    const towerName = tower.name;
-    
-    // Close modal first
-    handleClose();
-    
-    // Check if we're in an iframe (embedded mode)
-    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    
-    if (isInIframe) {
-      // In iframe - send message to parent to navigate to inventory
-      console.log('[HardwareDeploymentModal] In iframe, sending message to parent to navigate to inventory');
-      if (window.parent) {
-        window.parent.postMessage({
-          source: 'coverage-map',
-          type: 'navigate-to-inventory',
-          payload: {
-            siteId: towerId,
-            siteName: towerName,
-            action: 'view'
-          }
-        }, '*');
-      }
-    } else {
-      // Standalone mode - navigate normally
-      goto(`/modules/inventory?siteId=${towerId}&siteName=${encodeURIComponent(towerName)}`);
-    }
+    // Dispatch event to parent to show SiteEquipmentModal instead of navigating
+    console.log('[HardwareDeploymentModal] Dispatching view-inventory event for tower:', tower.name);
+    dispatch('view-inventory', { tower });
   }
 
   onMount(async () => {

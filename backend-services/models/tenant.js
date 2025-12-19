@@ -43,6 +43,20 @@ const tenantSchema = new mongoose.Schema({
     required: true
   },
   
+  // Primary location for inventory management
+  // References a UnifiedSite (NOC/HQ/Tower/Warehouse)
+  primaryLocation: {
+    siteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'UnifiedSite',
+      default: null
+    },
+    siteName: {
+      type: String,
+      default: null
+    }
+  },
+  
   // Status and metadata
   status: {
     type: String,

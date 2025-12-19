@@ -285,6 +285,65 @@ router.get('/payment-methods/:tenantId', authenticateUser, async (req, res) => {
 });
 
 /**
+ * Create payment method (without subscription)
+ * Used during tenant setup to collect payment info
+ */
+router.post('/payment-methods', authenticateUser, async (req, res) => {
+  try {
+    const { tenantId, type, paypalEmail, creditCard } = req.body;
+    
+    if (!tenantId || !type) {
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'tenantId and type are required' 
+      });
+    }
+    
+    // Validate payment method type
+    if (type === 'paypal' && !paypalEmail) {
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'paypalEmail is required for PayPal payment method' 
+      });
+    }
+    
+    // For credit card, we'll store basic info (in production, use a payment processor like Stripe)
+    // For now, we just validate that credit card info is provided
+    if (type === 'credit_card' && !creditCard) {
+      return res.status(400).json({ 
+        error: 'Bad Request', 
+        message: 'creditCard information is required for credit card payment method' 
+      });
+    }
+    
+    // Create payment method record
+    const paymentMethod = new PaymentMethod({
+      id: `pm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      tenantId,
+      type: type === 'credit_card' ? 'paypal' : type, // Store credit card as paypal type for now (we'll use PayPal's card processing)
+      paypalEmail: paypalEmail || creditCard?.email || req.user?.email,
+      isDefault: true, // First payment method is always default
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    
+    await paymentMethod.save();
+
+    res.json({ 
+      message: 'Payment method created successfully',
+      paymentMethod: {
+        id: paymentMethod.id,
+        type: paymentMethod.type,
+        paypalEmail: paymentMethod.paypalEmail
+      }
+    });
+  } catch (error) {
+    console.error('Error creating payment method:', error);
+    res.status(500).json({ error: 'Failed to create payment method', message: error.message });
+  }
+});
+
+/**
  * Update payment method
  */
 router.put('/payment-methods/:paymentMethodId', authenticateUser, async (req, res) => {
@@ -314,9 +373,9 @@ router.put('/payment-methods/:paymentMethodId', authenticateUser, async (req, re
 });
 
 /**
- * Get billing analytics (admin only)
+ * Get billing analytics (platform admin only)
  */
-router.get('/analytics', authenticateUser, requireAdmin, async (req, res) => {
+router.get('/analytics', authenticateUser, requirePlatformAdmin, async (req, res) => {
   try {
     // Calculate analytics from database
     const activeSubscriptions = await Subscription.countDocuments({ 
@@ -351,15 +410,41 @@ router.get('/analytics', authenticateUser, requireAdmin, async (req, res) => {
 });
 
 /**
- * Get all subscriptions (admin only)
+ * Get all subscriptions (platform admin only)
  */
-router.get('/subscriptions', authenticateUser, requireAdmin, async (req, res) => {
+router.get('/subscriptions', authenticateUser, requirePlatformAdmin, async (req, res) => {
   try {
     const subscriptions = await Subscription.find().sort({ createdAt: -1 });
     res.json(subscriptions);
   } catch (error) {
     console.error('Error fetching all subscriptions:', error);
     res.status(500).json({ error: 'Failed to fetch subscriptions' });
+  }
+});
+
+/**
+ * Get all invoices (platform admin only)
+ */
+router.get('/invoices', authenticateUser, requirePlatformAdmin, async (req, res) => {
+  try {
+    const invoices = await Invoice.find().sort({ createdAt: -1 }).limit(100);
+    res.json(invoices);
+  } catch (error) {
+    console.error('Error fetching all invoices:', error);
+    res.status(500).json({ error: 'Failed to fetch invoices' });
+  }
+});
+
+/**
+ * Get all payment methods (platform admin only)
+ */
+router.get('/payment-methods', authenticateUser, requirePlatformAdmin, async (req, res) => {
+  try {
+    const paymentMethods = await PaymentMethod.find().sort({ createdAt: -1 });
+    res.json(paymentMethods);
+  } catch (error) {
+    console.error('Error fetching all payment methods:', error);
+    res.status(500).json({ error: 'Failed to fetch payment methods' });
   }
 });
 

@@ -14,6 +14,7 @@ import DeployedHardwareModal from './components/DeployedHardwareModal.svelte';
 import SiteDetailsModal from './components/SiteDetailsModal.svelte';
 import SiteEquipmentModal from './components/SiteEquipmentModal.svelte';
 import SiteEditModal from '../coverage-map/components/SiteEditModal.svelte';
+import AddInventoryModal from '../coverage-map/components/AddInventoryModal.svelte';
 import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
   import SharedMap from '$lib/map/SharedMap.svelte';
   import { mapLayerManager } from '$lib/map/MapLayerManager';
@@ -71,6 +72,10 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   // Site Equipment Modal
   let showSiteEquipmentModal = false;
   let selectedSiteForEquipment: any = null;
+  
+  // Add Inventory Modal
+  let showAddInventoryModal = false;
+  let selectedSiteForAddInventory: any = null;
   
   // Set up global handler IMMEDIATELY - don't wait for onMount
   // This function will be called directly from SharedMap when view-inventory action is received
@@ -352,18 +357,7 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         };
         console.log('[Deploy] 🔥🔥🔥 Global handler updated in onMount:', typeof (window as any).__deployHandleViewInventory);
         
-        // Handle navigation messages from iframe
-        const navigationHandler = (event: MessageEvent) => {
-          if (event.data?.source === 'coverage-map' && event.data?.type === 'navigate-to-inventory') {
-            const { siteId, siteName, action } = event.data.payload || {};
-            console.log('[Deploy] Received navigate-to-inventory message:', { siteId, siteName, action });
-            if (siteId) {
-              goto(`/modules/inventory?siteId=${siteId}&siteName=${encodeURIComponent(siteName || '')}&action=${action || 'view'}`);
-            }
-          }
-        };
-        window.addEventListener('message', navigationHandler);
-        (window as any).__deployNavigationHandler = navigationHandler;
+        // Navigation handler removed - all inventory operations now use modals
         
         // Store handler for cleanup
         (window as any).__deployDirectMessageHandler = directMessageHandler;
@@ -1371,9 +1365,38 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         selectedSiteForEquipment = null;
       }}
       on:add-equipment={(e) => {
-        // Open AddInventoryModal for this site
+        // Open AddInventoryModal instead of navigating
         const site = e.detail.site;
-        goto(`/modules/inventory/add?siteId=${site.id}&siteName=${encodeURIComponent(site.name)}`);
+        selectedSiteForAddInventory = site;
+        showAddInventoryModal = true;
+      }}
+    />
+  {/if}
+  
+  <!-- Add Inventory Modal -->
+  {#if showAddInventoryModal && selectedSiteForAddInventory}
+    {@const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null}
+    {@const effectiveTenantId = ($currentTenant?.id || (storedTenantId && typeof storedTenantId === 'string' && storedTenantId.trim() !== '' ? storedTenantId : null)) || ''}
+    <AddInventoryModal
+      show={showAddInventoryModal}
+      site={selectedSiteForAddInventory}
+      tenantId={effectiveTenantId}
+      on:close={() => {
+        showAddInventoryModal = false;
+        selectedSiteForAddInventory = null;
+      }}
+      on:saved={async () => {
+        showAddInventoryModal = false;
+        selectedSiteForAddInventory = null;
+        // Refresh site equipment modal if it's open
+        if (showSiteEquipmentModal && selectedSiteForEquipment) {
+          // Trigger reload by toggling the modal
+          const site = selectedSiteForEquipment;
+          showSiteEquipmentModal = false;
+          await new Promise(resolve => setTimeout(resolve, 100));
+          selectedSiteForEquipment = site;
+          showSiteEquipmentModal = true;
+        }
       }}
     />
   {/if}

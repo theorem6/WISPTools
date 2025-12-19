@@ -10,7 +10,11 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
-  type User
+  signInWithRedirect,
+  getRedirectResult,
+  type User,
+  type UserCredential,
+  type Auth
 } from 'firebase/auth';
 import type { UserProfile } from '../models/network';
 
@@ -33,10 +37,82 @@ export class AuthService {
   private authStateListeners: ((user: User | null) => void)[] = [];
   private tokenRefreshInterval: NodeJS.Timeout | null = null;
 
+  private redirectResultChecked = false; // Track if we've checked redirect result
+  private redirectResultPromise: Promise<UserCredential | null> | null = null; // Track the promise
+
   constructor() {
     if (browser) {
+      // CRITICAL: Check redirect result BEFORE initializing auth listener
+      // getRedirectResult() can only be called once, and must be called before
+      // the auth state listener processes the redirect
+      // We call it synchronously (the function call itself is sync, it returns a Promise)
+      this.checkRedirectResultSyncImmediate();
       this.initializeAuthListener();
       this.setupTokenRefresh();
+    }
+  }
+
+  /**
+   * Check redirect result synchronously during initialization
+   * This MUST happen before auth state listener is set up
+   * The key is that getRedirectResult() is CALLED synchronously (before listener),
+   * even though it returns a Promise that resolves asynchronously
+   */
+  private checkRedirectResultSyncImmediate(): void {
+    try {
+      const auth = getAuth();
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : 'N/A';
+      const urlSearch = typeof window !== 'undefined' ? window.location.search : '';
+      const urlHash = typeof window !== 'undefined' ? window.location.hash : '';
+      
+      console.log('[AuthService] 🔍 Calling getRedirectResult() SYNCHRONOUSLY (before auth listener)...', {
+        currentUrl,
+        urlSearch,
+        urlHash,
+        authDomain: auth.app.options.authDomain
+      });
+      
+      // CRITICAL: Call getRedirectResult() synchronously - this is what matters!
+      // Even though it returns a Promise, calling it here ensures Firebase processes
+      // the redirect result before the auth state listener fires
+      this.redirectResultPromise = getRedirectResult(auth);
+      
+      // Handle the result asynchronously
+      this.redirectResultPromise.then((result) => {
+        console.log('[AuthService] 📋 getRedirectResult() promise resolved:', {
+          hasResult: !!result,
+          hasUser: !!result?.user,
+          userEmail: result?.user?.email,
+          providerId: result?.providerId,
+          operationType: result?.operationType
+        });
+        
+        if (result && result.user) {
+          console.log('[AuthService] ✅✅✅ Redirect result found during init!', {
+            email: result.user.email,
+            uid: result.user.uid,
+            providerId: result.providerId
+          });
+          this.currentUser = result.user;
+          this.notifyListeners(result.user);
+          this.redirectResultChecked = true;
+        } else {
+          console.log('[AuthService] ℹ️ No redirect result during init (normal for non-redirect visits)');
+          this.redirectResultChecked = true;
+        }
+      }).catch((error: any) => {
+        console.error('[AuthService] ❌ Error in redirect result promise:', {
+          code: error?.code,
+          message: error?.message,
+          name: error?.name
+        });
+        this.redirectResultChecked = true;
+      });
+      
+      console.log('[AuthService] getRedirectResult() called, promise created, waiting for result...');
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Failed to initiate redirect result check:', error);
+      this.redirectResultChecked = true; // Mark as checked to prevent retries
     }
   }
 
@@ -49,25 +125,54 @@ export class AuthService {
       console.log('[AuthService] Initializing auth listener with:', {
         app: auth.app.name,
         projectId: auth.app.options.projectId,
-        authDomain: auth.app.options.authDomain
+        authDomain: auth.app.options.authDomain,
+        redirectResultChecked: this.redirectResultChecked
       });
       
-      onAuthStateChanged(auth, (user) => {
-        this.currentUser = user;
+      onAuthStateChanged(auth, async (user) => {
+        // Don't overwrite user if we already set it from redirect result
+        if (!this.currentUser || this.currentUser.uid !== user?.uid) {
+          this.currentUser = user;
+        }
         
         // Log auth state changes for debugging
         if (user) {
-          console.log('[AuthService] Auth state: User signed in', user.email);
+          console.log('[AuthService] 🔵 Auth state: User signed in', user.email);
           console.log('[AuthService] User metadata:', {
             uid: user.uid,
             email: user.email,
-            lastSignInTime: user.metadata.lastSignInTime
+            lastSignInTime: user.metadata.lastSignInTime,
+            providerData: user.providerData.map(p => p.providerId),
+            isGoogleUser: user.providerData.some(p => p.providerId === 'google.com'),
+            isEmailUser: user.providerData.some(p => p.providerId === 'password')
           });
+          
+          // If this is a Google user and we're on the login page, trigger a custom event
+          // This helps the login page detect the sign-in even if getRedirectResult() didn't work
+          const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
+          if (isGoogleUser && typeof window !== 'undefined' && window.location.pathname === '/login') {
+            console.log('[AuthService] 🔵✅ Google user detected on login page - dispatching event');
+            
+            // Wait a moment to ensure the user is fully loaded
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Double-check the user is still there
+            const currentAuth = getAuth();
+            const currentUser = currentAuth.currentUser;
+            if (currentUser && currentUser.uid === user.uid) {
+              console.log('[AuthService] ✅ Confirmed user still authenticated, dispatching event');
+              window.dispatchEvent(new CustomEvent('google-signin-complete', { 
+                detail: { user: this.mapUserToProfile(user) } 
+              }));
+            } else {
+              console.warn('[AuthService] ⚠️ User disappeared before event dispatch');
+            }
+          }
         } else {
           console.log('[AuthService] Auth state: User signed out');
         }
         
-        this.notifyListeners(user);
+        this.notifyListeners(this.currentUser);
       }, (error: unknown) => {
         console.error('[AuthService] Auth state change error:', error);
         if (error instanceof Error) {
@@ -196,17 +301,169 @@ export class AuthService {
   }
 
   /**
-   * Sign in with Google
+   * Sign in with Google using redirect (avoids COOP popup blocking)
+   * 
+   * IMPORTANT: Firebase's signInWithRedirect works differently on custom domains.
+   * It redirects to Firebase's auth handler first, which then redirects to Google,
+   * then back to the handler, then back to your site. The redirect result should
+   * be available when the page loads after the final redirect.
    */
   async signInWithGoogle(): Promise<AuthResult<UserProfile>> {
     try {
+      const auth = getAuth();
       const provider = new GoogleAuthProvider();
-      const userCredential = await signInWithPopup(getAuth(), provider);
+      
+      // Add custom parameters if needed
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      // Store the current URL so we can redirect back to it
+      const currentUrl = typeof window !== 'undefined' ? window.location.href : '/login';
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('google_signin_redirect_url', currentUrl);
+        sessionStorage.setItem('google_signin_initiated', Date.now().toString());
+        console.log('[AuthService] Stored redirect URL:', currentUrl);
+      }
+      
+      console.log('[AuthService] 🚀 Initiating Google sign-in redirect...', {
+        authDomain: auth.app.options.authDomain,
+        currentUrl,
+        projectId: auth.app.options.projectId,
+        hasWindow: typeof window !== 'undefined',
+        redirectUrl: typeof window !== 'undefined' ? window.location.origin + '/login' : '/login'
+      });
+      
+      // Use redirect instead of popup to avoid Cross-Origin-Opener-Policy issues
+      // This will redirect to Firebase auth handler, then to Google, then back
+      // The redirect happens synchronously - this function won't return normally
+      await signInWithRedirect(auth, provider);
+      
+      // This code should not execute - redirect happens immediately
+      // If we reach here, something went wrong
+      console.error('[AuthService] ❌ signInWithRedirect returned without redirecting (UNEXPECTED!)');
+      console.error('[AuthService] This should never happen - redirect should occur immediately');
+      
+      // Redirect will happen, so return a pending result
+      // The actual result will be handled by getRedirectResult() when page loads
       return {
         success: true,
-        data: this.mapUserToProfile(userCredential.user)
+        data: null as any // Will be set after redirect
       };
     } catch (error: any) {
+      console.error('[AuthService] ❌ Error initiating Google redirect:', error);
+      console.error('[AuthService] Error details:', {
+        code: error?.code,
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack?.substring(0, 500)
+      });
+      
+      // Clear stored redirect URL on error
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('google_signin_redirect_url');
+        sessionStorage.removeItem('google_signin_initiated');
+      }
+      
+      // If user cancels or error occurs before redirect
+      return {
+        success: false,
+        error: this.getAuthErrorMessage(error)
+      };
+    }
+  }
+
+  /**
+   * Check for Google Sign-In redirect result
+   * Call this on page load to handle OAuth redirect
+   * NOTE: Redirect result is already checked during initialization, but this provides
+   * a way for pages to check if redirect was successful
+   */
+  async checkRedirectResult(): Promise<AuthResult<UserProfile> | null> {
+    try {
+      const auth = getAuth();
+      console.log('[AuthService] Checking for redirect result (page-level check)...', {
+        currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
+        search: typeof window !== 'undefined' ? window.location.search : 'N/A',
+        hash: typeof window !== 'undefined' ? window.location.hash : 'N/A',
+        authDomain: auth.app.options.authDomain,
+        redirectResultChecked: this.redirectResultChecked,
+        hasCurrentUser: !!this.currentUser,
+        currentUserEmail: this.currentUser?.email
+      });
+      
+      // If we already checked during init and have a user, return that
+      if (this.currentUser) {
+        const isGoogleUser = this.currentUser.providerData.some(p => p.providerId === 'google.com');
+        if (isGoogleUser) {
+          console.log('[AuthService] ✅ User authenticated with Google (from init check):', this.currentUser.email);
+          return {
+            success: true,
+            data: this.mapUserToProfile(this.currentUser)
+          };
+        }
+      }
+      
+      // CRITICAL: Even if we checked during init, try checking again
+      // The redirect might complete AFTER initialization
+      // getRedirectResult() can be called multiple times, but only returns a result once per redirect
+      console.log('[AuthService] 🔍 Checking getRedirectResult() again (redirect may have completed after init)...');
+      try {
+        const result = await getRedirectResult(auth);
+        console.log('[AuthService] 📋 Second getRedirectResult() check:', {
+          hasResult: !!result,
+          hasUser: !!result?.user,
+          userEmail: result?.user?.email,
+          providerId: result?.providerId
+        });
+        
+        if (result && result.user) {
+          console.log('[AuthService] ✅✅✅ Redirect result found on second check!', result.user.email);
+          this.currentUser = result.user;
+          this.notifyListeners(result.user);
+          this.redirectResultChecked = true;
+          
+          return {
+            success: true,
+            data: this.mapUserToProfile(result.user)
+          };
+        }
+      } catch (redirectError: any) {
+        console.log('[AuthService] Second getRedirectResult() check failed (may be normal):', redirectError?.code || redirectError?.message);
+      }
+      
+      // Also check Firebase's current user directly (bypass our cached value)
+      const firebaseCurrentUser = auth.currentUser;
+      if (firebaseCurrentUser && firebaseCurrentUser !== this.currentUser) {
+        console.log('[AuthService] 🔵 Found user in Firebase auth.currentUser:', firebaseCurrentUser.email);
+        const isGoogleUser = firebaseCurrentUser.providerData.some(p => p.providerId === 'google.com');
+        if (isGoogleUser) {
+          console.log('[AuthService] ✅ User is Google user, updating our state');
+          this.currentUser = firebaseCurrentUser;
+          this.notifyListeners(firebaseCurrentUser);
+          return {
+            success: true,
+            data: this.mapUserToProfile(firebaseCurrentUser)
+          };
+        }
+      }
+      
+      console.log('[AuthService] No redirect result (already checked or none available)');
+      return null; // No redirect result
+    } catch (error: any) {
+      console.error('[AuthService] ❌ Error checking redirect result:', error);
+      console.error('[AuthService] Error details:', {
+        code: error?.code,
+        message: error?.message,
+        name: error?.name
+      });
+      
+      // If it's a user cancellation, don't treat as error
+      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+        console.log('[AuthService] User cancelled sign-in');
+        return null;
+      }
+      
       return {
         success: false,
         error: this.getAuthErrorMessage(error)
@@ -235,6 +492,29 @@ export class AuthService {
   async resetPassword(email: string): Promise<AuthResult<void>> {
     try {
       await sendPasswordResetEmail(getAuth(), email);
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: this.getAuthErrorMessage(error)
+      };
+    }
+  }
+
+  /**
+   * Delete the current user account
+   */
+  async deleteCurrentUser(): Promise<AuthResult<void>> {
+    try {
+      const user = getAuth().currentUser;
+      if (!user) {
+        return {
+          success: false,
+          error: 'No user is currently signed in'
+        };
+      }
+      
+      await user.delete();
       return { success: true };
     } catch (error: any) {
       return {
@@ -281,6 +561,26 @@ export class AuthService {
     }
     
     return false;
+  }
+
+  /**
+   * Check if user signed in with Google (OAuth provider)
+   */
+  isGoogleUser(user: User | null): boolean {
+    if (!user) return false;
+    // Check if user has Google as a provider
+    return user.providerData.some(provider => provider.providerId === 'google.com');
+  }
+
+  /**
+   * Check if user can use password authentication
+   * Google OAuth users don't need passwords
+   */
+  canUsePassword(user: User | null): boolean {
+    if (!user) return true; // New users can set passwords
+    // If user only has Google provider, they don't need a password
+    const hasGoogleOnly = user.providerData.length === 1 && this.isGoogleUser(user);
+    return !hasGoogleOnly;
   }
 
   /**
@@ -341,7 +641,8 @@ export class AuthService {
       case 'auth/invalid-email':
         return 'Invalid email address';
       case 'auth/invalid-credential':
-        return 'Invalid credentials. Please check your email and password.';
+        // Provide more helpful error message
+        return 'Invalid email or password. Please check your credentials and try again. If you are a platform admin, ensure your account exists in Firebase.';
       case 'auth/weak-password':
         return 'Password is too weak. Use at least 6 characters';
       case 'auth/user-disabled':

@@ -343,3 +343,96 @@ export async function getAllSubscriptions(): Promise<Subscription[]> {
     throw error;
   }
 }
+
+/**
+ * Get all invoices (admin only)
+ */
+export async function getAllInvoices(): Promise<Invoice[]> {
+  try {
+    const headers = await getAuthHeaders();
+    
+    const apiPath = API_BASE_URL || '/api';
+    const response = await fetch(`${apiPath}/billing/invoices`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch all invoices');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching all invoices:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all payment methods (admin only)
+ */
+export async function getAllPaymentMethods(): Promise<PaymentMethod[]> {
+  try {
+    const headers = await getAuthHeaders();
+    
+    const apiPath = API_BASE_URL || '/api';
+    const response = await fetch(`${apiPath}/billing/payment-methods`, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch all payment methods');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching all payment methods:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a payment method
+ */
+export async function createPaymentMethod(
+  tenantId: string,
+  type: 'paypal' | 'credit_card',
+  paypalEmail?: string,
+  creditCardInfo?: {
+    email: string;
+    cardNumber: string;
+    expiryDate: string;
+    cvv: string;
+    name: string;
+  }
+): Promise<{ id: string; type: string; paypalEmail: string }> {
+  try {
+    const headers = await getAuthHeaders(tenantId);
+    
+    const apiPath = API_BASE_URL || '/api';
+    const response = await fetch(`${apiPath}/billing/payment-methods`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        tenantId,
+        type,
+        paypalEmail,
+        creditCard: creditCardInfo
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create payment method');
+    }
+
+    const result = await response.json();
+    return result.paymentMethod;
+  } catch (error) {
+    console.error('Error creating payment method:', error);
+    throw error;
+  }
+}

@@ -16,11 +16,13 @@ export interface ContactInfo {
   role?: string; // Site manager, tower crew, etc.
 }
 
+export type SiteType = 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'internet-access' | 'internet' | 'hq' | 'other';
+
 export interface TowerSite {
   id: string;
   name: string;
   location: Location;
-  type: 'tower' | 'rooftop' | 'monopole' | 'warehouse' | 'noc' | 'internet-access' | 'internet' | 'other';
+  type: SiteType | SiteType[]; // Support both single type (backward compatibility) and array of types
   height?: number; // feet
   
   // Professional Info

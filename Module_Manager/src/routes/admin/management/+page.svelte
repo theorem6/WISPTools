@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
-  import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
   import { isPlatformAdmin } from '$lib/services/adminService';
@@ -19,13 +18,6 @@
   }
 
   const adminFeatures: AdminFeature[] = [
-    {
-      id: 'user-management',
-      name: 'User Management',
-      description: 'Manage users, roles, and permissions across tenants',
-      icon: '👥',
-      path: '/modules/user-management'
-    },
     {
       id: 'tenant-management',
       name: 'Tenant Management',
@@ -67,16 +59,31 @@
   let statusUpdateInterval: NodeJS.Timeout | null = null;
 
   onMount(async () => {
-    if (browser) {
-      currentUser = await authService.getCurrentUser();
-      isAdmin = isPlatformAdmin(currentUser?.email || null);
-      
-      if (isAdmin) {
-        await loadSystemStatus();
-        // Update status every 30 seconds
-        statusUpdateInterval = setInterval(loadSystemStatus, 30000);
-      }
+    if (!browser) return;
+    
+    // Wait a bit for auth state to be ready after page refresh
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    currentUser = await authService.getCurrentUser();
+    
+    if (!currentUser) {
+      // Not authenticated - redirect to login
+      goto('/login', { replaceState: true });
+      return;
     }
+    
+    isAdmin = isPlatformAdmin(currentUser?.email || null);
+    
+    if (!isAdmin) {
+      // Not admin - redirect to dashboard
+      goto('/dashboard', { replaceState: true });
+      return;
+    }
+    
+    // Only load status if admin
+    await loadSystemStatus();
+    // Update status every 30 seconds
+    statusUpdateInterval = setInterval(loadSystemStatus, 30000);
   });
 
   onDestroy(() => {
@@ -93,10 +100,22 @@
       statusError = '';
       
       // Load tenants and users in parallel
-      const [tenants, users] = await Promise.all([
-        tenantService.getAllTenants().catch(() => []),
-        getAllUsers().catch(() => [])
+      // Wrap in Promise.allSettled to prevent one failure from blocking the other
+      const [tenantsResult, usersResult] = await Promise.allSettled([
+        tenantService.getAllTenants(),
+        getAllUsers()
       ]);
+      
+      const tenants = tenantsResult.status === 'fulfilled' ? tenantsResult.value : [];
+      const users = usersResult.status === 'fulfilled' ? usersResult.value : [];
+      
+      // Log errors but don't throw
+      if (tenantsResult.status === 'rejected') {
+        console.error('[Admin Management] Error loading tenants:', tenantsResult.reason);
+      }
+      if (usersResult.status === 'rejected') {
+        console.error('[Admin Management] Error loading users:', usersResult.reason);
+      }
       
       // Update system status
       systemStatus = {
@@ -130,20 +149,31 @@
     goto(feature.path);
   }
 
-  function goBack() {
-    goto('/dashboard');
+  // No back button needed - this is the main admin page
+  
+  async function handleLogout() {
+    try {
+      await authService.signOut();
+      
+      // Clear all localStorage data
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('selectedTenantId');
+      localStorage.removeItem('selectedTenantName');
+      localStorage.removeItem('tenantSetupCompleted');
+      
+      // Redirect to login
+      goto('/login', { replaceState: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   }
 </script>
 
-<TenantGuard requireTenant={false} adminOnly={true}>
-  <div class="admin-module">
+<div class="admin-module">
     <!-- Header -->
     <div class="module-header">
       <div class="header-content">
-        <button class="back-btn" on:click={goBack}>
-          <span class="back-icon">←</span>
-          Back to Dashboard
-        </button>
         <div class="module-title">
           <h1>⚙️ Admin Management</h1>
           <p>User and tenant management for owners and administrators</p>
@@ -152,6 +182,9 @@
           {#if currentUser}
             <span class="user-name">{currentUser.email}</span>
             <span class="user-role">Platform Admin</span>
+            <button class="logout-btn" on:click={handleLogout} title="Logout">
+              🚪 Logout
+            </button>
           {/if}
         </div>
       </div>
@@ -256,20 +289,19 @@
           </div>
         </div>
       </div>
+      </div>
     </div>
-  </div>
-</TenantGuard>
-
-<style>
+  
+  <style>
   .admin-module {
     min-height: 100vh;
-    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    background: var(--bg-primary);
   }
 
   .module-header {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--card-bg);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid var(--border-color);
     padding: 1rem 0;
   }
 
@@ -283,20 +315,21 @@
   }
 
   .back-btn {
-    background: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    transition: all 0.2s ease;
+    transition: var(--transition);
+    color: var(--text-primary);
   }
 
   .back-btn:hover {
-    background: #e5e7eb;
-    border-color: #9ca3af;
+    background: var(--hover-bg);
+    border-color: var(--primary-color);
   }
 
   .back-icon {
@@ -311,12 +344,12 @@
   .module-title h1 {
     font-size: 2rem;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--text-primary);
     margin: 0;
   }
 
   .module-title p {
-    color: #6b7280;
+    color: var(--text-secondary);
     margin: 0.25rem 0 0 0;
   }
 
@@ -328,12 +361,30 @@
 
   .user-name {
     font-weight: 500;
-    color: #1f2937;
+    color: var(--text-primary);
   }
 
   .user-role {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: var(--text-secondary);
+  }
+
+  .logout-btn {
+    margin-top: 0.5rem;
+    background: var(--danger-color, #dc2626);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm, 0.375rem);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition, all 0.2s);
+  }
+
+  .logout-btn:hover {
+    background: var(--danger-dark, #b91c1c);
+    transform: translateY(-1px);
   }
 
   .module-content {
@@ -343,22 +394,22 @@
   }
 
   .overview-section {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 1rem;
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
     padding: 2rem;
     margin-bottom: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
   }
 
   .overview-section h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-primary);
     margin: 0 0 1rem 0;
   }
 
   .overview-section p {
-    color: #6b7280;
+    color: var(--text-secondary);
     line-height: 1.6;
     margin: 0;
   }
@@ -370,9 +421,8 @@
   .features-section h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: white;
+    color: var(--text-primary);
     margin: 0 0 1.5rem 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .features-grid {
@@ -382,13 +432,13 @@
   }
 
   .feature-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 1rem;
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     border: 2px solid transparent;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
     display: flex;
     align-items: center;
     gap: 1rem;
@@ -396,8 +446,8 @@
 
   .feature-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    border-color: #6b7280;
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
   }
 
   .feature-icon {
@@ -412,19 +462,19 @@
   .feature-name {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-primary);
     margin: 0 0 0.5rem 0;
   }
 
   .feature-description {
-    color: #6b7280;
+    color: var(--text-secondary);
     margin: 0;
     line-height: 1.5;
   }
 
   .feature-arrow {
     font-size: 1.5rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     flex-shrink: 0;
   }
 
@@ -435,9 +485,8 @@
   .system-status h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: white;
+    color: var(--text-primary);
     margin: 0 0 1.5rem 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .status-grid {
@@ -447,18 +496,18 @@
   }
 
   .status-card {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 0.75rem;
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
     padding: 1rem;
     display: flex;
     align-items: center;
     gap: 1rem;
-    transition: all 0.2s ease;
+    transition: var(--transition);
   }
 
   .status-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-md);
   }
 
   .status-icon {
@@ -467,38 +516,38 @@
   }
 
   .status-icon.operational {
-    color: #10b981;
+    color: var(--success-color);
   }
 
   .status-icon.error {
-    color: #ef4444;
+    color: var(--danger-color);
   }
 
   .status-icon.checking {
-    color: #f59e0b;
+    color: var(--warning-color);
   }
 
   .status-icon.connected {
-    color: #10b981;
+    color: var(--success-color);
   }
 
   .status-info h4 {
     font-size: 1rem;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-primary);
     margin: 0 0 0.25rem 0;
   }
 
   .status-info p {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: var(--text-secondary);
     margin: 0;
   }
 
   .status-error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 0.75rem;
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
     padding: 1rem;
     margin-bottom: 1rem;
     display: flex;
@@ -508,24 +557,24 @@
 
   .status-error p {
     margin: 0;
-    color: #dc2626;
+    color: var(--danger-dark, #991b1b);
     font-weight: 500;
   }
 
   .retry-btn {
-    background: #dc2626;
-    color: white;
+    background: var(--danger-color);
+    color: var(--text-inverse);
     border: none;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-md);
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: var(--transition);
   }
 
   .retry-btn:hover {
-    background: #b91c1c;
+    background: var(--danger-hover);
     transform: translateY(-1px);
   }
 

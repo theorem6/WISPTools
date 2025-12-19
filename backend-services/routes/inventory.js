@@ -152,11 +152,47 @@ router.get('/:id', async (req, res) => {
 // POST /inventory - Create new item
 router.post('/', async (req, res) => {
   try {
+    // Get tenant's primary location if no location specified
+    let defaultLocation = null;
+    if (!req.body.currentLocation) {
+      const { Tenant } = require('../models/tenant');
+      const { UnifiedSite } = require('../models/network');
+      
+      const tenant = await Tenant.findOne({ _id: req.tenantId });
+      if (tenant?.primaryLocation?.siteId) {
+        const site = await UnifiedSite.findOne({ 
+          _id: tenant.primaryLocation.siteId,
+          tenantId: req.tenantId 
+        });
+        
+        if (site) {
+          // Determine location type from site types
+          const siteTypes = Array.isArray(site.type) ? site.type : [site.type];
+          let locationType = 'warehouse';
+          if (siteTypes.includes('noc')) locationType = 'noc';
+          else if (siteTypes.includes('hq')) locationType = 'noc'; // HQ treated as NOC
+          else if (siteTypes.includes('tower')) locationType = 'tower';
+          else if (siteTypes.includes('warehouse')) locationType = 'warehouse';
+          
+          defaultLocation = {
+            type: locationType,
+            siteId: site._id.toString(),
+            siteName: site.name || tenant.primaryLocation.siteName,
+            latitude: site.location?.latitude,
+            longitude: site.location?.longitude,
+            address: site.location?.address
+          };
+        }
+      }
+    }
+    
     const itemData = {
       ...req.body,
       tenantId: req.tenantId,
       createdBy: req.user?.name || req.user?.email,
-      createdById: req.user?.uid
+      createdById: req.user?.uid,
+      // Use default location if none provided
+      currentLocation: req.body.currentLocation || defaultLocation
     };
     
     const item = new InventoryItem(itemData);
@@ -259,14 +295,38 @@ router.post('/:id/deploy', async (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
     
-    if (item.status !== 'available' && item.status !== 'reserved') {
+    // Ensure status exists (should have default, but safety check)
+    if (!item.status) {
+      console.warn(`[Deploy] Item ${item._id} has no status, defaulting to 'available'`);
+      item.status = 'available';
+    }
+    
+    console.log(`[Deploy] Attempting to deploy item ${item._id} (${item.model || item.equipmentType || 'unknown'}), current status: ${item.status}`);
+    
+    // Allow deployment for: available, reserved, deployed (redeployment), maintenance (returning to service), in-transit
+    // Block deployment for: retired, lost, sold, rma
+    const deployableStatuses = ['available', 'reserved', 'deployed', 'maintenance', 'in-transit'];
+    const blockedStatuses = ['retired', 'lost', 'sold', 'rma'];
+    
+    if (blockedStatuses.includes(item.status)) {
       return res.status(400).json({ 
-        error: 'Item cannot be deployed', 
-        currentStatus: item.status 
+        error: `Item cannot be deployed. Current status: ${item.status}. Items with status '${item.status}' cannot be deployed.`,
+        currentStatus: item.status,
+        message: `This item is marked as '${item.status}' and cannot be deployed. Please update the item status first if you need to deploy it.`
+      });
+    }
+    
+    if (!deployableStatuses.includes(item.status)) {
+      return res.status(400).json({ 
+        error: `Item cannot be deployed. Current status: ${item.status}`,
+        currentStatus: item.status,
+        message: `Items with status '${item.status}' cannot be deployed. Please update the item status to 'available' or 'reserved' first.`
       });
     }
     
     await item.deploy(deploymentInfo);
+    
+    console.log(`[Deploy] Successfully deployed item ${item._id} (${item.model || item.equipmentType || 'unknown'}) to status: ${item.status}`);
     
     res.json({ message: 'Item deployed successfully', item });
   } catch (error) {
@@ -498,8 +558,42 @@ router.post('/scan/check-in', async (req, res) => {
       return res.status(400).json({ error: 'identifier is required (barcode, QR code, or asset tag)' });
     }
     
-    if (!location) {
-      return res.status(400).json({ error: 'location is required' });
+    // Get default location from tenant if not provided
+    let finalLocation = location;
+    if (!finalLocation) {
+      const { Tenant } = require('../models/tenant');
+      const { UnifiedSite } = require('../models/network');
+      
+      const tenant = await Tenant.findOne({ _id: req.tenantId });
+      if (tenant?.primaryLocation?.siteId) {
+        const site = await UnifiedSite.findOne({ 
+          _id: tenant.primaryLocation.siteId,
+          tenantId: req.tenantId 
+        });
+        
+        if (site) {
+          // Determine location type from site types
+          const siteTypes = Array.isArray(site.type) ? site.type : [site.type];
+          let locationType = 'warehouse';
+          if (siteTypes.includes('noc')) locationType = 'noc';
+          else if (siteTypes.includes('hq')) locationType = 'noc'; // HQ treated as NOC
+          else if (siteTypes.includes('tower')) locationType = 'tower';
+          else if (siteTypes.includes('warehouse')) locationType = 'warehouse';
+          
+          finalLocation = {
+            type: locationType,
+            siteId: site._id.toString(),
+            siteName: site.name || tenant.primaryLocation.siteName,
+            latitude: site.location?.latitude,
+            longitude: site.location?.longitude,
+            address: site.location?.address
+          };
+        }
+      }
+      
+      if (!finalLocation) {
+        return res.status(400).json({ error: 'location is required. Please set a primary location in tenant settings.' });
+      }
     }
     
     // Find item by barcode, QR code, or asset tag
@@ -519,7 +613,7 @@ router.post('/scan/check-in', async (req, res) => {
     
     // Check in: Transfer to new location and set status to available if not already
     const movedBy = req.user?.name || req.user?.email || 'system';
-    await item.transferTo(location, 'check-in', movedBy, notes || 'Checked in via scanner');
+    await item.transferTo(finalLocation, 'check-in', movedBy, notes || 'Checked in via scanner');
     
     // Update status to available if currently in-transit or reserved
     if (item.status === 'in-transit' || item.status === 'reserved') {

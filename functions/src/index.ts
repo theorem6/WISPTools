@@ -275,6 +275,12 @@ export const apiProxy = onRequest({
     incoming = incoming.substring('apiProxy/'.length);
   }
   
+  // Strip /api prefix for admin routes (backend admin routes are at /admin, not /api/admin)
+  // Keep /api prefix for other routes (backend routes like /api/users, /api/tenants, etc.)
+  if (incoming.startsWith('/api/admin')) {
+    incoming = incoming.substring('/api'.length); // Remove /api, keep /admin
+  }
+  
   // For Firebase Hosting rewrites, the path might include query string
   // Extract just the pathname if query string is present
   if (incoming.includes('?')) {
