@@ -150,6 +150,11 @@
 
   // Tenant Setup Functions
   async function handleTenantSubmit() {
+    // Prevent double submission
+    if (isLoading) {
+      return;
+    }
+
     if (!tenantName || !displayName || !contactPhone) {
       error = 'Please fill in all required fields';
       return;
