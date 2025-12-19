@@ -559,7 +559,7 @@
               bind:value={subdomain}
               placeholder="acme-wisp"
               disabled={isLoading}
-              pattern="[a-z0-9\\-]+"
+              pattern="[-a-z0-9]+"
               minlength="3"
               maxlength="63"
               required
@@ -591,7 +591,7 @@
                 <span class="spinner"></span>
                 Creating...
               {:else}
-                Continue to Payment
+                Finish
               {/if}
             </button>
           </div>
