@@ -12,9 +12,9 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const { Tenant } = require('../models/tenant');
 const { UserTenant } = require('../routes/users/user-schema');
-const { TenantEmail } = require('../models/tenant-email');
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
-const { PlanProject, PlanLayerFeature } = require('../models/plan');
+const { PlanProject } = require('../models/plan');
+const PlanLayerFeature = require('../models/plan-layer-feature');
 const { InventoryItem } = require('../models/inventory');
 
 // Additional models that might need cleanup
@@ -84,7 +84,6 @@ async function deleteTenant(identifier) {
 
     // Get counts before deletion
     const userTenantCount = await UserTenant.countDocuments({ tenantId });
-    const tenantEmailCount = await TenantEmail.countDocuments({ tenantId });
     const siteCount = await UnifiedSite.countDocuments({ tenantId });
     const sectorCount = await UnifiedSector.countDocuments({ tenantId });
     const cpeCount = await UnifiedCPE.countDocuments({ tenantId });
@@ -96,7 +95,6 @@ async function deleteTenant(identifier) {
 
     console.log('📊 Data to be deleted:');
     console.log(`   - User-Tenant associations: ${userTenantCount}`);
-    console.log(`   - Tenant emails: ${tenantEmailCount}`);
     console.log(`   - Sites: ${siteCount}`);
     console.log(`   - Sectors: ${sectorCount}`);
     console.log(`   - CPE Devices: ${cpeCount}`);
@@ -145,10 +143,6 @@ async function deleteTenant(identifier) {
     const userTenantResult = await UserTenant.deleteMany({ tenantId });
     console.log(`   ✅ Deleted ${userTenantResult.deletedCount} user-tenant associations`);
 
-    // 10. Delete tenant emails
-    const tenantEmailResult = await TenantEmail.deleteMany({ tenantId });
-    console.log(`   ✅ Deleted ${tenantEmailResult.deletedCount} tenant emails`);
-
     // 11. Try to delete other collections (may not exist, so use try-catch)
     try {
       const workOrderResult = await WorkOrder.deleteMany({ tenantId });
@@ -179,7 +173,6 @@ async function deleteTenant(identifier) {
     console.log('📊 Deletion summary:');
     console.log(`   - Tenant: ${tenantName} (${tenantId})`);
     console.log(`   - User-Tenant associations: ${userTenantResult.deletedCount}`);
-    console.log(`   - Tenant emails: ${tenantEmailResult.deletedCount}`);
     console.log(`   - Sites: ${siteResult.deletedCount}`);
     console.log(`   - Sectors: ${sectorResult.deletedCount}`);
     console.log(`   - CPE Devices: ${cpeResult.deletedCount}`);
