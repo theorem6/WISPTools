@@ -11,7 +11,7 @@ const mongoose = require('mongoose');
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const { Tenant } = require('../models/tenant');
-const { UserTenant } = require('../models/user-tenant');
+const { UserTenant } = require('../routes/users/user-schema');
 const { TenantEmail } = require('../models/tenant-email');
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
 const { PlanProject, PlanLayerFeature } = require('../models/plan');
