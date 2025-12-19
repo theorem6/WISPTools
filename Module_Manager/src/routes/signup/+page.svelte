@@ -264,6 +264,11 @@
 
       success = 'Tenant created successfully!';
       step = 4; // Move to success step
+      
+      // Redirect to login after a short delay
+      setTimeout(() => {
+        goto('/login?signup=success');
+      }, 2000);
     } catch (err: any) {
       // If we created a Firebase user but tenant creation failed, delete the user
       if (userCreated && firebaseUser) {
@@ -554,7 +559,7 @@
               bind:value={subdomain}
               placeholder="acme-wisp"
               disabled={isLoading}
-              pattern="[a-z0-9-]+"
+              pattern="[a-z0-9\\-]+"
               minlength="3"
               maxlength="63"
               required
@@ -613,9 +618,9 @@
           <button 
             type="button" 
             class="btn-primary" 
-            onclick={() => goto('/dashboard')}
+            onclick={() => goto('/login?signup=success')}
           >
-            Go to Dashboard →
+            Go to Login →
           </button>
         </div>
       {/if}
