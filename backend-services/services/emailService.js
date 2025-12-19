@@ -215,9 +215,106 @@ async function sendPasswordResetEmail(email, resetLink) {
   return { sent: false, reason: 'Use Firebase Auth password reset' };
 }
 
+/**
+ * Send email verification code
+ */
+async function sendVerificationEmail(options) {
+  const { email, code } = options;
+
+  const transport = getTransporter();
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WISPTools Email Verification</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background: #f3f4f6; }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+    .card { background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .logo { text-align: center; margin-bottom: 30px; }
+    .logo h1 { color: #8b5cf6; margin: 0; font-size: 28px; }
+    h2 { color: #1f2937; margin: 0 0 20px; }
+    p { margin: 0 0 16px; color: #4b5563; }
+    .code-box { background: #f5f3ff; border: 2px dashed #8b5cf6; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0; }
+    .code { font-size: 32px; font-weight: 700; color: #7c3aed; letter-spacing: 4px; font-family: monospace; }
+    .footer { text-align: center; margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 14px; }
+    .footer a { color: #8b5cf6; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="logo">
+        <h1>🌐 WISPTools</h1>
+      </div>
+      
+      <h2>Email Verification</h2>
+      
+      <p>Hi there,</p>
+      
+      <p>You're creating a new WISPTools account. Please use the verification code below to verify your email address:</p>
+      
+      <div class="code-box">
+        <div class="code">${code}</div>
+      </div>
+      
+      <p>This code will expire in 10 minutes.</p>
+      
+      <p>If you didn't request this code, you can safely ignore this email.</p>
+    </div>
+    
+    <div class="footer">
+      <p>This email was sent by <a href="https://wisptools.io">WISPTools</a></p>
+      <p>WISP Management Platform</p>
+      <p>https://wisptools.io</p>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const textContent = `
+WISPTools Email Verification
+
+Hi there,
+
+You're creating a new WISPTools account. Please use the verification code below to verify your email address:
+
+${code}
+
+This code will expire in 10 minutes.
+
+If you didn't request this code, you can safely ignore this email.
+
+---
+WISPTools - WISP Management Platform
+https://wisptools.io
+  `;
+
+  try {
+    const result = await transport.sendMail({
+      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+      to: email,
+      subject: 'WISPTools Email Verification Code',
+      text: textContent,
+      html: htmlContent
+    });
+
+    console.log(`✅ [Email] Verification code sent to ${email}`);
+    return { sent: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(`❌ [Email] Failed to send verification email to ${email}:`, error.message);
+    throw error; // Re-throw so caller can handle
+  }
+}
+
 module.exports = {
   isConfigured,
   sendWelcomeEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendVerificationEmail
 };
 

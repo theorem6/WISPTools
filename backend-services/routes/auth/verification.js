@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const emailService = require('../../services/emailService');
 
 // In-memory store for verification codes (in production, use Redis or database)
 const verificationCodes = new Map();
@@ -107,18 +108,32 @@ router.post('/send-verification-code', async (req, res) => {
 </html>
       `;
 
-      // Use email service to send verification code
-      // For now, we'll use a simple approach - in production, use proper email service
+      // Send email with verification code using email service
       console.log(`[Email Verification] Sending code to ${email}: ${code}`);
       
-      // TODO: Integrate with actual email service
-      // await emailService.sendVerificationEmail(email, code);
-
-      res.json({
-        success: true,
-        message: 'Verification code sent to your email',
-        expiresIn: CODE_EXPIRATION_MS / 1000 // seconds
-      });
+      try {
+        await emailService.sendVerificationEmail({
+          email: email.toLowerCase(),
+          code: code
+        });
+        
+        console.log(`[Email Verification] ✅ Email sent successfully to ${email}`);
+        
+        res.json({
+          success: true,
+          message: 'Verification code sent to your email',
+          expiresIn: CODE_EXPIRATION_MS / 1000 // seconds
+        });
+      } catch (emailError) {
+        console.error('[Email Verification] Failed to send email:', emailError);
+        // Still return success - code is generated and stored
+        // But log the error for debugging
+        res.json({
+          success: true,
+          message: 'Verification code generated (email sending may have failed - check server logs)',
+          expiresIn: CODE_EXPIRATION_MS / 1000
+        });
+      }
     } catch (emailError) {
       console.error('[Email Verification] Failed to send email:', emailError);
       // Still return success - code is generated and stored
