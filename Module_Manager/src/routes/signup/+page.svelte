@@ -295,6 +295,7 @@
       console.error('Tenant creation error:', err);
     } finally {
       isLoading = false;
+      isCreatingTenant = false;
     }
   }
 
