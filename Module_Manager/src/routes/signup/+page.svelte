@@ -40,25 +40,110 @@
   let createdTenantId: string = '';
   let isCreatingTenant = false; // Guard to prevent double creation
 
-  onMount(() => {
+  onMount(async () => {
     if (!browser) return;
     
     console.log('[Signup Page] 🔄 Page mounted');
     console.log('[Signup Page] Current URL:', window.location.href);
+    
+    // Check for Google sign-in redirect result first
+    try {
+      const redirectResult = await authService.checkRedirectResult();
+      if (redirectResult && redirectResult.success && redirectResult.data) {
+        console.log('[Signup Page] Google redirect sign-in successful!');
+        await handleGoogleSignInSuccess(redirectResult.data);
+        return;
+      }
+    } catch (err: any) {
+      console.warn('[Signup Page] No redirect result or error:', err);
+    }
     
     // Check if user is already authenticated
     const currentUser = authService.getCurrentUser();
     console.log('[Signup Page] Auth check:', { hasUser: !!currentUser, email: currentUser?.email });
     
     if (currentUser) {
-      // User is already logged in, redirect to dashboard
-      console.log('[Signup Page] User already authenticated, redirecting to dashboard');
-      goto('/dashboard');
-      return;
+      // Check if user already has a tenant
+      const userEmail = currentUser.email;
+      if (userEmail) {
+        email = userEmail;
+        // Skip to payment step if user is already authenticated
+        step = 2;
+        paymentMethodType = 'beta';
+        return;
+      }
     }
     
     console.log('[Signup Page] ✅ Ready to show signup wizard, step:', step);
   });
+
+  // Google Sign-In Functions
+  async function handleGoogleSignIn() {
+    isLoading = true;
+    error = '';
+
+    try {
+      console.log('[Signup Page] Initiating Google sign in...');
+      const result = await authService.signInWithGoogle();
+
+      if (result.success) {
+        // Redirect will happen automatically
+        console.log('[Signup Page] Redirecting to Google for sign-in...');
+        return;
+      } else {
+        error = result.error || 'Google authentication failed';
+        isLoading = false;
+      }
+    } catch (err: any) {
+      error = err.message || 'Google authentication error';
+      isLoading = false;
+    }
+  }
+
+  async function handleGoogleSignInSuccess(userProfile: any) {
+    isLoading = true;
+    error = '';
+
+    try {
+      console.log('[Signup Page] Processing Google sign-in success...');
+      
+      // Wait for Firebase auth state to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const finalUser = authService.getCurrentUser();
+      if (!finalUser || !finalUser.email) {
+        error = 'Failed to get user information from Google';
+        isLoading = false;
+        return;
+      }
+
+      // Set email from Google account
+      email = finalUser.email;
+
+      // Try to get user tenants - if they have any, redirect to dashboard
+      try {
+        const userTenants = await tenantService.getUserTenants();
+        if (userTenants && userTenants.length > 0) {
+          console.log('[Signup Page] User already has tenant, redirecting to dashboard');
+          goto('/dashboard');
+          return;
+        }
+      } catch (err: any) {
+        // User doesn't have tenants yet, continue with signup
+        console.log('[Signup Page] No existing tenants found, continuing with signup');
+      }
+
+      // Continue with signup flow - skip email verification
+      step = 2; // Move to payment step
+      paymentMethodType = 'beta';
+      success = 'Google sign-in successful! Continue with account setup.';
+      setTimeout(() => success = '', 3000);
+      isLoading = false;
+    } catch (err: any) {
+      error = err.message || 'Error processing Google sign-in';
+      isLoading = false;
+    }
+  }
 
   // Email Verification Functions
   async function sendVerificationCode() {
@@ -360,19 +445,43 @@
           </div>
 
           {#if !verificationCodeSent}
-            <button 
-              type="button" 
-              class="btn-primary" 
-              onclick={sendVerificationCode}
-              disabled={isLoading || !email}
-            >
-              {#if isLoading}
-                <span class="spinner"></span>
-                Sending...
-              {:else}
-                Send Verification Code
-              {/if}
-            </button>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+              <button 
+                type="button" 
+                class="btn-primary" 
+                onclick={sendVerificationCode}
+                disabled={isLoading || !email}
+              >
+                {#if isLoading}
+                  <span class="spinner"></span>
+                  Sending...
+                {:else}
+                  Send Verification Code
+                {/if}
+              </button>
+
+              <div style="display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0;">
+                <div style="flex: 1; height: 1px; background: var(--border-color, #d1d5db);"></div>
+                <span style="color: var(--text-secondary, #6b7280); font-size: 0.875rem;">OR</span>
+                <div style="flex: 1; height: 1px; background: var(--border-color, #d1d5db);"></div>
+              </div>
+
+              <button 
+                type="button" 
+                class="btn-google" 
+                onclick={handleGoogleSignIn}
+                disabled={isLoading}
+                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.9rem 1rem; border-radius: 0.6rem; background: #ffffff; color: #1a2332; font-weight: 600; font-size: 0.95rem; border: none; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);"
+              >
+                <svg aria-hidden="true" viewBox="0 0 533.5 544.3" style="width: 20px; height: 20px;">
+                  <path fill="#4285f4" d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.2H272v95h147.5c-6.4 34-25 62.8-53.4 82v68h86.1c50.4-46.5 80.3-115.1 80.3-194.8z"/>
+                  <path fill="#34a853" d="M272 544.3c72.2 0 132.8-23.9 177-64.7l-86.1-68c-23.9 16.1-54.5 25.7-90.9 25.7-69.9 0-129.2-47.2-150.4-110.5h-90.7v69.8c44 87.4 134.5 148.7 241.1 148.7z"/>
+                  <path fill="#fbbc04" d="M121.6 326.8c-10.2-30-10.2-62.5 0-92.5v-69.8h-90.7c-37.3 74.6-37.3 158.4 0 233z"/>
+                  <path fill="#ea4335" d="M272 107.7c39.2-.6 76.4 13.8 105 39.9l78.2-78.2C404.5 25.5 344 0 272 0 165.4 0 74.9 61.3 30.9 148.7l90.7 69.8C142.7 175 202.1 107.7 272 107.7z"/>
+                </svg>
+                <span>Sign up with Google</span>
+              </button>
+            </div>
           {:else}
             <div class="verification-sent">
               <p class="success-text">✅ Verification code sent to {email}</p>

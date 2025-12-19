@@ -755,12 +755,6 @@
         <span>Sign in with Google</span>
       </button>
 
-      <p class="domain-note">Sign in with your Google account. No password needed - Google handles authentication.</p>
-
-      <div class="demo-notice">
-        <p><strong>Google Sign-In:</strong> Uses Google's secure authentication - no password required for Google accounts.</p>
-        <p>Email/Password accounts can be created for non-Google email addresses.</p>
-      </div>
     </div>
 
     <!-- Features Section -->
