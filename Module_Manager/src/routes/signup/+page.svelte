@@ -174,9 +174,9 @@
       subdomain = tenantName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     }
 
-    // Validate subdomain format
-    if (!/^[a-z0-9-]+$/.test(subdomain)) {
-      error = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+    // Validate subdomain format (hyphen at end of character class to avoid range interpretation)
+    if (!/^[a-z0-9-]+$/.test(subdomain) || subdomain.startsWith('-') || subdomain.endsWith('-')) {
+      error = 'Subdomain can only contain lowercase letters, numbers, and hyphens (cannot start or end with hyphen)';
       return;
     }
 
@@ -559,7 +559,6 @@
               bind:value={subdomain}
               placeholder="acme-wisp"
               disabled={isLoading}
-              pattern="[-a-z0-9]+"
               minlength="3"
               maxlength="63"
               required
