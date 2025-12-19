@@ -14,7 +14,7 @@ const { Tenant } = require('../models/tenant');
 const { UserTenant } = require('../routes/users/user-schema');
 const { UnifiedSite, UnifiedSector, UnifiedCPE, NetworkEquipment, HardwareDeployment } = require('../models/network');
 const { PlanProject } = require('../models/plan');
-const PlanLayerFeature = require('../models/plan-layer-feature');
+const { PlanLayerFeature } = require('../models/plan-layer-feature');
 const { InventoryItem } = require('../models/inventory');
 
 // Additional models that might need cleanup
