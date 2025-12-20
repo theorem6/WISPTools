@@ -57,7 +57,7 @@
     error = '';
 
     try {
-      const result = await authService.confirmPasswordReset(actionCode, newPassword);
+      const result = await authService.verifyPasswordReset(actionCode, newPassword);
       
       if (result.success) {
         success = 'Password reset successfully! Redirecting to login...';
@@ -79,7 +79,7 @@
     error = '';
 
     try {
-      const result = await authService.applyActionCodeToAuth(actionCode);
+      const result = await authService.verifyActionCode(actionCode);
       
       if (result.success) {
         success = 'Email verified successfully! Redirecting to login...';

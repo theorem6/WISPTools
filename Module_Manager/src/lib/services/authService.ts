@@ -514,7 +514,7 @@ export class AuthService {
   /**
    * Confirm password reset with action code
    */
-  async confirmPasswordReset(actionCode: string, newPassword: string): Promise<AuthResult<void>> {
+  async verifyPasswordReset(actionCode: string, newPassword: string): Promise<AuthResult<void>> {
     try {
       const auth = getAuth();
       await confirmPasswordReset(auth, actionCode, newPassword);
@@ -530,9 +530,10 @@ export class AuthService {
   /**
    * Apply action code (for email verification, etc.)
    */
-  async applyActionCode(code: string): Promise<AuthResult<void>> {
+  async verifyActionCode(code: string): Promise<AuthResult<void>> {
     try {
-      await applyActionCode(getAuth(), code);
+      const auth = getAuth();
+      await applyActionCode(auth, code);
       return { success: true };
     } catch (error: any) {
       return {
