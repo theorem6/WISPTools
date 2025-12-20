@@ -171,8 +171,11 @@ console.log('   → Backend only receives and stores metrics from remote agents'
 // EPC management routes (includes delete endpoint)
 app.use('/api/epc-management', require('./routes/epc-management'));
 app.use('/api/deploy', require('./routes/epc-deployment'));
+app.use('/api/deploy', require('./routes/deployment/epc-management')); // EPC deployment management
+app.use('/api/remote-agents', require('./routes/remote-agents-status')); // Remote agents status
 app.use('/api/system', require('./routes/system'));
-app.use('/api/permissions', require('./routes/permissions')); // FCAPS permission management
+app.use('/api/permissions', require('./routes/permissions'));
+app.use('/api/mobile', require('./routes/mobile-tasks')); // FCAPS permission management
 // Branding API for customer portal
 try {
   const registerBrandingRoutes = require('./routes/branding-api');
