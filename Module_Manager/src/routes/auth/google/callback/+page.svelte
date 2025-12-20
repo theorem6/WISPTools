@@ -32,10 +32,19 @@
         const context = sessionStorage.getItem('google_auth_context') || 'login';
         
         if (context === 'signup') {
-          // For signup, check if user needs to complete tenant setup
-          goto('/signup?googleSuccess=true');
+          // For signup, check if user already has a tenant
+          const { tenantService } = await import('$lib/services/tenantService');
+          const userHasTenant = await tenantService.checkUserHasTenant(result.user.uid);
+          
+          if (userHasTenant.success && userHasTenant.hasTenant) {
+            // User already has a tenant, go to dashboard
+            goto('/dashboard');
+          } else {
+            // Continue with signup flow
+            goto('/signup?googleSuccess=true');
+          }
         } else {
-          // For login, go to dashboard
+          // For login, go to dashboard or return URL
           goto(returnUrl);
         }
       } else {
