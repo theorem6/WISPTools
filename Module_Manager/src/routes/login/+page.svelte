@@ -491,8 +491,8 @@
     error = '';
 
     try {
-      console.log('[Login Page] Initiating Google sign in with redirect...');
-      const result = await authService.signInWithGoogle();
+      console.log('[Login Page] Initiating Google sign in...');
+      const result = await authService.signInWithGoogle('login');
 
       if (result.success) {
         // Redirect will happen automatically - user will be redirected to Google

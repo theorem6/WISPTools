@@ -84,7 +84,7 @@
 
     try {
       console.log('[Signup Page] Initiating Google sign in...');
-      const result = await authService.signInWithGoogle();
+      const result = await authService.signInWithGoogle('signup');
 
       if (result.success) {
         // Redirect will happen automatically

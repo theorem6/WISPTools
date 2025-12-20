@@ -303,82 +303,26 @@ export class AuthService {
   }
 
   /**
-   * Sign in with Google using popup (keeps flow within app, avoids Firebase redirect pages)
-   * Falls back to redirect if popup fails (e.g., due to popup blockers)
+   * Sign in with Google using direct OAuth 2.0 flow
+   * Redirects directly to Google (not through Firebase auth handler)
+   * Works like standard OAuth implementations
    */
-  async signInWithGoogle(): Promise<AuthResult<UserProfile>> {
+  async signInWithGoogle(context: 'login' | 'signup' = 'login'): Promise<AuthResult<UserProfile>> {
     try {
-      const auth = getAuth();
-      const provider = new GoogleAuthProvider();
+      // Import the Google auth service dynamically to avoid circular dependencies
+      const { initiateGoogleSignIn } = await import('./googleAuthService');
       
-      // Add custom parameters if needed
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
+      // Initiate OAuth flow - this will redirect to Google
+      await initiateGoogleSignIn(context);
       
-      // Try popup first - this keeps the flow within our app and avoids Firebase redirect pages
-      try {
-        console.log('[AuthService] Attempting Google sign-in with popup...');
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        console.log('[AuthService] ✅ Google popup sign-in successful:', user.email);
-        
-        // Update current user immediately
-        this.currentUser = user;
-        this.notifyListeners(user);
-        
-        return {
-          success: true,
-          data: this.mapUserToProfile(user)
-        };
-      } catch (popupError: any) {
-        // If popup fails (usually due to popup blockers), fall back to redirect
-        if (popupError.code === 'auth/popup-blocked' || 
-            popupError.code === 'auth/popup-closed-by-user' ||
-            popupError.message?.includes('popup')) {
-          console.warn('[AuthService] Popup blocked or closed, falling back to redirect...');
-          
-          // Store the current URL so we can redirect back to it
-          const currentUrl = typeof window !== 'undefined' ? window.location.href : '/login';
-          if (typeof window !== 'undefined') {
-            sessionStorage.setItem('google_signin_redirect_url', currentUrl);
-            sessionStorage.setItem('google_signin_initiated', Date.now().toString());
-            console.log('[AuthService] Stored redirect URL:', currentUrl);
-          }
-          
-          // Use redirect as fallback - this will redirect to Firebase auth handler, then to Google, then back
-          // The redirect happens synchronously - this function won't return normally
-          await signInWithRedirect(auth, provider);
-          
-          // This code should not execute - redirect happens immediately
-          console.error('[AuthService] ❌ signInWithRedirect returned without redirecting (UNEXPECTED!)');
-          
-          // Redirect will happen, so return a pending result
-          return {
-            success: true,
-            data: null as any // Will be set after redirect
-          };
-        } else {
-          // Re-throw other popup errors
-          throw popupError;
-        }
-      }
+      // This code won't execute because redirect happens
+      // Return pending result - actual result handled in callback
+      return {
+        success: true,
+        data: null as any // Will be set after redirect
+      };
     } catch (error: any) {
       console.error('[AuthService] ❌ Error initiating Google sign-in:', error);
-      console.error('[AuthService] Error details:', {
-        code: error?.code,
-        message: error?.message,
-        name: error?.name,
-        stack: error?.stack?.substring(0, 500)
-      });
-      
-      // Clear stored redirect URL on error
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('google_signin_redirect_url');
-        sessionStorage.removeItem('google_signin_initiated');
-      }
-      
-      // If user cancels or error occurs before redirect
       return {
         success: false,
         error: this.getAuthErrorMessage(error)
