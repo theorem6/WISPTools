@@ -1213,7 +1213,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
           <p><strong>Category:</strong> {selectedDevice.cbsdCategory}</p>
         </div>
         
-        <form on:submit|preventDefault={handleSubmitGrantRequest}>
+        <form onsubmit={(e) => { e.preventDefault(); handleSubmitGrantRequest(e); }}>
           <div class="form-group">
             <label>Max EIRP (dBm/MHz)</label>
             <input type="number" step="0.1" bind:value={grantRequest.maxEirp} required />

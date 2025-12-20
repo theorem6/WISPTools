@@ -144,7 +144,7 @@
   <div class="header">
     <div class="header-content">
       <div class="header-main">
-        <button class="back-button" on:click={() => window.location.href = '/dashboard'}>
+        <button class="back-button" onclick={() => window.location.href = '/dashboard'}>
           ← Back to Dashboard
         </button>
         <div>
@@ -178,43 +178,43 @@
     <div class="tabs">
       <button 
         class:active={activeTab === 'dashboard'} 
-        on:click={() => switchTab('dashboard')}
+        onclick={() => switchTab('dashboard')}
       >
         📊 Dashboard
       </button>
       <button 
         class:active={activeTab === 'subscribers'} 
-        on:click={() => switchTab('subscribers')}
+        onclick={() => switchTab('subscribers')}
       >
         👥 Subscribers
       </button>
       <button 
         class:active={activeTab === 'groups'} 
-        on:click={() => switchTab('groups')}
+        onclick={() => switchTab('groups')}
       >
         📦 Groups
       </button>
       <button 
         class:active={activeTab === 'plans'} 
-        on:click={() => switchTab('plans')}
+        onclick={() => switchTab('plans')}
       >
         🚀 Bandwidth Plans
       </button>
       <button 
         class:active={activeTab === 'mme'} 
-        on:click={() => switchTab('mme')}
+        onclick={() => switchTab('mme')}
       >
         🌐 MME Connections
       </button>
       <button 
         class:active={activeTab === 'import'} 
-        on:click={() => switchTab('import')}
+        onclick={() => switchTab('import')}
       >
         📥 Bulk Import
       </button>
       <button 
         class:active={activeTab === 'remote-epcs'} 
-        on:click={() => switchTab('remote-epcs')}
+        onclick={() => switchTab('remote-epcs')}
       >
         🌐 Remote EPCs
       </button>

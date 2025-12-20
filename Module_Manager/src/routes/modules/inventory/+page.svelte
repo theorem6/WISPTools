@@ -288,7 +288,7 @@
   <!-- Header -->
   <div class="page-header">
     <div class="header-left">
-      <button class="back-button" on:click={() => goto('/dashboard')}>
+        <button class="back-button" onclick={() => goto('/dashboard')}>
         ← Back to Dashboard
       </button>
       <h1>📦 Inventory Management</h1>
@@ -296,28 +296,28 @@
     </div>
     
     <div class="header-actions">
-      <button class="btn-secondary" on:click={() => { scanMode = 'lookup'; showScanModal = true; }}>
+      <button class="btn-secondary" onclick={() => { scanMode = 'lookup'; showScanModal = true; }}>
         🔍 Scan Lookup
       </button>
-      <button class="btn-secondary" on:click={() => { scanMode = 'check-in'; showScanModal = true; }}>
+      <button class="btn-secondary" onclick={() => { scanMode = 'check-in'; showScanModal = true; }}>
         📥 Scan Check In
       </button>
-      <button class="btn-secondary" on:click={() => { scanMode = 'check-out'; showScanModal = true; }}>
+      <button class="btn-secondary" onclick={() => { scanMode = 'check-out'; showScanModal = true; }}>
         📤 Scan Check Out
       </button>
-      <button class="btn-secondary" on:click={() => showManualEntry = true}>
+      <button class="btn-secondary" onclick={() => showManualEntry = true}>
         🔍 Manual Lookup
       </button>
-      <button class="btn-secondary" on:click={() => goto('/modules/inventory/bundles')}>
+      <button class="btn-secondary" onclick={() => goto('/modules/inventory/bundles')}>
         📦 Bundles
       </button>
-      <button class="btn-secondary" on:click={() => goto('/modules/inventory/reports')}>
+      <button class="btn-secondary" onclick={() => goto('/modules/inventory/reports')}>
         📊 View Reports
       </button>
-      <button class="btn-secondary" on:click={handleExport}>
+      <button class="btn-secondary" onclick={handleExport}>
         📥 Export CSV
       </button>
-      <button class="btn-primary" on:click={() => goto('/modules/inventory/add')}>
+      <button class="btn-primary" onclick={() => goto('/modules/inventory/add')}>
         ➕ Add Item
       </button>
     </div>
@@ -327,14 +327,14 @@
   {#if error}
     <div class="alert alert-error">
       ⚠️ {error}
-      <button class="dismiss-btn" on:click={() => error = ''}>✕</button>
+      <button class="dismiss-btn" onclick={() => error = ''}>✕</button>
     </div>
   {/if}
   
   {#if success}
     <div class="alert alert-success">
       ✅ {success}
-      <button class="dismiss-btn" on:click={() => success = ''}>✕</button>
+      <button class="dismiss-btn" onclick={() => success = ''}>✕</button>
     </div>
   {/if}
   
@@ -385,7 +385,7 @@
           type="text"
           placeholder="🔍 Search by serial number, model, manufacturer..."
           bind:value={searchQuery}
-          on:keydown={(e) => e.key === 'Enter' && applyFilters()}
+          onkeydown={(e) => e.key === 'Enter' && applyFilters()}
         />
       </div>
       
@@ -410,8 +410,8 @@
         {/each}
       </select>
       
-      <button class="btn-primary" on:click={applyFilters}>Apply</button>
-      <button class="btn-secondary" on:click={clearFilters}>Clear</button>
+      <button class="btn-primary" onclick={applyFilters}>Apply</button>
+      <button class="btn-secondary" onclick={clearFilters}>Clear</button>
     </div>
   </div>
   
@@ -427,16 +427,16 @@
       <table class="inventory-table">
         <thead>
           <tr>
-            <th on:click={() => handleSort('assetTag')}>Asset Tag</th>
-            <th on:click={() => handleSort('category')}>Category</th>
-            <th on:click={() => handleSort('equipmentType')}>Type</th>
-            <th on:click={() => handleSort('manufacturer')}>Manufacturer</th>
-            <th on:click={() => handleSort('model')}>Model</th>
-            <th on:click={() => handleSort('serialNumber')}>Serial Number</th>
-            <th on:click={() => handleSort('status')}>Status</th>
-            <th on:click={() => handleSort('condition')}>Condition</th>
+            <th onclick={() => handleSort('assetTag')}>Asset Tag</th>
+            <th onclick={() => handleSort('category')}>Category</th>
+            <th onclick={() => handleSort('equipmentType')}>Type</th>
+            <th onclick={() => handleSort('manufacturer')}>Manufacturer</th>
+            <th onclick={() => handleSort('model')}>Model</th>
+            <th onclick={() => handleSort('serialNumber')}>Serial Number</th>
+            <th onclick={() => handleSort('status')}>Status</th>
+            <th onclick={() => handleSort('condition')}>Condition</th>
             <th>Location</th>
-            <th on:click={() => handleSort('updatedAt')}>Last Updated</th>
+            <th onclick={() => handleSort('updatedAt')}>Last Updated</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -446,7 +446,7 @@
               <td colspan="11" class="empty-state">
                 <div>
                   <p>📦 No inventory items found</p>
-                  <button class="btn-primary" on:click={() => goto('/modules/inventory/add')}>
+                  <button class="btn-primary" onclick={() => goto('/modules/inventory/add')}>
                     Add Your First Item
                   </button>
                 </div>
@@ -488,21 +488,21 @@
                     <button 
                       class="btn-icon" 
                       title="View Details"
-                      on:click={() => goto(`/modules/inventory/${item._id}`)}
+                      onclick={() => goto(`/modules/inventory/${item._id}`)}
                     >
                       👁️
                     </button>
                     <button 
                       class="btn-icon" 
                       title="Edit Equipment"
-                      on:click={() => goto(`/modules/inventory/${item._id}/edit`)}
+                      onclick={() => goto(`/modules/inventory/${item._id}/edit`)}
                     >
                       ✏️
                     </button>
                     <button 
                       class="btn-icon" 
                       title="Print Asset Tag"
-                      on:click={() => handlePrintTag(item)}
+                      onclick={() => handlePrintTag(item)}
                     >
                       🏷️
                     </button>
@@ -521,7 +521,7 @@
         <button 
           class="btn-secondary"
           disabled={pagination.page === 1}
-          on:click={() => goToPage(pagination.page - 1)}
+          onclick={() => goToPage(pagination.page - 1)}
         >
           ← Previous
         </button>
@@ -534,7 +534,7 @@
         <button 
           class="btn-secondary"
           disabled={pagination.page === pagination.pages}
-          on:click={() => goToPage(pagination.page + 1)}
+          onclick={() => goToPage(pagination.page + 1)}
         >
           Next →
         </button>
@@ -544,11 +544,11 @@
   
   <!-- Manual Barcode Entry Modal -->
   {#if showManualEntry}
-  <div class="modal-overlay" on:click={() => showManualEntry = false}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={() => showManualEntry = false}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h3>🔍 Manual Equipment Lookup</h3>
-        <button class="close-btn" on:click={() => showManualEntry = false}>✕</button>
+        <button class="close-btn" onclick={() => showManualEntry = false}>✕</button>
       </div>
       <div class="modal-body">
         <p class="modal-description">
@@ -562,15 +562,15 @@
             type="text" 
             bind:value={manualBarcode} 
             placeholder="Enter barcode, asset tag, or serial number..."
-            on:keydown={(e) => e.key === 'Enter' && handleManualBarcodeEntry()}
+            onkeydown={(e) => e.key === 'Enter' && handleManualBarcodeEntry()}
           />
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" on:click={() => showManualEntry = false}>
+        <button class="btn btn-secondary" onclick={() => showManualEntry = false}>
           Cancel
         </button>
-        <button class="btn btn-primary" on:click={handleManualBarcodeEntry} disabled={!manualBarcode.trim()}>
+        <button class="btn btn-primary" onclick={handleManualBarcodeEntry} disabled={!manualBarcode.trim()}>
           Lookup Equipment
         </button>
       </div>
