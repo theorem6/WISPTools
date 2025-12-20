@@ -17,17 +17,40 @@
   let sectors: any[] = [];
   let isLoading = false;
   let error = '';
+  let lastLoadedSiteId: string | null = null;
 
-  // Watch for modal opening and load equipment
+  // Watch for modal opening and load equipment (only once per site when modal opens)
   $: if (show && site && tenantId) {
-    console.log('[SiteEquipmentModal] ✅✅✅ Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId);
-    console.log('[SiteEquipmentModal] ✅ Site data:', JSON.stringify(site, null, 2));
-    // Use setTimeout to ensure reactive statement completes before calling loadEquipment
-    setTimeout(() => {
-      loadEquipment();
-    }, 0);
+    const siteId = site.id || site._id;
+    const siteIdStr = String(siteId);
+    
+    // Only load if this is a different site than last time
+    if (siteIdStr !== lastLoadedSiteId) {
+      console.log('[SiteEquipmentModal] ✅✅✅ Reactive trigger - show:', show, 'site:', site?.name, 'tenantId:', tenantId, 'siteId:', siteIdStr);
+      console.log('[SiteEquipmentModal] ✅ Site data:', JSON.stringify(site, null, 2));
+      
+      // Reset arrays when switching sites
+      hardwareDeployments = [];
+      equipment = [];
+      sectors = [];
+      
+      // Update tracking before loading
+      const previousSiteId = lastLoadedSiteId;
+      lastLoadedSiteId = siteIdStr;
+      
+      // Use setTimeout to ensure reactive statement completes before calling loadEquipment
+      setTimeout(() => {
+        loadEquipment();
+      }, 0);
+    }
   }
   
+  // Reset tracking when modal closes
+  $: if (!show) {
+    lastLoadedSiteId = null;
+  }
+  
+  // Watch for show state changes for logging/debugging only
   $: if (show) {
     console.log('[SiteEquipmentModal] Modal show state changed:', show, 'site:', site?.name, 'hasSite:', !!site, 'tenantId:', tenantId);
     if (show && !site) {
@@ -36,21 +59,17 @@
     if (show && site && !tenantId) {
       console.warn('[SiteEquipmentModal] ⚠️ Modal is shown but tenantId is missing!');
     }
-    // Fallback: if show is true and we have both site and tenantId, ensure loadEquipment is called
-    if (show && site && tenantId) {
-      // Double-check: if reactive statement didn't fire, call loadEquipment directly after a short delay
-      setTimeout(() => {
-        if (show && site && tenantId && !isLoading && equipment.length === 0 && hardwareDeployments.length === 0 && sectors.length === 0) {
-          console.log('[SiteEquipmentModal] 🔵 Fallback: calling loadEquipment from show watcher');
-          loadEquipment();
-        }
-      }, 150);
-    }
   }
 
   async function loadEquipment() {
     if (!site || !tenantId) {
       console.warn('[SiteEquipmentModal] loadEquipment called but missing data:', { hasSite: !!site, hasTenantId: !!tenantId, siteName: site?.name, tenantId });
+      return;
+    }
+
+    // Prevent multiple simultaneous loads
+    if (isLoading) {
+      console.log('[SiteEquipmentModal] ⏸️ loadEquipment already in progress, skipping');
       return;
     }
 
