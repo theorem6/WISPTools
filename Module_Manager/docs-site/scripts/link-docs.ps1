@@ -9,7 +9,8 @@ $ErrorActionPreference = "Continue"
 
 # Get paths
 $rootDir = Split-Path -Parent $PSScriptRoot
-$docsRoot = Join-Path (Split-Path -Parent $rootDir) "docs"
+$projectRoot = Split-Path -Parent (Split-Path -Parent $rootDir)
+$docsRoot = Join-Path $projectRoot "docs"
 $docsSite = $rootDir
 
 Write-Host "Linking documentation files..." -ForegroundColor Cyan
