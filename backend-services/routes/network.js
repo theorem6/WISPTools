@@ -240,6 +240,9 @@ router.delete('/sites/:id', async (req, res) => {
 router.get('/sectors', async (req, res) => {
   try {
     const { band, technology, siteId } = req.query;
+    const includePlanLayer = req.query.includePlanLayer === 'true';
+    const planIdList = extractPlanIdList(req.query);
+    
     const query = applyPlanVisibilityFilter({ tenantId: req.tenantId }, req);
     
     if (band) query.band = band;
@@ -247,9 +250,9 @@ router.get('/sectors', async (req, res) => {
     if (siteId) query.siteId = siteId;
     
     // Populate siteId if it exists and is a valid ObjectId, otherwise handle gracefully
-    let sectors;
+    let sectors = [];
     try {
-      sectors = await UnifiedSector.find(query)
+      const productionSectors = await UnifiedSector.find(query)
         .populate({
           path: 'siteId',
           select: 'name type location',
@@ -259,13 +262,154 @@ router.get('/sectors', async (req, res) => {
         .lean();
       
       // Filter out sectors where populate returned null (site not found or doesn't belong to tenant)
-      sectors = sectors.filter(sector => sector.siteId !== null && sector.siteId !== undefined);
+      sectors = productionSectors.filter(sector => sector.siteId !== null && sector.siteId !== undefined);
     } catch (populateError) {
       console.warn('[Network API] Populate failed, fetching without populate:', populateError.message);
       // Fallback: fetch without populate if populate fails
       sectors = await UnifiedSector.find(query)
         .sort({ name: 1 })
         .lean();
+    }
+    
+    // If includePlanLayer is true, also fetch plan layer sectors
+    if (includePlanLayer && planIdList.length > 0) {
+      const { PlanLayerFeature } = require('../models/plan-layer-feature');
+      const planSectorFeatures = await PlanLayerFeature.find({
+        tenantId: req.tenantId,
+        planId: { $in: planIdList },
+        featureType: 'sector'
+      }).lean();
+      
+      // Get all unique siteIds from plan sectors to populate location fallback
+      const planSectorSiteIds = [...new Set(planSectorFeatures
+        .map(f => f.properties?.siteId)
+        .filter(Boolean))];
+      
+      const siteMap = new Map();
+      if (planSectorSiteIds.length > 0) {
+        // First, try to find production sites
+        const productionSites = await UnifiedSite.find({
+          _id: { $in: planSectorSiteIds },
+          tenantId: req.tenantId
+        }).select('_id name location').lean();
+        productionSites.forEach(site => {
+          siteMap.set(String(site._id), site);
+        });
+        
+        // Also check for plan layer sites (staged sites) - these are referenced by their _id
+        const planLayerSiteIds = planSectorSiteIds.filter(id => !siteMap.has(String(id)));
+        if (planLayerSiteIds.length > 0) {
+          // Try to match plan layer sites by _id
+          const mongoose = require('mongoose');
+          const validObjectIds = planLayerSiteIds.filter(id => mongoose.Types.ObjectId.isValid(String(id)));
+          
+          if (validObjectIds.length > 0) {
+            const planLayerSites = await PlanLayerFeature.find({
+              tenantId: req.tenantId,
+              planId: { $in: planIdList },
+              featureType: 'site',
+              _id: { $in: validObjectIds }
+            }).lean();
+            
+            for (const siteFeature of planLayerSites) {
+              const siteId = String(siteFeature._id);
+              const props = siteFeature.properties || {};
+              
+              // Extract location from geometry or properties
+              let latitude = null;
+              let longitude = null;
+              if (siteFeature.geometry && siteFeature.geometry.type === 'Point' && Array.isArray(siteFeature.geometry.coordinates)) {
+                longitude = siteFeature.geometry.coordinates[0];
+                latitude = siteFeature.geometry.coordinates[1];
+              } else if (props.latitude !== undefined && props.longitude !== undefined) {
+                latitude = props.latitude;
+                longitude = props.longitude;
+              } else if (props.location) {
+                latitude = props.location.latitude;
+                longitude = props.location.longitude;
+              }
+              
+              if (latitude !== null && longitude !== null) {
+                siteMap.set(siteId, {
+                  _id: siteFeature._id,
+                  name: props.name || props.siteName || 'Plan Site',
+                  location: {
+                    latitude,
+                    longitude,
+                    address: props.address || props.location?.address || ''
+                  }
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      // Convert plan layer features to sector format
+      for (const feature of planSectorFeatures) {
+        const props = feature.properties || {};
+        
+        // Extract coordinates from geometry
+        let latitude = null;
+        let longitude = null;
+        if (feature.geometry && feature.geometry.type === 'Point' && Array.isArray(feature.geometry.coordinates)) {
+          longitude = feature.geometry.coordinates[0];
+          latitude = feature.geometry.coordinates[1];
+        } else if (props.latitude !== undefined && props.longitude !== undefined) {
+          latitude = props.latitude;
+          longitude = props.longitude;
+        } else if (props.location) {
+          latitude = props.location.latitude;
+          longitude = props.location.longitude;
+        }
+        
+        // Fallback: get location from associated site if coordinates are missing
+        if ((latitude === null || longitude === null) && props.siteId) {
+          const siteIdStr = String(props.siteId);
+          const site = siteMap.get(siteIdStr);
+          if (site && site.location && site.location.latitude && site.location.longitude) {
+            latitude = site.location.latitude;
+            longitude = site.location.longitude;
+          }
+        }
+        
+        // Build sector object in UnifiedSector format
+        const planSector = {
+          _id: feature._id,
+          id: feature._id.toString(),
+          name: props.name || 'Staged Sector',
+          status: props.status || feature.status || 'planned',
+          technology: props.technology || 'LTE',
+          band: props.band,
+          frequency: props.frequency,
+          azimuth: props.azimuth || 0,
+          beamwidth: props.beamwidth,
+          power: props.power,
+          location: latitude !== null && longitude !== null ? {
+            latitude,
+            longitude,
+            address: props.address || props.location?.address || ''
+          } : null,
+          siteId: props.siteId ? (typeof props.siteId === 'object' ? String(props.siteId) : String(props.siteId)) : null,
+          tenantId: feature.tenantId,
+          planId: feature.planId,
+          inventoryId: props.inventoryId,
+          createdBy: feature.createdBy,
+          createdAt: feature.createdAt,
+          updatedBy: feature.updatedBy,
+          updatedAt: feature.updatedAt
+        };
+        
+        // Apply filters if specified
+        if (band && planSector.band !== band) continue;
+        if (technology && planSector.technology !== technology) continue;
+        if (siteId && planSector.siteId !== siteId && String(planSector.siteId) !== String(siteId)) continue;
+        
+        // Only add if it has valid location data
+        if (planSector.location && planSector.location.latitude && planSector.location.longitude) {
+          sectors.push(planSector);
+        }
+      }
     }
     
     res.json(sectors);
