@@ -303,12 +303,8 @@ export class AuthService {
   }
 
   /**
-   * Sign in with Google using redirect (avoids COOP popup blocking)
-   * 
-   * IMPORTANT: Firebase's signInWithRedirect works differently on custom domains.
-   * It redirects to Firebase's auth handler first, which then redirects to Google,
-   * then back to the handler, then back to your site. The redirect result should
-   * be available when the page loads after the final redirect.
+   * Sign in with Google using popup (keeps flow within app, avoids Firebase redirect pages)
+   * Falls back to redirect if popup fails (e.g., due to popup blockers)
    */
   async signInWithGoogle(): Promise<AuthResult<UserProfile>> {
     try {
@@ -320,40 +316,55 @@ export class AuthService {
         prompt: 'select_account'
       });
       
-      // Store the current URL so we can redirect back to it
-      const currentUrl = typeof window !== 'undefined' ? window.location.href : '/login';
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('google_signin_redirect_url', currentUrl);
-        sessionStorage.setItem('google_signin_initiated', Date.now().toString());
-        console.log('[AuthService] Stored redirect URL:', currentUrl);
+      // Try popup first - this keeps the flow within our app and avoids Firebase redirect pages
+      try {
+        console.log('[AuthService] Attempting Google sign-in with popup...');
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        console.log('[AuthService] ✅ Google popup sign-in successful:', user.email);
+        
+        // Update current user immediately
+        this.currentUser = user;
+        this.notifyListeners(user);
+        
+        return {
+          success: true,
+          data: this.mapUserToProfile(user)
+        };
+      } catch (popupError: any) {
+        // If popup fails (usually due to popup blockers), fall back to redirect
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.message?.includes('popup')) {
+          console.warn('[AuthService] Popup blocked or closed, falling back to redirect...');
+          
+          // Store the current URL so we can redirect back to it
+          const currentUrl = typeof window !== 'undefined' ? window.location.href : '/login';
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('google_signin_redirect_url', currentUrl);
+            sessionStorage.setItem('google_signin_initiated', Date.now().toString());
+            console.log('[AuthService] Stored redirect URL:', currentUrl);
+          }
+          
+          // Use redirect as fallback - this will redirect to Firebase auth handler, then to Google, then back
+          // The redirect happens synchronously - this function won't return normally
+          await signInWithRedirect(auth, provider);
+          
+          // This code should not execute - redirect happens immediately
+          console.error('[AuthService] ❌ signInWithRedirect returned without redirecting (UNEXPECTED!)');
+          
+          // Redirect will happen, so return a pending result
+          return {
+            success: true,
+            data: null as any // Will be set after redirect
+          };
+        } else {
+          // Re-throw other popup errors
+          throw popupError;
+        }
       }
-      
-      console.log('[AuthService] 🚀 Initiating Google sign-in redirect...', {
-        authDomain: auth.app.options.authDomain,
-        currentUrl,
-        projectId: auth.app.options.projectId,
-        hasWindow: typeof window !== 'undefined',
-        redirectUrl: typeof window !== 'undefined' ? window.location.origin + '/login' : '/login'
-      });
-      
-      // Use redirect instead of popup to avoid Cross-Origin-Opener-Policy issues
-      // This will redirect to Firebase auth handler, then to Google, then back
-      // The redirect happens synchronously - this function won't return normally
-      await signInWithRedirect(auth, provider);
-      
-      // This code should not execute - redirect happens immediately
-      // If we reach here, something went wrong
-      console.error('[AuthService] ❌ signInWithRedirect returned without redirecting (UNEXPECTED!)');
-      console.error('[AuthService] This should never happen - redirect should occur immediately');
-      
-      // Redirect will happen, so return a pending result
-      // The actual result will be handled by getRedirectResult() when page loads
-      return {
-        success: true,
-        data: null as any // Will be set after redirect
-      };
     } catch (error: any) {
-      console.error('[AuthService] ❌ Error initiating Google redirect:', error);
+      console.error('[AuthService] ❌ Error initiating Google sign-in:', error);
       console.error('[AuthService] Error details:', {
         code: error?.code,
         message: error?.message,
