@@ -30,7 +30,6 @@
   
   function handleClose() {
     console.log('[HardwareDeploymentModal] handleClose called');
-    show = false;
     showInventoryList = false;
     selectedInventoryItem = null;
     searchQuery = '';
@@ -195,17 +194,27 @@
     dispatch('view-inventory', { tower });
   }
 
+  let hasLoadedSites = false;
+  
   onMount(async () => {
-    if (show) {
+    if (show && tenantId && !hasLoadedSites) {
       await loadAvailableSites();
+      hasLoadedSites = true;
       if (tower) {
         selectedSiteId = tower.id;
       }
     }
   });
   
-  $: if (show && tenantId) {
+  // Only load sites once when modal opens
+  $: if (show && tenantId && !hasLoadedSites) {
     loadAvailableSites();
+    hasLoadedSites = true;
+  }
+  
+  // Reset flag when modal closes
+  $: if (!show) {
+    hasLoadedSites = false;
   }
   
   $: if (tower && availableSites.length > 0) {

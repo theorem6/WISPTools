@@ -959,19 +959,12 @@ let configStatus: ConfigStatus = getConfigStatus(null);
       </div>
       
       <div class="header-actions">
-        <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help" title="Help">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-        </button>
         {#if currentUserID}
-          <button 
-            class="btn btn-network-selector active" 
-            on:click={handleShowUserIDSelector}
-            title="Switch network/User ID"
-          >
+            <button 
+              class="btn btn-network-selector active" 
+              onclick={handleShowUserIDSelector}
+              title="Switch network/User ID"
+            >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
               <path d="M2 12h20"/>
@@ -985,7 +978,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
         {:else}
           <button 
             class="btn btn-network-selector" 
-            on:click={handleShowUserIDSelector}
+            onclick={handleShowUserIDSelector}
             title="Select network/User ID"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -996,10 +989,10 @@ let configStatus: ConfigStatus = getConfigStatus(null);
             Select Network
           </button>
         {/if}
-        <button class="btn btn-secondary" on:click={() => showSettingsModal = true} title="Configure SAS providers">
+        <button class="btn btn-secondary" onclick={() => showSettingsModal = true} title="Configure SAS providers">
           ⚙️ Settings
         </button>
-        <button class="btn btn-primary" on:click={() => showAddDeviceModal = true}>
+        <button class="btn btn-primary" onclick={() => showAddDeviceModal = true}>
           + Add CBSD Device
         </button>
       </div>
@@ -1010,7 +1003,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     <div class="error-banner">
       <span class="error-icon">⚠️</span>
       <span class="error-message">{error}</span>
-      <button class="btn btn-sm" on:click={() => error = null}>✕</button>
+      <button class="btn btn-sm" onclick={() => error = null}>✕</button>
     </div>
   {/if}
   
@@ -1028,7 +1021,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
       <span class="warning-icon">⚠️</span>
       <span class="warning-message">
         {configStatus.message}
-        <button class="btn btn-link" on:click={() => showSettingsModal = true}>
+        <button class="btn btn-link" onclick={() => showSettingsModal = true}>
           Configure Now →
         </button>
       </span>
@@ -1131,14 +1124,14 @@ let configStatus: ConfigStatus = getConfigStatus(null);
 
 <!-- Add Device Modal -->
 {#if showAddDeviceModal}
-  <div class="modal-overlay" on:click={() => showAddDeviceModal = false}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={() => showAddDeviceModal = false}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h3>Add CBSD Device</h3>
-        <button class="modal-close" on:click={() => showAddDeviceModal = false}>✕</button>
+        <button class="modal-close" onclick={() => showAddDeviceModal = false}>✕</button>
       </div>
       <div class="modal-body">
-        <form on:submit|preventDefault={handleAddDevice}>
+        <form onsubmit={(e) => { e.preventDefault(); handleAddDevice(e); }}>
           <div class="form-group">
             <label>CBSD Serial Number</label>
             <input type="text" bind:value={newDevice.cbsdSerialNumber} required />
@@ -1192,7 +1185,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
           </div>
           
           <div class="form-actions">
-            <button type="button" class="btn btn-secondary" on:click={() => showAddDeviceModal = false}>
+            <button type="button" class="btn btn-secondary" onclick={() => showAddDeviceModal = false}>
               Cancel
             </button>
             <button type="submit" class="btn btn-primary">
@@ -1207,11 +1200,11 @@ let configStatus: ConfigStatus = getConfigStatus(null);
 
 <!-- Grant Request Modal -->
 {#if showGrantRequestModal && selectedDevice}
-  <div class="modal-overlay" on:click={() => showGrantRequestModal = false}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" onclick={() => showGrantRequestModal = false}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
         <h3>Request Spectrum Grant</h3>
-        <button class="modal-close" on:click={() => showGrantRequestModal = false}>✕</button>
+        <button class="modal-close" onclick={() => showGrantRequestModal = false}>✕</button>
       </div>
       <div class="modal-body">
         <div class="device-info-card">
@@ -1240,7 +1233,7 @@ let configStatus: ConfigStatus = getConfigStatus(null);
           </div>
           
           <div class="form-actions">
-            <button type="button" class="btn btn-secondary" on:click={() => showGrantRequestModal = false}>
+            <button type="button" class="btn btn-secondary" onclick={() => showGrantRequestModal = false}>
               Cancel
             </button>
             <button type="submit" class="btn btn-primary">
@@ -1268,6 +1261,15 @@ let configStatus: ConfigStatus = getConfigStatus(null);
   on:select={handleMainUserIDSelect}
   on:close={() => showUserIDSelector = false}
 />
+
+<!-- Help Button - Fixed Position -->
+<button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+  </svg>
+</button>
 
 <!-- Help Modal -->
 <HelpModal 
@@ -1770,24 +1772,34 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     border-top: 1px solid var(--border-color);
   }
   
+  /* Help Button */
   .help-button {
+    position: fixed;
+    bottom: 5rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
     background: var(--primary-color);
     color: white;
     border: none;
-    padding: 0.5rem;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 999;
   }
   
   .help-button:hover {
     transform: scale(1.1);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+  
+  .help-button svg {
+    width: 28px;
+    height: 28px;
   }
   
   @media (max-width: 1024px) {

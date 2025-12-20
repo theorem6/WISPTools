@@ -296,13 +296,6 @@
     </div>
     
     <div class="header-actions">
-      <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help" title="Help">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-      </button>
       <button class="btn-secondary" on:click={() => { scanMode = 'lookup'; showScanModal = true; }}>
         🔍 Scan Lookup
       </button>
@@ -603,15 +596,24 @@
       on:checked-out={() => { loadData(); }}
     />
   {/if}
-  
-  <!-- Help Modal -->
-  <HelpModal 
-    show={showHelpModal}
-    title="Inventory Management Help"
-    content={helpContent}
-    on:close={() => showHelpModal = false}
-  />
 </div>
+
+<!-- Help Button - Fixed Position -->
+<button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+  </svg>
+</button>
+
+<!-- Help Modal -->
+<HelpModal 
+  show={showHelpModal}
+  title="Inventory Management Help"
+  content={helpContent}
+  on:close={() => showHelpModal = false}
+/>
 </TenantGuard>
 
 <style>
@@ -1025,24 +1027,34 @@
     background: var(--bg-hover);
   }
   
+  /* Help Button */
   .help-button {
+    position: fixed;
+    bottom: 5rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
     background: var(--primary-color);
     color: white;
     border: none;
-    padding: 0.5rem;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 999;
   }
   
   .help-button:hover {
     transform: scale(1.1);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+  
+  .help-button svg {
+    width: 28px;
+    height: 28px;
   }
   
   .pagination {

@@ -1701,10 +1701,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <button class="control-btn main-menu-btn" onclick={() => showMainMenu = !showMainMenu} title="Main Menu">
       ☰
     </button>
-    <button class="control-btn help-button" onclick={() => showHelpModal = true} title="Help">
-      ?
-    </button>
   </div>
+  
+  <!-- Help Button - Fixed Position -->
+  <button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+  </button>
 
   {#if displayPlanSummary && (() => {
     // In deploy mode, only show if a plan is being worked on (has objects)
@@ -2051,7 +2057,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
 <!-- Hardware Deployment Modal -->
 <HardwareDeploymentModal
-  bind:show={showHardwareDeploymentModal}
+  show={showHardwareDeploymentModal}
   tower={selectedTowerForEPC}
   {tenantId}
   on:close={() => {
@@ -2198,6 +2204,36 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   .main-menu-btn {
     background: rgba(124, 58, 237, 0.8);
     border-color: rgba(124, 58, 237, 0.5);
+  }
+  
+  /* Help Button */
+  .help-button {
+    position: fixed;
+    bottom: 5rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  }
+  
+  .help-button svg {
+    width: 28px;
+    height: 28px;
   }
 
   .quick-actions {
