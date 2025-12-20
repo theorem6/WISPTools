@@ -642,7 +642,7 @@ export class AuthService {
         return 'Invalid email address';
       case 'auth/invalid-credential':
         // Provide more helpful error message
-        return 'Invalid email or password. Please check your credentials and try again. If you are a platform admin, ensure your account exists in Firebase.';
+        return 'Invalid email or password. If you just signed up, you need to set your password using the "Forgot password?" link. If you forgot your password, use the "Forgot password?" link to reset it.';
       case 'auth/weak-password':
         return 'Password is too weak. Use at least 6 characters';
       case 'auth/user-disabled':

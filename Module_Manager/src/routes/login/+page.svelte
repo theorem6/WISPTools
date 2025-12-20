@@ -298,7 +298,12 @@
         if (isAdminEmail && errorMsg.includes('Invalid')) {
           error = 'Invalid credentials. If this is a platform admin account, ensure it exists in Firebase Authentication. You may need to create the account first or use Google Sign-In.';
         } else {
-          error = errorMsg;
+          // For invalid credential errors, suggest using password reset
+          if (errorMsg.includes('Invalid email or password')) {
+            error = errorMsg + ' Click "Forgot password?" below to reset your password or set a new one.';
+          } else {
+            error = errorMsg;
+          }
         }
         
         console.error('[Login Page] Authentication failed:', error);
