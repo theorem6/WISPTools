@@ -39,7 +39,7 @@ Guides for integrating with external services:
 
 ## Getting Help
 
-- Check the [Troubleshooting Guide](/guides/troubleshooting)
-- Review [Common Issues](/guides/common-issues)
+- Review the guides in each section
+- Check deployment documentation
 - Contact support
 

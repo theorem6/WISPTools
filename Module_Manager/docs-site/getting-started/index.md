@@ -23,8 +23,7 @@ WISPTools is a comprehensive management platform for LTE Wireless Internet Servi
 ### For New Users
 
 1. **Create an Account**
-   - Visit the [signup page](/signup)
-   - Complete the registration wizard
+   - Complete the registration wizard on the platform
    - Verify your email address
 
 2. **Set Up Your First Tenant**
@@ -62,7 +61,6 @@ WISPTools is a comprehensive management platform for LTE Wireless Internet Servi
    - Configure environment variables
 
 2. **Explore the Architecture**
-   - Read the [Architecture Overview](/guides/developer-guides/architecture)
    - Understand the [Database Structure](/guides/developer-guides/database-structure)
    - Review the [API Reference](/api/)
 
@@ -80,7 +78,7 @@ WISPTools is a comprehensive management platform for LTE Wireless Internet Servi
 
 ## Need Help?
 
-- Check the [Troubleshooting Guide](/guides/troubleshooting)
-- Review [Common Issues](/guides/common-issues)
+- Review the guides in the [Guides section](/guides/)
+- Check deployment documentation
 - Contact support
 

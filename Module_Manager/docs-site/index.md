@@ -56,16 +56,15 @@ WISPTools is a comprehensive LTE WISP Management Platform that provides:
 
 ### For Users
 - [Getting Started](/getting-started/)
-- [Tenant Management](/guides/user-guides/tenant-management)
-- [Authentication](/guides/user-guides/authentication)
+- [User Roles & Permissions](/guides/user-guides/user-roles)
 
 ### For Developers
-- [Architecture Overview](/guides/developer-guides/architecture)
-- [API Reference](/api/)
 - [Database Structure](/guides/developer-guides/database-structure)
+- [Data Model](/guides/developer-guides/data-model)
+- [API Reference](/api/)
 
 ### Deployment
+- [Deployment Overview](/deployment/)
 - [Backend Deployment](/deployment/backend)
-- [Frontend Deployment](/deployment/frontend)
 - [Infrastructure Setup](/deployment/infrastructure)
 
