@@ -539,6 +539,10 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         planIdsForFetch.push(...Array.from(currentVisiblePlanIds));
       }
 
+      // In plan mode, includePlanLayer tells the API to return both:
+      // 1. Production hardware (towers/sectors/etc with planId matching)
+      // 2. Plan layer features (staged features converted to production format)
+      // We need this to show staged plan features in plan mode
       const includePlanLayer = planIdsForFetch.length > 0;
       const fetchOptions = includePlanLayer ? { includePlanLayer: true, planIds: planIdsForFetch } : {};
 
@@ -617,17 +621,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         planId
       });
       
-      // The reactive bindings in CoverageMapView will automatically call setData
-      // which triggers renderAllAssets, so graphics should refresh automatically
-      console.log('[CoverageMap] Data loaded, map should refresh via reactive bindings');
-      
-      // Force a small delay to ensure reactive updates complete, then trigger explicit refresh
-      if (mapComponent) {
-        setTimeout(() => {
-          // The reactive statement $: controller && controller.setData(...) should handle this
-          // But we'll also ensure the map component knows data has changed
-          console.log('[CoverageMap] Triggering map data refresh');
-        }, 200);
+      // Explicitly refresh map data to ensure newly created objects are displayed
+      // The reactive bindings should also trigger, but this ensures it happens
+      if (mapComponent && typeof mapComponent.refreshMapData === 'function') {
+        mapComponent.refreshMapData();
+        console.log('[CoverageMap] Explicitly refreshed map data');
+      } else {
+        console.log('[CoverageMap] Map component not ready yet, reactive bindings will handle refresh');
       }
     } catch (err: any) {
       console.error('Failed to load data:', err);
@@ -959,9 +959,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         showAddCPEModal = true;
         break;
       case 'copy-coords':
-        navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-        success = 'Coordinates copied to clipboard';
-        setTimeout(() => success = '', 3000);
+        if (typeof latitude === 'number' && typeof longitude === 'number' && !isNaN(latitude) && !isNaN(longitude)) {
+          navigator.clipboard.writeText(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          success = 'Coordinates copied to clipboard';
+          setTimeout(() => success = '', 3000);
+        } else {
+          error = 'Invalid coordinates';
+          setTimeout(() => error = '', 3000);
+        }
         break;
     }
     
@@ -1578,14 +1583,21 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     setTimeout(() => success = '', 3000);
     planDraftForSiteEdit = null;
     initialSiteType = null;
-    // Reload all data to show newly created sectors, sites, etc.
-    await loadAllData();
-
+    
     try {
+      // Reload all data to show newly created sectors, sites, etc.
+      await loadAllData();
+      
+      // Refresh plan features if in plan mode
       if (effectivePlanId && (isPlanMode || sharedMapMode === 'plan')) {
         await mapLayerManager.refreshPlan(effectivePlanId);
-      } else {
-        await loadAllData();
+      }
+      
+      // Explicitly refresh map data to ensure newly created objects are displayed
+      // This is a safeguard in case the reactive statement doesn't trigger properly
+      if (mapComponent && typeof mapComponent.refreshMapData === 'function') {
+        mapComponent.refreshMapData();
+        console.log('[CoverageMap] Explicitly refreshed map after modal save');
       }
     } catch (err: any) {
       console.error('Error refreshing data after modal save:', err);
@@ -1636,8 +1648,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         <p>Drag the marker to refine this deployment location.</p>
         <p class="coords">
           📍
-          {selectedPlanDraftCoords.latitude !== null ? selectedPlanDraftCoords.latitude.toFixed(7) : '—'},
-          {selectedPlanDraftCoords.longitude !== null ? selectedPlanDraftCoords.longitude.toFixed(7) : '—'}
+          {selectedPlanDraftCoords.latitude != null && typeof selectedPlanDraftCoords.latitude === 'number' ? selectedPlanDraftCoords.latitude.toFixed(7) : '—'},
+          {selectedPlanDraftCoords.longitude != null && typeof selectedPlanDraftCoords.longitude === 'number' ? selectedPlanDraftCoords.longitude.toFixed(7) : '—'}
         </p>
       </div>
       <button class="menu-item" onclick={() => handlePlanDraftMenuAction('edit-site')}>

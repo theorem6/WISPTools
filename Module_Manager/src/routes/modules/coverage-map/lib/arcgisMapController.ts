@@ -98,22 +98,34 @@ export class CoverageMapController {
   public async initialize(options: CoverageMapInitOptions): Promise<CoverageMapInitResult> {
     this.container = options.container;
     this.filters = options.filters;
-    this.setData({
-      towers: options.towers,
-      sectors: options.sectors,
-      cpeDevices: options.cpeDevices,
-      equipment: options.equipment
+    
+    // Store data before map initialization
+    this.data = {
+      towers: options.towers || [],
+      sectors: options.sectors || [],
+      cpeDevices: options.cpeDevices || [],
+      equipment: options.equipment || []
+    };
+    
+    console.log('[CoverageMap] Initializing with data:', {
+      towersCount: this.data.towers.length,
+      sectorsCount: this.data.sectors.length,
+      cpeCount: this.data.cpeDevices.length,
+      equipmentCount: this.data.equipment.length
     });
+    
     this.setPlanFeatures(options.externalPlanFeatures ?? []);
     this.marketingLeads = options.marketingLeads ?? [];
 
     await this.initializeMap();
+    
+    // Set mapReady BEFORE rendering so setData calls will trigger rendering
+    this.mapReady = true;
+    
     await this.renderAllAssets();
     await this.renderPlanDrafts();
     await this.renderMarketingLeads();
     await this.fitMapToVisibleGraphics(true);
-
-    this.mapReady = true;
 
     return {
       map: this.map,
@@ -490,15 +502,29 @@ export class CoverageMapController {
   }
 
   public setData(data: CoverageMapData): void {
+    console.log('[CoverageMap] setData called:', {
+      towersCount: data.towers?.length || 0,
+      sectorsCount: data.sectors?.length || 0,
+      cpeCount: data.cpeDevices?.length || 0,
+      equipmentCount: data.equipment?.length || 0,
+      mapReady: this.mapReady
+    });
+    
     this.data = {
-      towers: data.towers,
-      sectors: data.sectors,
-      cpeDevices: data.cpeDevices,
-      equipment: data.equipment
+      towers: data.towers || [],
+      sectors: data.sectors || [],
+      cpeDevices: data.cpeDevices || [],
+      equipment: data.equipment || []
     };
 
     if (this.mapReady) {
-      this.renderAllAssets().catch(err => console.error('[CoverageMap] Asset render error:', err));
+      console.log('[CoverageMap] Map is ready, calling renderAllAssets');
+      this.renderAllAssets().catch(err => {
+        console.error('[CoverageMap] Asset render error:', err);
+        console.error('[CoverageMap] Error stack:', err?.stack);
+      });
+    } else {
+      console.log('[CoverageMap] Map not ready yet, data stored for later rendering');
     }
   }
 
@@ -1545,19 +1571,41 @@ export class CoverageMapController {
     if (response.results.length > 0) {
       const graphic = response.results[0].graphic;
       if (graphic && graphic.attributes) {
+        const attrs = graphic.attributes;
         this.dispatch('asset-click', {
-          type: graphic.attributes.type,
-          id: graphic.attributes.id,
-          data: graphic.attributes,
-          screenX: event.x,
-          screenY: event.y
+          type: attrs.type || attrs.featureType || null,
+          id: attrs.id || attrs._id || null,
+          data: attrs,
+          screenX: event.x || event.native?.clientX || 0,
+          screenY: event.y || event.native?.clientY || 0,
+          isRightClick: false
         });
       }
     }
   }
 
   private async renderAllAssets(): Promise<void> {
-    if (!this.graphicsLayer || !this.mapView) return;
+    if (!this.graphicsLayer || !this.mapView) {
+      console.warn('[CoverageMap] renderAllAssets called but map not ready:', {
+        hasGraphicsLayer: !!this.graphicsLayer,
+        hasMapView: !!this.mapView,
+        mapReady: this.mapReady
+      });
+      return;
+    }
+    
+    console.log('[CoverageMap] renderAllAssets starting:', {
+      towersCount: this.data.towers?.length || 0,
+      sectorsCount: this.data.sectors?.length || 0,
+      cpeCount: this.data.cpeDevices?.length || 0,
+      equipmentCount: this.data.equipment?.length || 0,
+      filters: {
+        showTowers: this.filters.showTowers,
+        showSectors: this.filters.showSectors,
+        showCPE: this.filters.showCPE,
+        showEquipment: this.filters.showEquipment
+      }
+    });
 
     try {
       const [
@@ -1589,7 +1637,20 @@ export class CoverageMapController {
         await this.renderBackhaulLinks();
       }
 
-      if (this.filters.showTowers && Array.isArray(this.data.towers)) {
+      console.log('[CoverageMap] Checking towers filter:', {
+        showTowers: this.filters.showTowers,
+        isArray: Array.isArray(this.data.towers),
+        towersLength: this.data.towers?.length || 0,
+        firstTower: this.data.towers?.[0] ? {
+          id: this.data.towers[0].id,
+          name: this.data.towers[0].name,
+          type: this.data.towers[0].type,
+          hasLocation: !!this.data.towers[0].location,
+          location: this.data.towers[0].location
+        } : null
+      });
+
+      if (this.filters.showTowers && Array.isArray(this.data.towers) && this.data.towers.length > 0) {
         const { default: PictureMarkerSymbol } = await import('@arcgis/core/symbols/PictureMarkerSymbol.js');
 
         const isMobile = window.innerWidth <= 768;
@@ -1597,59 +1658,182 @@ export class CoverageMapController {
         const symbolSize = isMobile ? '28px' : '20px';
         const outlineWidth = isMobile ? 4 : 3;
 
-        this.data.towers.forEach(tower => {
-          let symbol;
-          const customIcon = createLocationIcon(tower.type, iconSize);
+        let towersRendered = 0;
+        let towersSkipped = 0;
 
-          if (customIcon) {
-            symbol = new PictureMarkerSymbol(customIcon);
-          } else {
-            // Use status-based color if status is provided, otherwise use type-based color
-            const color = getTowerColor(tower.type, tower.status);
-            symbol = new SimpleMarkerSymbol({
-              style: 'circle',
-              color: color,
-              size: symbolSize,
-              outline: {
-                color: 'white',
-                width: outlineWidth
+        this.data.towers.forEach(tower => {
+          try {
+            // Validate tower has required location data
+            if (!tower.location || !tower.location.latitude || !tower.location.longitude) {
+              console.warn('[CoverageMap] Tower missing location data:', tower.id, tower.name, tower.location);
+              return;
+            }
+
+            const lat = tower.location.latitude;
+            const lon = tower.location.longitude;
+
+            // Validate coordinates are valid numbers
+            if (typeof lat !== 'number' || typeof lon !== 'number' || isNaN(lat) || isNaN(lon)) {
+              console.warn('[CoverageMap] Tower has invalid coordinates:', tower.id, { lat, lon });
+              return;
+            }
+
+            // Validate coordinate ranges
+            if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+              console.warn('[CoverageMap] Tower coordinates out of range:', tower.id, { lat, lon });
+              return;
+            }
+
+            // Normalize type field - handle both string and array formats
+            // Backend stores type as array, but icon lookup expects string
+            let towerType: string;
+            if (Array.isArray(tower.type)) {
+              // If it's an array, prefer 'noc', 'warehouse', etc. if present, otherwise use first element
+              const preferredTypes = ['noc', 'warehouse', 'vehicle', 'rma', 'vendor', 'internet-access', 'internet'];
+              const preferredType = tower.type.find((t: string) => preferredTypes.includes(t));
+              towerType = preferredType || tower.type[0] || 'tower';
+            } else {
+              towerType = tower.type || 'tower';
+            }
+
+            let symbol;
+            const customIcon = createLocationIcon(towerType, iconSize);
+
+            if (customIcon) {
+              symbol = new PictureMarkerSymbol(customIcon);
+            } else {
+              // Use status-based color if status is provided, otherwise use type-based color
+              const color = getTowerColor(towerType, tower.status);
+              symbol = new SimpleMarkerSymbol({
+                style: 'circle',
+                color: color,
+                size: symbolSize,
+                outline: {
+                  color: 'white',
+                  width: outlineWidth
+                }
+              });
+            }
+
+            const point = new Point({
+              longitude: lon,
+              latitude: lat
+            });
+
+            const graphic = new Graphic({
+              geometry: point,
+              symbol,
+              attributes: {
+                ...tower,
+                type: 'tower',
+                id: tower.id,
+                name: tower.name
               }
             });
-          }
 
-          const point = new Point({
-            longitude: tower.location.longitude,
-            latitude: tower.location.latitude
-          });
-
-          const graphic = new Graphic({
-            geometry: point,
-            symbol,
-            attributes: {
-              ...tower,
-              type: 'tower',
-              id: tower.id,
-              name: tower.name
+            if (this.graphicsLayer) {
+              this.graphicsLayer.add(graphic);
+              towersRendered++;
             }
-          });
-
-          this.graphicsLayer!.add(graphic);
+          } catch (towerError) {
+            console.error('[CoverageMap] Error rendering tower:', tower.id, towerError);
+            towersSkipped++;
+          }
+        });
+        
+        console.log(`[CoverageMap] Towers rendering complete: ${towersRendered} rendered, ${towersSkipped} skipped`);
+      } else {
+        console.log('[CoverageMap] Towers not rendered:', {
+          showTowers: this.filters.showTowers,
+          isArray: Array.isArray(this.data.towers),
+          towersLength: this.data.towers?.length || 0
         });
       }
 
+      console.log('[CoverageMap] Checking sectors filter:', {
+        showSectors: this.filters.showSectors,
+        isArray: Array.isArray(this.data.sectors),
+        sectorsLength: this.data.sectors?.length || 0,
+        firstSector: this.data.sectors?.[0] ? {
+          id: this.data.sectors[0].id,
+          name: this.data.sectors[0].name,
+          siteId: this.data.sectors[0].siteId,
+          hasLocation: !!this.data.sectors[0].location,
+          location: this.data.sectors[0].location
+        } : null
+      });
+
       if (this.filters.showSectors && this.graphicsLayer) {
         const filteredSectors = this.filterSectorsByBand(this.data.sectors || []);
+        
+        console.log('[CoverageMap] Filtered sectors by band:', {
+          originalCount: this.data.sectors?.length || 0,
+          filteredCount: filteredSectors.length
+        });
+
+        let sectorsRendered = 0;
+        let sectorsSkipped = 0;
 
         for (const sector of filteredSectors) {
           try {
-            if (!sector.location?.latitude || !sector.location?.longitude) {
-              console.warn('[CoverageMap] Sector missing location:', sector.id, sector.name);
+            // Sectors might not have location directly - try to get it from associated site
+            let sectorLat = sector.location?.latitude;
+            let sectorLon = sector.location?.longitude;
+            
+            // If sector doesn't have location but has siteId, try to find the site
+            if ((!sectorLat || !sectorLon) && sector.siteId) {
+              // Normalize siteId for comparison (handle both string and ObjectId)
+              const sectorSiteIdStr = String(sector.siteId);
+              
+              // Look for the site in towers array (includes both production and plan layer sites)
+              const associatedSite = this.data.towers?.find((t: any) => {
+                const siteIdStr = String(t.id || t._id || '');
+                return siteIdStr === sectorSiteIdStr || 
+                       (t._id && String(t._id) === sectorSiteIdStr) ||
+                       (sector.siteId && typeof sector.siteId === 'object' && String(sector.siteId) === siteIdStr);
+              });
+              
+              if (associatedSite?.location && associatedSite.location.latitude && associatedSite.location.longitude) {
+                sectorLat = associatedSite.location.latitude;
+                sectorLon = associatedSite.location.longitude;
+                console.log('[CoverageMap] Sector using location from site:', {
+                  sectorId: sector.id || sector._id,
+                  sectorName: sector.name,
+                  sectorSiteId: sector.siteId,
+                  siteId: associatedSite.id || associatedSite._id,
+                  siteName: associatedSite.name,
+                  lat: sectorLat,
+                  lon: sectorLon,
+                  isPlanLayer: !!sector.planId
+                });
+              } else {
+                console.warn('[CoverageMap] Sector site not found or missing location:', {
+                  sectorId: sector.id || sector._id,
+                  sectorName: sector.name,
+                  sectorSiteId: sector.siteId,
+                  sectorSiteIdStr,
+                  towersCount: this.data.towers?.length || 0,
+                  searchedSiteIds: this.data.towers?.slice(0, 3).map((t: any) => String(t.id || t._id || ''))
+                });
+              }
+            }
+            
+            if (!sectorLat || !sectorLon) {
+              console.warn('[CoverageMap] Sector missing location:', {
+                id: sector.id || sector._id,
+                name: sector.name,
+                siteId: sector.siteId,
+                hasLocation: !!sector.location,
+                location: sector.location,
+                planId: sector.planId
+              });
+              sectorsSkipped++;
               continue;
             }
 
             const sectorPolygon = createSectorCone(
-              sector.location.latitude,
-              sector.location.longitude,
+              sectorLat,
+              sectorLon,
               sector.azimuth || 0,
               sector.beamwidth || 60,
               0.01
@@ -1679,11 +1863,21 @@ export class CoverageMapController {
 
             if (this.graphicsLayer) {
               this.graphicsLayer.add(graphic);
+              sectorsRendered++;
             }
           } catch (sectorError) {
             console.error('[CoverageMap] Error rendering sector:', sector.id, sectorError);
+            sectorsSkipped++;
           }
         }
+        
+        console.log(`[CoverageMap] Sectors rendering complete: ${sectorsRendered} rendered, ${sectorsSkipped} skipped`);
+      } else {
+        console.log('[CoverageMap] Sectors not rendered:', {
+          showSectors: this.filters.showSectors,
+          hasGraphicsLayer: !!this.graphicsLayer,
+          sectorsLength: this.data.sectors?.length || 0
+        });
       }
 
       if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
@@ -1718,7 +1912,9 @@ export class CoverageMapController {
             }
           });
 
-          this.graphicsLayer!.add(graphic);
+          if (this.graphicsLayer) {
+            this.graphicsLayer.add(graphic);
+          }
         });
       }
 
@@ -1791,7 +1987,9 @@ export class CoverageMapController {
             }
           });
 
-          this.graphicsLayer!.add(graphic);
+          if (this.graphicsLayer) {
+            this.graphicsLayer.add(graphic);
+          }
         });
       }
 
@@ -1800,20 +1998,42 @@ export class CoverageMapController {
       const sectorsCount = this.data.sectors?.length || 0;
       const cpeCount = this.data.cpeDevices?.length || 0;
       const equipmentCount = this.data.equipment?.length || 0;
-      console.log(`[CoverageMap] ✅ Rendered ${graphicsCount} graphics on map:`, {
+      
+      // Log detailed information for debugging
+      const towersWithLocation = this.data.towers?.filter((t: any) => 
+        t.location && t.location.latitude != null && t.location.longitude != null
+      ).length || 0;
+      
+      // Log actual tower data for first few towers
+      const sampleTowers = this.data.towers?.slice(0, 3).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        type: t.type,
+        hasLocation: !!t.location,
+        lat: t.location?.latitude,
+        lon: t.location?.longitude
+      })) || [];
+      
+      console.log(`[CoverageMap] ✅ Rendered ${graphicsCount} graphics on map`, {
         totalGraphics: graphicsCount,
         dataCounts: {
           towers: towersCount,
+          towersWithLocation: towersWithLocation,
           sectors: sectorsCount,
           cpe: cpeCount,
           equipment: equipmentCount
         },
+        sampleTowers: sampleTowers,
         filters: {
           showTowers: this.filters.showTowers,
           showSectors: this.filters.showSectors,
           showCPE: this.filters.showCPE,
           showEquipment: this.filters.showEquipment
-        }
+        },
+        mapReady: this.mapReady,
+        hasGraphicsLayer: !!this.graphicsLayer,
+        hasMapView: !!this.mapView,
+        graphicsLayerGraphicsCount: this.graphicsLayer?.graphics?.length
       });
     } catch (err) {
       console.error('Failed to render assets:', err);
@@ -2180,8 +2400,7 @@ export class CoverageMapController {
             haloSize: isMobile ? '3px' : '2px',
             font: {
               size: isMobile ? 14 : 12,
-              family: 'Inter, system-ui, sans-serif',
-              weight: 'bold'
+              family: 'Arial'
             },
             yoffset: isMobile ? 18 : 12
           });

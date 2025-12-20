@@ -32,7 +32,7 @@ export let disabled = false;
 >
   <div class="menu-header">
     <span class="coords">
-      📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}
+      📍 {latitude != null && longitude != null ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : '—'}
     </span>
     {#if planMode}
       <div class="plan-mode-indicator">
