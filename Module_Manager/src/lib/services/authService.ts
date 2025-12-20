@@ -8,6 +8,8 @@ import {
   onAuthStateChanged,
   updateProfile,
   sendPasswordResetEmail,
+  confirmPasswordReset,
+  applyActionCode,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
@@ -487,11 +489,50 @@ export class AuthService {
   }
 
   /**
-   * Send password reset email
+   * Send password reset email with custom action URL
    */
   async resetPassword(email: string): Promise<AuthResult<void>> {
     try {
-      await sendPasswordResetEmail(getAuth(), email);
+      // Get the current origin (handles both localhost and production)
+      const actionCodeSettings = {
+        url: typeof window !== 'undefined' 
+          ? `${window.location.origin}/reset-password`
+          : 'https://wisptools.io/reset-password',
+        handleCodeInApp: true // This keeps the reset flow within our app
+      };
+      
+      await sendPasswordResetEmail(getAuth(), email, actionCodeSettings);
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: this.getAuthErrorMessage(error)
+      };
+    }
+  }
+
+  /**
+   * Confirm password reset with action code
+   */
+  async confirmPasswordReset(actionCode: string, newPassword: string): Promise<AuthResult<void>> {
+    try {
+      const auth = getAuth();
+      await confirmPasswordReset(auth, actionCode, newPassword);
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: this.getAuthErrorMessage(error)
+      };
+    }
+  }
+
+  /**
+   * Apply action code (for email verification, etc.)
+   */
+  async applyActionCode(code: string): Promise<AuthResult<void>> {
+    try {
+      await applyActionCode(getAuth(), code);
       return { success: true };
     } catch (error: any) {
       return {
