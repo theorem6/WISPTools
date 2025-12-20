@@ -1,3 +1,15 @@
+---
+title: "Multi-Tenant Setup Guide"
+description: "Complete guide for setting up and using the multi-tenant GenieACS system for managing TR-069/CWMP devices across multiple customer organizations"
+category: "guides"
+subcategory: "admin-guides"
+tags: ["multi-tenant", "genieacs", "tr069", "cwmp", "setup", "configuration"]
+last_updated: "2025-12-19"
+author: "Documentation Team"
+difficulty: "intermediate"
+audience: "administrators"
+---
+
 # Multi-Tenant GenieACS Setup Guide
 
 ## 🎯 Overview

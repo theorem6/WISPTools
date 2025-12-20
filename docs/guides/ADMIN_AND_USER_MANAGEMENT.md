@@ -1,3 +1,15 @@
+---
+title: "Admin & User Management"
+description: "Guide to admin-only tenant management and user invitation system for the multi-tenant platform"
+category: "guides"
+subcategory: "admin-guides"
+tags: ["admin", "user-management", "tenants", "roles", "permissions"]
+last_updated: "2025-12-19"
+author: "Documentation Team"
+difficulty: "beginner"
+audience: "administrators"
+---
+
 # Admin & User Management Features
 
 ## ✅ Implementation Complete
