@@ -14,6 +14,8 @@
   import ScanModal from './components/ScanModal.svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import { inventoryDocs } from '$lib/docs/inventory-docs';
   
   // Data
   let items: InventoryItem[] = [];
@@ -32,6 +34,10 @@
   // Asset Tag
   let showAssetTag = false;
   let selectedItemForTag: InventoryItem | null = null;
+  
+  // Help
+  let showHelpModal = false;
+  const helpContent = inventoryDocs;
   
   // Filters
   let filters: InventoryFilters = {
@@ -290,6 +296,13 @@
     </div>
     
     <div class="header-actions">
+      <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help" title="Help">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </button>
       <button class="btn-secondary" on:click={() => { scanMode = 'lookup'; showScanModal = true; }}>
         🔍 Scan Lookup
       </button>
@@ -590,6 +603,14 @@
       on:checked-out={() => { loadData(); }}
     />
   {/if}
+  
+  <!-- Help Modal -->
+  <HelpModal 
+    show={showHelpModal}
+    title="Inventory Management Help"
+    content={helpContent}
+    on:close={() => showHelpModal = false}
+  />
 </div>
 </TenantGuard>
 
@@ -1002,6 +1023,26 @@
   
   .btn-icon:hover {
     background: var(--bg-hover);
+  }
+  
+  .help-button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .help-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   }
   
   .pagination {

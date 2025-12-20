@@ -1,4 +1,11 @@
 <script lang="ts">
+  import { pciResolutionDocs } from '$lib/docs/pci-resolution-docs';
+  import { acsCpeDocs } from '$lib/docs/acs-cpe-docs';
+  import { cbrsManagementDocs } from '$lib/docs/cbrs-management-docs';
+  import { inventoryDocs } from '$lib/docs/inventory-docs';
+  import { coverageMapDocs } from '$lib/docs/coverage-map-docs';
+  import { hssSubscribersDocs } from '$lib/docs/hss-subscribers-docs';
+  
   let selectedTopic = 'overview';
   
   const topics = [
@@ -454,6 +461,36 @@
               <li>Try logging out and back in</li>
             </ol>
           </section>
+        </article>
+      
+      {:else if selectedTopic === 'pci-resolution'}
+        <article>
+          {@html pciResolutionDocs}
+        </article>
+      
+      {:else if selectedTopic === 'acs-cpe'}
+        <article>
+          {@html acsCpeDocs}
+        </article>
+      
+      {:else if selectedTopic === 'cbrs'}
+        <article>
+          {@html cbrsManagementDocs}
+        </article>
+      
+      {:else if selectedTopic === 'inventory'}
+        <article>
+          {@html inventoryDocs}
+        </article>
+      
+      {:else if selectedTopic === 'coverage-map'}
+        <article>
+          {@html coverageMapDocs}
+        </article>
+      
+      {:else if selectedTopic === 'hss-subscribers'}
+        <article>
+          {@html hssSubscribersDocs}
         </article>
       
       {:else}

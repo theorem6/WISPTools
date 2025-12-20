@@ -28,6 +28,8 @@
   import SiteEditModal from './components/SiteEditModal.svelte';
 import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
+  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import { coverageMapDocs } from '$lib/docs/coverage-map-docs';
   import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { 
@@ -71,6 +73,8 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showHSSRegistrationModal = false;
   let showHardwareDeploymentModal = false;
   let showSiteEditModal = false;
+  let showHelpModal = false;
+  const helpContent = coverageMapDocs;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat: number | null = null;
@@ -1697,6 +1701,9 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     <button class="control-btn main-menu-btn" onclick={() => showMainMenu = !showMainMenu} title="Main Menu">
       ☰
     </button>
+    <button class="control-btn help-button" onclick={() => showHelpModal = true} title="Help">
+      ?
+    </button>
   </div>
 
   {#if displayPlanSummary && (() => {
@@ -2089,6 +2096,14 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     setTimeout(() => success = '', 5000);
     await loadAllData();
   }}
+/>
+
+<!-- Help Modal -->
+<HelpModal 
+  show={showHelpModal}
+  title="Coverage Map Help"
+  content={helpContent}
+  on:close={() => showHelpModal = false}
 />
 
 <!-- Site Edit Modal -->

@@ -12,6 +12,8 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   import GrantStatus from './components/GrantStatus.svelte';
   import SettingsModal from './components/SettingsModal.svelte';
   import UserIDSelector from './components/UserIDSelector.svelte';
+  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import { cbrsManagementDocs } from '$lib/docs/cbrs-management-docs';
   
   // State
   let devices: CBSDDevice[] = [];
@@ -25,6 +27,8 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   let showGrantRequestModal = false;
   let showSettingsModal = false;
   let showUserIDSelector = false;
+  let showHelpModal = false;
+  const helpContent = cbrsManagementDocs;
   let currentUserID: string | null = null;
   let currentUserIDDisplay: string | null = null;
   
@@ -955,6 +959,13 @@ let configStatus: ConfigStatus = getConfigStatus(null);
       </div>
       
       <div class="header-actions">
+        <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help" title="Help">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
         {#if currentUserID}
           <button 
             class="btn btn-network-selector active" 
@@ -1256,6 +1267,14 @@ let configStatus: ConfigStatus = getConfigStatus(null);
   tenantId={tenantId}
   on:select={handleMainUserIDSelect}
   on:close={() => showUserIDSelector = false}
+/>
+
+<!-- Help Modal -->
+<HelpModal 
+  show={showHelpModal}
+  title="CBRS Management Help"
+  content={helpContent}
+  on:close={() => showHelpModal = false}
 />
 </TenantGuard>
 
@@ -1749,6 +1768,26 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     margin-top: 1.5rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--border-color);
+  }
+  
+  .help-button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .help-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   }
   
   @media (max-width: 1024px) {
