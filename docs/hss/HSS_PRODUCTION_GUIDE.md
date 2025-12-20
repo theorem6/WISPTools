@@ -1,3 +1,15 @@
+---
+title: "HSS Production System Guide"
+description: "Complete production system guide for the Home Subscriber Server (HSS) including architecture, service configurations, MongoDB schema, subscriber management, monitoring, and security best practices"
+category: "guides"
+subcategory: "admin-guides"
+tags: ["hss", "open5gs", "production", "subscriber-management", "mongodb", "diameter", "s6a"]
+last_updated: "2025-12-19"
+author: "Documentation Team"
+difficulty: "advanced"
+audience: "administrators"
+---
+
 # LTE WISP HSS Production Guide
 
 Complete guide for the Open5GS HSS + Management Platform deployment.
