@@ -1,0 +1,30 @@
+/* Custom theme styles for WISPTools documentation */
+
+:root {
+  --vp-c-brand: #00d9ff;
+  --vp-c-brand-light: #33e1ff;
+  --vp-c-brand-lighter: #66e9ff;
+  --vp-c-brand-dark: #00a8cc;
+  --vp-c-brand-darker: #0088aa;
+}
+
+/* Custom hero styling */
+.VPHero .name {
+  background: linear-gradient(135deg, #00d9ff 0%, #0088cc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Feature cards */
+.VPFeatures .VPFeature {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.VPFeatures .VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.15);
+}
+

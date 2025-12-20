@@ -17,8 +17,9 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Getting Started', link: '/getting-started/' },
       { text: 'Guides', link: '/guides/' },
-      { text: 'API Reference', link: '/api/' },
-      { text: 'Deployment', link: '/deployment/' }
+      { text: 'API', link: '/api/' },
+      { text: 'Deployment', link: '/deployment/' },
+      { text: 'Reference', link: '/reference/' }
     ],
     
     // Sidebar
@@ -38,8 +39,7 @@ export default defineConfig({
         {
           text: 'User Guides',
           items: [
-            { text: 'Authentication', link: '/guides/user-guides/authentication' },
-            { text: 'Tenant Management', link: '/guides/user-guides/tenant-management' }
+            { text: 'User Roles & Permissions', link: '/guides/user-guides/user-roles' }
           ]
         },
         {
@@ -47,15 +47,22 @@ export default defineConfig({
           items: [
             { text: 'Multi-Tenant Setup', link: '/guides/admin-guides/multi-tenant-setup' },
             { text: 'HSS Production Guide', link: '/guides/admin-guides/hss-production' },
-            { text: 'Admin & User Management', link: '/guides/admin-guides/admin-user-management' }
+            { text: 'Admin & User Management', link: '/guides/admin-guides/admin-user-management' },
+            { text: 'Tenant Deletion Guide', link: '/guides/admin-guides/tenant-deletion' }
           ]
         },
         {
           text: 'Developer Guides',
           items: [
-            { text: 'Architecture', link: '/guides/developer-guides/architecture' },
-            { text: 'API Reference', link: '/guides/developer-guides/api-reference' },
-            { text: 'Database Structure', link: '/guides/developer-guides/database-structure' }
+            { text: 'Database Structure', link: '/guides/developer-guides/database-structure' },
+            { text: 'Data Model', link: '/guides/developer-guides/data-model' }
+          ]
+        },
+        {
+          text: 'Integration Guides',
+          items: [
+            { text: 'CBRS/SAS Setup', link: '/guides/integration-guides/cbrs-setup' },
+            { text: 'Google OAuth Setup', link: '/guides/integration-guides/google-oauth' }
           ]
         }
       ],
@@ -65,7 +72,7 @@ export default defineConfig({
           items: [
             { text: 'Overview', link: '/deployment/' },
             { text: 'Backend Deployment', link: '/deployment/backend' },
-            { text: 'Frontend Deployment', link: '/deployment/frontend' }
+            { text: 'Infrastructure Setup', link: '/deployment/infrastructure' }
           ]
         }
       ]
