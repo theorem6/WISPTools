@@ -546,10 +546,8 @@ Remove the danger zone section and delete buttons
 
 ## Related Documentation
 
-- [Tenant Management Guide](./MULTI_TENANT_SETUP_GUIDE.md)
-- [One Tenant Per User Policy](./ONE_TENANT_PER_USER.md)
-- [Admin and User Management](./ADMIN_AND_USER_MANAGEMENT.md)
-- [Multi-Tenant Architecture](./MULTI_TENANT_ARCHITECTURE.md)
+- [Multi-Tenant Setup Guide](/guides/admin-guides/multi-tenant-setup)
+- [Admin and User Management](/guides/admin-guides/admin-user-management)
 
 ## Files Modified
 
