@@ -434,17 +434,91 @@ router.get('/sectors/:id', async (req, res) => {
 
 router.post('/sectors', async (req, res) => {
   try {
+    console.log('[Network API] Creating sector:', {
+      tenantId: req.tenantId,
+      body: JSON.stringify(req.body, null, 2)
+    });
+    
     // Ensure createdBy is set
     const createdBy = req.body.createdBy || req.body.email || req.user?.email || 'System';
+    
+    // Validate required fields
+    if (!req.body.name) {
+      return res.status(400).json({ error: 'Sector name is required' });
+    }
+    if (!req.body.technology) {
+      return res.status(400).json({ error: 'Technology is required' });
+    }
+    if (req.body.azimuth === undefined || req.body.azimuth === null) {
+      return res.status(400).json({ error: 'Azimuth is required' });
+    }
+    if (!req.body.siteId) {
+      return res.status(400).json({ error: 'Site ID is required' });
+    }
+    
+    // Validate siteId is a valid ObjectId
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.body.siteId)) {
+      return res.status(400).json({ error: 'Invalid site ID format' });
+    }
+    
+    // Verify site exists and belongs to tenant
+    const site = await UnifiedSite.findOne({ _id: req.body.siteId, tenantId: req.tenantId });
+    if (!site) {
+      return res.status(404).json({ error: 'Site not found or does not belong to tenant' });
+    }
+    
+    // Ensure location is set (use site location if not provided)
+    let location = req.body.location;
+    if (!location || !location.latitude || !location.longitude) {
+      if (site.location && site.location.latitude && site.location.longitude) {
+        location = {
+          latitude: site.location.latitude,
+          longitude: site.location.longitude,
+          address: site.location.address || ''
+        };
+      } else {
+        return res.status(400).json({ error: 'Location is required. Site must have valid coordinates.' });
+      }
+    }
+    
+    // Convert siteId to ObjectId
+    const siteId = new mongoose.Types.ObjectId(req.body.siteId);
+    
     const sector = new UnifiedSector({ 
-      ...req.body, 
+      ...req.body,
+      siteId: siteId,
+      location: location,
       tenantId: req.tenantId,
       createdBy: createdBy
     });
+    
     await sector.save();
+    console.log('[Network API] ✅ Sector created successfully:', sector._id);
     res.status(201).json(sector);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create sector', details: error.message });
+    console.error('[Network API] ❌ Error creating sector:', error);
+    console.error('[Network API] Error stack:', error.stack);
+    console.error('[Network API] Error name:', error.name);
+    if (error.errors) {
+      console.error('[Network API] Validation errors:', JSON.stringify(error.errors, null, 2));
+    }
+    
+    // Return more detailed error information
+    let errorMessage = error.message || 'Failed to create sector';
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors || {}).map((e: any) => e.message).join(', ');
+      errorMessage = `Validation error: ${validationErrors}`;
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to create sector', 
+      details: errorMessage,
+      validationErrors: error.errors ? Object.keys(error.errors).map(key => ({
+        field: key,
+        message: error.errors[key].message
+      })) : undefined
+    });
   }
 });
 

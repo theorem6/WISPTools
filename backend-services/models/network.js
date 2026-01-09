@@ -104,12 +104,10 @@ const UnifiedSiteSchema = new mongoose.Schema({
   },
   owner: String,
   fccId: String,
-  gateCode: String,
   
   // Integration
   inventoryId: String, // Link to inventory system
   planId: String, // Link to plan project (if created within a plan)
-  originPlanId: String, // Plan that originally created this asset
   originPlanId: String, // Plan that originally created this asset
   modules: {
     pci: {
@@ -178,7 +176,7 @@ const UnifiedSectorSchema = new mongoose.Schema({
   // Site Association
   siteId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'UnifiedTower',
+    ref: 'UnifiedSite',
     required: true
   },
   
@@ -256,7 +254,7 @@ const UnifiedCPESchema = new mongoose.Schema({
   // Site Association
   siteId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'UnifiedTower'
+    ref: 'UnifiedSite'
   },
   
   // Customer Information
@@ -334,7 +332,7 @@ const NetworkEquipmentSchema = new mongoose.Schema({
   // Site Association
   siteId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'UnifiedTower'
+    ref: 'UnifiedSite'
   },
   
   // Ownership

@@ -72,8 +72,13 @@ export class CoverageMapService {
     });
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+      const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+      const errorMessage = errorData.details || errorData.error || `HTTP ${response.status}`;
+      const error = new Error(errorMessage);
+      // Attach additional error details for debugging
+      (error as any).details = errorData.details;
+      (error as any).validationErrors = errorData.validationErrors;
+      throw error;
     }
     
     return await response.json();
