@@ -71,7 +71,36 @@ router.get('/sites', async (req, res) => {
     
     console.log(`📊 Found ${sites.length} sites for tenant ${req.tenantId}`);
     
-    res.json(sites);
+    // Ensure all sites have location data in the correct format for mobile app
+    const normalizedSites = sites.map(site => {
+      const normalized = { ...site };
+      
+      // Ensure location object exists
+      if (!normalized.location) {
+        normalized.location = {
+          latitude: 0,
+          longitude: 0,
+          address: ''
+        };
+      } else {
+        // Ensure latitude and longitude are numbers
+        if (typeof normalized.location.latitude !== 'number') {
+          normalized.location.latitude = normalized.location.latitude ? Number(normalized.location.latitude) : 0;
+        }
+        if (typeof normalized.location.longitude !== 'number') {
+          normalized.location.longitude = normalized.location.longitude ? Number(normalized.location.longitude) : 0;
+        }
+        
+        // Ensure address is a string
+        if (!normalized.location.address) {
+          normalized.location.address = '';
+        }
+      }
+      
+      return normalized;
+    });
+    
+    res.json(normalizedSites);
   } catch (error) {
     console.error('Error fetching sites:', error);
     res.status(500).json({ error: 'Failed to fetch sites', message: error.message });
@@ -86,6 +115,26 @@ router.get('/sites/:id', async (req, res) => {
     // Normalize type field for backward compatibility: convert single string to array
     if (site.type && !Array.isArray(site.type)) {
       site.type = [site.type];
+    }
+    
+    // Ensure location data is in correct format for mobile app
+    if (!site.location) {
+      site.location = {
+        latitude: 0,
+        longitude: 0,
+        address: ''
+      };
+    } else {
+      // Ensure latitude and longitude are numbers
+      if (typeof site.location.latitude !== 'number') {
+        site.location.latitude = site.location.latitude ? Number(site.location.latitude) : 0;
+      }
+      if (typeof site.location.longitude !== 'number') {
+        site.location.longitude = site.location.longitude ? Number(site.location.longitude) : 0;
+      }
+      if (!site.location.address) {
+        site.location.address = '';
+      }
     }
     
     res.json(site);
@@ -105,6 +154,39 @@ router.post('/sites', async (req, res) => {
       normalizedType = [normalizedType];
     } else if (!normalizedType || normalizedType.length === 0) {
       normalizedType = ['tower']; // Default
+    }
+    
+    // Validate location - ensure GPS coordinates are provided
+    // Location is required for mobile app lookup
+    if (!req.body.location) {
+      return res.status(400).json({ 
+        error: 'Location is required', 
+        message: 'Sites must have GPS coordinates (latitude and longitude) for mobile app lookup' 
+      });
+    }
+    
+    const location = req.body.location;
+    const hasValidCoords = location.latitude !== undefined && 
+                          location.longitude !== undefined &&
+                          typeof location.latitude === 'number' &&
+                          typeof location.longitude === 'number' &&
+                          location.latitude !== 0 &&
+                          location.longitude !== 0;
+    
+    if (!hasValidCoords) {
+      // If address is provided but no coordinates, suggest geocoding
+      if (location.address) {
+        return res.status(400).json({ 
+          error: 'GPS coordinates required', 
+          message: 'Please provide latitude and longitude coordinates. You can use the geocoding feature to convert the address to coordinates.',
+          suggestion: 'Use the geocoding endpoint to convert address to coordinates first'
+        });
+      } else {
+        return res.status(400).json({ 
+          error: 'GPS coordinates required', 
+          message: 'Sites must have GPS coordinates (latitude and longitude) for mobile app lookup' 
+        });
+      }
     }
     
     const site = new UnifiedSite({ 
@@ -149,6 +231,23 @@ router.put('/sites/:id', async (req, res) => {
         updateData.type = [updateData.type];
       } else if (updateData.type.length === 0) {
         updateData.type = ['tower']; // Ensure at least one type
+      }
+    }
+    
+    // Validate location if being updated - ensure GPS coordinates are valid
+    if (updateData.location) {
+      const location = updateData.location;
+      const hasValidCoords = location.latitude !== undefined && 
+                            location.longitude !== undefined &&
+                            typeof location.latitude === 'number' &&
+                            typeof location.longitude === 'number' &&
+                            location.latitude !== 0 &&
+                            location.longitude !== 0;
+      
+      // If location is being updated but coordinates are invalid, warn but don't block
+      // (allows partial updates, but logs warning for mobile app compatibility)
+      if (!hasValidCoords && (location.latitude !== undefined || location.longitude !== undefined)) {
+        console.warn(`[Network API] Site ${req.params.id} updated with invalid/missing GPS coordinates. Mobile app may not be able to locate this site.`);
       }
     }
     
