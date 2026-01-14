@@ -1225,19 +1225,3 @@
     }
   }
 </style>
-
-    .section-header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: flex-start;
-    }
-  }
-</style>
-
-    .section-header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: flex-start;
-    }
-  }
-</style>

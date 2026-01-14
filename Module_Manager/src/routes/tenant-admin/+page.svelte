@@ -890,4 +890,3 @@ const dataRetentionFieldId = 'tenant-data-retention';
     }
   }
 </style>
-

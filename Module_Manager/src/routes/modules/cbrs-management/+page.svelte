@@ -1840,20 +1840,3 @@ let configStatus: ConfigStatus = getConfigStatus(null);
     }
   }
 </style>
-
-
-    
-    .form-row {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
-
-
-    
-    .form-row {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
-

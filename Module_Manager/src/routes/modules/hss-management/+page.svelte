@@ -426,20 +426,3 @@
     }
   }
 </style>
-
-
-    .tabs button {
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-    }
-  }
-</style>
-
-
-    .tabs button {
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-    }
-  }
-</style>
-

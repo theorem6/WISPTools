@@ -884,19 +884,3 @@
     stroke-width: 2.5;
   }
 </style>
-  .help-button svg {
-    width: 24px;
-    height: 24px;
-    stroke: white;
-    fill: none;
-    stroke-width: 2.5;
-  }
-</style>
-  .help-button svg {
-    width: 24px;
-    height: 24px;
-    stroke: white;
-    fill: none;
-    stroke-width: 2.5;
-  }
-</style>

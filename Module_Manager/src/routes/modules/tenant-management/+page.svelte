@@ -1276,4 +1276,3 @@ function handleDeleteBackdropKeydown(event: KeyboardEvent) {
     }
   }
 </style>
-
