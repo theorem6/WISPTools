@@ -5,7 +5,22 @@ export const inventoryDocs = `
   <strong>Purpose:</strong> Centralized asset tracking with location management, maintenance history, and warranty tracking for all network equipment and hardware.
 </div>
 
-<h4>🎯 Key Features</h4>
+<div class="toc">
+  <h4>📑 Table of Contents</h4>
+  <ul>
+    <li><a href="#key-features">🎯 Key Features</a></li>
+    <li><a href="#getting-started">🚀 Getting Started</a></li>
+    <li><a href="#inventory-management">📊 Inventory Management</a></li>
+    <li><a href="#maintenance-tracking">🔧 Maintenance Tracking</a></li>
+    <li><a href="#bundles-kits">📦 Bundles and Kits</a></li>
+    <li><a href="#reports">📊 Reports</a></li>
+    <li><a href="#mobile-integration">🔍 Mobile App Integration</a></li>
+    <li><a href="#best-practices">💡 Best Practices</a></li>
+    <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+  </ul>
+</div>
+
+<h4 id="key-features">🎯 Key Features</h4>
 <ul>
   <li><strong>Equipment Tracking:</strong> Track all network equipment, CPE devices, and hardware</li>
   <li><strong>Location Management:</strong> Assign equipment to sites, vehicles, warehouses, or field technicians</li>
@@ -15,7 +30,7 @@ export const inventoryDocs = `
   <li><strong>Inventory Reports:</strong> Generate reports for audits, depreciation, and planning</li>
 </ul>
 
-<h4>🚀 Getting Started</h4>
+<h4 id="getting-started">🚀 Getting Started</h4>
 
 <h4>Step 1: Add Equipment to Inventory</h4>
 <ol>
@@ -75,7 +90,7 @@ export const inventoryDocs = `
   <li>Location updates automatically</li>
 </ol>
 
-<h4>📊 Inventory Management</h4>
+<h4 id="inventory-management">📊 Inventory Management</h4>
 
 <h4>Viewing Inventory</h4>
 <p>The inventory list shows:</p>
@@ -105,7 +120,7 @@ export const inventoryDocs = `
   <li><strong>Delete:</strong> Remove from inventory (requires confirmation)</li>
 </ul>
 
-<h4>🔧 Maintenance Tracking</h4>
+<h4 id="maintenance-tracking">🔧 Maintenance Tracking</h4>
 
 <h4>Adding Maintenance Records</h4>
 <ol>
@@ -132,7 +147,7 @@ export const inventoryDocs = `
   <li>Track total maintenance costs</li>
 </ul>
 
-<h4>📦 Bundles and Kits</h4>
+<h4 id="bundles-kits">📦 Bundles and Kits</h4>
 
 <h4>Creating Equipment Bundles</h4>
 <p>Group related equipment for easier deployment:</p>
@@ -152,7 +167,7 @@ export const inventoryDocs = `
   <li>Individual items still tracked separately</li>
 </ul>
 
-<h4>📊 Reports</h4>
+<h4 id="reports">📊 Reports</h4>
 
 <h4>Available Reports</h4>
 <ul>
@@ -171,7 +186,7 @@ export const inventoryDocs = `
   <li>Email reports to stakeholders</li>
 </ul>
 
-<h4>🔍 Mobile App Integration</h4>
+<h4 id="mobile-integration">🔍 Mobile App Integration</h4>
 
 <h4>QR Code Scanner</h4>
 <p>Field technicians can use mobile app to:</p>
@@ -195,7 +210,7 @@ export const inventoryDocs = `
   <li>Add installation notes and photos</li>
 </ol>
 
-<h4>💡 Best Practices</h4>
+<h4 id="best-practices">💡 Best Practices</h4>
 <ul>
   <li><strong>Label Everything:</strong> Print and attach QR codes to all equipment</li>
   <li><strong>Regular Audits:</strong> Periodically verify equipment locations</li>
@@ -205,7 +220,7 @@ export const inventoryDocs = `
   <li><strong>Use Bundles:</strong> Group common equipment for faster deployment</li>
 </ul>
 
-<h4>🔧 Troubleshooting</h4>
+<h4 id="troubleshooting">🔧 Troubleshooting</h4>
 
 <h4>Equipment not appearing in inventory:</h4>
 <ul>
@@ -215,6 +230,36 @@ export const inventoryDocs = `
 </ul>
 
 <h4>Can't check out equipment:</h4>
+<ul>
+  <li>Verify equipment status is "Available"</li>
+  <li>Check equipment isn't already checked out</li>
+  <li>Ensure you have checkout permissions</li>
+</ul>
+
+<h4>QR code not scanning:</h4>
+<ul>
+  <li>Verify QR code is printed clearly</li>
+  <li>Check mobile app has camera permissions</li>
+  <li>Ensure QR code hasn't been damaged</li>
+  <li>Try manual serial number lookup</li>
+</ul>
+`;
+
+<ul>
+  <li>Verify equipment status is "Available"</li>
+  <li>Check equipment isn't already checked out</li>
+  <li>Ensure you have checkout permissions</li>
+</ul>
+
+<h4>QR code not scanning:</h4>
+<ul>
+  <li>Verify QR code is printed clearly</li>
+  <li>Check mobile app has camera permissions</li>
+  <li>Ensure QR code hasn't been damaged</li>
+  <li>Try manual serial number lookup</li>
+</ul>
+`;
+
 <ul>
   <li>Verify equipment status is "Available"</li>
   <li>Check equipment isn't already checked out</li>

@@ -15,9 +15,14 @@ import { mapLayerManager } from '$lib/map/MapLayerManager';
 import { mapContext, setMapData, type MapLayerState } from '$lib/map/mapContext';
 import SharedMap from '$lib/map/SharedMap.svelte';
 import { getCapabilitiesForMode, type MapCapabilities, type MapModuleMode } from '$lib/map/MapCapabilities';
-import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
-import type { ModuleContext } from '$lib/services/objectStateManager';
-import '$lib/styles/moduleHeaderMenu.css';
+  import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
+  import type { ModuleContext } from '$lib/services/objectStateManager';
+  import '$lib/styles/moduleHeaderMenu.css';
+  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import { planDocs } from '$lib/docs/plan-docs';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { getModuleTips } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
 
 interface MapViewExtentPayload {
   center?: { lat: number; lon: number };
@@ -43,6 +48,12 @@ interface MapViewExtentPayload {
   let discoveryResults: PlanMarketingAddress[] = [];
   let isDiscoveringAddresses = false;
   let showFilterPanel = false;
+  let showHelpModal = false;
+  const helpContent = planDocs;
+  
+  // Tips Modal
+  let showTipsModal = false;
+  const tips = getModuleTips('plan');
   
   // Data
   let projects: PlanProject[] = [];
@@ -51,6 +62,7 @@ interface MapViewExtentPayload {
   let error: string = '';
   let successMessage: string = '';
   let loadedTenantId: string | null = null; // Track which tenant's data is loaded
+  let isLoadingData = false; // Guard flag to prevent duplicate loads
 let mapState: MapLayerState | undefined;
 let mapMode: MapModuleMode = 'plan';
 let contextActivePlan: PlanProject | null = null;
@@ -530,11 +542,22 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
   $: availableTypes = equipmentCategories[newRequirement.category as keyof typeof equipmentCategories] || [];
 
   // Watch for tenant changes and load data when tenant is available
-  $: if ($currentTenant && $currentTenant.id && browser && !isLoading && currentUser && loadedTenantId !== $currentTenant.id) {
+  // Add guard to prevent duplicate loads
+  $: if ($currentTenant && $currentTenant.id && browser && !isLoading && !isLoadingData && currentUser && loadedTenantId !== $currentTenant.id) {
+    isLoadingData = true;
+    loadedTenantId = $currentTenant.id;
     loadData();
   }
 
   onMount(() => {
+    // Show tips on first visit (if not dismissed)
+    if (tips.length > 0 && tipsService.shouldShowTips('plan')) {
+      // Use requestAnimationFrame for minimal delay (single frame ~16ms)
+      requestAnimationFrame(() => {
+        showTipsModal = true;
+      });
+    }
+    
     if (!browser) {
       return;
     }
@@ -606,10 +629,8 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
         };
         
         iframeInitialized = true;
-        console.log('[Plan] Iframe communication initialized');
-      } else {
-        console.warn('[Plan] Iframe not found - message listener is still active');
       }
+      // If iframe not found yet, message listener will handle it when iframe loads
     })().catch(err => {
       console.error('[Plan] Failed to initialize iframe communication:', err);
     });
@@ -1815,26 +1836,33 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     <!-- Enhanced Header Overlay -->
     <div class="module-header-overlay" style="background: var(--gradient-primary);">
       <div class="module-header-left">
-        <button class="module-back-btn" on:click={() => goto('/dashboard')} title="Back to Dashboard">
+        <button class="module-back-btn" onclick={() => goto('/dashboard')} title="Back to Dashboard">
           ←
         </button>
         <h1>📋 Plan</h1>
       </div>
       <div class="module-header-controls">
-        <button class="module-control-btn" on:click={openHardwareView} title="View All Hardware">
+        <button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help" title="Help">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+          <button class="module-control-btn" onclick={openHardwareView} title="View All Hardware">
           <span class="control-icon">🔧</span>
           <span class="control-label">Hardware</span>
         </button>
-        <button class="module-control-btn" on:click={openProjectList} title="Project List">
+        <button class="module-control-btn" onclick={openProjectList} title="Project List">
           <span class="control-icon">📁</span>
           <span class="control-label">Projects</span>
         </button>
         <button
           class="module-control-btn marketing-btn"
           class:drawing={isDrawingRectangle}
-          type="button"
-          on:click={() => openMarketingTools()}
-          title={isDrawingRectangle ? "Click and drag on map to draw a rectangle" : "Draw a rectangle on the map to discover addresses"}
+            type="button"
+            onclick={() => openMarketingTools()}
+            title={isDrawingRectangle ? "Click and drag on map to draw a rectangle" : "Draw a rectangle on the map to discover addresses"}
           disabled={!marketingAvailable || isDiscoveringAddresses}
         >
           <span class="control-icon">🔍</span>
@@ -1844,7 +1872,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           class="module-control-btn filter-btn" 
           class:active={showFilterPanel}
           type="button"
-          on:click={(e) => {
+          onclick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             showFilterPanel = !showFilterPanel;
@@ -1863,11 +1891,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {#if showFilterPanel}
     <div 
       class="filter-panel-container"
-      on:click|stopPropagation
+      onclick={(e) => e.stopPropagation()}
       role="dialog"
       aria-label="Layer Filters"
     >
-      <PlanLayerFilterPanel filters={layerFilters} on:change={handleLayerFiltersChange} />
+      <PlanLayerFilterPanel filters={layerFilters} onchange={handleLayerFiltersChange} />
     </div>
   {/if}
   
@@ -1875,7 +1903,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {#if showFilterPanel}
     <div 
       class="filter-panel-overlay"
-      on:click={() => showFilterPanel = false}
+      onclick={() => showFilterPanel = false}
       role="presentation"
     ></div>
   {/if}
@@ -1887,7 +1915,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     role="presentation"
     aria-hidden="true"
     tabindex="-1"
-    on:click={handleHardwareOverlayClick}
+    onclick={handleHardwareOverlayClick}
   >
     <div
       class="modal-content hardware-modal"
@@ -1895,11 +1923,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       aria-modal="true"
       aria-label="All hardware"
       tabindex="0"
-      on:keydown={handleHardwareOverlayKeydown}
+      onkeydown={handleHardwareOverlayKeydown}
     >
         <div class="modal-header">
           <h2>🔧 All Existing Hardware</h2>
-          <button class="close-btn" on:click={closeHardwareModal}>✕</button>
+          <button class="close-btn" onclick={closeHardwareModal}>✕</button>
         </div>
         
         <div class="modal-body">
@@ -1998,8 +2026,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeHardwareModal}>Close</button>
-          <button class="btn-primary" on:click={() => { goto('/modules/inventory'); closeHardwareModal(); }}>
+          <button class="btn-secondary" onclick={closeHardwareModal}>Close</button>
+          <button class="btn-primary" onclick={() => { goto('/modules/inventory'); closeHardwareModal(); }}>
             View Full Inventory
           </button>
         </div>
@@ -2014,7 +2042,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       role="presentation"
       aria-hidden="true"
       tabindex="-1"
-      on:click={handleProjectOverlayClick}
+      onclick={handleProjectOverlayClick}
     >
       <div
         class="modal-content project-modal"
@@ -2022,18 +2050,18 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         aria-modal="true"
         aria-label="Deployment projects"
         tabindex="0"
-        on:keydown={handleProjectOverlayKeydown}
+        onkeydown={handleProjectOverlayKeydown}
       >
         <div class="modal-header">
           <h2>📁 Deployment Projects</h2>
-          <button class="close-btn" on:click={closeProjectModal}>✕</button>
+          <button class="close-btn" onclick={closeProjectModal}>✕</button>
         </div>
         
         <div class="modal-body">
           <div class="project-list">
             {#each projects as project}
               <div class="project-item">
-                <button type="button" class="project-content" on:click={() => selectProject(project)}>
+                <button type="button" class="project-content" onclick={() => selectProject(project)}>
                   <div class="project-header">
                     <h3>{project.name}</h3>
                     <span class="status-badge {project.status}">{project.status}</span>
@@ -2049,46 +2077,46 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   <button
                     class="action-btn marketing-btn"
                     type="button"
-                    on:click={() => downloadProjectAddressesCSV(project)}
+                    onclick={() => downloadProjectAddressesCSV(project)}
                     title="Download all addresses from this project as CSV"
                   >
                     📥 Download CSV
                   </button>
                   {#if project.status === 'draft'}
-                    <button class="action-btn start-btn" on:click={() => startProject(project)} title="Start Project - Begin working on this project">
+                    <button class="action-btn start-btn" onclick={() => startProject(project)} title="Start Project - Begin working on this project">
                       ▶️ Start
                     </button>
                   {/if}
                   
                   {#if project.status === 'ready'}
-                    <button class="action-btn approve-btn" on:click={() => approveProject(project)} title="Approve Project - Mark as ready for deployment">
+                    <button class="action-btn approve-btn" onclick={() => approveProject(project)} title="Approve Project - Mark as ready for deployment">
                       ✅ Approve
                     </button>
-                    <button class="action-btn reject-btn" on:click={() => rejectProject(project)} title="Reject Project - Send back for revision">
+                    <button class="action-btn reject-btn" onclick={() => rejectProject(project)} title="Reject Project - Send back for revision">
                       ❌ Reject
                     </button>
                   {/if}
                   
                   {#if project.status !== 'authorized'}
-                    <button class="action-btn delete-btn" on:click={() => deleteProject(project)} title="Delete Project">
+                    <button class="action-btn delete-btn" onclick={() => deleteProject(project)} title="Delete Project">
                       🗑️ Delete
                     </button>
                   {/if}
                   
                   {#if project.status === 'active'}
-                    <button class="action-btn finish-btn" on:click={() => {
+                    <button class="action-btn finish-btn" onclick={() => {
                       activeProject = project;
                       finishProject();
                     }} title="Finish Project - Mark as ready for deployment">
                       ✅ Finish
                     </button>
-                    <button class="action-btn pause-btn" on:click={() => {
+                    <button class="action-btn pause-btn" onclick={() => {
                       activeProject = project;
                       pauseProject();
                     }} title="Pause Project - Save progress and pause work">
                       ⏸️ Pause
                     </button>
-                    <button class="action-btn cancel-btn" on:click={() => {
+                    <button class="action-btn cancel-btn" onclick={() => {
                       activeProject = project;
                       cancelProject();
                     }} title="Cancel Project - Cancel this project">
@@ -2099,7 +2127,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   
                   <button 
                     class="action-btn {project.showOnMap ? 'visibility-active' : 'visibility-inactive'} {project.status === 'authorized' ? 'disabled' : ''}" 
-                    on:click={() => togglePlanVisibility(project)} 
+                    onclick={() => togglePlanVisibility(project)} 
                     title={project.status === 'authorized' ? "Authorized projects are always visible in production" : project.showOnMap ? "Hide on map" : "Show on map"}
                     disabled={project.status === 'authorized'}
                   >
@@ -2109,7 +2137,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   {#if ['ready','approved','rejected','cancelled'].includes(project.status)}
                     <button 
                       class="action-btn reopen-btn" 
-                      on:click={() => reopenProject(project)} 
+                      onclick={() => reopenProject(project)} 
                       title="Reopen this project for additional planning work"
                     >
                       ♻️ Reopen
@@ -2119,7 +2147,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   {#if project.status === 'approved'}
                     <button 
                       class="action-btn authorize-btn" 
-                      on:click={() => authorizeProject(project)} 
+                      onclick={() => authorizeProject(project)} 
                       title="Authorize Project - Promote this project to production"
                     >
                       🚀 Authorize
@@ -2147,15 +2175,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 <div class="empty-icon">📁</div>
                 <h3>No Projects Yet</h3>
                 <p>Create your first deployment project to get started.</p>
-                <button class="btn-primary" on:click={openCreateProject}>Create Project</button>
+                <button class="btn-primary" onclick={openCreateProject}>Create Project</button>
               </div>
             {/if}
           </div>
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" type="button" on:click={closeProjectModal}>Close</button>
-          <button class="btn-primary" type="button" on:click={openCreateProject}>Create New Project</button>
+          <button class="btn-secondary" type="button" onclick={closeProjectModal}>Close</button>
+          <button class="btn-primary" type="button" onclick={openCreateProject}>Create New Project</button>
         </div>
       </div>
     </div>
@@ -2168,7 +2196,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       role="presentation"
       aria-hidden="true"
       tabindex="-1"
-      on:click={handleCreateProjectOverlayClick}
+      onclick={handleCreateProjectOverlayClick}
     >
       <div
         class="modal-content create-modal"
@@ -2176,11 +2204,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         aria-modal="true"
         aria-label="Create new project"
         tabindex="0"
-        on:keydown={handleCreateProjectOverlayKeydown}
+        onkeydown={handleCreateProjectOverlayKeydown}
       >
         <div class="modal-header">
           <h2>➕ Create New Project</h2>
-          <button class="close-btn" on:click={closeCreateProjectModal}>✕</button>
+          <button class="close-btn" onclick={closeCreateProjectModal}>✕</button>
         </div>
         
         <div class="modal-body">
@@ -2194,7 +2222,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
               <strong>Success:</strong> {successMessage}
             </div>
           {/if}
-          <form on:submit|preventDefault={createProject}>
+          <form onsubmit={(e) => { e.preventDefault(); createProject(); }}>
             <div class="form-group">
               <label for="projectName">Project Name *</label>
               <input
@@ -2240,7 +2268,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                     placeholder="e.g., 40.7128, -74.0060 or New York, NY or 10001"
                     bind:value={projectLocationLookup}
                     disabled={isLoading || isLookingUpProjectLocation}
-                    on:keydown={(e) => {
+                    onkeydown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         handleProjectLocationLookup();
@@ -2250,7 +2278,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                   />
                   <button
                     type="button"
-                    on:click={handleProjectLocationLookup}
+                    onclick={handleProjectLocationLookup}
                     disabled={!projectLocationLookup.trim() || isLoading || isLookingUpProjectLocation}
                     style="padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap;"
                   >
@@ -2300,8 +2328,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeCreateProjectModal} disabled={isLoading}>Cancel</button>
-          <button class="btn-primary" on:click={createProject} disabled={isLoading}>
+          <button class="btn-secondary" onclick={closeCreateProjectModal} disabled={isLoading}>Cancel</button>
+          <button class="btn-primary" onclick={createProject} disabled={isLoading}>
             {isLoading ? 'Creating...' : 'Create Project'}
           </button>
         </div>
@@ -2316,7 +2344,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       role="presentation"
       aria-hidden="true"
       tabindex="-1"
-      on:click={handleMissingHardwareOverlayClick}
+      onclick={handleMissingHardwareOverlayClick}
     >
       <div
         class="modal-content missing-hardware-modal"
@@ -2324,11 +2352,11 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         aria-modal="true"
         aria-label={`Missing hardware analysis for ${selectedProject.name}`}
         tabindex="0"
-        on:keydown={handleMissingHardwareOverlayKeydown}
+        onkeydown={handleMissingHardwareOverlayKeydown}
       >
         <div class="modal-header">
           <h2>🛒 Missing Hardware Analysis - {selectedProject.name}</h2>
-          <button class="close-btn" on:click={closeMissingHardwareModal}>✕</button>
+          <button class="close-btn" onclick={closeMissingHardwareModal}>✕</button>
         </div>
         
         <div class="modal-body">
@@ -2362,7 +2390,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
                 <div class="empty-icon">✅</div>
                 <h3>No Missing Hardware</h3>
                 <p>All required hardware is available in inventory.</p>
-                <button class="btn-primary" on:click={analyzeMissingHardware}>Re-analyze</button>
+                <button class="btn-primary" onclick={analyzeMissingHardware}>Re-analyze</button>
               </div>
             {:else}
               <div class="hardware-requirements">
@@ -2418,9 +2446,9 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeMissingHardwareModal}>Close</button>
-          <button class="btn-secondary" on:click={analyzeMissingHardware}>Re-analyze</button>
-          <button class="btn-primary" on:click={generatePurchaseOrder} disabled={selectedProject.purchasePlan.missingHardware.length === 0}>
+          <button class="btn-secondary" onclick={closeMissingHardwareModal}>Close</button>
+          <button class="btn-secondary" onclick={analyzeMissingHardware}>Re-analyze</button>
+          <button class="btn-primary" onclick={generatePurchaseOrder} disabled={selectedProject.purchasePlan.missingHardware.length === 0}>
             Generate Purchase Order
           </button>
         </div>
@@ -2455,7 +2483,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       role="presentation"
       aria-hidden="true"
       tabindex="-1"
-      on:click={handleAddRequirementOverlayClick}
+      onclick={handleAddRequirementOverlayClick}
     >
       <div
         class="modal-content add-requirement-modal"
@@ -2463,15 +2491,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         aria-modal="true"
         aria-label={`Add hardware requirement for ${selectedProject.name}`}
         tabindex="0"
-        on:keydown={handleAddRequirementOverlayKeydown}
+        onkeydown={handleAddRequirementOverlayKeydown}
       >
         <div class="modal-header">
           <h2>📋 Add Hardware Requirement - {selectedProject.name}</h2>
-          <button class="close-btn" on:click={closeAddRequirementModal}>✕</button>
+          <button class="close-btn" onclick={closeAddRequirementModal}>✕</button>
         </div>
         
         <div class="modal-body">
-          <form on:submit|preventDefault={addHardwareRequirement}>
+          <form onsubmit={(e) => { e.preventDefault(); addHardwareRequirement(); }}>
             <div class="form-group">
               <label for="category">Category *</label>
               <select id="category" bind:value={newRequirement.category} required>
@@ -2540,8 +2568,8 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeAddRequirementModal}>Cancel</button>
-          <button class="btn-primary" on:click={addHardwareRequirement} disabled={!newRequirement.equipmentType.trim()}>
+          <button class="btn-secondary" onclick={closeAddRequirementModal}>Cancel</button>
+          <button class="btn-primary" onclick={addHardwareRequirement} disabled={!newRequirement.equipmentType.trim()}>
             Add Requirement
           </button>
         </div>
@@ -2556,7 +2584,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
       role="presentation"
       aria-hidden="true"
       tabindex="-1"
-      on:click={handleReportOverlayClick}
+      onclick={handleReportOverlayClick}
     >
       <div
         class="modal-content"
@@ -2564,18 +2592,18 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         aria-modal="true"
         aria-label="Planning reports dialog"
         tabindex="0"
-        on:keydown={handleReportOverlayKeydown}
+        onkeydown={handleReportOverlayKeydown}
       >
         <div class="modal-header">
           <h2>📊 Planning Reports</h2>
-          <button class="close-btn" on:click={closeReportModal}>✕</button>
+          <button class="close-btn" onclick={closeReportModal}>✕</button>
         </div>
         
         <div class="modal-body">
           <div class="report-section">
             <h3>📡 Tower Sites</h3>
             <p>Complete inventory of all tower sites with coverage analysis and capacity planning data.</p>
-            <button class="btn-primary" on:click={() => goto('/modules/coverage-map')}>
+            <button class="btn-primary" onclick={() => goto('/modules/coverage-map')}>
               View Tower Sites
             </button>
           </div>
@@ -2583,7 +2611,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <div class="report-section">
             <h3>📶 Sector Analysis</h3>
             <p>Detailed sector coverage maps, interference analysis, and optimization recommendations.</p>
-            <button class="btn-primary" on:click={() => goto('/modules/coverage-map')}>
+            <button class="btn-primary" onclick={() => goto('/modules/coverage-map')}>
               View Sector Analysis
             </button>
           </div>
@@ -2591,7 +2619,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <div class="report-section">
             <h3>📱 CPE Planning</h3>
             <p>Customer premises equipment planning, signal strength analysis, and deployment recommendations.</p>
-            <button class="btn-primary" on:click={() => goto('/modules/coverage-map')}>
+            <button class="btn-primary" onclick={() => goto('/modules/coverage-map')}>
               View CPE Planning
             </button>
           </div>
@@ -2599,7 +2627,7 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <div class="report-section">
             <h3>🔧 Equipment Inventory</h3>
             <p>Complete equipment inventory with maintenance schedules and replacement planning.</p>
-            <button class="btn-primary" on:click={() => goto('/modules/inventory')}>
+            <button class="btn-primary" onclick={() => goto('/modules/inventory')}>
               View Equipment Inventory
             </button>
           </div>
@@ -2607,15 +2635,15 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
           <div class="report-section">
             <h3>📋 Work Orders</h3>
             <p>Planning work orders, maintenance schedules, and deployment tasks.</p>
-            <button class="btn-primary" on:click={() => goto('/modules/work-orders')}>
+            <button class="btn-primary" onclick={() => goto('/modules/work-orders')}>
               View Work Orders
             </button>
           </div>
         </div>
         
         <div class="modal-footer">
-          <button class="btn-secondary" on:click={closeReportModal}>Close</button>
-          <button class="btn-primary" on:click={() => { goto('/modules/coverage-map'); closeReportModal(); }}>
+          <button class="btn-secondary" onclick={closeReportModal}>Close</button>
+          <button class="btn-primary" onclick={() => { goto('/modules/coverage-map'); closeReportModal(); }}>
             Open Full Coverage Map
           </button>
         </div>
@@ -2624,6 +2652,14 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   {/if}
   
   <!-- Global Settings Button - Hidden in plan mode, shown in coverage-map iframe instead -->
+
+  <!-- Help Modal -->
+  <HelpModal 
+    show={showHelpModal}
+    title="Plan Module Help"
+    content={helpContent}
+    on:close={() => showHelpModal = false}
+  />
 </TenantGuard>
 
 <!-- TODO: integrate MapLayerManager feature CRUD controls for staging (site/equipment) -->
@@ -3703,4 +3739,231 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
     background: rgba(250, 204, 21, 0.32);
     border-color: rgba(250, 204, 21, 0.65);
   }
+
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
+  }
+  
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
 </style>
+
+<HelpModal
+  show={showHelpModal}
+  title="Plan Module Help"
+  content={helpContent}
+  on:close={() => showHelpModal = false}
+/>
+
+<TipsModal 
+  bind:show={showTipsModal} 
+  moduleId="plan" 
+  {tips}
+  on:close={() => showTipsModal = false}
+/>
+
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.55);
+  }
+
+  .module-control-btn.reopen-btn {
+    background: rgba(250, 204, 21, 0.18);
+    border-color: rgba(250, 204, 21, 0.35);
+  }
+
+  .module-control-btn.reopen-btn:hover {
+    background: rgba(250, 204, 21, 0.28);
+    border-color: rgba(250, 204, 21, 0.55);
+  }
+
+  .action-btn.resume-btn {
+    background: rgba(59, 130, 246, 0.2);
+    color: #dbeafe;
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .action-btn.resume-btn:hover {
+    background: rgba(59, 130, 246, 0.32);
+    border-color: rgba(59, 130, 246, 0.65);
+  }
+
+  .action-btn.reopen-btn {
+    background: rgba(250, 204, 21, 0.2);
+    color: #fef3c7;
+    border-color: rgba(250, 204, 21, 0.5);
+  }
+
+  .action-btn.reopen-btn:hover {
+    background: rgba(250, 204, 21, 0.32);
+    border-color: rgba(250, 204, 21, 0.65);
+  }
+
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
+  }
+  
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
+</style>
+
+<HelpModal
+  show={showHelpModal}
+  title="Plan Module Help"
+  content={helpContent}
+  on:close={() => showHelpModal = false}
+/>
+
+<TipsModal 
+  bind:show={showTipsModal} 
+  moduleId="plan" 
+  {tips}
+  on:close={() => showTipsModal = false}
+/>
+
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.55);
+  }
+
+  .module-control-btn.reopen-btn {
+    background: rgba(250, 204, 21, 0.18);
+    border-color: rgba(250, 204, 21, 0.35);
+  }
+
+  .module-control-btn.reopen-btn:hover {
+    background: rgba(250, 204, 21, 0.28);
+    border-color: rgba(250, 204, 21, 0.55);
+  }
+
+  .action-btn.resume-btn {
+    background: rgba(59, 130, 246, 0.2);
+    color: #dbeafe;
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .action-btn.resume-btn:hover {
+    background: rgba(59, 130, 246, 0.32);
+    border-color: rgba(59, 130, 246, 0.65);
+  }
+
+  .action-btn.reopen-btn {
+    background: rgba(250, 204, 21, 0.2);
+    color: #fef3c7;
+    border-color: rgba(250, 204, 21, 0.5);
+  }
+
+  .action-btn.reopen-btn:hover {
+    background: rgba(250, 204, 21, 0.32);
+    border-color: rgba(250, 204, 21, 0.65);
+  }
+
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
+  }
+  
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
+</style>
+
+<HelpModal
+  show={showHelpModal}
+  title="Plan Module Help"
+  content={helpContent}
+  on:close={() => showHelpModal = false}
+/>
+
+<TipsModal 
+  bind:show={showTipsModal} 
+  moduleId="plan" 
+  {tips}
+  on:close={() => showTipsModal = false}
+/>

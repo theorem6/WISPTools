@@ -295,11 +295,15 @@ router.get('/epc/list', async (req, res) => {
     const seenIds = new Set();
     
     // PRIMARY SOURCE: Get EPCs from RemoteEPC collection (devices linked via device code)
-    const remoteEPCs = await RemoteEPC.find({ tenant_id: req.tenantId }).lean();
-    console.log(`📡 [Monitoring] Found ${remoteEPCs.length} RemoteEPCs`);
+    // TENANT-SPECIFIC ONLY: Only return EPCs that belong to this tenant
+    const tenantEPCs = await RemoteEPC.find({
+      tenant_id: req.tenantId
+    }).lean();
+    
+    console.log(`📡 [Monitoring] Found ${tenantEPCs.length} RemoteEPCs for tenant ${req.tenantId}`);
     
     // Get all sites to populate EPC locations from site_id
-    const siteIds = remoteEPCs.map(epc => epc.site_id).filter(Boolean);
+    const siteIds = tenantEPCs.map(epc => epc.site_id).filter(Boolean);
     const mongoose = require('mongoose');
     
     // Convert site_ids to ObjectIds if they're strings
@@ -323,7 +327,7 @@ router.get('/epc/list', async (req, res) => {
     });
     
     // Get latest service status for all EPCs to populate metrics - use efficient aggregation
-    const epcIds = remoteEPCs.map(epc => epc.epc_id);
+    const epcIds = tenantEPCs.map(epc => epc.epc_id);
     const latestStatuses = await EPCServiceStatus.aggregate([
       { $match: { epc_id: { $in: epcIds }, tenant_id: req.tenantId } },
       { $sort: { timestamp: -1 } },
@@ -340,7 +344,7 @@ router.get('/epc/list', async (req, res) => {
       statusMap.set(item._id, item.latest);
     });
     
-    remoteEPCs.forEach(epc => {
+    tenantEPCs.forEach(epc => {
       const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
       const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
       
@@ -425,11 +429,11 @@ router.get('/epc/list', async (req, res) => {
       seenIds.add(epc.epc_id);
     });
     
-    // SECONDARY: Get EPC hardware deployments (legacy)
+    // SECONDARY: Get EPC hardware deployments (legacy - include all statuses, not just 'deployed')
     const epcDeployments = await HardwareDeployment.find({
       tenantId: req.tenantId,
-      hardware_type: 'epc',
-      status: 'deployed'
+      hardware_type: 'epc'
+      // Don't filter by status - include all EPC hardware deployments
     }).populate('siteId', 'name location').lean();
     
     for (const deployment of epcDeployments) {
@@ -1101,6 +1105,14 @@ router.get('/monitoring/topology', async (req, res) => {
   } catch (error) {
     console.error('Error fetching network topology:', error);
     res.status(500).json({ error: 'Failed to fetch network topology', message: error.message });
+  }
+});
+
+module.exports = router;
+  }
+});
+
+module.exports = router;
   }
 });
 

@@ -1,9 +1,49 @@
 <resources>
 
-    <!-- Base application theme. -->
+    <!-- Base application theme (Modern Dark Theme for WISPTools) -->
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
-        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Main colors -->
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryDark">@color/bg_main</item>
+        <item name="colorAccent">@color/brand_primary</item>
+        
+        <!-- Backgrounds -->
+        <item name="android:windowBackground">@color/bg_main</item>
+        
+        <!-- Text appearances -->
+        <item name="android:textColorPrimary">@color/text_main</item>
+        <item name="android:textColorSecondary">@color/text_muted</item>
+        
+        <!-- Component styles -->
+        <item name="buttonStyle">@style/WISPButton</item>
+        <item name="editTextStyle">@style/WISPEditText</item>
+    </style>
+
+    <!-- Card style for the login box -->
+    <style name="WISPCard" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/bg_card</item>
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">8dp</item>
+        <item name="android:layout_margin">16dp</item>
+    </style>
+
+    <!-- Input field style -->
+    <style name="WISPEditText" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/input_background</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:textColor">@color/text_input</item>
+        <item name="android:textColorHint">@color/text_muted</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <!-- Primary button style -->
+    <style name="WISPButton" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/button_background</item>
+        <item name="android:textColor">@color/text_button</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:padding">12dp</item>
     </style>
 
 </resources>

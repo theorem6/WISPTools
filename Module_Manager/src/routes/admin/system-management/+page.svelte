@@ -7,6 +7,8 @@
   import { tenantService } from '$lib/services/tenantService';
   import { authService } from '$lib/services/authService';
   import type { Tenant } from '$lib/models/tenant';
+  import { buildApiUrl } from '$lib/config/backendConfig';
+  import AdminBreadcrumb from '$lib/components/admin/AdminBreadcrumb.svelte';
 
   let isLoading = true;
   let isAdmin = false;
@@ -16,6 +18,11 @@
   let selectedTenant: Tenant | null = null;
   let showDeleteConfirm = false;
   let tenantToDelete: Tenant | null = null;
+  
+  // Remote agents status (global/system-wide)
+  let remoteAgents: any[] = [];
+  let loadingAgents = false;
+  let agentsError = '';
 
   onMount(async () => {
     if (!browser) return;
@@ -30,6 +37,7 @@
     }
 
     await loadTenants();
+    await loadAllRemoteAgents();
     isLoading = false;
   });
 
@@ -165,6 +173,76 @@
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   }
+
+  async function loadAllRemoteAgents() {
+    try {
+      loadingAgents = true;
+      agentsError = '';
+      remoteAgents = [];
+
+      const headers = await getAuthHeaders();
+      const allAgents: any[] = [];
+
+      // Load agents from all tenants
+      for (const tenant of tenants) {
+        try {
+          const tenantHeaders = { ...headers };
+          tenantHeaders['X-Tenant-ID'] = tenant.id;
+
+          const apiUrl = buildApiUrl('remote-agents/status');
+          const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: tenantHeaders
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.agents && Array.isArray(data.agents)) {
+              // Add tenant info to each agent
+              const agentsWithTenant = data.agents.map((agent: any) => ({
+                ...agent,
+                tenant_id: tenant.id,
+                tenant_name: tenant.displayName || tenant.name
+              }));
+              allAgents.push(...agentsWithTenant);
+            }
+          }
+        } catch (err: any) {
+          console.warn(`Failed to load agents for tenant ${tenant.id}:`, err);
+          // Continue with other tenants
+        }
+      }
+
+      // Sort by last check-in (most recent first)
+      remoteAgents = allAgents.sort((a, b) => {
+        const aTime = a.last_checkin || a.discovered_at || 0;
+        const bTime = b.last_checkin || b.discovered_at || 0;
+        return new Date(bTime).getTime() - new Date(aTime).getTime();
+      });
+    } catch (err: any) {
+      console.error('Error loading remote agents:', err);
+      agentsError = err.message || 'Failed to load remote agents';
+      remoteAgents = [];
+    } finally {
+      loadingAgents = false;
+    }
+  }
+
+  function formatTimeAgo(seconds: number | null): string {
+    if (seconds === null || seconds === undefined) return 'N/A';
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  function getFirstCheckin(agent: any): string {
+    if (agent.type === 'epc_agent') {
+      return agent.created_at ? formatDate(agent.created_at) : 'N/A';
+    } else {
+      return agent.discovered_at ? formatDate(agent.discovered_at) : 'N/A';
+    }
+  }
 </script>
 
 <div class="system-admin-page">
@@ -230,13 +308,13 @@
                     </td>
                     <td>{formatDate(tenant.createdAt)}</td>
                     <td class="actions">
-                      <button 
-                        class="btn btn-sm btn-secondary" 
-                        on:click={() => selectTenant(tenant)}
-                        title="View Details"
-                      >
-                        View
-                      </button>
+            <button 
+              class="btn btn-sm btn-secondary" 
+              on:click={() => selectTenant(tenant)}
+              title="View Details"
+            >
+              View
+            </button>
                       <button 
                         class="btn btn-sm btn-warning" 
                         on:click={() => suspendTenant(tenant)}
@@ -331,6 +409,97 @@
         </div>
       {/if}
     </div>
+
+    <!-- Remote Agents Status Section (Global/System-wide) -->
+    <div class="remote-agents-section">
+      <div class="section-header">
+        <h2>📡 Remote Agents Status (System-wide)</h2>
+        <button class="btn btn-secondary" on:click={loadAllRemoteAgents} disabled={loadingAgents}>
+          {loadingAgents ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+        {#if loadingAgents}
+          <div class="loading">
+            <p>Loading remote agents...</p>
+          </div>
+        {:else if agentsError}
+          <div class="error-message">
+            <span class="error-icon">⚠️</span>
+            {agentsError}
+          </div>
+        {:else if remoteAgents.length === 0}
+          <div class="empty-state">
+            <p>No remote agents found across all tenants.</p>
+          </div>
+        {:else}
+          <div class="agents-table-container">
+            <table class="agents-table">
+              <thead>
+                <tr>
+                  <th>Tenant</th>
+                  <th>Type</th>
+                  <th>ID</th>
+                  <th>Name/Code</th>
+                  <th>First Check-in</th>
+                  <th>Last Check-in</th>
+                  <th>Status</th>
+                  <th>Hardware Linked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each remoteAgents as agent (agent.epc_id || agent.device_id)}
+                  <tr>
+                    <td>
+                      <strong>{agent.tenant_name || agent.tenant_id || 'Unknown'}</strong>
+                    </td>
+                    <td>
+                      <span class="agent-type-badge type-{agent.type}">
+                        {agent.type === 'epc_agent' ? 'EPC' : 'SNMP'}
+                      </span>
+                    </td>
+                    <td>
+                      <code>{agent.epc_id || agent.device_id || 'N/A'}</code>
+                    </td>
+                    <td>
+                      {agent.type === 'epc_agent' 
+                        ? (agent.device_code || agent.site_name || 'N/A')
+                        : (agent.name || agent.ip_address || 'N/A')}
+                    </td>
+                    <td>{getFirstCheckin(agent)}</td>
+                    <td>
+                      {agent.type === 'epc_agent' 
+                        ? (agent.last_checkin ? formatDate(agent.last_checkin) : 'Never')
+                        : (agent.discovered_at ? formatDate(agent.discovered_at) : 'N/A')}
+                      {#if agent.time_since_checkin !== null && agent.time_since_checkin !== undefined}
+                        <br>
+                        <small class="time-ago">{formatTimeAgo(agent.time_since_checkin)}</small>
+                      {/if}
+                    </td>
+                    <td>
+                      <span class="status-badge status-{agent.checkin_status || agent.status}">
+                        {agent.type === 'epc_agent' 
+                          ? (agent.checkin_status || agent.status || 'unknown')
+                          : (agent.status || 'discovered')}
+                      </span>
+                    </td>
+                    <td>
+                      {#if agent.hardware_linked}
+                        <span class="linked-badge linked">✓ Linked</span>
+                        {#if agent.hardware_link_type}
+                          <br><small>({agent.hardware_link_type})</small>
+                        {/if}
+                      {:else}
+                        <span class="linked-badge unlinked">✗ Unlinked</span>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </div>
 
     {#if showDeleteConfirm && tenantToDelete}
       <div class="modal-overlay" on:click={cancelDelete}>
@@ -606,6 +775,713 @@
     text-align: center;
     padding: 3rem;
     color: var(--text-secondary);
+  }
+
+  .remote-agents-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    margin-top: 2rem;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .btn-primary {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  .agents-table-container {
+    overflow-x: auto;
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents-table th {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+  }
+
+  .agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .agents-table tbody tr:hover {
+    background: var(--hover-bg);
+  }
+
+  .agent-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .type-epc_agent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .type-snmp_device {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  code {
+    background: var(--code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+
+  .time-ago {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .linked-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .linked-badge.linked {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .linked-badge.unlinked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .status-stale {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .status-never {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+</style>
+
+
+  }
+
+  .status-active {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .status-suspended {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-deleted {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .btn-secondary {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+
+  .btn-secondary:hover {
+    background: var(--text-secondary);
+    opacity: 0.9;
+  }
+
+  .btn-warning {
+    background: var(--warning-color);
+    color: var(--text-inverse);
+  }
+
+  .btn-warning:hover {
+    background: var(--warning-hover);
+  }
+
+  .btn-danger {
+    background: var(--danger-color);
+    color: var(--text-inverse);
+  }
+
+  .btn-danger:hover {
+    background: var(--danger-hover);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .tenant-details {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .details-card {
+    margin-bottom: 1.5rem;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .details-actions {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--overlay-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+  }
+
+  .modal h2 {
+    margin-bottom: 1rem;
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .warning-text {
+    color: var(--danger-dark, #991b1b);
+    font-weight: 500;
+    margin: 1rem 0;
+  }
+
+  .modal ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+  }
+
+  .error-message, .success-message {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .error-message {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .success-message {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .loading {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+  }
+
+  .remote-agents-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    margin-top: 2rem;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .btn-primary {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  .agents-table-container {
+    overflow-x: auto;
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents-table th {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+  }
+
+  .agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .agents-table tbody tr:hover {
+    background: var(--hover-bg);
+  }
+
+  .agent-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .type-epc_agent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .type-snmp_device {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  code {
+    background: var(--code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+
+  .time-ago {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .linked-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .linked-badge.linked {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .linked-badge.unlinked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .status-stale {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .status-never {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+</style>
+
+
+  }
+
+  .status-active {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .status-suspended {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-deleted {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .btn-secondary {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+
+  .btn-secondary:hover {
+    background: var(--text-secondary);
+    opacity: 0.9;
+  }
+
+  .btn-warning {
+    background: var(--warning-color);
+    color: var(--text-inverse);
+  }
+
+  .btn-warning:hover {
+    background: var(--warning-hover);
+  }
+
+  .btn-danger {
+    background: var(--danger-color);
+    color: var(--text-inverse);
+  }
+
+  .btn-danger:hover {
+    background: var(--danger-hover);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .tenant-details {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .details-card {
+    margin-bottom: 1.5rem;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .details-actions {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--overlay-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+  }
+
+  .modal h2 {
+    margin-bottom: 1rem;
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .warning-text {
+    color: var(--danger-dark, #991b1b);
+    font-weight: 500;
+    margin: 1rem 0;
+  }
+
+  .modal ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+  }
+
+  .error-message, .success-message {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  .error-message {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .success-message {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .loading {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+  }
+
+  .remote-agents-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    margin-top: 2rem;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .btn-primary {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+
+  .agents-table-container {
+    overflow-x: auto;
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents-table th {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+  }
+
+  .agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .agents-table tbody tr:hover {
+    background: var(--hover-bg);
+  }
+
+  .agent-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .type-epc_agent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .type-snmp_device {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  code {
+    background: var(--code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+
+  .time-ago {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .linked-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .linked-badge.linked {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .linked-badge.unlinked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .status-stale {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .status-never {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
   }
 </style>
 

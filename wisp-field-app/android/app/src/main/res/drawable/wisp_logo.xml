@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="800"
+    android:viewportHeight="800">
+
+    <!-- Glow Effect -->
+    <path
+        android:fillColor="#4facfe"
+        android:fillAlpha="0.3"
+        android:pathData="M400,400m-320,0a320,320 0,1 1,640 0a320,320 0,1 1,-640 0" />
+
+    <!-- Hexagon Border -->
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="8"
+        android:fillColor="#1a2332"
+        android:pathData="M400,150 L580,250 L580,450 L400,550 L220,450 L220,250 Z" />
+
+    <!-- W Letter (Simplified representation) -->
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M280,280 L295,280 L295,435 L280,435 Z" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M480,280 L495,280 L495,435 L480,435 Z" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M295,400 L360,400 L360,415 L295,415 Z" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M415,400 L480,400 L480,415 L415,415 Z" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M360,340 L375,340 L375,435 L360,435 Z" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M400,340 L415,340 L415,435 L400,435 Z" />
+
+    <!-- Circuit Lines (Left) -->
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M220,300 L180,300 M220,350 L150,350 M220,400 L120,400" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M180,300m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0 M150,350m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0 M120,400m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+
+    <!-- Circuit Lines (Right) -->
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M580,300 L620,300 M580,350 L650,350 M580,400 L680,400" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M620,300m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0 M650,350m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0 M680,400m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+
+</vector>

@@ -3,7 +3,7 @@
  * Scan items to load into vehicle for field work
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,9 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
+import { colors } from '../theme/colors';
 
 interface CheckoutItem {
   _id: string;
@@ -29,11 +30,27 @@ export default function CheckoutScreen() {
   const [cart, setCart] = useState<CheckoutItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const navigation = useNavigation();
+  const route = useRoute();
+  
+  // Handle scanned item from QRScanner
+  useEffect(() => {
+    const scannedItem = (route.params as any)?.scannedItem;
+    if (scannedItem) {
+      handleItemScanned(scannedItem);
+      // Clear the param to avoid re-processing (safe check)
+      try {
+        if (navigation.setParams) {
+          navigation.setParams({ scannedItem: undefined });
+        }
+      } catch (e) {
+        // Ignore if setParams not available
+      }
+    }
+  }, [(route.params as any)?.scannedItem]);
 
   const handleScanItem = () => {
     navigation.navigate('QRScanner' as never, {
-      mode: 'checkout',
-      onScan: handleItemScanned
+      mode: 'checkout'
     } as never);
   };
 
@@ -178,7 +195,7 @@ export default function CheckoutScreen() {
             disabled={isProcessing}
           >
             {isProcessing ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textPrimary} />
             ) : (
               <>
                 <Text style={styles.checkoutText}>
@@ -199,30 +216,30 @@ export default function CheckoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827'
+    backgroundColor: colors.backgroundPrimary
   },
   header: {
     padding: 20,
-    backgroundColor: '#1f2937',
+    backgroundColor: colors.backgroundSecondary,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151'
+    borderBottomColor: colors.border
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 4
   },
   subtitle: {
     fontSize: 14,
-    color: '#9ca3af'
+    color: colors.textSecondary
   },
   scanSection: {
     padding: 20,
     alignItems: 'center'
   },
   scanButton: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     paddingVertical: 20,
     paddingHorizontal: 40,
     borderRadius: 12,
@@ -235,7 +252,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   scanText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold'
   },
@@ -246,21 +263,21 @@ const styles = StyleSheet.create({
   cartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 15
   },
   cartList: {
     gap: 10
   },
   cartItem: {
-    backgroundColor: '#1f2937',
+    backgroundColor: colors.backgroundSecondary,
     padding: 15,
     borderRadius: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#374151'
+    borderColor: colors.border
   },
   itemInfo: {
     flex: 1
@@ -268,20 +285,20 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 4
   },
   itemSerial: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: colors.textSecondary,
     marginBottom: 2
   },
   itemTag: {
     fontSize: 12,
-    color: '#6b7280'
+    color: colors.textTertiary
   },
   removeButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -289,7 +306,7 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   removeText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 20,
     fontWeight: 'bold'
   },
@@ -305,34 +322,34 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 8
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.textSecondary,
     textAlign: 'center'
   },
   footer: {
     padding: 15,
-    backgroundColor: '#1f2937',
+    backgroundColor: colors.backgroundSecondary,
     borderTopWidth: 1,
-    borderTopColor: '#374151'
+    borderTopColor: colors.border
   },
   checkoutButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
     padding: 18,
     borderRadius: 8,
     alignItems: 'center'
   },
   checkoutText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4
   },
   checkoutSubtext: {
-    color: '#d1fae5',
+    color: colors.successLight,
     fontSize: 14
   }
 });

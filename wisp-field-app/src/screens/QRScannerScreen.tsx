@@ -17,7 +17,7 @@ import {
   Platform
 } from 'react-native';
 import { Camera, CameraType } from 'react-native-camera-kit';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
 
 export default function QRScannerScreen() {
@@ -27,6 +27,10 @@ export default function QRScannerScreen() {
   const [hasScanned, setHasScanned] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const navigation = useNavigation();
+  const route = useRoute();
+  
+  const scanMode = (route.params as any)?.mode || 'default';
+  const onScanCallback = (route.params as any)?.onScan;
 
   useEffect(() => {
     checkCameraPermission();
@@ -213,7 +217,12 @@ export default function QRScannerScreen() {
           >
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Scan Equipment</Text>
+          <Text style={styles.title}>
+            {scanMode === 'checkin' ? 'Scan to Checkin' :
+             scanMode === 'checkout' ? 'Scan to Checkout' :
+             scanMode === 'aiming' ? 'Scan CPE Device' :
+             'Scan Equipment'}
+          </Text>
           <TouchableOpacity
             style={styles.manualButton}
             onPress={() => setShowManualEntry(true)}

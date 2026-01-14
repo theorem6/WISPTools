@@ -45,6 +45,8 @@ const { requireAuth, requireAdmin: requireAdminMiddleware, auditLog } = require(
 // Use reusable middleware
 const authenticateUser = requireAuth;
 const requireAdmin = requireAdminMiddleware();
+// Platform admin only - restrict to platform_admin role
+const requirePlatformAdmin = requireAdminMiddleware({ allowedRoles: ['platform_admin'] });
 
 /**
  * Get all subscription plans
@@ -544,5 +546,9 @@ async function handlePaymentDenied(event) {
     console.error('Error handling payment denial:', error);
   }
 }
+
+module.exports = router;
+
+module.exports = router;
 
 module.exports = router;

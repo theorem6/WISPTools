@@ -5,7 +5,24 @@ export const hssSubscribersDocs = `
   <strong>Purpose:</strong> Manage Home Subscriber Server (HSS) database for LTE/5G networks. Create, configure, and manage subscriber profiles, authentication credentials, and service access for mobile network subscribers.
 </div>
 
-<h4>🎯 Key Features</h4>
+<div class="toc">
+  <h4>📑 Table of Contents</h4>
+  <ul>
+    <li><a href="#key-features">🎯 Key Features</a></li>
+    <li><a href="#getting-started">🚀 Getting Started</a></li>
+    <li><a href="#subscriber-management">📱 Subscriber Management</a></li>
+    <li><a href="#authentication">🔐 Authentication</a></li>
+    <li><a href="#group-management">👥 Group Management</a></li>
+    <li><a href="#epc-deployment">🌐 EPC Deployment</a></li>
+    <li><a href="#mme-connection">🔌 MME Connection</a></li>
+    <li><a href="#monitoring">📊 Monitoring</a></li>
+    <li><a href="#best-practices">💡 Best Practices</a></li>
+    <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+    <li><a href="#technical-details">📚 Technical Details</a></li>
+  </ul>
+</div>
+
+<h4 id="key-features">🎯 Key Features</h4>
 <ul>
   <li><strong>Subscriber Management:</strong> Create, edit, and delete subscriber profiles</li>
   <li><strong>Authentication:</strong> Manage authentication vectors (AUTN, RAND, XRES, CK, IK)</li>
@@ -16,7 +33,7 @@ export const hssSubscribersDocs = `
   <li><strong>Monitoring:</strong> Track subscriber activity and authentication events</li>
 </ul>
 
-<h4>🚀 Getting Started</h4>
+<h4 id="getting-started">🚀 Getting Started</h4>
 
 <h4>Step 1: Add a Subscriber</h4>
 <ol>
@@ -52,7 +69,7 @@ export const hssSubscribersDocs = `
   <li>Save changes</li>
 </ol>
 
-<h4>📱 Subscriber Management</h4>
+<h4 id="subscriber-management">📱 Subscriber Management</h4>
 
 <h4>Subscriber Fields</h4>
 <ul>
@@ -83,7 +100,7 @@ export const hssSubscribersDocs = `
   <li>Click <strong>"Activate"</strong> to restore access</li>
 </ol>
 
-<h4>🔐 Authentication</h4>
+<h4 id="authentication">🔐 Authentication</h4>
 
 <h4>How Authentication Works</h4>
 <p>The HSS generates authentication vectors for MMEs:</p>
@@ -107,7 +124,7 @@ export const hssSubscribersDocs = `
   <li><strong>Access Control:</strong> Limit who can view/edit Ki values</li>
 </ul>
 
-<h4>👥 Group Management</h4>
+<h4 id="group-management">👥 Group Management</h4>
 
 <h4>Creating Groups</h4>
 <ol>
@@ -126,7 +143,7 @@ export const hssSubscribersDocs = `
   <li>Organize by service tier or location</li>
 </ul>
 
-<h4>🌐 EPC Deployment</h4>
+<h4 id="epc-deployment">🌐 EPC Deployment</h4>
 
 <h4>What is EPC?</h4>
 <p>Evolved Packet Core (EPC) is the core network for LTE:</p>
@@ -148,7 +165,7 @@ export const hssSubscribersDocs = `
   <li>Test authentication flow</li>
 </ol>
 
-<h4>🔌 MME Connection</h4>
+<h4 id="mme-connection">🔌 MME Connection</h4>
 
 <h4>Connecting MMEs</h4>
 <p>MMEs connect to HSS via S6a interface:</p>
@@ -169,7 +186,7 @@ export const hssSubscribersDocs = `
   <li><strong>Heartbeat:</strong> Configure watchdog/heartbeat</li>
 </ul>
 
-<h4>📊 Monitoring</h4>
+<h4 id="monitoring">📊 Monitoring</h4>
 
 <h4>Subscriber Activity</h4>
 <p>Monitor subscriber activity:</p>
@@ -188,7 +205,7 @@ export const hssSubscribersDocs = `
   <li>Database performance</li>
 </ul>
 
-<h4>💡 Best Practices</h4>
+<h4 id="best-practices">💡 Best Practices</h4>
 <ul>
   <li><strong>Unique IMSIs:</strong> Ensure each subscriber has unique IMSI</li>
   <li><strong>Secure Ki:</strong> Protect authentication keys</li>
@@ -198,7 +215,7 @@ export const hssSubscribersDocs = `
   <li><strong>Documentation:</strong> Document APN configurations</li>
 </ul>
 
-<h4>🔧 Troubleshooting</h4>
+<h4 id="troubleshooting">🔧 Troubleshooting</h4>
 
 <h4>Subscriber cannot authenticate:</h4>
 <ul>
@@ -227,7 +244,7 @@ export const hssSubscribersDocs = `
   <li>Verify MME configuration</li>
 </ul>
 
-<h4>📚 Technical Details</h4>
+<h4 id="technical-details">📚 Technical Details</h4>
 
 <h4>IMSI Format</h4>
 <p>IMSI consists of:</p>
@@ -237,6 +254,40 @@ export const hssSubscribersDocs = `
   <li><strong>MSIN:</strong> Mobile Subscriber Identification Number (9-10 digits)</li>
 </ul>
 <p>Example: 310150123456789 (MCC: 310, MNC: 150, MSIN: 123456789)</p>
+
+<h4>Authentication Algorithms</h4>
+<ul>
+  <li><strong>MILENAGE:</strong> Standard 3GPP authentication algorithm</li>
+  <li><strong>TUAK:</strong> Alternative authentication algorithm</li>
+  <li><strong>Custom:</strong> Proprietary algorithms (not recommended)</li>
+</ul>
+
+<h4>APN Configuration</h4>
+<ul>
+  <li><strong>APN Name:</strong> Access Point Name identifier</li>
+  <li><strong>IP Type:</strong> IPv4, IPv6, or both</li>
+  <li><strong>QoS:</strong> Quality of Service profile</li>
+  <li><strong>Charging:</strong> Charging characteristics</li>
+</ul>
+`;
+
+
+<h4>Authentication Algorithms</h4>
+<ul>
+  <li><strong>MILENAGE:</strong> Standard 3GPP authentication algorithm</li>
+  <li><strong>TUAK:</strong> Alternative authentication algorithm</li>
+  <li><strong>Custom:</strong> Proprietary algorithms (not recommended)</li>
+</ul>
+
+<h4>APN Configuration</h4>
+<ul>
+  <li><strong>APN Name:</strong> Access Point Name identifier</li>
+  <li><strong>IP Type:</strong> IPv4, IPv6, or both</li>
+  <li><strong>QoS:</strong> Quality of Service profile</li>
+  <li><strong>Charging:</strong> Charging characteristics</li>
+</ul>
+`;
+
 
 <h4>Authentication Algorithms</h4>
 <ul>

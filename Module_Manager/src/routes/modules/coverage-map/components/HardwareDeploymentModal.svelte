@@ -371,9 +371,25 @@
           {:else if filteredInventoryItems.length === 0}
             <div class="empty-state">
               {#if searchQuery}
-                No inventory items found matching "{searchQuery}"
+                <p>No inventory items found matching "{searchQuery}"</p>
               {:else}
-                No available inventory items found
+                <div class="help-message">
+                  <h3>📦 No Hardware Available</h3>
+                  <p>You need to add hardware to your inventory before you can deploy it.</p>
+                  <p><strong>To add hardware:</strong></p>
+                  <ol>
+                    <li>Go to the <strong>Inventory</strong> module</li>
+                    <li>Click <strong>"Add Item"</strong> or scan hardware</li>
+                    <li>Add hardware details (manufacturer, model, serial number)</li>
+                    <li>Set status to <strong>"Available"</strong></li>
+                    <li>Return here to deploy it to this site</li>
+                  </ol>
+                  <button class="btn btn-primary" onclick={() => { 
+                    window.location.href = '/modules/inventory';
+                  }}>
+                    ➕ Go to Inventory Module
+                  </button>
+                </div>
               {/if}
             </div>
           {:else}
@@ -591,6 +607,39 @@
   .empty-state {
     padding: 2rem;
     text-align: center;
+  }
+  
+  .help-message {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2rem;
+    background: var(--card-bg, #ffffff);
+    border-radius: 8px;
+    border: 2px solid var(--primary-color, #3b82f6);
+  }
+  
+  .help-message h3 {
+    margin-top: 0;
+    color: var(--primary-color, #3b82f6);
+  }
+  
+  .help-message ol {
+    text-align: left;
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+  
+  .help-message ol li {
+    margin: 0.5rem 0;
+  }
+  
+  .help-message .btn {
+    margin-top: 1rem;
+  }
+  
+  .empty-state {
+    padding: 2rem;
+    text-align: center;
     color: var(--text-secondary);
   }
 
@@ -612,6 +661,104 @@
   .inventory-item:hover {
     background: var(--bg-hover);
   }
+
+  .inventory-item.selected {
+    background: var(--primary);
+    color: white;
+  }
+
+  .inventory-item:last-child {
+    border-bottom: none;
+  }
+
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .item-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-available {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  }
+
+  .inventory-item.selected .item-status.status-available {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
+
+  .item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .inventory-item.selected .item-details {
+    color: rgba(255, 255, 255, 0.9);
+  }
+</style>
+
+
+
+  .inventory-item.selected {
+    background: var(--primary);
+    color: white;
+  }
+
+  .inventory-item:last-child {
+    border-bottom: none;
+  }
+
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .item-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .status-available {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+  }
+
+  .inventory-item.selected .item-status.status-available {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
+
+  .item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .inventory-item.selected .item-details {
+    color: rgba(255, 255, 255, 0.9);
+  }
+</style>
+
+
 
   .inventory-item.selected {
     background: var(--primary);

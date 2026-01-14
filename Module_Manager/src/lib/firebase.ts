@@ -30,24 +30,7 @@ const firebaseConfig = {
   measurementId: env.PUBLIC_FIREBASE_MEASUREMENT_ID || import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ''
 };
 
-// Log configuration status (only in development)
-if (browser && typeof window !== 'undefined') {
-  console.log('🔥 Firebase Config:', {
-    apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing',
-    authDomain: firebaseConfig.authDomain ? '✅ Set' : '❌ Missing',
-    projectId: firebaseConfig.projectId ? '✅ Set' : '❌ Missing',
-    appId: firebaseConfig.appId ? '✅ Set' : '❌ Missing',
-    storageBucket: firebaseConfig.storageBucket ? '✅ Set' : '❌ Missing',
-    messagingSenderId: firebaseConfig.messagingSenderId ? '✅ Set' : '❌ Missing'
-  });
-  console.log('🔥 Firebase Config Values:', {
-    apiKey: firebaseConfig.apiKey?.substring(0, 20) + '...',
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
-    appId: firebaseConfig.appId,
-    storageBucket: firebaseConfig.storageBucket
-  });
-}
+// Configuration logging removed for security - API keys should not be exposed in browser console
 
 // Singleton instances
 let firebaseApp: FirebaseApp | null = null;
@@ -64,12 +47,6 @@ function getFirebaseApp(): FirebaseApp {
 
   if (!firebaseApp) {
     try {
-      console.log('🔥 Initializing Firebase app:', {
-        projectId: firebaseConfig.projectId,
-        authDomain: firebaseConfig.authDomain,
-        apiKey: firebaseConfig.apiKey?.substring(0, 20) + '...'
-      });
-      
       // FORCE check for existing apps and clear them if wrong project
       const existingApps = getApps();
       const existingApp = existingApps.find(app => 
@@ -78,12 +55,7 @@ function getFirebaseApp(): FirebaseApp {
       );
       
       if (existingApp) {
-        console.warn('⚠️ Found existing app with different config:', {
-          existingProjectId: existingApp.options.projectId,
-          existingApiKey: existingApp.options.apiKey?.substring(0, 20) + '...',
-          correctProjectId: firebaseConfig.projectId
-        });
-        console.warn('⚠️ Firebase apps cannot be deleted. Using new app instance with unique name.');
+        console.warn('⚠️ Found existing app with different config. Using new app instance with unique name.');
         
         // Clear singleton instances
         firebaseAuth = null;
@@ -94,13 +66,6 @@ function getFirebaseApp(): FirebaseApp {
       
       // Always initialize with correct config
       firebaseApp = initializeApp(firebaseConfig, 'wisptools-production');
-      
-      console.log('🔥 Firebase app initialized successfully:', {
-        name: firebaseApp.name,
-        projectId: firebaseApp.options.projectId,
-        apiKey: firebaseApp.options.apiKey?.substring(0, 20) + '...',
-        authDomain: firebaseApp.options.authDomain
-      });
     } catch (error) {
       console.error('❌ Firebase initialization error:', error);
       throw error;
@@ -121,9 +86,6 @@ export function getFirebaseAuth(): Auth {
 
     // Set auth persistence
     setPersistence(firebaseAuth, browserLocalPersistence)
-      .then(() => {
-        console.log('🔐 Firebase Auth: Persistence set to LOCAL');
-      })
       .catch((error) => {
         console.error('❌ Firebase Auth: Failed to set persistence:', error);
       });
@@ -154,7 +116,6 @@ export function getFirebaseStorage(): FirebaseStorage {
 
   if (!firebaseStorage) {
     firebaseStorage = getStorage(getFirebaseApp());
-    console.log('📦 Firebase Storage initialized');
   }
 
   return firebaseStorage;
@@ -168,7 +129,6 @@ export function getFirebaseFunctions(): Functions {
 
   if (!firebaseFunctions) {
     firebaseFunctions = getFunctions(getFirebaseApp());
-    console.log('⚡ Firebase Functions initialized');
   }
 
   return firebaseFunctions;

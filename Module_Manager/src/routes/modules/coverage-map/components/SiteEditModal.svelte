@@ -88,6 +88,7 @@
   
   // Initialize form when modal opens or site changes
   $: if (show && site) {
+    console.log('[SiteEditModal] Initializing form with site:', { siteId: site.id || site._id, siteName: site.name, siteType: site.type });
     // Editing existing site
     formData.name = site.name || '';
     // Handle both old single type and new array type format
@@ -98,6 +99,7 @@
     } else {
       formData.types = ['tower'];
     }
+    console.log('[SiteEditModal] Form types initialized:', formData.types);
     formData.status = site.status || 'active';
     formData.latitude = site.location?.latitude || 0;
     formData.longitude = site.location?.longitude || 0;
@@ -858,4 +860,8 @@
     background: var(--bg-tertiary);
   }
 </style>
+
+
+
+
 

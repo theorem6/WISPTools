@@ -5,7 +5,20 @@ export const pciResolutionDocs = `
   <strong>Purpose:</strong> Detect and resolve Physical Cell ID (PCI) conflicts in LTE networks, optimize neighbor relationships, and implement Self-Organizing Network (SON) features.
 </div>
 
-<h4>🎯 Key Features</h4>
+<div class="toc">
+  <h4>📑 Table of Contents</h4>
+  <ul>
+    <li><a href="#key-features">🎯 Key Features</a></li>
+    <li><a href="#getting-started">🚀 Getting Started</a></li>
+    <li><a href="#map-features">🗺️ Map Features</a></li>
+    <li><a href="#technical-details">📐 Technical Details</a></li>
+    <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+    <li><a href="#best-practices">💡 Best Practices</a></li>
+    <li><a href="#network-management">📞 Network Management</a></li>
+  </ul>
+</div>
+
+<h4 id="key-features">🎯 Key Features</h4>
 <ul>
   <li><strong>PCI Conflict Detection:</strong> Automatically identifies cells with conflicting PCIs</li>
   <li><strong>Neighbor Analysis:</strong> Analyzes cell adjacency and interference</li>
@@ -14,7 +27,7 @@ export const pciResolutionDocs = `
   <li><strong>Export Capabilities:</strong> Generate reports and Nokia configuration scripts</li>
 </ul>
 
-<h4>🚀 Getting Started</h4>
+<h4 id="getting-started">🚀 Getting Started</h4>
 
 <h4>Step 1: Import Cell Data</h4>
 <p>Click the <strong>"📊 Manage Towers"</strong> button to:</p>
@@ -73,7 +86,7 @@ export const pciResolutionDocs = `
   <li><strong>Nokia Configuration:</strong> Ready-to-use CLI commands for Nokia eNodeBs</li>
 </ul>
 
-<h4>🗺️ Map Features</h4>
+<h4 id="map-features">🗺️ Map Features</h4>
 <ul>
   <li><strong>Color Coding:</strong> Cells colored by PCI conflict status</li>
   <li><strong>Click Cells:</strong> View detailed cell information</li>
@@ -82,7 +95,7 @@ export const pciResolutionDocs = `
   <li><strong>Basemap Options:</strong> Streets, Satellite, Hybrid, Topographic</li>
 </ul>
 
-<h4>📐 Technical Details</h4>
+<h4 id="technical-details">📐 Technical Details</h4>
 
 <h4>PCI Conflict Rules:</h4>
 <ul>
@@ -98,7 +111,7 @@ export const pciResolutionDocs = `
   <li>Adjustable in analysis settings</li>
 </ul>
 
-<h4>🔧 Troubleshooting</h4>
+<h4 id="troubleshooting">🔧 Troubleshooting</h4>
 
 <h4>No conflicts detected but cells are close:</h4>
 <p>Increase the interference range in analysis settings</p>
@@ -109,7 +122,7 @@ export const pciResolutionDocs = `
 <h4>Map not loading:</h4>
 <p>Check ArcGIS API key in environment variables</p>
 
-<h4>💡 Best Practices</h4>
+<h4 id="best-practices">💡 Best Practices</h4>
 <ul>
   <li>Import all cell data before analysis</li>
   <li>Review AI recommendations before auto-optimization</li>
@@ -119,7 +132,33 @@ export const pciResolutionDocs = `
   <li>Use Nokia export for quick configuration deployment</li>
 </ul>
 
-<h4>📞 Network Management</h4>
+<h4 id="network-management">📞 Network Management</h4>
+<p>Use the <strong>"🌐 Networks"</strong> button to:</p>
+<ul>
+  <li>Create multiple isolated networks</li>
+  <li>Switch between different deployments</li>
+  <li>Keep production and staging separate</li>
+  <li>Manage different geographical areas</li>
+</ul>
+`;
+
+
+</ul>
+
+<h4 id="network-management">📞 Network Management</h4>
+<p>Use the <strong>"🌐 Networks"</strong> button to:</p>
+<ul>
+  <li>Create multiple isolated networks</li>
+  <li>Switch between different deployments</li>
+  <li>Keep production and staging separate</li>
+  <li>Manage different geographical areas</li>
+</ul>
+`;
+
+
+</ul>
+
+<h4 id="network-management">📞 Network Management</h4>
 <p>Use the <strong>"🌐 Networks"</strong> button to:</p>
 <ul>
   <li>Create multiple isolated networks</li>

@@ -2,10 +2,28 @@ export const coverageMapDocs = `
 <h3>🗺️ Coverage Map Module</h3>
 
 <div class="info">
-  <strong>Purpose:</strong> Comprehensive network asset mapping with towers, sectors, CPE devices, backhaul links, and equipment inventory management. Visualize your entire network infrastructure on an interactive map.
+  <strong>Purpose:</strong> The Coverage Map is a comprehensive network asset management and visualization system that consolidates all network equipment (towers, sectors, CPE devices, and inventory) into a single interactive ArcGIS-powered map interface. This module serves as the <strong>central hub</strong> for viewing and managing your entire network infrastructure across all modules (CBRS, ACS, PCI Resolution, etc.).
 </div>
 
-<h4>🎯 Key Features</h4>
+<div class="toc">
+  <h4>📑 Table of Contents</h4>
+  <ul>
+    <li><a href="#key-features">🎯 Key Features</a></li>
+    <li><a href="#getting-started">🚀 Getting Started</a></li>
+    <li><a href="#map-features">🗺️ Map Features</a></li>
+    <li><a href="#site-management">Site Management</a></li>
+    <li><a href="#sector-configuration">Sector Configuration</a></li>
+    <li><a href="#cpe-management">📡 CPE Management</a></li>
+    <li><a href="#backhaul-management">🔗 Backhaul Management</a></li>
+    <li><a href="#equipment-inventory">📦 Equipment Inventory</a></li>
+    <li><a href="#filtering-search">🔍 Filtering and Search</a></li>
+    <li><a href="#reports-export">📊 Reports and Export</a></li>
+    <li><a href="#best-practices">💡 Best Practices</a></li>
+    <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+  </ul>
+</div>
+
+<h4 id="key-features">🎯 Key Features</h4>
 <ul>
   <li><strong>Interactive Map:</strong> ArcGIS-powered map with satellite, street, and hybrid views</li>
   <li><strong>Tower Site Management:</strong> Add, edit, and manage tower sites with GPS coordinates</li>
@@ -16,7 +34,7 @@ export const coverageMapDocs = `
   <li><strong>Coverage Visualization:</strong> View coverage areas and signal strength</li>
 </ul>
 
-<h4>🚀 Getting Started</h4>
+<h4 id="getting-started">🚀 Getting Started</h4>
 
 <h4>Step 1: Add a Tower Site</h4>
 <ol>
@@ -65,7 +83,7 @@ export const coverageMapDocs = `
   <li>Save CPE device</li>
 </ol>
 
-<h4>🗺️ Map Features</h4>
+<h4 id="map-features">🗺️ Map Features</h4>
 
 <h4>Map Controls</h4>
 <ul>
@@ -87,7 +105,7 @@ export const coverageMapDocs = `
   <li><strong>Equipment:</strong> Deployed equipment markers</li>
 </ul>
 
-<h4>Site Management</h4>
+<h4 id="site-management">Site Management</h4>
 
 <h4>Viewing Site Details</h4>
 <p>Click on any site marker to see:</p>
@@ -109,7 +127,7 @@ export const coverageMapDocs = `
   <li>Save changes</li>
 </ol>
 
-<h4>Sector Configuration</h4>
+<h4 id="sector-configuration">Sector Configuration</h4>
 
 <h4>Adding Sectors</h4>
 <p>Each tower can have multiple sectors:</p>
@@ -130,7 +148,7 @@ export const coverageMapDocs = `
   <li><strong>Height:</strong> Antenna height above ground</li>
 </ul>
 
-<h4>📡 CPE Management</h4>
+<h4 id="cpe-management">📡 CPE Management</h4>
 
 <h4>Adding CPE Devices</h4>
 <p>CPE devices represent customer equipment:</p>
@@ -150,7 +168,7 @@ export const coverageMapDocs = `
   <li><strong>Pending:</strong> Device awaiting installation</li>
 </ul>
 
-<h4>🔗 Backhaul Management</h4>
+<h4 id="backhaul-management">🔗 Backhaul Management</h4>
 
 <h4>Adding Backhaul Links</h4>
 <ol>
@@ -176,7 +194,7 @@ export const coverageMapDocs = `
   <li>Monitor link utilization</li>
 </ul>
 
-<h4>📦 Equipment Inventory</h4>
+<h4 id="equipment-inventory">📦 Equipment Inventory</h4>
 
 <h4>Site Equipment</h4>
 <p>Track equipment deployed at each site:</p>
@@ -197,7 +215,7 @@ export const coverageMapDocs = `
   <li>Save equipment assignment</li>
 </ol>
 
-<h4>🔍 Filtering and Search</h4>
+<h4 id="filtering-search">🔍 Filtering and Search</h4>
 
 <h4>Filter Panel</h4>
 <p>Use filters to focus on specific elements:</p>
@@ -216,7 +234,7 @@ export const coverageMapDocs = `
   <li>Search by equipment serial number</li>
 </ul>
 
-<h4>📊 Reports and Export</h4>
+<h4 id="reports-export">📊 Reports and Export</h4>
 
 <h4>Available Reports</h4>
 <ul>
@@ -234,7 +252,7 @@ export const coverageMapDocs = `
   <li>Print map with annotations</li>
 </ul>
 
-<h4>💡 Best Practices</h4>
+<h4 id="best-practices">💡 Best Practices</h4>
 <ul>
   <li><strong>Accurate Coordinates:</strong> Use GPS for precise site locations</li>
   <li><strong>Regular Updates:</strong> Keep site information current</li>
@@ -244,7 +262,7 @@ export const coverageMapDocs = `
   <li><strong>Backhaul Monitoring:</strong> Track backhaul link status</li>
 </ul>
 
-<h4>🔧 Troubleshooting</h4>
+<h4 id="troubleshooting">🔧 Troubleshooting</h4>
 
 <h4>Map not loading:</h4>
 <ul>
@@ -252,6 +270,42 @@ export const coverageMapDocs = `
   <li>Verify internet connection</li>
   <li>Clear browser cache</li>
   <li>Check browser console for errors</li>
+</ul>
+
+<h4>Sites not appearing:</h4>
+<ul>
+  <li>Check filters aren't hiding sites</li>
+  <li>Verify site coordinates are valid</li>
+  <li>Zoom out to see all sites</li>
+  <li>Check site status filter</li>
+</ul>
+
+<h4>Can't add sectors:</h4>
+<ul>
+  <li>Verify site is selected</li>
+  <li>Check you have edit permissions</li>
+  <li>Ensure site exists and is saved</li>
+</ul>
+`;
+
+</ul>
+
+<h4>Sites not appearing:</h4>
+<ul>
+  <li>Check filters aren't hiding sites</li>
+  <li>Verify site coordinates are valid</li>
+  <li>Zoom out to see all sites</li>
+  <li>Check site status filter</li>
+</ul>
+
+<h4>Can't add sectors:</h4>
+<ul>
+  <li>Verify site is selected</li>
+  <li>Check you have edit permissions</li>
+  <li>Ensure site exists and is saved</li>
+</ul>
+`;
+
 </ul>
 
 <h4>Sites not appearing:</h4>

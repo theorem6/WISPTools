@@ -1,0 +1,102 @@
+package com.wispfieldapp;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
+
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.wispfieldapp.api.WispApi;
+import com.wispfieldapp.models.TenantResponse;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "WISP_FIELD_APP";
+    private static final String PREFS_NAME = "WISPPrefs";
+    private static final String KEY_TENANT_ID = "tenant_id";
+    private static final String KEY_ROLE = "role";
+    private static final String BASE_URL = "https://hss.wisptools.io/";
+
+    private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
+    private WispApi api;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate: Initializing App");
+
+        mAuth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
+
+        // Initialize Firebase
+        if (mAuth.getApp() != null) {
+            Log.d(TAG, "Firebase initialized");
+        } else {
+            Log.e(TAG, "Firebase NOT initialized!");
+        }
+        
+        // Initialize API
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
+            Log.d(TAG, "HTTP: " + message);
+        });
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+        
+        OkHttpClient client = new OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .build();
+        
+        Retrofit retrofit = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build();
+        
+        api = retrofit.create(WispApi.class);
+
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String savedTenantId = prefs.getString(KEY_TENANT_ID, null);
+        
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser != null && savedTenantId != null) {
+            Log.d(TAG, "User already logged in, showing dashboard");
+            String role = prefs.getString(KEY_ROLE, "viewer");
+            showDashboard(currentUser.getEmail(), savedTenantId, role);
+        } else {
+            Log.d(TAG, "No user logged in, showing login screen");
+            showLoginScreen();
+        }
+    }

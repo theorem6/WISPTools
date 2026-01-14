@@ -23,6 +23,8 @@
   let mapComponent: any = null;
   let savedViewState: { center?: [number, number], zoom?: number } | null = null;
   let isRefreshing = false; // Flag to prevent multiple simultaneous refreshes
+  let isLoadingSites = false; // Flag to prevent concurrent site loads
+  let lastLoadedTenantId: string | null = null; // Track last loaded tenant to avoid reloads
   
   $: tenantId = $currentTenant?.id || '';
   
@@ -469,12 +471,20 @@
   
   // Load sites, sectors, backhauls, and CPE from database with uptime data
   async function loadSites() {
+    // Guard against duplicate concurrent loads
+    if (isLoadingSites) {
+      return;
+    }
+    
     if (!tenantId) {
       towers = [];
       sectors = [];
       cpeDevices = [];
       return;
     }
+    
+    isLoadingSites = true;
+    lastLoadedTenantId = tenantId;
     
     // Save map view state before refreshing (preserve zoom/center)
     await saveMapViewState();
@@ -745,6 +755,8 @@
       towers = [];
       sectors = [];
       cpeDevices = [];
+    } finally {
+      isLoadingSites = false; // Always reset loading flag
     }
   }
   
@@ -780,9 +792,10 @@
     setTimeout(() => { isRefreshing = false; }, 500); // Reset flag after a delay
   }
   
-  // Load sites on mount
+  // Load sites on mount (only if not already loading)
   onMount(() => {
-    if (tenantId) {
+    if (tenantId && !isLoadingSites) {
+      lastLoadedTenantId = tenantId;
       loadSites();
     }
   });
@@ -834,11 +847,11 @@
           </div>
           
           {#if getEPCSystemUptime()}
-            <div class="status-card success">
+            <div class="status-card success epc-uptime-card">
               <div class="status-icon">⏱️</div>
               <div class="status-content">
                 <div class="status-value" style="font-size: 0.9rem;">{getEPCSystemUptime()}</div>
-                <div class="status-label">EPC System Uptime</div>
+                <div class="status-label epc-uptime-label">EPC System Uptime</div>
               </div>
             </div>
           {/if}
@@ -957,10 +970,12 @@
     border: 1px solid var(--color-border);
     pointer-events: auto;
     width: 350px;
+    max-width: calc(100vw - 40px); /* Prevent overflow on small screens */
     max-height: calc(100vh - 60px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-sizing: border-box;
   }
 
   .section-header {
@@ -1007,18 +1022,24 @@
     margin-bottom: 1.5rem;
     padding-bottom: 1.5rem;
     border-bottom: 2px solid var(--color-border);
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .status-cards {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
     margin-top: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   
-  /* If there are 5 cards, make them wrap nicely */
+  /* If there are 5 cards, keep 2-column layout but ensure proper sizing */
   .status-cards:has(> :nth-child(5)) {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .status-card {
@@ -1031,6 +1052,8 @@
     border: 1px solid var(--color-border);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
+    min-width: 0; /* Allow flex items to shrink */
+    overflow: hidden; /* Prevent content from overflowing */
   }
 
   .status-card:hover {
@@ -1062,6 +1085,7 @@
   .status-content {
     flex: 1;
     min-width: 0;
+    overflow: hidden; /* Prevent text overflow */
   }
 
   .status-value {
@@ -1070,14 +1094,27 @@
     color: var(--color-text-primary);
     line-height: 1.2;
     margin-bottom: 0.25rem;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .status-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--color-text-secondary);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.025em;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.3;
+    hyphens: auto;
+    max-width: 100%;
+  }
+  
+  /* Special handling for EPC System Uptime card - smaller font */
+  .epc-uptime-card .epc-uptime-label {
+    font-size: 0.65rem;
+    line-height: 1.2;
   }
   
   
@@ -1249,6 +1286,80 @@
   .alert-action-btn:hover {
     background: var(--color-background-secondary);
     border-color: var(--color-primary);
+    color: var(--color-primary);
+    transform: translateY(-1px);
+  }
+
+  .alert-action-btn.details:hover {
+    border-color: var(--color-info);
+    color: var(--color-info);
+  }
+
+  .alert-action-btn.ticket:hover {
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+
+  .no-alerts {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+
+  .no-alerts-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .no-alerts-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    color: var(--color-text-primary);
+  }
+</style>
+
+    color: var(--color-primary);
+    transform: translateY(-1px);
+  }
+
+  .alert-action-btn.details:hover {
+    border-color: var(--color-info);
+    color: var(--color-info);
+  }
+
+  .alert-action-btn.ticket:hover {
+    border-color: var(--color-success);
+    color: var(--color-success);
+  }
+
+  .no-alerts {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+
+  .no-alerts-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .no-alerts-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    color: var(--color-text-primary);
+  }
+</style>
+
     color: var(--color-primary);
     transform: translateY(-1px);
   }

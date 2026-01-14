@@ -7,6 +7,7 @@
   import { isPlatformAdmin } from '$lib/services/adminService';
   import { getAllUsers } from '$lib/services/userManagementService';
   import { tenantService } from '$lib/services/tenantService';
+  import { auth } from '$lib/firebase';
 
   interface AdminFeature {
     id: string;
@@ -57,6 +58,11 @@
   let statusLoading = true;
   let statusError = '';
   let statusUpdateInterval: NodeJS.Timeout | null = null;
+  
+  // Remote agents status
+  let remoteAgents: any[] = [];
+  let loadingAgents = false;
+  let agentsError = '';
 
   onMount(async () => {
     if (!browser) return;
@@ -82,8 +88,12 @@
     
     // Only load status if admin
     await loadSystemStatus();
+    await loadAllRemoteAgents();
     // Update status every 30 seconds
-    statusUpdateInterval = setInterval(loadSystemStatus, 30000);
+    statusUpdateInterval = setInterval(() => {
+      loadSystemStatus();
+      loadAllRemoteAgents();
+    }, 30000);
   });
 
   onDestroy(() => {
@@ -168,6 +178,92 @@
       console.error('Logout error:', error);
     }
   }
+
+  async function getAuthHeaders() {
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+    const token = await currentUser.getIdToken();
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async function loadAllRemoteAgents() {
+    if (!isAdmin) return;
+    
+    try {
+      loadingAgents = true;
+      agentsError = '';
+      remoteAgents = [];
+
+      const headers = await getAuthHeaders();
+
+      // System-wide query - get ALL agents (assigned and unassigned) in one call
+      // No tenant header needed - backend returns everything for admin/system queries
+      const response = await fetch('/api/remote-agents/status', {
+        method: 'GET',
+        headers: headers // No X-Tenant-ID header for system-wide query
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.agents && Array.isArray(data.agents)) {
+          // Get all tenants to map tenant_id to tenant names
+          const tenants = await tenantService.getAllTenants();
+          const tenantMap = new Map(tenants.map(t => [t.id, t.displayName || t.name]));
+
+          // Add tenant names to agents
+          remoteAgents = data.agents.map((agent: any) => ({
+            ...agent,
+            tenant_name: agent.tenant_id 
+              ? (tenantMap.get(agent.tenant_id) || agent.tenant_id || 'Unknown')
+              : 'Unassigned'
+          })).sort((a, b) => {
+            // Sort by last check-in (most recent first)
+            const aTime = a.last_checkin || a.discovered_at || 0;
+            const bTime = b.last_checkin || b.discovered_at || 0;
+            return new Date(bTime).getTime() - new Date(aTime).getTime();
+          });
+        } else {
+          remoteAgents = [];
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+    } catch (err: any) {
+      console.error('Error loading remote agents:', err);
+      agentsError = err.message || 'Failed to load remote agents';
+      remoteAgents = [];
+    } finally {
+      loadingAgents = false;
+    }
+  }
+
+  function formatDate(date: Date | string | null | undefined): string {
+    if (!date) return 'N/A';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+  }
+
+  function formatTimeAgo(seconds: number | null): string {
+    if (seconds === null || seconds === undefined) return 'N/A';
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  function getFirstCheckin(agent: any): string {
+    if (agent.type === 'epc_agent') {
+      return agent.created_at ? formatDate(agent.created_at) : 'N/A';
+    } else {
+      return agent.discovered_at ? formatDate(agent.discovered_at) : 'N/A';
+    }
+  }
 </script>
 
 <div class="admin-module">
@@ -182,7 +278,7 @@
           {#if currentUser}
             <span class="user-name">{currentUser.email}</span>
             <span class="user-role">Platform Admin</span>
-            <button class="logout-btn" on:click={handleLogout} title="Logout">
+            <button class="logout-btn" onclick={handleLogout} title="Logout">
               🚪 Logout
             </button>
           {/if}
@@ -205,8 +301,8 @@
           {#each adminFeatures as feature}
             <div 
               class="feature-card" 
-              on:click={() => handleFeatureClick(feature)}
-              on:keydown={(e) => e.key === 'Enter' && handleFeatureClick(feature)}
+              onclick={() => handleFeatureClick(feature)}
+              onkeydown={(e) => e.key === 'Enter' && handleFeatureClick(feature)}
               role="button"
               tabindex="0"
             >
@@ -227,7 +323,7 @@
         {#if statusError}
           <div class="status-error">
             <p>⚠️ {statusError}</p>
-            <button class="retry-btn" on:click={loadSystemStatus}>Retry</button>
+            <button class="retry-btn" onclick={loadSystemStatus}>Retry</button>
           </div>
         {/if}
         <div class="status-grid">
@@ -288,6 +384,100 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Remote Agents Status Section -->
+      <div class="remote-agents-section">
+        <div class="section-header">
+          <h2>📡 Remote Agents Status</h2>
+          <button class="refresh-btn" onclick={loadAllRemoteAgents} disabled={loadingAgents}>
+            {loadingAgents ? 'Refreshing...' : '🔄 Refresh'}
+          </button>
+        </div>
+
+        {#if loadingAgents && remoteAgents.length === 0}
+          <div class="loading-state">
+            <p>Loading remote agents...</p>
+          </div>
+        {:else if agentsError}
+          <div class="error-state">
+            <p>⚠️ {agentsError}</p>
+            <button class="retry-btn" onclick={loadAllRemoteAgents}>Retry</button>
+          </div>
+        {:else if remoteAgents.length === 0}
+          <div class="empty-state">
+            <p>No remote agents found across all tenants.</p>
+          </div>
+        {:else}
+          <div class="agents-summary">
+            <p><strong>{remoteAgents.length}</strong> remote agent{remoteAgents.length !== 1 ? 's' : ''} checking in system-wide</p>
+          </div>
+          <div class="agents-table-container">
+            <table class="agents-table">
+              <thead>
+                <tr>
+                  <th>Tenant</th>
+                  <th>Type</th>
+                  <th>ID</th>
+                  <th>Name/Code</th>
+                  <th>First Check-in</th>
+                  <th>Last Check-in</th>
+                  <th>Status</th>
+                  <th>Hardware Linked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each remoteAgents as agent (agent.epc_id || agent.device_id)}
+                  <tr>
+                    <td>
+                      <strong>{agent.tenant_name || agent.tenant_id || 'Unknown'}</strong>
+                    </td>
+                    <td>
+                      <span class="agent-type-badge type-{agent.type}">
+                        {agent.type === 'epc_agent' ? 'EPC' : 'SNMP'}
+                      </span>
+                    </td>
+                    <td>
+                      <code>{agent.epc_id || agent.device_id || 'N/A'}</code>
+                    </td>
+                    <td>
+                      {agent.type === 'epc_agent' 
+                        ? (agent.device_code || agent.site_name || 'N/A')
+                        : (agent.name || agent.ip_address || 'N/A')}
+                    </td>
+                    <td>{getFirstCheckin(agent)}</td>
+                    <td>
+                      {agent.type === 'epc_agent' 
+                        ? (agent.last_checkin ? formatDate(agent.last_checkin) : 'Never')
+                        : (agent.discovered_at ? formatDate(agent.discovered_at) : 'N/A')}
+                      {#if agent.time_since_checkin !== null && agent.time_since_checkin !== undefined}
+                        <br>
+                        <small class="time-ago">{formatTimeAgo(agent.time_since_checkin)}</small>
+                      {/if}
+                    </td>
+                    <td>
+                      <span class="status-badge status-{agent.checkin_status || agent.status}">
+                        {agent.type === 'epc_agent' 
+                          ? (agent.checkin_status || agent.status || 'unknown')
+                          : (agent.status || 'discovered')}
+                      </span>
+                    </td>
+                    <td>
+                      {#if agent.hardware_linked}
+                        <span class="linked-badge linked">✓ Linked</span>
+                        {#if agent.hardware_link_type}
+                          <br><small>({agent.hardware_link_type})</small>
+                        {/if}
+                      {:else}
+                        <span class="linked-badge unlinked">✗ Unlinked</span>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
       </div>
       </div>
     </div>
@@ -578,6 +768,181 @@
     transform: translateY(-1px);
   }
 
+  .remote-agents-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .refresh-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .refresh-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+  }
+
+  .refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .agents-summary {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+  }
+
+  .agents-table-container {
+    overflow-x: auto;
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents-table th {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    color: var(--text-primary);
+  }
+
+  .agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .agents-table tbody tr:hover {
+    background: var(--hover-bg);
+  }
+
+  .agent-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .type-epc_agent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .type-snmp_device {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  code {
+    background: var(--code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+
+  .time-ago {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .linked-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .linked-badge.linked {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .linked-badge.unlinked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .status-active {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .status-recent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .status-stale {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .status-never {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+
+  .loading-state, .empty-state, .error-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+
+  .error-state {
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+    color: var(--danger-dark, #991b1b);
+  }
+
   @media (max-width: 768px) {
     .header-content {
       flex-direction: column;
@@ -599,6 +964,763 @@
 
     .status-grid {
       grid-template-columns: 1fr;
+    }
+
+    .agents-table-container {
+      font-size: 0.75rem;
+    }
+
+    .agents-table th,
+    .agents-table td {
+      padding: 0.5rem;
+    }
+  }
+</style>
+
+
+  .features-section {
+    margin-bottom: 2rem;
+  }
+
+  .features-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 2px solid transparent;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
+  }
+
+  .feature-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .feature-info {
+    flex: 1;
+  }
+
+  .feature-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .feature-description {
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .feature-arrow {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .system-status {
+    margin-bottom: 2rem;
+  }
+
+  .system-status h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .status-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: var(--transition);
+  }
+
+  .status-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .status-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .status-icon.operational {
+    color: var(--success-color);
+  }
+
+  .status-icon.error {
+    color: var(--danger-color);
+  }
+
+  .status-icon.checking {
+    color: var(--warning-color);
+  }
+
+  .status-icon.connected {
+    color: var(--success-color);
+  }
+
+  .status-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+  }
+
+  .status-info p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .status-error {
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-error p {
+    margin: 0;
+    color: var(--danger-dark, #991b1b);
+    font-weight: 500;
+  }
+
+  .retry-btn {
+    background: var(--danger-color);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .retry-btn:hover {
+    background: var(--danger-hover);
+    transform: translateY(-1px);
+  }
+
+  .remote-agents-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .refresh-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .refresh-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+  }
+
+  .refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .agents-summary {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+  }
+
+  .agents-table-container {
+    overflow-x: auto;
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents-table th {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    color: var(--text-primary);
+  }
+
+  .agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .agents-table tbody tr:hover {
+    background: var(--hover-bg);
+  }
+
+  .agent-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .type-epc_agent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .type-snmp_device {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  code {
+    background: var(--code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+
+  .time-ago {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .linked-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .linked-badge.linked {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .linked-badge.unlinked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .status-active {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .status-recent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .status-stale {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .status-never {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+
+  .loading-state, .empty-state, .error-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+
+  .error-state {
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .module-title h1 {
+      font-size: 1.5rem;
+    }
+
+    .module-content {
+      padding: 1rem;
+    }
+
+    .features-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .status-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .agents-table-container {
+      font-size: 0.75rem;
+    }
+
+    .agents-table th,
+    .agents-table td {
+      padding: 0.5rem;
+    }
+  }
+</style>
+
+
+  .features-section {
+    margin-bottom: 2rem;
+  }
+
+  .features-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 2px solid transparent;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
+  }
+
+  .feature-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .feature-info {
+    flex: 1;
+  }
+
+  .feature-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.5rem 0;
+  }
+
+  .feature-description {
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .feature-arrow {
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .system-status {
+    margin-bottom: 2rem;
+  }
+
+  .system-status h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .status-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: var(--transition);
+  }
+
+  .status-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .status-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .status-icon.operational {
+    color: var(--success-color);
+  }
+
+  .status-icon.error {
+    color: var(--danger-color);
+  }
+
+  .status-icon.checking {
+    color: var(--warning-color);
+  }
+
+  .status-icon.connected {
+    color: var(--success-color);
+  }
+
+  .status-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.25rem 0;
+  }
+
+  .status-info p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .status-error {
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-error p {
+    margin: 0;
+    color: var(--danger-dark, #991b1b);
+    font-weight: 500;
+  }
+
+  .retry-btn {
+    background: var(--danger-color);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .retry-btn:hover {
+    background: var(--danger-hover);
+    transform: translateY(-1px);
+  }
+
+  .remote-agents-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .section-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .refresh-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .refresh-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+  }
+
+  .refresh-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .agents-summary {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+  }
+
+  .agents-table-container {
+    overflow-x: auto;
+  }
+
+  .agents-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents-table th {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    color: var(--text-primary);
+  }
+
+  .agents-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .agents-table tbody tr:hover {
+    background: var(--hover-bg);
+  }
+
+  .agent-type-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .type-epc_agent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .type-snmp_device {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  code {
+    background: var(--code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+  }
+
+  .time-ago {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+  }
+
+  .linked-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .linked-badge.linked {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .linked-badge.unlinked {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .status-active {
+    background: var(--success-light);
+    color: var(--success-dark, #065f46);
+  }
+
+  .status-recent {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .status-stale {
+    background: var(--warning-light);
+    color: var(--warning-dark, #92400e);
+  }
+
+  .status-offline {
+    background: var(--danger-light);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  .status-never {
+    background: var(--text-secondary);
+    color: var(--text-inverse);
+  }
+
+  .loading-state, .empty-state, .error-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+
+  .error-state {
+    background: var(--danger-light);
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-md);
+    color: var(--danger-dark, #991b1b);
+  }
+
+  @media (max-width: 768px) {
+    .header-content {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .module-title h1 {
+      font-size: 1.5rem;
+    }
+
+    .module-content {
+      padding: 1rem;
+    }
+
+    .features-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .status-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .agents-table-container {
+      font-size: 0.75rem;
+    }
+
+    .agents-table th,
+    .agents-table td {
+      padding: 0.5rem;
     }
   }
 </style>

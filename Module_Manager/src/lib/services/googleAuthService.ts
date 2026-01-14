@@ -5,8 +5,9 @@
  */
 
 import { browser } from '$app/environment';
-import { auth as getAuth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import type { User } from 'firebase/auth';
+import { getFirebaseAuth } from '$lib/firebase';
 
 // Get Google OAuth Client ID from Firebase config
 // This should match the OAuth client ID configured in Firebase Console
@@ -126,7 +127,7 @@ export async function handleGoogleCallback(): Promise<{ success: boolean; user?:
     console.log('[Google Auth] Processing OAuth callback...', { context });
 
     // Use Firebase to sign in with the Google ID token
-    const auth = getAuth();
+    const auth = getFirebaseAuth();
     const credential = GoogleAuthProvider.credential(idToken);
     const result = await signInWithCredential(auth, credential);
 

@@ -240,10 +240,20 @@ export default function WorkOrdersScreen() {
           }
           ListHeaderComponent={
             <View style={styles.listHeader}>
-              <Text style={styles.headerTitle}>My Tickets</Text>
-              <Text style={styles.headerSubtitle}>
-                {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'}
-              </Text>
+              <View style={styles.headerRow}>
+                <View style={styles.headerText}>
+                  <Text style={styles.headerTitle}>My Tickets</Text>
+                  <Text style={styles.headerSubtitle}>
+                    {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.logTicketButton}
+                  onPress={handleLogTicket}
+                >
+                  <Text style={styles.logTicketText}>+ Log Ticket</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           }
           ListEmptyComponent={
@@ -401,6 +411,24 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     textAlign: 'center',
     paddingHorizontal: 40
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  headerText: {
+    flex: 1
+  },
+  logTicketButton: {
+    backgroundColor: '#7c3aed',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8
+  },
+  logTicketText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold'
   }
 });
-

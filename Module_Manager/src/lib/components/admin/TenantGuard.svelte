@@ -38,9 +38,9 @@
       // Step 1: Check Firebase authentication with retry logic
       let currentUser = authService.getCurrentUser();
       if (!currentUser) {
-        // Wait for auth state to initialize (with multiple retries)
+        // Wait for auth state to initialize (with reduced retries)
         let retries = 0;
-        const maxRetries = 15; // 1.5 seconds total wait
+        const maxRetries = 5; // 0.5 seconds total wait (reduced from 1.5s)
         while (!currentUser && retries < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 100));
           currentUser = authService.getCurrentUser();
@@ -81,7 +81,7 @@
       console.log('[TenantGuard] Ensuring token is ready...');
       let tokenReady = false;
       let tokenRetries = 0;
-      const maxTokenRetries = 10;
+      const maxTokenRetries = 3; // Reduced from 10
       
       while (!tokenReady && tokenRetries < maxTokenRetries) {
         try {
@@ -101,7 +101,7 @@
             attempt: tokenRetries + 1,
             error: tokenError?.message
           });
-          await new Promise(resolve => setTimeout(resolve, 200 * (tokenRetries + 1)));
+          await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay from 200ms * retries
           tokenRetries++;
         }
       }
@@ -113,8 +113,7 @@
         return;
       }
       
-      // Wait a bit more to ensure token is fully propagated
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Removed 300ms delay - token is ready, proceed immediately
       
       // Step 5: Check tenant requirement
       if (requireTenant) {

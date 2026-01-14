@@ -22,13 +22,40 @@ import ProjectFilterPanel from './components/ProjectFilterPanel.svelte';
 import type { MapModuleMode } from '$lib/map/MapCapabilities';
 import type { ModuleContext } from '$lib/services/objectStateManager';
 import { iframeCommunicationService } from '$lib/services/iframeCommunicationService';
-import { isPlatformAdmin } from '$lib/services/adminService';
-import '$lib/styles/moduleHeaderMenu.css';
-import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
+  import { isPlatformAdmin } from '$lib/services/adminService';
+  import '$lib/styles/moduleHeaderMenu.css';
+  import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
+  import HelpModal from '$lib/components/modals/HelpModal.svelte';
+  import { deployDocs } from '$lib/docs/deploy-docs';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { getModuleTips } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
 
   let currentUser: any = null;
   let showEPCDeploymentModal = false;
   let showAddHardwareMenu = false;
+  let showHelpModal = false;
+  const helpContent = deployDocs;
+  
+  // Tips Modal
+  let showTipsModal = false;
+  const tips = getModuleTips('deploy');
+  
+  onMount(() => {
+    // Show tips on first visit (if not dismissed)
+    if (tips.length > 0) {
+      try {
+        if (tipsService && tipsService.shouldShowTips('deploy')) {
+          // Use requestAnimationFrame for minimal delay (single frame ~16ms)
+          requestAnimationFrame(() => {
+            showTipsModal = true;
+          });
+        }
+      } catch (err) {
+        console.error('[Deploy] Error checking tips service:', err);
+      }
+    }
+  });
   let mapContainer: HTMLDivElement;
   let mapState: MapLayerState | undefined;
   let mapMode: MapModuleMode = 'deploy';
@@ -1217,6 +1244,13 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
         <h1>🚀 Deploy</h1>
       </div>
       <div class="module-header-controls">
+        <button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help" title="Help">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
         <button 
           class="module-control-btn" 
           class:active={showProjectFilters}
@@ -1552,6 +1586,21 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   {/if}
   
   <!-- Global Settings Button - Hidden in deploy mode, shown in coverage-map iframe instead -->
+
+  <!-- Help Modal -->
+<HelpModal
+    show={showHelpModal}
+    title="Deploy Module Help"
+    content={helpContent}
+    on:close={() => showHelpModal = false}
+  />
+
+<TipsModal 
+  bind:show={showTipsModal} 
+  moduleId="deploy" 
+  {tips}
+  on:close={() => showTipsModal = false}
+/>
 </TenantGuard>
 
 <style>
@@ -1996,5 +2045,214 @@ import EPCDeploymentModal from './components/EPCDeploymentModal.svelte';
   
   .dropdown-item:not(:last-child) {
     border-bottom: 1px solid var(--border-color, #e0e0e0);
+  }
+
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
+  }
+  
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
+</style>
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+  
+  /* Add Hardware Dropdown */
+  .dropdown-container {
+    position: relative;
+  }
+  
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: var(--card-bg, white);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    z-index: 1000;
+    overflow: hidden;
+  }
+  
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    transition: background 0.15s;
+  }
+  
+  .dropdown-item:hover {
+    background: var(--bg-hover, #f1f5f9);
+  }
+  
+  .dropdown-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+  }
+
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
+  }
+  
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
+</style>
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+  
+  /* Add Hardware Dropdown */
+  .dropdown-container {
+    position: relative;
+  }
+  
+  
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: var(--card-bg, white);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    z-index: 1000;
+    overflow: hidden;
+  }
+  
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    transition: background 0.15s;
+  }
+  
+  .dropdown-item:hover {
+    background: var(--bg-hover, #f1f5f9);
+  }
+  
+  .dropdown-item:not(:last-child) {
+    border-bottom: 1px solid var(--border-color, #e0e0e0);
+  }
+
+  .help-button {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    z-index: 999;
+  }
+  
+  .help-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
+  }
+  
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
   }
 </style>

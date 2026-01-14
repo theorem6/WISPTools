@@ -571,8 +571,8 @@
   <SettingsMenu />
   
   <!-- Help Button -->
-  <button class="help-button" on:click={() => showHelpModal = true} aria-label="Open Help">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help" title="Help">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"></circle>
       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
       <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -675,20 +675,20 @@
     <div 
       class="modal-overlay" 
       role="presentation"
-      on:click={() => showExportModal = false}
-      on:keydown={(e) => e.key === 'Escape' && (showExportModal = false)}
+        onclick={() => showExportModal = false}
+        onkeydown={(e) => e.key === 'Escape' && (showExportModal = false)}
     >
       <div 
         class="modal-container" 
         role="dialog"
         tabindex="-1"
         aria-labelledby="export-modal-title"
-        on:click|stopPropagation
-        on:keydown|stopPropagation
+          onclick={(e) => e.stopPropagation()}
+          onkeydown={(e) => e.stopPropagation()}
       >
         <div class="modal-header">
           <h3 id="export-modal-title">📤 Export & Configuration</h3>
-          <button class="modal-close-btn" on:click={() => showExportModal = false}>×</button>
+          <button class="modal-close-btn" onclick={() => showExportModal = false}>×</button>
         </div>
         <div class="modal-body">
           <ConflictReportExport 
@@ -849,30 +849,54 @@
   /* Help Button */
   .help-button {
     position: fixed;
-    bottom: 5rem;
-    right: 2rem;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--primary-color);
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
     z-index: 999;
   }
   
   .help-button:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
   }
   
   .help-button svg {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
+</style>
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
+  }
+</style>
+  .help-button svg {
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
   }
 </style>

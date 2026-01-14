@@ -1,0 +1,73 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="800dp"
+    android:height="800dp"
+    android:viewportWidth="800"
+    android:viewportHeight="800">
+
+    <!-- Glow effect -->
+    <path
+        android:fillColor="#4facfe"
+        android:fillAlpha="0.2"
+        android:pathData="M400,400m-320,0a320,320 0,1 1,640 0a320,320 0,1 1,-640 0" />
+
+    <!-- Hexagon border -->
+    <path
+        android:fillColor="#1a2332"
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="8"
+        android:pathData="M400,150 L580,250 L580,450 L400,550 L220,450 L220,250 Z" />
+
+    <!-- Circuit lines - Left side -->
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M220,300 L180,300" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M180,300m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M220,350 L150,350" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M150,350m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M220,400 L120,400" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M120,400m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+
+    <!-- Circuit lines - Right side -->
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M580,300 L620,300" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M620,300m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M580,350 L650,350" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M650,350m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="3"
+        android:pathData="M580,400 L680,400" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M680,400m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+
+    <!-- W letter (simplified as paths instead of rects) -->
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M280,280h15v155h-15z M480,280h15v155h-15z M360,340h35v95h-35z" />
+    <path
+        android:fillColor="#00d9ff"
+        android:pathData="M295,360h65v75h-65z M400,360h80v75h-80z" />
+</vector>

@@ -198,6 +198,16 @@ class APIService {
     return response.data;
   }
 
+  async createWorkOrder(workOrderData: any) {
+    try {
+      const response = await this.client.post('/api/work-orders', workOrderData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating work order:', error);
+      throw error;
+    }
+  }
+
   // ============================================================================
   // INSTALLATION DOCUMENTATION API
   // ============================================================================
@@ -315,7 +325,57 @@ class APIService {
       return null;
     }
   }
+
+  // ============================================================================
+  // MOBILE TASKS API - User task permissions
+  // ============================================================================
+
+  /**
+   * Get allowed tasks for current user
+   * @returns Array of allowed task objects
+   */
+  async getMyTasks() {
+    try {
+      const response = await this.client.get('/api/mobile/tasks');
+      return response.data.tasks || [];
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      // Return empty array on error - user will see no tasks
+      return [];
+    }
+  }
+
+  /**
+   * Check if user has a specific task permission
+   * @param taskId - Task ID (e.g., 'inventory-checkin', 'deploy-network')
+   * @returns True if user has permission for this task
+   */
+  async hasTask(taskId: string): Promise<boolean> {
+    try {
+      const tasks = await this.getMyTasks();
+      return tasks.some((task: any) => task.id === taskId);
+    } catch (error) {
+      console.error('Error checking task permission:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update CPE aiming data
+   * @param cpeId - CPE device ID
+   * @param aimingData - Aiming configuration data
+   */
+  async updateCPEAiming(cpeId: string, aimingData: any) {
+    try {
+      const response = await this.client.put(`/api/network/cpe/${cpeId}`, {
+        aiming: aimingData.aiming
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating CPE aiming:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new APIService();
-

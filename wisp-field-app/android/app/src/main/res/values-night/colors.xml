@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WISPTools Dark Theme (Remote Extension) -->
+
+    <!-- Primary Brand Colors -->
+    <color name="brand_primary">#00d9ff</color> <!-- Cyber Cyan -->
+    <color name="brand_secondary">#3B82F6</color>
+    <color name="brand_accent">#00f2fe</color>
+    
+    <!-- Backgrounds -->
+    <color name="bg_main">#0f172a</color> <!-- Deep Slate -->
+    <color name="bg_card">#1a2332</color> <!-- Card Slate -->
+    <color name="bg_input">#1e293b</color>
+    
+    <!-- UI Elements -->
+    <color name="border_subtle">#334155</color>
+    <color name="divider">#1e293b</color>
+    
+    <!-- Text Colors -->
+    <color name="text_main">#ffffff</color>
+    <color name="text_subtitle">#00d9ff</color>
+    <color name="text_muted">#94a3b8</color>
+    <color name="text_label">#00d9ff</color>
+    <color name="text_button">#0f172a</color>
+    <color name="text_input">#ffffff</color>
+
+    <!-- Semantic Colors -->
+    <color name="status_success">#10b981</color>
+    <color name="status_warning">#f59e0b</color>
+    <color name="status_danger">#ef4444</color>
+    <color name="status_info">#3b82f6</color>
+</resources>

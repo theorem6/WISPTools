@@ -9,7 +9,24 @@ export const cbrsManagementDocs = `
   <strong>Purpose:</strong> Manage Citizens Broadband Radio Service (CBRS) spectrum for the 3.5 GHz band (3550-3700 MHz) with integrated support for Google SAS and Federated Wireless.
 </div>
 
-<h4>Overview</h4>
+<div class="toc">
+  <h4>📑 Table of Contents</h4>
+  <ul>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#key-features">🎯 Key Features</a></li>
+    <li><a href="#cbrs-basics">CBRS Basics</a></li>
+    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#device-states">Device States</a></li>
+    <li><a href="#grant-management">Grant Management</a></li>
+    <li><a href="#api-integration">API Integration</a></li>
+    <li><a href="#best-practices">💡 Best Practices</a></li>
+    <li><a href="#compliance">Compliance & Regulations</a></li>
+    <li><a href="#troubleshooting">🔧 Troubleshooting</a></li>
+    <li><a href="#support">Support & Resources</a></li>
+  </ul>
+</div>
+
+<h4 id="overview">Overview</h4>
 
 The CBRS (Citizens Broadband Radio Service) Management module provides comprehensive spectrum management capabilities for the 3.5 GHz CBRS band (3550-3700 MHz) with integrated support for:
 
@@ -52,7 +69,7 @@ The CBRS (Citizens Broadband Radio Service) Management module provides comprehen
   </li>
 </ul>
 
-<h4>CBRS Basics</h4>
+<h4 id="cbrs-basics">CBRS Basics</h4>
 
 ### What is CBRS?
 
@@ -70,7 +87,7 @@ The SAS is a cloud-based database and spectrum management system that:
 - Provides dynamic spectrum allocation
 - Enforces FCC rules and regulations
 
-## Getting Started
+<h4 id="getting-started">Getting Started</h4>
 
 ### 1. Add a CBSD Device
 
@@ -124,7 +141,7 @@ The SAS is a cloud-based database and spectrum management system that:
   <li>Reports device status</li>
 </ul>
 
-<h4>Device States</h4>
+<h4 id="device-states">Device States</h4>
 
 <h4>UNREGISTERED</h4>
 <p>Device is created but not yet registered with SAS. Cannot transmit.</p>
@@ -144,7 +161,7 @@ The SAS is a cloud-based database and spectrum management system that:
 <h4>DEREGISTERED</h4>
 <p>Device is removed from SAS registration. All grants are terminated.</p>
 
-<h4>Grant Management</h4>
+<h4 id="grant-management">Grant Management</h4>
 
 <h4>Requesting Grants</h4>
 
@@ -198,7 +215,7 @@ The SAS is a cloud-based database and spectrum management system that:
   <li>Changing frequency assignments</li>
 </ul>
 
-<h4>API Integration</h4>
+<h4 id="api-integration">API Integration</h4>
 
 <h4>Google SAS</h4>
 
@@ -237,7 +254,7 @@ The SAS is a cloud-based database and spectrum management system that:
   <li>Maximum spectrum efficiency</li>
 </ul>
 
-<h4>💡 Best Practices</h4>
+<h4 id="best-practices">💡 Best Practices</h4>
 
 <h4>Device Installation</h4>
 
@@ -317,7 +334,7 @@ The SAS is a cloud-based database and spectrum management system that:
   </li>
 </ol>
 
-<h4>Compliance & Regulations</h4>
+<h4 id="compliance">Compliance & Regulations</h4>
 
 <h4>FCC Requirements</h4>
 
@@ -357,7 +374,7 @@ The SAS is a cloud-based database and spectrum management system that:
   <li>Installation changes</li>
 </ul>
 
-<h4>🔧 Troubleshooting</h4>
+<h4 id="troubleshooting">🔧 Troubleshooting</h4>
 
 <h4>Device Won't Register</h4>
 
@@ -430,7 +447,7 @@ The SAS is a cloud-based database and spectrum management system that:
   <li>Investigate root cause</li>
 </ol>
 
-<h4>Support & Resources</h4>
+<h4 id="support">Support & Resources</h4>
 
 <h4>Documentation</h4>
 <ul>
@@ -441,6 +458,40 @@ The SAS is a cloud-based database and spectrum management system that:
 </ul>
 
 <h4>Getting Help</h4>
+<ul>
+  <li>Technical support: support@yourcompany.com</li>
+  <li>SAS Provider support links in module settings</li>
+  <li>Community forums and user groups</li>
+  <li>Professional services for deployment assistance</li>
+</ul>
+
+<h4>Additional Training</h4>
+<ul>
+  <li>CBRS fundamentals course</li>
+  <li>SAS integration workshop</li>
+  <li>Network planning services</li>
+  <li>Compliance training</li>
+</ul>
+`;
+
+
+<ul>
+  <li>Technical support: support@yourcompany.com</li>
+  <li>SAS Provider support links in module settings</li>
+  <li>Community forums and user groups</li>
+  <li>Professional services for deployment assistance</li>
+</ul>
+
+<h4>Additional Training</h4>
+<ul>
+  <li>CBRS fundamentals course</li>
+  <li>SAS integration workshop</li>
+  <li>Network planning services</li>
+  <li>Compliance training</li>
+</ul>
+`;
+
+
 <ul>
   <li>Technical support: support@yourcompany.com</li>
   <li>SAS Provider support links in module settings</li>

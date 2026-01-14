@@ -9,6 +9,8 @@ const router = express.Router();
 const { Tenant } = require('../../models/tenant');
 const { RemoteEPC } = require('../../models/distributed-epc-schema');
 const { InventoryItem } = require('../../models/inventory');
+const { HardwareDeployment } = require('../../models/network');
+const { UnifiedSite } = require('../../models/network');
 const { generateSiteNameWithSuffix } = require('../../utils/site-naming');
 const appConfig = require('../../config/app');
 
@@ -414,7 +416,81 @@ router.post('/link-device', async (req, res) => {
     }).lean();
     
     if (existingEPC) {
-      // Device already linked - return success with existing info
+      // Device already linked - update tenant_id if it's 'unknown' or doesn't match current tenant
+      if (tenant_id && (existingEPC.tenant_id === 'unknown' || !existingEPC.tenant_id || existingEPC.tenant_id !== tenant_id)) {
+        console.log(`[Link Device] Updating tenant_id for EPC ${existingEPC.epc_id} from ${existingEPC.tenant_id} to ${tenant_id}`);
+        await RemoteEPC.updateOne(
+          { _id: existingEPC._id },
+          { $set: { tenant_id: tenant_id, updated_at: new Date() } }
+        );
+        existingEPC.tenant_id = tenant_id;
+      }
+      
+      // Site ID is REQUIRED for linking/deploying remotes
+      const site_id = config?.site_id;
+      if (!site_id) {
+        return res.status(400).json({ 
+          error: 'Site ID is required',
+          message: 'A site must be selected to link/deploy remote EPC/SNMP agents. Please select a site from the dropdown.'
+        });
+      }
+      
+      // Update site_id if it's different or missing
+      if (existingEPC.site_id !== site_id) {
+        console.log(`[Link Device] Updating site_id for EPC ${existingEPC.epc_id} from ${existingEPC.site_id} to ${site_id}`);
+        await RemoteEPC.updateOne(
+          { _id: existingEPC._id },
+          { $set: { site_id: site_id, updated_at: new Date() } }
+        );
+        existingEPC.site_id = site_id;
+      }
+      
+      // Ensure HardwareDeployment record exists for this EPC at this site
+      const { HardwareDeployment } = require('../../models/network');
+      let hardwareDeployment = await HardwareDeployment.findOne({
+        tenantId: tenant_id || existingEPC.tenant_id,
+        hardware_type: 'epc',
+        'config.epc_id': existingEPC.epc_id,
+        'config.device_code': device_code.toUpperCase()
+      });
+      
+      if (!hardwareDeployment) {
+        // Create HardwareDeployment if it doesn't exist
+        console.log(`[Link Device] Creating missing HardwareDeployment for existing EPC ${existingEPC.epc_id}`);
+        hardwareDeployment = new HardwareDeployment({
+          siteId: site_id,
+          tenantId: tenant_id || existingEPC.tenant_id,
+          hardware_type: 'epc',
+          name: `${existingEPC.site_name || 'EPC'} - ${device_code.toUpperCase()}`,
+          config: {
+            epc_id: existingEPC.epc_id,
+            device_code: device_code.toUpperCase(),
+            deployment_type: existingEPC.deployment_type || 'both',
+            ip_address: existingEPC.ip_address || null,
+            management_ip: existingEPC.ip_address || null
+          },
+          epc_config: {
+            epc_id: existingEPC.epc_id,
+            device_code: device_code.toUpperCase(),
+            deployment_type: existingEPC.deployment_type || 'both',
+            network_config: existingEPC.network_config || {},
+            hss_config: existingEPC.hss_config || {},
+            snmp_config: existingEPC.snmp_config || {}
+          },
+          deployedAt: existingEPC.created_at || new Date(),
+          status: 'deployed'
+        });
+        await hardwareDeployment.save();
+        console.log(`[Link Device] Created hardware deployment for existing EPC ${existingEPC.epc_id} at site ${site_id}`);
+      } else if (hardwareDeployment.siteId?.toString() !== site_id.toString()) {
+        // Update siteId if it's different
+        console.log(`[Link Device] Updating HardwareDeployment siteId for EPC ${existingEPC.epc_id} from ${hardwareDeployment.siteId} to ${site_id}`);
+        await HardwareDeployment.updateOne(
+          { _id: hardwareDeployment._id },
+          { $set: { siteId: site_id, updatedAt: new Date() } }
+        );
+      }
+      
       console.log(`[Link Device] Device code ${device_code} already linked to EPC ${existingEPC.epc_id}`);
       return res.json({
         success: true,
@@ -422,6 +498,8 @@ router.post('/link-device', async (req, res) => {
         epc_id: existingEPC.epc_id,
         site_name: existingEPC.site_name,
         device_code: device_code.toUpperCase(),
+        tenant_id: existingEPC.tenant_id,
+        site_id: site_id,
         message: `Device code ${device_code} is already linked to EPC ${existingEPC.site_name}`
       });
     }
@@ -433,8 +511,16 @@ router.post('/link-device', async (req, res) => {
     const api_key = crypto.randomBytes(16).toString('hex');
     const secret_key = crypto.randomBytes(32).toString('hex');
     
+    // Site ID is REQUIRED for linking/deploying remotes
+    const site_id = config?.site_id;
+    if (!site_id) {
+      return res.status(400).json({ 
+        error: 'Site ID is required',
+        message: 'A site must be selected to link/deploy remote EPC/SNMP agents. Please select a site from the dropdown.'
+      });
+    }
+    
     // Generate site name with suffix based on site_id
-    const site_id = config?.site_id || config?.site_name;
     let site_name = config?.site_name || 'New EPC Device';
     
     if (site_id) {
@@ -527,12 +613,50 @@ router.post('/link-device', async (req, res) => {
       updatedAt: new Date()
     });
     
+    let inventoryItemId = null;
     try {
       await inventoryItem.save();
+      inventoryItemId = inventoryItem._id.toString();
       console.log(`[Link Device] Created inventory item for EPC ${epc_id}`);
     } catch (invError) {
       console.warn(`[Link Device] Could not create inventory item:`, invError.message);
       // Continue even if inventory creation fails
+    }
+    
+    // Also create a HardwareDeployment record so it appears in site hardware lists
+    let hardwareDeploymentId = null;
+    try {
+      const hardwareDeployment = new HardwareDeployment({
+        siteId: site_id, // REQUIRED: Site ID for hardware to appear at site
+        tenantId: tenant_id || 'unknown',
+        hardware_type: 'epc',
+        name: `${config?.site_name || 'EPC'} - ${device_code.toUpperCase()}`,
+        config: {
+          epc_id: epc_id,
+          device_code: device_code.toUpperCase(),
+          deployment_type: config?.deployment_type || 'both',
+          ip_address: null, // Will be updated on check-in
+          management_ip: null
+        },
+        epc_config: {
+          epc_id: epc_id,
+          device_code: device_code.toUpperCase(),
+          deployment_type: config?.deployment_type || 'both',
+          network_config: config?.network_config || {},
+          hss_config: config?.hss_config || {},
+          snmp_config: config?.snmp_config || {}
+        },
+        inventory_item_id: inventoryItemId,
+        deployedAt: new Date(),
+        status: 'deployed'
+      });
+      
+      await hardwareDeployment.save();
+      hardwareDeploymentId = hardwareDeployment._id.toString();
+      console.log(`[Link Device] Created hardware deployment for EPC ${epc_id} at site ${site_id}`);
+    } catch (hwError) {
+      console.warn(`[Link Device] Could not create hardware deployment:`, hwError.message);
+      // Continue even if hardware deployment creation fails
     }
     
     res.json({
@@ -625,6 +749,596 @@ router.post('/:epc_id/link-device', async (req, res) => {
     console.error('[Link Device] Error:', error);
     res.status(500).json({ 
       error: 'Failed to link device code', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Backfill missing HardwareDeployment records for existing EPCs
+ * POST /api/deploy/backfill-hardware-deployments
+ * Creates HardwareDeployment records for EPCs that don't have them
+ */
+router.post('/backfill-hardware-deployments', async (req, res) => {
+  try {
+    const tenant_id = req.headers['x-tenant-id'] || req.body.tenant_id;
+    
+    if (!tenant_id) {
+      return res.status(400).json({ error: 'tenant_id is required' });
+    }
+    
+    console.log(`[Backfill] Starting hardware deployment backfill for tenant ${tenant_id}`);
+    
+    // Get all EPCs for this tenant that have a site_id
+    const epcs = await RemoteEPC.find({
+      tenant_id: tenant_id,
+      site_id: { $exists: true, $ne: null }
+    }).lean();
+    
+    console.log(`[Backfill] Found ${epcs.length} EPCs with site_id for tenant ${tenant_id}`);
+    
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+    
+    for (const epc of epcs) {
+      try {
+        // Check if HardwareDeployment already exists
+        let hardwareDeployment = await HardwareDeployment.findOne({
+          tenantId: tenant_id,
+          hardware_type: 'epc',
+          'config.epc_id': epc.epc_id
+        });
+        
+        if (hardwareDeployment) {
+          // Update siteId if it's different
+          const currentSiteId = hardwareDeployment.siteId?.toString();
+          const epcSiteId = epc.site_id?.toString();
+          
+          if (currentSiteId !== epcSiteId) {
+            console.log(`[Backfill] Updating HardwareDeployment siteId for EPC ${epc.epc_id} from ${currentSiteId} to ${epcSiteId}`);
+            await HardwareDeployment.updateOne(
+              { _id: hardwareDeployment._id },
+              { $set: { siteId: epc.site_id, updatedAt: new Date() } }
+            );
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          // Create new HardwareDeployment
+          console.log(`[Backfill] Creating HardwareDeployment for EPC ${epc.epc_id} at site ${epc.site_id}`);
+          
+          hardwareDeployment = new HardwareDeployment({
+            siteId: epc.site_id,
+            tenantId: tenant_id,
+            hardware_type: 'epc',
+            name: `${epc.site_name || 'EPC'} - ${epc.device_code || epc.epc_id}`,
+            config: {
+              epc_id: epc.epc_id,
+              device_code: epc.device_code || null,
+              deployment_type: epc.deployment_type || 'both',
+              ip_address: epc.ip_address || null,
+              management_ip: epc.ip_address || null
+            },
+            epc_config: {
+              epc_id: epc.epc_id,
+              device_code: epc.device_code || null,
+              deployment_type: epc.deployment_type || 'both',
+              network_config: epc.network_config || {},
+              hss_config: epc.hss_config || {},
+              snmp_config: epc.snmp_config || {}
+            },
+            deployedAt: epc.created_at || new Date(),
+            status: 'deployed'
+          });
+          
+          await hardwareDeployment.save();
+          created++;
+        }
+      } catch (error) {
+        console.error(`[Backfill] Error processing EPC ${epc.epc_id}:`, error);
+        errors.push({
+          epc_id: epc.epc_id,
+          error: error.message
+        });
+      }
+    }
+    
+    console.log(`[Backfill] Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+    
+    res.json({
+      success: true,
+      summary: {
+        total_epcs: epcs.length,
+        created,
+        updated,
+        skipped,
+        errors: errors.length
+      },
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('[Backfill] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to backfill hardware deployments', 
+      message: error.message 
+    });
+  }
+});
+
+module.exports = router;
+
+
+          device_code: device_code.toUpperCase(),
+          deployment_type: config?.deployment_type || 'both',
+          ip_address: null, // Will be updated on check-in
+          management_ip: null
+        },
+        epc_config: {
+          epc_id: epc_id,
+          device_code: device_code.toUpperCase(),
+          deployment_type: config?.deployment_type || 'both',
+          network_config: config?.network_config || {},
+          hss_config: config?.hss_config || {},
+          snmp_config: config?.snmp_config || {}
+        },
+        inventory_item_id: inventoryItemId,
+        deployedAt: new Date(),
+        status: 'deployed'
+      });
+      
+      await hardwareDeployment.save();
+      hardwareDeploymentId = hardwareDeployment._id.toString();
+      console.log(`[Link Device] Created hardware deployment for EPC ${epc_id} at site ${site_id}`);
+    } catch (hwError) {
+      console.warn(`[Link Device] Could not create hardware deployment:`, hwError.message);
+      // Continue even if hardware deployment creation fails
+    }
+    
+    res.json({
+      success: true,
+      epc_id,
+      site_name: newEPC.site_name,
+      device_code: device_code.toUpperCase(),
+      inventory_id: inventoryItem?._id?.toString() || null,
+      status: 'registered',
+      message: `Device code ${device_code} linked successfully! The device will configure automatically when it checks in.`,
+      next_steps: [
+        'Device will check in automatically every 60 seconds',
+        'Once connected, device status will change to "online"',
+        'Device will appear in Hardware Inventory and Monitoring'
+      ]
+    });
+    
+  } catch (error) {
+    console.error('[Link Device] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to link device code', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Link device code to existing EPC configuration
+ * POST /api/deploy/:epc_id/link-device
+ * Called from device configuration page to link device code to EPC
+ */
+router.post('/:epc_id/link-device', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const { device_code } = req.body;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+    
+    // Validate device code format
+    const deviceCodePattern = /^[A-Z0-9]{8}$/;
+    if (!deviceCodePattern.test(device_code.toUpperCase())) {
+      return res.status(400).json({ 
+        error: 'Invalid device code format',
+        message: 'Device code must be 8 alphanumeric characters'
+      });
+    }
+    
+    // Check if device code is already linked to a different EPC
+    const existingEPC = await RemoteEPC.findOne({ 
+      device_code: device_code.toUpperCase(),
+      epc_id: { $ne: epc_id }
+    }).lean();
+    
+    if (existingEPC) {
+      return res.status(400).json({ 
+        error: 'Device code already in use',
+        message: `Device code ${device_code} is already linked to EPC ${existingEPC.epc_id} (${existingEPC.site_name})`
+      });
+    }
+    
+    // Find the EPC
+    const epc = await RemoteEPC.findOne({ 
+      epc_id,
+      tenant_id
+    });
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Link device code to EPC
+    epc.device_code = device_code.toUpperCase();
+    epc.updated_at = new Date();
+    await epc.save();
+    
+    console.log(`[Link Device] Linked device code ${device_code} to EPC ${epc_id}`);
+    
+    res.json({
+      success: true,
+      epc_id,
+      device_code: device_code.toUpperCase(),
+      site_name: epc.site_name,
+      message: `Device code ${device_code} linked to EPC ${epc.site_name}. Hardware will automatically check in and configure when it boots.`
+    });
+    
+  } catch (error) {
+    console.error('[Link Device] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to link device code', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Backfill missing HardwareDeployment records for existing EPCs
+ * POST /api/deploy/backfill-hardware-deployments
+ * Creates HardwareDeployment records for EPCs that don't have them
+ */
+router.post('/backfill-hardware-deployments', async (req, res) => {
+  try {
+    const tenant_id = req.headers['x-tenant-id'] || req.body.tenant_id;
+    
+    if (!tenant_id) {
+      return res.status(400).json({ error: 'tenant_id is required' });
+    }
+    
+    console.log(`[Backfill] Starting hardware deployment backfill for tenant ${tenant_id}`);
+    
+    // Get all EPCs for this tenant that have a site_id
+    const epcs = await RemoteEPC.find({
+      tenant_id: tenant_id,
+      site_id: { $exists: true, $ne: null }
+    }).lean();
+    
+    console.log(`[Backfill] Found ${epcs.length} EPCs with site_id for tenant ${tenant_id}`);
+    
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+    
+    for (const epc of epcs) {
+      try {
+        // Check if HardwareDeployment already exists
+        let hardwareDeployment = await HardwareDeployment.findOne({
+          tenantId: tenant_id,
+          hardware_type: 'epc',
+          'config.epc_id': epc.epc_id
+        });
+        
+        if (hardwareDeployment) {
+          // Update siteId if it's different
+          const currentSiteId = hardwareDeployment.siteId?.toString();
+          const epcSiteId = epc.site_id?.toString();
+          
+          if (currentSiteId !== epcSiteId) {
+            console.log(`[Backfill] Updating HardwareDeployment siteId for EPC ${epc.epc_id} from ${currentSiteId} to ${epcSiteId}`);
+            await HardwareDeployment.updateOne(
+              { _id: hardwareDeployment._id },
+              { $set: { siteId: epc.site_id, updatedAt: new Date() } }
+            );
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          // Create new HardwareDeployment
+          console.log(`[Backfill] Creating HardwareDeployment for EPC ${epc.epc_id} at site ${epc.site_id}`);
+          
+          hardwareDeployment = new HardwareDeployment({
+            siteId: epc.site_id,
+            tenantId: tenant_id,
+            hardware_type: 'epc',
+            name: `${epc.site_name || 'EPC'} - ${epc.device_code || epc.epc_id}`,
+            config: {
+              epc_id: epc.epc_id,
+              device_code: epc.device_code || null,
+              deployment_type: epc.deployment_type || 'both',
+              ip_address: epc.ip_address || null,
+              management_ip: epc.ip_address || null
+            },
+            epc_config: {
+              epc_id: epc.epc_id,
+              device_code: epc.device_code || null,
+              deployment_type: epc.deployment_type || 'both',
+              network_config: epc.network_config || {},
+              hss_config: epc.hss_config || {},
+              snmp_config: epc.snmp_config || {}
+            },
+            deployedAt: epc.created_at || new Date(),
+            status: 'deployed'
+          });
+          
+          await hardwareDeployment.save();
+          created++;
+        }
+      } catch (error) {
+        console.error(`[Backfill] Error processing EPC ${epc.epc_id}:`, error);
+        errors.push({
+          epc_id: epc.epc_id,
+          error: error.message
+        });
+      }
+    }
+    
+    console.log(`[Backfill] Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+    
+    res.json({
+      success: true,
+      summary: {
+        total_epcs: epcs.length,
+        created,
+        updated,
+        skipped,
+        errors: errors.length
+      },
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('[Backfill] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to backfill hardware deployments', 
+      message: error.message 
+    });
+  }
+});
+
+module.exports = router;
+
+
+          device_code: device_code.toUpperCase(),
+          deployment_type: config?.deployment_type || 'both',
+          ip_address: null, // Will be updated on check-in
+          management_ip: null
+        },
+        epc_config: {
+          epc_id: epc_id,
+          device_code: device_code.toUpperCase(),
+          deployment_type: config?.deployment_type || 'both',
+          network_config: config?.network_config || {},
+          hss_config: config?.hss_config || {},
+          snmp_config: config?.snmp_config || {}
+        },
+        inventory_item_id: inventoryItemId,
+        deployedAt: new Date(),
+        status: 'deployed'
+      });
+      
+      await hardwareDeployment.save();
+      hardwareDeploymentId = hardwareDeployment._id.toString();
+      console.log(`[Link Device] Created hardware deployment for EPC ${epc_id} at site ${site_id}`);
+    } catch (hwError) {
+      console.warn(`[Link Device] Could not create hardware deployment:`, hwError.message);
+      // Continue even if hardware deployment creation fails
+    }
+    
+    res.json({
+      success: true,
+      epc_id,
+      site_name: newEPC.site_name,
+      device_code: device_code.toUpperCase(),
+      inventory_id: inventoryItem?._id?.toString() || null,
+      status: 'registered',
+      message: `Device code ${device_code} linked successfully! The device will configure automatically when it checks in.`,
+      next_steps: [
+        'Device will check in automatically every 60 seconds',
+        'Once connected, device status will change to "online"',
+        'Device will appear in Hardware Inventory and Monitoring'
+      ]
+    });
+    
+  } catch (error) {
+    console.error('[Link Device] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to link device code', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Link device code to existing EPC configuration
+ * POST /api/deploy/:epc_id/link-device
+ * Called from device configuration page to link device code to EPC
+ */
+router.post('/:epc_id/link-device', async (req, res) => {
+  try {
+    const { epc_id } = req.params;
+    const { device_code } = req.body;
+    const tenant_id = req.headers['x-tenant-id'] || 'unknown';
+    
+    if (!device_code) {
+      return res.status(400).json({ error: 'device_code is required' });
+    }
+    
+    // Validate device code format
+    const deviceCodePattern = /^[A-Z0-9]{8}$/;
+    if (!deviceCodePattern.test(device_code.toUpperCase())) {
+      return res.status(400).json({ 
+        error: 'Invalid device code format',
+        message: 'Device code must be 8 alphanumeric characters'
+      });
+    }
+    
+    // Check if device code is already linked to a different EPC
+    const existingEPC = await RemoteEPC.findOne({ 
+      device_code: device_code.toUpperCase(),
+      epc_id: { $ne: epc_id }
+    }).lean();
+    
+    if (existingEPC) {
+      return res.status(400).json({ 
+        error: 'Device code already in use',
+        message: `Device code ${device_code} is already linked to EPC ${existingEPC.epc_id} (${existingEPC.site_name})`
+      });
+    }
+    
+    // Find the EPC
+    const epc = await RemoteEPC.findOne({ 
+      epc_id,
+      tenant_id
+    });
+    
+    if (!epc) {
+      return res.status(404).json({ error: 'EPC not found' });
+    }
+    
+    // Link device code to EPC
+    epc.device_code = device_code.toUpperCase();
+    epc.updated_at = new Date();
+    await epc.save();
+    
+    console.log(`[Link Device] Linked device code ${device_code} to EPC ${epc_id}`);
+    
+    res.json({
+      success: true,
+      epc_id,
+      device_code: device_code.toUpperCase(),
+      site_name: epc.site_name,
+      message: `Device code ${device_code} linked to EPC ${epc.site_name}. Hardware will automatically check in and configure when it boots.`
+    });
+    
+  } catch (error) {
+    console.error('[Link Device] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to link device code', 
+      message: error.message 
+    });
+  }
+});
+
+/**
+ * Backfill missing HardwareDeployment records for existing EPCs
+ * POST /api/deploy/backfill-hardware-deployments
+ * Creates HardwareDeployment records for EPCs that don't have them
+ */
+router.post('/backfill-hardware-deployments', async (req, res) => {
+  try {
+    const tenant_id = req.headers['x-tenant-id'] || req.body.tenant_id;
+    
+    if (!tenant_id) {
+      return res.status(400).json({ error: 'tenant_id is required' });
+    }
+    
+    console.log(`[Backfill] Starting hardware deployment backfill for tenant ${tenant_id}`);
+    
+    // Get all EPCs for this tenant that have a site_id
+    const epcs = await RemoteEPC.find({
+      tenant_id: tenant_id,
+      site_id: { $exists: true, $ne: null }
+    }).lean();
+    
+    console.log(`[Backfill] Found ${epcs.length} EPCs with site_id for tenant ${tenant_id}`);
+    
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+    
+    for (const epc of epcs) {
+      try {
+        // Check if HardwareDeployment already exists
+        let hardwareDeployment = await HardwareDeployment.findOne({
+          tenantId: tenant_id,
+          hardware_type: 'epc',
+          'config.epc_id': epc.epc_id
+        });
+        
+        if (hardwareDeployment) {
+          // Update siteId if it's different
+          const currentSiteId = hardwareDeployment.siteId?.toString();
+          const epcSiteId = epc.site_id?.toString();
+          
+          if (currentSiteId !== epcSiteId) {
+            console.log(`[Backfill] Updating HardwareDeployment siteId for EPC ${epc.epc_id} from ${currentSiteId} to ${epcSiteId}`);
+            await HardwareDeployment.updateOne(
+              { _id: hardwareDeployment._id },
+              { $set: { siteId: epc.site_id, updatedAt: new Date() } }
+            );
+            updated++;
+          } else {
+            skipped++;
+          }
+        } else {
+          // Create new HardwareDeployment
+          console.log(`[Backfill] Creating HardwareDeployment for EPC ${epc.epc_id} at site ${epc.site_id}`);
+          
+          hardwareDeployment = new HardwareDeployment({
+            siteId: epc.site_id,
+            tenantId: tenant_id,
+            hardware_type: 'epc',
+            name: `${epc.site_name || 'EPC'} - ${epc.device_code || epc.epc_id}`,
+            config: {
+              epc_id: epc.epc_id,
+              device_code: epc.device_code || null,
+              deployment_type: epc.deployment_type || 'both',
+              ip_address: epc.ip_address || null,
+              management_ip: epc.ip_address || null
+            },
+            epc_config: {
+              epc_id: epc.epc_id,
+              device_code: epc.device_code || null,
+              deployment_type: epc.deployment_type || 'both',
+              network_config: epc.network_config || {},
+              hss_config: epc.hss_config || {},
+              snmp_config: epc.snmp_config || {}
+            },
+            deployedAt: epc.created_at || new Date(),
+            status: 'deployed'
+          });
+          
+          await hardwareDeployment.save();
+          created++;
+        }
+      } catch (error) {
+        console.error(`[Backfill] Error processing EPC ${epc.epc_id}:`, error);
+        errors.push({
+          epc_id: epc.epc_id,
+          error: error.message
+        });
+      }
+    }
+    
+    console.log(`[Backfill] Completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+    
+    res.json({
+      success: true,
+      summary: {
+        total_epcs: epcs.length,
+        created,
+        updated,
+        skipped,
+        errors: errors.length
+      },
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('[Backfill] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to backfill hardware deployments', 
       message: error.message 
     });
   }

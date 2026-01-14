@@ -13,6 +13,9 @@ import {
   Alert
 } from 'react-native';
 import { requestAllPermissions, PermissionStatus } from '../utils/PermissionManager';
+import { colors } from '../theme/colors';
+import { SvgUri } from 'react-native-svg';
+import { colors } from '../theme/colors';
 
 interface SplashScreenProps {
   onReady: () => void;
@@ -48,7 +51,7 @@ export default function SplashScreen({ onReady }: SplashScreenProps) {
         const deniedPerms = [];
         if (!permissions.camera) deniedPerms.push('Camera');
         if (!permissions.location) deniedPerms.push('Location');
-        if (!permissions.storage) deniedPerms.push('Storage');
+        if (!permissions.storage) deniedPerms.push('Media/Storage');
         
         Alert.alert(
           'Permissions Needed',
@@ -79,12 +82,16 @@ export default function SplashScreen({ onReady }: SplashScreenProps) {
       <View style={styles.content}>
         {/* App Icon/Logo */}
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>📡</Text>
+          <SvgUri
+            uri="https://wisptools.io/wisptools-logo.svg"
+            width={140}
+            height={140}
+          />
         </View>
         
         {/* App Name */}
-        <Text style={styles.title}>WISP Field</Text>
-        <Text style={styles.subtitle}>Equipment Management</Text>
+        <Text style={styles.title}>WISPTools</Text>
+        <Text style={styles.subtitle}>Field Operations Suite</Text>
         
         {/* Status */}
         {error ? (
@@ -109,7 +116,7 @@ export default function SplashScreen({ onReady }: SplashScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827',
+    backgroundColor: colors.backgroundPrimary,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -118,20 +125,19 @@ const styles = StyleSheet.create({
     padding: 40
   },
   iconContainer: {
-    marginBottom: 30
-  },
-  icon: {
-    fontSize: 100
+    marginBottom: 30,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 8
   },
   subtitle: {
     fontSize: 18,
-    color: '#9ca3af',
+    color: colors.textSecondary,
     marginBottom: 60
   },
   loadingContainer: {
@@ -140,7 +146,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.textSecondary,
     marginTop: 16
   },
   errorContainer: {
@@ -152,7 +158,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#ef4444',
+    color: colors.danger,
     textAlign: 'center',
     maxWidth: 280
   },
@@ -160,7 +166,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     fontSize: 12,
-    color: '#6b7280'
+    color: colors.textTertiary
   }
 });
 

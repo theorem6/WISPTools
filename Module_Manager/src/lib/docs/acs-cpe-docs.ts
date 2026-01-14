@@ -5,7 +5,26 @@ export const acsCpeDocs = `
   <strong>Purpose:</strong> Manage TR-069 Customer Premise Equipment (CPE) devices using GenieACS Auto-Configuration Server (ACS). Monitor device status, configure parameters, and track device locations with GPS mapping.
 </div>
 
-<h4>🎯 Key Features</h4>
+<div class="toc">
+  <h4>📑 Table of Contents</h4>
+  <ul>
+    <li><a href="#key-features">🎯 Key Features</a></li>
+    <li><a href="#getting-started">🚀 Getting Started</a></li>
+    <li><a href="#map-view">🗺️ Map View</a></li>
+    <li><a href="#device-management">📊 Device Management</a></li>
+    <li><a href="#preset-management">⚙️ Preset Management</a></li>
+    <li><a href="#fault-management">🚨 Fault Management</a></li>
+    <li><a href="#administration">🔧 Administration</a></li>
+    <li><a href="#api-endpoints">📡 API Endpoints</a></li>
+    <li><a href="#security">🔐 Security</a></li>
+    <li><a href="#troubleshooting">🔍 Troubleshooting</a></li>
+    <li><a href="#best-practices">💡 Best Practices</a></li>
+    <li><a href="#integration">🌐 Integration</a></li>
+    <li><a href="#additional-resources">📚 Additional Resources</a></li>
+  </ul>
+</div>
+
+<h4 id="key-features">🎯 Key Features</h4>
 <ul>
   <li><strong>Device Discovery:</strong> Automatically discover CPE devices via TR-069</li>
   <li><strong>GPS Mapping:</strong> View device locations on interactive ArcGIS map</li>
@@ -15,7 +34,7 @@ export const acsCpeDocs = `
   <li><strong>Preset Management:</strong> Create and apply configuration templates</li>
 </ul>
 
-<h4>🚀 Getting Started</h4>
+<h4 id="getting-started">🚀 Getting Started</h4>
 
 <h4>Step 1: Ensure GenieACS Services Are Running</h4>
 <p>Navigate to <strong>Administration → Service Status</strong> to verify:</p>
@@ -57,7 +76,7 @@ ACS Password: (optional)</code></pre>
   <li><strong>Auto-Fit:</strong> Automatically centers on all devices</li>
 </ul>
 
-<h4>📊 Device Management</h4>
+<h4 id="device-management">📊 Device Management</h4>
 
 <h4>View Devices:</h4>
 <p>Navigate to <strong>Devices</strong> tab to see:</p>
@@ -117,7 +136,7 @@ ACS Password: (optional)</code></pre>
   <li>Monitor application progress</li>
 </ul>
 
-<h4>🚨 Fault Management</h4>
+<h4 id="fault-management">🚨 Fault Management</h4>
 
 <p>Track and manage device faults reported via TR-069.</p>
 
@@ -160,7 +179,7 @@ ACS Password: (optional)</code></pre>
 <h4>Setup:</h4>
 <p>View GenieACS deployment status and configuration</p>
 
-<h4>📡 API Endpoints</h4>
+<h4 id="api-endpoints">📡 API Endpoints</h4>
 
 <h4>Exposed via Proxy Routes:</h4>
 <ul>
@@ -177,7 +196,7 @@ ACS Password: (optional)</code></pre>
   <li><code>/api/mongo/database/*</code> - Database operations</li>
 </ul>
 
-<h4>🔐 Security</h4>
+<h4 id="security">🔐 Security</h4>
 
 <div class="warning">
   <strong>Important:</strong> 
@@ -190,7 +209,7 @@ ACS Password: (optional)</code></pre>
   </ul>
 </div>
 
-<h4>🔍 Troubleshooting</h4>
+<h4 id="troubleshooting">🔍 Troubleshooting</h4>
 
 <h4>Devices not appearing:</h4>
 <ul>
@@ -215,7 +234,7 @@ ACS Password: (optional)</code></pre>
   <li>Verify device location data format</li>
 </ul>
 
-<h4>💡 Best Practices</h4>
+<h4 id="best-practices">💡 Best Practices</h4>
 <ul>
   <li><strong>Regular Monitoring:</strong> Check device status daily</li>
   <li><strong>Preset Testing:</strong> Test presets on single device before bulk apply</li>
@@ -225,7 +244,7 @@ ACS Password: (optional)</code></pre>
   <li><strong>Service Monitoring:</strong> Set up alerts for service failures</li>
 </ul>
 
-<h4>🌐 Integration</h4>
+<h4 id="integration">🌐 Integration</h4>
 
 <h4>MongoDB Atlas:</h4>
 <p>Stores presets, faults, and persistent configurations</p>
@@ -250,7 +269,45 @@ App Hosting (/nbi proxy)
     ↓
 Web UI (this app)</code></pre>
 
-<h4>📚 Additional Resources</h4>
+<h4 id="additional-resources">📚 Additional Resources</h4>
+<ul>
+  <li><a href="https://genieacs.com/" target="_blank">GenieACS Documentation</a></li>
+  <li><a href="https://www.broadband-forum.org/technical/download/TR-069.pdf" target="_blank">TR-069 Protocol Specification</a></li>
+  <li><a href="https://developers.arcgis.com/" target="_blank">ArcGIS JavaScript API Docs</a></li>
+</ul>
+`;
+
+
+Internal CWMP Server (7547)
+    ↓
+MongoDB (device data)
+    ↓
+NBI API (7557)
+    ↓
+App Hosting (/nbi proxy)
+    ↓
+Web UI (this app)</code></pre>
+
+<h4 id="additional-resources">📚 Additional Resources</h4>
+<ul>
+  <li><a href="https://genieacs.com/" target="_blank">GenieACS Documentation</a></li>
+  <li><a href="https://www.broadband-forum.org/technical/download/TR-069.pdf" target="_blank">TR-069 Protocol Specification</a></li>
+  <li><a href="https://developers.arcgis.com/" target="_blank">ArcGIS JavaScript API Docs</a></li>
+</ul>
+`;
+
+
+Internal CWMP Server (7547)
+    ↓
+MongoDB (device data)
+    ↓
+NBI API (7557)
+    ↓
+App Hosting (/nbi proxy)
+    ↓
+Web UI (this app)</code></pre>
+
+<h4 id="additional-resources">📚 Additional Resources</h4>
 <ul>
   <li><a href="https://genieacs.com/" target="_blank">GenieACS Documentation</a></li>
   <li><a href="https://www.broadband-forum.org/technical/download/TR-069.pdf" target="_blank">TR-069 Protocol Specification</a></li>

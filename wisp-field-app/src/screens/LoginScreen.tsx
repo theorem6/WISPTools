@@ -19,6 +19,7 @@ import firestore from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { apiService } from '../services/apiService';
+import { colors } from '../theme/colors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -98,7 +99,7 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <Text style={styles.logo}>📡</Text>
-          <Text style={styles.appName}>WISP Field App</Text>
+          <Text style={styles.appName}>WISPTools.io</Text>
           <Text style={styles.tagline}>Equipment Tracking & Documentation</Text>
         </View>
 
@@ -106,7 +107,7 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#6b7280"
+            placeholderTextColor={colors.textTertiary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -117,7 +118,7 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor="#6b7280"
+            placeholderTextColor={colors.textTertiary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -130,7 +131,7 @@ export default function LoginScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textPrimary} />
             ) : (
               <Text style={styles.loginText}>🔐 Login</Text>
             )}
@@ -148,7 +149,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111827'
+    backgroundColor: colors.backgroundPrimary
   },
   content: {
     flex: 1,
@@ -166,42 +167,44 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 8
   },
   tagline: {
     fontSize: 14,
-    color: '#9ca3af'
+    color: colors.textSecondary
   },
   form: {
     gap: 15
   },
   input: {
-    backgroundColor: '#1f2937',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: colors.border,
     borderRadius: 8,
     padding: 15,
     fontSize: 16,
-    color: '#fff'
+    color: colors.textPrimary
   },
   loginButton: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10
   },
   loginText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: 'bold'
   },
   footer: {
     textAlign: 'center',
-    color: '#6b7280',
+    color: colors.textTertiary,
     marginTop: 30,
     fontSize: 12
   }
 });
+
+
 

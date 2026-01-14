@@ -136,8 +136,26 @@
       return;
     }
     
+    // Validate coordinates
+    if (!formData.latitude || !formData.longitude || 
+        formData.latitude === 0 && formData.longitude === 0 ||
+        isNaN(formData.latitude) || isNaN(formData.longitude)) {
+      error = 'Please select a location on the map or enter valid coordinates';
+      return;
+    }
+    
     isSaving = true;
     error = '';
+    
+    console.log('[AddSiteModal] Saving site:', {
+      planId,
+      hasPlanId: !!planId,
+      name: formData.name,
+      type: formData.type,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
+      existingDraft: !!existingDraft
+    });
     
     try {
       if (planId) {
@@ -242,6 +260,13 @@
       }
       handleClose();
     } catch (err: any) {
+      console.error('[AddSiteModal] Error saving site:', err);
+      console.error('[AddSiteModal] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        planId,
+        formData
+      });
       error = err.message || 'Failed to create site';
     } finally {
       isSaving = false;

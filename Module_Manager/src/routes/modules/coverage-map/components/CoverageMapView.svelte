@@ -62,6 +62,7 @@ export let isPlanMode = false;
     mapView = null;
   });
 
+  // Reactive statements to update map when data changes
   $: controller && controller.setData({ towers, sectors, cpeDevices, equipment });
   $: controller && controller.setFilters(filters);
   $: controller && controller.setPlanFeatures(externalPlanFeatures);
@@ -105,6 +106,12 @@ export let isPlanMode = false;
 
   export function setPlanFeaturesVisibility(visible: boolean): void {
     controller?.setPlanFeaturesVisibility(visible);
+  }
+
+  export function refreshMapData(): void {
+    if (controller) {
+      controller.setData({ towers, sectors, cpeDevices, equipment });
+    }
   }
 </script>
 

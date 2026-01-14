@@ -1,7 +1,16 @@
-rootProject.name = 'WISPFieldApp'
-apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
-include ':app'
-includeBuild('../node_modules/@react-native/gradle-plugin')
+// Simplified settings.gradle for ARM64 Android app
+rootProject.name = "WISPFieldApp"
+include(":app")
 
-// All React Native modules are auto-included by applyNativeModulesSettingsGradle above
+// Removed React Native modules for ARM64 compatibility
+// include(":react-native-firebase_app")
+// project(":react-native-firebase_app").projectDir = new File(rootDir, "../node_modules/@react-native-firebase/app/android")
 
+// include(":react-native-firebase_auth")
+// project(":react-native-firebase_auth").projectDir = new File(rootDir, "../node_modules/@react-native-firebase/auth/android")
+
+// include(":react-native-firebase_firestore")
+// project(":react-native-firebase_firestore").projectDir = new File(rootDir, "../node_modules/@react-native-firebase/firestore/android")
+
+// include(":react-native-firebase_messaging")
+// project(":react-native-firebase_messaging").projectDir = new File(rootDir, "../node_modules/@react-native-firebase/messaging/android")

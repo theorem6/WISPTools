@@ -2,12 +2,19 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   import { authService } from '$lib/services/authService';
+  import { coverageMapService } from '../../coverage-map/lib/coverageMapService.mongodb';
 
   export let show = false;
   export let tenantId: string;
   export let siteData: any = null;
 
   const dispatch = createEventDispatcher();
+  
+  // Site selection
+  let sites: any[] = [];
+  let loadingSites = false;
+  let selectedSiteId: string = '';
+  let selectedSite: any = null;
 
   let currentStep = 1;
   let totalSteps = 7; // Will be calculated based on deployment type
@@ -99,9 +106,13 @@
 
   onMount(async () => {
     if (show) {
+      await loadSites();
+      
       if (siteData) {
         // Initialize with site data
         console.log(`[EPCDeployment] Initializing for site: ${siteData.name}`);
+        selectedSiteId = siteData.id || siteData._id || '';
+        selectedSite = siteData;
         epcConfig.siteName = siteData.name || '';
         epcConfig.location.address = siteData.location?.address || '';
         epcConfig.location.city = siteData.location?.city || '';
@@ -117,13 +128,53 @@
       } else if ($currentTenant?.id) {
         // Initialize with tenant data if available
         console.log(`[EPCDeployment] Initializing for tenant: ${$currentTenant.id}`);
-        epcConfig.siteName = $currentTenant.name || '';
         epcConfig.contact.name = getTenantContactField('contactName');
         epcConfig.contact.email = getTenantContactField('contactEmail');
         epcConfig.contact.phone = getTenantContactField('contactPhone');
       }
     }
   });
+  
+  // Reload sites when modal opens
+  $: if (show && (tenantId || $currentTenant?.id)) {
+    loadSites();
+  }
+  
+  async function loadSites() {
+    if (!tenantId && !$currentTenant?.id) return;
+    
+    loadingSites = true;
+    try {
+      const effectiveTenantId = tenantId || $currentTenant?.id || '';
+      const allSites = await coverageMapService.getTowerSites(effectiveTenantId);
+      sites = allSites || [];
+      console.log(`[EPCDeployment] Loaded ${sites.length} sites`);
+    } catch (err: any) {
+      console.error('[EPCDeployment] Failed to load sites:', err);
+      error = `Failed to load sites: ${err.message}`;
+    } finally {
+      loadingSites = false;
+    }
+  }
+  
+  // Watch for site selection changes
+  $: if (selectedSiteId && sites.length > 0) {
+    selectedSite = sites.find(s => String(s.id || s._id) === String(selectedSiteId));
+    if (selectedSite) {
+      epcConfig.siteName = selectedSite.name || '';
+      epcConfig.location.address = selectedSite.location?.address || '';
+      epcConfig.location.city = selectedSite.location?.city || '';
+      epcConfig.location.state = selectedSite.location?.state || '';
+      epcConfig.location.coordinates.latitude = selectedSite.location?.latitude || selectedSite.location?.coordinates?.latitude || 0;
+      epcConfig.location.coordinates.longitude = selectedSite.location?.longitude || selectedSite.location?.coordinates?.longitude || 0;
+      
+      if (selectedSite.siteContact) {
+        epcConfig.contact.name = selectedSite.siteContact.name || '';
+        epcConfig.contact.email = selectedSite.siteContact.email || '';
+        epcConfig.contact.phone = selectedSite.siteContact.phone || '';
+      }
+    }
+  }
 
   $: if (show && siteData) {
     console.log(`[EPCDeployment] Site data loaded: ${siteData.name}`);
@@ -183,16 +234,11 @@
   // Removed step-based navigation, using tabs instead
 
   function validateConfig(): boolean {
-    if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
+    // Site ID is required for linking/deploying remotes
+    if (!selectedSiteId || !selectedSiteId.trim()) {
       return false;
     }
-    if (!epcConfig.location.address || !epcConfig.location.address.trim()) {
-      return false;
-    }
-    if (!epcConfig.contact.name || !epcConfig.contact.name.trim()) {
-      return false;
-    }
-    if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
+    if (!selectedSite) {
       return false;
     }
     // EPC network validation (only when EPC is selected)
@@ -212,17 +258,11 @@
 
   function getValidationErrors(): string[] {
     const errors: string[] = [];
-    if (!epcConfig.siteName || !epcConfig.siteName.trim()) {
-      errors.push('Site Name is required');
+    if (!selectedSiteId || !selectedSiteId.trim()) {
+      errors.push('Site selection is required to link/deploy remotes');
     }
-    if (!epcConfig.location.address || !epcConfig.location.address.trim()) {
-      errors.push('Address is required');
-    }
-    if (!epcConfig.contact.name || !epcConfig.contact.name.trim()) {
-      errors.push('Contact Name is required');
-    }
-    if (!epcConfig.contact.email || !epcConfig.contact.email.trim()) {
-      errors.push('Contact Email is required');
+    if (!selectedSite) {
+      errors.push('Selected site not found. Please select a valid site.');
     }
     // EPC network validation (only when EPC is selected)
     if (deploymentType === 'epc' || deploymentType === 'both') {
@@ -285,9 +325,13 @@
       // Step 1: Deployment Type - no validation needed
       currentStep++;
     } else if (currentStep === getStepNumber('site')) {
-      // Site Info
-      if (!epcConfig.siteName || !epcConfig.location.address || !epcConfig.contact.name || !epcConfig.contact.email) {
-        error = 'Please fill in all required fields';
+      // Site Info - require site selection
+      if (!selectedSiteId || !selectedSiteId.trim()) {
+        error = 'Please select a site. A site is required to link/deploy remotes.';
+        return;
+      }
+      if (!selectedSite) {
+        error = 'Selected site not found. Please select a valid site.';
         return;
       }
       currentStep++;
@@ -1018,6 +1062,10 @@ echo "🎉 Deployment successful!";
 
   // Link device by entering device code
   async function linkDeviceByCode() {
+    if (!selectedSiteId || !selectedSiteId.trim()) {
+      error = 'Please select a site. A site is required to link device codes.';
+      return;
+    }
     if (!deviceCode || deviceCode.length !== 8) {
       error = 'Please enter a valid 8-character device code';
       return;
@@ -1044,6 +1092,7 @@ echo "🎉 Deployment successful!";
           device_code: deviceCode.toUpperCase(),
           tenant_id: tenantId,
           config: {
+            site_id: selectedSiteId, // REQUIRED: Site ID for linking/deploying remotes
             site_name: epcConfig.siteName,
             deployment_type: deploymentType,
             enable_epc: deploymentType === 'epc' || deploymentType === 'both',
@@ -1339,44 +1388,54 @@ echo "🎉 Deployment successful!";
           {:else if currentStep === 2}
             <div class="step-panel">
               <h3>Step 2: Site Information</h3>
-              <p class="step-description">Enter basic site details</p>
+              <p class="step-description">Select a site to deploy the remote EPC/SNMP agent. Site selection is required to link device codes.</p>
               <div class="form-section">
                 <div class="form-group">
-                  <label for="siteName">Site Name *</label>
-                  <input id="siteName" type="text" bind:value={epcConfig.siteName} placeholder="Enter site name" required />
+                  <label for="siteSelect">Select Site *</label>
+                  {#if loadingSites}
+                    <select id="siteSelect" disabled>
+                      <option>Loading sites...</option>
+                    </select>
+                  {:else if sites.length === 0}
+                    <select id="siteSelect" disabled>
+                      <option>No sites available. Please create a site first.</option>
+                    </select>
+                    <p class="form-hint" style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+                      You need to create a site in the Coverage Map module before deploying remotes.
+                    </p>
+                  {:else}
+                    <select id="siteSelect" bind:value={selectedSiteId} required>
+                      <option value="">-- Select a site --</option>
+                      {#each sites as site}
+                        <option value={site.id || site._id}>{site.name || 'Unnamed Site'}</option>
+                      {/each}
+                    </select>
+                  {/if}
                 </div>
-                <div class="form-group">
-                  <label for="address">Address *</label>
-                  <input id="address" type="text" bind:value={epcConfig.location.address} placeholder="Enter address" required />
-                </div>
-                <div class="form-row">
+                {#if selectedSiteId && selectedSite}
                   <div class="form-group">
-                    <label for="city">City</label>
-                    <input id="city" type="text" bind:value={epcConfig.location.city} placeholder="Enter city" />
+                    <label>Site Name</label>
+                    <input type="text" value={epcConfig.siteName} readonly />
                   </div>
                   <div class="form-group">
-                    <label for="state">State</label>
-                    <input id="state" type="text" bind:value={epcConfig.location.state} placeholder="Enter state" />
+                    <label>Location</label>
+                    <input type="text" value={epcConfig.location.address || 'N/A'} readonly />
                   </div>
-                  <div class="form-group">
-                    <label for="country">Country</label>
-                    <input id="country" type="text" bind:value={epcConfig.location.country} placeholder="Enter country" />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="contactName">Contact Name *</label>
-                  <input id="contactName" type="text" bind:value={epcConfig.contact.name} placeholder="Enter contact name" required />
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label for="contactEmail">Email *</label>
-                    <input id="contactEmail" type="email" bind:value={epcConfig.contact.email} placeholder="Enter email" required />
-                  </div>
-                  <div class="form-group">
-                    <label for="contactPhone">Phone</label>
-                    <input id="contactPhone" type="tel" bind:value={epcConfig.contact.phone} placeholder="Enter phone" />
-                  </div>
-                </div>
+                  {#if epcConfig.contact.name || epcConfig.contact.email}
+                    <div class="form-group">
+                      <label>Contact</label>
+                      <input type="text" value={epcConfig.contact.name || 'N/A'} readonly />
+                    </div>
+                    <div class="form-group">
+                      <label>Email</label>
+                      <input type="text" value={epcConfig.contact.email || 'N/A'} readonly />
+                    </div>
+                  {/if}
+                {:else}
+                  <p class="form-hint" style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+                    Select a site above to auto-fill site information.
+                  </p>
+                {/if}
               </div>
             </div>
 
@@ -2338,6 +2397,124 @@ echo "🎉 Deployment successful!";
     justify-content: center;
     margin-bottom: var(--spacing-lg);
   }
+
+  .device-code-input {
+    width: 280px;
+    padding: var(--spacing-lg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 24px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    letter-spacing: 6px;
+    text-align: center;
+    text-transform: uppercase;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .device-code-input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.2);
+  }
+
+  .device-code-input::placeholder {
+    color: var(--text-tertiary);
+    letter-spacing: 4px;
+  }
+
+  .link-success {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-md);
+    text-align: left;
+  }
+
+  .link-success .success-icon {
+    font-size: 2rem;
+  }
+
+  .link-success strong {
+    display: block;
+    color: var(--success);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .link-success p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .download-option.selected {
+    border-color: var(--brand-primary);
+    background: var(--bg-tertiary);
+  }
+</style>
+
+  .device-code-input {
+    width: 280px;
+    padding: var(--spacing-lg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 24px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    letter-spacing: 6px;
+    text-align: center;
+    text-transform: uppercase;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .device-code-input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.2);
+  }
+
+  .device-code-input::placeholder {
+    color: var(--text-tertiary);
+    letter-spacing: 4px;
+  }
+
+  .link-success {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-md);
+    text-align: left;
+  }
+
+  .link-success .success-icon {
+    font-size: 2rem;
+  }
+
+  .link-success strong {
+    display: block;
+    color: var(--success);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .link-success p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .download-option.selected {
+    border-color: var(--brand-primary);
+    background: var(--bg-tertiary);
+  }
+</style>
 
   .device-code-input {
     width: 280px;

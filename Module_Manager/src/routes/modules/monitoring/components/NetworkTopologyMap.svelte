@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
   
   const dispatch = createEventDispatcher();
@@ -129,10 +129,14 @@
     if (devices.length > 0) {
       updateTopology();
     }
-    
+
     if (topologyConfig.autoRefresh) {
       startAutoRefresh();
     }
+  });
+  
+  onDestroy(() => {
+    stopAutoRefresh();
   });
   
   // Watch for device/SNMP data changes
@@ -1214,6 +1218,14 @@
   
   .btn-sm {
     padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+  }
+</style>
+
+    font-size: 0.75rem;
+  }
+</style>
+
     font-size: 0.75rem;
   }
 </style>

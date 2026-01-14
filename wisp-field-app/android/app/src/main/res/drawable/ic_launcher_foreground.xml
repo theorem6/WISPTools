@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Full circle background (black) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M54,54m-54,0a54,54 0,1 1,108 0a54,54 0,1 1,-108 0" />
+    
+    <!-- Outer Glow (subtle) -->
+    <path
+        android:fillColor="#00d9ff"
+        android:fillAlpha="0.15"
+        android:pathData="M54,54m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0" />
+
+    <!-- Main Hexagon Frame (scaled for circle) -->
+    <path
+        android:fillColor="#1a2332"
+        android:strokeColor="#00d9ff"
+        android:strokeWidth="1.5"
+        android:pathData="M54,16 L84,32 L84,76 L54,92 L24,76 L24,32 Z" />
+
+    <!-- Circuit Lines (Cyan) -->
+    <group android:strokeColor="#00d9ff" android:strokeWidth="0.5">
+        <!-- Left Side -->
+        <path android:pathData="M24,36 L16,36" />
+        <path android:pathData="M24,48 L12,48" />
+        <path android:pathData="M24,60 L16,60" />
+        
+        <!-- Right Side -->
+        <path android:pathData="M84,36 L92,36" />
+        <path android:pathData="M84,48 L96,48" />
+        <path android:pathData="M84,60 L92,60" />
+    </group>
+
+    <!-- Circuit Terminal Dots -->
+    <group android:fillColor="#00d9ff">
+        <path android:pathData="M16,36m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+        <path android:pathData="M12,48m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+        <path android:pathData="M16,60m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+        
+        <path android:pathData="M92,36m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+        <path android:pathData="M96,48m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+        <path android:pathData="M92,60m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0" />
+    </group>
+
+    <!-- The 'W' with gradient effect (green to blue) - scaled for circle -->
+    <!-- Left side - Green -->
+    <group android:fillColor="#00ff88">
+        <path android:pathData="M32,26h4v38h-4z" />
+        <path android:pathData="M36,64h4v6h-4z" />
+    </group>
+    <!-- Center - Transition -->
+    <group android:fillColor="#00d9ff">
+        <path android:pathData="M51,38h4v32h-4z" />
+    </group>
+    <!-- Right side - Blue -->
+    <group android:fillColor="#3b82f6">
+        <path android:pathData="M68,64h4v6h-4z" />
+        <path android:pathData="M72,26h4v38h-4z" />
+    </group>
+
+    <!-- Shine Overlay (subtle) -->
+    <path
+        android:fillColor="#ffffff"
+        android:fillAlpha="0.08"
+        android:pathData="M54,16 L84,32 L84,44 L54,28 L24,44 L24,32 Z" />
+</vector>

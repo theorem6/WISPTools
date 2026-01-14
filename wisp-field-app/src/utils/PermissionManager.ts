@@ -34,16 +34,33 @@ export async function requestAllPermissions(): Promise<PermissionStatus> {
   };
 
   try {
-    // Request multiple permissions at once
-    const results = await PermissionsAndroid.requestMultiple([
+    const requests: string[] = [
       PermissionsAndroid.PERMISSIONS.CAMERA,
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+    ];
+
+    // Android 13+ splits storage into READ_MEDIA_*; fall back to legacy on older OS
+    const apiLevel = Platform.Version as number;
+    if (apiLevel >= 33) {
+      // Request images permission to cover photo attachments
+      requests.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES);
+    } else {
+      requests.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
+    }
+
+    // Request multiple permissions at once with a timeout safeguard to avoid hangs
+    const results = await Promise.race([
+      PermissionsAndroid.requestMultiple(requests),
+      new Promise<Record<string, PermissionsAndroid.PermissionStatus>>((resolve) =>
+        setTimeout(() => resolve({}), 10000)
+      ),
     ]);
 
     status.camera = results[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
     status.location = results[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] === PermissionsAndroid.RESULTS.GRANTED;
-    status.storage = results[PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE] === PermissionsAndroid.RESULTS.GRANTED;
+    status.storage =
+      results[PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE] === PermissionsAndroid.RESULTS.GRANTED ||
+      results[PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES] === PermissionsAndroid.RESULTS.GRANTED;
     
     status.allGranted = status.camera && status.location && status.storage;
 

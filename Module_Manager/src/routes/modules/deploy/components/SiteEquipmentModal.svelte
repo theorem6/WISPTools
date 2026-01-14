@@ -332,12 +332,36 @@
         const normalizedSiteId = siteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
         const normalizedEqSiteId = eqSiteIdStr.replace(/^ObjectId\(/, '').replace(/\)$/, '');
         
-        const matches = normalizedEqSiteId && normalizedSiteId && (
+        const matchesById = normalizedEqSiteId && normalizedSiteId && (
           normalizedEqSiteId === normalizedSiteId ||
           normalizedEqSiteId.toString() === normalizedSiteId.toString()
         );
         
-        if (eqSiteId && !matches) {
+        // Also try location-based matching if siteId doesn't match but locationType is 'tower' and location is close
+        let matchesByLocation = false;
+        if (!matchesById && eq.locationType === 'tower' && site.location?.latitude && site.location?.longitude && eq.location?.latitude && eq.location?.longitude) {
+          const siteLat = site.location.latitude;
+          const siteLon = site.location.longitude;
+          const eqLat = eq.location.latitude;
+          const eqLon = eq.location.longitude;
+          
+          // Calculate distance in kilometers
+          const R = 6371;
+          const dLat = (eqLat - siteLat) * Math.PI / 180;
+          const dLon = (eqLon - siteLon) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(siteLat * Math.PI / 180) * Math.cos(eqLat * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+          
+          // Match if within 100 meters (0.1 km)
+          matchesByLocation = distance < 0.1;
+        }
+        
+        const matches = matchesById || matchesByLocation;
+        
+        if (eqSiteId && !matchesById && !matchesByLocation) {
           console.log('[SiteEquipmentModal] Equipment does not match:', {
             equipmentName: eq.name,
             eqSiteId: eqSiteId,
@@ -346,7 +370,9 @@
             targetSiteId: siteId,
             targetSiteIdStr: siteIdStr,
             normalizedSiteId: normalizedSiteId,
-            siteIdObject: eq.siteId
+            siteIdObject: eq.siteId,
+            locationType: eq.locationType,
+            hasLocation: !!(eq.location?.latitude && eq.location?.longitude)
           });
         }
         
@@ -804,6 +830,58 @@
   .detail-row .label {
     font-weight: 500;
     min-width: 120px;
+    color: var(--text-secondary, #6b7280);
+  }
+
+  .detail-row .value {
+    color: var(--text-primary, #111827);
+  }
+
+  .detail-row .value.mono {
+    font-family: monospace;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge.active,
+  .status-badge.deployed {
+    background: #d1fae5;
+    color: #065f46;
+  }
+</style>
+
+
+    color: var(--text-secondary, #6b7280);
+  }
+
+  .detail-row .value {
+    color: var(--text-primary, #111827);
+  }
+
+  .detail-row .value.mono {
+    font-family: monospace;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .status-badge.active,
+  .status-badge.deployed {
+    background: #d1fae5;
+    color: #065f46;
+  }
+</style>
+
+
     color: var(--text-secondary, #6b7280);
   }
 

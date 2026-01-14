@@ -1,10 +1,34 @@
-const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
 /**
- * Metro configuration
+ * Metro configuration for WISPTools.io
  * https://facebook.github.io/metro/docs/configuration
  */
-const config = {};
+const defaultConfig = getDefaultConfig(__dirname);
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+const config = {
+  resolver: {
+    // Resolve file extensions
+    sourceExts: [...defaultConfig.resolver.sourceExts, 'json'],
+    // Asset extensions
+    assetExts: defaultConfig.resolver.assetExts.filter((ext) => ext !== 'svg'),
+  },
+  transformer: {
+    // Suppress warnings and optimize
+    getTransformOptions: async () => ({
+      transform: {
+        experimentalImportSupport: false,
+        inlineRequires: true,
+      },
+    }),
+  },
+  // Suppress watchman warnings
+  watchFolders: [],
+  // Reduce verbosity
+  reporter: {
+    update: () => {},
+  },
+};
+
+module.exports = mergeConfig(defaultConfig, config);
 

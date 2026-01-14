@@ -40,10 +40,13 @@ router.get('/epc/remote/list', async (req, res) => {
 
     console.log(`[HSS/EPC] Fetching remote EPCs for tenant: ${tenantId}`);
 
-    // Get EPCs from RemoteEPC collection (devices linked via device code)
-    const remoteEPCs = await RemoteEPC.find({ tenant_id: tenantId }).lean();
+    // Get EPCs from RemoteEPC collection - TENANT-SPECIFIC ONLY
+    // Only return EPCs that belong to this tenant (no unassigned EPCs for regular tenants)
+    const remoteEPCs = await RemoteEPC.find({ 
+      tenant_id: tenantId 
+    }).lean();
     
-    console.log(`[HSS/EPC] Found ${remoteEPCs.length} remote EPCs`);
+    console.log(`[HSS/EPC] Found ${remoteEPCs.length} EPCs for tenant ${tenantId}`);
 
     // Get latest service status for each EPC to include metrics
     const { EPCServiceStatus } = require('../../models/distributed-epc-schema');
@@ -585,5 +588,11 @@ router.delete('/epc/:epc_id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete EPC', message: error.message });
   }
 });
+
+module.exports = router;
+
+
+module.exports = router;
+
 
 module.exports = router;

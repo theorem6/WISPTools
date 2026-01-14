@@ -30,6 +30,9 @@ import { coverageMapService } from './lib/coverageMapService.mongodb';
   import { reportGenerator } from './lib/reportGenerator';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
   import { coverageMapDocs } from '$lib/docs/coverage-map-docs';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { getModuleTips } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
   import { objectStateManager, type ModuleContext } from '$lib/services/objectStateManager';
 import { mapLayerManager } from '$lib/map/MapLayerManager';
   import type { 
@@ -50,7 +53,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let error = '';
   let success = '';
   let showFilters = false;
-  let showMainMenu = false;
   let showStats = false;
   let currentBasemap = 'topo-vector';
   
@@ -75,6 +77,26 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   let showSiteEditModal = false;
   let showHelpModal = false;
   const helpContent = coverageMapDocs;
+  
+  // Tips Modal
+  let showTipsModal = false;
+  const tips = getModuleTips('coverage-map');
+  
+  // Check if we're in an iframe (will be set in onMount)
+  let isInIframe = false;
+  
+  // Check if we're embedded (in iframe or plan/deploy mode) - don't show tips if embedded
+  $: isEmbedded = (() => {
+    if (typeof window === 'undefined') return false;
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPlanMode = urlParams.get('mode') === 'plan' || urlParams.get('planMode') === 'true';
+    const isDeployMode = urlParams.get('mode') === 'deploy' || urlParams.get('deployMode') === 'true';
+    return isInIframe || isPlanMode || isDeployMode;
+  })();
+  
+  // Guard flag to prevent duplicate loads
+  let isLoadingData = false;
+  let lastLoadedTenantId: string | null = null;
   let contextMenuX = 0;
   let contextMenuY = 0;
   let contextMenuLat: number | null = null;
@@ -413,10 +435,18 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     }
 
   onMount(async () => {
+    // Check if we're in an iframe (must be done in onMount where window is available)
+    isInIframe = window.parent && window.parent !== window;
+    
+    // Only show tips if NOT embedded (standalone coverage-map page)
+    if (!isEmbedded && tips.length > 0 && tipsService.shouldShowTips('coverage-map')) {
+      // Use requestAnimationFrame for minimal delay (single frame ~16ms)
+      requestAnimationFrame(() => {
+        showTipsModal = true;
+      });
+    }
+    
     window.addEventListener('message', handleSharedMapMessage);
-
-    // Check if we're in an iframe
-    const isInIframe = window.parent && window.parent !== window;
     
     if (isInIframe) {
       // Request state immediately
@@ -426,13 +456,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       const storedTenantId = typeof window !== 'undefined' ? localStorage.getItem('selectedTenantId') : null;
       if (storedTenantId && !tenantId) {
         console.log('[CoverageMap] Found tenantId in localStorage from parent:', storedTenantId);
-        // Wait a bit for state-update message, then load data
-        setTimeout(async () => {
+        // Use requestAnimationFrame for minimal delay instead of 500ms setTimeout
+        requestAnimationFrame(async () => {
           if (tenantId || storedTenantId) {
             await loadAllData();
           }
           isLoading = false;
-        }, 500);
+        });
       } else if (tenantId) {
         await loadAllData();
         isLoading = false;
@@ -454,24 +484,34 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   });
   
   // Watch for tenant changes and plan visibility changes
-  $: if (browser && tenantId && mapMode) {
+  // Only reload if tenant actually changed (not on every reactive update)
+  $: if (browser && tenantId && mapMode && tenantId !== lastLoadedTenantId && !isLoadingData) {
+    lastLoadedTenantId = tenantId;
     loadAllData();
   }
   
-  // Reload when plan visibility changes
-  $: if (browser && planId !== null) {
+  // Reload when plan visibility changes (only if planId actually changed)
+  let lastPlanId: string | null = null;
+  $: if (browser && planId !== null && planId !== lastPlanId && !isLoadingData) {
+    lastPlanId = planId;
     loadAllData();
   }
   
   let currentVisiblePlanIds: Set<string> = new Set();
 
   async function loadAllData() {
+    // Guard against duplicate concurrent loads
+    if (isLoadingData) {
+      return; // Silently skip duplicate calls
+    }
+    
     if (!tenantId) {
       return;
     }
     
-    console.log('[CoverageMap] loadAllData called');
-
+    isLoadingData = true;
+    lastLoadedTenantId = tenantId;
+    
     isLoading = true;
     error = '';
     
@@ -638,6 +678,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       error = err.message || 'Failed to load network data';
     } finally {
       isLoading = false;
+      isLoadingData = false; // Reset guard flag
     }
   }
 
@@ -779,13 +820,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
         if (window.parent && window.parent !== window) {
           console.log('[CoverageMap] Received tenantId in iframe, loading data...');
           // Use the tenantId from state to load data
-          setTimeout(() => {
-            if (tenantIdFromState) {
-              loadAllData().catch(err => {
-                console.error('[CoverageMap] Failed to load data after receiving tenantId:', err);
-              });
-            }
-          }, 100);
+          // Load immediately when tenantId is received (no delay needed)
+          if (tenantIdFromState && !isLoadingData) {
+            loadAllData().catch(err => {
+              console.error('[CoverageMap] Failed to load data after receiving tenantId:', err);
+            });
+          }
         }
       }
 
@@ -839,11 +879,12 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     } else if (source === 'plan-page') {
       // Handle messages from plan page
       if (type === 'visibility-changed') {
-        console.log('[CoverageMap] Plan visibility changed, reloading data:', event.data.detail);
-        // Reload all data to reflect visibility changes
-        loadAllData().catch(err => {
-          console.error('[CoverageMap] Failed to reload after visibility change:', err);
-        });
+        // Reload all data to reflect visibility changes (only if not already loading)
+        if (!isLoadingData) {
+          loadAllData().catch(err => {
+            console.error('[CoverageMap] Failed to reload after visibility change:', err);
+          });
+        }
       } else if (type === 'enable-rectangle-drawing') {
         if (mapComponent) {
           console.log('[CoverageMap] Enabling rectangle drawing...');
@@ -1429,6 +1470,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
       case 'change-site-type':
         // Change site type via edit modal
         if (tower) {
+          console.log('[CoverageMap] change-site-type action triggered for tower:', tower.id, tower.name);
           // If in iframe (deploy/plan mode), dispatch action to parent
           if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
             // Send message to parent in the format expected by iframeCommunicationService
@@ -1441,9 +1483,13 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
             console.log('[CoverageMap] Sent change-site-type action to parent', { objectId: tower.id });
           } else {
             // Standalone mode - open edit modal
-            selectedSiteForEdit = tower;
+            console.log('[CoverageMap] Opening SiteEditModal for change-site-type', { towerId: tower.id, towerName: tower.name, towerType: tower.type });
+            selectedSiteForEdit = { ...tower }; // Create a copy to ensure reactivity
             showSiteEditModal = true;
+            console.log('[CoverageMap] SiteEditModal state:', { show: showSiteEditModal, hasSite: !!selectedSiteForEdit });
           }
+        } else {
+          console.error('[CoverageMap] change-site-type action called but tower is null/undefined');
         }
         break;
       case 'view-details':
@@ -1687,25 +1733,59 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 
   <!-- Floating Control Panel -->
   <div class="floating-controls">
-    <button class="control-btn" onclick={() => goto('/dashboard')} title="Back to Dashboard">
-      ←
-    </button>
     {#if !isDeployMode}
       <button class="control-btn" onclick={() => showFilters = !showFilters} title="Toggle Filters">
         🔍
       </button>
     {/if}
-    <button class="control-btn" onclick={() => showStats = !showStats} title="Toggle Statistics">
-      📊
-    </button>
-    <button class="control-btn main-menu-btn" onclick={() => showMainMenu = !showMainMenu} title="Main Menu">
-      ☰
-    </button>
+    {#if !hideStats}
+      <button class="control-btn" onclick={() => showStats = !showStats} title="Toggle Statistics">
+        📊
+      </button>
+    {/if}
+    
+    <!-- Map Type Toggle -->
+    <div class="control-group">
+      <button class="control-btn map-control-btn" title="Toggle Map Type">
+        🗺️
+      </button>
+      <div class="control-dropdown">
+        <div class="dropdown-section">
+          <div class="dropdown-label">Map View</div>
+          <div class="basemap-switcher-inline">
+            <button 
+              class="basemap-btn-inline" 
+              class:active={currentBasemap === 'streets-vector'}
+              onclick={() => changeBasemap('streets-vector')}
+              title="Streets"
+            >
+              🛣️
+            </button>
+            <button 
+              class="basemap-btn-inline" 
+              class:active={currentBasemap === 'hybrid'}
+              onclick={() => changeBasemap('hybrid')}
+              title="Satellite"
+            >
+              🛰️
+            </button>
+            <button 
+              class="basemap-btn-inline" 
+              class:active={currentBasemap === 'topo-vector'}
+              onclick={() => changeBasemap('topo-vector')}
+              title="Topographic"
+            >
+              🗺️
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
   
   <!-- Help Button - Fixed Position -->
-  <button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <button class="help-button" onclick={() => showHelpModal = true} aria-label="Open Help" title="Help">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"></circle>
       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
       <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -1740,91 +1820,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   {/if}
 
 
-  <!-- Main Menu Modal -->
-  {#if showMainMenu}
-  <div class="modal-overlay" onclick={() => showMainMenu = false}>
-    <div class="modal-content main-menu-modal" onclick={(e) => e.stopPropagation()}>
-      <div class="modal-header">
-        <h3>🗺️ Coverage Map Controls</h3>
-        <button class="close-btn" onclick={() => showMainMenu = false}>✕</button>
-      </div>
-      
-      <div class="modal-body">
-        <!-- Basemap Switcher -->
-        <div class="menu-section">
-          <h4>🗺️ Map View</h4>
-          <div class="basemap-switcher">
-            <button 
-              class="basemap-btn" 
-              class:active={currentBasemap === 'streets-vector'}
-              onclick={() => changeBasemap('streets-vector')}
-            >
-              🛣️ Streets
-            </button>
-            <button 
-              class="basemap-btn" 
-              class:active={currentBasemap === 'hybrid'}
-              onclick={() => changeBasemap('hybrid')}
-            >
-              🛰️ Satellite
-            </button>
-            <button 
-              class="basemap-btn" 
-              class:active={currentBasemap === 'topo-vector'}
-              onclick={() => changeBasemap('topo-vector')}
-            >
-              🗺️ Topographic
-            </button>
-          </div>
-        </div>
-
-        <!-- Add Equipment -->
-        <div class="menu-section">
-          <h4>➕ Add Equipment</h4>
-          <div class="action-grid">
-            <button class="action-btn" onclick={handleAddSite}>
-              📡 Tower Site
-            </button>
-            <button class="action-btn" onclick={() => handleAddSector(null)}>
-              📶 Sector
-            </button>
-            <button class="action-btn" onclick={handleAddCPE}>
-              📱 CPE Device
-            </button>
-            <button class="action-btn" onclick={() => showAddNOCModal = true}>
-              🏢 NOC
-            </button>
-            <button class="action-btn" onclick={() => showAddWarehouseModal = true}>
-              🏭 Warehouse
-            </button>
-            <button class="action-btn" onclick={() => showAddVehicleModal = true}>
-              🚛 Vehicle
-            </button>
-          </div>
-        </div>
-
-        <!-- Import/Export -->
-        <div class="menu-section">
-          <h4>📥 Import & Export</h4>
-          <div class="action-grid">
-            <button class="action-btn" onclick={handleImportFromCBRS}>
-              📡 Import from CBRS
-            </button>
-            <button class="action-btn" onclick={handleImportFromACS}>
-              📱 Import from ACS
-            </button>
-            <button class="action-btn" onclick={handleExportCSV}>
-              📊 Export CSV
-            </button>
-            <button class="action-btn" onclick={handleExportPDF}>
-              🖨️ Print PDF
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  {/if}
 
   <!-- Filters Modal -->
   {#if showFilters && !isDeployMode}
@@ -2105,7 +2100,16 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 />
 
 <!-- Help Modal -->
-<HelpModal 
+{#if !isEmbedded}
+<TipsModal
+  bind:show={showTipsModal}
+  moduleId="coverage-map"
+  tips={tips}
+  on:close={() => showTipsModal = false}
+/>
+{/if}
+
+<HelpModal
   show={showHelpModal}
   title="Coverage Map Help"
   content={helpContent}
@@ -2201,39 +2205,124 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     transform: scale(1.1);
   }
 
-  .main-menu-btn {
-    background: rgba(124, 58, 237, 0.8);
-    border-color: rgba(124, 58, 237, 0.5);
+  .map-control-btn {
+    background: rgba(59, 130, 246, 0.8);
+    border-color: rgba(59, 130, 246, 0.5);
   }
+  
+  .map-control-btn:hover {
+    background: rgba(59, 130, 246, 0.95);
+    border-color: rgba(59, 130, 246, 0.7);
+  }
+  
+  .control-group {
+    position: relative;
+  }
+  
+  .control-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 280px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .control-group:hover .control-dropdown,
+  .control-group:focus-within .control-dropdown {
+    display: flex;
+  }
+  
+  .dropdown-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .dropdown-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(148, 163, 184, 0.8);
+    margin-bottom: 0.25rem;
+  }
+  
+  .basemap-switcher-inline {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .basemap-btn-inline {
+    flex: 1;
+    padding: 0.5rem;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .basemap-btn-inline:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+  
+  .basemap-btn-inline.active {
+    background: rgba(59, 130, 246, 0.6);
+    border-color: rgba(59, 130, 246, 0.8);
+  }
+  
   
   /* Help Button */
   .help-button {
     position: fixed;
-    bottom: 5rem;
-    right: 2rem;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--primary-color);
+    bottom: 2rem;
+    left: 2rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     color: white;
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
     z-index: 999;
   }
   
   .help-button:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  }
+  
+  .help-button:active {
+    transform: translateY(0);
   }
   
   .help-button svg {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
+    stroke: white;
+    fill: none;
+    stroke-width: 2.5;
   }
 
   .quick-actions {
@@ -2649,6 +2738,184 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     
     .main-menu-modal,
     .filters-modal,
+    .stats-modal {
+      width: 100%;
+      max-width: calc(100vw - 1rem);
+    }
+    
+    .modal-header {
+      padding: 1rem;
+      position: sticky;
+      top: 0;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 10;
+    }
+    
+    .modal-body {
+      padding: 1rem;
+    }
+    
+    .action-grid {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .basemap-switcher {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .basemap-btn {
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
+    
+    .stats-grid {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    
+    .stat-card {
+      padding: 1rem;
+    }
+    
+    .message-banner {
+      left: 1rem;
+      right: 1rem;
+      transform: none;
+      max-width: none;
+      bottom: 80px; /* Above mobile controls */
+    }
+    
+    /* Improve touch targets */
+    .close-btn {
+      min-height: 44px;
+      min-width: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Better spacing for mobile */
+    .modal-body {
+      padding-bottom: 2rem; /* Extra space for mobile controls */
+    }
+    
+    /* Prevent zoom on input focus */
+    input, select, textarea {
+      font-size: 16px;
+    }
+
+    .plan-summary-card {
+      position: static;
+      margin: 0.75rem;
+      min-width: unset;
+    }
+    .plan-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
+    .stats-modal {
+      width: 100%;
+      max-width: calc(100vw - 1rem);
+    }
+    
+    .modal-header {
+      padding: 1rem;
+      position: sticky;
+      top: 0;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 10;
+    }
+    
+    .modal-body {
+      padding: 1rem;
+    }
+    
+    .action-grid {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .basemap-switcher {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+    
+    .basemap-btn {
+      min-height: 48px;
+      padding: 12px 16px;
+      font-size: 16px;
+    }
+    
+    .stats-grid {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    
+    .stat-card {
+      padding: 1rem;
+    }
+    
+    .message-banner {
+      left: 1rem;
+      right: 1rem;
+      transform: none;
+      max-width: none;
+      bottom: 80px; /* Above mobile controls */
+    }
+    
+    /* Improve touch targets */
+    .close-btn {
+      min-height: 44px;
+      min-width: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Better spacing for mobile */
+    .modal-body {
+      padding-bottom: 2rem; /* Extra space for mobile controls */
+    }
+    
+    /* Prevent zoom on input focus */
+    input, select, textarea {
+      font-size: 16px;
+    }
+
+    .plan-summary-card {
+      position: static;
+      margin: 0.75rem;
+      min-width: unset;
+    }
+    .plan-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
     .stats-modal {
       width: 100%;
       max-width: calc(100vw - 1rem);

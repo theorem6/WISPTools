@@ -238,7 +238,7 @@
 >
   <div class="menu-header">
     <span class="tower-name">📡 {tower?.name || 'Unknown Site'}</span>
-    <span class="tower-type">{tower?.type || 'tower'}</span>
+    <span class="tower-type">{siteTypeLabel}</span>
     {#if objectPermissions?.isReadOnly}
       <span class="readonly-indicator">🔒</span>
     {/if}
