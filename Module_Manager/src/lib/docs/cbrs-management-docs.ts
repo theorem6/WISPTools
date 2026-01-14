@@ -473,38 +473,3 @@ The SAS is a cloud-based database and spectrum management system that:
   <li>Compliance training</li>
 </ul>
 `;
-
-
-<ul>
-  <li>Technical support: support@yourcompany.com</li>
-  <li>SAS Provider support links in module settings</li>
-  <li>Community forums and user groups</li>
-  <li>Professional services for deployment assistance</li>
-</ul>
-
-<h4>Additional Training</h4>
-<ul>
-  <li>CBRS fundamentals course</li>
-  <li>SAS integration workshop</li>
-  <li>Network planning services</li>
-  <li>Compliance training</li>
-</ul>
-`;
-
-
-<ul>
-  <li>Technical support: support@yourcompany.com</li>
-  <li>SAS Provider support links in module settings</li>
-  <li>Community forums and user groups</li>
-  <li>Professional services for deployment assistance</li>
-</ul>
-
-<h4>Additional Training</h4>
-<ul>
-  <li>CBRS fundamentals course</li>
-  <li>SAS integration workshop</li>
-  <li>Network planning services</li>
-  <li>Compliance training</li>
-</ul>
-`;
-

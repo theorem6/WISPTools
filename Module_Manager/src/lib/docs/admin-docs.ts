@@ -203,4 +203,3 @@ export const adminDocs = `
   <li>All logs available in Firebase Console</li>
 </ul>
 `;
-

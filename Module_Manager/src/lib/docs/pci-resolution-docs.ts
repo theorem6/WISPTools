@@ -141,30 +141,3 @@ export const pciResolutionDocs = `
   <li>Manage different geographical areas</li>
 </ul>
 `;
-
-
-</ul>
-
-<h4 id="network-management">📞 Network Management</h4>
-<p>Use the <strong>"🌐 Networks"</strong> button to:</p>
-<ul>
-  <li>Create multiple isolated networks</li>
-  <li>Switch between different deployments</li>
-  <li>Keep production and staging separate</li>
-  <li>Manage different geographical areas</li>
-</ul>
-`;
-
-
-</ul>
-
-<h4 id="network-management">📞 Network Management</h4>
-<p>Use the <strong>"🌐 Networks"</strong> button to:</p>
-<ul>
-  <li>Create multiple isolated networks</li>
-  <li>Switch between different deployments</li>
-  <li>Keep production and staging separate</li>
-  <li>Manage different geographical areas</li>
-</ul>
-`;
-

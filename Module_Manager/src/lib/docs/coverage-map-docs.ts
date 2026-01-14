@@ -287,39 +287,3 @@ export const coverageMapDocs = `
   <li>Ensure site exists and is saved</li>
 </ul>
 `;
-
-</ul>
-
-<h4>Sites not appearing:</h4>
-<ul>
-  <li>Check filters aren't hiding sites</li>
-  <li>Verify site coordinates are valid</li>
-  <li>Zoom out to see all sites</li>
-  <li>Check site status filter</li>
-</ul>
-
-<h4>Can't add sectors:</h4>
-<ul>
-  <li>Verify site is selected</li>
-  <li>Check you have edit permissions</li>
-  <li>Ensure site exists and is saved</li>
-</ul>
-`;
-
-</ul>
-
-<h4>Sites not appearing:</h4>
-<ul>
-  <li>Check filters aren't hiding sites</li>
-  <li>Verify site coordinates are valid</li>
-  <li>Zoom out to see all sites</li>
-  <li>Check site status filter</li>
-</ul>
-
-<h4>Can't add sectors:</h4>
-<ul>
-  <li>Verify site is selected</li>
-  <li>Check you have edit permissions</li>
-  <li>Ensure site exists and is saved</li>
-</ul>
-`;

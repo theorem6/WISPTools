@@ -244,33 +244,3 @@ export const inventoryDocs = `
   <li>Try manual serial number lookup</li>
 </ul>
 `;
-
-<ul>
-  <li>Verify equipment status is "Available"</li>
-  <li>Check equipment isn't already checked out</li>
-  <li>Ensure you have checkout permissions</li>
-</ul>
-
-<h4>QR code not scanning:</h4>
-<ul>
-  <li>Verify QR code is printed clearly</li>
-  <li>Check mobile app has camera permissions</li>
-  <li>Ensure QR code hasn't been damaged</li>
-  <li>Try manual serial number lookup</li>
-</ul>
-`;
-
-<ul>
-  <li>Verify equipment status is "Available"</li>
-  <li>Check equipment isn't already checked out</li>
-  <li>Ensure you have checkout permissions</li>
-</ul>
-
-<h4>QR code not scanning:</h4>
-<ul>
-  <li>Verify QR code is printed clearly</li>
-  <li>Check mobile app has camera permissions</li>
-  <li>Ensure QR code hasn't been damaged</li>
-  <li>Try manual serial number lookup</li>
-</ul>
-`;

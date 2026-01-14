@@ -270,37 +270,3 @@ export const hssSubscribersDocs = `
   <li><strong>Charging:</strong> Charging characteristics</li>
 </ul>
 `;
-
-
-<h4>Authentication Algorithms</h4>
-<ul>
-  <li><strong>MILENAGE:</strong> Standard 3GPP authentication algorithm</li>
-  <li><strong>TUAK:</strong> Alternative authentication algorithm</li>
-  <li><strong>Custom:</strong> Proprietary algorithms (not recommended)</li>
-</ul>
-
-<h4>APN Configuration</h4>
-<ul>
-  <li><strong>APN Name:</strong> Access Point Name identifier</li>
-  <li><strong>IP Type:</strong> IPv4, IPv6, or both</li>
-  <li><strong>QoS:</strong> Quality of Service profile</li>
-  <li><strong>Charging:</strong> Charging characteristics</li>
-</ul>
-`;
-
-
-<h4>Authentication Algorithms</h4>
-<ul>
-  <li><strong>MILENAGE:</strong> Standard 3GPP authentication algorithm</li>
-  <li><strong>TUAK:</strong> Alternative authentication algorithm</li>
-  <li><strong>Custom:</strong> Proprietary algorithms (not recommended)</li>
-</ul>
-
-<h4>APN Configuration</h4>
-<ul>
-  <li><strong>APN Name:</strong> Access Point Name identifier</li>
-  <li><strong>IP Type:</strong> IPv4, IPv6, or both</li>
-  <li><strong>QoS:</strong> Quality of Service profile</li>
-  <li><strong>Charging:</strong> Charging characteristics</li>
-</ul>
-`;
