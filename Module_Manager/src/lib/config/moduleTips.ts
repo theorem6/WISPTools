@@ -958,3 +958,21 @@ export const moduleTips: ModuleTipsConfig = {
 /**
  * Get tips for a specific module
  */
+
+/**
+ * Get tips for a specific module
+ */
+export function getModuleTips(moduleId: string): ModuleTip[] {
+  return moduleTips[moduleId] || [];
+}
+
+/**
+ * Get module ID from route path
+ */
+export function getModuleIdFromPath(path: string): string | null {
+  const moduleMatch = path.match(/\/modules\/([^\/]+)/);
+  if (moduleMatch) {
+    return moduleMatch[1];
+  }
+  return null;
+}
