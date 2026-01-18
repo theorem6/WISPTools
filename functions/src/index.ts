@@ -586,8 +586,8 @@ export const isoProxy = onRequest({
   // The route is registered in backend-services/routes/epc-deployment.js on port 3001
   // Use domain name instead of IP address (hss.wisptools.io per memory)
   // Port 3001 is for the HSS Management API (per memory)
-  // Backend server runs HTTP on port 3001
-  const backendUrl = process.env.BACKEND_HOST || 'http://136.112.111.167:3001';  // Main API server port
+  // Backend server accessible via nginx on hss.wisptools.io
+  const backendUrl = process.env.BACKEND_HOST || 'https://hss.wisptools.io';  // Main API server via nginx
   
   // Extract path and query string from request
   // Firebase Functions 2nd gen with Hosting rewrites:
