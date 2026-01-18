@@ -24,12 +24,14 @@
   import TipsModal from '$lib/components/modals/TipsModal.svelte';
   import { getModuleTips } from '$lib/config/moduleTips';
   import { tipsService } from '$lib/services/tipsService';
+  import MonitoringSetupWizard from '$lib/components/wizards/MonitoringSetupWizard.svelte';
   
   // Use real backend data now that devices are created
   // Temporarily enable mock data to ensure devices show while debugging backend
   const USE_MOCK_DATA = false; // Use standard API service now
   
   let showSNMPConfig = false;
+  let showSetupWizard = false;
   let networkDevices = [];
   let snmpData = [];
   let selectedDevice = null;
@@ -792,6 +794,16 @@
 </script>
 
 <TenantGuard>
+  <!-- Monitoring Setup Wizard -->
+  {#if showSetupWizard}
+    <MonitoringSetupWizard 
+      show={showSetupWizard} 
+      autoStart={true}
+      on:close={() => showSetupWizard = false}
+      on:complete={() => { showSetupWizard = false; loadNetworkDevices(); }}
+    />
+  {/if}
+
   <div class="app">
     <!-- Full Screen Map -->
     <div class="map-fullscreen">
@@ -815,7 +827,10 @@
                 </ol>
                 <p class="note">💡 All hardware shown here is read-only. SNMP and uptime graphs will appear for deployed hardware and devices discovered via SNMP.</p>
                 <div class="deploy-actions">
-                  <button class="btn btn-primary" onclick={() => showSNMPConfig = true}>
+                  <button class="btn btn-primary" onclick={() => showSetupWizard = true}>
+                    🚀 Get Started with Setup Wizard
+                  </button>
+                  <button class="btn btn-secondary" onclick={() => showSNMPConfig = true}>
                     🔧 Configure SNMP
                   </button>
                   <button class="btn btn-secondary" onclick={() => { 
@@ -858,7 +873,10 @@
                 </ol>
                 <p class="note">💡 All hardware shown here is read-only. Network topology will appear for deployed hardware and devices discovered via SNMP.</p>
                 <div class="deploy-actions">
-                  <button class="btn btn-primary" onclick={() => showSNMPConfig = true}>
+                  <button class="btn btn-primary" onclick={() => showSetupWizard = true}>
+                    🚀 Get Started with Setup Wizard
+                  </button>
+                  <button class="btn btn-secondary" onclick={() => showSNMPConfig = true}>
                     🔧 Configure SNMP
                   </button>
                   <button class="btn btn-secondary" onclick={() => { 
