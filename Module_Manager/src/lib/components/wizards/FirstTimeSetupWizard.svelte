@@ -53,8 +53,16 @@
     isLoading = true;
     try {
       // Check if tower sites exist
-      const { coverageMapService } = await import('../../routes/modules/coverage-map/lib/coverageMapService.mongodb');
-      const sites = await coverageMapService.getTowerSites(tenantId);
+      const { authService } = await import('$lib/services/authService');
+      const token = await authService.getAuthToken();
+      const response = await fetch('/api/network/sites', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-tenant-id': tenantId
+        }
+      });
+      const sites = response.ok ? await response.json() : [];
+      setupProgress.towerAdded = Array.isArray(sites) && sites.length > 0;
       setupProgress.towerAdded = sites.length > 0;
       
       // Check CBRS configuration (if module accessible)
