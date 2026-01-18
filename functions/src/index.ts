@@ -300,7 +300,7 @@ export const apiProxy = onRequest({
   // Port 3001 is for the HSS Management API (per memory)
   // Backend server runs HTTP on port 3001
   // Fallback to IP if domain doesn't resolve (Firebase Functions network issue)
-  const backendHost = process.env.BACKEND_HOST || 'http://136.112.111.167:3001';
+  const backendHost = process.env.BACKEND_HOST || 'https://hss.wisptools.io';
   const url = `${backendHost}${proxiedPath}`;
   
   // Log request details for debugging
