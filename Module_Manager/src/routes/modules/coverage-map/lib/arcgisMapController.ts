@@ -1831,25 +1831,35 @@ export class CoverageMapController {
               continue;
             }
 
+            // Calculate sector radius based on zoom level for better visibility
+            const mapZoom = this.mapView?.zoom || 10;
+            const baseRadius = 0.003; // Base radius - much smaller and less distracting
+            const zoomFactor = Math.max(0.5, Math.min(1.5, (mapZoom - 8) / 10)); // Scale with zoom
+            const sectorRadius = baseRadius * zoomFactor;
+            
             const sectorPolygon = createSectorCone(
               sectorLat,
               sectorLon,
               sector.azimuth || 0,
               sector.beamwidth || 60,
-              0.01
+              sectorRadius
             );
 
             const color = getBandColor(sector.band || sector.technology);
+            
+            // Convert hex color to RGBA with transparency for less distracting display
+            const rgbaColor = hexToRgb(color);
+            const transparentColor = [...rgbaColor, 0.3]; // 30% opacity
 
             const graphic = new Graphic({
               geometry: sectorPolygon,
               symbol: {
                 type: 'simple-fill',
-                color,
+                color: transparentColor,
                 style: 'solid',
                 outline: {
-                  color: '#ffffff',
-                  width: 0.5
+                  color: color,
+                  width: 1
                 }
               },
               attributes: {
