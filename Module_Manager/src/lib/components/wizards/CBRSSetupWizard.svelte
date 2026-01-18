@@ -7,7 +7,7 @@
   
   import { createEventDispatcher, onMount } from 'svelte';
   import { currentTenant } from '$lib/stores/tenantStore';
-  import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, type CBRSConfig } from '\/modules/cbrs-management/lib/services/configService';
+  import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, type CBRSConfig } from '../../../routes/modules/cbrs-management/lib/services/configService';
   
   export let show = false;
   export let autoStart = false;
