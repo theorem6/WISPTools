@@ -619,3 +619,4 @@ $: if (showTicketDetails) {
     margin-bottom: 1rem;
   }
 </style>
+
