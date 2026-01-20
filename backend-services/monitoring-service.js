@@ -516,6 +516,32 @@ class MonitoringService {
       // Send notifications
       await this.sendNotifications(alert, rule);
 
+      // Create incident from critical/high severity alerts
+      if (rule.severity === 'critical' || rule.severity === 'high') {
+        try {
+          const incidentCreationService = require('./services/incident-creation-service');
+          
+          // Try to get device info from rule or alert context
+          let device = null;
+          if (rule.device_id) {
+            const { NetworkEquipment, UnifiedCPE } = require('./models/network');
+            device = await NetworkEquipment.findOne({ 
+              _id: rule.device_id, 
+              tenant_id: rule.tenant_id 
+            }).lean() || 
+            await UnifiedCPE.findOne({ 
+              _id: rule.device_id, 
+              tenant_id: rule.tenant_id 
+            }).lean();
+          }
+          
+          await incidentCreationService.createFromMonitoringAlert(alert, rule, device);
+        } catch (incidentError) {
+          console.error('[Monitoring] Failed to create incident from alert:', incidentError);
+          // Don't fail the alert creation if incident creation fails
+        }
+      }
+
       return alert;
     } catch (error) {
       console.error('Error triggering alert:', error);

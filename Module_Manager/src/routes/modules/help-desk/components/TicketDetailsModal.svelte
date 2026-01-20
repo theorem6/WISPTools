@@ -53,15 +53,28 @@
     if (!$currentTenant) return;
     
     try {
-      users = await getTenantUsers($currentTenant.id, 'visible');
-      // Filter for technicians/engineers
-      users = users.filter(u => 
-        u.role === 'engineer' || 
-        u.role === 'installer' || 
-        u.role === 'admin' || 
-        u.role === 'owner' ||
+      const allUsers = await getTenantUsers($currentTenant.id, 'visible');
+      
+      // Include all active users who can be assigned tickets
+      // This includes both web users (admins, support) and app users (installers, engineers)
+      users = allUsers.filter(u => 
+        (u.role === 'engineer' || 
+         u.role === 'installer' || 
+         u.role === 'admin' || 
+         u.role === 'owner' ||
+         u.role === 'support') &&
         u.status === 'active'
       );
+      
+      // Sort: app users (installers/engineers) first, then web users
+      users.sort((a, b) => {
+        const appRoles = ['installer', 'engineer'];
+        const aIsApp = appRoles.includes(a.role || '');
+        const bIsApp = appRoles.includes(b.role || '');
+        if (aIsApp && !bIsApp) return -1;
+        if (!aIsApp && bIsApp) return 1;
+        return (a.displayName || a.email || '').localeCompare(b.displayName || b.email || '');
+      });
     } catch (err: any) {
       console.error('Error loading users:', err);
     }
