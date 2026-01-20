@@ -79,14 +79,22 @@
       loadRecentActivity();
     }
   });
-  
+
   $: if (tenantId) {
-    if (activeTab === 'tickets') loadTickets();
+    if (activeTab === 'tickets' || activeTab === 'help-desk') {
+      loadTickets();
+      loadDashboardStats();
+    }
+    if (activeTab === 'incidents') {
+      loadDashboardStats();
+    }
     if (activeTab === 'customers') loadCustomers();
+    if (activeTab === 'help-desk') {
       loadDashboardStats();
       loadRecentActivity();
     }
   }
+
   
   $: applyTicketFilters();
   $: applyCustomerFilters();
@@ -619,4 +627,5 @@ $: if (showTicketDetails) {
     margin-bottom: 1rem;
   }
 </style>
+
 
