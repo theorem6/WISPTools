@@ -17,8 +17,8 @@
   const MAINTAIN_API = API_CONFIG.PATHS.MAINTAIN;
   
   // Tab management
-  type Tab = 'overview' | 'tickets' | 'maintenance' | 'customers' | 'incidents';
-  let activeTab: Tab = 'overview';
+  type Tab = 'help-desk' | 'overview' | 'tickets' | 'maintenance' | 'customers' | 'incidents' | 'installations';
+  let activeTab: Tab = 'help-desk'; // Help Desk is now the default and most prominent tab
   
   // Dashboard stats
   let dashboardStats = {
@@ -356,6 +356,11 @@ $: if (showTicketDetails) {
       
       <!-- Tabs -->
       <div class="tabs">
+        <button 
+          class="tab tab-primary {activeTab === 'help-desk' ? 'active' : ''}" 
+          on:click={() => activeTab = 'help-desk'}>
+          🎧 Help Desk
+        </button>
         <button 
           class="tab {activeTab === 'overview' ? 'active' : ''}" 
           on:click={() => activeTab = 'overview'}>
