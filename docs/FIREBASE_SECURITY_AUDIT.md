@@ -50,6 +50,8 @@
 - Password reset emails use Firebase Auth's built-in handlers
 - Action URLs go directly to Firebase Auth endpoints (not Dynamic Links)
 - No custom Dynamic Links wrapping found
+- ✅ Verified: `actionCodeSettings` uses `handleCodeInApp: true` (standard Firebase Auth, NOT Dynamic Links)
+- ✅ Verified: No `dynamicLinkDomain` property found in code
 
 ---
 
