@@ -61,7 +61,20 @@ export class CoverageMapService {
     // Use relative URL (goes through Firebase Hosting rewrite to apiProxy)
     // Use centralized API configuration
     const apiPath = API_URL;
-    const response = await fetch(`${apiPath}/${endpoint}`, {
+    const url = `${apiPath}/${endpoint}`;
+    
+    // Log API call details for hardware-deployments
+    if (endpoint.includes('hardware-deployments')) {
+      console.log('[CoverageMapService] API call:', {
+        endpoint,
+        url,
+        tenantId: resolvedTenantId,
+        method: options.method || 'GET',
+        hasToken: !!token
+      });
+    }
+    
+    const response = await fetch(url, {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -78,10 +91,41 @@ export class CoverageMapService {
       // Attach additional error details for debugging
       (error as any).details = errorData.details;
       (error as any).validationErrors = errorData.validationErrors;
+      
+      // Log error for hardware-deployments
+      if (endpoint.includes('hardware-deployments')) {
+        console.error('[CoverageMapService] API error:', {
+          endpoint,
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          tenantId: resolvedTenantId
+        });
+      }
+      
       throw error;
     }
     
-    return await response.json();
+    const result = await response.json();
+    
+    // Log result for hardware-deployments
+    if (endpoint.includes('hardware-deployments')) {
+      console.log('[CoverageMapService] API response:', {
+        endpoint,
+        status: response.status,
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+        count: Array.isArray(result) ? result.length : 'N/A',
+        sample: Array.isArray(result) && result.length > 0 ? {
+          id: result[0]._id,
+          name: result[0].name,
+          tenantId: result[0].tenantId,
+          status: result[0].status
+        } : result
+      });
+    }
+    
+    return result;
   }
   
   // ========== Unified Sites ==========
@@ -391,7 +435,29 @@ export class CoverageMapService {
       }
     }
     const params = hardware_type ? `?hardware_type=${hardware_type}` : '';
-    return await this.apiCall(`hardware-deployments${params}`, {}, resolvedTenantId);
+    console.log('[CoverageMapService] getAllHardwareDeployments called:', {
+      tenantId: resolvedTenantId,
+      hardware_type,
+      params,
+      endpoint: `hardware-deployments${params}`
+    });
+    try {
+      const result = await this.apiCall(`hardware-deployments${params}`, {}, resolvedTenantId);
+      console.log('[CoverageMapService] getAllHardwareDeployments result:', {
+        count: Array.isArray(result) ? result.length : 'not an array',
+        isArray: Array.isArray(result),
+        resultType: typeof result,
+        sample: Array.isArray(result) && result.length > 0 ? result[0] : result
+      });
+      return result;
+    } catch (error: any) {
+      console.error('[CoverageMapService] getAllHardwareDeployments error:', {
+        message: error.message,
+        tenantId: resolvedTenantId,
+        error
+      });
+      throw error;
+    }
   }
   
   async updateHardwareDeployment(tenantId: string, deploymentId: string, updates: any): Promise<any> {
