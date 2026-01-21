@@ -137,7 +137,11 @@
     }
   }
   
+  let groupWarning = '';
+  
   function handleGroupChange() {
+    groupWarning = ''; // Clear previous warning
+    
     if (!formData.groupId) {
       // Clear service plan if no group selected
       formData.servicePlan.planName = '';
@@ -155,11 +159,19 @@
     
     if (!selectedGroup) {
       console.warn('[CustomerForm] Group not found:', formData.groupId);
+      groupWarning = 'Selected group not found';
       return;
     }
     
     if (!selectedGroup.bandwidth_plan_id) {
       console.warn('[CustomerForm] Group has no bandwidth plan:', selectedGroup);
+      groupWarning = `Warning: The group "${selectedGroup.name}" does not have a bandwidth plan assigned. Please assign a bandwidth plan to this group in the Customer Groups tab.`;
+      // Clear service plan since group has no plan
+      formData.servicePlan.planName = '';
+      formData.servicePlan.downloadMbps = undefined;
+      formData.servicePlan.uploadMbps = undefined;
+      formData.servicePlan.maxBandwidthDl = undefined;
+      formData.servicePlan.maxBandwidthUl = undefined;
       return;
     }
     
@@ -185,6 +197,7 @@
       });
     } else {
       console.warn('[CustomerForm] Bandwidth plan not found:', selectedGroup.bandwidth_plan_id);
+      groupWarning = `Warning: The bandwidth plan assigned to "${selectedGroup.name}" could not be found.`;
     }
   }
   
@@ -233,7 +246,11 @@
     
     // Load groupId if it exists (may be stored in customer or need to look up from HSS)
     formData.groupId = (customer as any).groupId || (customer as any).group_id || '';
-    console.log('[CustomerForm] Loaded groupId:', formData.groupId);
+    console.log('[CustomerForm] Loaded groupId:', formData.groupId, 'from customer:', {
+      groupId: (customer as any).groupId,
+      group_id: (customer as any).group_id,
+      customerId: customer._id || customer.id
+    });
     
     // Load service plan from customer if it exists
     // Note: Service plan will be populated from group via reactive statement when groups load
@@ -333,7 +350,7 @@
         },
         serviceStatus: formData.serviceStatus || 'pending',
         serviceType: formData.serviceType || undefined,
-        groupId: formData.groupId ? formData.groupId : undefined,
+        groupId: formData.groupId && formData.groupId.trim() ? formData.groupId.trim() : null,
         servicePlan: formData.servicePlan.planName ? {
           planName: formData.servicePlan.planName,
           downloadMbps: formData.servicePlan.downloadMbps,
@@ -611,6 +628,12 @@
           </select>
         </div>
         
+        {#if groupWarning}
+          <div class="warning-message" style="margin-top: 0.75rem; padding: 0.75rem; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
+            <strong>⚠️ {groupWarning}</strong>
+          </div>
+        {/if}
+        
         {#if formData.groupId}
           {#if formData.servicePlan.planName}
             <div class="service-plan-preview">
@@ -634,7 +657,7 @@
                 {/if}
               </div>
             </div>
-          {:else}
+          {:else if !groupWarning}
             <div class="service-plan-preview" style="opacity: 0.6;">
               <p style="margin: 0; color: var(--text-secondary);">Loading service plan from group...</p>
             </div>
