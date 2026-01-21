@@ -289,7 +289,9 @@ function formatUptime(seconds) {
 // GET /api/monitoring/epc/list - List all EPC devices for monitoring
 router.get('/epc/list', async (req, res) => {
   try {
-    console.log(`🔍 [Monitoring] Fetching EPC devices for tenant: ${req.tenantId}`);
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`🔍 [Monitoring] Fetching EPC devices for tenant: ${req.tenantId}`);
     
     const epcs = [];
     const seenIds = new Set();
@@ -409,9 +411,9 @@ router.get('/epc/list', async (req, res) => {
             },
             address: site.location.address || site.name || epc.site_name || 'Unknown Location'
           };
-          console.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) got location from site ${siteIdStr}: ${location.coordinates.latitude}, ${location.coordinates.longitude}`);
+          debug.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) got location from site ${siteIdStr}: ${location.coordinates.latitude}, ${location.coordinates.longitude}`);
         } else if (epc.site_id) {
-          console.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) has site_id ${siteIdStr} but site not found in ${siteMap.size} loaded sites`);
+          debug.log(`[Monitoring] EPC ${epc.epc_id} (${epc.site_name}) has site_id ${siteIdStr} but site not found in ${siteMap.size} loaded sites`);
         }
       }
       
@@ -471,7 +473,7 @@ router.get('/epc/list', async (req, res) => {
       }
     }
     
-    console.log(`📊 [Monitoring] Total ${epcs.length} EPC devices for tenant ${req.tenantId}`);
+    debug.log(`📊 [Monitoring] Total ${epcs.length} EPC devices for tenant ${req.tenantId}`);
     
     res.json({ epcs, total: epcs.length });
   } catch (error) {
@@ -485,7 +487,9 @@ router.get('/epc/list', async (req, res) => {
 // GET /api/mikrotik/devices - List all Mikrotik devices
 router.get('/mikrotik/devices', async (req, res) => {
   try {
-    console.log(`🔍 Fetching Mikrotik devices for tenant: ${req.tenantId}`);
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`🔍 Fetching Mikrotik devices for tenant: ${req.tenantId}`);
     
     // Get Mikrotik network equipment (include both active and planned/deployed devices)
     const mikrotikEquipment = await NetworkEquipment.find({
@@ -590,7 +594,9 @@ router.get('/mikrotik/devices', async (req, res) => {
 // GET /api/snmp/devices - List all SNMP-enabled devices
 router.get('/snmp/devices', async (req, res) => {
   try {
-    console.log(`🔍 Fetching SNMP devices for tenant: ${req.tenantId}`);
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`🔍 Fetching SNMP devices for tenant: ${req.tenantId}`);
     
     // Get all network equipment with SNMP enabled (include both active and planned/deployed devices)
     const snmpEquipment = await NetworkEquipment.find({
@@ -932,7 +938,9 @@ router.get('/snmp/metrics/latest', async (req, res) => {
 // GET /api/monitoring/dashboard - Get monitoring dashboard data
 router.get('/monitoring/dashboard', async (req, res) => {
   try {
-    console.log(`🔍 Fetching monitoring dashboard for tenant: ${req.tenantId}`);
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`🔍 Fetching monitoring dashboard for tenant: ${req.tenantId}`);
     
     // Get counts of different device types
     const epcCount = await NetworkEquipment.countDocuments({
@@ -1020,7 +1028,9 @@ router.get('/monitoring/dashboard', async (req, res) => {
 // GET /api/monitoring/topology - Get network topology data
 router.get('/monitoring/topology', async (req, res) => {
   try {
-    console.log(`🔍 Fetching network topology for tenant: ${req.tenantId}`);
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`🔍 Fetching network topology for tenant: ${req.tenantId}`);
     
     // Get all sites, equipment, and relationships
     const sites = await UnifiedSite.find({

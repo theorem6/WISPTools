@@ -55,7 +55,7 @@ function createTenantStore() {
         const selectedTenantId = localStorage.getItem('selectedTenantId');
         const setupCompleted = localStorage.getItem('tenantSetupCompleted') === 'true';
         
-        console.log('[TenantStore] Initializing with:', { selectedTenantId, setupCompleted });
+        debug.log('[TenantStore] Initializing with:', { selectedTenantId, setupCompleted });
         
         if (selectedTenantId) {
           // Lazy load tenantService to avoid circular dependencies
@@ -78,7 +78,7 @@ function createTenantStore() {
             localStorage.setItem('selectedTenantName', tenant.displayName);
             localStorage.setItem('tenantSetupCompleted', 'true');
             
-            console.log('[TenantStore] Initialized with tenant:', tenant.displayName);
+            debug.log('[TenantStore] Initialized with tenant:', tenant.displayName);
           } else {
             // Tenant not found - clear localStorage
             console.warn('[TenantStore] Tenant not found, clearing localStorage');
@@ -105,7 +105,7 @@ function createTenantStore() {
             error: null
           }));
           
-          console.log('[TenantStore] No tenant in localStorage');
+          debug.log('[TenantStore] No tenant in localStorage');
         }
       } catch (error) {
         console.error('[TenantStore] Initialization error:', error);
@@ -126,7 +126,7 @@ function createTenantStore() {
     async loadUserTenants(userId: string, userEmail?: string): Promise<Tenant[]> {
       if (!browser) return [];
       
-      console.log('[TenantStore] loadUserTenants called with:', { userId, userEmail });
+      debug.log('[TenantStore] loadUserTenants called with:', { userId, userEmail });
       update(state => ({ ...state, isLoading: true }));
       
       try {
@@ -163,7 +163,7 @@ function createTenantStore() {
           try {
             const token = await user.getIdToken(true); // Force refresh to ensure valid token
             if (token && token.length > 100) { // Basic validation - tokens are usually long
-              console.log('[TenantStore] Token ready:', { 
+              debug.log('[TenantStore] Token ready:', { 
                 hasToken: !!token, 
                 tokenLength: token?.length,
                 userId: user.uid 
@@ -201,7 +201,7 @@ function createTenantStore() {
         const userIsPlatformAdmin = isPlatformAdmin(userEmail ?? null);
         
         if (userIsPlatformAdmin) {
-          console.log('[TenantStore] Platform admin detected, skipping tenant loading');
+          debug.log('[TenantStore] Platform admin detected, skipping tenant loading');
           update(state => ({
             ...state,
             userTenants: [],
@@ -214,12 +214,12 @@ function createTenantStore() {
         const { tenantService } = await import('../services/tenantService');
         console.log('[TenantStore] Calling tenantService.getUserTenants...');
         const tenants = await tenantService.getUserTenants(userId);
-        console.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
+        debug.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
         
         // Auto-select tenant for non-admin users to ensure data isolation
         const currentState = get({ subscribe });
         
-        console.log('[TenantStore] Auto-selection check:', { 
+        debug.log('[TenantStore] Auto-selection check:', { 
           tenantCount: tenants.length, 
           isPlatformAdmin: userIsPlatformAdmin,
           hasCurrentTenant: !!currentState.currentTenant,
@@ -229,7 +229,7 @@ function createTenantStore() {
         if (tenants.length === 1 && !currentState.currentTenant) {
           // Regular user with one tenant - auto-select it (enforces data isolation)
           const tenant = tenants[0];
-          console.log('[TenantStore] Auto-selecting single tenant:', tenant.displayName);
+          debug.log('[TenantStore] Auto-selecting single tenant:', tenant.displayName);
           
           update(state => ({
             ...state,
@@ -254,7 +254,7 @@ function createTenantStore() {
           }));
         }
         
-        console.log('[TenantStore] Loaded', tenants.length, 'tenants for user');
+        debug.log('[TenantStore] Loaded', tenants.length, 'tenants for user');
         return tenants;
       } catch (error: any) {
         console.error('[TenantStore] Error loading user tenants:', error);
@@ -299,13 +299,13 @@ function createTenantStore() {
         localStorage.setItem('selectedTenantId', tenant.id);
         localStorage.setItem('selectedTenantName', tenant.displayName);
         localStorage.setItem('tenantSetupCompleted', 'true');
-        console.log('[TenantStore] Current tenant set to:', tenant.displayName);
+        debug.log('[TenantStore] Current tenant set to:', tenant.displayName);
       } else {
         // Clear localStorage
         localStorage.removeItem('selectedTenantId');
         localStorage.removeItem('selectedTenantName');
         localStorage.removeItem('tenantSetupCompleted');
-        console.log('[TenantStore] Current tenant cleared');
+        debug.log('[TenantStore] Current tenant cleared');
       }
     },
     
@@ -317,7 +317,7 @@ function createTenantStore() {
       
       update(state => ({ ...state, setupCompleted: true }));
       localStorage.setItem('tenantSetupCompleted', 'true');
-      console.log('[TenantStore] Setup marked as completed');
+      debug.log('[TenantStore] Setup marked as completed');
     },
     
     /**
@@ -331,7 +331,7 @@ function createTenantStore() {
       localStorage.removeItem('selectedTenantName');
       localStorage.removeItem('tenantSetupCompleted');
       sessionStorage.clear();
-      console.log('[TenantStore] All tenant state cleared');
+      debug.log('[TenantStore] All tenant state cleared');
     },
     
     /**

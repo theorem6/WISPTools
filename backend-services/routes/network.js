@@ -1130,16 +1130,19 @@ router.get('/hardware-deployments', async (req, res) => {
     if (hardware_type) query.hardware_type = hardware_type;
     if (status) query.status = status;
     
-    console.log('[Network API] Fetching hardware deployments with query:', JSON.stringify(query));
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    
+    debug.log('[Network API] Fetching hardware deployments with query:', JSON.stringify(query));
     
     const hardware = await HardwareDeployment.find(query)
       .populate('siteId', 'name type location')
       .sort({ deployedAt: -1 })
       .lean();
     
-    console.log('[Network API] Found', hardware.length, 'hardware deployments for tenant:', req.tenantId);
+    debug.log('[Network API] Found', hardware.length, 'hardware deployments for tenant:', req.tenantId);
     if (hardware.length > 0) {
-      console.log('[Network API] Sample hardware deployment:', {
+      debug.log('[Network API] Sample hardware deployment:', {
         id: hardware[0]._id,
         name: hardware[0].name,
         hardware_type: hardware[0].hardware_type,
@@ -1150,7 +1153,7 @@ router.get('/hardware-deployments', async (req, res) => {
       // Check if there are any hardware deployments at all (for debugging)
       const totalCount = await HardwareDeployment.countDocuments({});
       const tenantCount = await HardwareDeployment.countDocuments({ tenantId: req.tenantId });
-      console.log('[Network API] Debug info:', {
+      debug.log('[Network API] Debug info:', {
         totalHardwareDeployments: totalCount,
         hardwareDeploymentsForTenant: tenantCount,
         requestedTenantId: req.tenantId,

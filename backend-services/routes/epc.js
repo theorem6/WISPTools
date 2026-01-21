@@ -98,7 +98,9 @@ const formatEPCDevice = (device, source = 'equipment') => {
 // GET /api/epc/list - List all EPC devices for tenant
 router.get('/list', async (req, res) => {
   try {
-    console.log(`🔍 [EPC API] Fetching EPC devices for tenant: ${req.tenantId}`);
+    const { createDebugLogger } = require('../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`🔍 [EPC API] Fetching EPC devices for tenant: ${req.tenantId}`);
     
     const epcs = [];
     const seenIds = new Set();
@@ -108,7 +110,7 @@ router.get('/list', async (req, res) => {
       tenant_id: req.tenantId
     }).lean();
     
-    console.log(`📡 Found ${remoteEPCs.length} RemoteEPCs`);
+    debug.log(`📡 Found ${remoteEPCs.length} RemoteEPCs`);
     
     remoteEPCs.forEach(epc => {
       const formatted = formatEPCDevice(epc, 'remote');

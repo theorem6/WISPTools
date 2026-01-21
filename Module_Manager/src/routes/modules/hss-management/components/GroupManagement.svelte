@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { debug } from '$lib/utils/debug';
   export let tenantId: string;
   export let HSS_API: string;
   
@@ -94,7 +95,7 @@
       if (response.ok) {
         const data = await response.json();
         customers = Array.isArray(data) ? data : (data.customers || []);
-        console.log('[GroupManagement] Loaded customers:', {
+        debug.log('[GroupManagement] Loaded customers:', {
           count: customers.length,
           customersWithGroups: customers.filter(c => c.groupId || c.group_id).map(c => ({
             id: c._id || c.id,
@@ -115,7 +116,7 @@
     const groupCustomers = customers.filter(c => {
       const matches = (c.groupId === groupId) || (c.group_id === groupId);
       if (matches) {
-        console.log('[GroupManagement] Customer in group:', {
+        debug.log('[GroupManagement] Customer in group:', {
           groupId,
           customerId: c._id || c.id,
           customerName: c.fullName || `${c.firstName} ${c.lastName}`,
@@ -126,7 +127,7 @@
       return matches;
     });
     
-    console.log('[GroupManagement] Customers in group:', {
+    debug.log('[GroupManagement] Customers in group:', {
       groupId,
       count: groupCustomers.length,
       customerIds: groupCustomers.map(c => c._id || c.id)

@@ -67,7 +67,7 @@ export class AuthService {
       const urlSearch = typeof window !== 'undefined' ? window.location.search : '';
       const urlHash = typeof window !== 'undefined' ? window.location.hash : '';
       
-      console.log('[AuthService] 🔍 Calling getRedirectResult() SYNCHRONOUSLY (before auth listener)...', {
+      debug.log('[AuthService] 🔍 Calling getRedirectResult() SYNCHRONOUSLY (before auth listener)...', {
         currentUrl,
         urlSearch,
         urlHash,
@@ -81,7 +81,7 @@ export class AuthService {
       
       // Handle the result asynchronously
       this.redirectResultPromise.then((result) => {
-        console.log('[AuthService] 📋 getRedirectResult() promise resolved:', {
+        debug.log('[AuthService] 📋 getRedirectResult() promise resolved:', {
           hasResult: !!result,
           hasUser: !!result?.user,
           userEmail: result?.user?.email,
@@ -90,7 +90,7 @@ export class AuthService {
         });
         
         if (result && result.user) {
-          console.log('[AuthService] ✅✅✅ Redirect result found during init!', {
+          debug.log('[AuthService] ✅✅✅ Redirect result found during init!', {
             email: result.user.email,
             uid: result.user.uid,
             providerId: result.providerId
@@ -99,7 +99,7 @@ export class AuthService {
           this.notifyListeners(result.user);
           this.redirectResultChecked = true;
         } else {
-          console.log('[AuthService] ℹ️ No redirect result during init (normal for non-redirect visits)');
+          debug.log('[AuthService] ℹ️ No redirect result during init (normal for non-redirect visits)');
           this.redirectResultChecked = true;
         }
       }).catch((error: any) => {
@@ -111,7 +111,7 @@ export class AuthService {
         this.redirectResultChecked = true;
       });
       
-      console.log('[AuthService] getRedirectResult() called, promise created, waiting for result...');
+      debug.log('[AuthService] getRedirectResult() called, promise created, waiting for result...');
     } catch (error: any) {
       console.error('[AuthService] ❌ Failed to initiate redirect result check:', error);
       this.redirectResultChecked = true; // Mark as checked to prevent retries
@@ -139,8 +139,8 @@ export class AuthService {
         
         // Log auth state changes for debugging
         if (user) {
-          console.log('[AuthService] 🔵 Auth state: User signed in', user.email);
-          console.log('[AuthService] User metadata:', {
+          debug.log('[AuthService] 🔵 Auth state: User signed in', user.email);
+          debug.log('[AuthService] User metadata:', {
             uid: user.uid,
             email: user.email,
             lastSignInTime: user.metadata.lastSignInTime,
@@ -162,7 +162,7 @@ export class AuthService {
             const currentAuth = getAuth();
             const currentUser = currentAuth.currentUser;
             if (currentUser && currentUser.uid === user.uid) {
-              console.log('[AuthService] ✅ Confirmed user still authenticated, dispatching event');
+              debug.log('[AuthService] ✅ Confirmed user still authenticated, dispatching event');
               window.dispatchEvent(new CustomEvent('google-signin-complete', { 
                 detail: { user: this.mapUserToProfile(user) } 
               }));
@@ -171,7 +171,7 @@ export class AuthService {
             }
           }
         } else {
-          console.log('[AuthService] Auth state: User signed out');
+          debug.log('[AuthService] Auth state: User signed out');
         }
         
         this.notifyListeners(this.currentUser);
@@ -215,7 +215,7 @@ export class AuthService {
           if (token) {
             // Token is still valid, force refresh
             await this.currentUser.getIdToken(true);
-            console.log('Auth token refreshed successfully');
+            debug.log('Auth token refreshed successfully');
           }
         } catch (error) {
           console.error('Token refresh failed:', error);
@@ -339,7 +339,7 @@ export class AuthService {
   async checkRedirectResult(): Promise<AuthResult<UserProfile> | null> {
     try {
       const auth = getAuth();
-      console.log('[AuthService] Checking for redirect result (page-level check)...', {
+      debug.log('[AuthService] Checking for redirect result (page-level check)...', {
         currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
         search: typeof window !== 'undefined' ? window.location.search : 'N/A',
         hash: typeof window !== 'undefined' ? window.location.hash : 'N/A',
@@ -353,7 +353,7 @@ export class AuthService {
       if (this.currentUser) {
         const isGoogleUser = this.currentUser.providerData.some(p => p.providerId === 'google.com');
         if (isGoogleUser) {
-          console.log('[AuthService] ✅ User authenticated with Google (from init check):', this.currentUser.email);
+          debug.log('[AuthService] ✅ User authenticated with Google (from init check):', this.currentUser.email);
           return {
             success: true,
             data: this.mapUserToProfile(this.currentUser)
@@ -364,7 +364,7 @@ export class AuthService {
       // CRITICAL: Even if we checked during init, try checking again
       // The redirect might complete AFTER initialization
       // getRedirectResult() can be called multiple times, but only returns a result once per redirect
-      console.log('[AuthService] 🔍 Checking getRedirectResult() again (redirect may have completed after init)...');
+      debug.log('[AuthService] 🔍 Checking getRedirectResult() again (redirect may have completed after init)...');
       try {
         const result = await getRedirectResult(auth);
         console.log('[AuthService] 📋 Second getRedirectResult() check:', {

@@ -20,6 +20,7 @@ app.use(express.urlencoded({ extended: true, limit: appConfig.limits.urlEncodedB
 // Middleware
 app.use(require('./middleware/error-handler'));
 app.use(require('./middleware/request-logger'));
+app.use(require('./middleware/debug-header'));
 
 // MongoDB Connection - Atlas
 const MONGODB_URI = appConfig.mongodb.uri;

@@ -1,6 +1,7 @@
 // Coverage Map Service - MongoDB Backend Version
 import type { TowerSite, Sector, CPEDevice, NetworkEquipment } from './models';
 import { getApiUrl } from '$lib/config/api';
+import { debug } from '$lib/utils/debug';
 
 // API Configuration - Use centralized config
 const API_URL = getApiUrl('NETWORK');
@@ -63,9 +64,12 @@ export class CoverageMapService {
     const apiPath = API_URL;
     const url = `${apiPath}/${endpoint}`;
     
-    // Log API call details for hardware-deployments
+    // Check if debug mode is enabled and add header
+    const isDebugMode = typeof window !== 'undefined' && localStorage.getItem('wisptools_debug_enabled') === 'true';
+    
+    // Log API call details for hardware-deployments (debug only)
     if (endpoint.includes('hardware-deployments')) {
-      console.log('[CoverageMapService] API call:', {
+      debug.log('[CoverageMapService] API call:', {
         endpoint,
         url,
         tenantId: resolvedTenantId,
@@ -79,6 +83,7 @@ export class CoverageMapService {
       headers: {
         'Authorization': `Bearer ${token}`,
         'X-Tenant-ID': resolvedTenantId,
+        'X-Debug-Mode': isDebugMode ? 'true' : 'false',
         'Content-Type': 'application/json',
         ...options.headers
       }
@@ -92,9 +97,9 @@ export class CoverageMapService {
       (error as any).details = errorData.details;
       (error as any).validationErrors = errorData.validationErrors;
       
-      // Log error for hardware-deployments
+      // Log error for hardware-deployments (always log errors)
       if (endpoint.includes('hardware-deployments')) {
-        console.error('[CoverageMapService] API error:', {
+        debug.error('[CoverageMapService] API error:', {
           endpoint,
           status: response.status,
           statusText: response.statusText,
@@ -108,9 +113,9 @@ export class CoverageMapService {
     
     const result = await response.json();
     
-    // Log result for hardware-deployments
+    // Log result for hardware-deployments (debug only)
     if (endpoint.includes('hardware-deployments')) {
-      console.log('[CoverageMapService] API response:', {
+      debug.log('[CoverageMapService] API response:', {
         endpoint,
         status: response.status,
         resultType: typeof result,
@@ -435,7 +440,7 @@ export class CoverageMapService {
       }
     }
     const params = hardware_type ? `?hardware_type=${hardware_type}` : '';
-    console.log('[CoverageMapService] getAllHardwareDeployments called:', {
+    debug.log('[CoverageMapService] getAllHardwareDeployments called:', {
       tenantId: resolvedTenantId,
       hardware_type,
       params,
@@ -443,7 +448,7 @@ export class CoverageMapService {
     });
     try {
       const result = await this.apiCall(`hardware-deployments${params}`, {}, resolvedTenantId);
-      console.log('[CoverageMapService] getAllHardwareDeployments result:', {
+      debug.log('[CoverageMapService] getAllHardwareDeployments result:', {
         count: Array.isArray(result) ? result.length : 'not an array',
         isArray: Array.isArray(result),
         resultType: typeof result,
@@ -451,7 +456,7 @@ export class CoverageMapService {
       });
       return result;
     } catch (error: any) {
-      console.error('[CoverageMapService] getAllHardwareDeployments error:', {
+      debug.error('[CoverageMapService] getAllHardwareDeployments error:', {
         message: error.message,
         tenantId: resolvedTenantId,
         error

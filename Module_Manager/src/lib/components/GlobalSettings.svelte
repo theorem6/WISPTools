@@ -17,8 +17,9 @@
   import ImportSystem from './ImportSystem.svelte';
   import UserManagementEmbedded from './UserManagementEmbedded.svelte';
   import BrandingManagement from './BrandingManagement.svelte';
+  import { isDebugEnabled, enableDebug, disableDebug } from '$lib/utils/debug';
   
-  let activeTab: 'appearance' | 'acs' | 'info' | 'import' | 'users' | 'branding' = 'appearance';
+  let activeTab: 'appearance' | 'acs' | 'info' | 'import' | 'users' | 'branding' | 'debug' = 'appearance';
   let showImportSystem = false;
   let loading = false;
   let saveSuccess = false;
@@ -26,6 +27,10 @@
   
   // Appearance settings
   let theme: 'light' | 'dark' | 'system' = 'system';
+  
+  // Debug settings
+  let debugEnabled = false;
+  let showDebugWarning = false;
   
   // ACS credentials
   let acsSettings = {
@@ -56,6 +61,9 @@
       theme = savedTheme;
     }
     
+    // Load debug setting
+    debugEnabled = isDebugEnabled();
+    
     // Load ACS settings from localStorage (temporary - should be from backend)
     const savedACS = localStorage.getItem('acs_settings');
     if (savedACS) {
@@ -75,6 +83,24 @@
         console.error('Failed to parse company info:', e);
       }
     }
+  }
+  
+  function toggleDebugMode() {
+    if (debugEnabled) {
+      // Disabling - no warning needed
+      disableDebug();
+      debugEnabled = false;
+      showDebugWarning = false;
+    } else {
+      // Enabling - show warning
+      showDebugWarning = true;
+      enableDebug();
+      debugEnabled = true;
+    }
+  }
+  
+  function acknowledgeDebugWarning() {
+    showDebugWarning = false;
   }
   
   function applyTheme(newTheme: 'light' | 'dark' | 'system') {
@@ -189,6 +215,13 @@
           on:click={() => activeTab = 'branding'}
         >
           🎨 Customer Portal Branding
+        </button>
+        <button 
+          class="tab" 
+          class:active={activeTab === 'debug'}
+          on:click={() => activeTab = 'debug'}
+        >
+          🐛 Debug Mode
         </button>
       </div>
       
@@ -369,6 +402,58 @@
         {:else if activeTab === 'branding'}
           <div class="tab-content">
             <BrandingManagement />
+          </div>
+        {:else if activeTab === 'debug'}
+          <div class="tab-content">
+            <h3>🐛 Debug Mode</h3>
+            <p class="description">Advanced debugging for troubleshooting with WISPTools.io engineers</p>
+            
+            {#if showDebugWarning}
+              <div class="debug-warning">
+                <div class="warning-header">
+                  <span class="warning-icon">⚠️</span>
+                  <strong>Warning: Debug Mode Enabled</strong>
+                </div>
+                <p>Debug mode will:</p>
+                <ul>
+                  <li>Slow down web application responses</li>
+                  <li>Generate extensive console logging</li>
+                  <li>Expose detailed system information</li>
+                </ul>
+                <p><strong>This should only be enabled when working with a WISPTools.io engineer.</strong></p>
+                <button class="btn-acknowledge" on:click={acknowledgeDebugWarning}>
+                  I Understand
+                </button>
+              </div>
+            {/if}
+            
+            <div class="debug-setting">
+              <div class="setting-item">
+                <div class="setting-info">
+                  <label>Enable Debug Logging</label>
+                  <p class="setting-description">
+                    When enabled, detailed debug information will be logged to the browser console.
+                    This includes API calls, data transformations, state changes, and system metrics.
+                    <strong>Only enable this when troubleshooting with a WISPTools.io engineer.</strong>
+                  </p>
+                </div>
+                <label class="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    bind:checked={debugEnabled}
+                    on:change={toggleDebugMode}
+                  />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            
+            {#if debugEnabled}
+              <div class="debug-status">
+                <p><strong>Debug mode is currently enabled.</strong></p>
+                <p>Check your browser's developer console (F12) to see debug logs.</p>
+              </div>
+            {/if}
           </div>
         {/if}
         
@@ -709,6 +794,141 @@
     margin-bottom: 0.375rem;
     color: var(--text-secondary, #718096);
     font-size: 0.85rem;
+  }
+  
+  .debug-warning {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    color: #92400e;
+  }
+  
+  .warning-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+  }
+  
+  .warning-icon {
+    font-size: 1.5rem;
+  }
+  
+  .debug-warning ul {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+  
+  .debug-warning li {
+    margin-bottom: 0.25rem;
+  }
+  
+  .btn-acknowledge {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  .btn-acknowledge:hover {
+    background: #d97706;
+  }
+  
+  .debug-setting {
+    margin-top: 1rem;
+  }
+  
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1rem;
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #e0e0e0);
+  }
+  
+  .setting-info {
+    flex: 1;
+    margin-right: 1rem;
+  }
+  
+  .setting-info label {
+    display: block;
+    font-weight: 600;
+    color: var(--text-primary, #1a202c);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+  
+  .setting-description {
+    margin: 0;
+    color: var(--text-secondary, #718096);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+  
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 26px;
+  }
+  
+  .toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+  }
+  
+  .toggle-switch input:checked + .toggle-slider {
+    background-color: #3b82f6;
+  }
+  
+  .toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+  }
+  
+  .debug-status {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #d1fae5;
+    border: 1px solid #6ee7b7;
+    border-radius: 8px;
+    color: #065f46;
+    font-size: 0.9rem;
   }
 </style>
 

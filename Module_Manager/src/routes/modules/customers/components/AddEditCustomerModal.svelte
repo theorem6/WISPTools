@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { customerService, type Customer } from '$lib/services/customerService';
   import { API_CONFIG } from '$lib/config/api';
+  import { debug } from '$lib/utils/debug';
   
   export let show = false;
   export let customer: Customer | null = null;
@@ -90,7 +91,7 @@
   // This ensures service plan displays when editing existing customers with a group
   $: groupsReady = customerGroups.length > 0 && bandwidthPlans.length > 0;
   $: if (formData.groupId && groupsReady && formData.groupId !== lastProcessedGroupId) {
-    console.log('[CustomerForm] Reactive: Triggering handleGroupChange', {
+    debug.log('[CustomerForm] Reactive: Triggering handleGroupChange', {
       groupId: formData.groupId,
       groupsCount: customerGroups.length,
       plansCount: bandwidthPlans.length,
@@ -135,7 +136,7 @@
       if (groupsRes?.ok) {
         const groupsData = await groupsRes.json();
         customerGroups = Array.isArray(groupsData.groups) ? groupsData.groups : groupsData;
-        console.log('[CustomerForm] Loaded groups:', {
+        debug.log('[CustomerForm] Loaded groups:', {
           count: customerGroups.length,
           groups: customerGroups.map(g => ({
             group_id: g.group_id,
@@ -149,7 +150,7 @@
       if (plansRes?.ok) {
         const plansData = await plansRes.json();
         bandwidthPlans = Array.isArray(plansData.plans) ? plansData.plans : plansData;
-        console.log('[CustomerForm] Loaded bandwidth plans:', {
+        debug.log('[CustomerForm] Loaded bandwidth plans:', {
           count: bandwidthPlans.length,
           plans: bandwidthPlans.map(p => ({
             id: p.id,
@@ -175,7 +176,7 @@
   function handleGroupChange() {
     groupWarning = ''; // Clear previous warning
     
-    console.log('[CustomerForm] handleGroupChange called', {
+    debug.log('[CustomerForm] handleGroupChange called', {
       groupId: formData.groupId,
       groupsCount: customerGroups.length,
       plansCount: bandwidthPlans.length,
@@ -202,7 +203,7 @@
     // Find selected group - check both group_id and id fields
     const selectedGroup = customerGroups.find(g => {
       const groupMatch = (g.group_id === formData.groupId) || (g.id === formData.groupId);
-      console.log('[CustomerForm] Checking group:', {
+      debug.log('[CustomerForm] Checking group:', {
         group_id: g.group_id,
         id: g.id,
         targetGroupId: formData.groupId,
@@ -220,7 +221,7 @@
       return;
     }
     
-    console.log('[CustomerForm] Found group:', {
+    debug.log('[CustomerForm] Found group:', {
       name: selectedGroup.name,
       bandwidth_plan_id: selectedGroup.bandwidth_plan_id
     });
@@ -258,7 +259,7 @@
       return matches;
     });
     
-    console.log('[CustomerForm] Looking for plan:', {
+    debug.log('[CustomerForm] Looking for plan:', {
       searchedPlanId: selectedGroup.bandwidth_plan_id,
       foundPlan: !!plan,
       groupBandwidthPlanId: selectedGroup.bandwidth_plan_id,
@@ -299,8 +300,8 @@
         (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
       
       // Log full plan object to see all available fields
-      console.log('[CustomerForm] Full plan object:', plan);
-      console.log('[CustomerForm] ✅ Service plan populated from group:', {
+      debug.log('[CustomerForm] Full plan object:', plan);
+      debug.log('[CustomerForm] ✅ Service plan populated from group:', {
         groupId: formData.groupId,
         groupName: selectedGroup.name,
         planId: formData.servicePlan.planId,
@@ -404,7 +405,7 @@
         dataQuota: customer.servicePlan.dataQuota,
         priorityLevel: customer.servicePlan.priorityLevel || 'medium'
       };
-      console.log('[CustomerForm] Loaded existing service plan:', {
+      debug.log('[CustomerForm] Loaded existing service plan:', {
         planId: formData.servicePlan.planId,
         planName: formData.servicePlan.planName
       });
@@ -423,7 +424,7 @@
         dataQuota: undefined,
         priorityLevel: 'medium'
       };
-      console.log('[CustomerForm] Initialized empty service plan, will populate from group if groupId exists');
+      debug.log('[CustomerForm] Initialized empty service plan, will populate from group if groupId exists');
     }
   }
   

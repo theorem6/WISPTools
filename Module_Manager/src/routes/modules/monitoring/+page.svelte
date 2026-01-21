@@ -25,6 +25,7 @@
   import { getModuleTips } from '$lib/config/moduleTips';
   import { tipsService } from '$lib/services/tipsService';
   import MonitoringSetupWizard from '$lib/components/wizards/MonitoringSetupWizard.svelte';
+  import { debug } from '$lib/utils/debug';
   
   // Use real backend data now that devices are created
   // Temporarily enable mock data to ensure devices show while debugging backend
@@ -163,7 +164,7 @@
     // Listen for storage events (when sites/hardware are deleted in other tabs/modules)
     handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'monitoring-refresh-needed' && tenantId) {
-        console.log('[Monitoring] Storage event detected - refreshing data');
+        debug.log('[Monitoring] Storage event detected - refreshing data');
         loadDashboard();
         loadNetworkDevices();
         loadSNMPData();
@@ -184,7 +185,7 @@
       if (tenantId && typeof window !== 'undefined') {
         const needsRefresh = localStorage.getItem('monitoring-refresh-needed');
         if (needsRefresh) {
-          console.log('[Monitoring] Focus detected with refresh flag - refreshing data');
+          debug.log('[Monitoring] Focus detected with refresh flag - refreshing data');
           loadDashboard();
           loadNetworkDevices();
           loadSNMPData();
@@ -247,7 +248,7 @@
           const data = await response.json();
           epcDevices = Array.isArray(data.epcs) ? data.epcs : [];
           epcLoadError = null;
-          console.log('[Monitoring] Loaded', epcDevices.length, 'EPC devices');
+          debug.log('[Monitoring] Loaded', epcDevices.length, 'EPC devices');
         } else {
           const errorText = await response.text();
           console.error('[Monitoring] Failed to load EPC devices:', response.status, errorText);
@@ -492,7 +493,7 @@
             metrics: { portUtilization: 65, temperature: 42 }
           }
         ];
-        console.log('[Network Monitoring] Loaded mock network devices:', networkDevices.length);
+        debug.log('[Network Monitoring] Loaded mock network devices:', networkDevices.length);
         return;
       }
       
@@ -545,20 +546,20 @@
       ]);
       
       const loadTime = performance.now() - startTime;
-      console.log(`[Network Monitoring] All device sources loaded in ${loadTime.toFixed(0)}ms`);
+      debug.log(`[Network Monitoring] All device sources loaded in ${loadTime.toFixed(0)}ms`);
       
       // Process EPC devices
       if (epcResult.status === 'fulfilled' && epcResult.value.success && epcResult.value.data?.epcs) {
         epcResult.value.data.epcs.forEach((epc: any) => addDevice(epc, 'epc'));
       } else if (epcResult.status === 'rejected') {
-        console.log('[Network Monitoring] EPC API not available:', epcResult.reason);
+        debug.log('[Network Monitoring] EPC API not available:', epcResult.reason);
       }
       
       // Process Mikrotik devices
       if (mikrotikResult.status === 'fulfilled' && mikrotikResult.value.success && mikrotikResult.value.data?.devices) {
         mikrotikResult.value.data.devices.forEach((device: any) => addDevice(device, 'mikrotik'));
       } else if (mikrotikResult.status === 'rejected') {
-        console.log('[Network Monitoring] Mikrotik API not available:', mikrotikResult.reason);
+        debug.log('[Network Monitoring] Mikrotik API not available:', mikrotikResult.reason);
       }
       
       // Process SNMP devices
@@ -581,7 +582,7 @@
           }
           addDevice(device, 'snmp');
         });
-        console.log('[Network Monitoring] Loaded SNMP devices:', snmpResult.value.data.devices.length);
+          debug.log('[Network Monitoring] Loaded SNMP devices:', snmpResult.value.data.devices.length);
       } else if (snmpResult.status === 'rejected') {
         console.error('[Network Monitoring] Error loading SNMP devices:', snmpResult.reason);
       }
@@ -606,7 +607,7 @@
           }
           addDevice(device, device.type || 'snmp');
         });
-        console.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.value.data.devices.length, '(all devices, including undeployed)');
+          debug.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.value.data.devices.length, '(all devices, including undeployed)');
       } else if (discoveredResult.status === 'rejected') {
         console.error('[Network Monitoring] Error loading discovered devices:', discoveredResult.reason);
       }
@@ -614,10 +615,10 @@
       // Process hardware deployments
       if (hardwareDeploymentsResult.status === 'fulfilled') {
         const allHardwareDeployments = hardwareDeploymentsResult.value;
-        console.log('[Network Monitoring] Loaded hardware deployments:', allHardwareDeployments.length);
+        debug.log('[Network Monitoring] Loaded hardware deployments:', allHardwareDeployments.length);
         
         if (allHardwareDeployments.length > 0) {
-          console.log('[Network Monitoring] Sample hardware deployment:', {
+          debug.log('[Network Monitoring] Sample hardware deployment:', {
             id: allHardwareDeployments[0]._id,
             name: allHardwareDeployments[0].name,
             hardware_type: allHardwareDeployments[0].hardware_type,
@@ -656,13 +657,13 @@
           
           addDevice(deviceData, deployment.hardware_type || 'other');
         });
-        console.log('[Network Monitoring] Added hardware deployments to device list');
+        debug.log('[Network Monitoring] Added hardware deployments to device list');
       } else if (hardwareDeploymentsResult.status === 'rejected') {
         console.error('[Network Monitoring] Error loading hardware deployments:', hardwareDeploymentsResult.reason);
       }
       
       networkDevices = devices;
-      console.log('[Network Monitoring] Loaded network devices:', devices.length, '(deduped)');
+      debug.log('[Network Monitoring] Loaded network devices:', devices.length, '(deduped)');
     } catch (error) {
       console.error('[Network Monitoring] Failed to load network devices:', error);
       networkDevices = [];
@@ -707,7 +708,7 @@
             }
           }
         ];
-        console.log('[Network Monitoring] Loaded mock SNMP data:', snmpData.length);
+        debug.log('[Network Monitoring] Loaded mock SNMP data:', snmpData.length);
         return;
       }
       
@@ -715,7 +716,7 @@
       
       if (result.success && result.data) {
         snmpData = Array.isArray(result.data) ? result.data : [result.data];
-        console.log('[Network Monitoring] Loaded SNMP data:', snmpData.length);
+        debug.log('[Network Monitoring] Loaded SNMP data:', snmpData.length);
       }
     } catch (error) {
       console.error('[Network Monitoring] Failed to load SNMP data:', error);
@@ -727,19 +728,19 @@
 
   function handleDeviceSelected(event) {
     selectedDevice = event.detail;
-    console.log('[Network Monitoring] Device selected:', selectedDevice);
+    debug.log('[Network Monitoring] Device selected:', selectedDevice);
   }
 
   function handleViewDeviceDetails(event) {
     const device = event.detail;
     // Navigate to device details page or open modal
-    console.log('[Network Monitoring] View device details:', device);
+    debug.log('[Network Monitoring] View device details:', device);
   }
 
   function handleConfigureDevice(event) {
     const device = event.detail;
     // Open device configuration modal
-    console.log('[Network Monitoring] Configure device:', device);
+    debug.log('[Network Monitoring] Configure device:', device);
   }
 
   function handleRefreshData() {
@@ -771,7 +772,7 @@
   let selectedAlert = null;
 
   function handleAlertClick(alert) {
-    console.log('[Monitoring] Alert clicked:', alert);
+    debug.log('[Monitoring] Alert clicked:', alert);
     showAlertDetails(alert);
   }
   

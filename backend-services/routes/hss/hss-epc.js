@@ -38,7 +38,9 @@ router.get('/epc/remote/list', async (req, res) => {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
 
-    console.log(`[HSS/EPC] Fetching remote EPCs for tenant: ${tenantId}`);
+    const { createDebugLogger } = require('../../utils/debug');
+    const debug = createDebugLogger(req);
+    debug.log(`[HSS/EPC] Fetching remote EPCs for tenant: ${tenantId}`);
 
     // Get EPCs from RemoteEPC collection - TENANT-SPECIFIC ONLY
     // Only return EPCs that belong to this tenant (no unassigned EPCs for regular tenants)
@@ -46,7 +48,7 @@ router.get('/epc/remote/list', async (req, res) => {
       tenant_id: tenantId 
     }).lean();
     
-    console.log(`[HSS/EPC] Found ${remoteEPCs.length} EPCs for tenant ${tenantId}`);
+    debug.log(`[HSS/EPC] Found ${remoteEPCs.length} EPCs for tenant ${tenantId}`);
 
     // Get latest service status for each EPC to include metrics
     const { EPCServiceStatus } = require('../../models/distributed-epc-schema');
@@ -64,13 +66,13 @@ router.get('/epc/remote/list', async (req, res) => {
       }
     ]).allowDiskUse(true);
 
-    console.log(`[HSS/EPC] Found ${latestStatuses.length} service status records`);
+    debug.log(`[HSS/EPC] Found ${latestStatuses.length} service status records`);
 
     // Create a map of epc_id to latest status
     const statusMap = new Map();
     latestStatuses.forEach(item => {
       statusMap.set(item._id, item.latest);
-      console.log(`[HSS/EPC] Service status for ${item._id}:`, {
+      debug.log(`[HSS/EPC] Service status for ${item._id}:`, {
         timestamp: item.latest.timestamp,
         hasSystem: !!item.latest.system,
         cpuPercent: item.latest.system?.cpu_percent,
@@ -115,7 +117,7 @@ router.get('/epc/remote/list', async (req, res) => {
       
       // Debug log for metrics
       if (epc.epc_id === 'EPC-CB4C5042' || epc.device_code === 'YALNTFQC') {
-        console.log(`[HSS/EPC] Metrics for ${epc.epc_id}:`, {
+        debug.log(`[HSS/EPC] Metrics for ${epc.epc_id}:`, {
           hasLatestStatus: !!latestStatus,
           hasSystem: !!latestStatus?.system,
           cpuPercent: latestStatus?.system?.cpu_percent,
