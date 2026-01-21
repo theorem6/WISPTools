@@ -611,28 +611,34 @@
           </select>
         </div>
         
-        {#if formData.groupId && formData.servicePlan.planName}
-          <div class="service-plan-preview">
-            <h4>Service Plan</h4>
-            <div class="plan-details">
-              <div class="plan-detail">
-                <span class="label">Plan:</span>
-                <span class="value">{formData.servicePlan.planName}</span>
+        {#if formData.groupId}
+          {#if formData.servicePlan.planName}
+            <div class="service-plan-preview">
+              <h4>Service Plan</h4>
+              <div class="plan-details">
+                <div class="plan-detail">
+                  <span class="label">Plan:</span>
+                  <span class="value">{formData.servicePlan.planName}</span>
+                </div>
+                {#if formData.servicePlan.downloadMbps}
+                  <div class="plan-detail">
+                    <span class="label">Download:</span>
+                    <span class="value">{formData.servicePlan.downloadMbps} Mbps</span>
+                  </div>
+                {/if}
+                {#if formData.servicePlan.uploadMbps}
+                  <div class="plan-detail">
+                    <span class="label">Upload:</span>
+                    <span class="value">{formData.servicePlan.uploadMbps} Mbps</span>
+                  </div>
+                {/if}
               </div>
-              {#if formData.servicePlan.downloadMbps}
-                <div class="plan-detail">
-                  <span class="label">Download:</span>
-                  <span class="value">{formData.servicePlan.downloadMbps} Mbps</span>
-                </div>
-              {/if}
-              {#if formData.servicePlan.uploadMbps}
-                <div class="plan-detail">
-                  <span class="label">Upload:</span>
-                  <span class="value">{formData.servicePlan.uploadMbps} Mbps</span>
-                </div>
-              {/if}
             </div>
-          </div>
+          {:else}
+            <div class="service-plan-preview" style="opacity: 0.6;">
+              <p style="margin: 0; color: var(--text-secondary);">Loading service plan from group...</p>
+            </div>
+          {/if}
         {/if}
         
         {#if formData.serviceType === '4G/5G'}
