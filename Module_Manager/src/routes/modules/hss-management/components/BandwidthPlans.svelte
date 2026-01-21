@@ -150,7 +150,6 @@
         <div class="plan-card">
           <div class="plan-header">
             <h3>{plan.name}</h3>
-            <span class="plan-id">{plan.plan_id}</span>
           </div>
           <div class="plan-speeds">
             <div class="speed">
@@ -180,15 +179,6 @@
         <button class="close-btn" on:click={closeModal}>×</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Plan ID</label>
-          <input 
-            type="text" 
-            bind:value={formData.plan_id} 
-            disabled={!!editingPlan}
-            placeholder="plan_gold"
-          />
-        </div>
         <div class="form-group">
           <label>Plan Name</label>
           <input 
@@ -292,15 +282,9 @@
   }
 
   .plan-header h3 {
-    margin: 0 0 0.5rem 0;
+    margin: 0;
     font-size: 1.25rem;
     color: #1a202c;
-  }
-
-  .plan-id {
-    font-size: 0.875rem;
-    color: #64748b;
-    font-family: monospace;
   }
 
   .plan-speeds {

@@ -4,7 +4,6 @@
   import { auth } from '$lib/firebase';
   import { currentTenant } from '$lib/stores/tenantStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
-  import SubscriberList from './components/SubscriberList.svelte';
   import GroupManagement from './components/GroupManagement.svelte';
   import BandwidthPlans from './components/BandwidthPlans.svelte';
   import HSSStats from './components/HSSStats.svelte';
@@ -17,7 +16,7 @@
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
   import { hssSubscribersDocs } from '$lib/docs/hss-subscribers-docs';
   
-  type HSSManagementTab = 'dashboard' | 'subscribers' | 'groups' | 'plans' | 'mme' | 'import' | 'remote-epcs';
+  type HSSManagementTab = 'dashboard' | 'groups' | 'plans' | 'mme' | 'import' | 'remote-epcs';
   
   // Use centralized API configuration
   const HSS_API = API_CONFIG.PATHS.HSS;
@@ -183,12 +182,6 @@
         📊 Dashboard
       </button>
       <button 
-        class:active={activeTab === 'subscribers'} 
-        onclick={() => switchTab('subscribers')}
-      >
-        👥 Subscribers
-      </button>
-      <button 
         class:active={activeTab === 'groups'} 
         onclick={() => switchTab('groups')}
       >
@@ -224,8 +217,6 @@
     <div class="tab-content">
       {#if activeTab === 'dashboard'}
         <HSSStats {stats} on:refresh={loadStats} on:navigate={handleNavigate} />
-      {:else if activeTab === 'subscribers'}
-        <SubscriberList {tenantId} {HSS_API} {groups} {bandwidthPlans} />
       {:else if activeTab === 'groups'}
         <GroupManagement {tenantId} {HSS_API} />
       {:else if activeTab === 'plans'}

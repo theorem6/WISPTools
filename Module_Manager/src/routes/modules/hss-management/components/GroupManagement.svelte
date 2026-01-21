@@ -164,7 +164,6 @@
         <div class="group-card">
           <div class="group-header">
             <h3>{group.name}</h3>
-            <span class="group-id">{group.group_id}</span>
           </div>
           {#if group.description}
             <p class="description">{group.description}</p>
@@ -193,15 +192,6 @@
         <button class="close-btn" on:click={closeModal}>×</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Group ID</label>
-          <input 
-            type="text" 
-            bind:value={formData.group_id} 
-            disabled={!!editingGroup}
-            placeholder="group_residential"
-          />
-        </div>
         <div class="form-group">
           <label>Group Name</label>
           <input 
@@ -302,15 +292,9 @@
   }
 
   .group-header h3 {
-    margin: 0 0 0.5rem 0;
+    margin: 0;
     font-size: 1.25rem;
     color: #1a202c;
-  }
-
-  .group-id {
-    font-size: 0.875rem;
-    color: #64748b;
-    font-family: monospace;
   }
 
   .description {
