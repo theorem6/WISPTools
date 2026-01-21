@@ -14,6 +14,7 @@
   import { tenantStore } from '../../stores/tenantStore';
   import { authService } from '../../services/authService';
   import { isPlatformAdmin } from '../../services/adminService';
+  import { debug } from '../../utils/debug';
   
   export let requireTenant = true; // If false, only checks auth
   export let adminOnly = false; // If true, only admins can access

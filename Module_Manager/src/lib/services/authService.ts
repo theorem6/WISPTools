@@ -19,6 +19,7 @@ import {
   type Auth
 } from 'firebase/auth';
 import type { UserProfile } from '../models/network';
+import { debug } from '../utils/debug';
 
 // ============================================================================
 // Auth Service Result Types

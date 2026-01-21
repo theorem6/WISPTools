@@ -6,6 +6,7 @@ import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { Tenant } from '../models/tenant';
 import { isPlatformAdmin } from '../services/adminService';
+import { debug } from '../utils/debug';
 
 export interface TenantState {
   // Current tenant
