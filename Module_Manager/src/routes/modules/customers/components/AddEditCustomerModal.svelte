@@ -298,6 +298,8 @@
       formData.servicePlan.maxBandwidthUl = plan.max_bandwidth_ul || 
         (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
       
+      // Log full plan object to see all available fields
+      console.log('[CustomerForm] Full plan object:', plan);
       console.log('[CustomerForm] ✅ Service plan populated from group:', {
         groupId: formData.groupId,
         groupName: selectedGroup.name,
@@ -306,9 +308,11 @@
         planObject: { 
           name: plan.name, 
           plan_name: plan.plan_name, 
-          planName: plan.planName, 
+          planName: plan.planName,
+          description: plan.description,
           plan_id: plan.plan_id, 
           id: plan.id,
+          _id: plan._id,
           download_mbps: plan.download_mbps,
           upload_mbps: plan.upload_mbps,
           max_bandwidth_dl: plan.max_bandwidth_dl,
@@ -780,14 +784,21 @@
         {/if}
         
         {#if formData.groupId}
-          {#if formData.servicePlan.planName}
+          {#if formData.servicePlan.planId || formData.servicePlan.downloadMbps || formData.servicePlan.uploadMbps}
             <div class="service-plan-preview">
               <h4>Service Plan</h4>
               <div class="plan-details">
-                <div class="plan-detail">
-                  <span class="label">Plan:</span>
-                  <span class="value">{formData.servicePlan.planName}</span>
-                </div>
+                {#if formData.servicePlan.planName}
+                  <div class="plan-detail">
+                    <span class="label">Plan:</span>
+                    <span class="value">{formData.servicePlan.planName}</span>
+                  </div>
+                {:else if formData.servicePlan.planId}
+                  <div class="plan-detail">
+                    <span class="label">Plan ID:</span>
+                    <span class="value">{formData.servicePlan.planId}</span>
+                  </div>
+                {/if}
                 {#if formData.servicePlan.downloadMbps}
                   <div class="plan-detail">
                     <span class="label">Download:</span>
