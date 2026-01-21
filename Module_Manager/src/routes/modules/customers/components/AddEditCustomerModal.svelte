@@ -856,9 +856,10 @@
   }
   
   .form-group label {
-    font-weight: 500;
-    font-size: 0.9rem;
+    font-weight: 600;
+    font-size: 0.95rem;
     color: var(--text-primary);
+    margin-bottom: 0.25rem;
   }
   
   .form-group input,
@@ -867,18 +868,47 @@
     padding: var(--spacing-md);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    background: var(--input-bg);
+    background: var(--input-bg, var(--card-bg));
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 1rem;
+    font-family: inherit;
     transition: var(--transition);
+    width: 100%;
+  }
+  
+  /* Enhanced select dropdown styling */
+  .form-group select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23334155' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px;
+    padding-right: 2.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    border: 2px solid var(--border-color);
+    background-color: var(--card-bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .form-group select:hover {
+    border-color: var(--brand-primary, #3b82f6);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  }
+  
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--brand-primary, #3b82f6);
+    background-color: var(--card-bg);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
   
   .form-group input:focus,
-  .form-group select:focus,
   .form-group textarea:focus {
     outline: none;
-    border-color: var(--brand-primary);
+    border-color: var(--brand-primary, #3b82f6);
     background: var(--card-bg);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
   
   .form-group textarea {
