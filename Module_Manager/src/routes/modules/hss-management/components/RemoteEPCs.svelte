@@ -899,6 +899,11 @@ To use:
               <div class="detail-row">
                 <span class="icon">🕐</span>
                 <span>Last seen: {new Date(epc.last_seen).toLocaleString()}</span>
+                {#if epc.status === 'offline' && epc.timeSinceCheckin}
+                  <span style="color: #ef4444; margin-left: 0.5rem; font-weight: 500;">
+                    (Offline for {formatTimeSince(epc.timeSinceCheckin)})
+                  </span>
+                {/if}
               </div>
             {/if}
             
