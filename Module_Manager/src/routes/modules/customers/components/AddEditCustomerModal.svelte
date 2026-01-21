@@ -135,13 +135,32 @@
       if (groupsRes?.ok) {
         const groupsData = await groupsRes.json();
         customerGroups = Array.isArray(groupsData.groups) ? groupsData.groups : groupsData;
-        console.log('[CustomerForm] Loaded groups:', customerGroups.length);
+        console.log('[CustomerForm] Loaded groups:', {
+          count: customerGroups.length,
+          groups: customerGroups.map(g => ({
+            group_id: g.group_id,
+            id: g.id,
+            name: g.name,
+            bandwidth_plan_id: g.bandwidth_plan_id
+          }))
+        });
       }
       
       if (plansRes?.ok) {
         const plansData = await plansRes.json();
         bandwidthPlans = Array.isArray(plansData.plans) ? plansData.plans : plansData;
-        console.log('[CustomerForm] Loaded bandwidth plans:', bandwidthPlans.length);
+        console.log('[CustomerForm] Loaded bandwidth plans:', {
+          count: bandwidthPlans.length,
+          plans: bandwidthPlans.map(p => ({
+            id: p.id,
+            plan_id: p.plan_id,
+            name: p.name,
+            download_mbps: p.download_mbps,
+            upload_mbps: p.upload_mbps,
+            max_bandwidth_dl: p.max_bandwidth_dl,
+            max_bandwidth_ul: p.max_bandwidth_ul
+          }))
+        });
       }
       
       // Service plan will be populated by reactive statement when groupsReady becomes true
@@ -219,16 +238,36 @@
       return;
     }
     
-    // Find bandwidth plan - check both plan_id and id fields
+    // Find bandwidth plan - check multiple possible ID fields
     const plan = bandwidthPlans.find(p => {
-      const planMatch = (p.plan_id === selectedGroup.bandwidth_plan_id) || (p.id === selectedGroup.bandwidth_plan_id);
-      return planMatch;
+      const planId = selectedGroup.bandwidth_plan_id;
+      // Check all possible ID fields
+      const matches = 
+        p.plan_id === planId ||
+        p.id === planId ||
+        p._id?.toString() === planId ||
+        (p._id && p._id.toString() === planId);
+      
+      if (matches) {
+        console.log('[CustomerForm] Plan match found:', {
+          searchedId: planId,
+          matchedPlan: { plan_id: p.plan_id, id: p.id, _id: p._id, name: p.name }
+        });
+      }
+      
+      return matches;
     });
     
     console.log('[CustomerForm] Looking for plan:', {
       searchedPlanId: selectedGroup.bandwidth_plan_id,
       foundPlan: !!plan,
-      availablePlans: bandwidthPlans.map(p => ({ plan_id: p.plan_id, id: p.id, name: p.name }))
+      groupBandwidthPlanId: selectedGroup.bandwidth_plan_id,
+      availablePlans: bandwidthPlans.map(p => ({ 
+        plan_id: p.plan_id, 
+        id: p.id, 
+        _id: p._id?.toString(),
+        name: p.name 
+      }))
     });
     
     if (plan) {
@@ -239,20 +278,48 @@
       // Check for plan name in multiple possible fields
       const planName = plan.name || plan.plan_name || plan.planName || '';
       formData.servicePlan.planName = planName;
-      formData.servicePlan.downloadMbps = plan.download_mbps || (plan.max_bandwidth_dl ? Math.round(plan.max_bandwidth_dl / 1000000) : undefined);
-      formData.servicePlan.uploadMbps = plan.upload_mbps || (plan.max_bandwidth_ul ? Math.round(plan.max_bandwidth_ul / 1000000) : undefined);
-      formData.servicePlan.maxBandwidthDl = plan.max_bandwidth_dl || (plan.download_mbps ? plan.download_mbps * 1000000 : undefined);
-      formData.servicePlan.maxBandwidthUl = plan.max_bandwidth_ul || (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
+      
+      // Handle bandwidth values - API may return in Mbps or bytes
+      // If max_bandwidth_dl/ul are in bytes (large numbers), convert to Mbps
+      // If download_mbps/upload_mbps exist, use those
+      const downloadMbps = plan.download_mbps || 
+        (plan.max_bandwidth_dl && plan.max_bandwidth_dl > 1000 ? Math.round(plan.max_bandwidth_dl / 1000000) : 
+         plan.max_bandwidth_dl ? plan.max_bandwidth_dl : undefined);
+      const uploadMbps = plan.upload_mbps || 
+        (plan.max_bandwidth_ul && plan.max_bandwidth_ul > 1000 ? Math.round(plan.max_bandwidth_ul / 1000000) : 
+         plan.max_bandwidth_ul ? plan.max_bandwidth_ul : undefined);
+      
+      formData.servicePlan.downloadMbps = downloadMbps;
+      formData.servicePlan.uploadMbps = uploadMbps;
+      
+      // Store max bandwidth in bytes (convert Mbps to bytes if needed)
+      formData.servicePlan.maxBandwidthDl = plan.max_bandwidth_dl || 
+        (plan.download_mbps ? plan.download_mbps * 1000000 : undefined);
+      formData.servicePlan.maxBandwidthUl = plan.max_bandwidth_ul || 
+        (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
+      
       console.log('[CustomerForm] ✅ Service plan populated from group:', {
         groupId: formData.groupId,
         groupName: selectedGroup.name,
         planId: formData.servicePlan.planId,
         planName: formData.servicePlan.planName,
-        planObject: { name: plan.name, plan_name: plan.plan_name, planName: plan.planName, plan_id: plan.plan_id, id: plan.id },
-        download: formData.servicePlan.downloadMbps,
-        upload: formData.servicePlan.uploadMbps,
-        maxDl: formData.servicePlan.maxBandwidthDl,
-        maxUl: formData.servicePlan.maxBandwidthUl
+        planObject: { 
+          name: plan.name, 
+          plan_name: plan.plan_name, 
+          planName: plan.planName, 
+          plan_id: plan.plan_id, 
+          id: plan.id,
+          download_mbps: plan.download_mbps,
+          upload_mbps: plan.upload_mbps,
+          max_bandwidth_dl: plan.max_bandwidth_dl,
+          max_bandwidth_ul: plan.max_bandwidth_ul
+        },
+        populated: {
+          download: formData.servicePlan.downloadMbps,
+          upload: formData.servicePlan.uploadMbps,
+          maxDl: formData.servicePlan.maxBandwidthDl,
+          maxUl: formData.servicePlan.maxBandwidthUl
+        }
       });
     } else {
       console.warn('[CustomerForm] ❌ Bandwidth plan not found:', {
