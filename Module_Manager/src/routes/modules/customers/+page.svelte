@@ -6,6 +6,14 @@
   import { customerService, type Customer } from '$lib/services/customerService';
   import AddEditCustomerModal from './components/AddEditCustomerModal.svelte';
   import { goto } from '$app/navigation';
+  import GroupManagement from '../hss-management/components/GroupManagement.svelte';
+  import BandwidthPlans from '../hss-management/components/BandwidthPlans.svelte';
+  import { API_CONFIG } from '$lib/config/api';
+  
+  type CustomerTab = 'customers' | 'service-plans' | 'customer-groups';
+  
+  let activeTab: CustomerTab = 'customers';
+  const HSS_API = API_CONFIG.PATHS.HSS;
   
   // Data
   let customers: Customer[] = [];
@@ -198,28 +206,52 @@
           </button>
           <h1>👥 Customer Management</h1>
         </div>
-        <p class="subtitle">Manage your tenant's customers and subscribers</p>
+        <p class="subtitle">Manage your tenant's customers, service plans, and customer groups</p>
       </div>
       <div class="header-actions">
-        <a 
-          href="/modules/customers/portal-setup" 
-          class="btn-secondary"
-          title="Setup Customer Portal"
-        >
-          🌐 Setup Portal
-        </a>
-        <a 
-          href="/modules/customers/portal/login" 
-          target="_blank" 
-          class="btn-secondary"
-          title="Open Customer Portal"
-        >
-          👁️ View Portal
-        </a>
-        <button class="btn-primary" on:click={handleAdd}>
-          ➕ Add Customer
-        </button>
+        {#if activeTab === 'customers'}
+          <a 
+            href="/modules/customers/portal-setup" 
+            class="btn-secondary"
+            title="Setup Customer Portal"
+          >
+            🌐 Setup Portal
+          </a>
+          <a 
+            href="/modules/customers/portal/login" 
+            target="_blank" 
+            class="btn-secondary"
+            title="Open Customer Portal"
+          >
+            👁️ View Portal
+          </a>
+          <button class="btn-primary" on:click={handleAdd}>
+            ➕ Add Customer
+          </button>
+        {/if}
       </div>
+    </div>
+    
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button 
+        class:active={activeTab === 'customers'} 
+        on:click={() => activeTab = 'customers'}
+      >
+        👥 Customers
+      </button>
+      <button 
+        class:active={activeTab === 'service-plans'} 
+        on:click={() => activeTab = 'service-plans'}
+      >
+        📡 Service Plans
+      </button>
+      <button 
+        class:active={activeTab === 'customer-groups'} 
+        on:click={() => activeTab = 'customer-groups'}
+      >
+        📦 Customer Groups
+      </button>
     </div>
     
     {#if error}
@@ -230,8 +262,12 @@
       <div class="alert alert-success">{success}</div>
     {/if}
     
-    <!-- Stats Cards -->
-    <div class="stats-grid">
+    <!-- Tab Content -->
+    <div class="tab-content">
+      {#if activeTab === 'customers'}
+        <!-- Customers Tab -->
+        <!-- Stats Cards -->
+        <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-value">{stats.total}</div>
         <div class="stat-label">Total Customers</div>
@@ -380,6 +416,14 @@
             </div>
           {/each}
         </div>
+      {/if}
+    </div>
+      {:else if activeTab === 'service-plans'}
+        <!-- Service Plans Tab -->
+        <BandwidthPlans {tenantId} {HSS_API} />
+      {:else if activeTab === 'customer-groups'}
+        <!-- Customer Groups Tab -->
+        <GroupManagement {tenantId} {HSS_API} />
       {/if}
     </div>
   </div>
@@ -736,5 +780,57 @@
   .btn-sm {
     padding: 0.4rem 0.75rem;
     font-size: 0.8rem;
+  }
+  
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 2rem;
+    overflow-x: auto;
+  }
+  
+  .tabs button {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  
+  .tabs button:hover {
+    color: var(--brand-primary);
+    background: var(--bg-secondary);
+  }
+  
+  .tabs button.active {
+    color: var(--brand-primary);
+    border-bottom-color: var(--brand-primary);
+    font-weight: 600;
+  }
+  
+  .tab-content {
+    animation: fadeIn 0.3s;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @media (max-width: 768px) {
+    .tabs {
+      padding-bottom: 0.5rem;
+    }
+    
+    .tabs button {
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+    }
   }
 </style>
