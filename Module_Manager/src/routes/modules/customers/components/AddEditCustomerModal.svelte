@@ -35,8 +35,8 @@
       country: 'USA',
       sameAsService: true
     },
-    serviceStatus: 'pending' as Customer['serviceStatus'],
-    serviceType: undefined as Customer['serviceType'],
+    serviceStatus: '' as Customer['serviceStatus'] | '',
+    serviceType: '' as Customer['serviceType'] | '',
     groupId: '' as string | undefined,
     servicePlan: {
       planName: '',
@@ -156,7 +156,8 @@
     formData.primaryPhone = customer.primaryPhone || '';
     formData.alternatePhone = customer.alternatePhone || '';
     formData.email = customer.email || '';
-    formData.serviceStatus = customer.serviceStatus || 'pending';
+    formData.serviceStatus = customer.serviceStatus || '';
+    formData.serviceType = customer.serviceType || '';
     formData.serviceType = customer.serviceType;
     formData.macAddress = customer.macAddress || '';
     formData.notes = (customer as any).notes || '';
@@ -271,8 +272,8 @@
           zipCode: formData.billingAddress.zipCode.trim() || undefined,
           country: formData.billingAddress.country
         },
-        serviceStatus: formData.serviceStatus,
-        serviceType: formData.serviceType,
+        serviceStatus: formData.serviceStatus || 'pending',
+        serviceType: formData.serviceType || undefined,
         groupId: formData.groupId || undefined,
         servicePlan: formData.servicePlan.planName ? {
           planName: formData.servicePlan.planName,
@@ -448,8 +449,8 @@
         </div>
         
         <div class="form-group">
-          <label>Service Status</label>
           <select bind:value={formData.serviceStatus}>
+            <option value="">Select Service Status</option>
             <option value="pending">Pending</option>
             <option value="active">Active</option>
             <option value="trial">Trial</option>
@@ -459,9 +460,8 @@
         </div>
         
         <div class="form-group">
-          <label>Service Type</label>
           <select bind:value={formData.serviceType}>
-            <option value={undefined}>Select Service Type</option>
+            <option value="">Select Service Type</option>
             <option value="4G/5G">4G/5G (LTE/5G)</option>
             <option value="FWA">FWA (Fixed Wireless Access)</option>
             <option value="WiFi">WiFi</option>
@@ -539,9 +539,8 @@
         <p class="section-description">Select a customer group. The service plan will be automatically set from the group's bandwidth plan.</p>
         
         <div class="form-group">
-          <label>Group</label>
           <select bind:value={formData.groupId} on:change={handleGroupChange}>
-            <option value="">No Group Selected</option>
+            <option value="">Select Customer Group</option>
             {#each customerGroups as group}
               <option value={group.group_id || group.id}>{group.name}</option>
             {/each}
@@ -587,8 +586,8 @@
             </div>
             
             <div class="form-group">
-              <label>Priority Level</label>
               <select bind:value={formData.servicePlan.priorityLevel}>
+                <option value="">Select Priority Level</option>
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
@@ -889,6 +888,22 @@
     border: 2px solid var(--border-color);
     background-color: var(--card-bg);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Style placeholder option in dropdown list */
+  .form-group select option[value=""] {
+    color: var(--text-secondary, #64748b);
+    font-style: italic;
+  }
+  
+  /* Style select when placeholder is selected (empty value) */
+  .form-group select:has(option[value=""]:checked) {
+    color: var(--text-secondary, #64748b);
+  }
+  
+  /* When a real value is selected, show normal text color */
+  .form-group select:not(:has(option[value=""]:checked)) {
+    color: var(--text-primary);
   }
   
   .form-group select:hover {
