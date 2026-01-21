@@ -31,10 +31,20 @@
     
     // Listen for quick action events
     window.addEventListener('quick-action' as any, handleQuickAction as any);
+    
+    // Refresh customers periodically to catch new assignments
+    refreshInterval = setInterval(() => {
+      loadCustomers();
+    }, 5000); // Refresh every 5 seconds
   });
+  
+  let refreshInterval: ReturnType<typeof setInterval> | null = null;
   
   onDestroy(() => {
     window.removeEventListener('quick-action' as any, handleQuickAction as any);
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
   });
 
   async function loadGroups() {
@@ -84,6 +94,15 @@
       if (response.ok) {
         const data = await response.json();
         customers = Array.isArray(data) ? data : (data.customers || []);
+        console.log('[GroupManagement] Loaded customers:', {
+          count: customers.length,
+          customersWithGroups: customers.filter(c => c.groupId || c.group_id).map(c => ({
+            id: c._id || c.id,
+            name: c.fullName || `${c.firstName} ${c.lastName}`,
+            groupId: c.groupId,
+            group_id: c.group_id
+          }))
+        });
       }
     } catch (error: unknown) {
       console.error('Error loading customers:', error);
@@ -91,9 +110,29 @@
   }
 
   function getCustomersInGroup(groupId: string) {
-    return customers.filter(c => 
-      (c.groupId === groupId) || (c.group_id === groupId)
-    );
+    if (!groupId) return [];
+    
+    const groupCustomers = customers.filter(c => {
+      const matches = (c.groupId === groupId) || (c.group_id === groupId);
+      if (matches) {
+        console.log('[GroupManagement] Customer in group:', {
+          groupId,
+          customerId: c._id || c.id,
+          customerName: c.fullName || `${c.firstName} ${c.lastName}`,
+          customerGroupId: c.groupId,
+          customerGroup_id: c.group_id
+        });
+      }
+      return matches;
+    });
+    
+    console.log('[GroupManagement] Customers in group:', {
+      groupId,
+      count: groupCustomers.length,
+      customerIds: groupCustomers.map(c => c._id || c.id)
+    });
+    
+    return groupCustomers;
   }
 
   function openAddModal() {
@@ -178,9 +217,14 @@
 <div class="group-management">
   <div class="header">
     <h2>Subscriber Groups</h2>
-    <button class="btn-primary" on:click={openAddModal}>
-      + Add Group
-    </button>
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="btn-secondary" on:click={() => { loadCustomers(); loadGroups(); }} title="Refresh groups and customers">
+        🔄 Refresh
+      </button>
+      <button class="btn-primary" on:click={openAddModal}>
+        + Add Group
+      </button>
+    </div>
   </div>
 
   {#if loading}
@@ -319,6 +363,20 @@
 
   .btn-primary:hover {
     background: #2563eb;
+  }
+
+  .btn-secondary {
+    background: #64748b;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .btn-secondary:hover {
+    background: #475569;
   }
 
   .empty-state {
