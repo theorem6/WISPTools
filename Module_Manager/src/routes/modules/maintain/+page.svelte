@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
@@ -328,16 +328,16 @@ $: if (showTicketDetails) {
     <div class="module-header">
       <div class="header-top">
         <button class="back-btn" on:click={() => goto('/dashboard')}>
-          <span>â†</span> Back
+          <span>←</span> Back
         </button>
-        <h1>ðŸ”§ Maintain Module</h1>
+        <h1>Maintain Module</h1>
         <div class="header-actions">
           <button 
             class="btn btn-secondary btn-reports" 
             on:click={() => goto('/modules/help-desk/reports')}
             title="View Ticket Reports and Analytics"
           >
-            ðŸ“Š Reports
+            Reports
           </button>
           {#if activeTab === 'tickets'}
             <button class="btn btn-primary" on:click={() => {
@@ -359,27 +359,32 @@ $: if (showTicketDetails) {
         <button 
           class="tab {activeTab === 'help-desk' ? 'active' : ''}" 
           on:click={() => activeTab = 'help-desk'}>
-          ðŸ“Š Help Desk
+          Help Desk
         </button>
         <button 
           class="tab {activeTab === 'tickets' ? 'active' : ''}" 
           on:click={() => activeTab = 'tickets'}>
-          ðŸŽ« Tickets
+          Tickets
         </button>
         <button 
           class="tab {activeTab === 'maintenance' ? 'active' : ''}" 
           on:click={() => activeTab = 'maintenance'}>
-          ðŸ”§ Maintenance
+          Maintenance
         </button>
         <button 
           class="tab {activeTab === 'customers' ? 'active' : ''}" 
           on:click={() => activeTab = 'customers'}>
-          ðŸ‘¥ Customers
+          Customers
         </button>
         <button 
           class="tab {activeTab === 'incidents' ? 'active' : ''}" 
           on:click={() => activeTab = 'incidents'}>
-          ðŸš¨ Incidents
+          Incidents
+        </button>
+        <button 
+          class="tab {activeTab === 'reports' ? 'active' : ''}" 
+          on:click={() => activeTab = 'reports'}>
+          Reports
         </button>
       </div>
     </div>
@@ -390,7 +395,7 @@ $: if (showTicketDetails) {
         <!-- Help Desk Dashboard -->
         <div class="dashboard-grid">
           <div class="stat-card">
-            <div class="stat-icon">ðŸŽ«</div>
+            <div class="stat-icon">📋</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.openTickets}</div>
               <div class="stat-label">Open Tickets</div>
@@ -399,7 +404,7 @@ $: if (showTicketDetails) {
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon">ðŸ”§</div>
+            <div class="stat-icon">🔧</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.scheduledMaintenance}</div>
               <div class="stat-label">Scheduled Maintenance</div>
@@ -407,7 +412,7 @@ $: if (showTicketDetails) {
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon">ðŸ‘¥</div>
+            <div class="stat-icon">👥</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.activeCustomers}</div>
               <div class="stat-label">Active Customers</div>
@@ -431,7 +436,7 @@ $: if (showTicketDetails) {
             {#each recentActivity.slice(0, 10) as activity}
               <div class="activity-item">
                 <span class="activity-icon">
-                  {activity.type === 'ticket' ? 'ðŸŽ«' : 'ðŸ‘¥'}
+                  {activity.type === 'ticket' ? '📋' : '👥'}
                 </span>
                 <div class="activity-content">
                   <div class="activity-title">{activity.title}</div>
@@ -917,4 +922,5 @@ $: if (showTicketDetails) {
     margin-bottom: 1rem;
   }
 </style>
+
 
