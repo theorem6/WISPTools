@@ -1015,5 +1015,8 @@ router.post('/bulk-import', requireAdmin, async (req, res) => {
 // EXPORTS
 // ============================================================================
 
+// Mobile app status routes
+router.use('/mobile-status', require('./mobile-status'));
+
 module.exports = router;
 
