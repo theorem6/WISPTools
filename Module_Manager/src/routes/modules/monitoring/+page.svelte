@@ -607,8 +607,25 @@
       // Load hardware deployments (includes backhaul, routers, switches, etc.)
       try {
         const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+        console.log('[Network Monitoring] Loading hardware deployments for tenant:', tenantId);
         const allHardwareDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
         console.log('[Network Monitoring] Loaded hardware deployments:', allHardwareDeployments.length);
+        
+        if (allHardwareDeployments.length > 0) {
+          console.log('[Network Monitoring] Sample hardware deployment:', {
+            id: allHardwareDeployments[0]._id,
+            name: allHardwareDeployments[0].name,
+            hardware_type: allHardwareDeployments[0].hardware_type,
+            status: allHardwareDeployments[0].status,
+            siteId: allHardwareDeployments[0].siteId
+          });
+        } else {
+          console.warn('[Network Monitoring] No hardware deployments found. This could mean:');
+          console.warn('  1. No hardware has been deployed yet');
+          console.warn('  2. Hardware deployments exist but are not associated with this tenant');
+          console.warn('  3. The API endpoint is not returning data correctly');
+          console.warn('  Tenant ID:', tenantId);
+        }
         
         allHardwareDeployments.forEach((deployment: any) => {
           // Convert hardware deployment to device format
