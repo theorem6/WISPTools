@@ -48,7 +48,7 @@ router.get('/:tenantId/mobile-status', async (req, res) => {
         if (hasMobileApp) {
           const tokenEntries = Object.values(fcmTokens);
           const lastActiveTimes = tokenEntries
-            .map((token: any) => token.lastActive?.toDate?.() || null)
+            .map((token) => token.lastActive?.toDate?.() || null)
             .filter(Boolean)
             .sort((a, b) => b.getTime() - a.getTime());
           
@@ -135,11 +135,11 @@ router.get('/:userId/mobile-status', async (req, res) => {
     let status = 'offline';
     
     if (hasMobileApp) {
-      const tokenEntries = Object.values(fcmTokens);
-      const lastActiveTimes = tokenEntries
-        .map((token: any) => token.lastActive?.toDate?.() || null)
-        .filter(Boolean)
-        .sort((a, b) => b.getTime() - a.getTime());
+          const tokenEntries = Object.values(fcmTokens);
+          const lastActiveTimes = tokenEntries
+            .map((token) => token.lastActive?.toDate?.() || null)
+            .filter(Boolean)
+            .sort((a, b) => b.getTime() - a.getTime());
       
       if (lastActiveTimes.length > 0) {
         lastActive = lastActiveTimes[0];
