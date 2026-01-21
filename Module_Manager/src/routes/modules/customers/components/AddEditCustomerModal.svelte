@@ -83,22 +83,16 @@
   }
   
   // Watch for when groups are loaded and we have a groupId - populate service plan
-  $: if (formData.groupId && customerGroups.length > 0 && bandwidthPlans.length > 0 && customer) {
-    // Populate service plan from group if not already populated
-    // This handles the case when editing an existing customer with a group but no service plan data
-    const selectedGroup = customerGroups.find(g => 
-      (g.group_id === formData.groupId) || (g.id === formData.groupId)
-    );
-    if (selectedGroup && selectedGroup.bandwidth_plan_id) {
-      const plan = bandwidthPlans.find(p => 
-        (p.plan_id === selectedGroup.bandwidth_plan_id) || 
-        (p.id === selectedGroup.bandwidth_plan_id)
-      );
-      if (plan && (!formData.servicePlan.planName || formData.servicePlan.planName !== plan.name)) {
-        // Only update if plan name doesn't match (to avoid overwriting if already correct)
+  // This ensures service plan displays when editing existing customers with a group
+  $: groupsReady = customerGroups.length > 0 && bandwidthPlans.length > 0;
+  $: if (formData.groupId && groupsReady && customer) {
+    // Trigger service plan population when editing existing customer with group
+    // Use a small delay to ensure reactive updates complete
+    setTimeout(() => {
+      if (formData.groupId && !formData.servicePlan.planName) {
         handleGroupChange();
       }
-    }
+    }, 50);
   }
   
   async function loadGroups() {
@@ -144,17 +138,30 @@
       formData.servicePlan.planName = '';
       formData.servicePlan.downloadMbps = undefined;
       formData.servicePlan.uploadMbps = undefined;
+      formData.servicePlan.maxBandwidthDl = undefined;
+      formData.servicePlan.maxBandwidthUl = undefined;
       return;
     }
     
     // Find selected group
-    const selectedGroup = customerGroups.find(g => g.group_id === formData.groupId || g.id === formData.groupId);
-    if (!selectedGroup || !selectedGroup.bandwidth_plan_id) return;
+    const selectedGroup = customerGroups.find(g => 
+      (g.group_id === formData.groupId) || (g.id === formData.groupId)
+    );
+    
+    if (!selectedGroup) {
+      console.warn('[CustomerForm] Group not found:', formData.groupId);
+      return;
+    }
+    
+    if (!selectedGroup.bandwidth_plan_id) {
+      console.warn('[CustomerForm] Group has no bandwidth plan:', selectedGroup);
+      return;
+    }
     
     // Find bandwidth plan
     const plan = bandwidthPlans.find(p => 
-      p.plan_id === selectedGroup.bandwidth_plan_id || 
-      p.id === selectedGroup.bandwidth_plan_id
+      (p.plan_id === selectedGroup.bandwidth_plan_id) || 
+      (p.id === selectedGroup.bandwidth_plan_id)
     );
     
     if (plan) {
@@ -164,6 +171,15 @@
       formData.servicePlan.uploadMbps = plan.upload_mbps || plan.max_bandwidth_ul || undefined;
       formData.servicePlan.maxBandwidthDl = plan.max_bandwidth_dl || (plan.download_mbps ? plan.download_mbps * 1000000 : undefined);
       formData.servicePlan.maxBandwidthUl = plan.max_bandwidth_ul || (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
+      console.log('[CustomerForm] Service plan populated from group:', {
+        groupId: formData.groupId,
+        groupName: selectedGroup.name,
+        planName: formData.servicePlan.planName,
+        download: formData.servicePlan.downloadMbps,
+        upload: formData.servicePlan.uploadMbps
+      });
+    } else {
+      console.warn('[CustomerForm] Bandwidth plan not found:', selectedGroup.bandwidth_plan_id);
     }
   }
   
@@ -214,6 +230,7 @@
     formData.groupId = (customer as any).groupId || (customer as any).group_id || '';
     
     // Load service plan from customer if it exists
+    // Note: Service plan will be populated from group via reactive statement when groups load
     if (customer.servicePlan) {
       formData.servicePlan = {
         planName: customer.servicePlan.planName || '',
@@ -226,6 +243,20 @@
         maxBandwidthUl: customer.servicePlan.maxBandwidthUl,
         dataQuota: customer.servicePlan.dataQuota,
         priorityLevel: customer.servicePlan.priorityLevel || 'medium'
+      };
+    } else {
+      // Initialize empty service plan - will be populated from group if groupId exists
+      formData.servicePlan = {
+        planName: '',
+        downloadMbps: undefined,
+        uploadMbps: undefined,
+        monthlyFee: undefined,
+        currency: 'USD',
+        qci: 9,
+        maxBandwidthDl: undefined,
+        maxBandwidthUl: undefined,
+        dataQuota: undefined,
+        priorityLevel: 'medium'
       };
     }
   }
