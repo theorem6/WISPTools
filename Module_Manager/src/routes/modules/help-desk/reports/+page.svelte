@@ -86,8 +86,8 @@
 <div class="reports-page">
   <div class="page-header">
     <div class="header-left">
-      <button class="back-btn" on:click={() => goto('/modules/help-desk')}>
-        ← Back to Help Desk
+      <button class="back-btn" on:click={() => goto('/modules/maintain')}>
+        ← Back to Maintain Module
       </button>
       <h1>📊 Ticket Reports & Analytics</h1>
       <p class="subtitle">{tenantName}</p>
