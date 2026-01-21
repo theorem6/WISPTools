@@ -37,6 +37,7 @@
     },
     serviceStatus: 'pending' as Customer['serviceStatus'],
     serviceType: undefined as Customer['serviceType'],
+    groupId: '' as string | undefined,
     servicePlan: {
       planName: '',
       downloadMbps: undefined as number | undefined,
@@ -66,48 +67,29 @@
   
   let tagInput = '';
   
-  // HSS Subscriber Management
-  let showHSSSubscriber = false;
-  let hssSubscriber: any = null;
-  let isLoadingSubscriber = false;
-  let hssGroups: any[] = [];
-  let hssBandwidthPlans: any[] = [];
-  let hssSubscriberForm = {
-    imsi: '',
-    msisdn: '',
-    ki: '',
-    opc: '',
-    group_id: '',
-    bandwidth_plan_id: '',
-    qci: 9
-  };
+  // Customer Groups
+  let customerGroups: any[] = [];
+  let bandwidthPlans: any[] = [];
   
   onMount(() => {
     if (customer) {
       loadCustomerData();
     }
+    loadGroups();
   });
   
   $: if (customer && show) {
     loadCustomerData();
-    if (customer._id) {
-      loadHSSSubscriber();
-      loadHSSData();
-    }
   }
   
-  async function loadHSSData() {
-    if (!customer?._id) return;
-    
+  async function loadGroups() {
     try {
       const tenantId = localStorage.getItem('selectedTenantId');
       if (!tenantId) return;
       
-      // Use centralized API configuration
       const apiPath = API_CONFIG.PATHS.CUSTOMERS.split('/customers')[0];
       const token = await (await import('$lib/services/authService')).authService.getIdToken();
       
-      // Load groups and bandwidth plans
       const [groupsRes, plansRes] = await Promise.all([
         fetch(`${apiPath}/hss/groups`, {
           headers: {
@@ -125,67 +107,44 @@
       
       if (groupsRes?.ok) {
         const groupsData = await groupsRes.json();
-        hssGroups = Array.isArray(groupsData.groups) ? groupsData.groups : groupsData;
+        customerGroups = Array.isArray(groupsData.groups) ? groupsData.groups : groupsData;
       }
       
       if (plansRes?.ok) {
         const plansData = await plansRes.json();
-        hssBandwidthPlans = Array.isArray(plansData.plans) ? plansData.plans : plansData;
+        bandwidthPlans = Array.isArray(plansData.plans) ? plansData.plans : plansData;
       }
     } catch (err) {
-      console.error('Error loading HSS data:', err);
+      console.error('Error loading groups:', err);
     }
   }
   
-  async function loadHSSSubscriber() {
-    if (!customer?._id) return;
-    
-    isLoadingSubscriber = true;
-    try {
-      hssSubscriber = await customerService.getHSSSubscriber(customer._id);
-      if (hssSubscriber) {
-        hssSubscriberForm = {
-          imsi: hssSubscriber.imsi || '',
-          msisdn: hssSubscriber.msisdn || formData.primaryPhone.replace(/\D/g, '') || '',
-          ki: hssSubscriber.ki || '',
-          opc: hssSubscriber.opc || '',
-          group_id: hssSubscriber.group_id || '',
-          bandwidth_plan_id: hssSubscriber.bandwidth_plan_id || '',
-          qci: hssSubscriber.qci || 9
-        };
-        showHSSSubscriber = true;
-      }
-    } catch (err: any) {
-      // No subscriber exists yet - that's OK
-      if (!err.message?.includes('404')) {
-        console.error('Error loading HSS subscriber:', err);
-      }
-      // Pre-fill MSISDN from phone
-      hssSubscriberForm.msisdn = formData.primaryPhone.replace(/\D/g, '');
-    } finally {
-      isLoadingSubscriber = false;
-    }
-  }
-  
-  async function createHSSSubscriber() {
-    if (!customer?._id || !hssSubscriberForm.imsi.trim()) {
-      error = 'IMSI is required';
+  function handleGroupChange() {
+    if (!formData.groupId) {
+      // Clear service plan if no group selected
+      formData.servicePlan.planName = '';
+      formData.servicePlan.downloadMbps = undefined;
+      formData.servicePlan.uploadMbps = undefined;
       return;
     }
     
-    isSaving = true;
-    error = '';
+    // Find selected group
+    const selectedGroup = customerGroups.find(g => g.group_id === formData.groupId || g.id === formData.groupId);
+    if (!selectedGroup || !selectedGroup.bandwidth_plan_id) return;
     
-    try {
-      hssSubscriber = await customerService.createHSSSubscriber(customer._id, hssSubscriberForm);
-      showHSSSubscriber = true;
-      success = 'HSS subscriber created successfully';
-      setTimeout(() => success = '', 3000);
-    } catch (err: any) {
-      console.error('Error creating HSS subscriber:', err);
-      error = err.message || 'Failed to create HSS subscriber';
-    } finally {
-      isSaving = false;
+    // Find bandwidth plan
+    const plan = bandwidthPlans.find(p => 
+      p.plan_id === selectedGroup.bandwidth_plan_id || 
+      p.id === selectedGroup.bandwidth_plan_id
+    );
+    
+    if (plan) {
+      // Populate service plan from group's bandwidth plan
+      formData.servicePlan.planName = plan.name || '';
+      formData.servicePlan.downloadMbps = plan.download_mbps || plan.max_bandwidth_dl || undefined;
+      formData.servicePlan.uploadMbps = plan.upload_mbps || plan.max_bandwidth_ul || undefined;
+      formData.servicePlan.maxBandwidthDl = plan.max_bandwidth_dl || (plan.download_mbps ? plan.download_mbps * 1000000 : undefined);
+      formData.servicePlan.maxBandwidthUl = plan.max_bandwidth_ul || (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
     }
   }
   
@@ -230,6 +189,9 @@
         longitude: customer.serviceAddress.longitude
       };
     }
+    
+    // Load groupId if it exists (may be stored in customer or need to look up from HSS)
+    formData.groupId = (customer as any).groupId || (customer as any).group_id || '';
     
     if (customer.servicePlan) {
       formData.servicePlan = {
@@ -311,6 +273,7 @@
         },
         serviceStatus: formData.serviceStatus,
         serviceType: formData.serviceType,
+        groupId: formData.groupId || undefined,
         servicePlan: formData.servicePlan.planName ? {
           planName: formData.servicePlan.planName,
           downloadMbps: formData.servicePlan.downloadMbps,
@@ -570,50 +533,51 @@
         {/if}
       </div>
       
-      <!-- Service Plan -->
+      <!-- Customer Group -->
       <div class="section">
-        <h3>📡 Service Plan</h3>
+        <h3>📦 Customer Group</h3>
+        <p class="section-description">Select a customer group. The service plan will be automatically set from the group's bandwidth plan.</p>
         
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Plan Name</label>
-            <input type="text" bind:value={formData.servicePlan.planName} placeholder="50/10 Mbps" />
-          </div>
-          
-          <div class="form-group">
-            <label>Download (Mbps)</label>
-            <input type="number" bind:value={formData.servicePlan.downloadMbps} placeholder="50" />
-          </div>
-          
-          <div class="form-group">
-            <label>Upload (Mbps)</label>
-            <input type="number" bind:value={formData.servicePlan.uploadMbps} placeholder="10" />
-          </div>
-          
-          <div class="form-group">
-            <label>Monthly Fee ($)</label>
-            <input type="number" bind:value={formData.servicePlan.monthlyFee} placeholder="0.00" step="0.01" />
-          </div>
+        <div class="form-group">
+          <label>Group</label>
+          <select bind:value={formData.groupId} on:change={handleGroupChange}>
+            <option value="">No Group Selected</option>
+            {#each customerGroups as group}
+              <option value={group.group_id || group.id}>{group.name}</option>
+            {/each}
+          </select>
         </div>
         
+        {#if formData.groupId && formData.servicePlan.planName}
+          <div class="service-plan-preview">
+            <h4>Service Plan (from group)</h4>
+            <div class="plan-details">
+              <div class="plan-detail">
+                <span class="label">Plan:</span>
+                <span class="value">{formData.servicePlan.planName}</span>
+              </div>
+              {#if formData.servicePlan.downloadMbps}
+                <div class="plan-detail">
+                  <span class="label">Download:</span>
+                  <span class="value">{formData.servicePlan.downloadMbps} Mbps</span>
+                </div>
+              {/if}
+              {#if formData.servicePlan.uploadMbps}
+                <div class="plan-detail">
+                  <span class="label">Upload:</span>
+                  <span class="value">{formData.servicePlan.uploadMbps} Mbps</span>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {/if}
+        
         {#if formData.serviceType === '4G/5G'}
-          <div class="form-grid">
+          <div class="form-grid" style="margin-top: 1rem;">
             <div class="form-group">
               <label>QCI (Quality Class Identifier)</label>
               <input type="number" bind:value={formData.servicePlan.qci} min="1" max="9" placeholder="9" />
               <small>1-9 (9 is default best effort)</small>
-            </div>
-            
-            <div class="form-group">
-              <label>Max Download Bandwidth (bps)</label>
-              <input type="number" bind:value={formData.servicePlan.maxBandwidthDl} placeholder="100000000" />
-              <small>Leave empty to auto-calculate from Mbps</small>
-            </div>
-            
-            <div class="form-group">
-              <label>Max Upload Bandwidth (bps)</label>
-              <input type="number" bind:value={formData.servicePlan.maxBandwidthUl} placeholder="50000000" />
-              <small>Leave empty to auto-calculate from Mbps</small>
             </div>
             
             <div class="form-group">
@@ -773,108 +737,6 @@
         </div>
       </div>
       
-      <!-- HSS Subscriber Management -->
-      {#if customer?._id}
-        <div class="section">
-          <div class="section-header">
-            <h3>📡 HSS Subscriber</h3>
-            <button 
-              class="btn-toggle" 
-              on:click={() => showHSSSubscriber = !showHSSSubscriber}
-            >
-              {showHSSSubscriber ? '▼' : '▶'}
-            </button>
-          </div>
-          
-          {#if isLoadingSubscriber}
-            <div class="loading">Loading subscriber data...</div>
-          {:else if showHSSSubscriber}
-            {#if hssSubscriber}
-              <div class="subscriber-info">
-                <div class="info-row">
-                  <span class="label">IMSI:</span>
-                  <span class="value">{hssSubscriber.imsi}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">MSISDN:</span>
-                  <span class="value">{hssSubscriber.msisdn || '-'}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">Group:</span>
-                  <span class="value">{hssSubscriber.group_id || '-'}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">Bandwidth Plan:</span>
-                  <span class="value">{hssSubscriber.bandwidth_plan_id || '-'}</span>
-                </div>
-                <div class="info-row">
-                  <span class="label">Status:</span>
-                  <span class="value {hssSubscriber.enabled ? 'enabled' : 'disabled'}">
-                    {hssSubscriber.enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-              </div>
-            {:else}
-              <div class="subscriber-form">
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label>IMSI *</label>
-                    <input type="text" bind:value={hssSubscriberForm.imsi} placeholder="123456789012345" required />
-                  </div>
-                  
-                  <div class="form-group">
-                    <label>MSISDN</label>
-                    <input type="text" bind:value={hssSubscriberForm.msisdn} placeholder={formData.primaryPhone.replace(/\D/g, '')} />
-                  </div>
-                </div>
-                
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label>KI (Authentication Key)</label>
-                    <input type="text" bind:value={hssSubscriberForm.ki} placeholder="Optional" />
-                  </div>
-                  
-                  <div class="form-group">
-                    <label>OPc (Operator Variant)</label>
-                    <input type="text" bind:value={hssSubscriberForm.opc} placeholder="Optional" />
-                  </div>
-                </div>
-                
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label>Group ID</label>
-                    <select bind:value={hssSubscriberForm.group_id}>
-                      <option value="">Select Group</option>
-                      {#each hssGroups as group}
-                        <option value={group.group_id || group.id}>{group.name}</option>
-                      {/each}
-                    </select>
-                  </div>
-                  
-                  <div class="form-group">
-                    <label>Bandwidth Plan</label>
-                    <select bind:value={hssSubscriberForm.bandwidth_plan_id}>
-                      <option value="">Select Plan</option>
-                      {#each hssBandwidthPlans as plan}
-                        <option value={plan.plan_id || plan.id}>{plan.name} ({plan.download_mbps}/{plan.upload_mbps} Mbps)</option>
-                      {/each}
-                    </select>
-                  </div>
-                </div>
-                
-                <div class="form-group">
-                  <label>QCI (Quality of Service)</label>
-                  <input type="number" bind:value={hssSubscriberForm.qci} min="1" max="9" />
-                </div>
-                
-                <button class="btn-primary" on:click={createHSSSubscriber} disabled={isSaving}>
-                  {isSaving ? 'Creating...' : '📡 Create HSS Subscriber'}
-                </button>
-              </div>
-            {/if}
-          {/if}
-        </div>
-      {/if}
     </div>
     
     <div class="modal-footer">
@@ -1146,43 +1008,41 @@
     color: var(--text-primary);
   }
   
-  .subscriber-info {
+  /* Service Plan Preview */
+  .service-plan-preview {
     background: var(--bg-secondary);
-    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    margin-top: var(--spacing-md);
+    padding: 1rem;
+    margin-top: 1rem;
   }
   
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-color);
-  }
-  
-  .info-row:last-child {
-    border-bottom: none;
-  }
-  
-  .info-row .label {
-    font-weight: 600;
-    color: var(--text-secondary);
-  }
-  
-  .info-row .value {
+  .service-plan-preview h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
     color: var(--text-primary);
   }
   
-  .value.enabled {
-    color: var(--success);
+  .plan-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
   
-  .value.disabled {
-    color: var(--danger);
+  .plan-detail {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
   }
   
-  .subscriber-form {
-    margin-top: var(--spacing-md);
+  .plan-detail .label {
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  
+  .plan-detail .value {
+    color: var(--text-primary);
+    font-weight: 500;
   }
   
   .loading {

@@ -35,6 +35,7 @@ export interface Customer {
   };
   serviceStatus: 'pending' | 'active' | 'suspended' | 'cancelled' | 'trial';
   serviceType?: '4G/5G' | 'FWA' | 'WiFi' | 'Fiber';
+  groupId?: string;
   servicePlan?: {
     planName?: string;
     downloadMbps?: number;

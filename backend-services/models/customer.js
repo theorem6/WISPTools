@@ -94,6 +94,13 @@ const CustomerSchema = new mongoose.Schema({
     index: true
   },
   
+  // Customer Group (for HSS/bandwidth plan assignment)
+  groupId: {
+    type: String,
+    index: true,
+    sparse: true
+  },
+  
   servicePlan: {
     planName: String,           // "50/10 Mbps"
     downloadMbps: Number,
