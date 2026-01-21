@@ -86,8 +86,16 @@
   // This ensures service plan displays when editing existing customers with a group
   $: groupsReady = customerGroups.length > 0 && bandwidthPlans.length > 0;
   $: if (formData.groupId && groupsReady) {
+    console.log('[CustomerForm] Reactive: Triggering handleGroupChange', {
+      groupId: formData.groupId,
+      groupsCount: customerGroups.length,
+      plansCount: bandwidthPlans.length
+    });
     // Always populate from group to ensure consistency - group is source of truth
-    handleGroupChange();
+    // Use setTimeout to avoid reactive loop issues
+    setTimeout(() => {
+      handleGroupChange();
+    }, 0);
   }
   
   async function loadGroups() {
@@ -140,6 +148,12 @@
   function handleGroupChange() {
     groupWarning = ''; // Clear previous warning
     
+    console.log('[CustomerForm] handleGroupChange called', {
+      groupId: formData.groupId,
+      groupsCount: customerGroups.length,
+      plansCount: bandwidthPlans.length
+    });
+    
     if (!formData.groupId) {
       // Clear service plan if no group selected
       formData.servicePlan.planName = '';
@@ -150,16 +164,31 @@
       return;
     }
     
-    // Find selected group
-    const selectedGroup = customerGroups.find(g => 
-      (g.group_id === formData.groupId) || (g.id === formData.groupId)
-    );
+    // Find selected group - check both group_id and id fields
+    const selectedGroup = customerGroups.find(g => {
+      const groupMatch = (g.group_id === formData.groupId) || (g.id === formData.groupId);
+      console.log('[CustomerForm] Checking group:', {
+        group_id: g.group_id,
+        id: g.id,
+        targetGroupId: formData.groupId,
+        matches: groupMatch
+      });
+      return groupMatch;
+    });
     
     if (!selectedGroup) {
-      console.warn('[CustomerForm] Group not found:', formData.groupId);
+      console.warn('[CustomerForm] Group not found:', {
+        searchedGroupId: formData.groupId,
+        availableGroups: customerGroups.map(g => ({ group_id: g.group_id, id: g.id, name: g.name }))
+      });
       groupWarning = 'Selected group not found';
       return;
     }
+    
+    console.log('[CustomerForm] Found group:', {
+      name: selectedGroup.name,
+      bandwidth_plan_id: selectedGroup.bandwidth_plan_id
+    });
     
     if (!selectedGroup.bandwidth_plan_id) {
       console.warn('[CustomerForm] Group has no bandwidth plan:', selectedGroup);
@@ -173,28 +202,39 @@
       return;
     }
     
-    // Find bandwidth plan
-    const plan = bandwidthPlans.find(p => 
-      (p.plan_id === selectedGroup.bandwidth_plan_id) || 
-      (p.id === selectedGroup.bandwidth_plan_id)
-    );
+    // Find bandwidth plan - check both plan_id and id fields
+    const plan = bandwidthPlans.find(p => {
+      const planMatch = (p.plan_id === selectedGroup.bandwidth_plan_id) || (p.id === selectedGroup.bandwidth_plan_id);
+      return planMatch;
+    });
+    
+    console.log('[CustomerForm] Looking for plan:', {
+      searchedPlanId: selectedGroup.bandwidth_plan_id,
+      foundPlan: !!plan,
+      availablePlans: bandwidthPlans.map(p => ({ plan_id: p.plan_id, id: p.id, name: p.name }))
+    });
     
     if (plan) {
       // Populate service plan from group's bandwidth plan
       formData.servicePlan.planName = plan.name || '';
-      formData.servicePlan.downloadMbps = plan.download_mbps || plan.max_bandwidth_dl || undefined;
-      formData.servicePlan.uploadMbps = plan.upload_mbps || plan.max_bandwidth_ul || undefined;
+      formData.servicePlan.downloadMbps = plan.download_mbps || (plan.max_bandwidth_dl ? Math.round(plan.max_bandwidth_dl / 1000000) : undefined);
+      formData.servicePlan.uploadMbps = plan.upload_mbps || (plan.max_bandwidth_ul ? Math.round(plan.max_bandwidth_ul / 1000000) : undefined);
       formData.servicePlan.maxBandwidthDl = plan.max_bandwidth_dl || (plan.download_mbps ? plan.download_mbps * 1000000 : undefined);
       formData.servicePlan.maxBandwidthUl = plan.max_bandwidth_ul || (plan.upload_mbps ? plan.upload_mbps * 1000000 : undefined);
-      console.log('[CustomerForm] Service plan populated from group:', {
+      console.log('[CustomerForm] ✅ Service plan populated from group:', {
         groupId: formData.groupId,
         groupName: selectedGroup.name,
         planName: formData.servicePlan.planName,
         download: formData.servicePlan.downloadMbps,
-        upload: formData.servicePlan.uploadMbps
+        upload: formData.servicePlan.uploadMbps,
+        maxDl: formData.servicePlan.maxBandwidthDl,
+        maxUl: formData.servicePlan.maxBandwidthUl
       });
     } else {
-      console.warn('[CustomerForm] Bandwidth plan not found:', selectedGroup.bandwidth_plan_id);
+      console.warn('[CustomerForm] ❌ Bandwidth plan not found:', {
+        searchedPlanId: selectedGroup.bandwidth_plan_id,
+        availablePlans: bandwidthPlans
+      });
       groupWarning = `Warning: The bandwidth plan assigned to "${selectedGroup.name}" could not be found.`;
     }
   }
