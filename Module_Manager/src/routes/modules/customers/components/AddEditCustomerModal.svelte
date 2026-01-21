@@ -447,6 +447,11 @@
           <label>Email</label>
           <input type="email" bind:value={formData.email} placeholder="john.smith@example.com" />
         </div>
+      </div>
+      
+      <!-- Service -->
+      <div class="section">
+        <h3>📡 Service</h3>
         
         <div class="form-group">
           <select bind:value={formData.serviceStatus}>
@@ -549,7 +554,7 @@
         
         {#if formData.groupId && formData.servicePlan.planName}
           <div class="service-plan-preview">
-            <h4>Service Plan (from group)</h4>
+            <h4>Service Plan</h4>
             <div class="plan-details">
               <div class="plan-detail">
                 <span class="label">Plan:</span>
