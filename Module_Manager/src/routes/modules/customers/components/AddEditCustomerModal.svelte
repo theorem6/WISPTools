@@ -95,11 +95,11 @@
       plansCount: bandwidthPlans.length,
       lastProcessed: lastProcessedGroupId
     });
-    // Only populate if this is a different groupId than we last processed
+    // Set tracking immediately to prevent reactive statement from retriggering
+    lastProcessedGroupId = formData.groupId;
     // Use setTimeout to avoid reactive loop issues
     setTimeout(() => {
       handleGroupChange();
-      lastProcessedGroupId = formData.groupId;
     }, 0);
   }
   
@@ -158,11 +158,14 @@
     console.log('[CustomerForm] handleGroupChange called', {
       groupId: formData.groupId,
       groupsCount: customerGroups.length,
-      plansCount: bandwidthPlans.length
+      plansCount: bandwidthPlans.length,
+      lastProcessed: lastProcessedGroupId
     });
     
-    // Update tracking to prevent reactive statement from retriggering
-    lastProcessedGroupId = formData.groupId;
+    // Update tracking immediately to prevent reactive statement from retriggering
+    // This works for both event handler calls and reactive statement calls
+    const currentGroupId = formData.groupId;
+    lastProcessedGroupId = currentGroupId;
     
     if (!formData.groupId) {
       // Clear service plan if no group selected
@@ -227,7 +230,9 @@
     
     if (plan) {
       // Populate service plan from group's bandwidth plan
-      formData.servicePlan.planName = plan.name || '';
+      // Check for plan name in multiple possible fields
+      const planName = plan.name || plan.plan_name || plan.planName || '';
+      formData.servicePlan.planName = planName;
       formData.servicePlan.downloadMbps = plan.download_mbps || (plan.max_bandwidth_dl ? Math.round(plan.max_bandwidth_dl / 1000000) : undefined);
       formData.servicePlan.uploadMbps = plan.upload_mbps || (plan.max_bandwidth_ul ? Math.round(plan.max_bandwidth_ul / 1000000) : undefined);
       formData.servicePlan.maxBandwidthDl = plan.max_bandwidth_dl || (plan.download_mbps ? plan.download_mbps * 1000000 : undefined);
@@ -236,6 +241,7 @@
         groupId: formData.groupId,
         groupName: selectedGroup.name,
         planName: formData.servicePlan.planName,
+        planObject: { name: plan.name, plan_name: plan.plan_name, planName: plan.planName },
         download: formData.servicePlan.downloadMbps,
         upload: formData.servicePlan.uploadMbps,
         maxDl: formData.servicePlan.maxBandwidthDl,
