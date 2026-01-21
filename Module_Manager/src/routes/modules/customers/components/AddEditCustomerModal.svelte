@@ -82,20 +82,30 @@
     loadCustomerData();
   }
   
+  // Track the last groupId we processed to avoid infinite loops
+  let lastProcessedGroupId: string | undefined = undefined;
+  
   // Watch for when groups are loaded and we have a groupId - populate service plan
   // This ensures service plan displays when editing existing customers with a group
   $: groupsReady = customerGroups.length > 0 && bandwidthPlans.length > 0;
-  $: if (formData.groupId && groupsReady) {
+  $: if (formData.groupId && groupsReady && formData.groupId !== lastProcessedGroupId) {
     console.log('[CustomerForm] Reactive: Triggering handleGroupChange', {
       groupId: formData.groupId,
       groupsCount: customerGroups.length,
-      plansCount: bandwidthPlans.length
+      plansCount: bandwidthPlans.length,
+      lastProcessed: lastProcessedGroupId
     });
-    // Always populate from group to ensure consistency - group is source of truth
+    // Only populate if this is a different groupId than we last processed
     // Use setTimeout to avoid reactive loop issues
     setTimeout(() => {
       handleGroupChange();
+      lastProcessedGroupId = formData.groupId;
     }, 0);
+  }
+  
+  // Reset tracking when groupId is cleared
+  $: if (!formData.groupId) {
+    lastProcessedGroupId = undefined;
   }
   
   async function loadGroups() {
@@ -133,11 +143,8 @@
         console.log('[CustomerForm] Loaded bandwidth plans:', bandwidthPlans.length);
       }
       
-      // After groups are loaded, if we have a groupId, populate service plan
-      if (formData.groupId && customerGroups.length > 0 && bandwidthPlans.length > 0) {
-        console.log('[CustomerForm] Groups loaded, populating service plan for groupId:', formData.groupId);
-        handleGroupChange();
-      }
+      // Service plan will be populated by reactive statement when groupsReady becomes true
+      // No need to call handleGroupChange here - the reactive statement will handle it
     } catch (err) {
       console.error('Error loading groups:', err);
     }
@@ -154,6 +161,9 @@
       plansCount: bandwidthPlans.length
     });
     
+    // Update tracking to prevent reactive statement from retriggering
+    lastProcessedGroupId = formData.groupId;
+    
     if (!formData.groupId) {
       // Clear service plan if no group selected
       formData.servicePlan.planName = '';
@@ -161,6 +171,7 @@
       formData.servicePlan.uploadMbps = undefined;
       formData.servicePlan.maxBandwidthDl = undefined;
       formData.servicePlan.maxBandwidthUl = undefined;
+      lastProcessedGroupId = undefined;
       return;
     }
     
@@ -242,6 +253,9 @@
   function loadCustomerData() {
     if (!customer) return;
     
+    // Reset tracking when loading new customer data
+    lastProcessedGroupId = undefined;
+    
     formData.firstName = customer.firstName || '';
     formData.lastName = customer.lastName || '';
     formData.primaryPhone = customer.primaryPhone || '';
@@ -287,7 +301,7 @@
     console.log('[CustomerForm] Loaded groupId:', formData.groupId, 'from customer:', {
       groupId: (customer as any).groupId,
       group_id: (customer as any).group_id,
-      customerId: customer._id || customer.id
+      customerId: customer._id || (customer as any).id
     });
     
     // Load service plan from customer if it exists
@@ -388,7 +402,7 @@
         },
         serviceStatus: formData.serviceStatus || 'pending',
         serviceType: formData.serviceType || undefined,
-        groupId: formData.groupId && formData.groupId.trim() ? formData.groupId.trim() : null,
+        groupId: formData.groupId && formData.groupId.trim() ? formData.groupId.trim() : undefined,
         servicePlan: formData.servicePlan.planName ? {
           planName: formData.servicePlan.planName,
           downloadMbps: formData.servicePlan.downloadMbps,
@@ -455,6 +469,8 @@
   function handleClose() {
     show = false;
     error = '';
+    // Reset tracking
+    lastProcessedGroupId = undefined;
     // Reset form
     formData = {
       firstName: '',
@@ -481,6 +497,7 @@
       },
       serviceStatus: 'pending',
       serviceType: undefined,
+      groupId: undefined,
       servicePlan: {
         planName: '',
         downloadMbps: undefined,
