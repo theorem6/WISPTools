@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
@@ -17,8 +17,8 @@
   const MAINTAIN_API = API_CONFIG.PATHS.MAINTAIN;
   
   // Tab management
-  type Tab = 'overview' | 'tickets' | 'maintenance' | 'customers' | 'incidents';
-  let activeTab: Tab = 'overview';
+  type Tab = 'help-desk' | 'tickets' | 'maintenance' | 'customers' | 'incidents';
+  let activeTab: Tab = 'help-desk';
   
   // Dashboard stats
   let dashboardStats = {
@@ -84,7 +84,7 @@
   $: if (tenantId) {
     if (activeTab === 'tickets') loadTickets();
     if (activeTab === 'customers') loadCustomers();
-    if (activeTab === 'overview') {
+    if (activeTab === 'help-desk') {
       loadDashboardStats();
       loadRecentActivity();
     }
@@ -328,16 +328,16 @@ $: if (showTicketDetails) {
     <div class="module-header">
       <div class="header-top">
         <button class="back-btn" on:click={() => goto('/dashboard')}>
-          <span>←</span> Back
+          <span>â†</span> Back
         </button>
-        <h1>🔧 Maintain Module</h1>
+        <h1>ðŸ”§ Maintain Module</h1>
         <div class="header-actions">
           <button 
             class="btn btn-secondary btn-reports" 
             on:click={() => goto('/modules/help-desk/reports')}
             title="View Ticket Reports and Analytics"
           >
-            📊 Reports
+            ðŸ“Š Reports
           </button>
           {#if activeTab === 'tickets'}
             <button class="btn btn-primary" on:click={() => {
@@ -357,40 +357,40 @@ $: if (showTicketDetails) {
       <!-- Tabs -->
       <div class="tabs">
         <button 
-          class="tab {activeTab === 'overview' ? 'active' : ''}" 
-          on:click={() => activeTab = 'overview'}>
-          📊 Overview
+          class="tab {activeTab === 'help-desk' ? 'active' : ''}" 
+          on:click={() => activeTab = 'help-desk'}>
+          ðŸ“Š Help Desk
         </button>
         <button 
           class="tab {activeTab === 'tickets' ? 'active' : ''}" 
           on:click={() => activeTab = 'tickets'}>
-          🎫 Tickets
+          ðŸŽ« Tickets
         </button>
         <button 
           class="tab {activeTab === 'maintenance' ? 'active' : ''}" 
           on:click={() => activeTab = 'maintenance'}>
-          🔧 Maintenance
+          ðŸ”§ Maintenance
         </button>
         <button 
           class="tab {activeTab === 'customers' ? 'active' : ''}" 
           on:click={() => activeTab = 'customers'}>
-          👥 Customers
+          ðŸ‘¥ Customers
         </button>
         <button 
           class="tab {activeTab === 'incidents' ? 'active' : ''}" 
           on:click={() => activeTab = 'incidents'}>
-          🚨 Incidents
+          ðŸš¨ Incidents
         </button>
       </div>
     </div>
     
     <!-- Content -->
     <div class="module-content">
-      {#if activeTab === 'overview'}
-        <!-- Overview Dashboard -->
+      {#if activeTab === 'help-desk'}
+        <!-- Help Desk Dashboard -->
         <div class="dashboard-grid">
           <div class="stat-card">
-            <div class="stat-icon">🎫</div>
+            <div class="stat-icon">ðŸŽ«</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.openTickets}</div>
               <div class="stat-label">Open Tickets</div>
@@ -399,7 +399,7 @@ $: if (showTicketDetails) {
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon">🔧</div>
+            <div class="stat-icon">ðŸ”§</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.scheduledMaintenance}</div>
               <div class="stat-label">Scheduled Maintenance</div>
@@ -407,7 +407,7 @@ $: if (showTicketDetails) {
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon">ðŸ‘¥</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.activeCustomers}</div>
               <div class="stat-label">Active Customers</div>
@@ -416,7 +416,7 @@ $: if (showTicketDetails) {
           </div>
           
           <div class="stat-card">
-            <div class="stat-icon">⏱️</div>
+            <div class="stat-icon">â±ï¸</div>
             <div class="stat-info">
               <div class="stat-value">{dashboardStats.avgResponseTime}</div>
               <div class="stat-label">Avg Response Time</div>
@@ -431,7 +431,7 @@ $: if (showTicketDetails) {
             {#each recentActivity.slice(0, 10) as activity}
               <div class="activity-item">
                 <span class="activity-icon">
-                  {activity.type === 'ticket' ? '🎫' : '👥'}
+                  {activity.type === 'ticket' ? 'ðŸŽ«' : 'ðŸ‘¥'}
                 </span>
                 <div class="activity-content">
                   <div class="activity-title">{activity.title}</div>
@@ -917,3 +917,4 @@ $: if (showTicketDetails) {
     margin-bottom: 1rem;
   }
 </style>
+
