@@ -526,89 +526,94 @@
         }
       };
       
-      try {
-        const epcResult = await monitoringService.getEPCDevices();
-        if (epcResult.success && epcResult.data?.epcs) {
-          epcResult.data.epcs.forEach((epc: any) => addDevice(epc, 'epc'));
-        }
-      } catch (e) { console.log('EPC API not available:', e); }
+      // Load all device sources in parallel for faster loading
+      const startTime = performance.now();
+      const [epcResult, mikrotikResult, snmpResult, discoveredResult, hardwareDeploymentsResult] = await Promise.allSettled([
+        monitoringService.getEPCDevices().catch(e => ({ success: false, error: e })),
+        monitoringService.getMikrotikDevices().catch(e => ({ success: false, error: e })),
+        monitoringService.getSNMPDevices().catch(e => ({ success: false, error: e })),
+        monitoringService.getDiscoveredDevices().catch(e => ({ success: false, error: e })),
+        (async () => {
+          try {
+            const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
+            return await coverageMapService.getAllHardwareDeployments(tenantId);
+          } catch (e) {
+            console.error('[Network Monitoring] Error loading hardware deployments:', e);
+            return [];
+          }
+        })()
+      ]);
       
-      try {
-        const mikrotikResult = await monitoringService.getMikrotikDevices();
-        if (mikrotikResult.success && mikrotikResult.data?.devices) {
-          mikrotikResult.data.devices.forEach((device: any) => addDevice(device, 'mikrotik'));
-        }
-      } catch (e) { console.log('Mikrotik API not available:', e); }
+      const loadTime = performance.now() - startTime;
+      console.log(`[Network Monitoring] All device sources loaded in ${loadTime.toFixed(0)}ms`);
       
-      try {
-        const snmpResult = await monitoringService.getSNMPDevices();
-        if (snmpResult.success && snmpResult.data?.devices) {
-          // Show all SNMP devices - include discovered ones even if not deployed
-          // The SNMP devices endpoint returns configured SNMP devices, which may include discovered ones
-          snmpResult.data.devices.forEach((device: any) => {
-            // Ensure location structure is correct
-            if (!device.location) {
-              device.location = {
-                coordinates: { latitude: 0, longitude: 0 },
-                address: 'SNMP Device - Location Unknown'
-              };
-            } else if (!device.location.coordinates) {
-              device.location = {
-                coordinates: {
-                  latitude: device.location.latitude || 0,
-                  longitude: device.location.longitude || 0
-                },
-                address: device.location.address || 'SNMP Device'
-              };
-            }
-            addDevice(device, 'snmp');
-          });
-          console.log('[Network Monitoring] Loaded SNMP devices:', snmpResult.data.devices.length);
-        }
-      } catch (e) { 
-        console.error('[Network Monitoring] Error loading SNMP devices:', e); 
+      // Process EPC devices
+      if (epcResult.status === 'fulfilled' && epcResult.value.success && epcResult.value.data?.epcs) {
+        epcResult.value.data.epcs.forEach((epc: any) => addDevice(epc, 'epc'));
+      } else if (epcResult.status === 'rejected') {
+        console.log('[Network Monitoring] EPC API not available:', epcResult.reason);
       }
       
-      // Load discovered devices from EPC agents (CDP/LLDP, ping, SNMP)
-      // Show ALL discovered devices - they don't need to be deployed or have coordinates
-      // Discovered devices are shown so users can see what was found and potentially deploy them
-      try {
-        const discoveredResult = await monitoringService.getDiscoveredDevices();
-        if (discoveredResult.success && discoveredResult.data?.devices) {
-          discoveredResult.data.devices.forEach((device: any) => {
-            // Add discovered devices - include all of them, not just deployed ones
-            // If device doesn't have location, use a default or the EPC's location
-            if (!device.location) {
-              device.location = {
-                coordinates: {
-                  latitude: 0,
-                  longitude: 0
-                },
-                address: 'Discovered Device - Location Unknown'
-              };
-            } else if (!device.location.coordinates) {
-              // Convert flat location to coordinates structure
-              device.location = {
-                coordinates: {
-                  latitude: device.location.latitude || 0,
-                  longitude: device.location.longitude || 0
-                },
-                address: device.location.address || 'Discovered Device'
-              };
-            }
-            addDevice(device, device.type || 'snmp');
-          });
-          console.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.data.devices.length, '(all devices, including undeployed)');
-        }
-      } catch (e) { 
-        console.error('[Network Monitoring] Error loading discovered devices:', e); 
+      // Process Mikrotik devices
+      if (mikrotikResult.status === 'fulfilled' && mikrotikResult.value.success && mikrotikResult.value.data?.devices) {
+        mikrotikResult.value.data.devices.forEach((device: any) => addDevice(device, 'mikrotik'));
+      } else if (mikrotikResult.status === 'rejected') {
+        console.log('[Network Monitoring] Mikrotik API not available:', mikrotikResult.reason);
       }
       
-      // Load hardware deployments (includes backhaul, routers, switches, etc.)
-      try {
-        const { coverageMapService } = await import('../coverage-map/lib/coverageMapService.mongodb');
-        console.log('[Network Monitoring] Loading hardware deployments for tenant:', tenantId);
-        const allHardwareDeployments = await coverageMapService.getAllHardwareDeployments(tenantId);
+      // Process SNMP devices
+      if (snmpResult.status === 'fulfilled' && snmpResult.value.success && snmpResult.value.data?.devices) {
+        snmpResult.value.data.devices.forEach((device: any) => {
+          // Ensure location structure is correct
+          if (!device.location) {
+            device.location = {
+              coordinates: { latitude: 0, longitude: 0 },
+              address: 'SNMP Device - Location Unknown'
+            };
+          } else if (!device.location.coordinates) {
+            device.location = {
+              coordinates: {
+                latitude: device.location.latitude || 0,
+                longitude: device.location.longitude || 0
+              },
+              address: device.location.address || 'SNMP Device'
+            };
+          }
+          addDevice(device, 'snmp');
+        });
+        console.log('[Network Monitoring] Loaded SNMP devices:', snmpResult.value.data.devices.length);
+      } else if (snmpResult.status === 'rejected') {
+        console.error('[Network Monitoring] Error loading SNMP devices:', snmpResult.reason);
+      }
+      
+      // Process discovered devices
+      if (discoveredResult.status === 'fulfilled' && discoveredResult.value.success && discoveredResult.value.data?.devices) {
+        discoveredResult.value.data.devices.forEach((device: any) => {
+          // Add discovered devices - include all of them, not just deployed ones
+          if (!device.location) {
+            device.location = {
+              coordinates: { latitude: 0, longitude: 0 },
+              address: 'Discovered Device - Location Unknown'
+            };
+          } else if (!device.location.coordinates) {
+            device.location = {
+              coordinates: {
+                latitude: device.location.latitude || 0,
+                longitude: device.location.longitude || 0
+              },
+              address: device.location.address || 'Discovered Device'
+            };
+          }
+          addDevice(device, device.type || 'snmp');
+        });
+        console.log('[Network Monitoring] Loaded discovered devices:', discoveredResult.value.data.devices.length, '(all devices, including undeployed)');
+      } else if (discoveredResult.status === 'rejected') {
+        console.error('[Network Monitoring] Error loading discovered devices:', discoveredResult.reason);
+      }
+      
+      // Process hardware deployments
+      if (hardwareDeploymentsResult.status === 'fulfilled') {
+        const allHardwareDeployments = hardwareDeploymentsResult.value;
         console.log('[Network Monitoring] Loaded hardware deployments:', allHardwareDeployments.length);
         
         if (allHardwareDeployments.length > 0) {
@@ -619,12 +624,6 @@
             status: allHardwareDeployments[0].status,
             siteId: allHardwareDeployments[0].siteId
           });
-        } else {
-          console.warn('[Network Monitoring] No hardware deployments found. This could mean:');
-          console.warn('  1. No hardware has been deployed yet');
-          console.warn('  2. Hardware deployments exist but are not associated with this tenant');
-          console.warn('  3. The API endpoint is not returning data correctly');
-          console.warn('  Tenant ID:', tenantId);
         }
         
         allHardwareDeployments.forEach((deployment: any) => {
@@ -658,8 +657,8 @@
           addDevice(deviceData, deployment.hardware_type || 'other');
         });
         console.log('[Network Monitoring] Added hardware deployments to device list');
-      } catch (e) {
-        console.error('[Network Monitoring] Error loading hardware deployments:', e);
+      } else if (hardwareDeploymentsResult.status === 'rejected') {
+        console.error('[Network Monitoring] Error loading hardware deployments:', hardwareDeploymentsResult.reason);
       }
       
       networkDevices = devices;
@@ -667,6 +666,8 @@
     } catch (error) {
       console.error('[Network Monitoring] Failed to load network devices:', error);
       networkDevices = [];
+    } finally {
+      isLoadingNetworkDevices = false;
     }
   }
 
