@@ -85,14 +85,11 @@
   // Watch for when groups are loaded and we have a groupId - populate service plan
   // This ensures service plan displays when editing existing customers with a group
   $: groupsReady = customerGroups.length > 0 && bandwidthPlans.length > 0;
-  $: if (formData.groupId && groupsReady && customer) {
-    // Trigger service plan population when editing existing customer with group
-    // Use a small delay to ensure reactive updates complete
-    setTimeout(() => {
-      if (formData.groupId && !formData.servicePlan.planName) {
-        handleGroupChange();
-      }
-    }, 50);
+  $: if (formData.groupId && groupsReady) {
+    // Only populate if service plan is not already set (to avoid overwriting)
+    if (!formData.servicePlan.planName) {
+      handleGroupChange();
+    }
   }
   
   async function loadGroups() {
@@ -121,11 +118,19 @@
       if (groupsRes?.ok) {
         const groupsData = await groupsRes.json();
         customerGroups = Array.isArray(groupsData.groups) ? groupsData.groups : groupsData;
+        console.log('[CustomerForm] Loaded groups:', customerGroups.length);
       }
       
       if (plansRes?.ok) {
         const plansData = await plansRes.json();
         bandwidthPlans = Array.isArray(plansData.plans) ? plansData.plans : plansData;
+        console.log('[CustomerForm] Loaded bandwidth plans:', bandwidthPlans.length);
+      }
+      
+      // After groups are loaded, if we have a groupId, populate service plan
+      if (formData.groupId && customerGroups.length > 0 && bandwidthPlans.length > 0) {
+        console.log('[CustomerForm] Groups loaded, populating service plan for groupId:', formData.groupId);
+        handleGroupChange();
       }
     } catch (err) {
       console.error('Error loading groups:', err);
@@ -228,6 +233,7 @@
     
     // Load groupId if it exists (may be stored in customer or need to look up from HSS)
     formData.groupId = (customer as any).groupId || (customer as any).group_id || '';
+    console.log('[CustomerForm] Loaded groupId:', formData.groupId);
     
     // Load service plan from customer if it exists
     // Note: Service plan will be populated from group via reactive statement when groups load
@@ -244,6 +250,7 @@
         dataQuota: customer.servicePlan.dataQuota,
         priorityLevel: customer.servicePlan.priorityLevel || 'medium'
       };
+      console.log('[CustomerForm] Loaded existing service plan:', formData.servicePlan.planName);
     } else {
       // Initialize empty service plan - will be populated from group if groupId exists
       formData.servicePlan = {
@@ -258,6 +265,7 @@
         dataQuota: undefined,
         priorityLevel: 'medium'
       };
+      console.log('[CustomerForm] Initialized empty service plan, will populate from group if groupId exists');
     }
   }
   
