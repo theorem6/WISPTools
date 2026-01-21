@@ -27,16 +27,33 @@ const formatEPCDevice = (device, source = 'equipment') => {
     (typeof device.notes === 'string' ? JSON.parse(device.notes) : device.notes) : 
     (device.config || {});
 
-  // Calculate uptime based on last_seen
+  // Calculate uptime based on last_seen - prioritize timestamp over status field
   const lastSeen = device.last_seen || device.last_heartbeat || device.updatedAt;
+  // Check if last check-in was within 5 minutes - if not, EPC is offline regardless of status field
   const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000; // 5 min threshold
+  
+  // Calculate time since last check-in (for offline display)
+  const timeSinceCheckin = lastSeen 
+    ? Math.floor((Date.now() - new Date(lastSeen).getTime()) / 1000) // seconds
+    : null;
+  
+  // Determine status: prioritize timestamp check over status field
+  let status;
+  if (!lastSeen) {
+    status = 'offline'; // Never checked in
+  } else if (isOnline) {
+    status = 'online'; // Checked in within last 5 minutes
+  } else if (device.status === 'registered') {
+    status = 'pending'; // Registered but not yet checked in
+  } else {
+    status = 'offline'; // Last check-in was more than 5 minutes ago
+  }
   
   return {
     id: device._id?.toString() || device.epc_id,
     epcId: device.epc_id || device._id?.toString(),
     name: device.name || device.site_name,
-    status: device.status === 'online' || (device.status === 'active' && isOnline) || device.status === 'deployed' ? 'online' : 
-            device.status === 'registered' ? 'pending' : 'offline',
+    status: status,
     type: 'epc',
     device_code: device.device_code,
     hardware_id: device.hardware_id,
@@ -71,6 +88,7 @@ const formatEPCDevice = (device, source = 'equipment') => {
     },
     last_seen: lastSeen,
     last_heartbeat: device.last_heartbeat,
+    timeSinceCheckin: timeSinceCheckin, // Time in seconds since last check-in
     createdAt: device.createdAt || device.created_at,
     updatedAt: device.updatedAt || device.updated_at,
     deployedAt: device.deployedAt || device.createdAt || device.created_at

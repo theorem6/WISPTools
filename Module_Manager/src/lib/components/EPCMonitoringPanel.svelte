@@ -42,6 +42,23 @@
     // Charts are managed by Chart component
   });
   
+  // Format time since last check-in (in seconds)
+  function formatTimeSince(seconds: number): string {
+    if (!seconds || seconds < 0) return 'Unknown';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) {
+      return `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
+    } else if (hours > 0) {
+      return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    } else {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+  }
+  
   async function loadStatus() {
     if (!epc?.epc_id && !epc?.epcId) return;
     
@@ -423,6 +440,11 @@
           <span class="stat-value">
             {#if epc?.last_seen}
               {new Date(epc.last_seen).toLocaleString()}
+              {#if epc?.status === 'offline' && epc?.timeSinceCheckin}
+                <span class="offline-indicator" style="display: block; font-size: 0.875rem; color: #ef4444; margin-top: 0.25rem;">
+                  Offline for {formatTimeSince(epc.timeSinceCheckin)}
+                </span>
+              {/if}
             {:else}
               Never
             {/if}

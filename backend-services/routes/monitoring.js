@@ -346,7 +346,14 @@ router.get('/epc/list', async (req, res) => {
     
     tenantEPCs.forEach(epc => {
       const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
+      // Check if last check-in was within 5 minutes - prioritize timestamp over status field
+      // If last_seen is missing or more than 5 minutes ago, EPC is offline
       const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+      
+      // Calculate time since last check-in (for offline display)
+      const timeSinceCheckin = lastSeen 
+        ? Math.floor((Date.now() - new Date(lastSeen).getTime()) / 1000) // seconds
+        : null;
       
       // Get latest service status for this EPC
       const latestStatus = statusMap.get(epc.epc_id);
@@ -408,13 +415,25 @@ router.get('/epc/list', async (req, res) => {
         }
       }
       
+      // Determine status: prioritize timestamp check over status field
+      // If last check-in was more than 5 minutes ago, EPC is offline regardless of status field
+      let status;
+      if (!lastSeen) {
+        status = 'offline'; // Never checked in
+      } else if (isOnline) {
+        status = 'online'; // Checked in within last 5 minutes
+      } else if (epc.status === 'registered') {
+        status = 'pending'; // Registered but not yet checked in
+      } else {
+        status = 'offline'; // Last check-in was more than 5 minutes ago
+      }
+      
       epcs.push({
         id: epc._id?.toString() || epc.epc_id,
         epcId: epc.epc_id,
         name: epc.site_name,
         type: 'epc',
-        status: epc.status === 'online' || isOnline ? 'online' : 
-                epc.status === 'registered' ? 'pending' : 'offline',
+        status: status,
         device_code: epc.device_code,
         hardware_id: epc.hardware_id,
         ipAddress: epc.ip_address || null,
@@ -423,6 +442,8 @@ router.get('/epc/list', async (req, res) => {
         location: location,
         metrics: metrics,
         last_seen: lastSeen,
+        last_heartbeat: epc.last_heartbeat,
+        timeSinceCheckin: timeSinceCheckin, // Time in seconds since last check-in
         createdAt: epc.created_at,
         updatedAt: epc.updated_at
       });

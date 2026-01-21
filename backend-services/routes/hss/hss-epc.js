@@ -82,7 +82,14 @@ router.get('/epc/remote/list', async (req, res) => {
     // Format for frontend
     const epcs = remoteEPCs.map(epc => {
       const lastSeen = epc.last_seen || epc.last_heartbeat || epc.updated_at;
+      // Check if last check-in was within 5 minutes - prioritize timestamp over status field
       const isOnline = lastSeen && (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+      
+      // Calculate time since last check-in (for offline display)
+      const timeSinceCheckin = lastSeen 
+        ? Math.floor((Date.now() - new Date(lastSeen).getTime()) / 1000) // seconds
+        : null;
+      
       const latestStatus = statusMap.get(epc.epc_id);
       
       // Format metrics for frontend - always return metrics object, even if null
@@ -118,6 +125,18 @@ router.get('/epc/remote/list', async (req, res) => {
         });
       }
       
+      // Determine status: prioritize timestamp check over status field
+      let status;
+      if (!lastSeen) {
+        status = 'offline'; // Never checked in
+      } else if (isOnline) {
+        status = 'online'; // Checked in within last 5 minutes
+      } else if (epc.status === 'registered') {
+        status = 'pending'; // Registered but not yet checked in
+      } else {
+        status = 'offline'; // Last check-in was more than 5 minutes ago
+      }
+      
       return {
         id: epc._id?.toString() || epc.epc_id,
         epcId: epc.epc_id,
@@ -127,8 +146,7 @@ router.get('/epc/remote/list', async (req, res) => {
         site_id: epc.site_id, // Include site_id for filtering
         siteId: epc.site_id, // Support both formats
         type: 'epc',
-        status: epc.status === 'online' || isOnline ? 'online' : 
-                epc.status === 'registered' ? 'pending' : 'offline',
+        status: status,
         device_code: epc.device_code,
         hardware_id: epc.hardware_id,
         ipAddress: epc.ip_address || latestStatus?.network?.ip_address || null,
@@ -145,6 +163,7 @@ router.get('/epc/remote/list', async (req, res) => {
         snmp_config: epc.snmp_config || {},
         last_seen: lastSeen,
         last_heartbeat: epc.last_heartbeat,
+        timeSinceCheckin: timeSinceCheckin, // Time in seconds since last check-in
         createdAt: epc.created_at,
         updatedAt: epc.updated_at,
         created_at: epc.created_at, // Support both formats

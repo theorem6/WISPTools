@@ -708,6 +708,23 @@ To use:
     };
   }
   
+  // Format time since last check-in (in seconds)
+  function formatTimeSince(seconds: number): string {
+    if (!seconds || seconds < 0) return 'Unknown';
+    
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) {
+      return `${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
+    } else if (hours > 0) {
+      return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    } else {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+  }
+  
   function getStatusBadge(status: string) {
     const badges: Record<string, { class: string; label: string }> = {
       'registered': { class: 'status-registered', label: 'Registered' },
