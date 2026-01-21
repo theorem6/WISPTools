@@ -72,14 +72,33 @@
   let bandwidthPlans: any[] = [];
   
   onMount(() => {
+    loadGroups();
     if (customer) {
       loadCustomerData();
     }
-    loadGroups();
   });
   
   $: if (customer && show) {
     loadCustomerData();
+  }
+  
+  // Watch for when groups are loaded and we have a groupId - populate service plan
+  $: if (formData.groupId && customerGroups.length > 0 && bandwidthPlans.length > 0 && customer) {
+    // Populate service plan from group if not already populated
+    // This handles the case when editing an existing customer with a group but no service plan data
+    const selectedGroup = customerGroups.find(g => 
+      (g.group_id === formData.groupId) || (g.id === formData.groupId)
+    );
+    if (selectedGroup && selectedGroup.bandwidth_plan_id) {
+      const plan = bandwidthPlans.find(p => 
+        (p.plan_id === selectedGroup.bandwidth_plan_id) || 
+        (p.id === selectedGroup.bandwidth_plan_id)
+      );
+      if (plan && (!formData.servicePlan.planName || formData.servicePlan.planName !== plan.name)) {
+        // Only update if plan name doesn't match (to avoid overwriting if already correct)
+        handleGroupChange();
+      }
+    }
   }
   
   async function loadGroups() {
@@ -194,6 +213,7 @@
     // Load groupId if it exists (may be stored in customer or need to look up from HSS)
     formData.groupId = (customer as any).groupId || (customer as any).group_id || '';
     
+    // Load service plan from customer if it exists
     if (customer.servicePlan) {
       formData.servicePlan = {
         planName: customer.servicePlan.planName || '',
@@ -274,7 +294,7 @@
         },
         serviceStatus: formData.serviceStatus || 'pending',
         serviceType: formData.serviceType || undefined,
-        groupId: formData.groupId || undefined,
+        groupId: formData.groupId ? formData.groupId : undefined,
         servicePlan: formData.servicePlan.planName ? {
           planName: formData.servicePlan.planName,
           downloadMbps: formData.servicePlan.downloadMbps,
