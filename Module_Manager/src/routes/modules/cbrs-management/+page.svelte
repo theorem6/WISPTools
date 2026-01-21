@@ -14,6 +14,7 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   import UserIDSelector from './components/UserIDSelector.svelte';
   import HelpModal from '$lib/components/modals/HelpModal.svelte';
   import { cbrsManagementDocs } from '$lib/docs/cbrs-management-docs';
+  import CBRSSetupWizard from '$lib/components/wizards/CBRSSetupWizard.svelte';
   
   // State
   let devices: CBSDDevice[] = [];
@@ -28,6 +29,7 @@ import { loadCBRSConfig, saveCBRSConfig, getConfigStatus, loadPlatformCBRSConfig
   let showSettingsModal = false;
   let showUserIDSelector = false;
   let showHelpModal = false;
+  let showSetupWizard = false;
   const helpContent = cbrsManagementDocs;
   let currentUserID: string | null = null;
   let currentUserIDDisplay: string | null = null;
@@ -87,6 +89,16 @@ let configStatus: ConfigStatus = getConfigStatus(null);
           platformConfig = await loadPlatformCBRSConfig();
           
           configStatus = getConfigStatus(cbrsConfig);
+          
+          // Show setup wizard if config is missing or incomplete
+          if (configStatus.status === 'missing' || configStatus.status === 'incomplete') {
+            // Auto-show wizard on first visit if config not complete
+            const wizardShown = sessionStorage.getItem('cbrs-wizard-shown');
+            if (!wizardShown) {
+              showSetupWizard = true;
+              sessionStorage.setItem('cbrs-wizard-shown', 'true');
+            }
+          }
         } else {
           // No tenant selected - show warning
           configStatus = {
@@ -933,6 +945,16 @@ let configStatus: ConfigStatus = getConfigStatus(null);
 </svelte:head>
 
 <TenantGuard>
+<!-- CBRS Setup Wizard -->
+{#if showSetupWizard}
+  <CBRSSetupWizard 
+    show={showSetupWizard} 
+    autoStart={true}
+    on:close={() => showSetupWizard = false}
+    on:complete={handleWizardComplete}
+  />
+{/if}
+
 <div class="cbrs-module">
   <!-- Header -->
   <div class="module-header">
@@ -1021,8 +1043,11 @@ let configStatus: ConfigStatus = getConfigStatus(null);
       <span class="warning-icon">⚠️</span>
       <span class="warning-message">
         {configStatus.message}
+        <button class="btn btn-link" onclick={() => showSetupWizard = true}>
+          Run Setup Wizard →
+        </button>
         <button class="btn btn-link" onclick={() => showSettingsModal = true}>
-          Configure Now →
+          Configure Manually →
         </button>
       </span>
     </div>

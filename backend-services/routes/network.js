@@ -606,7 +606,7 @@ router.post('/sectors', async (req, res) => {
     // Return more detailed error information
     let errorMessage = error.message || 'Failed to create sector';
     if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors || {}).map((e: any) => e.message).join(', ');
+      const validationErrors = Object.values(error.errors || {}).map((e) => e.message).join(', ');
       errorMessage = `Validation error: ${validationErrors}`;
     }
     

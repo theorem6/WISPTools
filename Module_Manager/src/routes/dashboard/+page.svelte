@@ -8,6 +8,7 @@
   import { isCurrentUserPlatformAdmin, isPlatformAdminByUid, getCurrentUserUid, isPlatformAdmin } from '$lib/services/adminService';
   import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
   import SettingsButton from '$lib/components/SettingsButton.svelte';
+  import FirstTimeSetupWizard from '$lib/components/wizards/FirstTimeSetupWizard.svelte';
 
   interface Module {
     id: string;
@@ -112,6 +113,7 @@
   let isAdmin = false;
   let currentUser: any = null;
   let isLoggedIn = false;
+  let showOnboardingWizard = false;
 
   onMount(async () => {
     if (browser) {
@@ -132,8 +134,45 @@
         await goto('/admin/management', { replaceState: true });
         return;
       }
+      
+      // Check if onboarding wizard should be shown
+      if (browser) {
+        const onboardingCompleted = localStorage.getItem('onboardingCompleted');
+        const tenantSetupCompleted = localStorage.getItem('tenantSetupCompleted');
+        
+        // Show wizard if tenant setup is complete but onboarding isn't
+        if (tenantSetupCompleted === 'true' && onboardingCompleted !== 'true') {
+          showOnboardingWizard = true;
+        }
+      }
     }
   });
+  
+  function handleWizardAction(event: CustomEvent) {
+    const { type } = event.detail;
+    switch (type) {
+      case 'add-tower':
+        goto('/modules/coverage-map');
+        showOnboardingWizard = false;
+        break;
+      case 'setup-cbrs':
+        goto('/modules/cbrs-management');
+        showOnboardingWizard = false;
+        break;
+      case 'setup-acs':
+        goto('/modules/acs-cpe-management');
+        showOnboardingWizard = false;
+        break;
+      case 'setup-monitoring':
+        goto('/modules/monitoring');
+        showOnboardingWizard = false;
+        break;
+    }
+  }
+  
+  function handleWizardClose() {
+    showOnboardingWizard = false;
+  }
 
   function handleModuleClick(module: Module) {
     if (module.status === 'active') {
@@ -163,6 +202,16 @@
 </script>
 
 <TenantGuard>
+  <!-- First-Time Setup Wizard -->
+  {#if showOnboardingWizard}
+    <FirstTimeSetupWizard 
+      show={showOnboardingWizard} 
+      autoStart={true}
+      on:close={handleWizardClose}
+      on:action={handleWizardAction}
+    />
+  {/if}
+  
   <div class="dashboard-container">
     <!-- Header -->
     <div class="header">

@@ -114,6 +114,7 @@ app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/bundles', require('./routes/hardwareBundles'));
 app.use('/api/work-orders', require('./routes/work-orders'));
 app.use('/api/maintain', require('./routes/maintain'));
+app.use('/api/incidents', require('./routes/incidents')); // Incident management
 app.use('/api/network', require('./routes/network'));
 app.use('/api/plans', require('./routes/plans'));
 app.use('/api/hss', require('./routes/hss-management'));
