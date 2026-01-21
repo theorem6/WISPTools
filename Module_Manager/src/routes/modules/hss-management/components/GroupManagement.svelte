@@ -5,6 +5,7 @@
   
   let groups: any[] = [];
   let bandwidthPlans: any[] = [];
+  let customers: any[] = [];
   let loading = true;
   let showAddModal = false;
   let editingGroup: any = null;
@@ -26,6 +27,7 @@
   onMount(() => {
     loadGroups();
     loadBandwidthPlans();
+    loadCustomers();
     
     // Listen for quick action events
     window.addEventListener('quick-action' as any, handleQuickAction as any);
@@ -65,6 +67,33 @@
     } catch (error: unknown) {
       console.error('Error loading bandwidth plans:', error);
     }
+  }
+
+  async function loadCustomers() {
+    try {
+      const apiPath = HSS_API.split('/hss')[0];
+      const token = await (await import('$lib/services/authService')).authService.getIdToken();
+      
+      const response = await fetch(`${apiPath}/customers?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Tenant-ID': tenantId
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        customers = Array.isArray(data) ? data : (data.customers || []);
+      }
+    } catch (error: unknown) {
+      console.error('Error loading customers:', error);
+    }
+  }
+
+  function getCustomersInGroup(groupId: string) {
+    return customers.filter(c => 
+      (c.groupId === groupId) || (c.group_id === groupId)
+    );
   }
 
   function openAddModal() {
@@ -108,6 +137,7 @@
       if (response.ok) {
         closeModal();
         loadGroups();
+        loadCustomers(); // Reload customers after save
       } else {
         alert('Error saving group');
       }
@@ -128,6 +158,7 @@
 
       if (response.ok) {
         loadGroups();
+        loadCustomers(); // Reload customers after deletion
       } else {
         alert('Error deleting group');
       }
@@ -138,7 +169,8 @@
   }
 
   function getBandwidthPlanName(planId: string) {
-    const plan = bandwidthPlans.find(p => p.plan_id === planId);
+    if (!planId) return 'None';
+    const plan = bandwidthPlans.find(p => (p.plan_id === planId) || (p.id === planId));
     return plan ? plan.name : 'None';
   }
 </script>
@@ -161,9 +193,11 @@
   {:else}
     <div class="groups-grid">
       {#each groups as group}
+        {@const groupCustomers = getCustomersInGroup(group.group_id || group.id)}
         <div class="group-card">
           <div class="group-header">
             <h3>{group.name}</h3>
+            <span class="customer-count">{groupCustomers.length} {groupCustomers.length === 1 ? 'customer' : 'customers'}</span>
           </div>
           {#if group.description}
             <p class="description">{group.description}</p>
@@ -174,6 +208,30 @@
               <span class="value">{getBandwidthPlanName(group.bandwidth_plan_id)}</span>
             </div>
           </div>
+          
+          {#if groupCustomers.length > 0}
+            <div class="customers-list">
+              <h4>Customers in this group:</h4>
+              <ul>
+                {#each groupCustomers as customer}
+                  <li>
+                    <span class="customer-name">{customer.fullName || `${customer.firstName} ${customer.lastName}`}</span>
+                    {#if customer.primaryPhone}
+                      <span class="customer-phone">{customer.primaryPhone}</span>
+                    {/if}
+                    {#if customer.serviceStatus}
+                      <span class="customer-status status-{customer.serviceStatus}">{customer.serviceStatus}</span>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {:else}
+            <div class="no-customers">
+              <p>No customers assigned to this group</p>
+            </div>
+          {/if}
+          
           <div class="group-actions">
             <button class="btn-edit" on:click={() => openEditModal(group)}>Edit</button>
             <button class="btn-delete" on:click={() => deleteGroup(group.group_id)}>Delete</button>
@@ -291,10 +349,22 @@
     margin-bottom: 0.75rem;
   }
 
+  .group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   .group-header h3 {
     margin: 0;
     font-size: 1.25rem;
     color: #1a202c;
+  }
+
+  .customer-count {
+    font-size: 0.875rem;
+    color: #64748b;
+    font-weight: 500;
   }
 
   .description {
@@ -324,9 +394,94 @@
     color: #1a202c;
   }
 
+  .customers-list {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .customers-list h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .customers-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .customers-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .customers-list li:last-child {
+    border-bottom: none;
+  }
+
+  .customer-name {
+    font-weight: 500;
+    color: #1a202c;
+    flex: 1;
+  }
+
+  .customer-phone {
+    font-size: 0.875rem;
+    color: #64748b;
+  }
+
+  .customer-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+
+  .customer-status.status-active {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .customer-status.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .customer-status.status-suspended {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .customer-status.status-cancelled {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  .no-customers {
+    margin: 1rem 0;
+    padding: 0.75rem;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.875rem;
+    background: #f8fafc;
+    border-radius: 4px;
+  }
+
   .group-actions {
     display: flex;
     gap: 0.5rem;
+    margin-top: 1rem;
   }
 
   .btn-edit, .btn-delete {

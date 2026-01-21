@@ -86,10 +86,8 @@
   // This ensures service plan displays when editing existing customers with a group
   $: groupsReady = customerGroups.length > 0 && bandwidthPlans.length > 0;
   $: if (formData.groupId && groupsReady) {
-    // Only populate if service plan is not already set (to avoid overwriting)
-    if (!formData.servicePlan.planName) {
-      handleGroupChange();
-    }
+    // Always populate from group to ensure consistency - group is source of truth
+    handleGroupChange();
   }
   
   async function loadGroups() {
