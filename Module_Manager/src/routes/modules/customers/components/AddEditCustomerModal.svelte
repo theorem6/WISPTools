@@ -39,6 +39,7 @@
     serviceType: '' as Customer['serviceType'] | '',
     groupId: '' as string | undefined,
     servicePlan: {
+      planId: undefined as string | undefined,
       planName: '',
       downloadMbps: undefined as number | undefined,
       uploadMbps: undefined as number | undefined,
@@ -169,6 +170,7 @@
     
     if (!formData.groupId) {
       // Clear service plan if no group selected
+      formData.servicePlan.planId = undefined;
       formData.servicePlan.planName = '';
       formData.servicePlan.downloadMbps = undefined;
       formData.servicePlan.uploadMbps = undefined;
@@ -208,6 +210,7 @@
       console.warn('[CustomerForm] Group has no bandwidth plan:', selectedGroup);
       groupWarning = `Warning: The group "${selectedGroup.name}" does not have a bandwidth plan assigned. Please assign a bandwidth plan to this group in the Customer Groups tab.`;
       // Clear service plan since group has no plan
+      formData.servicePlan.planId = undefined;
       formData.servicePlan.planName = '';
       formData.servicePlan.downloadMbps = undefined;
       formData.servicePlan.uploadMbps = undefined;
@@ -230,6 +233,9 @@
     
     if (plan) {
       // Populate service plan from group's bandwidth plan
+      // Store plan ID for reference
+      formData.servicePlan.planId = plan.plan_id || plan.id || selectedGroup.bandwidth_plan_id;
+      
       // Check for plan name in multiple possible fields
       const planName = plan.name || plan.plan_name || plan.planName || '';
       formData.servicePlan.planName = planName;
@@ -240,8 +246,9 @@
       console.log('[CustomerForm] ✅ Service plan populated from group:', {
         groupId: formData.groupId,
         groupName: selectedGroup.name,
+        planId: formData.servicePlan.planId,
         planName: formData.servicePlan.planName,
-        planObject: { name: plan.name, plan_name: plan.plan_name, planName: plan.planName },
+        planObject: { name: plan.name, plan_name: plan.plan_name, planName: plan.planName, plan_id: plan.plan_id, id: plan.id },
         download: formData.servicePlan.downloadMbps,
         upload: formData.servicePlan.uploadMbps,
         maxDl: formData.servicePlan.maxBandwidthDl,
@@ -314,6 +321,7 @@
     // Note: Service plan will be populated from group via reactive statement when groups load
     if (customer.servicePlan) {
       formData.servicePlan = {
+        planId: (customer.servicePlan as any).planId || undefined,
         planName: customer.servicePlan.planName || '',
         downloadMbps: customer.servicePlan.downloadMbps,
         uploadMbps: customer.servicePlan.uploadMbps,
@@ -325,10 +333,14 @@
         dataQuota: customer.servicePlan.dataQuota,
         priorityLevel: customer.servicePlan.priorityLevel || 'medium'
       };
-      console.log('[CustomerForm] Loaded existing service plan:', formData.servicePlan.planName);
+      console.log('[CustomerForm] Loaded existing service plan:', {
+        planId: formData.servicePlan.planId,
+        planName: formData.servicePlan.planName
+      });
     } else {
       // Initialize empty service plan - will be populated from group if groupId exists
       formData.servicePlan = {
+        planId: undefined,
         planName: '',
         downloadMbps: undefined,
         uploadMbps: undefined,
@@ -408,18 +420,22 @@
         },
         serviceStatus: formData.serviceStatus || 'pending',
         serviceType: formData.serviceType || undefined,
+        // groupId is required when a group is selected
         groupId: formData.groupId && formData.groupId.trim() ? formData.groupId.trim() : undefined,
-        servicePlan: formData.servicePlan.planName ? {
-          planName: formData.servicePlan.planName,
+        // servicePlan is required when a group is selected (group always has a plan)
+        // Always save planId and bandwidth data when groupId exists
+        servicePlan: formData.groupId && formData.groupId.trim() ? {
+          planId: formData.servicePlan.planId || undefined,
+          planName: formData.servicePlan.planName || undefined,
           downloadMbps: formData.servicePlan.downloadMbps,
           uploadMbps: formData.servicePlan.uploadMbps,
           monthlyFee: formData.servicePlan.monthlyFee,
-          currency: formData.servicePlan.currency,
-          qci: formData.servicePlan.qci,
+          currency: formData.servicePlan.currency || 'USD',
+          qci: formData.servicePlan.qci || 9,
           maxBandwidthDl: formData.servicePlan.maxBandwidthDl,
           maxBandwidthUl: formData.servicePlan.maxBandwidthUl,
           dataQuota: formData.servicePlan.dataQuota,
-          priorityLevel: formData.servicePlan.priorityLevel
+          priorityLevel: formData.servicePlan.priorityLevel || 'medium'
         } : undefined,
         lteAuth: formData.serviceType === '4G/5G' && (formData.lteAuth.ki || formData.lteAuth.opc) ? {
           ki: formData.lteAuth.ki || undefined,
@@ -505,6 +521,7 @@
       serviceType: undefined,
       groupId: undefined,
       servicePlan: {
+        planId: undefined,
         planName: '',
         downloadMbps: undefined,
         uploadMbps: undefined,
