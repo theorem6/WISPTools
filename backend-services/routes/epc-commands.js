@@ -270,6 +270,34 @@ router.get('/:epc_id/status', async (req, res) => {
       return res.status(404).json({ error: 'No status data found' });
     }
     
+    // Synchronize service uptime with system uptime
+    // For active services, use system uptime to ensure consistency
+    const systemUptime = status.system?.uptime_seconds || 0;
+    
+    if (status.services && systemUptime > 0) {
+      // Handle both Map and plain object formats (Mongoose .lean() converts Maps to objects)
+      let servicesObj;
+      if (status.services instanceof Map) {
+        servicesObj = Object.fromEntries(status.services);
+      } else {
+        servicesObj = { ...status.services };
+      }
+      
+      // Update active services to use system uptime for consistency
+      for (const [serviceName, serviceData] of Object.entries(servicesObj)) {
+        if (serviceData && typeof serviceData === 'object' && serviceData.status === 'active') {
+          // Always use system uptime for active services to keep them synchronized
+          servicesObj[serviceName] = {
+            ...serviceData,
+            uptime_seconds: systemUptime
+          };
+        }
+      }
+      
+      // Convert back to the original format
+      status.services = servicesObj;
+    }
+    
     res.json(status);
     
   } catch (error) {

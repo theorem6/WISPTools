@@ -56,8 +56,6 @@ function createTenantStore() {
         const selectedTenantId = localStorage.getItem('selectedTenantId');
         const setupCompleted = localStorage.getItem('tenantSetupCompleted') === 'true';
         
-        debug.log('[TenantStore] Initializing with:', { selectedTenantId, setupCompleted });
-        
         if (selectedTenantId) {
           // Lazy load tenantService to avoid circular dependencies
           const { tenantService } = await import('../services/tenantService');
@@ -105,8 +103,6 @@ function createTenantStore() {
             isInitialized: true,
             error: null
           }));
-          
-          debug.log('[TenantStore] No tenant in localStorage');
         }
       } catch (error) {
         console.error('[TenantStore] Initialization error:', error);
@@ -127,7 +123,6 @@ function createTenantStore() {
     async loadUserTenants(userId: string, userEmail?: string): Promise<Tenant[]> {
       if (!browser) return [];
       
-      debug.log('[TenantStore] loadUserTenants called with:', { userId, userEmail });
       update(state => ({ ...state, isLoading: true }));
       
       try {
@@ -164,11 +159,6 @@ function createTenantStore() {
           try {
             const token = await user.getIdToken(true); // Force refresh to ensure valid token
             if (token && token.length > 100) { // Basic validation - tokens are usually long
-              debug.log('[TenantStore] Token ready:', { 
-                hasToken: !!token, 
-                tokenLength: token?.length,
-                userId: user.uid 
-              });
               tokenReady = true;
             } else {
               throw new Error('Token invalid or too short');
@@ -202,7 +192,6 @@ function createTenantStore() {
         const userIsPlatformAdmin = isPlatformAdmin(userEmail ?? null);
         
         if (userIsPlatformAdmin) {
-          debug.log('[TenantStore] Platform admin detected, skipping tenant loading');
           update(state => ({
             ...state,
             userTenants: [],
@@ -213,19 +202,10 @@ function createTenantStore() {
         }
         
         const { tenantService } = await import('../services/tenantService');
-        console.log('[TenantStore] Calling tenantService.getUserTenants...');
         const tenants = await tenantService.getUserTenants(userId);
-        debug.log('[TenantStore] tenantService.getUserTenants returned:', tenants.length, 'tenants');
         
         // Auto-select tenant for non-admin users to ensure data isolation
         const currentState = get({ subscribe });
-        
-        debug.log('[TenantStore] Auto-selection check:', { 
-          tenantCount: tenants.length, 
-          isPlatformAdmin: userIsPlatformAdmin,
-          hasCurrentTenant: !!currentState.currentTenant,
-          userEmail 
-        });
         
         if (tenants.length === 1 && !currentState.currentTenant) {
           // Regular user with one tenant - auto-select it (enforces data isolation)
@@ -255,7 +235,6 @@ function createTenantStore() {
           }));
         }
         
-        debug.log('[TenantStore] Loaded', tenants.length, 'tenants for user');
         return tenants;
       } catch (error: any) {
         console.error('[TenantStore] Error loading user tenants:', error);
@@ -306,7 +285,6 @@ function createTenantStore() {
         localStorage.removeItem('selectedTenantId');
         localStorage.removeItem('selectedTenantName');
         localStorage.removeItem('tenantSetupCompleted');
-        debug.log('[TenantStore] Current tenant cleared');
       }
     },
     
@@ -318,7 +296,6 @@ function createTenantStore() {
       
       update(state => ({ ...state, setupCompleted: true }));
       localStorage.setItem('tenantSetupCompleted', 'true');
-      debug.log('[TenantStore] Setup marked as completed');
     },
     
     /**
@@ -332,7 +309,6 @@ function createTenantStore() {
       localStorage.removeItem('selectedTenantName');
       localStorage.removeItem('tenantSetupCompleted');
       sessionStorage.clear();
-      debug.log('[TenantStore] All tenant state cleared');
     },
     
     /**

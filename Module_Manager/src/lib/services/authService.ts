@@ -68,13 +68,6 @@ export class AuthService {
       const urlSearch = typeof window !== 'undefined' ? window.location.search : '';
       const urlHash = typeof window !== 'undefined' ? window.location.hash : '';
       
-      debug.log('[AuthService] 🔍 Calling getRedirectResult() SYNCHRONOUSLY (before auth listener)...', {
-        currentUrl,
-        urlSearch,
-        urlHash,
-        authDomain: auth.app.options.authDomain
-      });
-      
       // CRITICAL: Call getRedirectResult() synchronously - this is what matters!
       // Even though it returns a Promise, calling it here ensures Firebase processes
       // the redirect result before the auth state listener fires
@@ -82,25 +75,12 @@ export class AuthService {
       
       // Handle the result asynchronously
       this.redirectResultPromise.then((result) => {
-        debug.log('[AuthService] 📋 getRedirectResult() promise resolved:', {
-          hasResult: !!result,
-          hasUser: !!result?.user,
-          userEmail: result?.user?.email,
-          providerId: result?.providerId,
-          operationType: result?.operationType
-        });
-        
         if (result && result.user) {
-          debug.log('[AuthService] ✅✅✅ Redirect result found during init!', {
-            email: result.user.email,
-            uid: result.user.uid,
-            providerId: result.providerId
-          });
+          debug.log('[AuthService] Redirect result found during init:', result.user.email);
           this.currentUser = result.user;
           this.notifyListeners(result.user);
           this.redirectResultChecked = true;
         } else {
-          debug.log('[AuthService] ℹ️ No redirect result during init (normal for non-redirect visits)');
           this.redirectResultChecked = true;
         }
       }).catch((error: any) => {
@@ -111,8 +91,6 @@ export class AuthService {
         });
         this.redirectResultChecked = true;
       });
-      
-      debug.log('[AuthService] getRedirectResult() called, promise created, waiting for result...');
     } catch (error: any) {
       console.error('[AuthService] ❌ Failed to initiate redirect result check:', error);
       this.redirectResultChecked = true; // Mark as checked to prevent retries
@@ -138,24 +116,14 @@ export class AuthService {
           this.currentUser = user;
         }
         
-        // Log auth state changes for debugging
+        // Log auth state changes for debugging (only in debug mode)
         if (user) {
-          debug.log('[AuthService] 🔵 Auth state: User signed in', user.email);
-          debug.log('[AuthService] User metadata:', {
-            uid: user.uid,
-            email: user.email,
-            lastSignInTime: user.metadata.lastSignInTime,
-            providerData: user.providerData.map(p => p.providerId),
-            isGoogleUser: user.providerData.some(p => p.providerId === 'google.com'),
-            isEmailUser: user.providerData.some(p => p.providerId === 'password')
-          });
+          debug.log('[AuthService] User signed in:', user.email);
           
           // If this is a Google user and we're on the login page, trigger a custom event
           // This helps the login page detect the sign-in even if getRedirectResult() didn't work
           const isGoogleUser = user.providerData.some(p => p.providerId === 'google.com');
           if (isGoogleUser && typeof window !== 'undefined' && window.location.pathname === '/login') {
-            console.log('[AuthService] 🔵✅ Google user detected on login page - dispatching event');
-            
             // Wait a moment to ensure the user is fully loaded
             await new Promise(resolve => setTimeout(resolve, 100));
             
@@ -163,16 +131,11 @@ export class AuthService {
             const currentAuth = getAuth();
             const currentUser = currentAuth.currentUser;
             if (currentUser && currentUser.uid === user.uid) {
-              debug.log('[AuthService] ✅ Confirmed user still authenticated, dispatching event');
               window.dispatchEvent(new CustomEvent('google-signin-complete', { 
                 detail: { user: this.mapUserToProfile(user) } 
               }));
-            } else {
-              console.warn('[AuthService] ⚠️ User disappeared before event dispatch');
             }
           }
-        } else {
-          debug.log('[AuthService] Auth state: User signed out');
         }
         
         this.notifyListeners(this.currentUser);
@@ -216,7 +179,6 @@ export class AuthService {
           if (token) {
             // Token is still valid, force refresh
             await this.currentUser.getIdToken(true);
-            debug.log('Auth token refreshed successfully');
           }
         } catch (error) {
           console.error('Token refresh failed:', error);
@@ -340,21 +302,11 @@ export class AuthService {
   async checkRedirectResult(): Promise<AuthResult<UserProfile> | null> {
     try {
       const auth = getAuth();
-      debug.log('[AuthService] Checking for redirect result (page-level check)...', {
-        currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A',
-        search: typeof window !== 'undefined' ? window.location.search : 'N/A',
-        hash: typeof window !== 'undefined' ? window.location.hash : 'N/A',
-        authDomain: auth.app.options.authDomain,
-        redirectResultChecked: this.redirectResultChecked,
-        hasCurrentUser: !!this.currentUser,
-        currentUserEmail: this.currentUser?.email
-      });
-      
       // If we already checked during init and have a user, return that
       if (this.currentUser) {
         const isGoogleUser = this.currentUser.providerData.some(p => p.providerId === 'google.com');
         if (isGoogleUser) {
-          debug.log('[AuthService] ✅ User authenticated with Google (from init check):', this.currentUser.email);
+          debug.log('[AuthService] User authenticated with Google:', this.currentUser.email);
           return {
             success: true,
             data: this.mapUserToProfile(this.currentUser)
@@ -365,7 +317,6 @@ export class AuthService {
       // CRITICAL: Even if we checked during init, try checking again
       // The redirect might complete AFTER initialization
       // getRedirectResult() can be called multiple times, but only returns a result once per redirect
-      debug.log('[AuthService] 🔍 Checking getRedirectResult() again (redirect may have completed after init)...');
       try {
         const result = await getRedirectResult(auth);
         console.log('[AuthService] 📋 Second getRedirectResult() check:', {

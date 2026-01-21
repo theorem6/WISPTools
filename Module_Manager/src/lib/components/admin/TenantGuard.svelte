@@ -33,8 +33,6 @@
   onMount(async () => {
     if (!browser) return;
     
-    debug.log('[TenantGuard] Checking authentication and tenant...');
-    
     try {
       // Step 1: Check Firebase authentication with retry logic
       let currentUser = authService.getCurrentUser();
@@ -56,12 +54,10 @@
       }
       
       isAuthenticated = true;
-      debug.log('[TenantGuard] User authenticated:', currentUser.email);
       
       // Step 2: Check if user is admin
       const userEmail = currentUser?.email || '';
       isAdmin = isPlatformAdmin(userEmail);
-      debug.log('[TenantGuard] Is admin:', isAdmin);
       
       // Step 3: Check admin-only access
       if (adminOnly && !isAdmin) {
@@ -79,7 +75,6 @@
       
       // Step 4.5: Ensure token is ready before making API calls
       // This is critical - tokens need time to propagate after login
-      debug.log('[TenantGuard] Ensuring token is ready...');
       let tokenReady = false;
       let tokenRetries = 0;
       const maxTokenRetries = 3; // Reduced from 10
@@ -88,11 +83,6 @@
         try {
           const token = await currentUser.getIdToken(true); // Force refresh
           if (token && token.length > 100) {
-            debug.log('[TenantGuard] Token ready:', { 
-              hasToken: !!token, 
-              tokenLength: token?.length,
-              userId: currentUser.uid 
-            });
             tokenReady = true;
           } else {
             throw new Error('Token invalid or too short');
@@ -123,14 +113,9 @@
           if (!tenantState.currentTenant) {
             // No tenant selected - load user's tenants
             if (currentUser) {
-              debug.log('[TenantGuard] No tenant selected, loading user tenants...');
-              debug.log('[TenantGuard] User UID:', currentUser.uid);
-              debug.log('[TenantGuard] User Email:', currentUser.email);
-              
               let tenants: any[] = [];
               try {
                 tenants = await tenantStore.loadUserTenants(currentUser.uid, currentUser.email || undefined);
-                debug.log('[TenantGuard] Loaded tenants:', tenants.length, tenants.map(t => ({ id: t.id, name: t.displayName })));
               } catch (err: any) {
                 console.error('[TenantGuard] Error loading tenants:', err);
                 // If 401 error, backend auth is misconfigured - show helpful message
@@ -155,7 +140,6 @@
                 tenantStore.setCurrentTenant(tenants[0]);
               } else {
                 // Multiple tenants - redirect to selector
-                debug.log('[TenantGuard] Multiple tenants, redirecting to selector');
                 await goto('/tenant-selector', { replaceState: true });
                 return;
               }
