@@ -6,6 +6,11 @@
 const express = require('express');
 const router = express.Router();
 const { Customer } = require('../models/customer');
+const { 
+  syncCustomerToCloudHSS, 
+  removeCustomerFromCloudHSS,
+  syncCustomerToRemoteHSSs 
+} = require('../services/hss-sync-service');
 
 // Middleware to extract tenant ID (matching pattern used by work-orders, plans, etc.)
 const requireTenant = (req, res, next) => {
@@ -158,6 +163,17 @@ router.post('/', async (req, res) => {
     
     console.log('[Customer API] Customer created successfully:', customer._id);
     
+    // Sync to HSS if 4G/5G customer with credentials
+    if (customer.serviceType === '4G/5G' && customer.networkInfo?.imsi && customer.lteAuth?.ki && customer.lteAuth?.opc) {
+      try {
+        await syncCustomerToCloudHSS(customer, tenantId);
+        await syncCustomerToRemoteHSSs(customer, tenantId, 'update');
+      } catch (hssError) {
+        console.error('[Customer API] HSS sync failed (non-blocking):', hssError);
+        // Don't fail customer creation if HSS sync fails
+      }
+    }
+    
     res.status(201).json(customer);
   } catch (error) {
     console.error('[Customer API] Error creating customer:', {
@@ -248,6 +264,25 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
     
+    // Sync to HSS if 4G/5G customer with credentials
+    if (customer.serviceType === '4G/5G' && customer.networkInfo?.imsi && customer.lteAuth?.ki && customer.lteAuth?.opc) {
+      try {
+        await syncCustomerToCloudHSS(customer, tenantId);
+        await syncCustomerToRemoteHSSs(customer, tenantId, 'update');
+      } catch (hssError) {
+        console.error('[Customer API] HSS sync failed (non-blocking):', hssError);
+        // Don't fail customer update if HSS sync fails
+      }
+    } else if (customer.serviceType !== '4G/5G' || !customer.networkInfo?.imsi) {
+      // If customer is no longer 4G/5G or IMSI removed, remove from HSS
+      try {
+        await removeCustomerFromCloudHSS(customer, tenantId);
+        await syncCustomerToRemoteHSSs(customer, tenantId, 'delete');
+      } catch (hssError) {
+        console.error('[Customer API] HSS removal failed (non-blocking):', hssError);
+      }
+    }
+    
     res.json(customer);
   } catch (error) {
     console.error('Error updating customer:', error);
@@ -275,6 +310,17 @@ router.delete('/:id', async (req, res) => {
     
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
+    }
+    
+    // Remove from HSS if 4G/5G customer
+    if (customer.serviceType === '4G/5G' && customer.networkInfo?.imsi) {
+      try {
+        await removeCustomerFromCloudHSS(customer, tenantId);
+        await syncCustomerToRemoteHSSs(customer, tenantId, 'delete');
+      } catch (hssError) {
+        console.error('[Customer API] HSS removal failed (non-blocking):', hssError);
+        // Don't fail customer deletion if HSS removal fails
+      }
     }
     
     res.json({ message: 'Customer deleted', customer });

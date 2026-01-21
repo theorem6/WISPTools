@@ -34,18 +34,32 @@ export interface Customer {
     longitude?: number;
   };
   serviceStatus: 'pending' | 'active' | 'suspended' | 'cancelled' | 'trial';
+  serviceType?: '4G/5G' | 'FWA' | 'WiFi' | 'Fiber';
   servicePlan?: {
     planName?: string;
     downloadMbps?: number;
     uploadMbps?: number;
     monthlyFee?: number;
     currency?: string;
+    qci?: number;
+    maxBandwidthDl?: number;
+    maxBandwidthUl?: number;
+    dataQuota?: number;
+    priorityLevel?: 'low' | 'medium' | 'high' | 'premium';
   };
+  lteAuth?: {
+    ki?: string;
+    op?: string;
+    opc?: string;
+    sqn?: number;
+  };
+  macAddress?: string;
   networkInfo?: {
     imsi?: string;
     msisdn?: string;
     ipAddress?: string;
     cpeSerialNumber?: string;
+    lastOnline?: Date | string;
   };
   billingAddress?: {
     street?: string;

@@ -135,6 +135,7 @@ app.use('/api/epc', require('./routes/epc-logs')); // EPC logs
 app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
 app.use('/api/mikrotik', require('./routes/mikrotik'));
 app.use('/api/snmp', require('./routes/snmp'));
+app.use('/api/mme', require('./routes/mme-status')); // MME subscriber status reporting
 
 // NOTE: SNMP polling and Ping monitoring are DISABLED on cloud backend
 // These services should ONLY run on remote EPC agents, not on the cloud GCE server.

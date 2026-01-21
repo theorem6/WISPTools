@@ -113,6 +113,15 @@ const RemoteEPCSchema = new mongoose.Schema({
     log_level: { type: String, enum: ['error', 'warn', 'info', 'debug'], default: 'info' }
   },
   
+  // Customer Metrics (live from MME status reports)
+  metrics: {
+    customer_count: {
+      online: { type: Number, default: 0 },
+      total: { type: Number, default: 0 },
+      updated_at: Date
+    }
+  },
+  
   // Contact
   contact: {
     name: String,

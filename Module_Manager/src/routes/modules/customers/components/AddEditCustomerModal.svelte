@@ -36,12 +36,29 @@
       sameAsService: true
     },
     serviceStatus: 'pending' as Customer['serviceStatus'],
+    serviceType: undefined as Customer['serviceType'],
     servicePlan: {
       planName: '',
       downloadMbps: undefined as number | undefined,
       uploadMbps: undefined as number | undefined,
       monthlyFee: undefined as number | undefined,
-      currency: 'USD'
+      currency: 'USD',
+      qci: 9 as number | undefined,
+      maxBandwidthDl: undefined as number | undefined,
+      maxBandwidthUl: undefined as number | undefined,
+      dataQuota: undefined as number | undefined,
+      priorityLevel: 'medium' as 'low' | 'medium' | 'high' | 'premium' | undefined
+    },
+    lteAuth: {
+      ki: '',
+      op: '',
+      opc: '',
+      sqn: 0
+    },
+    macAddress: '',
+    networkInfo: {
+      imsi: '',
+      msisdn: ''
     },
     notes: '',
     tags: [] as string[]
@@ -181,8 +198,26 @@
     formData.alternatePhone = customer.alternatePhone || '';
     formData.email = customer.email || '';
     formData.serviceStatus = customer.serviceStatus || 'pending';
+    formData.serviceType = customer.serviceType;
+    formData.macAddress = customer.macAddress || '';
     formData.notes = (customer as any).notes || '';
     formData.tags = (customer as any).tags || [];
+    
+    if (customer.lteAuth) {
+      formData.lteAuth = {
+        ki: customer.lteAuth.ki || '',
+        op: customer.lteAuth.op || '',
+        opc: customer.lteAuth.opc || '',
+        sqn: customer.lteAuth.sqn || 0
+      };
+    }
+    
+    if (customer.networkInfo) {
+      formData.networkInfo = {
+        imsi: customer.networkInfo.imsi || '',
+        msisdn: customer.networkInfo.msisdn || ''
+      };
+    }
     
     if (customer.serviceAddress) {
       formData.serviceAddress = {
@@ -201,8 +236,13 @@
         planName: customer.servicePlan.planName || '',
         downloadMbps: customer.servicePlan.downloadMbps,
         uploadMbps: customer.servicePlan.uploadMbps,
-        monthlyFee: undefined,
-        currency: 'USD'
+        monthlyFee: customer.servicePlan.monthlyFee,
+        currency: customer.servicePlan.currency || 'USD',
+        qci: customer.servicePlan.qci || 9,
+        maxBandwidthDl: customer.servicePlan.maxBandwidthDl,
+        maxBandwidthUl: customer.servicePlan.maxBandwidthUl,
+        dataQuota: customer.servicePlan.dataQuota,
+        priorityLevel: customer.servicePlan.priorityLevel || 'medium'
       };
     }
   }
@@ -270,12 +310,29 @@
           country: formData.billingAddress.country
         },
         serviceStatus: formData.serviceStatus,
+        serviceType: formData.serviceType,
         servicePlan: formData.servicePlan.planName ? {
           planName: formData.servicePlan.planName,
           downloadMbps: formData.servicePlan.downloadMbps,
           uploadMbps: formData.servicePlan.uploadMbps,
           monthlyFee: formData.servicePlan.monthlyFee,
-          currency: formData.servicePlan.currency
+          currency: formData.servicePlan.currency,
+          qci: formData.servicePlan.qci,
+          maxBandwidthDl: formData.servicePlan.maxBandwidthDl,
+          maxBandwidthUl: formData.servicePlan.maxBandwidthUl,
+          dataQuota: formData.servicePlan.dataQuota,
+          priorityLevel: formData.servicePlan.priorityLevel
+        } : undefined,
+        lteAuth: formData.serviceType === '4G/5G' && (formData.lteAuth.ki || formData.lteAuth.opc) ? {
+          ki: formData.lteAuth.ki || undefined,
+          op: formData.lteAuth.op || undefined,
+          opc: formData.lteAuth.opc || undefined,
+          sqn: formData.lteAuth.sqn || 0
+        } : undefined,
+        macAddress: formData.macAddress.trim() || undefined,
+        networkInfo: formData.networkInfo.imsi ? {
+          imsi: formData.networkInfo.imsi,
+          msisdn: formData.networkInfo.msisdn || undefined
         } : undefined,
         notes: formData.notes.trim() || undefined,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
@@ -345,12 +402,29 @@
         sameAsService: true
       },
       serviceStatus: 'pending',
+      serviceType: undefined,
       servicePlan: {
         planName: '',
         downloadMbps: undefined,
         uploadMbps: undefined,
         monthlyFee: undefined,
-        currency: 'USD'
+        currency: 'USD',
+        qci: 9,
+        maxBandwidthDl: undefined,
+        maxBandwidthUl: undefined,
+        dataQuota: undefined,
+        priorityLevel: 'medium'
+      },
+      lteAuth: {
+        ki: '',
+        op: '',
+        opc: '',
+        sqn: 0
+      },
+      macAddress: '',
+      networkInfo: {
+        imsi: '',
+        msisdn: ''
       },
       notes: '',
       tags: []
@@ -418,6 +492,17 @@
             <option value="trial">Trial</option>
             <option value="suspended">Suspended</option>
             <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>Service Type</label>
+          <select bind:value={formData.serviceType}>
+            <option value={undefined}>Select Service Type</option>
+            <option value="4G/5G">4G/5G (LTE/5G)</option>
+            <option value="FWA">FWA (Fixed Wireless Access)</option>
+            <option value="WiFi">WiFi</option>
+            <option value="Fiber">Fiber</option>
           </select>
         </div>
       </div>
@@ -504,6 +589,146 @@
             <label>Upload (Mbps)</label>
             <input type="number" bind:value={formData.servicePlan.uploadMbps} placeholder="10" />
           </div>
+          
+          <div class="form-group">
+            <label>Monthly Fee ($)</label>
+            <input type="number" bind:value={formData.servicePlan.monthlyFee} placeholder="0.00" step="0.01" />
+          </div>
+        </div>
+        
+        {#if formData.serviceType === '4G/5G'}
+          <div class="form-grid">
+            <div class="form-group">
+              <label>QCI (Quality Class Identifier)</label>
+              <input type="number" bind:value={formData.servicePlan.qci} min="1" max="9" placeholder="9" />
+              <small>1-9 (9 is default best effort)</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Max Download Bandwidth (bps)</label>
+              <input type="number" bind:value={formData.servicePlan.maxBandwidthDl} placeholder="100000000" />
+              <small>Leave empty to auto-calculate from Mbps</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Max Upload Bandwidth (bps)</label>
+              <input type="number" bind:value={formData.servicePlan.maxBandwidthUl} placeholder="50000000" />
+              <small>Leave empty to auto-calculate from Mbps</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Data Quota (bytes)</label>
+              <input type="number" bind:value={formData.servicePlan.dataQuota} placeholder="0 = unlimited" />
+              <small>0 = unlimited, or specify bytes</small>
+            </div>
+            
+            <div class="form-group">
+              <label>Priority Level</label>
+              <select bind:value={formData.servicePlan.priorityLevel}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="premium">Premium</option>
+              </select>
+            </div>
+          </div>
+        {/if}
+      </div>
+      
+      <!-- LTE/5G Authentication (for 4G/5G service type) -->
+      {#if formData.serviceType === '4G/5G'}
+        <div class="section">
+          <h3>🔐 LTE/5G Authentication</h3>
+          <p class="section-description">Required for 4G/5G service type. These credentials are used for subscriber authentication.</p>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label>IMSI (15 digits)</label>
+              <input 
+                type="text" 
+                bind:value={formData.networkInfo.imsi} 
+                placeholder="123456789012345" 
+                maxlength="15"
+                pattern="[0-9]{15}"
+              />
+              <small>International Mobile Subscriber Identity</small>
+            </div>
+            
+            <div class="form-group">
+              <label>MSISDN (Phone Number)</label>
+              <input 
+                type="text" 
+                bind:value={formData.networkInfo.msisdn} 
+                placeholder={formData.primaryPhone.replace(/\D/g, '')} 
+              />
+              <small>Mobile Station ISDN Number</small>
+            </div>
+          </div>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Ki (Authentication Key) *</label>
+              <input 
+                type="text" 
+                bind:value={formData.lteAuth.ki} 
+                placeholder="32 or 64 hex characters" 
+                pattern="[0-9A-Fa-f]{32}|[0-9A-Fa-f]{64}"
+              />
+              <small>128-bit (32 hex) or 256-bit (64 hex) key</small>
+            </div>
+            
+            <div class="form-group">
+              <label>OPc (Operator Variant) *</label>
+              <input 
+                type="text" 
+                bind:value={formData.lteAuth.opc} 
+                placeholder="32 hex characters" 
+                pattern="[0-9A-Fa-f]{32}"
+              />
+              <small>128-bit (32 hex) operator variant</small>
+            </div>
+          </div>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label>OP (Operator Variant - Alternative)</label>
+              <input 
+                type="text" 
+                bind:value={formData.lteAuth.op} 
+                placeholder="32 hex characters (optional)" 
+                pattern="[0-9A-Fa-f]{32}"
+              />
+              <small>Use OP instead of OPc if needed</small>
+            </div>
+            
+            <div class="form-group">
+              <label>SQN (Sequence Number)</label>
+              <input 
+                type="number" 
+                bind:value={formData.lteAuth.sqn} 
+                placeholder="0" 
+                min="0"
+              />
+              <small>Sequence number for AKA (default: 0)</small>
+            </div>
+          </div>
+        </div>
+      {/if}
+      
+      <!-- MAC Address (Optional, for ACS integration) -->
+      <div class="section">
+        <h3>🔌 MAC Address (Optional)</h3>
+        <p class="section-description">MAC address for ACS/TR-069 integration. Not required but useful for device management.</p>
+        
+        <div class="form-group">
+          <label>MAC Address</label>
+          <input 
+            type="text" 
+            bind:value={formData.macAddress} 
+            placeholder="aa:bb:cc:dd:ee:ff or aa-bb-cc-dd-ee-ff" 
+            pattern="([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})"
+          />
+          <small>Format: xx:xx:xx:xx:xx:xx or xx-xx-xx-xx-xx-xx</small>
         </div>
       </div>
       
@@ -739,6 +964,21 @@
     font-size: 1.1rem;
     color: var(--brand-primary);
     font-weight: 600;
+  }
+  
+  .section-description {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    font-style: italic;
+  }
+  
+  .form-group small {
+    display: block;
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    font-weight: normal;
   }
   
   .form-grid {

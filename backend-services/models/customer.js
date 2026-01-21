@@ -87,12 +87,50 @@ const CustomerSchema = new mongoose.Schema({
     default: 'pending'
   },
   
+  // Customer Service Type
+  serviceType: {
+    type: String,
+    enum: ['4G/5G', 'FWA', 'WiFi', 'Fiber'],
+    index: true
+  },
+  
   servicePlan: {
     planName: String,           // "50/10 Mbps"
     downloadMbps: Number,
     uploadMbps: Number,
     monthlyFee: Number,
-    currency: { type: String, default: 'USD' }
+    currency: { type: String, default: 'USD' },
+    // Speed package details for QoS
+    qci: { type: Number, default: 9 }, // Quality Class Identifier (LTE/5G)
+    maxBandwidthDl: Number,    // Max downlink bandwidth (bps)
+    maxBandwidthUl: Number,    // Max uplink bandwidth (bps)
+    dataQuota: Number,         // Monthly data quota in bytes (0 = unlimited)
+    priorityLevel: { type: String, enum: ['low', 'medium', 'high', 'premium'], default: 'medium' }
+  },
+  
+  // LTE/5G Authentication Credentials (encrypted in cloud HSS, stored here for sync)
+  lteAuth: {
+    ki: String,                 // Authentication key (128-bit or 256-bit hex)
+    op: String,                 // Operator variant (OP) - alternative to OPc
+    opc: String,                // Operator variant (OPc) - computed from OP and Ki
+    sqn: { type: Number, default: 0 }, // Sequence number for AKA
+    // Note: Ki, OP, OPc should be encrypted when stored in database
+    // These are required for 4G/5G service types
+  },
+  
+  // MAC Address (optional, for ACS integration)
+  macAddress: {
+    type: String,
+    index: true,
+    sparse: true,
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Optional field
+        // Validate MAC address format (xx:xx:xx:xx:xx:xx or xx-xx-xx-xx-xx-xx)
+        return /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(v);
+      },
+      message: 'MAC address must be in format xx:xx:xx:xx:xx:xx or xx-xx-xx-xx-xx-xx'
+    }
   },
   
   // Installation Details
@@ -211,9 +249,11 @@ CustomerSchema.index({ tenantId: 1, customerId: 1 });
 CustomerSchema.index({ tenantId: 1, primaryPhone: 1 });
 CustomerSchema.index({ tenantId: 1, email: 1 });
 CustomerSchema.index({ tenantId: 1, serviceStatus: 1 });
+CustomerSchema.index({ tenantId: 1, serviceType: 1 });
 CustomerSchema.index({ 'serviceAddress.latitude': 1, 'serviceAddress.longitude': 1 });
 CustomerSchema.index({ 'networkInfo.imsi': 1 });
 CustomerSchema.index({ tenantId: 1, leadHash: 1 }, { unique: true, sparse: true });
+CustomerSchema.index({ macAddress: 1 }, { sparse: true });
 
 // Pre-save middleware - generate fullName
 CustomerSchema.pre('save', function(next) {
