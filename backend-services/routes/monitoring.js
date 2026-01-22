@@ -315,6 +315,7 @@ function formatUptime(seconds) {
 
 // GET /api/monitoring/epc/list - List all EPC devices for monitoring
 router.get('/epc/list', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { createDebugLogger } = require('../utils/debug');
     const debug = createDebugLogger(req);
@@ -325,11 +326,11 @@ router.get('/epc/list', async (req, res) => {
     
     // PRIMARY SOURCE: Get EPCs from RemoteEPC collection (devices linked via device code)
     // TENANT-SPECIFIC ONLY: Only return EPCs that belong to this tenant
+    const queryStart = Date.now();
     const tenantEPCs = await RemoteEPC.find({
       tenant_id: req.tenantId
     }).lean();
-    
-    console.log(`📡 [Monitoring] Found ${tenantEPCs.length} RemoteEPCs for tenant ${req.tenantId}`);
+    console.log(`⏱️ [Monitoring] RemoteEPC query took ${Date.now() - queryStart}ms, found ${tenantEPCs.length} EPCs`);
     
     // Get all sites to populate EPC locations from site_id
     const siteIds = tenantEPCs.map(epc => epc.site_id).filter(Boolean);
@@ -502,7 +503,9 @@ router.get('/epc/list', async (req, res) => {
     if (deploymentDevices.length > 0) {
       // Batch get ping statuses for all deployment devices
       const deploymentDeviceIds = deploymentDevices.map(d => d._id.toString());
+      const pingStart = Date.now();
       const deploymentStatusMap = await getDeviceStatusesFromPingMetrics(deploymentDeviceIds, req.tenantId);
+      console.log(`⏱️ [Monitoring] EPC deployment ping status batch query took ${Date.now() - pingStart}ms for ${deploymentDeviceIds.length} devices`);
       
       // Format all devices in parallel
       const formattedDeployments = await Promise.all(
@@ -517,10 +520,12 @@ router.get('/epc/list', async (req, res) => {
     }
     
     debug.log(`📊 [Monitoring] Total ${epcs.length} EPC devices for tenant ${req.tenantId}`);
+    console.log(`⏱️ [Monitoring] Total EPC endpoint time: ${Date.now() - startTime}ms`);
     
     res.json({ epcs, total: epcs.length });
   } catch (error) {
     console.error('[Monitoring] Error fetching EPC devices:', error);
+    console.log(`⏱️ [Monitoring] EPC endpoint failed after ${Date.now() - startTime}ms`);
     res.status(500).json({ error: 'Failed to fetch EPC devices', message: error.message });
   }
 });
@@ -529,12 +534,14 @@ router.get('/epc/list', async (req, res) => {
 
 // GET /api/mikrotik/devices - List all Mikrotik devices
 router.get('/mikrotik/devices', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { createDebugLogger } = require('../utils/debug');
     const debug = createDebugLogger(req);
     debug.log(`🔍 Fetching Mikrotik devices for tenant: ${req.tenantId}`);
     
     // Get Mikrotik network equipment (include both active and planned/deployed devices)
+    const queryStart = Date.now();
     const mikrotikEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       manufacturer: /mikrotik/i,
@@ -579,7 +586,9 @@ router.get('/mikrotik/devices', async (req, res) => {
     const allMikrotikDeviceIds = [...mikrotikEquipment, ...mikrotikCPE]
       .map(d => d._id?.toString())
       .filter(Boolean);
+    const pingStart = Date.now();
     const mikrotikStatusMap = await getDeviceStatusesFromPingMetrics(allMikrotikDeviceIds, req.tenantId);
+    console.log(`⏱️ [Monitoring] Mikrotik ping status batch query took ${Date.now() - pingStart}ms for ${allMikrotikDeviceIds.length} devices`);
     
     const devices = [];
     
@@ -638,10 +647,12 @@ router.get('/mikrotik/devices', async (req, res) => {
     devices.push(...cpeDevices);
     
     console.log(`📊 Found ${devices.length} Mikrotik devices for tenant ${req.tenantId}`);
+    console.log(`⏱️ [Monitoring] Mikrotik endpoint took ${Date.now() - startTime}ms (query: ${Date.now() - queryStart}ms)`);
     
     res.json({ devices });
   } catch (error) {
     console.error('Error fetching Mikrotik devices:', error);
+    console.log(`⏱️ [Monitoring] Mikrotik endpoint failed after ${Date.now() - startTime}ms`);
     res.status(500).json({ error: 'Failed to fetch Mikrotik devices', message: error.message });
   }
 });
@@ -650,12 +661,14 @@ router.get('/mikrotik/devices', async (req, res) => {
 
 // GET /api/snmp/devices - List all SNMP-enabled devices
 router.get('/snmp/devices', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { createDebugLogger } = require('../utils/debug');
     const debug = createDebugLogger(req);
     debug.log(`🔍 Fetching SNMP devices for tenant: ${req.tenantId}`);
     
     // Get all network equipment with SNMP enabled (include both active and planned/deployed devices)
+    const queryStart = Date.now();
     const snmpEquipment = await NetworkEquipment.find({
       tenantId: req.tenantId,
       $and: [
@@ -711,7 +724,9 @@ router.get('/snmp/devices', async (req, res) => {
     const allSNMPDeviceIds = [...snmpEquipment, ...snmpCPE]
       .map(d => d._id?.toString())
       .filter(Boolean);
+    const pingStart = Date.now();
     const snmpStatusMap = await getDeviceStatusesFromPingMetrics(allSNMPDeviceIds, req.tenantId);
+    console.log(`⏱️ [Monitoring] SNMP ping status batch query took ${Date.now() - pingStart}ms for ${allSNMPDeviceIds.length} devices`);
     
     const devices = [];
     
@@ -770,10 +785,12 @@ router.get('/snmp/devices', async (req, res) => {
     devices.push(...cpeDevices);
     
     console.log(`📊 Found ${devices.length} SNMP devices for tenant ${req.tenantId}`);
+    console.log(`⏱️ [Monitoring] SNMP devices endpoint took ${Date.now() - startTime}ms (query: ${Date.now() - queryStart}ms)`);
     
     res.json({ devices });
   } catch (error) {
     console.error('Error fetching SNMP devices:', error);
+    console.log(`⏱️ [Monitoring] SNMP devices endpoint failed after ${Date.now() - startTime}ms`);
     res.status(500).json({ error: 'Failed to fetch SNMP devices', message: error.message });
   }
 });
@@ -781,6 +798,7 @@ router.get('/snmp/devices', async (req, res) => {
 // GET /api/snmp/metrics/latest - Get latest SNMP metrics for all devices
 // GET /api/monitoring/snmp/discovered - Get discovered SNMP devices (proxies to SNMP route)
 router.get('/snmp/discovered', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { NetworkEquipment } = require('../models/network');
     
@@ -790,6 +808,7 @@ router.get('/snmp/discovered', async (req, res) => {
 
     // Get all network equipment that was discovered via SNMP (include both active and planned/deployed devices)
     // Notes are stored as JSON strings, so we search for the discovery_source string
+    const queryStart = Date.now();
     const devices = await NetworkEquipment.find({
       tenantId: req.tenantId,
       $and: [
@@ -924,9 +943,11 @@ router.get('/snmp/discovered', async (req, res) => {
       };
     });
 
+    console.log(`⏱️ [Monitoring] Discovered devices endpoint took ${Date.now() - startTime}ms (query: ${Date.now() - queryStart}ms)`);
     res.json({ devices: formattedDevices });
   } catch (error) {
     console.error('❌ [Monitoring API] Error fetching discovered devices:', error);
+    console.log(`⏱️ [Monitoring] Discovered devices endpoint failed after ${Date.now() - startTime}ms`);
     res.status(500).json({
       error: 'Failed to fetch discovered devices',
       message: error.message,
