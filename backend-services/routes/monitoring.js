@@ -21,97 +21,123 @@ const requireTenant = (req, res, next) => {
 router.use(requireTenant);
 
 // Helper function to convert network devices to monitoring format
-// Helper function to get device status from recent ping metrics
-async function getDeviceStatusFromPingMetrics(deviceId, tenantId) {
+// Helper function to batch get device statuses from recent ping metrics
+// This is much faster than calling getDeviceStatusFromPingMetrics individually for each device
+async function getDeviceStatusesFromPingMetrics(deviceIds, tenantId) {
   try {
     const { PingMetrics } = require('../models/ping-metrics-schema');
     const mongoose = require('mongoose');
     
-    // Check for recent successful pings (last 15 minutes)
+    if (!deviceIds || deviceIds.length === 0) {
+      return new Map();
+    }
+    
+    const statusMap = new Map();
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    
-    // Try with device_id as string
-    let recentMetrics = await PingMetrics.find({
-      device_id: deviceId,
-      tenant_id: tenantId,
-      timestamp: { $gte: fifteenMinutesAgo }
-    })
-    .sort({ timestamp: -1 })
-    .limit(10)
-    .lean();
-    
-    // If no results, try with ObjectId format
-    if (recentMetrics.length === 0 && mongoose.Types.ObjectId.isValid(deviceId)) {
-      const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
-      recentMetrics = await PingMetrics.find({
-        $or: [
-          { device_id: deviceId },
-          { device_id: objectIdDeviceId }
-        ],
-        tenant_id: tenantId,
-        timestamp: { $gte: fifteenMinutesAgo }
-      })
-      .sort({ timestamp: -1 })
-      .limit(10)
-      .lean();
-    }
-    
-    if (recentMetrics.length > 0) {
-      // Check if any recent ping was successful (success === true OR has response_time)
-      const successfulPings = recentMetrics.filter(m => 
-        m.success === true || (m.response_time_ms !== null && m.response_time_ms !== undefined)
-      );
-      if (successfulPings.length > 0) {
-        return 'online';
-      }
-    }
-    
-    // Check last metric within 30 minutes as fallback
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    let lastMetric = await PingMetrics.findOne({
-      device_id: deviceId,
-      tenant_id: tenantId,
-      timestamp: { $gte: thirtyMinutesAgo }
+    
+    // Convert deviceIds to both string and ObjectId formats for querying
+    const deviceIdQueries = deviceIds.map(id => {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        return { device_id: { $in: [id, new mongoose.Types.ObjectId(id)] } };
+      }
+      return { device_id: id };
+    });
+    
+    // Single query to get all recent successful pings (last 15 minutes)
+    const recentMetrics = await PingMetrics.find({
+      $and: [
+        { $or: deviceIdQueries },
+        { tenant_id: tenantId },
+        { timestamp: { $gte: fifteenMinutesAgo } },
+        { $or: [
+          { success: true },
+          { response_time_ms: { $ne: null } }
+        ]}
+      ]
     })
     .sort({ timestamp: -1 })
     .lean();
     
-    if (!lastMetric && mongoose.Types.ObjectId.isValid(deviceId)) {
-      const objectIdDeviceId = new mongoose.Types.ObjectId(deviceId);
-      lastMetric = await PingMetrics.findOne({
-        $or: [
-          { device_id: deviceId },
-          { device_id: objectIdDeviceId }
-        ],
-        tenant_id: tenantId,
-        timestamp: { $gte: thirtyMinutesAgo }
+    // Mark devices with recent successful pings as online
+    recentMetrics.forEach(metric => {
+      const deviceId = String(metric.device_id);
+      if (!statusMap.has(deviceId)) {
+        statusMap.set(deviceId, 'online');
+      }
+    });
+    
+    // For devices not yet marked, check 30-minute window
+    const unmarkedIds = deviceIds.filter(id => !statusMap.has(String(id)));
+    if (unmarkedIds.length > 0) {
+      const unmarkedQueries = unmarkedIds.map(id => {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return { device_id: { $in: [id, new mongoose.Types.ObjectId(id)] } };
+        }
+        return { device_id: id };
+      });
+      
+      const thirtyMinMetrics = await PingMetrics.find({
+        $and: [
+          { $or: unmarkedQueries },
+          { tenant_id: tenantId },
+          { timestamp: { $gte: thirtyMinutesAgo } },
+          { $or: [
+            { success: true },
+            { response_time_ms: { $ne: null } }
+          ]}
+        ]
       })
       .sort({ timestamp: -1 })
       .lean();
+      
+      thirtyMinMetrics.forEach(metric => {
+        const deviceId = String(metric.device_id);
+        if (!statusMap.has(deviceId)) {
+          statusMap.set(deviceId, 'online');
+        }
+      });
     }
     
-    if (lastMetric && (lastMetric.success === true || (lastMetric.response_time_ms !== null && lastMetric.response_time_ms !== undefined))) {
-      return 'online';
+    // For remaining devices, check if they have any metrics at all (mark as offline)
+    const stillUnmarkedIds = deviceIds.filter(id => !statusMap.has(String(id)));
+    if (stillUnmarkedIds.length > 0) {
+      const stillUnmarkedQueries = stillUnmarkedIds.map(id => {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          return { device_id: { $in: [id, new mongoose.Types.ObjectId(id)] } };
+        }
+        return { device_id: id };
+      });
+      
+      const anyMetrics = await PingMetrics.find({
+        $or: stillUnmarkedQueries,
+        tenant_id: tenantId
+      })
+      .select('device_id')
+      .lean();
+      
+      anyMetrics.forEach(metric => {
+        const deviceId = String(metric.device_id);
+        if (!statusMap.has(deviceId)) {
+          statusMap.set(deviceId, 'offline');
+        }
+      });
     }
     
-    // If we have any ping metrics at all (even old ones), mark as offline
-    const anyMetrics = await PingMetrics.findOne({
-      device_id: deviceId,
-      tenant_id: tenantId
-    }).lean();
-    
-    if (anyMetrics) {
-      return 'offline'; // Has monitoring data but not recently online
-    }
-    
-    return null; // No ping metrics found
+    return statusMap;
   } catch (error) {
-    console.error(`[formatDeviceForMonitoring] Error checking ping metrics for device ${deviceId}:`, error);
-    return null;
+    console.error(`[getDeviceStatusesFromPingMetrics] Error batch checking ping metrics:`, error);
+    return new Map();
   }
 }
 
-const formatDeviceForMonitoring = async (device, type, deviceType = null, tenantId = null) => {
+// Legacy single-device function for backward compatibility (but prefer batch version)
+async function getDeviceStatusFromPingMetrics(deviceId, tenantId) {
+  const statusMap = await getDeviceStatusesFromPingMetrics([deviceId], tenantId);
+  return statusMap.get(String(deviceId)) || null;
+}
+
+const formatDeviceForMonitoring = async (device, type, deviceType = null, tenantId = null, preFetchedPingStatus = null) => {
   // Determine device status based on monitoring data
   let deviceStatus = 'unknown'; // Default to unknown (grey) for devices without monitoring data
   
@@ -125,8 +151,9 @@ const formatDeviceForMonitoring = async (device, type, deviceType = null, tenant
   }
   
   // First, try to get status from recent ping metrics (if tenantId is provided)
+  // Use pre-fetched status if available (from batch query), otherwise fetch individually
   if (tenantId && device._id) {
-    const pingStatus = await getDeviceStatusFromPingMetrics(device._id.toString(), tenantId);
+    const pingStatus = preFetchedPingStatus || (await getDeviceStatusFromPingMetrics(device._id.toString(), tenantId));
     if (pingStatus) {
       deviceStatus = pingStatus;
     }
@@ -459,18 +486,34 @@ router.get('/epc/list', async (req, res) => {
       // Don't filter by status - include all EPC hardware deployments
     }).populate('siteId', 'name location').lean();
     
-    for (const deployment of epcDeployments) {
-      if (!seenIds.has(deployment._id.toString())) {
-        epcs.push(await formatDeviceForMonitoring({
-          _id: deployment._id,
-          name: deployment.name,
-          status: deployment.status,
-          location: deployment.siteId?.location || {},
-          config: deployment.config || {},
-          createdAt: deployment.createdAt,
-          updatedAt: deployment.updatedAt
-        }, 'epc', null, req.tenantId));
-      }
+    // Batch format deployments for better performance
+    const deploymentDevices = epcDeployments
+      .filter(deployment => !seenIds.has(deployment._id.toString()))
+      .map(deployment => ({
+        _id: deployment._id,
+        name: deployment.name,
+        status: deployment.status,
+        location: deployment.siteId?.location || {},
+        config: deployment.config || {},
+        createdAt: deployment.createdAt,
+        updatedAt: deployment.updatedAt
+      }));
+    
+    if (deploymentDevices.length > 0) {
+      // Batch get ping statuses for all deployment devices
+      const deploymentDeviceIds = deploymentDevices.map(d => d._id.toString());
+      const deploymentStatusMap = await getDeviceStatusesFromPingMetrics(deploymentDeviceIds, req.tenantId);
+      
+      // Format all devices in parallel
+      const formattedDeployments = await Promise.all(
+        deploymentDevices.map(async (device) => {
+          // Use pre-fetched status if available
+          const preStatus = deploymentStatusMap.get(device._id.toString());
+          return formatDeviceForMonitoring(device, 'epc', null, req.tenantId, preStatus);
+        })
+      );
+      
+      epcs.push(...formattedDeployments);
     }
     
     debug.log(`📊 [Monitoring] Total ${epcs.length} EPC devices for tenant ${req.tenantId}`);
@@ -532,53 +575,67 @@ router.get('/mikrotik/devices', async (req, res) => {
       }
     }
     
+    // Batch get ping statuses for all Mikrotik devices
+    const allMikrotikDeviceIds = [...mikrotikEquipment, ...mikrotikCPE]
+      .map(d => d._id?.toString())
+      .filter(Boolean);
+    const mikrotikStatusMap = await getDeviceStatusesFromPingMetrics(allMikrotikDeviceIds, req.tenantId);
+    
     const devices = [];
     
-    // Add Mikrotik equipment with location from site if needed
-    for (const equipment of mikrotikEquipment) {
-      const device = await formatDeviceForMonitoring(equipment, 'mikrotik', equipment.type, req.tenantId);
-      
-      // If device has siteId but no valid coordinates, get location from site
-      if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
-        const siteIdStr = typeof equipment.siteId === 'object' ? equipment.siteId._id?.toString() || equipment.siteId.toString() : equipment.siteId.toString();
-        const site = siteMap.get(siteIdStr) || (typeof equipment.siteId === 'object' ? equipment.siteId : null);
+    // Add Mikrotik equipment with location from site if needed (parallelized)
+    const equipmentDevices = await Promise.all(
+      mikrotikEquipment.map(async (equipment) => {
+        const preStatus = mikrotikStatusMap.get(equipment._id.toString());
+        const device = await formatDeviceForMonitoring(equipment, 'mikrotik', equipment.type, req.tenantId, preStatus);
         
-        if (site && site.location) {
-          device.location = {
-            coordinates: {
-              latitude: site.location.latitude || 0,
-              longitude: site.location.longitude || 0
-            },
-            address: site.location.address || device.location?.address || 'Unknown Location'
-          };
+        // If device has siteId but no valid coordinates, get location from site
+        if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+          const siteIdStr = typeof equipment.siteId === 'object' ? equipment.siteId._id?.toString() || equipment.siteId.toString() : equipment.siteId.toString();
+          const site = siteMap.get(siteIdStr) || (typeof equipment.siteId === 'object' ? equipment.siteId : null);
+          
+          if (site && site.location) {
+            device.location = {
+              coordinates: {
+                latitude: site.location.latitude || 0,
+                longitude: site.location.longitude || 0
+              },
+              address: site.location.address || device.location?.address || 'Unknown Location'
+            };
+          }
         }
-      }
-      
-      devices.push(device);
-    }
+        
+        return device;
+      })
+    );
+    devices.push(...equipmentDevices);
     
-    // Add Mikrotik CPE with location from site if needed
-    for (const cpe of mikrotikCPE) {
-      const device = await formatDeviceForMonitoring(cpe, 'mikrotik', 'cpe', req.tenantId);
-      
-      // If device has siteId but no valid coordinates, get location from site
-      if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
-        const siteIdStr = typeof cpe.siteId === 'object' ? cpe.siteId._id?.toString() || cpe.siteId.toString() : cpe.siteId.toString();
-        const site = siteMap.get(siteIdStr) || (typeof cpe.siteId === 'object' ? cpe.siteId : null);
+    // Add Mikrotik CPE with location from site if needed (parallelized)
+    const cpeDevices = await Promise.all(
+      mikrotikCPE.map(async (cpe) => {
+        const preStatus = mikrotikStatusMap.get(cpe._id.toString());
+        const device = await formatDeviceForMonitoring(cpe, 'mikrotik', 'cpe', req.tenantId, preStatus);
         
-        if (site && site.location) {
-          device.location = {
-            coordinates: {
-              latitude: site.location.latitude || 0,
-              longitude: site.location.longitude || 0
-            },
-            address: site.location.address || device.location?.address || 'Unknown Location'
-          };
+        // If device has siteId but no valid coordinates, get location from site
+        if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+          const siteIdStr = typeof cpe.siteId === 'object' ? cpe.siteId._id?.toString() || cpe.siteId.toString() : cpe.siteId.toString();
+          const site = siteMap.get(siteIdStr) || (typeof cpe.siteId === 'object' ? cpe.siteId : null);
+          
+          if (site && site.location) {
+            device.location = {
+              coordinates: {
+                latitude: site.location.latitude || 0,
+                longitude: site.location.longitude || 0
+              },
+              address: site.location.address || device.location?.address || 'Unknown Location'
+            };
+          }
         }
-      }
-      
-      devices.push(device);
-    }
+        
+        return device;
+      })
+    );
+    devices.push(...cpeDevices);
     
     console.log(`📊 Found ${devices.length} Mikrotik devices for tenant ${req.tenantId}`);
     
@@ -650,53 +707,67 @@ router.get('/snmp/devices', async (req, res) => {
       }
     }
     
+    // Batch get ping statuses for all SNMP devices
+    const allSNMPDeviceIds = [...snmpEquipment, ...snmpCPE]
+      .map(d => d._id?.toString())
+      .filter(Boolean);
+    const snmpStatusMap = await getDeviceStatusesFromPingMetrics(allSNMPDeviceIds, req.tenantId);
+    
     const devices = [];
     
-    // Add SNMP equipment with location from site if needed
-    for (const equipment of snmpEquipment) {
-      const device = await formatDeviceForMonitoring(equipment, 'snmp', equipment.type, req.tenantId);
-      
-      // If device has siteId but no valid coordinates, get location from site
-      if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
-        const siteIdStr = typeof equipment.siteId === 'object' ? equipment.siteId._id?.toString() || equipment.siteId.toString() : equipment.siteId.toString();
-        const site = siteMap.get(siteIdStr) || (typeof equipment.siteId === 'object' ? equipment.siteId : null);
+    // Add SNMP equipment with location from site if needed (parallelized)
+    const equipmentDevices = await Promise.all(
+      snmpEquipment.map(async (equipment) => {
+        const preStatus = snmpStatusMap.get(equipment._id.toString());
+        const device = await formatDeviceForMonitoring(equipment, 'snmp', equipment.type, req.tenantId, preStatus);
         
-        if (site && site.location) {
-          device.location = {
-            coordinates: {
-              latitude: site.location.latitude || 0,
-              longitude: site.location.longitude || 0
-            },
-            address: site.location.address || device.location?.address || 'Unknown Location'
-          };
+        // If device has siteId but no valid coordinates, get location from site
+        if (equipment.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+          const siteIdStr = typeof equipment.siteId === 'object' ? equipment.siteId._id?.toString() || equipment.siteId.toString() : equipment.siteId.toString();
+          const site = siteMap.get(siteIdStr) || (typeof equipment.siteId === 'object' ? equipment.siteId : null);
+          
+          if (site && site.location) {
+            device.location = {
+              coordinates: {
+                latitude: site.location.latitude || 0,
+                longitude: site.location.longitude || 0
+              },
+              address: site.location.address || device.location?.address || 'Unknown Location'
+            };
+          }
         }
-      }
-      
-      devices.push(device);
-    }
+        
+        return device;
+      })
+    );
+    devices.push(...equipmentDevices);
     
-    // Add SNMP CPE with location from site if needed
-    for (const cpe of snmpCPE) {
-      const device = await formatDeviceForMonitoring(cpe, 'snmp', 'cpe', req.tenantId);
-      
-      // If device has siteId but no valid coordinates, get location from site
-      if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
-        const siteIdStr = typeof cpe.siteId === 'object' ? cpe.siteId._id?.toString() || cpe.siteId.toString() : cpe.siteId.toString();
-        const site = siteMap.get(siteIdStr) || (typeof cpe.siteId === 'object' ? cpe.siteId : null);
+    // Add SNMP CPE with location from site if needed (parallelized)
+    const cpeDevices = await Promise.all(
+      snmpCPE.map(async (cpe) => {
+        const preStatus = snmpStatusMap.get(cpe._id.toString());
+        const device = await formatDeviceForMonitoring(cpe, 'snmp', 'cpe', req.tenantId, preStatus);
         
-        if (site && site.location) {
-          device.location = {
-            coordinates: {
-              latitude: site.location.latitude || 0,
-              longitude: site.location.longitude || 0
-            },
-            address: site.location.address || device.location?.address || 'Unknown Location'
-          };
+        // If device has siteId but no valid coordinates, get location from site
+        if (cpe.siteId && (!device.location?.coordinates?.latitude || device.location.coordinates.latitude === 0)) {
+          const siteIdStr = typeof cpe.siteId === 'object' ? cpe.siteId._id?.toString() || cpe.siteId.toString() : cpe.siteId.toString();
+          const site = siteMap.get(siteIdStr) || (typeof cpe.siteId === 'object' ? cpe.siteId : null);
+          
+          if (site && site.location) {
+            device.location = {
+              coordinates: {
+                latitude: site.location.latitude || 0,
+                longitude: site.location.longitude || 0
+              },
+              address: site.location.address || device.location?.address || 'Unknown Location'
+            };
+          }
         }
-      }
-      
-      devices.push(device);
-    }
+        
+        return device;
+      })
+    );
+    devices.push(...cpeDevices);
     
     console.log(`📊 Found ${devices.length} SNMP devices for tenant ${req.tenantId}`);
     
