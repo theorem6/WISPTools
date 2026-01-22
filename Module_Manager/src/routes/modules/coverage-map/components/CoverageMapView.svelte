@@ -20,6 +20,12 @@ export let isPlanMode = false;
   let mapContainer: HTMLDivElement;
   let mapView: any = null;
   let controller: CoverageMapController | null = null;
+  
+  // Track last data to avoid unnecessary updates
+  let lastTowers: TowerSite[] = [];
+  let lastSectors: Sector[] = [];
+  let lastCPEDevices: CPEDevice[] = [];
+  let lastEquipment: NetworkEquipment[] = [];
 
   onMount(async () => {
     controller = new CoverageMapController((event, detail) => {
@@ -62,8 +68,35 @@ export let isPlanMode = false;
     mapView = null;
   });
 
+  // Helper to check if arrays have actually changed (not just new instances)
+  function arraysEqual<T>(a: T[], b: T[], getId: (item: T) => string): boolean {
+    if (a.length !== b.length) return false;
+    const aIds = new Set(a.map(getId));
+    const bIds = new Set(b.map(getId));
+    if (aIds.size !== bIds.size) return false;
+    for (const id of aIds) {
+      if (!bIds.has(id)) return false;
+    }
+    return true;
+  }
+  
   // Reactive statements to update map when data changes
-  $: controller && controller.setData({ towers, sectors, cpeDevices, equipment });
+  $: if (controller) {
+    // Only call setData if the data actually changed (not just new array instances)
+    const towersChanged = !arraysEqual(towers, lastTowers, (t) => String(t.id || t._id));
+    const sectorsChanged = !arraysEqual(sectors, lastSectors, (s) => String(s.id || s._id));
+    const cpeChanged = !arraysEqual(cpeDevices, lastCPEDevices, (c) => String(c.id || c._id));
+    const equipmentChanged = !arraysEqual(equipment, lastEquipment, (e) => String(e.id || e._id));
+    
+    if (towersChanged || sectorsChanged || cpeChanged || equipmentChanged) {
+      controller.setData({ towers, sectors, cpeDevices, equipment });
+      lastTowers = towers;
+      lastSectors = sectors;
+      lastCPEDevices = cpeDevices;
+      lastEquipment = equipment;
+    }
+  }
+  
   $: controller && controller.setFilters(filters);
   $: controller && controller.setPlanFeatures(externalPlanFeatures);
   $: controller && controller.setMarketingLeads(marketingLeads);
@@ -112,6 +145,20 @@ export let isPlanMode = false;
     if (controller) {
       controller.setData({ towers, sectors, cpeDevices, equipment });
     }
+  }
+  
+  export function updateUptimeStatus(updates: {
+    towers?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    sectors?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    cpeDevices?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    equipment?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+  }): void {
+    controller?.updateUptimeStatus(updates);
+  }
+  
+  // Expose controller for direct access if needed
+  export function getController(): CoverageMapController | null {
+    return controller;
   }
 </script>
 

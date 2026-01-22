@@ -765,28 +765,180 @@
     }
   }
   
-  // Watch for device changes - wait for towers to be loaded so devices can get locations from sites
-  $: if (devices && towers.length > 0) {
-    convertDevicesToEquipment();
-  }
+  // Track last known status/uptime to detect changes
+  let lastStatusHash: string = '';
   
-  // Also re-process devices when towers change (sites loaded)
+  // Watch for device changes - wait for towers to be loaded so devices can get locations from sites
   $: if (devices && towers.length > 0) {
     convertDevicesToEquipment();
   }
   
   // Debounce timer for loadSites to prevent rapid-fire calls
   let loadSitesTimeout: ReturnType<typeof setTimeout> | null = null;
+  let statusUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   
-  // Watch for tenant, devices, and alerts to reload sites with updated status
-  $: if (tenantId) {
-    // Debounce loadSites to prevent multiple rapid calls
+  // Watch for tenant changes - reload sites
+  $: if (tenantId && tenantId !== lastLoadedTenantId) {
+    // Clear any pending debounced call and load immediately
     if (loadSitesTimeout) {
       clearTimeout(loadSitesTimeout);
     }
-    loadSitesTimeout = setTimeout(() => {
-      loadSites();
-    }, 300); // 300ms debounce
+    loadSites();
+  }
+  
+  // Watch for status/uptime changes only (not structural changes)
+  // This watches networkDevices and alerts for status changes that affect map colors
+  $: if (tenantId && towers.length > 0) {
+    // Calculate current status hash based on networkDevices (source of truth for uptime)
+    const currentStatusHash = calculateStatusHash();
+    
+    // Only update if status actually changed (skip first run when lastStatusHash is empty)
+    if (currentStatusHash !== lastStatusHash) {
+      if (lastStatusHash !== '') {
+        // Clear any pending status update
+        if (statusUpdateTimeout) {
+          clearTimeout(statusUpdateTimeout);
+        }
+        
+        // Debounce status updates to avoid rapid-fire updates
+        statusUpdateTimeout = setTimeout(() => {
+          updateStatusOnly();
+        }, 200); // 200ms debounce for status updates
+      }
+      
+      lastStatusHash = currentStatusHash;
+    }
+  }
+  
+  // Calculate a hash of current status/uptime values based on networkDevices
+  // This detects when device status changes, which should trigger a color update
+  function calculateStatusHash(): string {
+    // Hash based on networkDevices status (the source of truth for uptime)
+    const deviceStatuses = (networkDevices || []).map(d => {
+      const deviceId = String(d.id || d._id);
+      const status = d.status || 'unknown';
+      const siteId = String(d.siteId || d.site_id || '');
+      return `${deviceId}:${status}:${siteId}`;
+    }).sort().join('|');
+    
+    // Also include alert count as it affects tower colors
+    const alertCount = (alerts || []).length;
+    
+    return `${deviceStatuses}|alerts:${alertCount}`;
+  }
+  
+  // Update only status/uptime without reloading everything
+  function updateStatusOnly() {
+    if (!mapComponent || !mapComponent.updateUptimeStatus) return;
+    
+    const systemUptime = getSystemUptimePercent();
+    
+    // Update towers status
+    const towerUpdates = towers.map(tower => {
+      const siteId = tower.id || tower._id;
+      const status = getSiteStatus(String(siteId), systemUptime);
+      const uptimePercent = calculateSiteUptime(String(siteId));
+      
+      // Update in place
+      tower.status = status;
+      tower.uptimePercent = uptimePercent;
+      
+      return {
+        id: String(siteId),
+        status: status,
+        uptimePercent: uptimePercent
+      };
+    });
+    
+    // Update sectors status
+    const sectorUpdates = sectors.map(sector => {
+      const sectorSiteId = sector.towerId?._id || sector.towerId?.id || sector.towerId || 
+                           sector.siteId?._id || sector.siteId?.id || sector.siteId;
+      
+      let sectorStatus = sector.status || 'active';
+      let uptimePercent = 100;
+      
+      if (sectorSiteId && networkDevices) {
+        const siteDevices = networkDevices.filter((device: any) => {
+          const deviceSiteId = device.siteId || device.site_id;
+          return deviceSiteId && String(deviceSiteId) === String(sectorSiteId);
+        });
+        
+        if (siteDevices.length > 0) {
+          const onlineDevices = siteDevices.filter((d: any) => d.status === 'online').length;
+          uptimePercent = Math.round((onlineDevices / siteDevices.length) * 100);
+          
+          if (uptimePercent === 100) {
+            sectorStatus = 'active';
+          } else if (uptimePercent === 0) {
+            sectorStatus = 'inactive';
+          } else {
+            sectorStatus = 'maintenance';
+          }
+        }
+      }
+      
+      // Update in place
+      sector.status = sectorStatus;
+      sector.uptimePercent = uptimePercent;
+      
+      return {
+        id: String(sector.id || sector._id),
+        status: sectorStatus,
+        uptimePercent: uptimePercent
+      };
+    });
+    
+    // Update equipment status
+    const equipmentUpdates = equipment.map(eq => {
+      // Find matching device in networkDevices
+      const matchingDevice = networkDevices.find((device: any) => {
+        return (device.id === String(eq.id || eq._id)) ||
+               (eq.ipAddress && device.ipAddress === eq.ipAddress);
+      });
+      
+      const status = matchingDevice?.status || eq.status || 'unknown';
+      const uptimePercent = status === 'online' ? 100 : (status === 'offline' ? 0 : 50);
+      
+      // Update in place
+      eq.status = status;
+      eq.uptimePercent = uptimePercent;
+      
+      return {
+        id: String(eq.id || eq._id),
+        status: status,
+        uptimePercent: uptimePercent
+      };
+    });
+    
+    // Update CPE status
+    const cpeUpdates = cpeDevices.map(cpe => {
+      const matchingDevice = networkDevices.find((device: any) => {
+        return (device.id === String(cpe.id || cpe._id)) ||
+               (device.serialNumber === cpe.serialNumber);
+      });
+      
+      const status = matchingDevice?.status || cpe.status || 'unknown';
+      const uptimePercent = status === 'online' ? 100 : (status === 'offline' ? 0 : 0);
+      
+      // Update in place
+      cpe.status = status;
+      cpe.uptimePercent = uptimePercent;
+      
+      return {
+        id: String(cpe.id || cpe._id),
+        status: status,
+        uptimePercent: uptimePercent
+      };
+    });
+    
+    // Use the new updateUptimeStatus method to update only colors
+    mapComponent.updateUptimeStatus({
+      towers: towerUpdates,
+      sectors: sectorUpdates,
+      equipment: equipmentUpdates,
+      cpeDevices: cpeUpdates
+    });
   }
   
   // Handle refreshData event from parent - reload sites when data refreshes

@@ -506,14 +506,6 @@ export class CoverageMapController {
   }
 
   public setData(data: CoverageMapData): void {
-    console.log('[CoverageMap] setData called:', {
-      towersCount: data.towers?.length || 0,
-      sectorsCount: data.sectors?.length || 0,
-      cpeCount: data.cpeDevices?.length || 0,
-      equipmentCount: data.equipment?.length || 0,
-      mapReady: this.mapReady
-    });
-    
     const newData = {
       towers: data.towers || [],
       sectors: data.sectors || [],
@@ -524,6 +516,24 @@ export class CoverageMapController {
     // Check if this is a structural change (items added/removed) or just status updates
     const newDataHash = this.getDataStructureHash(newData);
     const isStructuralChange = newDataHash !== this.lastDataHash;
+    
+    // If structure hasn't changed, check if status/uptime actually changed
+    if (!isStructuralChange && this.lastDataHash) {
+      const statusChanged = this.hasStatusChanged(newData, this.data);
+      if (!statusChanged) {
+        // No structural or status changes - skip update entirely
+        return;
+      }
+    }
+    
+    console.log('[CoverageMap] setData called:', {
+      towersCount: newData.towers?.length || 0,
+      sectorsCount: newData.sectors?.length || 0,
+      cpeCount: newData.cpeDevices?.length || 0,
+      equipmentCount: newData.equipment?.length || 0,
+      mapReady: this.mapReady,
+      isStructuralChange
+    });
     
     this.data = newData;
     this.lastDataHash = newDataHash;
@@ -547,6 +557,254 @@ export class CoverageMapController {
       }
     } else {
       console.log('[CoverageMap] Map not ready yet, data stored for later rendering');
+    }
+  }
+  
+  // Check if status/uptime has changed between old and new data
+  private hasStatusChanged(newData: CoverageMapData, oldData: CoverageMapData): boolean {
+    // Check towers
+    if (newData.towers?.length !== oldData.towers?.length) return true;
+    for (let i = 0; i < (newData.towers?.length || 0); i++) {
+      const newTower = newData.towers[i];
+      const oldTower = oldData.towers.find(t => String(t.id || t._id) === String(newTower.id || newTower._id));
+      if (!oldTower) return true;
+      if (newTower.status !== oldTower.status || 
+          newTower.uptimePercent !== oldTower.uptimePercent) {
+        return true;
+      }
+    }
+    
+    // Check sectors
+    if (newData.sectors?.length !== oldData.sectors?.length) return true;
+    for (let i = 0; i < (newData.sectors?.length || 0); i++) {
+      const newSector = newData.sectors[i];
+      const oldSector = oldData.sectors.find(s => String(s.id || s._id) === String(newSector.id || newSector._id));
+      if (!oldSector) return true;
+      if (newSector.status !== oldSector.status || 
+          newSector.uptimePercent !== oldSector.uptimePercent) {
+        return true;
+      }
+    }
+    
+    // Check CPE
+    if (newData.cpeDevices?.length !== oldData.cpeDevices?.length) return true;
+    for (let i = 0; i < (newData.cpeDevices?.length || 0); i++) {
+      const newCPE = newData.cpeDevices[i];
+      const oldCPE = oldData.cpeDevices.find(c => String(c.id || c._id) === String(newCPE.id || newCPE._id));
+      if (!oldCPE) return true;
+      if (newCPE.status !== oldCPE.status || 
+          newCPE.uptimePercent !== oldCPE.uptimePercent) {
+        return true;
+      }
+    }
+    
+    // Check equipment
+    if (newData.equipment?.length !== oldData.equipment?.length) return true;
+    for (let i = 0; i < (newData.equipment?.length || 0); i++) {
+      const newEquip = newData.equipment[i];
+      const oldEquip = oldData.equipment.find(e => String(e.id || e._id) === String(newEquip.id || newEquip._id));
+      if (!oldEquip) return true;
+      if (newEquip.status !== oldEquip.status || 
+          newEquip.uptimePercent !== oldEquip.uptimePercent) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  // Public method to update only status/uptime without full data refresh
+  public updateUptimeStatus(updates: {
+    towers?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    sectors?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    cpeDevices?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    equipment?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+  }): void {
+    if (!this.mapReady || !this.graphicsLayer) {
+      return;
+    }
+    
+    console.log('[CoverageMap] updateUptimeStatus called, updating colors only');
+    this.updateGraphicsIncrementalFromUpdates(updates).catch(err => {
+      console.error('[CoverageMap] Error updating uptime status:', err);
+    });
+  }
+  
+  // Update graphics from status updates only
+  private async updateGraphicsIncrementalFromUpdates(updates: {
+    towers?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    sectors?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    cpeDevices?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+    equipment?: Array<{ id: string, status?: string, uptimePercent?: number }>;
+  }): Promise<void> {
+    if (!this.graphicsLayer || !this.mapView) return;
+    
+    try {
+      const [
+        { default: SimpleMarkerSymbol },
+        { default: SimpleFillSymbol },
+        { default: PictureMarkerSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/SimpleFillSymbol.js'),
+        import('@arcgis/core/symbols/PictureMarkerSymbol.js')
+      ]);
+      
+      let updatedCount = 0;
+      const isMobile = window.innerWidth <= 768;
+      const iconSize = isMobile ? 48 : 40;
+      const symbolSize = isMobile ? '28px' : '20px';
+      const outlineWidth = isMobile ? 4 : 3;
+      
+      // Update towers
+      if (updates.towers) {
+        for (const update of updates.towers) {
+          const graphicId = `tower-${update.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            // Find full tower data to get type
+            const tower = this.data.towers.find(t => String(t.id || t._id) === update.id);
+            if (tower) {
+              let towerType: string;
+              if (Array.isArray(tower.type)) {
+                const preferredTypes = ['noc', 'warehouse', 'vehicle', 'rma', 'vendor', 'internet-access', 'internet'];
+                const preferredType = tower.type.find((t: string) => preferredTypes.includes(t));
+                towerType = preferredType || tower.type[0] || 'tower';
+              } else {
+                towerType = tower.type || 'tower';
+              }
+              
+              const status = update.status || tower.status;
+              let symbol;
+              const customIcon = createLocationIcon(towerType, iconSize);
+              
+              if (customIcon) {
+                symbol = new PictureMarkerSymbol(customIcon);
+              } else {
+                const color = getTowerColor(towerType, status);
+                symbol = new SimpleMarkerSymbol({
+                  style: 'circle',
+                  color: color,
+                  size: symbolSize,
+                  outline: {
+                    color: 'white',
+                    width: outlineWidth
+                  }
+                });
+              }
+              
+              graphic.symbol = symbol;
+              graphic.attributes = {
+                ...graphic.attributes,
+                status: status,
+                uptimePercent: update.uptimePercent ?? tower.uptimePercent
+              };
+              updatedCount++;
+            }
+          }
+        }
+      }
+      
+      // Update sectors
+      if (updates.sectors) {
+        for (const update of updates.sectors) {
+          const graphicId = `sector-${update.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const sector = this.data.sectors.find(s => String(s.id || s._id) === update.id);
+            if (sector) {
+              const color = getBandColor(sector.band || sector.technology);
+              const rgbaColor = hexToRgb(color);
+              const transparentColor = [...rgbaColor, 0.3];
+              
+              const symbol = new SimpleFillSymbol({
+                style: 'solid',
+                color: transparentColor,
+                outline: {
+                  color: color,
+                  width: 1
+                }
+              });
+              
+              graphic.symbol = symbol;
+              graphic.attributes = {
+                ...graphic.attributes,
+                status: update.status ?? sector.status,
+                uptimePercent: update.uptimePercent ?? sector.uptimePercent
+              };
+              updatedCount++;
+            }
+          }
+        }
+      }
+      
+      // Update CPE
+      if (updates.cpeDevices) {
+        for (const update of updates.cpeDevices) {
+          const graphicId = `cpe-${update.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const status = update.status;
+            const color = status === 'online' ? '#10b981' : '#ef4444';
+            const fillSymbol = new SimpleFillSymbol({
+              color: [...hexToRgb(color), 0.5],
+              outline: {
+                color: color,
+                width: 1
+              }
+            });
+            
+            graphic.symbol = fillSymbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              status: status,
+              uptimePercent: update.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update equipment
+      if (updates.equipment) {
+        for (const update of updates.equipment) {
+          const graphicId = `equipment-${update.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const status = update.status;
+            const color = getEquipmentColor(status);
+            const symbolSize = isMobile ? '16px' : '12px';
+            const outlineWidth = isMobile ? 2 : 1;
+            
+            const symbol = new SimpleMarkerSymbol({
+              style: 'circle',
+              color: color,
+              size: symbolSize,
+              outline: {
+                color: 'white',
+                width: outlineWidth
+              }
+            });
+            
+            graphic.symbol = symbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              status: status,
+              uptimePercent: update.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      console.log(`[CoverageMap] ✅ Updated ${updatedCount} graphics with new status/uptime`);
+    } catch (error) {
+      console.error('[CoverageMap] Error updating graphics from status updates:', error);
+      throw error;
     }
   }
   
@@ -2064,170 +2322,30 @@ export class CoverageMapController {
         lon: t.location?.longitude
       })) || [];
       
-  // Incremental update method - only updates symbols for existing graphics
-  private async updateGraphicsIncremental(): Promise<void> {
-    if (!this.graphicsLayer || !this.mapView) {
-      console.warn('[CoverageMap] updateGraphicsIncremental called but map not ready');
-      return;
-    }
-    
-    console.log('[CoverageMap] Starting incremental update');
-    
-    try {
-      const [
-        { default: SimpleMarkerSymbol },
-        { default: PictureMarkerSymbol }
-      ] = await Promise.all([
-        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
-        import('@arcgis/core/symbols/PictureMarkerSymbol.js')
-      ]);
-      
-      let updatedCount = 0;
-      const isMobile = window.innerWidth <= 768;
-      const iconSize = isMobile ? 48 : 40;
-      const symbolSize = isMobile ? '28px' : '20px';
-      const outlineWidth = isMobile ? 4 : 3;
-      
-      // Update tower graphics
-      if (this.filters.showTowers && Array.isArray(this.data.towers)) {
-        for (const tower of this.data.towers) {
-          const graphicId = `tower-${tower.id}`;
-          const graphic = this.graphicsMap.get(graphicId);
-          
-          if (graphic) {
-            // Update symbol based on status
-            let towerType: string;
-            if (Array.isArray(tower.type)) {
-              const preferredTypes = ['noc', 'warehouse', 'vehicle', 'rma', 'vendor', 'internet-access', 'internet'];
-              const preferredType = tower.type.find((t: string) => preferredTypes.includes(t));
-              towerType = preferredType || tower.type[0] || 'tower';
-            } else {
-              towerType = tower.type || 'tower';
-            }
-            
-            let symbol;
-            const customIcon = createLocationIcon(towerType, iconSize);
-            
-            if (customIcon) {
-              symbol = new PictureMarkerSymbol(customIcon);
-            } else {
-              const color = getTowerColor(towerType, tower.status);
-              symbol = new SimpleMarkerSymbol({
-                style: 'circle',
-                color: color,
-                size: symbolSize,
-                outline: {
-                  color: 'white',
-                  width: outlineWidth
-                }
-              });
-            }
-            
-            graphic.symbol = symbol;
-            // Update attributes
-            graphic.attributes = {
-              ...graphic.attributes,
-              ...tower,
-              status: tower.status
-            };
-            updatedCount++;
-          }
-        }
-      }
-      
-      // Update sector graphics
-      if (this.filters.showSectors && Array.isArray(this.data.sectors)) {
-        for (const sector of this.data.sectors) {
-          const graphicId = `sector-${sector.id}`;
-          const graphic = this.graphicsMap.get(graphicId);
-          
-          if (graphic) {
-            const color = getSectorColor(sector.status, sector.uptimePercent);
-            const symbol = new SimpleFillSymbol({
-              style: 'solid',
-              color: color,
-              outline: {
-                color: 'white',
-                width: 2
-              }
-            });
-            
-            graphic.symbol = symbol;
-            graphic.attributes = {
-              ...graphic.attributes,
-              ...sector,
-              status: sector.status,
-              uptimePercent: sector.uptimePercent
-            };
-            updatedCount++;
-          }
-        }
-      }
-      
-      // Update CPE graphics
-      if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
-        for (const cpe of this.data.cpeDevices) {
-          const graphicId = `cpe-${cpe.id}`;
-          const graphic = this.graphicsMap.get(graphicId);
-          
-          if (graphic) {
-            const color = getCPEColor(cpe.status, cpe.uptimePercent);
-            const symbol = new SimpleMarkerSymbol({
-              style: 'square',
-              color: color,
-              size: '12px',
-              outline: {
-                color: 'white',
-                width: 1
-              }
-            });
-            
-            graphic.symbol = symbol;
-            graphic.attributes = {
-              ...graphic.attributes,
-              ...cpe,
-              status: cpe.status,
-              uptimePercent: cpe.uptimePercent
-            };
-            updatedCount++;
-          }
-        }
-      }
-      
-      // Update equipment graphics
-      if (this.filters.showEquipment && Array.isArray(this.data.equipment)) {
-        for (const equip of this.data.equipment) {
-          const graphicId = `equipment-${equip.id}`;
-          const graphic = this.graphicsMap.get(graphicId);
-          
-          if (graphic) {
-            const color = getEquipmentColor(equip.status, equip.uptimePercent);
-            const symbol = new SimpleMarkerSymbol({
-              style: 'diamond',
-              color: color,
-              size: '14px',
-              outline: {
-                color: 'white',
-                width: 1
-              }
-            });
-            
-            graphic.symbol = symbol;
-            graphic.attributes = {
-              ...graphic.attributes,
-              ...equip,
-              status: equip.status,
-              uptimePercent: equip.uptimePercent
-            };
-            updatedCount++;
-          }
-        }
-      }
-      
-      console.log(`[CoverageMap] ✅ Incrementally updated ${updatedCount} graphics`);
-    } catch (error) {
-      console.error('[CoverageMap] Error in incremental update:', error);
-      throw error;
+      console.log(`[CoverageMap] ✅ Rendered ${graphicsCount} graphics on map`, {
+        totalGraphics: graphicsCount,
+        dataCounts: {
+          towers: towersCount,
+          towersWithLocation: towersWithLocation,
+          sectors: sectorsCount,
+          cpe: cpeCount,
+          equipment: equipmentCount
+        },
+        sampleTowers: sampleTowers,
+        filters: {
+          showTowers: this.filters.showTowers,
+          showSectors: this.filters.showSectors,
+          showCPE: this.filters.showCPE,
+          showEquipment: this.filters.showEquipment
+        },
+        mapReady: this.mapReady,
+        hasGraphicsLayer: !!this.graphicsLayer,
+        hasMapView: !!this.mapView,
+        graphicsLayerGraphicsCount: this.graphicsLayer?.graphics?.length
+      });
+    } catch (err) {
+      console.error('Failed to render assets:', err);
+      console.error('Error details:', err);
     }
   }
 
@@ -2311,7 +2429,7 @@ export class CoverageMapController {
           const graphic = this.graphicsMap.get(graphicId);
           
           if (graphic) {
-            // Get color based on status/uptime
+            // Get color based on band/technology (same as full render)
             const color = getBandColor(sector.band || sector.technology);
             const rgbaColor = hexToRgb(color);
             const transparentColor = [...rgbaColor, 0.3];
@@ -2320,8 +2438,8 @@ export class CoverageMapController {
               style: 'solid',
               color: transparentColor,
               outline: {
-                color: 'white',
-                width: 2
+                color: color,
+                width: 1
               }
             });
             
@@ -2344,11 +2462,12 @@ export class CoverageMapController {
           const graphic = this.graphicsMap.get(graphicId);
           
           if (graphic) {
+            // CPE uses fill symbol (polygon) - same logic as full render
             const color = cpe.status === 'online' ? '#10b981' : '#ef4444';
             const fillSymbol = new SimpleFillSymbol({
               color: [...hexToRgb(color), 0.5],
               outline: {
-                color: 'white',
+                color: color,
                 width: 1
               }
             });
@@ -2372,6 +2491,7 @@ export class CoverageMapController {
           const graphic = this.graphicsMap.get(graphicId);
           
           if (graphic) {
+            // Equipment uses marker symbol - same logic as full render
             const color = getEquipmentColor(equip.status);
             const symbolSize = isMobile ? '16px' : '12px';
             const outlineWidth = isMobile ? 2 : 1;
@@ -2405,7 +2525,6 @@ export class CoverageMapController {
     }
   }
 
-      console.log(`[CoverageMap] ✅ Rendered ${graphicsCount} graphics on map`, {
         totalGraphics: graphicsCount,
         dataCounts: {
           towers: towersCount,
@@ -2431,6 +2550,9 @@ export class CoverageMapController {
       console.error('Error details:', err);
     }
   }
+
+  // Incremental update method - only updates symbols for existing graphics
+  private async updateGraphicsIncremental(): Promise<void> {
 
   private async renderMarketingLeads(): Promise<void> {
     if (!this.marketingLayer || !this.mapView) return;
