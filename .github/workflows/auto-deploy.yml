@@ -3,24 +3,7 @@ name: Auto Deploy WISPTools.io Platform
 on:
   push:
     branches: [ main, master ]
-    paths:
-      # Cloud Functions changes
-      - 'functions/**'
-      # Frontend changes
-      - 'Module_Manager/src/**'
-      - 'Module_Manager/src/routes/**'
-      - 'Module_Manager/src/lib/**'
-      - 'Module_Manager/src/routes/modules/**'
-      - 'Module_Manager/src/routes/modules/coverage-map/**'
-      - 'Module_Manager/package.json'
-      - 'Module_Manager/package-lock.json'
-      - 'Module_Manager/vite.config.ts'
-      - 'Module_Manager/svelte.config.js'
-      # Firestore rules changes
-      - 'firestore.rules'
-      - 'firestore.indexes.json'
-      # Firebase config changes
-      - 'firebase.json'
+    # Always run on push to main/master - let jobs decide what to deploy based on changed files
   workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
 
 env:
@@ -105,37 +88,12 @@ jobs:
             - 'Module_Manager/svelte.config.*'
             - 'Module_Manager/tsconfig.json'
             - 'firebase.json'
-          backend:
-            - 'backend-services/**'
-            - 'gce-backend/**'
-            - 'distributed-epc/**'
-            - 'hss-module/**'
-            - 'genieacs-cloudrun/**'
-            - 'genieacs-fork/**'
-            - 'scripts/**'
-            - 'deploy*.sh'
-            - '*.sh'
     
     - name: Skip if no frontend changes (unless manual trigger)
       if: steps.changes.outputs.frontend == 'false' && github.event_name != 'workflow_dispatch'
       run: |
         echo "⏭️ No frontend changes detected, skipping frontend deployment"
-        echo "Backend-only changes will not trigger frontend deployment"
-        echo "To force deployment, use 'workflow_dispatch' from Actions tab"
         exit 0
-    
-    - name: Skip if only backend changes (unless manual trigger)
-      if: steps.changes.outputs.frontend == 'false' && steps.changes.outputs.backend == 'true' && github.event_name != 'workflow_dispatch'
-      run: |
-        echo "⏭️ Only backend changes detected - skipping frontend deployment"
-        echo "Frontend will only deploy when frontend files are changed"
-        echo "To force deployment, use 'workflow_dispatch' from Actions tab"
-        exit 0
-    
-    - name: Force deployment on manual trigger
-      if: github.event_name == 'workflow_dispatch'
-      run: |
-        echo "🔧 Manual trigger detected - forcing frontend deployment"
     
     - name: Setup Node.js
       if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
