@@ -128,6 +128,7 @@ app.use('/api/agent', require('./routes/agent'));
 
 // EPC Check-in routes - MUST be defined BEFORE /api/epc routes (no tenant ID required)
 app.use('/api/epc', require('./routes/epc-checkin'));
+app.use('/api/epc', require('./routes/epcMetrics'));
 
 // EPC routes with tenant requirement
 app.use('/api/epc', require('./routes/epc'));

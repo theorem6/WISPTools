@@ -11,6 +11,7 @@
   import { loadCPEDevices, syncCPEDevices as syncCPEDevicesService } from './lib/cpeDataService';
   import { syncACSCPEToInventory } from '$lib/services/acsInventorySync';
   import ACSSetupWizard from '$lib/components/wizards/ACSSetupWizard.svelte';
+  import CPEPerformanceModal from './components/CPEPerformanceModal.svelte';
   
   // Module data
   let moduleData = {
@@ -644,37 +645,12 @@
     </div>
   </div>
 
-  <!-- CPE Performance Modal Placeholder -->
-  {#if showPerformanceModal && selectedCPE}
-      <div class="modal-overlay" onclick={closePerformanceModal}>
-        <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-          <div class="modal-header">
-            <h3>CPE Performance Data</h3>
-            <button class="modal-close" onclick={closePerformanceModal}>✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="cpe-info">
-            <h4>{selectedCPE.manufacturer} - {selectedCPE.id}</h4>
-            <p><strong>Status:</strong> {selectedCPE.status}</p>
-            <p><strong>Last Contact:</strong> {selectedCPE.lastContact ? new Date(selectedCPE.lastContact).toLocaleString() : 'Unknown'}</p>
-            {#if selectedCPE.location}
-              <p><strong>Location:</strong> {selectedCPE.location.latitude.toFixed(4)}, {selectedCPE.location.longitude.toFixed(4)}</p>
-            {/if}
-          </div>
-          <div class="performance-placeholder">
-            <div class="placeholder-icon">📊</div>
-            <h4>Performance Analytics Coming Soon</h4>
-            <p>Real-time performance metrics and historical data visualization will be available here.</p>
-            <div class="metrics-preview">
-              <div class="metric">Signal Strength: -45 dBm</div>
-              <div class="metric">Data Usage: 2.3 GB</div>
-              <div class="metric">Uptime: 99.2%</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  {/if}
+  <!-- CPE Performance Modal -->
+  <CPEPerformanceModal
+    device={selectedCPE}
+    show={showPerformanceModal}
+    on:close={closePerformanceModal}
+  />
   
   <!-- Help Modal -->
   <HelpModal 

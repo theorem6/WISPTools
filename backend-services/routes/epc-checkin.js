@@ -172,10 +172,8 @@ router.post('/checkin', async (req, res) => {
         }
         
         if (shouldCreateNew) {
-          // Generate and queue update command (with optional apt packages)
-          // TODO: Add apt_packages from config if needed
           const updateCommand = generateUpdateCommand(updateInfo, {
-            apt_packages: [] // Can be populated from EPC config in future
+            apt_packages: Array.isArray(epc.apt_config?.packages) ? epc.apt_config.packages : []
           });
           
           if (updateCommand) {

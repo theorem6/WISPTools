@@ -85,7 +85,8 @@ const RemoteEPCSchema = new mongoose.Schema({
   apt_config: {
     customRepoUrl: String,
     gpgKeyUrl: String,
-    updateSchedule: { type: String, default: 'daily' }
+    updateSchedule: { type: String, default: 'daily' },
+    packages: [String]
   },
   
   // Connection Status

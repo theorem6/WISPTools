@@ -23,6 +23,7 @@
     { id: 'welcome', title: 'Welcome', icon: '📊' },
     { id: 'snmp', title: 'SNMP Setup', icon: '🔧' },
     { id: 'mikrotik', title: 'MikroTik (Optional)', icon: '📡' },
+    { id: 'acs', title: 'ACS (TR-069)', icon: '🛰️' },
     { id: 'complete', title: 'Complete!', icon: '🎉' }
   ];
   
@@ -32,9 +33,20 @@
   let mikrotikEnabled = false;
   let mikrotikUsername = '';
   let mikrotikPassword = '';
+  let genieacsUrl = '';
+  let genieacsApiUrl = '';
+  let acsLoaded = false;
 
   $: if (show && autoStart) {
     currentStep = 0;
+  }
+
+  $: if (show && $currentTenant?.cwmpUrl && genieacsUrl !== $currentTenant.cwmpUrl) {
+    genieacsUrl = $currentTenant.cwmpUrl;
+  }
+
+  $: if (show && !acsLoaded) {
+    loadAcsConfiguration();
   }
   
   function handleClose() {
@@ -63,6 +75,16 @@
       error = 'No tenant selected';
       return;
     }
+
+    if (!genieacsUrl.trim()) {
+      error = 'Tenant ACS URL is missing. Please contact support.';
+      return;
+    }
+
+    if (!genieacsApiUrl.trim()) {
+      error = 'GenieACS NBI API URL is required';
+      return;
+    }
     
     isLoading = true;
     error = '';
@@ -85,7 +107,26 @@
         throw new Error(data?.error || data?.message || 'Failed to save SNMP configuration');
       }
 
-      success = 'SNMP configuration saved successfully!';
+      const normalizedCwmpUrl = genieacsUrl.trim().replace(/\/$/, '');
+      const normalizedNbiUrl = genieacsApiUrl.trim().replace(/\/$/, '');
+
+      const acsResponse = await fetch('/api/tr069/configuration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
+        body: JSON.stringify({
+          genieacsUrl: normalizedCwmpUrl,
+          genieacsApiUrl: normalizedNbiUrl
+        })
+      });
+      const acsData = await acsResponse.json();
+      if (!acsResponse.ok || acsData?.success === false) {
+        throw new Error(acsData?.error || acsData?.message || 'Failed to save ACS configuration');
+      }
+
+      success = 'Monitoring configuration saved successfully!';
       
       // Move to completion step
       setTimeout(() => {
@@ -101,6 +142,29 @@
   function completeSetup() {
     dispatch('complete');
     handleClose();
+  }
+
+  async function loadAcsConfiguration() {
+    const tenantId = $currentTenant?.id;
+    if (!tenantId) return;
+
+    try {
+      const response = await fetch('/api/tr069/configuration', {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data?.config) {
+        genieacsUrl = $currentTenant?.cwmpUrl || data.config.genieacsUrl || genieacsUrl;
+        genieacsApiUrl = data.config.genieacsApiUrl || genieacsApiUrl;
+      }
+      acsLoaded = true;
+    } catch (err) {
+      console.warn('[MonitoringSetupWizard] Failed to load ACS configuration', err);
+      acsLoaded = true;
+    }
   }
 </script>
 
@@ -155,12 +219,13 @@
                 <ul>
                   <li>✅ SNMP credentials for device polling</li>
                   <li>✅ MikroTik device credentials (optional)</li>
+                  <li>✅ ACS (TR-069) endpoints for CPE management</li>
                   <li>✅ Ping monitoring (automatic)</li>
                 </ul>
               </div>
               
               <div class="setup-time">
-                <strong>⏱️ Estimated time:</strong> 3-5 minutes
+                <strong>⏱️ Estimated time:</strong> 5-7 minutes
               </div>
             </div>
           </div>
@@ -261,6 +326,52 @@
           </div>
           
         {:else if currentStep === 3}
+          <!-- ACS Setup Step -->
+          <div class="wizard-panel">
+            <h3>ACS (TR-069) Configuration</h3>
+            <p>Use your tenant's ACS endpoint and provide the GenieACS NBI API URL.</p>
+            
+            <div class="form-group">
+              <label>
+                Tenant ACS URL <span class="required">*</span>
+              </label>
+              <div class="form-input" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="flex: 1; word-break: break-all;">{genieacsUrl || 'Not available'}</span>
+                {#if genieacsUrl}
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    style="padding: 0.35rem 0.75rem; font-size: 0.75rem;"
+                    on:click={() => navigator.clipboard?.writeText(genieacsUrl)}
+                  >
+                    Copy
+                  </button>
+                {/if}
+              </div>
+              <small class="form-hint">This is generated automatically per tenant during setup.</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="genieacs-api-url">
+                GenieACS NBI API URL <span class="required">*</span>
+              </label>
+              <input
+                id="genieacs-api-url"
+                type="text"
+                bind:value={genieacsApiUrl}
+                placeholder="http://your-acs-server:7557"
+                class="form-input"
+                disabled={isLoading}
+              />
+              <small class="form-hint">NBI API base URL used for device actions and metrics</small>
+            </div>
+            
+            <div class="info-card">
+              <p><strong>💡 Tip:</strong> Keep your NBI URL pointing at the GenieACS server (default port 7557).</p>
+            </div>
+          </div>
+          
+        {:else if currentStep === 4}
           <!-- Complete Step -->
           <div class="wizard-panel">
             <h3>🎉 Monitoring Setup Complete!</h3>
@@ -307,7 +418,7 @@
         {/if}
         
         <div class="footer-actions">
-          {#if currentStep === 2}
+        {#if currentStep === 3}
             <button class="btn-primary" on:click={saveConfiguration} disabled={isLoading}>
               {isLoading ? 'Saving...' : 'Save & Complete →'}
             </button>
@@ -506,10 +617,6 @@
   .btn-secondary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
-  
-  .info-box, .setup-requirements, .setup-time, .info-section, .form-group, .form-input, .form-hint, .info-card, .next-steps, .next-step-item, .alert {
-    /* Styles match CBRSSetupWizard - see that file for complete styles */
   }
   
 </style>

@@ -22,6 +22,7 @@ const router = express.Router();
 const paypalClientId = process.env.PAYPAL_CLIENT_ID;
 const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET;
 const paypalEnv = process.env.PAYPAL_ENVIRONMENT || 'sandbox';
+const paypalWebhookId = process.env.PAYPAL_WEBHOOK_ID;
 
 if (!paypalClientId || !paypalClientSecret) {
   console.error('? PayPal credentials not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in environment variables.');
@@ -35,6 +36,70 @@ const environment = paypalClientId && paypalClientSecret
   : null;
 
 const client = environment ? new paypal.core.PayPalHttpClient(environment) : null;
+
+const getPayPalBaseUrl = () => (
+  paypalEnv === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com'
+);
+
+async function getPayPalAccessToken() {
+  if (!paypalClientId || !paypalClientSecret) {
+    throw new Error('PayPal credentials not configured');
+  }
+  const auth = Buffer.from(`${paypalClientId}:${paypalClientSecret}`).toString('base64');
+  const response = await axios.post(
+    `${getPayPalBaseUrl()}/v1/oauth2/token`,
+    'grant_type=client_credentials',
+    {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    }
+  );
+  return response.data.access_token;
+}
+
+async function verifyPayPalWebhook(event, headers) {
+  if (!paypalWebhookId) {
+    return { verified: false, skipped: true, reason: 'PAYPAL_WEBHOOK_ID not configured' };
+  }
+  const requiredHeaders = {
+    transmissionId: headers['paypal-transmission-id'],
+    transmissionTime: headers['paypal-transmission-time'],
+    transmissionSig: headers['paypal-transmission-sig'],
+    certUrl: headers['paypal-cert-url'],
+    authAlgo: headers['paypal-auth-algo']
+  };
+  if (!requiredHeaders.transmissionId || !requiredHeaders.transmissionTime || !requiredHeaders.transmissionSig || !requiredHeaders.certUrl || !requiredHeaders.authAlgo) {
+    return { verified: false, skipped: true, reason: 'Missing PayPal signature headers' };
+  }
+
+  const accessToken = await getPayPalAccessToken();
+  const response = await axios.post(
+    `${getPayPalBaseUrl()}/v1/notifications/verify-webhook-signature`,
+    {
+      auth_algo: requiredHeaders.authAlgo,
+      cert_url: requiredHeaders.certUrl,
+      transmission_id: requiredHeaders.transmissionId,
+      transmission_sig: requiredHeaders.transmissionSig,
+      transmission_time: requiredHeaders.transmissionTime,
+      webhook_id: paypalWebhookId,
+      webhook_event: event
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  return {
+    verified: response.data?.verification_status === 'SUCCESS',
+    skipped: false,
+    status: response.data?.verification_status
+  };
+}
 
 /**
  * Authentication and Authorization Middleware
@@ -168,16 +233,22 @@ router.post('/webhook/paypal', express.raw({ type: 'application/json' }), async 
   try {
     // Parse JSON from raw body
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    
-    // TODO: Implement PayPal webhook signature verification for production
-    // For now, log the webhook for debugging
+
+    const verification = await verifyPayPalWebhook(event, req.headers);
+    if (!verification.skipped && !verification.verified) {
+      console.warn('❌ PayPal webhook verification failed', { status: verification.status });
+      return res.status(400).json({ error: 'Invalid PayPal webhook signature' });
+    }
+
+    if (verification.skipped) {
+      console.warn(`⚠️ PayPal webhook verification skipped: ${verification.reason}`);
+    }
+
     console.log(`?? PayPal webhook received: ${event.event_type}`, {
       id: event.id,
       resource_type: event.resource_type,
       summary: event.summary
     });
-    
-    // TODO: Verify webhook signature (implement PayPal webhook verification)
     
     switch (event.event_type) {
       case 'BILLING.SUBSCRIPTION.ACTIVATED':

@@ -386,6 +386,13 @@
                   </div>
                 {/if}
                 
+                {#if customer.serviceType}
+                  <div class="detail-row">
+                    <span class="detail-icon">📶</span>
+                    <span>Service Type: {customer.serviceType}</span>
+                  </div>
+                {/if}
+                
                 {#if customer.networkInfo?.imsi}
                   <div class="detail-row">
                     <span class="detail-icon">🔢</span>

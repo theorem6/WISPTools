@@ -37,6 +37,7 @@ export interface Customer {
   serviceType?: '4G/5G' | 'FWA' | 'WiFi' | 'Fiber';
   groupId?: string;
   servicePlan?: {
+    planId?: string;
     planName?: string;
     downloadMbps?: number;
     uploadMbps?: number;

@@ -11,6 +11,7 @@
 
 const { admin, auth, firestore } = require('../config/firebase');
 const { UserTenant } = require('../models/user');
+const { Tenant } = require('../models/tenant');
 const { 
   determineRoleFromEmail, 
   getCreatableRoles, 
@@ -351,9 +352,21 @@ function isPlatformAdmin(email) {
  */
 async function getModuleAccess(role, tenantId) {
   try {
-    // For now, just return default access
-    // TODO: Implement tenant-specific module config in MongoDB if needed
-    return DEFAULT_MODULE_ACCESS[role] || {};
+    const baseAccess = { ...(DEFAULT_MODULE_ACCESS[role] || {}) };
+    if (!tenantId) {
+      return baseAccess;
+    }
+
+    const tenant = await Tenant.findById(tenantId).lean();
+    const features = tenant?.settings?.features || {};
+
+    if (features.acs === false) baseAccess.acsManagement = false;
+    if (features.hss === false) baseAccess.hssManagement = false;
+    if (features.pci === false) baseAccess.pciResolution = false;
+    if (features.helpDesk === false) baseAccess.helpDesk = false;
+    if (features.userManagement === false) baseAccess.userManagement = false;
+
+    return baseAccess;
   } catch (error) {
     console.error('Error getting module access:', error);
     return DEFAULT_MODULE_ACCESS[role] || {};

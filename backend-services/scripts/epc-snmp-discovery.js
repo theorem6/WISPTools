@@ -38,12 +38,13 @@ const execAsync = promisify(exec);
 // OUI (Organizationally Unique Identifier) Lookup Utility (Embedded)
 // Used to identify device manufacturers from MAC addresses
 // ============================================================================
-const MIKROTIK_OUIS = [
+let ouiLookup = null;
+let MIKROTIK_OUIS = [
   '00:0C:42', '4C:5E:0C', 'D4:CA:6D', 'E4:8D:8C', '48:8F:5A', 'A4:BA:DB',
   'C4:AD:34', 'CC:2D:E0', 'F4:EC:38', 'FC:2A:54', 'FC:C2:3D'
 ];
 
-const COMMON_NETWORK_OUIS = {
+let COMMON_NETWORK_OUIS = {
   '00:0C:42': 'Mikrotik', '4C:5E:0C': 'Mikrotik', 'D4:CA:6D': 'Mikrotik',
   'E4:8D:8C': 'Mikrotik', '48:8F:5A': 'Mikrotik', 'A4:BA:DB': 'Mikrotik',
   'C4:AD:34': 'Mikrotik', 'CC:2D:E0': 'Mikrotik', 'F4:EC:38': 'Mikrotik',
@@ -140,6 +141,18 @@ const COMMON_NETWORK_OUIS = {
   '00:0C:29': 'VMware', '00:0D:29': 'VMware', '00:50:56': 'VMware'
 };
 
+try {
+  const externalLookup = require('./snmp-discovery/oui-lookup');
+  if (externalLookup?.MIKROTIK_OUIS) {
+    MIKROTIK_OUIS = externalLookup.MIKROTIK_OUIS;
+  }
+  if (externalLookup?.COMMON_NETWORK_OUIS) {
+    COMMON_NETWORK_OUIS = externalLookup.COMMON_NETWORK_OUIS;
+  }
+} catch (e) {
+  // Fallback to embedded OUI list (standalone mode)
+}
+
 function normalizeMacAddress(mac) {
   if (!mac || typeof mac !== 'string') return null;
   const cleaned = mac.replace(/[-.:\s]/g, '').toUpperCase();
@@ -230,7 +243,7 @@ function detectManufacturerFromInterfaces(interfaces) {
 }
 
 // OUI Lookup utility object
-const ouiLookup = {
+ouiLookup = {
   normalizeMacAddress,
   extractOUI,
   isMikrotikOUI,
@@ -242,15 +255,18 @@ const ouiLookup = {
   COMMON_NETWORK_OUIS
 };
 
+// ============================================================================
+// Configuration Constants
+// ============================================================================
 // Configuration
-const CENTRAL_SERVER = 'hss.wisptools.io';
-const API_URL = `https://${CENTRAL_SERVER}/api/epc`;
-const CONFIG_DIR = '/etc/wisptools';
-const LOG_FILE = '/var/log/wisptools-snmp-discovery.log';
-const SNMP_COMMUNITIES = ['public', 'private', 'community']; // Default fallback
-const SNMP_TIMEOUT = 2000; // 2 seconds
-const MAX_PARALLEL_PINGS = 50;
-const MAX_PARALLEL_SNMP = 20;
+let CENTRAL_SERVER = 'hss.wisptools.io';
+let API_URL = `https://${CENTRAL_SERVER}/api/epc`;
+let CONFIG_DIR = '/etc/wisptools';
+let LOG_FILE = '/var/log/wisptools-snmp-discovery.log';
+let SNMP_COMMUNITIES = ['public', 'private', 'community']; // Default fallback
+let SNMP_TIMEOUT = 2000; // 2 seconds
+let MAX_PARALLEL_PINGS = 50;
+let MAX_PARALLEL_SNMP = 20;
 
 // SNMP configuration from EPC config (loaded at runtime)
 let SNMP_CONFIG = {
@@ -258,8 +274,11 @@ let SNMP_CONFIG = {
   targets: [] // Subnets to scan
 };
 
+// ============================================================================
+// SNMP OID Definitions
+// ============================================================================
 // Mikrotik-specific OIDs
-const MIKROTIK_OIDS = {
+let MIKROTIK_OIDS = {
   identity: '1.3.6.1.4.1.14988.1.1.1.1.1.3.0',
   version: '1.3.6.1.4.1.14988.1.1.1.1.1.4.0',
   serial: '1.3.6.1.4.1.14988.1.1.1.1.1.7.0',
@@ -270,7 +289,7 @@ const MIKROTIK_OIDS = {
 };
 
 // LLDP (Link Layer Discovery Protocol) OIDs - Standard neighbor discovery
-const LLDP_OIDS = {
+let LLDP_OIDS = {
   lldpLocChassisId: '1.0.8802.1.1.2.1.3.2.0', // Local chassis ID
   lldpRemTable: '1.0.8802.1.1.2.1.4.1', // Remote neighbor table
   lldpRemChassisId: '1.0.8802.1.1.2.1.4.1.1.5', // Remote chassis ID
@@ -281,7 +300,7 @@ const LLDP_OIDS = {
 };
 
 // CDP (Cisco Discovery Protocol) OIDs
-const CDP_OIDS = {
+let CDP_OIDS = {
   cdpGlobalRun: '1.3.6.1.4.1.9.9.23.1.3.1.0', // CDP enabled
   cdpCacheTable: '1.3.6.1.4.1.9.9.23.1.2.1', // CDP cache table
   cdpCacheDeviceId: '1.3.6.1.4.1.9.9.23.1.2.1.1.6', // Device ID
@@ -291,7 +310,7 @@ const CDP_OIDS = {
 };
 
 // Standard SNMP OIDs
-const STD_OIDS = {
+let STD_OIDS = {
   sysDescr: '1.3.6.1.2.1.1.1.0',
   sysObjectID: '1.3.6.1.2.1.1.2.0',
   sysName: '1.3.6.1.2.1.1.5.0',
@@ -301,7 +320,7 @@ const STD_OIDS = {
 };
 
 // Interface MIB OIDs (IF-MIB)
-const IF_MIB_OIDS = {
+let IF_MIB_OIDS = {
   ifNumber: '1.3.6.1.2.1.2.1.0',
   ifTable: '1.3.6.1.2.1.2.2.1', // Interface table
   ifIndex: '1.3.6.1.2.1.2.2.1.1', // Interface index
@@ -319,7 +338,7 @@ const IF_MIB_OIDS = {
 };
 
 // IP MIB OIDs (for ARP and routing)
-const IP_MIB_OIDS = {
+let IP_MIB_OIDS = {
   ipAdEntAddr: '1.3.6.1.2.1.4.20.1.1', // IP address table
   ipAdEntNetMask: '1.3.6.1.2.1.4.20.1.3', // Netmask
   ipAdEntIfIndex: '1.3.6.1.2.1.4.20.1.2', // Interface index for IP
@@ -336,6 +355,83 @@ const IP_MIB_OIDS = {
   ipRouteProto: '1.3.6.1.2.1.4.21.1.9' // Routing protocol
 };
 
+try {
+  const configOverrides = require('./snmp-discovery/config');
+  if (configOverrides?.CENTRAL_SERVER) {
+    CENTRAL_SERVER = configOverrides.CENTRAL_SERVER;
+  }
+  if (configOverrides?.API_URL) {
+    API_URL = configOverrides.API_URL;
+  } else {
+    API_URL = `https://${CENTRAL_SERVER}/api/epc`;
+  }
+  CONFIG_DIR = configOverrides?.CONFIG_DIR || CONFIG_DIR;
+  LOG_FILE = configOverrides?.LOG_FILE || LOG_FILE;
+  SNMP_COMMUNITIES = configOverrides?.SNMP_COMMUNITIES || SNMP_COMMUNITIES;
+  SNMP_TIMEOUT = configOverrides?.SNMP_TIMEOUT || SNMP_TIMEOUT;
+  MAX_PARALLEL_PINGS = configOverrides?.MAX_PARALLEL_PINGS || MAX_PARALLEL_PINGS;
+  MAX_PARALLEL_SNMP = configOverrides?.MAX_PARALLEL_SNMP || MAX_PARALLEL_SNMP;
+  MIKROTIK_OIDS = configOverrides?.MIKROTIK_OIDS || MIKROTIK_OIDS;
+  LLDP_OIDS = configOverrides?.LLDP_OIDS || LLDP_OIDS;
+  CDP_OIDS = configOverrides?.CDP_OIDS || CDP_OIDS;
+  STD_OIDS = configOverrides?.STD_OIDS || STD_OIDS;
+  IF_MIB_OIDS = configOverrides?.IF_MIB_OIDS || IF_MIB_OIDS;
+  IP_MIB_OIDS = configOverrides?.IP_MIB_OIDS || IP_MIB_OIDS;
+} catch (e) {
+  // Fallback to embedded config (standalone mode)
+}
+
+try {
+  const initNetworkHelpers = require('./snmp-discovery/network-helpers');
+  const helpers = initNetworkHelpers({
+    execAsync,
+    os,
+    pingScanner,
+    log,
+    MAX_PARALLEL_PINGS
+  });
+  getNetworkInfo = helpers.getNetworkInfo;
+  pingSweep = helpers.pingSweep;
+  calculateBroadcast = helpers.calculateBroadcast;
+  getNetworkInterfaces = helpers.getNetworkInterfaces;
+} catch (e) {
+  // Fallback to embedded helpers (standalone mode)
+}
+
+try {
+  const initOidWalk = require('./snmp-discovery/oid-walk');
+  const oidHelpers = initOidWalk({
+    snmp,
+    SNMP_TIMEOUT,
+    IF_MIB_OIDS,
+    IP_MIB_OIDS,
+    ouiLookup,
+    log
+  });
+  performOIDWalk = oidHelpers.performOIDWalk;
+  identifyDeviceType = oidHelpers.identifyDeviceType;
+} catch (e) {
+  // Fallback to embedded helpers (standalone mode)
+}
+
+try {
+  const initNeighborDiscovery = require('./snmp-discovery/neighbor-discovery');
+  const neighborHelpers = initNeighborDiscovery({
+    snmp,
+    SNMP_TIMEOUT,
+    LLDP_OIDS,
+    CDP_OIDS,
+    log
+  });
+  getMikrotikNeighbors = neighborHelpers.getMikrotikNeighbors;
+  getNeighborsWithSystemSNMP = neighborHelpers.getNeighborsWithSystemSNMP;
+} catch (e) {
+  // Fallback to embedded helpers (standalone mode)
+}
+
+// ============================================================================
+// Utilities & Local Configuration Loading
+// ============================================================================
 /**
  * Logging utility
  */
@@ -394,6 +490,9 @@ async function getTenantId() {
   return null;
 }
 
+// ============================================================================
+// SNMP Configuration Loading
+// ============================================================================
 /**
  * Load SNMP configuration from EPC config file
  */
@@ -443,6 +542,9 @@ async function loadSNMPConfig() {
   return false; // No config loaded, will use defaults
 }
 
+// ============================================================================
+// Network Discovery Helpers
+// ============================================================================
 /**
  * Get network information
  */
@@ -544,6 +646,9 @@ async function pingSweep(subnet) {
   return filteredIPs;
 }
 
+// ============================================================================
+// SNMP OID Walks & Device Identification
+// ============================================================================
 /**
  * Perform OID walk to collect comprehensive device information
  */
@@ -1004,6 +1109,9 @@ async function getDeviceInfoWithSystemSNMP(ip, community) {
   }
 }
 
+// ============================================================================
+// Neighbor Discovery (LLDP/CDP)
+// ============================================================================
 /**
  * Get Mikrotik neighbors via LLDP or CDP
  * Returns: { neighbors: [], cdp_enabled: boolean, lldp_enabled: boolean, cdp_failed: boolean, lldp_failed: boolean }
@@ -1286,6 +1394,9 @@ async function getNeighborsWithSystemSNMP(ip, community) {
   return result;
 }
 
+// ============================================================================
+// Mikrotik-Specific Queries
+// ============================================================================
 /**
  * Get Mikrotik-specific information
  */
@@ -1462,6 +1573,9 @@ async function getNetworkInterfaces() {
   return activeInterfaces;
 }
 
+// ============================================================================
+// MNDP Discovery (Layer 2 Mikrotik Neighbor Broadcasts)
+// ============================================================================
 /**
  * Discover Mikrotik devices via MNDP (Mikrotik Neighbor Discovery Protocol)
  * MNDP is a Layer 2 broadcast protocol that Mikrotik devices use to announce themselves
@@ -1832,6 +1946,9 @@ async function queryCDPLLDPNeighbors(ips, communities = SNMP_COMMUNITIES) {
   return neighbors;
 }
 
+// ============================================================================
+// Network Scan Orchestration
+// ============================================================================
 /**
  * Scan network for devices (three-phase: CDP/LLDP first, then ping, then SNMP)
  */
@@ -2190,6 +2307,9 @@ async function scanNetwork(subnet, communities = SNMP_COMMUNITIES) {
   return allDevices;
 }
 
+// ============================================================================
+// Reporting
+// ============================================================================
 /**
  * Report discovered devices to server
  */
@@ -2270,6 +2390,9 @@ async function reportDiscoveredDevices(discoveredDevices) {
   });
 }
 
+// ============================================================================
+// Entrypoint
+// ============================================================================
 /**
  * Main function
  */

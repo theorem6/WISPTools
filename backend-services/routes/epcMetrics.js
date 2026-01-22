@@ -5,6 +5,51 @@
 
 const express = require('express');
 const router = express.Router();
+const { RemoteEPC, EPCMetrics, EPCAlert } = require('../models/distributed-epc-schema');
+
+const METRIC_LOOKBACK_MINUTES = 5;
+
+const getAuthToken = (req, bodyAuthCode) => {
+  if (bodyAuthCode) return bodyAuthCode;
+  const headerAuth = req.headers.authorization || '';
+  if (headerAuth.startsWith('Bearer ')) {
+    return headerAuth.slice(7);
+  }
+  return req.headers['x-api-key'] || null;
+};
+
+const normalizeAlertType = (alertType, severity) => {
+  if (!alertType) return 'component_down';
+  if (alertType === 'health') return severity === 'critical' ? 'component_down' : 'high_cpu';
+  if (['offline', 'high_cpu', 'high_memory', 'high_disk', 'component_down', 'no_heartbeat', 'pool_exhausted', 'enb_disconnected'].includes(alertType)) {
+    return alertType;
+  }
+  return 'component_down';
+};
+
+const toNumber = (value, fallback = 0) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const toDate = (value) => {
+  const date = value ? new Date(value) : new Date();
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+};
+
+async function authenticateEPC(req, epcId, tenantId, authToken) {
+  if (!epcId || !tenantId || !authToken) {
+    return null;
+  }
+  return RemoteEPC.findOne({
+    epc_id: epcId,
+    tenant_id: tenantId,
+    $or: [
+      { auth_code: authToken },
+      { api_key: authToken }
+    ]
+  }).lean();
+}
 
 /**
  * Receive metrics from EPC SNMP agent
@@ -21,13 +66,17 @@ router.post('/metrics', async (req, res) => {
       });
     }
     
-    // TODO: Validate authCode against stored EPC credentials
+    const authToken = getAuthToken(req, authCode);
+    const epc = await authenticateEPC(req, epcId, tenantId, authToken);
+    if (!epc) {
+      return res.status(401).json({ error: 'Invalid EPC credentials' });
+    }
     
-    // Process and store metrics
+    const metricTimestamp = toDate(metrics?.timestamp || timestamp);
     const processedMetrics = {
       epcId,
       tenantId,
-      timestamp: timestamp || new Date().toISOString(),
+      timestamp: metricTimestamp,
       receivedAt: new Date().toISOString(),
       
       // System metrics
@@ -67,7 +116,37 @@ router.post('/metrics', async (req, res) => {
       custom: metrics.custom || {}
     };
     
-    // TODO: Store metrics in time-series database (InfluxDB/MongoDB)
+    const metricsRecord = new EPCMetrics({
+      epc_id: epcId,
+      tenant_id: tenantId,
+      timestamp: metricTimestamp,
+      subscribers: {
+        total_connected: toNumber(metrics?.epc?.activeUsers),
+        active_sessions: toNumber(metrics?.epc?.activeSessions)
+      },
+      system: {
+        cpu_percent: toNumber(metrics?.resources?.cpuUsage),
+        memory_percent: toNumber(metrics?.resources?.memoryUsage),
+        disk_percent: toNumber(metrics?.resources?.diskUsage),
+        load_average: Array.isArray(metrics?.resources?.loadAverage)
+          ? metrics.resources.loadAverage.map((value) => toNumber(value))
+          : []
+      }
+    });
+    await metricsRecord.save();
+
+    await RemoteEPC.updateOne(
+      { epc_id: epcId, tenant_id: tenantId },
+      {
+        $set: {
+          status: 'online',
+          last_seen: new Date(),
+          last_heartbeat: new Date(),
+          uptime_seconds: toNumber(metrics?.system?.uptime)
+        }
+      }
+    );
+
     console.log(`[EPC Metrics] Received metrics from EPC ${epcId} (Tenant: ${tenantId})`);
     
     // Emit metrics event for real-time processing
@@ -77,7 +156,18 @@ router.post('/metrics', async (req, res) => {
     const alerts = await checkMetricThresholds(processedMetrics);
     if (alerts.length > 0) {
       console.log(`[EPC Metrics] Generated ${alerts.length} alerts for EPC ${epcId}`);
-      // TODO: Send alerts to monitoring system
+      await EPCAlert.insertMany(alerts.map((alert) => ({
+        tenant_id: tenantId,
+        epc_id: epcId,
+        severity: alert.severity,
+        alert_type: normalizeAlertType(alert.type, alert.severity),
+        message: alert.message,
+        details: {
+          value: alert.value,
+          threshold: alert.threshold,
+          raw_type: alert.type
+        }
+      })));
     }
     
     res.json({
@@ -112,7 +202,11 @@ router.post('/alerts', async (req, res) => {
       });
     }
     
-    // TODO: Validate authCode
+    const authToken = getAuthToken(req, authCode);
+    const epc = await authenticateEPC(req, epcId, tenantId, authToken);
+    if (!epc) {
+      return res.status(401).json({ error: 'Invalid EPC credentials' });
+    }
     
     const alert = {
       epcId,
@@ -125,16 +219,23 @@ router.post('/alerts', async (req, res) => {
       status: 'active'
     };
     
-    // TODO: Store alert in database
+    const alertRecord = new EPCAlert({
+      tenant_id: tenantId,
+      epc_id: epcId,
+      severity: severity === 'critical' ? 'critical' : severity === 'warning' ? 'warning' : severity === 'error' ? 'error' : 'info',
+      alert_type: normalizeAlertType(alertType, severity),
+      message: health?.overallStatus ? `EPC health ${health.overallStatus}` : alertType,
+      details: health || {}
+    });
+    await alertRecord.save();
+
     console.log(`[EPC Alerts] Received ${severity} alert from EPC ${epcId}: ${alertType}`);
-    
-    // TODO: Integrate with alerting system (email, SMS, etc.)
     
     res.json({
       success: true,
       message: 'Alert received successfully',
       epcId,
-      alertId: `alert_${Date.now()}`, // TODO: Generate proper alert ID
+      alertId: alertRecord._id,
       timestamp: alert.receivedAt
     });
     
@@ -160,35 +261,37 @@ router.get('/:epcId/status', async (req, res) => {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
     
-    // TODO: Fetch latest metrics from database
+    const latestMetrics = await EPCMetrics.findOne({
+      epc_id: epcId,
+      tenant_id: tenantId
+    }).sort({ timestamp: -1 }).lean();
+
+    const lastSeen = latestMetrics?.timestamp || null;
+    const isOnline = lastSeen
+      ? Date.now() - new Date(lastSeen).getTime() <= METRIC_LOOKBACK_MINUTES * 60 * 1000
+      : false;
+
+    const activeAlerts = await EPCAlert.find({
+      epc_id: epcId,
+      tenant_id: tenantId,
+      resolved: false
+    }).sort({ timestamp: -1 }).limit(5).lean();
+
     const status = {
       epcId,
       tenantId,
-      status: 'online', // 'online', 'offline', 'warning', 'critical'
-      lastSeen: new Date().toISOString(),
-      
-      // Latest metrics (mock data for now)
-      metrics: {
-        cpuUsage: 25.5,
-        memoryUsage: 45.2,
-        diskUsage: 67.8,
-        activeUsers: 12,
-        activeSessions: 8,
-        uptime: 86400 // 1 day
-      },
-      
-      // Health status
-      health: {
-        overall: 'healthy',
-        cpu: 'healthy',
-        memory: 'healthy',
-        disk: 'warning',
-        network: 'healthy',
-        service: 'healthy'
-      },
-      
-      // Active alerts
-      activeAlerts: []
+      status: isOnline ? 'online' : 'offline',
+      lastSeen,
+      metrics: latestMetrics
+        ? {
+            cpuUsage: latestMetrics.system?.cpu_percent ?? null,
+            memoryUsage: latestMetrics.system?.memory_percent ?? null,
+            diskUsage: latestMetrics.system?.disk_percent ?? null,
+            activeUsers: latestMetrics.subscribers?.total_connected ?? null,
+            activeSessions: latestMetrics.subscribers?.active_sessions ?? null
+          }
+        : null,
+      activeAlerts
     };
     
     res.json(status);
@@ -216,18 +319,47 @@ router.get('/:epcId/metrics/history', async (req, res) => {
       return res.status(400).json({ error: 'Tenant ID required' });
     }
     
-    // TODO: Query time-series database for historical metrics
+    const startDate = startTime ? new Date(startTime) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const endDate = endTime ? new Date(endTime) : new Date();
+    const docs = await EPCMetrics.find({
+      epc_id: epcId,
+      tenant_id: tenantId,
+      timestamp: { $gte: startDate, $lte: endDate }
+    }).sort({ timestamp: 1 }).lean();
+
+    const timestamps = docs.map((doc) => doc.timestamp);
+    const series = {};
+    const metricKey = metric || 'all';
+
+    if (metricKey === 'cpu') {
+      series.cpu = docs.map((doc) => doc.system?.cpu_percent ?? null);
+    } else if (metricKey === 'memory') {
+      series.memory = docs.map((doc) => doc.system?.memory_percent ?? null);
+    } else if (metricKey === 'disk') {
+      series.disk = docs.map((doc) => doc.system?.disk_percent ?? null);
+    } else if (metricKey === 'activeSessions') {
+      series.activeSessions = docs.map((doc) => doc.subscribers?.active_sessions ?? null);
+    } else if (metricKey === 'activeUsers') {
+      series.activeUsers = docs.map((doc) => doc.subscribers?.total_connected ?? null);
+    } else {
+      series.cpu = docs.map((doc) => doc.system?.cpu_percent ?? null);
+      series.memory = docs.map((doc) => doc.system?.memory_percent ?? null);
+      series.disk = docs.map((doc) => doc.system?.disk_percent ?? null);
+      series.activeSessions = docs.map((doc) => doc.subscribers?.active_sessions ?? null);
+      series.activeUsers = docs.map((doc) => doc.subscribers?.total_connected ?? null);
+    }
+
     const history = {
       epcId,
-      metric: metric || 'all',
+      metric: metricKey,
       interval,
       timeRange: {
-        start: startTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        end: endTime || new Date().toISOString()
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
       },
       data: {
-        timestamps: [],
-        values: {}
+        timestamps,
+        values: series
       }
     };
     
@@ -242,88 +374,6 @@ router.get('/:epcId/metrics/history', async (req, res) => {
   }
 });
 
-/**
- * Get all EPCs for tenant
- * GET /api/epc/list
- */
-router.get('/list', async (req, res) => {
-  try {
-    const tenantId = req.headers['x-tenant-id'];
-    
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-    
-    // TODO: Fetch EPCs from database
-    const epcs = [
-      // Mock data for now
-      {
-        epcId: 'epc_example123',
-        tenantId,
-        siteName: 'Example Site',
-        status: 'online',
-        lastSeen: new Date().toISOString(),
-        location: {
-          address: '123 Example St',
-          coordinates: { latitude: 40.7128, longitude: -74.0060 }
-        },
-        metrics: {
-          cpuUsage: 25.5,
-          memoryUsage: 45.2,
-          activeUsers: 12
-        }
-      }
-    ];
-    
-    res.json({
-      success: true,
-      count: epcs.length,
-      epcs
-    });
-    
-  } catch (error) {
-    console.error('[EPC List] Failed to get EPC list:', error);
-    res.status(500).json({ 
-      error: 'Failed to get EPC list',
-      details: error.message 
-    });
-  }
-});
-
-/**
- * Send command to EPC
- * POST /api/epc/:epcId/command
- */
-router.post('/:epcId/command', async (req, res) => {
-  try {
-    const { epcId } = req.params;
-    const { command, params = {} } = req.body;
-    const tenantId = req.headers['x-tenant-id'];
-    
-    if (!tenantId || !command) {
-      return res.status(400).json({ error: 'Tenant ID and command required' });
-    }
-    
-    // TODO: Implement command sending to EPC (via message queue, webhook, etc.)
-    console.log(`[EPC Command] Sending command '${command}' to EPC ${epcId}`);
-    
-    res.json({
-      success: true,
-      message: 'Command sent successfully',
-      epcId,
-      command,
-      commandId: `cmd_${Date.now()}`,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('[EPC Command] Failed to send command:', error);
-    res.status(500).json({ 
-      error: 'Failed to send command',
-      details: error.message 
-    });
-  }
-});
 
 /**
  * Check metric thresholds and generate alerts

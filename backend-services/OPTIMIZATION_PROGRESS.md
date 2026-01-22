@@ -39,7 +39,7 @@ All major route files successfully modularized:
 
 ### SNMP Discovery Script (2147 lines)
 
-**Status:** Documented in OPTIMIZATION_PLAN.md
+**Status:** Section markers added, OUI lookup + config + network helpers + OID walk extracted, modularization pending
 
 **Complexity:** High - Runs on remote EPC devices, requires careful deployment strategy
 

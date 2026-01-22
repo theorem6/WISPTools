@@ -210,9 +210,63 @@ function getRoleName(role) {
  * Send password reset email (placeholder)
  */
 async function sendPasswordResetEmail(email, resetLink) {
-  // Firebase Auth handles password reset emails
   console.log(`📧 [Email] Password reset requested for ${email}`);
-  return { sent: false, reason: 'Use Firebase Auth password reset' };
+  if (!resetLink) {
+    return { sent: false, reason: 'Reset link not provided' };
+  }
+
+  const transport = getTransporter();
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset your WISPTools password</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 0; background: #f3f4f6; }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+    .card { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .button { display: inline-block; padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+    .muted { color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h2>Reset your password</h2>
+      <p>We received a request to reset your WISPTools password. Use the button below to choose a new password.</p>
+      <p><a class="button" href="${resetLink}">Reset password</a></p>
+      <p class="muted">If you did not request this, you can safely ignore this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const textContent = `
+Reset your WISPTools password
+
+Use this link to reset your password:
+${resetLink}
+
+If you did not request this, you can ignore this email.
+  `.trim();
+
+  try {
+    const result = await transport.sendMail({
+      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+      to: email,
+      subject: 'Reset your WISPTools password',
+      text: textContent,
+      html: htmlContent
+    });
+    console.log(`✅ [Email] Password reset email sent to ${email}`);
+    return { sent: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(`❌ [Email] Failed to send password reset email to ${email}:`, error.message);
+    return { sent: false, reason: error.message };
+  }
 }
 
 /**

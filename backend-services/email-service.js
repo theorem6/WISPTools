@@ -512,13 +512,128 @@ LTE WISP Management Platform
   }
 
   formatDigestHTML(summary) {
-    // TODO: Format daily digest HTML
-    return '<html><body>Daily Digest</body></html>';
+    const data = summary || {};
+    const period = data.period || data.dateRange || {};
+    const totalAlerts = data.totalAlerts ?? data.alerts?.total ?? data.alertSummary?.total ?? 0;
+    const criticalAlerts = data.criticalAlerts ?? data.alerts?.critical ?? data.alertSummary?.critical ?? 0;
+    const warningAlerts = data.warningAlerts ?? data.alerts?.warning ?? data.alertSummary?.warning ?? 0;
+    const resolvedAlerts = data.resolvedAlerts ?? data.alerts?.resolved ?? data.alertSummary?.resolved ?? 0;
+    const topAlerts = Array.isArray(data.topAlerts) ? data.topAlerts : Array.isArray(data.recentAlerts) ? data.recentAlerts : [];
+    const epcSummary = data.epcSummary || data.epcs || {};
+    const reportDate = data.date || new Date().toLocaleDateString();
+
+    const alertRows = topAlerts.length > 0
+      ? topAlerts.map((alert) => `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${alert.rule_name || alert.name || alert.alert_type || 'Alert'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${alert.severity || 'info'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${alert.timestamp ? new Date(alert.timestamp).toLocaleString() : 'N/A'}</td>
+        </tr>
+      `).join('')
+      : `
+        <tr>
+          <td colspan="3" style="padding: 12px; color: #6b7280;">No recent alerts</td>
+        </tr>
+      `;
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Monitoring Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #111827; margin: 0; padding: 0; background: #f3f4f6; }
+    .container { max-width: 720px; margin: 0 auto; padding: 24px; }
+    .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 10px 20px rgba(0,0,0,0.06); }
+    .section { margin-top: 20px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .stat { background: #f9fafb; border-radius: 10px; padding: 12px; }
+    .stat strong { display: block; font-size: 18px; color: #111827; }
+    .muted { color: #6b7280; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 8px; background: #f3f4f6; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h2 style="margin-top: 0;">Daily Monitoring Report</h2>
+      <p class="muted">Report date: ${reportDate}</p>
+      ${period.start || period.end ? `<p class="muted">Period: ${period.start || 'N/A'} - ${period.end || 'N/A'}</p>` : ''}
+
+      <div class="section">
+        <h3>Alert Summary</h3>
+        <div class="stat-grid">
+          <div class="stat"><strong>${totalAlerts}</strong><span class="muted">Total alerts</span></div>
+          <div class="stat"><strong>${criticalAlerts}</strong><span class="muted">Critical</span></div>
+          <div class="stat"><strong>${warningAlerts}</strong><span class="muted">Warning</span></div>
+          <div class="stat"><strong>${resolvedAlerts}</strong><span class="muted">Resolved</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Recent Alerts</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Alert</th>
+              <th>Severity</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${alertRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h3>EPC Summary</h3>
+        <p class="muted">Total EPCs: ${epcSummary.total ?? epcSummary.total_epcs ?? 'N/A'} | Online: ${epcSummary.online ?? epcSummary.online_epcs ?? 'N/A'} | Active Sessions: ${epcSummary.active_sessions ?? 'N/A'}</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
   }
 
   formatDigestText(summary) {
-    // TODO: Format daily digest text
-    return 'Daily Digest';
+    const data = summary || {};
+    const period = data.period || data.dateRange || {};
+    const totalAlerts = data.totalAlerts ?? data.alerts?.total ?? data.alertSummary?.total ?? 0;
+    const criticalAlerts = data.criticalAlerts ?? data.alerts?.critical ?? data.alertSummary?.critical ?? 0;
+    const warningAlerts = data.warningAlerts ?? data.alerts?.warning ?? data.alertSummary?.warning ?? 0;
+    const resolvedAlerts = data.resolvedAlerts ?? data.alerts?.resolved ?? data.alertSummary?.resolved ?? 0;
+    const topAlerts = Array.isArray(data.topAlerts) ? data.topAlerts : Array.isArray(data.recentAlerts) ? data.recentAlerts : [];
+    const epcSummary = data.epcSummary || data.epcs || {};
+    const reportDate = data.date || new Date().toLocaleDateString();
+
+    const alertLines = topAlerts.length
+      ? topAlerts.map((alert) => `- ${alert.rule_name || alert.name || alert.alert_type || 'Alert'} (${alert.severity || 'info'}) ${alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}`)
+      : ['- No recent alerts'];
+
+    return `
+DAILY MONITORING REPORT
+Date: ${reportDate}
+${period.start || period.end ? `Period: ${period.start || 'N/A'} - ${period.end || 'N/A'}` : ''}
+
+ALERT SUMMARY
+Total: ${totalAlerts}
+Critical: ${criticalAlerts}
+Warning: ${warningAlerts}
+Resolved: ${resolvedAlerts}
+
+RECENT ALERTS
+${alertLines.join('\n')}
+
+EPC SUMMARY
+Total EPCs: ${epcSummary.total ?? epcSummary.total_epcs ?? 'N/A'}
+Online EPCs: ${epcSummary.online ?? epcSummary.online_epcs ?? 'N/A'}
+Active Sessions: ${epcSummary.active_sessions ?? 'N/A'}
+    `.trim();
   }
 
   formatDuration(start, end) {

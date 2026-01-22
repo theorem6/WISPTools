@@ -22,7 +22,7 @@
   const steps = [
     { id: 'welcome', title: 'Welcome', icon: '⚙️' },
     { id: 'info', title: 'Information', icon: 'ℹ️' },
-    { id: 'genieacs-url', title: 'GenieACS URL', icon: '🔗' },
+    { id: 'genieacs-url', title: 'Tenant ACS URL', icon: '🔗' },
     { id: 'test', title: 'Test Connection', icon: '✅' },
     { id: 'complete', title: 'Complete!', icon: '🎉' }
   ];
@@ -31,6 +31,10 @@
   let genieacsUrl = '';
   let genieacsApiUrl = '';
   let isLoaded = false;
+
+  $: if (show && $currentTenant?.cwmpUrl && genieacsUrl !== $currentTenant.cwmpUrl) {
+    genieacsUrl = $currentTenant.cwmpUrl;
+  }
 
   onMount(async () => {
     if (show && autoStart) {
@@ -55,7 +59,7 @@
       });
       const data = await response.json();
       if (response.ok && data?.config) {
-        genieacsUrl = data.config.genieacsUrl || '';
+        genieacsUrl = $currentTenant?.cwmpUrl || data.config.genieacsUrl || '';
         genieacsApiUrl = data.config.genieacsApiUrl || '';
       }
       isLoaded = true;
@@ -94,7 +98,7 @@
     }
     
     if (!genieacsUrl.trim()) {
-      error = 'GenieACS URL is required';
+      error = 'Tenant ACS URL is missing. Please contact support.';
       return;
     }
     
@@ -131,7 +135,7 @@
         throw new Error(data.error || 'Failed to save configuration');
       }
 
-      genieacsUrl = normalizedUrl;
+        genieacsUrl = $currentTenant?.cwmpUrl || normalizedUrl;
       genieacsApiUrl = normalizedApiUrl;
       success = 'Configuration saved successfully!';
       
@@ -292,26 +296,31 @@
         {:else if currentStep === 2}
           <!-- GenieACS URL Step -->
           <div class="wizard-panel">
-            <h3>Enter GenieACS URL</h3>
-            <p>Enter your GenieACS server URL. This is typically provided by your platform administrator.</p>
+            <h3>Tenant ACS URL</h3>
+            <p>This ACS endpoint is generated automatically for your tenant.</p>
             
             <div class="form-group">
-              <label for="genieacs-url">
-                GenieACS Server URL <span class="required">*</span>
+              <label>
+                Tenant ACS URL <span class="required">*</span>
               </label>
-              <input
-                id="genieacs-url"
-                type="url"
-                bind:value={genieacsUrl}
-                placeholder="https://acs.example.com"
-                class="form-input"
-                disabled={isLoading}
-              />
-              <small class="form-hint">The base URL of your GenieACS server (e.g., https://acs.example.com)</small>
+              <div class="form-input" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="flex: 1; word-break: break-all;">{genieacsUrl || 'Not available'}</span>
+                {#if genieacsUrl}
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    style="padding: 0.35rem 0.75rem; font-size: 0.75rem;"
+                    on:click={() => navigator.clipboard?.writeText(genieacsUrl)}
+                  >
+                    Copy
+                  </button>
+                {/if}
+              </div>
+              <small class="form-hint">Use this URL in your CPE device ACS settings.</small>
             </div>
             
             <div class="info-card">
-              <p><strong>💡 Tip:</strong> If you don't have a GenieACS server, contact your platform administrator or refer to the documentation for setup instructions.</p>
+              <p><strong>💡 Tip:</strong> If this URL is missing, contact support to confirm tenant setup.</p>
             </div>
           </div>
           
@@ -600,7 +609,4 @@
     cursor: not-allowed;
   }
   
-  .info-box, .setup-requirements, .setup-time, .info-section, .form-group, .form-input, .form-hint, .info-card, .next-steps, .next-step-item, .alert {
-    /* See CBRSSetupWizard.svelte for complete styles - structure is identical */
-  }
 </style>

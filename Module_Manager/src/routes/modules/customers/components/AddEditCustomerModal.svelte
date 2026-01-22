@@ -348,7 +348,6 @@
     formData.email = customer.email || '';
     formData.serviceStatus = customer.serviceStatus || '';
     formData.serviceType = customer.serviceType || '';
-    formData.serviceType = customer.serviceType;
     formData.macAddress = customer.macAddress || '';
     formData.notes = (customer as any).notes || '';
     formData.tags = (customer as any).tags || [];
@@ -590,7 +589,7 @@
         sameAsService: true
       },
       serviceStatus: 'pending',
-      serviceType: undefined,
+      serviceType: '',
       groupId: undefined,
       servicePlan: {
         planId: undefined,
@@ -680,6 +679,7 @@
         <h3>📡 Service</h3>
         
         <div class="form-group">
+          <label>Service Status</label>
           <select bind:value={formData.serviceStatus}>
             <option value="">Select Service Status</option>
             <option value="pending">Pending</option>
@@ -691,6 +691,7 @@
         </div>
         
         <div class="form-group">
+          <label>Service Type</label>
           <select bind:value={formData.serviceType}>
             <option value="">Select Service Type</option>
             <option value="4G/5G">4G/5G (LTE/5G)</option>
