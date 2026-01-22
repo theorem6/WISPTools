@@ -38,6 +38,15 @@
     initCharts();
   });
   
+  // Reactive: Update charts when statusHistory changes
+  // Only update if we have data - the chart components will handle the update
+  $: if (statusHistory && statusHistory.length > 0) {
+    // Use a small delay to batch rapid updates
+    setTimeout(() => {
+      initCharts();
+    }, 0);
+  }
+  
   onDestroy(() => {
     // Charts are managed by Chart component
   });
@@ -162,6 +171,12 @@
   
   function initCharts() {
     if (statusHistory.length === 0) {
+      // Don't clear existing charts - just return
+      // This prevents component destruction/recreation on refresh
+      if (cpuChartOption || memoryChartOption || diskChartOption) {
+        return;
+      }
+      // Only set to null on first load when we have no data
       cpuChartOption = null;
       memoryChartOption = null;
       diskChartOption = null;
