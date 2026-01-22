@@ -446,16 +446,20 @@ router.get('/epc/list', async (req, res) => {
       }
       
       // Determine status: prioritize timestamp check over status field
-      // If last check-in was more than 5 minutes ago, EPC is offline regardless of status field
+      // BUT: If we have recent service status data (within 10 minutes), consider EPC online
+      // This handles cases where check-in is delayed but service status is still being reported
+      const hasRecentServiceStatus = latestStatus && latestStatus.timestamp && 
+        (Date.now() - new Date(latestStatus.timestamp).getTime()) < 10 * 60 * 1000;
+      
       let status;
-      if (!lastSeen) {
-        status = 'offline'; // Never checked in
-      } else if (isOnline) {
-        status = 'online'; // Checked in within last 5 minutes
+      if (!lastSeen && !hasRecentServiceStatus) {
+        status = 'offline'; // Never checked in and no recent service status
+      } else if (isOnline || hasRecentServiceStatus) {
+        status = 'online'; // Checked in within last 5 minutes OR has recent service status
       } else if (epc.status === 'registered') {
         status = 'pending'; // Registered but not yet checked in
       } else {
-        status = 'offline'; // Last check-in was more than 5 minutes ago
+        status = 'offline'; // Last check-in was more than 5 minutes ago and no recent service status
       }
       
       epcs.push({

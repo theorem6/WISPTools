@@ -217,16 +217,21 @@
   }
   
   // Get EPC system uptime (actual system runtime)
+  // This should match the same data source used for device status
   function getEPCSystemUptime() {
     if (!networkDevices || networkDevices.length === 0) return null;
     
-    // Find EPC devices with uptime metrics
+    // Find EPC devices with uptime metrics - prioritize online EPCs
     const epcDevices = networkDevices.filter(d => d.type === 'epc' && d.metrics?.uptime);
     
     if (epcDevices.length === 0) return null;
     
+    // Prefer online EPCs for uptime display (they're actively reporting)
+    const onlineEPCs = epcDevices.filter(d => d.status === 'online');
+    const devicesToUse = onlineEPCs.length > 0 ? onlineEPCs : epcDevices;
+    
     // Return the longest uptime (most reliable EPC)
-    const uptimes = epcDevices
+    const uptimes = devicesToUse
       .map(d => {
         const uptimeStr = d.metrics?.uptime;
         if (!uptimeStr) return null;
