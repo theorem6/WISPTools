@@ -78,10 +78,16 @@ let mapState: MapLayerState | undefined;
 let mapMode: MapModuleMode = 'plan';
 let contextActivePlan: PlanProject | null = null;
 let mapLocked = true;
+let stagedTotal = 0;
+let productionCount = 0;
+let marketingCount = 0;
 
 $: mapState = $mapContext;
 $: mapMode = (mapState?.mode ?? 'plan');
 $: contextActivePlan = mapState?.activePlan ?? null;
+$: stagedTotal = mapState?.stagedSummary?.total ?? 0;
+$: productionCount = mapState?.productionHardware?.length ?? 0;
+$: marketingCount = contextActivePlan?.marketing?.addresses?.length ?? 0;
 $: {
   if (!activeProject && contextActivePlan) {
     activeProject = contextActivePlan;
@@ -1888,6 +1894,21 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
         </button>
       </div>
     </div>
+
+    {#if contextActivePlan}
+      <div class="plan-summary">
+        <h3>Active Plan: {contextActivePlan.name}</h3>
+        <p class="summary-line">
+          Status: {contextActivePlan.status ?? 'draft'} • {contextActivePlan.showOnMap === false ? 'Hidden' : 'Visible'}
+        </p>
+        <p class="summary-line">
+          {stagedTotal} staged features • {productionCount} production assets
+        </p>
+        {#if marketingCount > 0}
+          <p class="summary-line">{marketingCount} marketing leads</p>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <!-- Filter Panel (non-modal) -->
@@ -2722,6 +2743,31 @@ TOTAL COST: $${purchaseOrder.totalCost.toLocaleString()}
   .module-control-btn.delete-btn:hover {
     background: rgba(239, 68, 68, 0.28);
     border-color: rgba(239, 68, 68, 0.55);
+  }
+
+  .plan-summary {
+    position: absolute;
+    bottom: 40px;
+    left: 20px;
+    background: rgba(15, 23, 42, 0.75);
+    padding: 0.85rem 1.2rem;
+    border-radius: var(--border-radius-md);
+    color: #e2e8f0;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(8px);
+    max-width: 320px;
+    z-index: 5;
+  }
+
+  .plan-summary h3 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+  }
+
+  .plan-summary .summary-line {
+    margin: 0;
+    font-size: 0.9rem;
+    color: rgba(226, 232, 240, 0.85);
   }
 
   /* Modal Styles */
