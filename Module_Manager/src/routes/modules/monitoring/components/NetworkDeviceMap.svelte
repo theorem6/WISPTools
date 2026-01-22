@@ -368,9 +368,11 @@
       // Import ArcGIS modules
       const [
         { default: Point },
+        { default: Polyline },
         { default: Graphic }
       ] = await Promise.all([
         import('@arcgis/core/geometry/Point.js'),
+        import('@arcgis/core/geometry/Polyline.js'),
         import('@arcgis/core/Graphic.js')
       ]);
       
@@ -420,6 +422,10 @@
       });
       
       console.log('[Network Map] Added', addedDevices, 'device graphics to map');
+
+      if (displayOptions.showConnections) {
+        drawDeviceConnections(filteredDevices, { mapType: 'arcgis', Polyline, Graphic });
+      }
       
       // Fit view to show all devices
       if (filteredDevices.length > 0 && deviceLayer) {
@@ -469,6 +475,10 @@
         }
       });
       
+      if (displayOptions.showConnections) {
+        drawDeviceConnections(filteredDevices, { mapType: 'leaflet', L });
+      }
+
       // Fit map to show all devices
       if (filteredDevices.length > 0) {
         const group = L.featureGroup(Array.from(deviceLayers.values()));
@@ -619,11 +629,107 @@
     `;
   }
   
-  function drawDeviceConnections(devices) {
-    // This is a simplified connection drawing - in a real implementation,
-    // you would use network topology data to determine actual connections
-    // TODO: Implement ArcGIS-based connection drawing
-    console.log('[Network Map] Connection drawing not yet implemented for ArcGIS');
+  function drawDeviceConnections(devices, { mapType, L, Polyline, Graphic }) {
+    if (!devices || devices.length === 0) return;
+
+    const epcs = devices.filter(device => getDeviceType(device) === 'epc');
+    const routers = devices.filter(device => {
+      const type = getDeviceType(device);
+      return type === 'mikrotik_router' || type === 'mikrotik_switch';
+    });
+    const aps = devices.filter(device => {
+      const type = getDeviceType(device);
+      return type === 'mikrotik_ap' || type === 'mikrotik_lte';
+    });
+    const cpes = devices.filter(device => getDeviceType(device) === 'mikrotik_cpe');
+
+    const connections = [];
+    const connectionKeys = new Set();
+
+    const addConnection = (from, to, type) => {
+      if (!from || !to) return;
+      if (!from.location?.coordinates || !to.location?.coordinates) return;
+      const key = [from.id, to.id].sort().join('|');
+      if (connectionKeys.has(key)) return;
+      connectionKeys.add(key);
+      connections.push({ from, to, type });
+    };
+
+    // Connect routers/switches to nearest EPC (or nearest router as fallback)
+    routers.forEach(router => {
+      const nearestEpc = findNearestDevice(router, epcs);
+      if (nearestEpc) {
+        addConnection(router, nearestEpc, 'fiber');
+      } else {
+        const nearestRouter = findNearestDevice(router, routers.filter(r => r.id !== router.id));
+        if (nearestRouter) {
+          addConnection(router, nearestRouter, 'ethernet');
+        }
+      }
+    });
+
+    // Connect AP/LTE devices to nearest router/switch
+    aps.forEach(ap => {
+      const nearestInfra = findNearestDevice(ap, routers);
+      if (nearestInfra) {
+        addConnection(nearestInfra, ap, 'ethernet');
+      }
+    });
+
+    // Connect CPEs to nearest AP/LTE device
+    cpes.forEach(cpe => {
+      const nearestAp = findNearestDevice(cpe, aps);
+      if (nearestAp) {
+        addConnection(nearestAp, cpe, 'wireless');
+      }
+    });
+
+    if (mapType === 'leaflet' && L) {
+      connections.forEach(({ from, to, type }) => {
+        const style = type === 'wireless'
+          ? { color: '#8b5cf6', weight: 2 }
+          : type === 'fiber'
+            ? { color: '#f59e0b', weight: 3 }
+            : { color: '#6b7280', weight: 2 };
+        drawConnection(from, to, L, style.color, style.weight);
+      });
+      return;
+    }
+
+    if (mapType === 'arcgis' && Polyline && Graphic) {
+      connections.forEach(({ from, to, type }) => {
+        const path = [
+          [from.location.coordinates.longitude, from.location.coordinates.latitude],
+          [to.location.coordinates.longitude, to.location.coordinates.latitude]
+        ];
+        const line = new Polyline({
+          paths: [path],
+          spatialReference: { wkid: 4326 }
+        });
+
+        const color = type === 'wireless'
+          ? [139, 92, 246, 0.8]
+          : type === 'fiber'
+            ? [245, 158, 11, 0.8]
+            : [107, 114, 128, 0.7];
+        const width = type === 'fiber' ? 2.5 : 2;
+
+        const graphic = new Graphic({
+          geometry: line,
+          symbol: {
+            type: 'simple-line',
+            color,
+            width
+          },
+          attributes: {
+            connectionType: type
+          }
+        });
+
+        deviceLayer.add(graphic);
+        deviceLayers.set(`connection-${from.id}-${to.id}`, graphic);
+      });
+    }
   }
   
   function drawConnection(device1, device2, L, color = '#6b7280', weight = 1) {
