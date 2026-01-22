@@ -261,20 +261,31 @@ router.get('/:epc_id/status', async (req, res) => {
   try {
     const { epc_id } = req.params;
     const tenant_id = req.headers['x-tenant-id'];
-    
+
+    // First check if EPC is online by checking last_seen timestamp
+    const epc = await RemoteEPC.findOne({ epc_id, tenant_id }).lean();
+    const isEPCOffline = !epc || !epc.last_seen || (Date.now() - new Date(epc.last_seen).getTime()) > 5 * 60 * 1000;
+
     const status = await EPCServiceStatus.findOne({ epc_id })
       .sort({ timestamp: -1 })
       .lean();
-    
+
     if (!status) {
       return res.status(404).json({ error: 'No status data found' });
     }
-    
+
+    // Check if status data is stale (older than 10 minutes)
+    const statusAge = Date.now() - new Date(status.timestamp).getTime();
+    const isStatusStale = statusAge > 10 * 60 * 1000;
+
+    // If EPC is offline or status is stale, mark all services as offline
+    const shouldMarkServicesOffline = isEPCOffline || isStatusStale;
+
     // Synchronize service uptime with system uptime
     // For active services, use system uptime to ensure consistency
     const systemUptime = status.system?.uptime_seconds || 0;
-    
-    if (status.services && systemUptime > 0) {
+
+    if (status.services) {
       // Handle both Map and plain object formats (Mongoose .lean() converts Maps to objects)
       let servicesObj;
       if (status.services instanceof Map) {
@@ -282,24 +293,38 @@ router.get('/:epc_id/status', async (req, res) => {
       } else {
         servicesObj = { ...status.services };
       }
-      
-      // Update active services to use system uptime for consistency
+
+      // Update services based on EPC status
       for (const [serviceName, serviceData] of Object.entries(servicesObj)) {
-        if (serviceData && typeof serviceData === 'object' && serviceData.status === 'active') {
-          // Always use system uptime for active services to keep them synchronized
-          servicesObj[serviceName] = {
-            ...serviceData,
-            uptime_seconds: systemUptime
-          };
+        if (serviceData && typeof serviceData === 'object') {
+          if (shouldMarkServicesOffline) {
+            // EPC is offline or status is stale - mark all services as inactive/offline
+            servicesObj[serviceName] = {
+              ...serviceData,
+              status: 'inactive',
+              uptime_seconds: 0
+            };
+          } else if (serviceData.status === 'active' && systemUptime > 0) {
+            // EPC is online and service is active - use system uptime for consistency
+            servicesObj[serviceName] = {
+              ...serviceData,
+              uptime_seconds: systemUptime
+            };
+          }
         }
       }
-      
+
       // Convert back to the original format
       status.services = servicesObj;
     }
-    
+
+    // Also mark system as offline if EPC is offline
+    if (shouldMarkServicesOffline && status.system) {
+      status.system.uptime_seconds = 0;
+    }
+
     res.json(status);
-    
+
   } catch (error) {
     console.error('[EPC Status] Error:', error);
     res.status(500).json({ error: 'Failed to get status', message: error.message });

@@ -474,14 +474,17 @@
       <div class="services-grid">
         {#each SERVICES as svc}
           {@const status = serviceStatus?.services?.[svc.id]}
+          {@const epcIsOffline = epc?.status === 'offline' || (epc?.last_seen && (Date.now() - new Date(epc.last_seen).getTime()) > 5 * 60 * 1000)}
+          {@const serviceStatusToShow = epcIsOffline ? 'inactive' : (status?.status || 'unknown')}
+          {@const serviceUptimeToShow = epcIsOffline ? 0 : (status?.uptime_seconds || 0)}
           <div class="service-card">
             <div class="service-header">
-              <span class="service-icon">{getStatusIcon(status?.status || 'unknown')}</span>
+              <span class="service-icon">{getStatusIcon(serviceStatusToShow)}</span>
               <span class="service-name">{svc.name}</span>
             </div>
             <div class="service-details">
               <span class="service-desc">{svc.description}</span>
-              <span class="service-uptime">Uptime: {formatUptime(status?.uptime_seconds)}</span>
+              <span class="service-uptime">Uptime: {formatUptime(serviceUptimeToShow)}</span>
               {#if status?.memory_mb}
                 <span class="service-memory">Memory: {status.memory_mb} MB</span>
               {/if}
