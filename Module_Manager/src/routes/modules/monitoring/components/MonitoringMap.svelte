@@ -25,6 +25,7 @@
   let isRefreshing = false; // Flag to prevent multiple simultaneous refreshes
   let isLoadingSites = false; // Flag to prevent concurrent site loads
   let lastLoadedTenantId: string | null = null; // Track last loaded tenant to avoid reloads
+  let isMounted = false; // Track if component is mounted
   
   $: tenantId = $currentTenant?.id || '';
   
@@ -476,8 +477,8 @@
   
   // Load sites, sectors, backhauls, and CPE from database with uptime data
   async function loadSites() {
-    // Guard against duplicate concurrent loads
-    if (isLoadingSites) {
+    // Guard against duplicate concurrent loads and ensure component is mounted
+    if (isLoadingSites || !isMounted) {
       return;
     }
     
@@ -495,8 +496,21 @@
     await saveMapViewState();
     
     try {
-      // Load actual sites from database
-      const loadedSites = await coverageMapService.getTowerSites(tenantId);
+      // Load all data in parallel for much faster loading
+      const [loadedSitesResult, allSectorsResult, allEquipmentResult, allCPEResult] = await Promise.allSettled([
+        coverageMapService.getTowerSites(tenantId),
+        coverageMapService.getSectors(tenantId),
+        coverageMapService.getEquipment(tenantId),
+        coverageMapService.getCPEDevices(tenantId)
+      ]);
+      
+      // Process sites
+      let loadedSites: any[] = [];
+      if (loadedSitesResult.status === 'fulfilled') {
+        loadedSites = loadedSitesResult.value;
+      } else {
+        console.error('[MonitoringMap] Failed to load sites:', loadedSitesResult.reason);
+      }
       
       // Filter out fake New York sites
       const realSites = loadedSites.filter((site: any) => !isFakeNewYorkSite(site));
@@ -569,12 +583,9 @@
         convertDevicesToEquipment();
       }
       
-      // Restore map view state after loading (preserve zoom/center)
-      setTimeout(() => restoreMapViewState(), 100); // Small delay to ensure map updates first
-      
-      // Load sectors from database
-      try {
-        const allSectors = await coverageMapService.getSectors(tenantId);
+      // Process sectors
+      if (allSectorsResult.status === 'fulfilled') {
+        const allSectors = allSectorsResult.value;
         
         // Process sectors with uptime calculation based on associated devices
         sectors = allSectors.map((sector: any) => {
@@ -615,16 +626,14 @@
         });
         
         console.log(`[MonitoringMap] Loaded ${sectors.length} sectors with uptime data`);
-      } catch (error) {
-        console.error('[MonitoringMap] Failed to load sectors:', error);
+      } else {
+        console.error('[MonitoringMap] Failed to load sectors:', allSectorsResult.reason);
         sectors = [];
       }
       
-      // Load backhauls from equipment (type: 'backhaul')
-      // Backhauls are already included in equipment from convertDevicesToEquipment()
-      // But we enhance them with uptime data here
-      try {
-        const allEquipment = await coverageMapService.getEquipment(tenantId);
+      // Process backhauls from equipment
+      if (allEquipmentResult.status === 'fulfilled') {
+        const allEquipment = allEquipmentResult.value;
         const backhaulEquipment = allEquipment.filter((eq: any) => eq.type === 'backhaul');
         
         // Update equipment array to include backhauls with uptime data
@@ -695,13 +704,13 @@
         }
         
         console.log(`[MonitoringMap] Processed ${backhaulEquipment.length} backhaul equipment items with uptime data`);
-      } catch (error) {
-        console.error('[MonitoringMap] Failed to load backhaul equipment:', error);
+      } else {
+        console.error('[MonitoringMap] Failed to load backhaul equipment:', allEquipmentResult.reason);
       }
       
-      // Load CPE devices from database
-      try {
-        const allCPE = await coverageMapService.getCPEDevices(tenantId);
+      // Process CPE devices
+      if (allCPEResult.status === 'fulfilled') {
+        const allCPE = allCPEResult.value;
         
         // Process CPE with uptime from networkDevices
         cpeDevices = allCPE.map((cpe: any) => {
@@ -751,10 +760,13 @@
         });
         
         console.log(`[MonitoringMap] Loaded ${cpeDevices.length} CPE devices from database with uptime data`);
-      } catch (error) {
-        console.error('[MonitoringMap] Failed to load CPE devices:', error);
+      } else {
+        console.error('[MonitoringMap] Failed to load CPE devices:', allCPEResult.reason);
         cpeDevices = [];
       }
+      
+      // Restore map view state after loading (preserve zoom/center)
+      setTimeout(() => restoreMapViewState(), 100); // Small delay to ensure map updates first
     } catch (error) {
       console.error('[MonitoringMap] Failed to load sites:', error);
       towers = [];
@@ -777,8 +789,8 @@
   let loadSitesTimeout: ReturnType<typeof setTimeout> | null = null;
   let statusUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   
-  // Watch for tenant changes - reload sites
-  $: if (tenantId && tenantId !== lastLoadedTenantId) {
+  // Watch for tenant changes - reload sites (only if mounted)
+  $: if (isMounted && tenantId && tenantId !== lastLoadedTenantId) {
     // Clear any pending debounced call and load immediately
     if (loadSitesTimeout) {
       clearTimeout(loadSitesTimeout);
@@ -964,9 +976,15 @@
   
   // Load sites on mount (only if not already loading)
   onMount(() => {
+    isMounted = true;
     if (tenantId && !isLoadingSites) {
       lastLoadedTenantId = tenantId;
-      loadSites();
+      // Defer initial load slightly to allow map to initialize first
+      setTimeout(() => {
+        if (isMounted && tenantId) {
+          loadSites();
+        }
+      }, 100);
     }
   });
 </script>
