@@ -1987,7 +1987,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
 <AddInventoryModal 
   bind:show={showAddInventoryModal}
   site={selectedSiteForInventory}
-  {tenantId}
   planId={effectivePlanId}
   on:saved={handleModalSaved}
 />

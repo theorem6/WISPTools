@@ -6,7 +6,6 @@
   
   export let show = false;
   export let site: TowerSite | null = null;
-  export let tenantId: string;
   export let planId: string | null = null;
   
   const dispatch = createEventDispatcher();

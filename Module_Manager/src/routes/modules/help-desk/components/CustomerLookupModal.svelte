@@ -10,6 +10,7 @@
   let customers: Customer[] = [];
   let loading = false;
   let error = '';
+  let selectedCustomerId: string | null = null;
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
   
   onMount(() => {
@@ -60,6 +61,7 @@
   }
   
   function selectCustomer(customer: Customer) {
+    selectedCustomerId = customer._id || customer.customerId || null;
     if (onSelect) {
       onSelect(customer);
     }
@@ -82,7 +84,7 @@
   role="presentation"
   on:click={() => dispatch('close')}
 >
-  <article
+  <div
     class="modal-content"
     data-size="sm"
     role="dialog"
@@ -137,6 +139,7 @@
               class="customer-item"
               type="button"
               role="option"
+              aria-selected={selectedCustomerId === (customer._id || customer.customerId)}
               on:click={() => selectCustomer(customer)}
             >
               <div class="customer-header">
@@ -199,7 +202,7 @@
         </div>
       {/if}
     </section>
-  </article>
+  </div>
 </div>
 
 <style>

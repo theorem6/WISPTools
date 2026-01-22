@@ -11,8 +11,6 @@ import {
   confirmPasswordReset,
   applyActionCode,
   GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
   getRedirectResult,
   type User,
   type UserCredential,

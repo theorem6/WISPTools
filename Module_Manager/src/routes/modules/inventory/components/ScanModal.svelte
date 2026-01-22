@@ -282,7 +282,6 @@
                 placeholder="Barcode, QR Code, Asset Tag, or Serial Number"
                 on:keypress={handleKeyPress}
                 disabled={loading || scanning}
-                autofocus
               />
               {#if barcodeDetector}
                 <button 
@@ -314,7 +313,9 @@
                 autoplay
                 playsinline
                 class="scanner-video"
-              ></video>
+              >
+                <track kind="captions" srclang="en" label="No captions available" />
+              </video>
             </div>
           {/if}
         </div>

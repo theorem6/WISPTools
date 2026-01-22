@@ -5,7 +5,7 @@
  */
 
 import { browser } from '$app/environment';
-import { getAuth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { getFirebaseAuth } from '$lib/firebase';
 

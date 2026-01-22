@@ -933,7 +933,7 @@ let results: PlanMarketingAddress[] = [];
 </script>
 
 <div class="marketing-backdrop" role="presentation" aria-hidden="false">
-  <section
+  <div
     class="marketing-panel"
     role="dialog"
     aria-modal="false"
@@ -1155,7 +1155,7 @@ let results: PlanMarketingAddress[] = [];
         </div>
       {/if}
     </div>
-  </section>
+  </div>
 </div>
 
 <style>

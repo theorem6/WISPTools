@@ -32,6 +32,10 @@
   let mikrotikEnabled = false;
   let mikrotikUsername = '';
   let mikrotikPassword = '';
+
+  $: if (show && autoStart) {
+    currentStep = 0;
+  }
   
   function handleClose() {
     dispatch('close');
@@ -65,14 +69,23 @@
     success = '';
     
     try {
-      // TODO: Save SNMP configuration to backend
-      // await saveMonitoringConfig({
-      //   snmp: { community: snmpCommunity, version: snmpVersion },
-      //   mikrotik: mikrotikEnabled ? { username: mikrotikUsername, password: mikrotikPassword } : null,
-      //   tenantId
-      // });
-      
-      success = 'Configuration saved successfully!';
+      const response = await fetch('/api/snmp/configuration', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
+        body: JSON.stringify({
+          community: snmpCommunity,
+          version: snmpVersion
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.error || data?.message || 'Failed to save SNMP configuration');
+      }
+
+      success = 'SNMP configuration saved successfully!';
       
       // Move to completion step
       setTimeout(() => {

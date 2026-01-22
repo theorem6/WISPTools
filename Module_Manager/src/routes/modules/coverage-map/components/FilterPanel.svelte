@@ -233,10 +233,18 @@
   
   <!-- Band/Technology Filters -->
   <div class="filter-section">
-    <button 
-      class="section-header" 
+    <div
+      class="section-header"
       class:collapsible={isMobile}
+      role="button"
+      tabindex="0"
       onclick={() => toggleSection('bands')}
+      onkeydown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggleSection('bands');
+        }
+      }}
     >
       <div class="filter-header">
         <h4>Bands / Technology</h4>
@@ -250,7 +258,7 @@
       {#if isMobile}
         <span class="expand-icon" class:expanded={expandedSections.bands}>▼</span>
       {/if}
-    </button>
+    </div>
     <div class="filter-options" class:collapsed={isMobile && !expandedSections.bands}>
       {#if isMobile}
         <div class="filter-actions mobile-actions">

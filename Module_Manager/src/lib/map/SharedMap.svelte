@@ -306,11 +306,11 @@
     loading="lazy"
     allow="geolocation"
     on:load={handleLoad}
-  />
+  ></iframe>
 
   {#if !iframeLoaded}
     <div class="shared-map__loading">
-      <div class="spinner" />
+      <div class="spinner"></div>
       <span>Loading map…</span>
     </div>
   {/if}

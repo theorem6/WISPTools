@@ -305,11 +305,11 @@
         </div>
         <div class="form-group">
           <label>Description</label>
-          <textarea 
+          <textarea
             bind:value={formData.description}
             placeholder="Group description..."
             rows="3"
-          />
+          ></textarea>
         </div>
         <div class="form-group">
           <label>Bandwidth Plan</label>

@@ -118,54 +118,55 @@
 - Add field app project workflow
 
 ### 2. ACS/TR-069 Features (Partial)
-**Status:** 🔨 ~75% Complete
+**Status:** 🔨 ~85% Complete
+
+**Completed Since Audit:**
+- ✅ Parameter editor modal
+- ✅ Real-time metrics API endpoints
+- ✅ Connection testing
 
 **What's Missing:**
-- ❌ Parameter editor UI (referenced but not implemented)
-- ❌ Real-time metrics API endpoints
-- ❌ Connection test functionality
+- ❌ Device actions still reference TODO in UI (reboot/factory reset/refresh call marked TODO)
+- ❌ Performance Analytics tab placeholder (coming soon)
+- ❌ CPE performance modal still uses local metrics instead of API
 
 **Files with TODOs:**
-- `Module_Manager/src/routes/modules/acs-cpe-management/devices/+page.svelte` (line 77)
-- `Module_Manager/src/routes/modules/acs-cpe-management/components/TR069Actions.svelte` (line 19)
-- `Module_Manager/src/routes/modules/acs-cpe-management/monitoring/+page.svelte` (line 56)
-- `Module_Manager/src/routes/modules/acs-cpe-management/graphs/+page.svelte` (line 49)
+- `Module_Manager/src/routes/modules/acs-cpe-management/components/TR069Actions.svelte`
+- `Module_Manager/src/routes/modules/acs-cpe-management/+page.svelte` (performance analytics placeholder)
+- `Module_Manager/src/lib/components/acs/CPEPerformanceModal.svelte`
 
 **Action Required:**
-- Implement parameter editor modal
-- Complete metrics API endpoints
-- Add connection testing
+- Remove TODO marker and confirm TR-069 actions are wired to backend tasks
+- Implement performance analytics view using TR-069 metrics endpoints
+- Replace local CPE performance data with API-backed metrics
 
 ### 3. Monitoring Features (Partial)
-**Status:** 🔨 ~80% Complete
+**Status:** 🔨 ~90% Complete
+
+**Completed Since Audit:**
+- ✅ SNMP configuration API persistence
+- ✅ Topology connection drawing
+- ✅ MikroTik credential testing
 
 **What's Missing:**
-- ❌ SNMP configuration endpoint
-- ❌ ArcGIS connection drawing for topology
-- ❌ Connection test for MikroTik credentials
+- ❌ Monitoring setup wizard does not save configuration to backend
 
 **Files with TODOs:**
-- `Module_Manager/src/routes/modules/monitoring/components/SNMPConfigurationPanel.svelte` (line 178)
-- `Module_Manager/src/routes/modules/monitoring/components/NetworkDeviceMap.svelte` (line 625)
-- `Module_Manager/src/routes/modules/monitoring/components/MikrotikCredentialsModal.svelte` (line 101)
+- `Module_Manager/src/lib/components/wizards/MonitoringSetupWizard.svelte`
 
 **Action Required:**
-- Complete SNMP configuration API
-- Implement topology connection visualization
-- Add credential testing
+- Wire Monitoring setup wizard to SNMP configuration API
 
 ### 4. Work Orders (Partial)
-**Status:** 🔨 ~70% Complete
+**Status:** 🔨 ~75% Complete
+
+**Completed Since Audit:**
+- ✅ Auth user ID wired into work order start
 
 **What's Missing:**
-- ❌ User ID from auth (currently hardcoded)
 - ❌ Advanced assignment workflows
 
-**Files with TODOs:**
-- `Module_Manager/src/routes/modules/work-orders/[id]/+page.svelte` (line 60)
-
 **Action Required:**
-- Integrate proper auth user ID
 - Complete assignment workflow
 
 ### 5. Marketing Discovery (Partial)
@@ -180,6 +181,45 @@
 **Action Required:**
 - Extract marketing discovery orchestration to service
 - Complete refactoring
+
+### 6. Additional Missing Items Found in Code Scan
+**Status:** 🔨 Mixed
+
+**Front-End Gaps:**
+- ❌ Plan module staging controls (MapLayerManager CRUD) not implemented
+  - `Module_Manager/src/routes/modules/plan/+page.svelte`
+- ❌ Deploy module map overlay and task assignment workflow placeholders
+  - `Module_Manager/src/routes/modules/deploy/+page.svelte`
+- ❌ Global settings still localStorage only (ACS credentials + company info)
+  - `Module_Manager/src/lib/components/GlobalSettings.svelte`
+- ❌ CBRS config encryption via Firebase Functions not implemented
+  - `Module_Manager/src/routes/modules/cbrs-management/lib/services/configService.ts`
+- ❌ Dashboard module list still shows “Coming Soon” badges
+  - `Module_Manager/src/routes/dashboard/+page.svelte`
+- ❌ Docs site has “More user guides coming soon…”
+  - `Module_Manager/docs-site/guides/index.md`
+
+**Back-End Gaps:**
+- ❌ PayPal webhook signature verification not implemented
+  - `backend-services/billing-api.js`
+- ❌ Daily digest email HTML/text templates missing
+  - `backend-services/email-service.js`
+- ❌ Password reset email sending placeholder
+  - `backend-services/services/emailService.js`
+- ❌ EPC metrics endpoints are mostly scaffolds (auth, storage, alerts, history)
+  - `backend-services/routes/epcMetrics.js`
+- ❌ Installation documentation notifications + payment workflow stubs
+  - `backend-services/routes/installation-documentation.js`
+- ❌ EPC check-in missing apt packages config extension
+  - `backend-services/routes/epc-checkin.js`
+- ❌ Tenant-specific module config in auth middleware
+  - `backend-services/middleware/auth.js`
+- ❌ Activity logging not implemented
+  - `backend-services/routes/users/index.js`
+- ❌ Marketing discovery orchestrator is placeholder
+  - `backend-services/services/plans-marketing-discovery-orchestrator.js`
+- ❌ EPC SNMP agent throughput/session helpers are placeholder
+  - `backend-services/utils/epc-snmp-agent.js`
 
 ---
 
