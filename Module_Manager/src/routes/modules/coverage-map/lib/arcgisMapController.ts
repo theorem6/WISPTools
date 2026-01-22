@@ -2187,35 +2187,6 @@ export class CoverageMapController {
     }
   }
 
-        totalGraphics: graphicsCount,
-        dataCounts: {
-          towers: towersCount,
-          towersWithLocation: towersWithLocation,
-          sectors: sectorsCount,
-          cpe: cpeCount,
-          equipment: equipmentCount
-        },
-        sampleTowers: sampleTowers,
-        filters: {
-          showTowers: this.filters.showTowers,
-          showSectors: this.filters.showSectors,
-          showCPE: this.filters.showCPE,
-          showEquipment: this.filters.showEquipment
-        },
-        mapReady: this.mapReady,
-        hasGraphicsLayer: !!this.graphicsLayer,
-        hasMapView: !!this.mapView,
-        graphicsLayerGraphicsCount: this.graphicsLayer?.graphics?.length
-      });
-    } catch (err) {
-      console.error('Failed to render assets:', err);
-      console.error('Error details:', err);
-    }
-  }
-
-  // Incremental update method - only updates symbols for existing graphics
-  private async updateGraphicsIncremental(): Promise<void> {
-
   private async renderMarketingLeads(): Promise<void> {
     if (!this.marketingLayer || !this.mapView) return;
 

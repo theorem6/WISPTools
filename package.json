@@ -1,55 +1,37 @@
 {
-  "name": "lte-pci-mapper",
-  "version": "0.2.0",
-  "private": true,
-  "description": "LTE WISP Management Platform - Module Manager System",
+  "name": "wisp-billing-service",
+  "version": "1.0.0",
+  "description": "PayPal billing service for WispTools.io",
+  "main": "billing-api.js",
   "scripts": {
-    "build": "cd Module_Manager && npm install && node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
-    "start": "cd Module_Manager && node build/index.js",
-    "dev": "cd Module_Manager && npm run dev",
-    "preview": "cd Module_Manager && npm run preview",
-    "check": "cd Module_Manager && npm run check",
-    "check:watch": "cd Module_Manager && npm run check:watch",
-    "lint": "eslint .",
-    "format": "prettier --plugin-search-dir . --write .",
-    "deploy:genieacs": "node deploy/genieacs-install.js",
-    "deploy:functions": "firebase deploy --only functions",
-    "deploy:apphosting": "firebase deploy --only apphosting",
-    "deploy:all": "firebase deploy",
-    "setup:genieacs": "chmod +x setup-genieacs-services.sh && sudo ./setup-genieacs-services.sh",
-    "test:functions": "curl -X POST https://us-central1-lte-pci-mapper.cloudfunctions.net/initializeSamplePresets",
-    "test:sync": "curl -X POST https://us-central1-lte-pci-mapper.cloudfunctions.net/syncGenieACSDevices"
+    "start": "node billing-api.js",
+    "init-plans": "node initialize-billing-plans.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
+    "axios": "^1.13.2",
+    "axios-retry": "^4.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase-admin": "^13.6.0",
+    "mongoose": "^7.8.8",
+    "multer": "^2.0.2",
+    "net-snmp": "^3.26.0",
+    "nodemailer": "^6.9.16",
+    "ping": "^0.4.4"
   },
   "devDependencies": {
-    "@types/eslint": "^9.6.1",
-    "@typescript-eslint/eslint-plugin": "^8.15.0",
-    "@typescript-eslint/parser": "^8.15.0",
-    "eslint": "^9.17.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-svelte": "^2.46.1",
-    "prettier": "^3.4.2",
-    "prettier-plugin-svelte": "^3.2.6"
+    "nodemon": "^3.1.11"
   },
-  "type": "module",
-  "dependencies": {
-    "@arcgis/core": "^4.33.0",
-    "firebase": "^11.1.0",
-    "@sveltejs/adapter-node": "^5.2.9",
-    "@sveltejs/kit": "^2.7.4",
-    "@sveltejs/vite-plugin-svelte": "^4.0.4",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.11",
-    "tslib": "^2.8.1",
-    "typescript": "^5.7.2",
-    "vite": "^5.4.11"
-  },
-  "engines": {
-    "node": ">=20.0.0",
-    "npm": ">=10.0.0"
-  },
-  "overrides": {
-    "@arcgis/core": {
-      "typescript": "^5.7.2"
-    }
-  }
+  "keywords": [
+    "paypal",
+    "billing",
+    "subscription",
+    "wisp",
+    "telecommunications"
+  ],
+  "author": "WispTools.io",
+  "license": "MIT"
 }

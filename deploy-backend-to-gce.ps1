@@ -3,15 +3,23 @@
 
 Write-Host "🚀 Deploying Backend Services to GCE VM..." -ForegroundColor Green
 
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $scriptDir
+
 # Check if we're in the right directory
-if (-not (Test-Path "backend-services")) {
+if (-not (Test-Path (Join-Path $scriptDir "backend-services"))) {
     Write-Host "❌ backend-services directory not found. Please run from project root." -ForegroundColor Red
     exit 1
 }
 
 # Create deployment package
 Write-Host "📦 Creating deployment package..." -ForegroundColor Yellow
-$deployDir = "backend-deployment"
+$deployDir = Join-Path $scriptDir "backend-deployment"
+if (-not $deployDir) {
+    Write-Host "❌ Deployment directory path is empty." -ForegroundColor Red
+    exit 1
+}
+Write-Host "📁 Deployment directory: $deployDir" -ForegroundColor Cyan
 if (Test-Path $deployDir) {
     Remove-Item -Recurse -Force $deployDir
 }
@@ -19,7 +27,7 @@ New-Item -ItemType Directory -Path $deployDir | Out-Null
 
 # Copy backend services
 Write-Host "📋 Copying backend services..." -ForegroundColor Yellow
-Copy-Item -Recurse "backend-services/*" "$deployDir/"
+Copy-Item -Recurse (Join-Path $scriptDir "backend-services\*") -Destination $deployDir
 
 # Create package.json for deployment
 Write-Host "📄 Creating deployment package.json..." -ForegroundColor Yellow
@@ -56,11 +64,11 @@ $packageJson = @{
     }
 } | ConvertTo-Json -Depth 3
 
-Set-Content -Path "$deployDir/package.json" -Value $packageJson
+Set-Content -Path (Join-Path $deployDir "package.json") -Value $packageJson
 
 # Create main server file
 Write-Host "🖥️ Creating main server file..." -ForegroundColor Yellow
-$serverJs = @"
+$serverJs = @'
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -154,12 +162,12 @@ app.use('*', (req, res) => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 LTE WISP Backend Server running on port `${PORT}`);
-  console.log(`🌐 Health check: http://localhost:`${PORT}`/health`);
-  console.log(`📡 SNMP API: http://localhost:`${PORT}`/api/snmp`);
-  console.log(`🌐 Mikrotik API: http://localhost:`${PORT}`/api/mikrotik`);
-  console.log(`📦 APT API: http://localhost:`${PORT}`/api/epc-updates`);
-  console.log(`📊 EPC Metrics API: http://localhost:`${PORT}`/api/epc`);
+  console.log(`🚀 LTE WISP Backend Server running on port ${PORT}`);
+  console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+  console.log(`📡 SNMP API: http://localhost:${PORT}/api/snmp`);
+  console.log(`🌐 Mikrotik API: http://localhost:${PORT}/api/mikrotik`);
+  console.log(`📦 APT API: http://localhost:${PORT}/api/epc-updates`);
+  console.log(`📊 EPC Metrics API: http://localhost:${PORT}/api/epc`);
 });
 
 // Graceful shutdown
@@ -172,13 +180,13 @@ process.on('SIGINT', () => {
   console.log('🛑 SIGINT received, shutting down gracefully');
   process.exit(0);
 });
-"@
+'@
 
-Set-Content -Path "$deployDir/server.js" -Value $serverJs
+Set-Content -Path (Join-Path $deployDir "server.js") -Value $serverJs
 
 # Create environment file template
 Write-Host "🔧 Creating environment template..." -ForegroundColor Yellow
-$envTemplate = @"
+$envTemplate = @'
 # LTE WISP Backend Configuration
 NODE_ENV=production
 PORT=3001
@@ -211,13 +219,13 @@ API_KEY=your-api-key-here
 # Logging
 LOG_LEVEL=info
 LOG_FILE=/var/log/lte-wisp/backend.log
-"@
+'@
 
-Set-Content -Path "$deployDir/.env.example" -Value $envTemplate
+Set-Content -Path (Join-Path $deployDir ".env.example") -Value $envTemplate
 
 # Create deployment instructions
 Write-Host "📋 Creating deployment instructions..." -ForegroundColor Yellow
-$deployInstructions = @"
+$deployInstructions = @'
 # Backend Deployment Instructions for GCE VM
 
 ## Server Details
@@ -362,9 +370,9 @@ The frontend (deployed to Firebase) will connect to:
 - **CORS**: Already configured for `wisptools-production.web.app`
 
 Make sure the frontend API configuration points to the correct GCE VM endpoint.
-"@
+'@
 
-Set-Content -Path "$deployDir/DEPLOYMENT_INSTRUCTIONS.md" -Value $deployInstructions
+Set-Content -Path (Join-Path $deployDir "DEPLOYMENT_INSTRUCTIONS.md") -Value $deployInstructions
 
 Write-Host "✅ Backend deployment package created successfully!" -ForegroundColor Green
 Write-Host ""
