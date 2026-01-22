@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../../models/network');
+const Tenant = require('../../models/tenant');
 const { SNMPMetrics } = require('../../models/snmp-metrics-schema');
 const { formatSNMPDevice, isFakeDevice } = require('./snmp-helpers');
 
@@ -96,18 +97,33 @@ router.get('/status', async (req, res) => {
 router.get('/configuration', async (req, res) => {
   try {
     const tenantId = req.tenantId;
-    
-    // Return default configuration (can be extended to store per-tenant config in DB)
-    res.json({
+    const tenant = await Tenant.findById(tenantId).lean();
+
+    const defaultConfig = {
+      defaultCommunity: 'public',
+      defaultPort: 161,
+      defaultTimeout: 5000,
+      defaultRetries: 3,
+      defaultAuthProtocol: 'SHA',
+      defaultPrivProtocol: 'AES',
+      discoverySubnets: [],
       communityProfiles: [],
       v3UserProfiles: [],
-      discoverySubnets: [],
-      defaultCommunity: 'public',
-      defaultVersion: '2c',
-      pollingInterval: 60,
-      trapPort: 162,
-      enabled: true
-    });
+      deviceOverrides: [],
+      autoDiscovery: {
+        enabled: true,
+        scanInterval: 3600000,
+        scanPorts: [161, 1161],
+        scanCommunities: ['public', 'private', 'monitor'],
+        maxConcurrent: 50,
+        excludeRanges: ['127.0.0.0/8', '169.254.0.0/16']
+      }
+    };
+
+    const savedConfig = tenant?.settings?.snmpConfig;
+    res.json(savedConfig && typeof savedConfig === 'object'
+      ? { ...defaultConfig, ...savedConfig }
+      : defaultConfig);
   } catch (error) {
     console.error('❌ [SNMP API] Error fetching configuration:', error);
     res.status(500).json({ 
@@ -123,8 +139,16 @@ router.post('/configuration', async (req, res) => {
     const tenantId = req.tenantId;
     const config = req.body;
     
-    // In the future, save this to a TenantSettings or SNMPConfig collection
+    if (!config || typeof config !== 'object') {
+      return res.status(400).json({ error: 'Invalid SNMP configuration payload' });
+    }
+
     console.log(`[SNMP API] Saving configuration for tenant ${tenantId}`);
+
+    await Tenant.updateOne(
+      { _id: tenantId },
+      { $set: { 'settings.snmpConfig': config, 'settings.snmpConfigUpdatedAt': new Date() } }
+    );
     
     res.json({
       success: true,
