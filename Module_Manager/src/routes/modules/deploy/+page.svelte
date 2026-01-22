@@ -39,23 +39,18 @@ import { iframeCommunicationService } from '$lib/services/iframeCommunicationSer
   
   // Tips Modal
   let showTipsModal = false;
+  let tipsShown = false;
   const tips = getModuleTips('deploy');
   
-  onMount(() => {
-    // Show tips on first visit (if not dismissed)
-    if (tips.length > 0) {
-      try {
-        if (tipsService && tipsService.shouldShowTips('deploy')) {
-          // Use requestAnimationFrame for minimal delay (single frame ~16ms)
-          requestAnimationFrame(() => {
-            showTipsModal = true;
-          });
-        }
-      } catch (err) {
-        console.error('[Deploy] Error checking tips service:', err);
+  // Show tips AFTER map iframe is ready
+  $: if (iframeReady && !isLoadingPlans && !tipsShown && tips.length > 0 && tipsService.shouldShowTips('deploy')) {
+    setTimeout(() => {
+      if (iframeReady && !isLoadingPlans && !tipsShown) {
+        showTipsModal = true;
+        tipsShown = true;
       }
-    }
-  });
+    }, 500);
+  }
   let mapContainer: HTMLDivElement;
   let mapState: MapLayerState | undefined;
   let mapMode: MapModuleMode = 'deploy';

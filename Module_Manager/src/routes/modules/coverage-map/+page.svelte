@@ -80,6 +80,7 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   
   // Tips Modal
   let showTipsModal = false;
+  let tipsShown = false; // Track if tips have been shown
   const tips = getModuleTips('coverage-map');
   
   // Check if we're in an iframe (will be set in onMount)
@@ -93,6 +94,17 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
     const isDeployMode = urlParams.get('mode') === 'deploy' || urlParams.get('deployMode') === 'true';
     return isInIframe || isPlanMode || isDeployMode;
   })();
+  
+  // Show tips AFTER loading completes (maps are loaded)
+  $: if (!isLoading && !tipsShown && !isEmbedded && tips.length > 0 && tipsService.shouldShowTips('coverage-map')) {
+    // Defer slightly to ensure maps are fully rendered
+    setTimeout(() => {
+      if (!isLoading && !tipsShown && !isEmbedded) {
+        showTipsModal = true;
+        tipsShown = true;
+      }
+    }, 500); // 500ms delay to ensure maps are loaded
+  }
   
   // Guard flag to prevent duplicate loads
   let isLoadingData = false;
@@ -437,14 +449,6 @@ import type { MapModuleMode, MapCapabilities } from '$lib/map/MapCapabilities';
   onMount(async () => {
     // Check if we're in an iframe (must be done in onMount where window is available)
     isInIframe = window.parent && window.parent !== window;
-    
-    // Only show tips if NOT embedded (standalone coverage-map page)
-    if (!isEmbedded && tips.length > 0 && tipsService.shouldShowTips('coverage-map')) {
-      // Use requestAnimationFrame for minimal delay (single frame ~16ms)
-      requestAnimationFrame(() => {
-        showTipsModal = true;
-      });
-    }
     
     window.addEventListener('message', handleSharedMapMessage);
     

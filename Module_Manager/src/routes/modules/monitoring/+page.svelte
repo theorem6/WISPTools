@@ -60,17 +60,19 @@
   
   // Tips Modal
   let showTipsModal = false;
+  let tipsShown = false; // Track if tips have been shown to prevent duplicate shows
   const tips = getModuleTips('monitoring');
   
-  onMount(() => {
-    // Show tips on first visit (if not dismissed)
-    if (tips.length > 0 && tipsService.shouldShowTips('monitoring')) {
-      // Use requestAnimationFrame for minimal delay (single frame ~16ms)
-      requestAnimationFrame(() => {
+  // Show tips AFTER loading completes (maps are loaded)
+  $: if (!loading && !tipsShown && tips.length > 0 && tipsService.shouldShowTips('monitoring')) {
+    // Defer slightly to ensure maps are fully rendered
+    setTimeout(() => {
+      if (!loading && !tipsShown) {
         showTipsModal = true;
-      });
-    }
-  });
+        tipsShown = true;
+      }
+    }, 500); // 500ms delay to ensure maps are loaded
+  }
   
   // Deploy Modals
   let showEPCDeploymentModal = false;
@@ -1143,6 +1145,14 @@
     title="Network Monitoring Help"
     content={helpContent}
     on:close={() => showHelpModal = false}
+  />
+
+  <!-- Tips Modal -->
+  <TipsModal
+    bind:show={showTipsModal}
+    moduleId="monitoring"
+    {tips}
+    on:close={() => showTipsModal = false}
   />
 </TenantGuard>
 

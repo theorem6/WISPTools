@@ -8,9 +8,27 @@
   import AddSectorModal from '../coverage-map/components/AddSectorModal.svelte';
   import AddCPEModal from '../coverage-map/components/AddCPEModal.svelte';
   import AddBackhaulLinkModal from '../coverage-map/components/AddBackhaulLinkModal.svelte';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { getModuleTips } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
   
   let sites: any[] = [];
   let loading = true;
+  
+  // Tips Modal
+  let showTipsModal = false;
+  let tipsShown = false;
+  const tips = getModuleTips('sites');
+  
+  // Show tips AFTER loading completes
+  $: if (!loading && !tipsShown && tips.length > 0 && tipsService.shouldShowTips('sites')) {
+    setTimeout(() => {
+      if (!loading && !tipsShown) {
+        showTipsModal = true;
+        tipsShown = true;
+      }
+    }, 500);
+  }
   let error = '';
   let searchQuery = '';
   let typeFilter: string = 'all';
@@ -407,6 +425,14 @@ const statusFilterFieldId = 'sites-status-filter';
       on:close={() => { showBackhaulModal = false; selectedSiteForBackhaul = null; }}
     />
   {/if}
+
+  <!-- Tips Modal -->
+  <TipsModal
+    bind:show={showTipsModal}
+    moduleId="sites"
+    {tips}
+    on:close={() => showTipsModal = false}
+  />
 </TenantGuard>
 
 <style>

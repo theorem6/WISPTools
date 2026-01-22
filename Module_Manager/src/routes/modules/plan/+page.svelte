@@ -53,7 +53,18 @@ interface MapViewExtentPayload {
   
   // Tips Modal
   let showTipsModal = false;
+  let tipsShown = false;
   const tips = getModuleTips('plan');
+  
+  // Show tips AFTER loading completes (maps are loaded)
+  $: if (!isLoading && !isLoadingData && !tipsShown && tips.length > 0 && tipsService.shouldShowTips('plan')) {
+    setTimeout(() => {
+      if (!isLoading && !isLoadingData && !tipsShown) {
+        showTipsModal = true;
+        tipsShown = true;
+      }
+    }, 500);
+  }
   
   // Data
   let projects: PlanProject[] = [];
@@ -550,14 +561,6 @@ $: draftPlanSuggestion = projects.find(p => p.status === 'draft');
   }
 
   onMount(() => {
-    // Show tips on first visit (if not dismissed)
-    if (tips.length > 0 && tipsService.shouldShowTips('plan')) {
-      // Use requestAnimationFrame for minimal delay (single frame ~16ms)
-      requestAnimationFrame(() => {
-        showTipsModal = true;
-      });
-    }
-    
     if (!browser) {
       return;
     }

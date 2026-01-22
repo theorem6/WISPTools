@@ -952,6 +952,106 @@ export const moduleTips: ModuleTipsConfig = {
         <p><strong>💡 Tip:</strong> Use Nokia configuration export to directly apply changes to your eNodeBs.</p>
       `
     }
+  ],
+  'sites': [
+    {
+      id: 'sites-1',
+      title: '🏗️ Managing Sites',
+      icon: '🏗️',
+      content: `
+        <h4>Site Management Overview</h4>
+        <p>The Sites module lets you manage all your tower sites and locations:</p>
+        <ul>
+          <li><strong>View Sites:</strong> See all sites with filters for type and status</li>
+          <li><strong>Edit Sites:</strong> Right-click or use the edit button to modify site details</li>
+          <li><strong>Add Sectors:</strong> Add coverage sectors to sites</li>
+          <li><strong>Add CPE:</strong> Add customer premises equipment</li>
+          <li><strong>Add Backhauls:</strong> Create backhaul links between sites</li>
+        </ul>
+        <p><strong>💡 Tip:</strong> Sites are the foundation of your network - organize them well!</p>
+      `
+    },
+    {
+      id: 'sites-2',
+      title: '📍 Site Location & Details',
+      icon: '📍',
+      content: `
+        <h4>Site Information</h4>
+        <p>Each site contains important information:</p>
+        <ul>
+          <li><strong>Location:</strong> GPS coordinates and address</li>
+          <li><strong>Type:</strong> Tower, building, or other structure type</li>
+          <li><strong>Status:</strong> Active, inactive, or maintenance</li>
+          <li><strong>Contact:</strong> Site contact information</li>
+          <li><strong>Equipment:</strong> Hardware deployed at the site</li>
+        </ul>
+        <p><strong>💡 Tip:</strong> Keep site information up-to-date for accurate network planning.</p>
+      `
+    },
+    {
+      id: 'sites-3',
+      title: '📡 Adding Sectors & Equipment',
+      icon: '📡',
+      content: `
+        <h4>Site Components</h4>
+        <p>Enhance your sites with:</p>
+        <ol>
+          <li><strong>Sectors:</strong> Coverage areas with frequency bands</li>
+          <li><strong>CPE Devices:</strong> Customer equipment at locations</li>
+          <li><strong>Backhaul Links:</strong> Connections between sites</li>
+        </ol>
+        <p><strong>💡 Tip:</strong> Use the right-click menu on sites to quickly add components.</p>
+      `
+    }
+  ],
+  'maintain': [
+    {
+      id: 'maintain-1',
+      title: '🎫 Help Desk & Tickets',
+      icon: '🎫',
+      content: `
+        <h4>Managing Support Tickets</h4>
+        <p>The Maintain module helps you manage customer support and maintenance:</p>
+        <ul>
+          <li><strong>Create Tickets:</strong> Click "Create Ticket" to open a new support request</li>
+          <li><strong>View Tickets:</strong> See all tickets with filters for status and priority</li>
+          <li><strong>Update Status:</strong> Change ticket status as you work on issues</li>
+          <li><strong>Customer Lookup:</strong> Quickly find customer information</li>
+        </ul>
+        <p><strong>💡 Tip:</strong> Use the filters to quickly find tickets by status, priority, or search term.</p>
+      `
+    },
+    {
+      id: 'maintain-2',
+      title: '👥 Customer Management',
+      icon: '👥',
+      content: `
+        <h4>Customer Information</h4>
+        <p>Manage customer data in the Customers tab:</p>
+        <ul>
+          <li><strong>View Customers:</strong> See all customers with contact information</li>
+          <li><strong>Add Customers:</strong> Create new customer records</li>
+          <li><strong>Edit Customers:</strong> Update customer information</li>
+          <li><strong>Search:</strong> Find customers by name, email, or phone</li>
+        </ul>
+        <p><strong>💡 Tip:</strong> Keep customer information up-to-date for better support.</p>
+      `
+    },
+    {
+      id: 'maintain-3',
+      title: '🔧 Maintenance Scheduling',
+      icon: '🔧',
+      content: `
+        <h4>Scheduled Maintenance</h4>
+        <p>Plan and track maintenance activities:</p>
+        <ul>
+          <li><strong>Schedule Maintenance:</strong> Plan regular maintenance tasks</li>
+          <li><strong>Track Progress:</strong> Monitor maintenance completion</li>
+          <li><strong>View History:</strong> See past maintenance activities</li>
+        </ul>
+        <p><strong>💡 Tip:</strong> Regular maintenance helps prevent issues before they occur.</p>
+      `
+    }
   ]
 };
 

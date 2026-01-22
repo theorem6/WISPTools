@@ -44,7 +44,18 @@
   
   // Tips Modal
   let showTipsModal = false;
+  let tipsShown = false;
   const tips = getModuleTips('inventory');
+  
+  // Show tips AFTER loading completes
+  $: if (!isLoading && !tipsShown && tips.length > 0 && tipsService.shouldShowTips('inventory')) {
+    setTimeout(() => {
+      if (!isLoading && !tipsShown) {
+        showTipsModal = true;
+        tipsShown = true;
+      }
+    }, 500);
+  }
   
   // Filters
   let filters: InventoryFilters = {
@@ -132,14 +143,6 @@
   }
   
   onMount(async () => {
-    // Show tips on first visit (if not dismissed)
-    if (tips.length > 0 && tipsService.shouldShowTips('inventory')) {
-      // Use requestAnimationFrame for minimal delay (single frame ~16ms)
-      requestAnimationFrame(() => {
-        showTipsModal = true;
-      });
-    }
-    
     if (tenantId) {
       await loadData();
       await loadStats();

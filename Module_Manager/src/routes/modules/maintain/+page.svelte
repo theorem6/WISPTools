@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
@@ -12,6 +12,9 @@
   import CustomerLookupModal from '../help-desk/components/CustomerLookupModal.svelte';
   import AddEditCustomerModal from '../customers/components/AddEditCustomerModal.svelte';
   import { API_CONFIG } from '$lib/config/api';
+  import TipsModal from '$lib/components/modals/TipsModal.svelte';
+  import { getModuleTips } from '$lib/config/moduleTips';
+  import { tipsService } from '$lib/services/tipsService';
   
   // Use centralized API configuration
   const MAINTAIN_API = API_CONFIG.PATHS.MAINTAIN;
@@ -19,6 +22,21 @@
   // Tab management
   type Tab = 'help-desk' | 'tickets' | 'maintenance' | 'customers' | 'incidents';
   let activeTab: Tab = 'help-desk';
+  
+  // Tips Modal
+  let showTipsModal = false;
+  let tipsShown = false;
+  const tips = getModuleTips('maintain');
+  
+  // Show tips AFTER loading completes
+  $: if (!loadingStats && !loadingTickets && !loadingCustomers && !tipsShown && tips.length > 0 && tipsService.shouldShowTips('maintain')) {
+    setTimeout(() => {
+      if (!loadingStats && !loadingTickets && !loadingCustomers && !tipsShown) {
+        showTipsModal = true;
+        tipsShown = true;
+      }
+    }, 500);
+  }
   
   // Dashboard stats
   let dashboardStats = {
@@ -617,6 +635,14 @@ $: if (showTicketDetails) {
   {#if showEditCustomer && selectedCustomer}
     <AddEditCustomerModal customer={selectedCustomer} on:close={() => { showEditCustomer = false; selectedCustomer = null; }} on:saved={handleCustomerCreated} />
   {/if}
+
+  <!-- Tips Modal -->
+  <TipsModal
+    bind:show={showTipsModal}
+    moduleId="maintain"
+    {tips}
+    on:close={() => showTipsModal = false}
+  />
 </TenantGuard>
 
 <style>
