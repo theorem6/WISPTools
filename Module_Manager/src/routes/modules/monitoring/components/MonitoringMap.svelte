@@ -775,14 +775,27 @@
     convertDevicesToEquipment();
   }
   
+  // Debounce timer for loadSites to prevent rapid-fire calls
+  let loadSitesTimeout: ReturnType<typeof setTimeout> | null = null;
+  
   // Watch for tenant, devices, and alerts to reload sites with updated status
   $: if (tenantId) {
-    loadSites();
+    // Debounce loadSites to prevent multiple rapid calls
+    if (loadSitesTimeout) {
+      clearTimeout(loadSitesTimeout);
+    }
+    loadSitesTimeout = setTimeout(() => {
+      loadSites();
+    }, 300); // 300ms debounce
   }
   
   // Handle refreshData event from parent - reload sites when data refreshes
   export function handleRefresh() {
     if (tenantId) {
+      // Clear any pending debounced call and load immediately
+      if (loadSitesTimeout) {
+        clearTimeout(loadSitesTimeout);
+      }
       loadSites();
     }
   }

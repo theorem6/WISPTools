@@ -44,6 +44,10 @@ export class CoverageMapController {
   private marketingLayer: any = null;
   private planDraftLayer: any = null;
   private planDraftGraphics: Map<string, any> = new Map();
+  
+  // Track graphics by ID for incremental updates
+  private graphicsMap: Map<string, any> = new Map(); // Map<graphicId, graphic>
+  private lastDataHash: string = ''; // Hash of last rendered data to detect structural changes
   private planDraftDragContext:
     | {
         featureId: string;
@@ -510,22 +514,49 @@ export class CoverageMapController {
       mapReady: this.mapReady
     });
     
-    this.data = {
+    const newData = {
       towers: data.towers || [],
       sectors: data.sectors || [],
       cpeDevices: data.cpeDevices || [],
       equipment: data.equipment || []
     };
+    
+    // Check if this is a structural change (items added/removed) or just status updates
+    const newDataHash = this.getDataStructureHash(newData);
+    const isStructuralChange = newDataHash !== this.lastDataHash;
+    
+    this.data = newData;
+    this.lastDataHash = newDataHash;
 
     if (this.mapReady) {
-      console.log('[CoverageMap] Map is ready, calling renderAllAssets');
-      this.renderAllAssets().catch(err => {
-        console.error('[CoverageMap] Asset render error:', err);
-        console.error('[CoverageMap] Error stack:', err?.stack);
-      });
+      if (isStructuralChange) {
+        console.log('[CoverageMap] Structural change detected, full re-render');
+        this.renderAllAssets().catch(err => {
+          console.error('[CoverageMap] Asset render error:', err);
+          console.error('[CoverageMap] Error stack:', err?.stack);
+        });
+      } else {
+        console.log('[CoverageMap] Status update only, incremental update');
+        this.updateGraphicsIncremental().catch(err => {
+          console.error('[CoverageMap] Incremental update error:', err);
+          // Fallback to full render on error
+          this.renderAllAssets().catch(renderErr => {
+            console.error('[CoverageMap] Fallback render error:', renderErr);
+          });
+        });
+      }
     } else {
       console.log('[CoverageMap] Map not ready yet, data stored for later rendering');
     }
+  }
+  
+  // Generate a hash of data structure (IDs only, not status/uptime)
+  private getDataStructureHash(data: CoverageMapData): string {
+    const towerIds = (data.towers || []).map(t => String(t.id || t._id)).sort().join(',');
+    const sectorIds = (data.sectors || []).map(s => String(s.id || s._id)).sort().join(',');
+    const cpeIds = (data.cpeDevices || []).map(c => String(c.id || c._id)).sort().join(',');
+    const equipmentIds = (data.equipment || []).map(e => String(e.id || e._id)).sort().join(',');
+    return `${towerIds}|${sectorIds}|${cpeIds}|${equipmentIds}`;
   }
 
   public setFilters(filters: CoverageMapFilters): void {
@@ -1626,6 +1657,9 @@ export class CoverageMapController {
         import('@arcgis/core/symbols/TextSymbol.js')
       ]);
 
+      // Clear graphics tracking map on full render
+      this.graphicsMap.clear();
+      
       if (this.graphicsLayer) {
         this.graphicsLayer.removeAll();
       }
@@ -1733,6 +1767,9 @@ export class CoverageMapController {
 
             if (this.graphicsLayer) {
               this.graphicsLayer.add(graphic);
+              // Track graphic by ID for incremental updates
+              const graphicId = `tower-${tower.id}`;
+              this.graphicsMap.set(graphicId, graphic);
               towersRendered++;
             }
           } catch (towerError) {
@@ -1873,6 +1910,9 @@ export class CoverageMapController {
 
             if (this.graphicsLayer) {
               this.graphicsLayer.add(graphic);
+              // Track graphic by ID for incremental updates
+              const graphicId = `sector-${sector.id}`;
+              this.graphicsMap.set(graphicId, graphic);
               sectorsRendered++;
             }
           } catch (sectorError) {
@@ -2024,6 +2064,347 @@ export class CoverageMapController {
         lon: t.location?.longitude
       })) || [];
       
+  // Incremental update method - only updates symbols for existing graphics
+  private async updateGraphicsIncremental(): Promise<void> {
+    if (!this.graphicsLayer || !this.mapView) {
+      console.warn('[CoverageMap] updateGraphicsIncremental called but map not ready');
+      return;
+    }
+    
+    console.log('[CoverageMap] Starting incremental update');
+    
+    try {
+      const [
+        { default: SimpleMarkerSymbol },
+        { default: PictureMarkerSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/PictureMarkerSymbol.js')
+      ]);
+      
+      let updatedCount = 0;
+      const isMobile = window.innerWidth <= 768;
+      const iconSize = isMobile ? 48 : 40;
+      const symbolSize = isMobile ? '28px' : '20px';
+      const outlineWidth = isMobile ? 4 : 3;
+      
+      // Update tower graphics
+      if (this.filters.showTowers && Array.isArray(this.data.towers)) {
+        for (const tower of this.data.towers) {
+          const graphicId = `tower-${tower.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            // Update symbol based on status
+            let towerType: string;
+            if (Array.isArray(tower.type)) {
+              const preferredTypes = ['noc', 'warehouse', 'vehicle', 'rma', 'vendor', 'internet-access', 'internet'];
+              const preferredType = tower.type.find((t: string) => preferredTypes.includes(t));
+              towerType = preferredType || tower.type[0] || 'tower';
+            } else {
+              towerType = tower.type || 'tower';
+            }
+            
+            let symbol;
+            const customIcon = createLocationIcon(towerType, iconSize);
+            
+            if (customIcon) {
+              symbol = new PictureMarkerSymbol(customIcon);
+            } else {
+              const color = getTowerColor(towerType, tower.status);
+              symbol = new SimpleMarkerSymbol({
+                style: 'circle',
+                color: color,
+                size: symbolSize,
+                outline: {
+                  color: 'white',
+                  width: outlineWidth
+                }
+              });
+            }
+            
+            graphic.symbol = symbol;
+            // Update attributes
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...tower,
+              status: tower.status
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update sector graphics
+      if (this.filters.showSectors && Array.isArray(this.data.sectors)) {
+        for (const sector of this.data.sectors) {
+          const graphicId = `sector-${sector.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const color = getSectorColor(sector.status, sector.uptimePercent);
+            const symbol = new SimpleFillSymbol({
+              style: 'solid',
+              color: color,
+              outline: {
+                color: 'white',
+                width: 2
+              }
+            });
+            
+            graphic.symbol = symbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...sector,
+              status: sector.status,
+              uptimePercent: sector.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update CPE graphics
+      if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
+        for (const cpe of this.data.cpeDevices) {
+          const graphicId = `cpe-${cpe.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const color = getCPEColor(cpe.status, cpe.uptimePercent);
+            const symbol = new SimpleMarkerSymbol({
+              style: 'square',
+              color: color,
+              size: '12px',
+              outline: {
+                color: 'white',
+                width: 1
+              }
+            });
+            
+            graphic.symbol = symbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...cpe,
+              status: cpe.status,
+              uptimePercent: cpe.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update equipment graphics
+      if (this.filters.showEquipment && Array.isArray(this.data.equipment)) {
+        for (const equip of this.data.equipment) {
+          const graphicId = `equipment-${equip.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const color = getEquipmentColor(equip.status, equip.uptimePercent);
+            const symbol = new SimpleMarkerSymbol({
+              style: 'diamond',
+              color: color,
+              size: '14px',
+              outline: {
+                color: 'white',
+                width: 1
+              }
+            });
+            
+            graphic.symbol = symbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...equip,
+              status: equip.status,
+              uptimePercent: equip.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      console.log(`[CoverageMap] ✅ Incrementally updated ${updatedCount} graphics`);
+    } catch (error) {
+      console.error('[CoverageMap] Error in incremental update:', error);
+      throw error;
+    }
+  }
+
+  // Incremental update method - only updates symbols for existing graphics
+  private async updateGraphicsIncremental(): Promise<void> {
+    if (!this.graphicsLayer || !this.mapView) {
+      console.warn('[CoverageMap] updateGraphicsIncremental called but map not ready');
+      return;
+    }
+    
+    console.log('[CoverageMap] Starting incremental update');
+    
+    try {
+      const [
+        { default: SimpleMarkerSymbol },
+        { default: SimpleFillSymbol },
+        { default: PictureMarkerSymbol }
+      ] = await Promise.all([
+        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
+        import('@arcgis/core/symbols/SimpleFillSymbol.js'),
+        import('@arcgis/core/symbols/PictureMarkerSymbol.js')
+      ]);
+      
+      let updatedCount = 0;
+      const isMobile = window.innerWidth <= 768;
+      const iconSize = isMobile ? 48 : 40;
+      const symbolSize = isMobile ? '28px' : '20px';
+      const outlineWidth = isMobile ? 4 : 3;
+      
+      // Update tower graphics
+      if (this.filters.showTowers && Array.isArray(this.data.towers)) {
+        for (const tower of this.data.towers) {
+          const graphicId = `tower-${tower.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            // Update symbol based on status
+            let towerType: string;
+            if (Array.isArray(tower.type)) {
+              const preferredTypes = ['noc', 'warehouse', 'vehicle', 'rma', 'vendor', 'internet-access', 'internet'];
+              const preferredType = tower.type.find((t: string) => preferredTypes.includes(t));
+              towerType = preferredType || tower.type[0] || 'tower';
+            } else {
+              towerType = tower.type || 'tower';
+            }
+            
+            let symbol;
+            const customIcon = createLocationIcon(towerType, iconSize);
+            
+            if (customIcon) {
+              symbol = new PictureMarkerSymbol(customIcon);
+            } else {
+              const color = getTowerColor(towerType, tower.status);
+              symbol = new SimpleMarkerSymbol({
+                style: 'circle',
+                color: color,
+                size: symbolSize,
+                outline: {
+                  color: 'white',
+                  width: outlineWidth
+                }
+              });
+            }
+            
+            graphic.symbol = symbol;
+            // Update attributes
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...tower,
+              status: tower.status
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update sector graphics
+      if (this.filters.showSectors && Array.isArray(this.data.sectors)) {
+        for (const sector of this.data.sectors) {
+          const graphicId = `sector-${sector.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            // Get color based on status/uptime
+            const color = getBandColor(sector.band || sector.technology);
+            const rgbaColor = hexToRgb(color);
+            const transparentColor = [...rgbaColor, 0.3];
+            
+            const symbol = new SimpleFillSymbol({
+              style: 'solid',
+              color: transparentColor,
+              outline: {
+                color: 'white',
+                width: 2
+              }
+            });
+            
+            graphic.symbol = symbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...sector,
+              status: sector.status,
+              uptimePercent: sector.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update CPE graphics
+      if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
+        for (const cpe of this.data.cpeDevices) {
+          const graphicId = `cpe-${cpe.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const color = cpe.status === 'online' ? '#10b981' : '#ef4444';
+            const fillSymbol = new SimpleFillSymbol({
+              color: [...hexToRgb(color), 0.5],
+              outline: {
+                color: 'white',
+                width: 1
+              }
+            });
+            
+            graphic.symbol = fillSymbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...cpe,
+              status: cpe.status,
+              uptimePercent: cpe.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      // Update equipment graphics
+      if (this.filters.showEquipment && Array.isArray(this.data.equipment)) {
+        for (const equip of this.data.equipment) {
+          const graphicId = `equipment-${equip.id}`;
+          const graphic = this.graphicsMap.get(graphicId);
+          
+          if (graphic) {
+            const color = getEquipmentColor(equip.status);
+            const symbolSize = isMobile ? '16px' : '12px';
+            const outlineWidth = isMobile ? 2 : 1;
+            
+            const symbol = new SimpleMarkerSymbol({
+              style: 'circle',
+              color: color,
+              size: symbolSize,
+              outline: {
+                color: 'white',
+                width: outlineWidth
+              }
+            });
+            
+            graphic.symbol = symbol;
+            graphic.attributes = {
+              ...graphic.attributes,
+              ...equip,
+              status: equip.status,
+              uptimePercent: equip.uptimePercent
+            };
+            updatedCount++;
+          }
+        }
+      }
+      
+      console.log(`[CoverageMap] ✅ Incrementally updated ${updatedCount} graphics`);
+    } catch (error) {
+      console.error('[CoverageMap] Error in incremental update:', error);
+      throw error;
+    }
+  }
+
       console.log(`[CoverageMap] ✅ Rendered ${graphicsCount} graphics on map`, {
         totalGraphics: graphicsCount,
         dataCounts: {
