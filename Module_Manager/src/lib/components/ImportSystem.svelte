@@ -398,7 +398,7 @@
   }
   
   function validateNetworkEquipmentData() {
-    const requiredFields = ['name', 'hardware_type'];
+    const requiredFields = ['name', 'type'];
     
     parsedData.forEach((row, index) => {
       requiredFields.forEach(field => {
@@ -411,6 +411,32 @@
           });
         }
       });
+      
+      // Validate type enum
+      if (row.type) {
+        const validTypes = ['router', 'switch', 'power-supply', 'ups', 'generator', 'cable', 'connector', 'mounting-hardware', 'backhaul', 'antenna', 'radio', 'other'];
+        if (!validTypes.includes(row.type.toLowerCase())) {
+          validationErrors.push({
+            row: row._rowIndex || index + 2,
+            field: 'type',
+            message: `Invalid type. Must be one of: ${validTypes.join(', ')}`,
+            value: row.type
+          });
+        }
+      }
+      
+      // Validate status enum if provided
+      if (row.status) {
+        const validStatuses = ['active', 'inactive', 'maintenance', 'planned', 'retired'];
+        if (!validStatuses.includes(row.status.toLowerCase())) {
+          validationErrors.push({
+            row: row._rowIndex || index + 2,
+            field: 'status',
+            message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+            value: row.status
+          });
+        }
+      }
     });
   }
   
@@ -523,15 +549,15 @@ Project Beta,Deployment project for Beta area,active,321 Elm St,City,ST,12346,40
   }
   
   function getSiteTemplate(): string {
-    return `name,type,latitude,longitude,address.street,address.city,address.state,address.zipCode,altitude,towerHeight
-Site Alpha,tower,40.7128,-74.0060,123 Main St,City,ST,12345,100,150
-Site Beta,tower,40.7130,-74.0062,456 Oak Ave,City,ST,12346,120,175`;
+    return `name,type,location.latitude,location.longitude,location.address,location.city,location.state,location.zipCode,location.country,height,status
+Site Alpha,tower,40.7128,-74.0060,123 Main St,City,ST,12345,US,150,active
+Site Beta,tower,40.7130,-74.0062,456 Oak Ave,City,ST,12346,US,175,active`;
   }
   
   function getNetworkEquipmentTemplate(): string {
-    return `name,hardware_type,siteId,status,config,notes
-Radio 1,radio,site-id-1,deployed,{"frequency":"2500","power":"20"},Main site radio
-Router 1,router,site-id-1,deployed,{"ip":"192.168.1.1"},Core router`;
+    return `name,type,hardware_type,status,location.latitude,location.longitude,location.address,siteId,manufacturer,model,serialNumber,notes
+Radio 1,radio,radio,active,40.7128,-74.0060,123 Main St,site-id-1,Ubiquiti,AF-5X,SN123456,Main site radio
+Router 1,router,router,active,40.7128,-74.0060,123 Main St,site-id-1,Mikrotik,CCR1036,SN789012,Core router`;
   }
   
   function getWorkOrderTemplate(): string {

@@ -1341,15 +1341,31 @@ router.post('/sites/bulk-import', async (req, res) => {
         const siteData = sites[i];
         const createdBy = siteData.createdBy || req.user?.email || 'System';
         
-        // Handle nested address fields
-        if (siteData['address.street'] || siteData['address.city']) {
-          siteData.address = {
-            street: siteData['address.street'] || siteData.address?.street,
-            city: siteData['address.city'] || siteData.address?.city,
-            state: siteData['address.state'] || siteData.address?.state,
-            zipCode: siteData['address.zipCode'] || siteData.address?.zipCode,
-            country: siteData['address.country'] || siteData.address?.country || 'USA'
+        // Handle nested location fields (location.latitude, location.longitude, etc.)
+        if (siteData['location.latitude'] || siteData['location.longitude'] || siteData.latitude || siteData.longitude) {
+          siteData.location = {
+            latitude: siteData['location.latitude'] !== undefined ? parseFloat(siteData['location.latitude']) : 
+                          (siteData.latitude !== undefined ? parseFloat(siteData.latitude) : (siteData.location?.latitude || 0)),
+            longitude: siteData['location.longitude'] !== undefined ? parseFloat(siteData['location.longitude']) : 
+                       (siteData.longitude !== undefined ? parseFloat(siteData.longitude) : (siteData.location?.longitude || 0)),
+            address: siteData['location.address'] || siteData['address.street'] || siteData.location?.address || siteData.address?.street,
+            city: siteData['location.city'] || siteData['address.city'] || siteData.location?.city || siteData.address?.city,
+            state: siteData['location.state'] || siteData['address.state'] || siteData.location?.state || siteData.address?.state,
+            zipCode: siteData['location.zipCode'] || siteData['address.zipCode'] || siteData.location?.zipCode || siteData.address?.zipCode,
+            country: siteData['location.country'] || siteData['address.country'] || siteData.location?.country || siteData.address?.country || 'US'
           };
+        }
+        
+        // Handle nested address fields (backward compatibility)
+        if (siteData['address.street'] || siteData['address.city']) {
+          if (!siteData.location) {
+            siteData.location = {};
+          }
+          siteData.location.address = siteData['address.street'] || siteData.address?.street || siteData.location.address;
+          siteData.location.city = siteData['address.city'] || siteData.address?.city || siteData.location.city;
+          siteData.location.state = siteData['address.state'] || siteData.address?.state || siteData.location.state;
+          siteData.location.zipCode = siteData['address.zipCode'] || siteData.address?.zipCode || siteData.location.zipCode;
+          siteData.location.country = siteData['address.country'] || siteData.address?.country || siteData.location.country || 'US';
         }
         
         // Remove dot-notation fields
@@ -1359,17 +1375,26 @@ router.post('/sites/bulk-import', async (req, res) => {
           }
         });
         
+        // Remove old top-level latitude/longitude if location object exists
+        if (siteData.location && (siteData.latitude !== undefined || siteData.longitude !== undefined)) {
+          delete siteData.latitude;
+          delete siteData.longitude;
+        }
+        
         // Ensure required fields
         if (!siteData.name) {
           throw new Error('name is required');
         }
         
-        if (siteData.latitude !== undefined && (isNaN(parseFloat(siteData.latitude)) || parseFloat(siteData.latitude) < -90 || parseFloat(siteData.latitude) > 90)) {
-          throw new Error('Invalid latitude');
-        }
-        
-        if (siteData.longitude !== undefined && (isNaN(parseFloat(siteData.longitude)) || parseFloat(siteData.longitude) < -180 || parseFloat(siteData.longitude) > 180)) {
-          throw new Error('Invalid longitude');
+        // Validate location coordinates
+        if (siteData.location) {
+          if (siteData.location.latitude !== undefined && (isNaN(siteData.location.latitude) || siteData.location.latitude < -90 || siteData.location.latitude > 90)) {
+            throw new Error('Invalid latitude. Must be between -90 and 90');
+          }
+          
+          if (siteData.location.longitude !== undefined && (isNaN(siteData.location.longitude) || siteData.location.longitude < -180 || siteData.location.longitude > 180)) {
+            throw new Error('Invalid longitude. Must be between -180 and 180');
+          }
         }
         
         const site = new UnifiedSite({
@@ -1429,13 +1454,29 @@ router.post('/equipment/bulk-import', async (req, res) => {
         const equipData = equipment[i];
         const createdBy = equipData.createdBy || req.user?.email || 'System';
         
-        // Parse config if it's a string
-        if (typeof equipData.config === 'string') {
-          try {
-            equipData.config = JSON.parse(equipData.config);
-          } catch (e) {
-            // Keep as string if not valid JSON
+        // Handle nested location fields (location.latitude, location.longitude, etc.)
+        if (equipData['location.latitude'] || equipData['location.longitude']) {
+          equipData.location = {
+            latitude: equipData['location.latitude'] !== undefined ? parseFloat(equipData['location.latitude']) : (equipData.location?.latitude || 0),
+            longitude: equipData['location.longitude'] !== undefined ? parseFloat(equipData['location.longitude']) : (equipData.location?.longitude || 0),
+            address: equipData['location.address'] || equipData.location?.address,
+            city: equipData['location.city'] || equipData.location?.city,
+            state: equipData['location.state'] || equipData.location?.state,
+            zipCode: equipData['location.zipCode'] || equipData.location?.zipCode,
+            country: equipData['location.country'] || equipData.location?.country || 'US'
+          };
+        }
+        
+        // Remove dot-notation fields
+        Object.keys(equipData).forEach(key => {
+          if (key.includes('.')) {
+            delete equipData[key];
           }
+        });
+        
+        // Map hardware_type to type if needed (backward compatibility)
+        if (equipData.hardware_type && !equipData.type) {
+          equipData.type = equipData.hardware_type;
         }
         
         // Ensure required fields
@@ -1443,8 +1484,8 @@ router.post('/equipment/bulk-import', async (req, res) => {
           throw new Error('name is required');
         }
         
-        if (!equipData.hardware_type) {
-          throw new Error('hardware_type is required');
+        if (!equipData.type && !equipData.hardware_type) {
+          throw new Error('type (or hardware_type) is required');
         }
         
         const equip = new NetworkEquipment({
