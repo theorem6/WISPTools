@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { currentTenant } from '$lib/stores/tenantStore';
+  import { userId } from '$lib/stores/authStore';
   import TenantGuard from '$lib/components/admin/TenantGuard.svelte';
   import { workOrderService, type WorkOrder } from '$lib/services/workOrderService';
   
@@ -57,8 +58,10 @@
     
     isUpdating = true;
     try {
-      const userId = 'current-user'; // TODO: Get from auth
-      await workOrderService.startWork(workOrder._id!, userId);
+      if (!$userId) {
+        throw new Error('No authenticated user');
+      }
+      await workOrderService.startWork(workOrder._id!, $userId);
       success = 'Work started';
       setTimeout(() => success = '', 3000);
       await loadWorkOrder();
