@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../models/network');
+const mikrotikManager = require('../services/mikrotikManager');
 
 // Middleware to extract tenant ID
 const requireTenant = (req, res, next) => {
@@ -539,6 +540,71 @@ router.put('/devices/:id/credentials', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to update credentials',
       message: error.message 
+    });
+  }
+});
+
+// POST /api/mikrotik/devices/:id/test-connection - Test device connection
+router.post('/devices/:id/test-connection', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, password, port = 8728, useSSL = false } = req.body || {};
+
+    console.log(`🔌 [Mikrotik API] Testing connection for device: ${id}`);
+
+    const device = await NetworkEquipment.findOne({
+      _id: id,
+      tenantId: req.tenantId
+    }).lean();
+
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    let notes = {};
+    try {
+      notes = typeof device.notes === 'string' ? JSON.parse(device.notes) : (device.notes || {});
+    } catch (e) {
+      notes = {};
+    }
+
+    const credentials = notes.mikrotik_api || {};
+    const ipAddress = notes.management_ip || device.ipAddress || device.name;
+    const resolvedUsername = username || credentials.username;
+    const resolvedPassword = typeof password === 'string' ? password : credentials.password;
+    const resolvedPort = useSSL ? 8729 : (port || credentials.port || 8728);
+
+    if (!ipAddress || !resolvedUsername || !resolvedPassword) {
+      return res.status(400).json({ error: 'Missing connection details (ip, username, password)' });
+    }
+
+    const connection = await mikrotikManager.createConnection({
+      host: ipAddress,
+      user: resolvedUsername,
+      password: resolvedPassword,
+      port: resolvedPort,
+      timeout: 10000
+    });
+
+    const [identity, systemInfo] = await Promise.all([
+      mikrotikManager.getDeviceIdentity(connection),
+      mikrotikManager.getSystemInfo(connection)
+    ]);
+
+    connection.close();
+
+    res.json({
+      success: true,
+      message: 'Connection successful',
+      identity,
+      systemInfo
+    });
+  } catch (error) {
+    console.error('❌ [Mikrotik API] Connection test failed:', error);
+    res.status(400).json({
+      success: false,
+      error: 'Connection failed',
+      details: error.message
     });
   }
 });

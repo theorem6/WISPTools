@@ -12,6 +12,7 @@
   let port = 8728;
   let useSSL = false;
   let loading = false;
+  let testingConnection = false;
   let error = '';
   let success = '';
   
@@ -97,9 +98,38 @@
     dispatch('close');
   }
   
-  function testConnection() {
-    // TODO: Implement connection test
-    alert('Connection test feature coming soon');
+  async function testConnection() {
+    if (!device?.id) return;
+
+    if (!username.trim()) {
+      error = 'Username is required to test connection';
+      return;
+    }
+
+    testingConnection = true;
+    error = '';
+    success = '';
+
+    try {
+      const response = await apiService.post(`/api/mikrotik/devices/${device.id}/test-connection`, {
+        username: username.trim(),
+        password: password,
+        port: port,
+        useSSL: useSSL
+      });
+
+      if (response?.success) {
+        const identity = response.identity?.name ? ` (${response.identity.name})` : '';
+        success = `Connection successful${identity}`;
+      } else {
+        error = response?.error || response?.details || 'Connection failed';
+      }
+    } catch (e: any) {
+      console.error('Failed to test connection:', e);
+      error = e.message || 'Connection test failed';
+    } finally {
+      testingConnection = false;
+    }
   }
 </script>
 
@@ -189,9 +219,9 @@
             type="button"
             class="btn btn-secondary"
             on:click={testConnection}
-            disabled={loading}
+            disabled={loading || testingConnection}
           >
-            🔌 Test Connection
+            {testingConnection ? '🔌 Testing...' : '🔌 Test Connection'}
           </button>
           <div class="action-buttons">
             <button
