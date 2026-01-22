@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { UnifiedSite, UnifiedCPE, NetworkEquipment } = require('../../models/network');
-const Tenant = require('../../models/tenant');
+const { Tenant } = require('../../models/tenant');
 const { SNMPMetrics } = require('../../models/snmp-metrics-schema');
 const { formatSNMPDevice, isFakeDevice } = require('./snmp-helpers');
 

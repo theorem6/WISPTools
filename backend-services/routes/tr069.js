@@ -1,6 +1,6 @@
 const express = require('express');
 const appConfig = require('../config/app');
-const Tenant = require('../models/tenant');
+const { Tenant } = require('../models/tenant');
 
 const router = express.Router();
 
