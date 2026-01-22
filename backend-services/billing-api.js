@@ -177,12 +177,7 @@ router.post('/webhook/paypal', express.raw({ type: 'application/json' }), async 
       summary: event.summary
     });
     
-    // Verify webhook signature (implement PayPal webhook verification)
-    // const webhookId = process.env.PAYPAL_WEBHOOK_ID;
-    // const isValid = await verifyPayPalWebhook(req, webhookId);
-    // if (!isValid) {
-    //   return res.status(401).send('Unauthorized');
-    // }
+    // TODO: Verify webhook signature (implement PayPal webhook verification)
     
     switch (event.event_type) {
       case 'BILLING.SUBSCRIPTION.ACTIVATED':

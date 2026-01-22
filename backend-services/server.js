@@ -142,31 +142,12 @@ app.use('/api/mme', require('./routes/mme-status')); // MME subscriber status re
 // These services should ONLY run on remote EPC agents, not on the cloud GCE server.
 // The cloud backend cannot reach devices on private IP addresses and should not perform network discovery.
 
-// Initialize SNMP polling service - DISABLED (should only run on remote EPC agents)
-// try {
-//   const snmpPollingService = require('./services/snmp-polling-service');
-//   snmpPollingService.start().catch(err => {
-//     console.warn('⚠️ SNMP polling service failed to start:', err.message);
-//   });
-//   console.log('✅ SNMP polling service initialized');
-// } catch (error) {
-//   console.warn('⚠️ SNMP polling service disabled:', error.message);
-// }
+// SNMP polling service - DISABLED (should only run on remote EPC agents)
 console.log('⚠️ SNMP polling service DISABLED - cloud backend should not perform SNMP polling');
 console.log('   → SNMP polling runs ONLY on remote EPC/SNMP agents');
 
-// Initialize Ping monitoring service - DISABLED (should only run on remote EPC agents)
+// Ping monitoring service - DISABLED (should only run on remote EPC agents)
 // IMPORTANT: Backend should NEVER run ping or SNMP sweeps - only remote agents do this
-// try {
-//   const { getPingMonitoringService } = require('./services/ping-monitoring-service');
-//   const pingMonitoringService = getPingMonitoringService();
-//   pingMonitoringService.start().catch(err => {
-//     console.warn('⚠️ Ping monitoring service failed to start:', err.message);
-//   });
-//   console.log('✅ Ping monitoring service initialized');
-// } catch (error) {
-//   console.warn('⚠️ Ping monitoring service disabled:', error.message);
-// }
 console.log('⚠️ Ping monitoring service DISABLED - cloud backend should not perform ping sweeps');
 console.log('   → Ping monitoring runs ONLY on remote EPC/SNMP agents');
 console.log('   → Backend only receives and stores metrics from remote agents');

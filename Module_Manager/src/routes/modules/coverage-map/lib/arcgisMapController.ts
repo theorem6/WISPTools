@@ -7,6 +7,11 @@ import type {
 } from './models';
 import type { PlanLayerFeature, PlanMarketingAddress } from '$lib/services/planService';
 import { createLocationIcon } from '$lib/mapIcons';
+import { getTowerColor, getBandColor, getEquipmentColor, getBackhaulColor, getPlanDraftColor, hexToRgb } from './utils/mapColorUtils';
+import { createSectorCone, normalizePlanGeometry } from './utils/mapGeometryUtils';
+import { createBackhaulPopupContent } from './utils/mapPopupUtils';
+import { toNumeric, normalizeStreetKey, getLeadSourcePriority, buildCoordinateKey, buildMarketingPopupContent } from './utils/marketingLeadUtils';
+import { renderTowers, renderSectors, renderCPEDevices, renderEquipment } from './renderers';
 
 type DispatchFn = (event: string, detail?: any) => void;
 
@@ -872,10 +877,10 @@ export class CoverageMapController {
     if (!leadsChanged && previousCount > 0 && incomingLeads.length > 0) {
       // Check if the content is different by comparing address keys
       const previousKeys = new Set(this.marketingLeads.map(l => 
-        `${this.toNumeric(l.latitude) ?? ''},${this.toNumeric(l.longitude) ?? ''},${(l.addressLine1 ?? '').toLowerCase()}`
+        `${toNumeric(l.latitude) ?? ''},${toNumeric(l.longitude) ?? ''},${(l.addressLine1 ?? '').toLowerCase()}`
       ));
       const incomingKeys = new Set(incomingLeads.map(l => 
-        `${this.toNumeric(l.latitude) ?? ''},${this.toNumeric(l.longitude) ?? ''},${(l.addressLine1 ?? '').toLowerCase()}`
+        `${toNumeric(l.latitude) ?? ''},${toNumeric(l.longitude) ?? ''},${(l.addressLine1 ?? '').toLowerCase()}`
       ));
       // Different if sizes don't match or if there are keys in one but not the other
       leadsChanged = previousKeys.size !== incomingKeys.size || 
@@ -1897,24 +1902,6 @@ export class CoverageMapController {
     });
 
     try {
-      const [
-        { default: Graphic },
-        { default: Point },
-        { default: Polygon },
-        { default: SimpleMarkerSymbol },
-        { default: SimpleFillSymbol },
-        { default: SimpleLineSymbol },
-        { default: TextSymbol }
-      ] = await Promise.all([
-        import('@arcgis/core/Graphic.js'),
-        import('@arcgis/core/geometry/Point.js'),
-        import('@arcgis/core/geometry/Polygon.js'),
-        import('@arcgis/core/symbols/SimpleMarkerSymbol.js'),
-        import('@arcgis/core/symbols/SimpleFillSymbol.js'),
-        import('@arcgis/core/symbols/SimpleLineSymbol.js'),
-        import('@arcgis/core/symbols/TextSymbol.js')
-      ]);
-
       // Clear graphics tracking map on full render
       this.graphicsMap.clear();
       
@@ -1929,376 +1916,51 @@ export class CoverageMapController {
         await this.renderBackhaulLinks();
       }
 
-      console.log('[CoverageMap] Checking towers filter:', {
-        showTowers: this.filters.showTowers,
-        isArray: Array.isArray(this.data.towers),
-        towersLength: this.data.towers?.length || 0,
-        firstTower: this.data.towers?.[0] ? {
-          id: this.data.towers[0].id,
-          name: this.data.towers[0].name,
-          type: this.data.towers[0].type,
-          hasLocation: !!this.data.towers[0].location,
-          location: this.data.towers[0].location
-        } : null
-      });
-
+      // Render towers
       if (this.filters.showTowers && Array.isArray(this.data.towers) && this.data.towers.length > 0) {
-        const { default: PictureMarkerSymbol } = await import('@arcgis/core/symbols/PictureMarkerSymbol.js');
-
-        const isMobile = window.innerWidth <= 768;
-        const iconSize = isMobile ? 48 : 40;
-        const symbolSize = isMobile ? '28px' : '20px';
-        const outlineWidth = isMobile ? 4 : 3;
-
-        let towersRendered = 0;
-        let towersSkipped = 0;
-
-        this.data.towers.forEach(tower => {
-          try {
-            // Validate tower has required location data
-            if (!tower.location || !tower.location.latitude || !tower.location.longitude) {
-              console.warn('[CoverageMap] Tower missing location data:', tower.id, tower.name, tower.location);
-              return;
-            }
-
-            const lat = tower.location.latitude;
-            const lon = tower.location.longitude;
-
-            // Validate coordinates are valid numbers
-            if (typeof lat !== 'number' || typeof lon !== 'number' || isNaN(lat) || isNaN(lon)) {
-              console.warn('[CoverageMap] Tower has invalid coordinates:', tower.id, { lat, lon });
-              return;
-            }
-
-            // Validate coordinate ranges
-            if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-              console.warn('[CoverageMap] Tower coordinates out of range:', tower.id, { lat, lon });
-              return;
-            }
-
-            // Normalize type field - handle both string and array formats
-            // Backend stores type as array, but icon lookup expects string
-            let towerType: string;
-            if (Array.isArray(tower.type)) {
-              // If it's an array, prefer 'noc', 'warehouse', etc. if present, otherwise use first element
-              const preferredTypes = ['noc', 'warehouse', 'vehicle', 'rma', 'vendor', 'internet-access', 'internet'];
-              const preferredType = tower.type.find((t: string) => preferredTypes.includes(t));
-              towerType = preferredType || tower.type[0] || 'tower';
-            } else {
-              towerType = tower.type || 'tower';
-            }
-
-            let symbol;
-            const customIcon = createLocationIcon(towerType, iconSize);
-
-            if (customIcon) {
-              symbol = new PictureMarkerSymbol(customIcon);
-            } else {
-              // Use status-based color if status is provided, otherwise use type-based color
-              const color = getTowerColor(towerType, tower.status);
-              symbol = new SimpleMarkerSymbol({
-                style: 'circle',
-                color: color,
-                size: symbolSize,
-                outline: {
-                  color: 'white',
-                  width: outlineWidth
-                }
-              });
-            }
-
-            const point = new Point({
-              longitude: lon,
-              latitude: lat
-            });
-
-            const graphic = new Graphic({
-              geometry: point,
-              symbol,
-              attributes: {
-                ...tower,
-                type: 'tower',
-                id: tower.id,
-                name: tower.name
-              }
-            });
-
-            if (this.graphicsLayer) {
-              this.graphicsLayer.add(graphic);
-              // Track graphic by ID for incremental updates
-              const graphicId = `tower-${tower.id}`;
-              this.graphicsMap.set(graphicId, graphic);
-              towersRendered++;
-            }
-          } catch (towerError) {
-            console.error('[CoverageMap] Error rendering tower:', tower.id, towerError);
-            towersSkipped++;
-          }
+        const result = await renderTowers(this.data.towers, {
+          graphicsLayer: this.graphicsLayer,
+          graphicsMap: this.graphicsMap,
+          mapView: this.mapView
         });
-        
-        console.log(`[CoverageMap] Towers rendering complete: ${towersRendered} rendered, ${towersSkipped} skipped`);
-      } else {
-        console.log('[CoverageMap] Towers not rendered:', {
-          showTowers: this.filters.showTowers,
-          isArray: Array.isArray(this.data.towers),
-          towersLength: this.data.towers?.length || 0
-        });
+        console.log(`[CoverageMap] Towers rendering complete: ${result.rendered} rendered, ${result.skipped} skipped`);
       }
 
-      console.log('[CoverageMap] Checking sectors filter:', {
-        showSectors: this.filters.showSectors,
-        isArray: Array.isArray(this.data.sectors),
-        sectorsLength: this.data.sectors?.length || 0,
-        firstSector: this.data.sectors?.[0] ? {
-          id: this.data.sectors[0].id,
-          name: this.data.sectors[0].name,
-          siteId: this.data.sectors[0].siteId,
-          hasLocation: !!this.data.sectors[0].location,
-          location: this.data.sectors[0].location
-        } : null
-      });
-
+      // Render sectors
       if (this.filters.showSectors && this.graphicsLayer) {
         const filteredSectors = this.filterSectorsByBand(this.data.sectors || []);
-        
         console.log('[CoverageMap] Filtered sectors by band:', {
           originalCount: this.data.sectors?.length || 0,
           filteredCount: filteredSectors.length
         });
 
-        let sectorsRendered = 0;
-        let sectorsSkipped = 0;
-
-        for (const sector of filteredSectors) {
-          try {
-            // Sectors might not have location directly - try to get it from associated site
-            let sectorLat = sector.location?.latitude;
-            let sectorLon = sector.location?.longitude;
-            
-            // If sector doesn't have location but has siteId, try to find the site
-            if ((!sectorLat || !sectorLon) && sector.siteId) {
-              // Normalize siteId for comparison (handle both string and ObjectId)
-              const sectorSiteIdStr = String(sector.siteId);
-              
-              // Look for the site in towers array (includes both production and plan layer sites)
-              const associatedSite = this.data.towers?.find((t: any) => {
-                const siteIdStr = String(t.id || t._id || '');
-                return siteIdStr === sectorSiteIdStr || 
-                       (t._id && String(t._id) === sectorSiteIdStr) ||
-                       (sector.siteId && typeof sector.siteId === 'object' && String(sector.siteId) === siteIdStr);
-              });
-              
-              if (associatedSite?.location && associatedSite.location.latitude && associatedSite.location.longitude) {
-                sectorLat = associatedSite.location.latitude;
-                sectorLon = associatedSite.location.longitude;
-                console.log('[CoverageMap] Sector using location from site:', {
-                  sectorId: sector.id || sector._id,
-                  sectorName: sector.name,
-                  sectorSiteId: sector.siteId,
-                  siteId: associatedSite.id || associatedSite._id,
-                  siteName: associatedSite.name,
-                  lat: sectorLat,
-                  lon: sectorLon,
-                  isPlanLayer: !!sector.planId
-                });
-              } else {
-                console.warn('[CoverageMap] Sector site not found or missing location:', {
-                  sectorId: sector.id || sector._id,
-                  sectorName: sector.name,
-                  sectorSiteId: sector.siteId,
-                  sectorSiteIdStr,
-                  towersCount: this.data.towers?.length || 0,
-                  searchedSiteIds: this.data.towers?.slice(0, 3).map((t: any) => String(t.id || t._id || ''))
-                });
-              }
-            }
-            
-            if (!sectorLat || !sectorLon) {
-              console.warn('[CoverageMap] Sector missing location:', {
-                id: sector.id || sector._id,
-                name: sector.name,
-                siteId: sector.siteId,
-                hasLocation: !!sector.location,
-                location: sector.location,
-                planId: sector.planId
-              });
-              sectorsSkipped++;
-              continue;
-            }
-
-            // Calculate sector radius based on zoom level for better visibility
-            const mapZoom = this.mapView?.zoom || 10;
-            const baseRadius = 0.003; // Base radius - much smaller and less distracting
-            const zoomFactor = Math.max(0.5, Math.min(1.5, (mapZoom - 8) / 10)); // Scale with zoom
-            const sectorRadius = baseRadius * zoomFactor;
-            
-            const sectorPolygon = createSectorCone(
-              sectorLat,
-              sectorLon,
-              sector.azimuth || 0,
-              sector.beamwidth || 60,
-              sectorRadius
-            );
-
-            const color = getBandColor(sector.band || sector.technology);
-            
-            // Convert hex color to RGBA with transparency for less distracting display
-            const rgbaColor = hexToRgb(color);
-            const transparentColor = [...rgbaColor, 0.3]; // 30% opacity
-
-            const graphic = new Graphic({
-              geometry: sectorPolygon,
-              symbol: {
-                type: 'simple-fill',
-                color: transparentColor,
-                style: 'solid',
-                outline: {
-                  color: color,
-                  width: 1
-                }
-              },
-              attributes: {
-                ...sector,
-                type: 'sector',
-                id: sector.id || sector._id,
-                name: sector.name,
-                siteId: sector.siteId
-              }
-            });
-
-            if (this.graphicsLayer) {
-              this.graphicsLayer.add(graphic);
-              // Track graphic by ID for incremental updates
-              const graphicId = `sector-${sector.id}`;
-              this.graphicsMap.set(graphicId, graphic);
-              sectorsRendered++;
-            }
-          } catch (sectorError) {
-            console.error('[CoverageMap] Error rendering sector:', sector.id, sectorError);
-            sectorsSkipped++;
-          }
-        }
-        
-        console.log(`[CoverageMap] Sectors rendering complete: ${sectorsRendered} rendered, ${sectorsSkipped} skipped`);
-      } else {
-        console.log('[CoverageMap] Sectors not rendered:', {
-          showSectors: this.filters.showSectors,
-          hasGraphicsLayer: !!this.graphicsLayer,
-          sectorsLength: this.data.sectors?.length || 0
+        const result = await renderSectors(filteredSectors, {
+          graphicsLayer: this.graphicsLayer,
+          graphicsMap: this.graphicsMap,
+          mapView: this.mapView,
+          towers: this.data.towers || []
         });
+        console.log(`[CoverageMap] Sectors rendering complete: ${result.rendered} rendered, ${result.skipped} skipped`);
       }
 
+      // Render CPE devices
       if (this.filters.showCPE && Array.isArray(this.data.cpeDevices)) {
-        this.data.cpeDevices.forEach(cpe => {
-          if (cpe.status === 'inventory') return;
-
-          const cpePolygon = createSectorCone(
-            cpe.location.latitude,
-            cpe.location.longitude,
-            cpe.azimuth,
-            cpe.beamwidth || 30,
-            0.002
-          );
-
-          const color = cpe.status === 'online' ? '#10b981' : '#ef4444';
-
-          const fillSymbol = new SimpleFillSymbol({
-            color: [...hexToRgb(color), 0.5],
-            outline: {
-              color: color,
-              width: 1
-            }
-          });
-
-          const graphic = new Graphic({
-            geometry: cpePolygon,
-            symbol: fillSymbol,
-            attributes: {
-              ...cpe,
-              type: 'cpe',
-              id: cpe.id
-            }
-          });
-
-          if (this.graphicsLayer) {
-            this.graphicsLayer.add(graphic);
-          }
+        const result = await renderCPEDevices(this.data.cpeDevices, {
+          graphicsLayer: this.graphicsLayer,
+          graphicsMap: this.graphicsMap
         });
+        console.log(`[CoverageMap] CPE rendering complete: ${result.rendered} rendered, ${result.skipped} skipped`);
       }
 
+      // Render equipment
       if (this.filters.showEquipment && Array.isArray(this.data.equipment)) {
         const locationTypeFilter = Array.isArray(this.filters.locationTypeFilter) ? this.filters.locationTypeFilter : [];
-        
-        // Filter equipment by location type and validate coordinates
-        const visibleEquipment = this.data.equipment.filter(eq => {
-          // Check location type filter
-          if (locationTypeFilter.length > 0 && !locationTypeFilter.includes(eq.locationType)) {
-            return false;
-          }
-          
-          // Validate coordinates - must have valid lat/lon
-          const lat = eq.location?.latitude;
-          const lon = eq.location?.longitude;
-          
-          if (lat == null || lon == null) {
-            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - missing coordinates`);
-            return false;
-          }
-          
-          if (typeof lat !== 'number' || typeof lon !== 'number') {
-            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - invalid coordinate types`);
-            return false;
-          }
-          
-          // Filter out 0,0 (invalid location - middle of ocean)
-          if (lat === 0 && lon === 0) {
-            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - coordinates are 0,0`);
-            return false;
-          }
-          
-          // Validate coordinate ranges
-          if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-            console.warn(`[CoverageMap] Skipping equipment ${eq.id} - coordinates out of valid range: ${lat}, ${lon}`);
-            return false;
-          }
-          
-          return true;
+        const result = await renderEquipment(this.data.equipment, {
+          graphicsLayer: this.graphicsLayer,
+          graphicsMap: this.graphicsMap,
+          locationTypeFilter
         });
-
-        const isMobile = window.innerWidth <= 768;
-        const symbolSize = isMobile ? '16px' : '12px';
-        const outlineWidth = isMobile ? 2 : 1;
-
-        visibleEquipment.forEach(eq => {
-          const symbol = new SimpleMarkerSymbol({
-            style: 'circle',
-            color: getEquipmentColor(eq.status),
-            size: symbolSize,
-            outline: {
-              color: 'white',
-              width: outlineWidth
-            }
-          });
-
-          const point = new Point({
-            longitude: eq.location.longitude,
-            latitude: eq.location.latitude
-          });
-
-          const graphic = new Graphic({
-            geometry: point,
-            symbol,
-            attributes: {
-              ...eq,
-              type: 'equipment',
-              id: eq.id
-            }
-          });
-
-          if (this.graphicsLayer) {
-            this.graphicsLayer.add(graphic);
-          }
-        });
+        console.log(`[CoverageMap] Equipment rendering complete: ${result.rendered} rendered, ${result.skipped} skipped`);
       }
 
       const graphicsCount = this.graphicsLayer?.graphics?.length || 0;
@@ -2593,14 +2255,14 @@ export class CoverageMapController {
             deduplicatedLeads.push(lead);
           } else {
             const existingLead = deduplicatedLeads[existingIndex];
-            if (this.getLeadSourcePriority(lead) > this.getLeadSourcePriority(existingLead)) {
+            if (getLeadSourcePriority(lead) > getLeadSourcePriority(existingLead)) {
               deduplicatedLeads[existingIndex] = lead;
             }
           }
           return;
         }
 
-        const fallbackKey = this.buildCoordinateKey(lead);
+        const fallbackKey = buildCoordinateKey(lead);
         if (!fallbackKey) {
           deduplicatedLeads.push(lead);
           return;
@@ -2631,8 +2293,8 @@ export class CoverageMapController {
       let newMarkersAdded = 0;
 
       deduplicatedLeads.forEach((lead, index) => {
-        const latitude = this.toNumeric(lead.latitude);
-        const longitude = this.toNumeric(lead.longitude);
+        const latitude = toNumeric(lead.latitude);
+        const longitude = toNumeric(lead.longitude);
         if (latitude === null || longitude === null) {
           return;
         }
@@ -2662,7 +2324,7 @@ export class CoverageMapController {
         });
 
         const title = lead.addressLine1 ?? 'Potential Customer';
-        const popupContent = this.buildMarketingPopupContent(lead, latitude, longitude);
+        const popupContent = buildMarketingPopupContent(lead, latitude, longitude);
 
         const graphic = new Graphic({
           geometry: point,
@@ -2989,110 +2651,6 @@ export class CoverageMapController {
     }
   }
 
-  private toNumeric(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value;
-    }
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  private normalizeStreetKey(addressLine1?: string | null): string | null {
-    if (!addressLine1) return null;
-
-    const trimmed = addressLine1.trim();
-    if (!trimmed) return null;
-
-    const match = trimmed.match(/^(\d+[a-z0-9-]*)\s+(.*)$/i);
-    if (!match) return null;
-
-    const directionMap: Record<string, string> = {
-      northeast: 'ne',
-      northwest: 'nw',
-      southeast: 'se',
-      southwest: 'sw',
-      north: 'n',
-      south: 's',
-      east: 'e',
-      west: 'w'
-    };
-
-    const streetTypeMap: Record<string, string> = {
-      street: 'st',
-      avenue: 'ave',
-      boulevard: 'blvd',
-      court: 'ct',
-      drive: 'dr',
-      lane: 'ln',
-      place: 'pl',
-      road: 'rd',
-      terrace: 'ter',
-      trail: 'trl',
-      highway: 'hwy',
-      parkway: 'pkwy',
-      circle: 'cir'
-    };
-
-    const numberPart = match[1].toLowerCase();
-    let streetPart = match[2]
-      .toLowerCase()
-      .replace(/[.,#]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    Object.entries(directionMap).forEach(([full, abbr]) => {
-      streetPart = streetPart.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
-    });
-
-    Object.entries(streetTypeMap).forEach(([full, abbr]) => {
-      streetPart = streetPart.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
-    });
-
-    if (!streetPart) return null;
-    return `${numberPart}|${streetPart}`;
-  }
-
-  private getLeadSourcePriority(lead: PlanMarketingAddress): number {
-    const source = (lead.source ?? '').toLowerCase();
-    if (source.includes('arcgis')) return 3;
-    if (source.includes('osm')) return 2;
-    if (source.includes('nominatim')) return 1;
-    return 0;
-  }
-
-  private buildCoordinateKey(lead: PlanMarketingAddress): string | null {
-    const latitude = this.toNumeric(lead.latitude);
-    const longitude = this.toNumeric(lead.longitude);
-    if (latitude === null || longitude === null) {
-      return null;
-    }
-    const address = (lead.addressLine1 ?? '').toLowerCase();
-    return `${latitude.toFixed(5)}|${longitude.toFixed(5)}|${address}`;
-  }
-
-  private buildMarketingPopupContent(lead: PlanMarketingAddress, latitude: number, longitude: number): string {
-    const rows: string[] = [];
-
-    if (lead.addressLine1) {
-      rows.push(`<strong>Address:</strong> ${lead.addressLine1}`);
-    }
-    if (lead.addressLine2) {
-      rows.push(`<strong>Unit:</strong> ${lead.addressLine2}`);
-    }
-    const localityParts = [lead.city, lead.state, lead.postalCode].filter(Boolean).join(', ');
-    if (localityParts) {
-      rows.push(`<strong>Location:</strong> ${localityParts}`);
-    }
-    if (lead.country) {
-      rows.push(`<strong>Country:</strong> ${lead.country}`);
-    }
-    rows.push(`<strong>Coordinates:</strong> ${latitude.toFixed(7)}, ${longitude.toFixed(7)}`);
-    if (lead.source) {
-      rows.push(`<strong>Source:</strong> ${lead.source}`);
-    }
-
-    return `<div class="marketing-lead-popup">${rows.join('<br/>')}</div>`;
-  }
 
   private filterSectorsByBand(allSectors: Sector[]): Sector[] {
     if (!allSectors || !Array.isArray(allSectors)) return [];
@@ -3110,193 +2668,5 @@ export class CoverageMapController {
   }
 }
 
-function createSectorCone(lat: number, lon: number, azimuth: number, beamwidth: number, radius: number): any {
-  const startAngle = azimuth - beamwidth / 2;
-  const endAngle = azimuth + beamwidth / 2;
-  const rings = [[
-    [lon, lat]
-  ]];
 
-  for (let angle = startAngle; angle <= endAngle; angle += 5) {
-    const radians = (angle * Math.PI) / 180;
-    const x = lon + radius * Math.sin(radians);
-    const y = lat + radius * Math.cos(radians);
-    rings[0].push([x, y]);
-  }
-
-  rings[0].push([lon, lat]);
-
-  return {
-    type: 'polygon',
-    rings,
-    spatialReference: { wkid: 4326 }
-  };
-}
-
-function getTowerColor(type: string, status?: string): string {
-  // If status is provided, use status-based colors (for monitoring)
-  if (status) {
-    const statusColors: Record<string, string> = {
-      active: '#10b981',      // Green - healthy/online
-      inactive: '#ef4444',    // Red - down/offline
-      maintenance: '#f59e0b', // Yellow - degraded/warning
-      planned: '#6b7280',     // Gray - planned sites
-      online: '#10b981',      // Green - device is online
-      offline: '#ef4444',     // Red - device is offline
-      unknown: '#6b7280'      // Gray - unknown/unmonitored status (initial state)
-    };
-    if (statusColors[status]) {
-      return statusColors[status];
-    }
-  }
-  
-  // Fallback to type-based colors
-  const colors: Record<string, string> = {
-    tower: '#3b82f6',
-    rooftop: '#8b5cf6',
-    monopole: '#06b6d4',
-    warehouse: '#f59e0b',
-    noc: '#ef4444',
-    'internet-access': '#06b6d4',
-    internet: '#06b6d4',
-    vehicle: '#10b981',
-    rma: '#f97316',
-    vendor: '#6366f1',
-    other: '#6b7280'
-  };
-  return colors[type] || colors.other;
-}
-
-function getBandColor(band: string): string {
-  const colors: Record<string, string> = {
-    LTE: '#ef4444',
-    CBRS: '#3b82f6',
-    FWA: '#10b981',
-    '5G': '#8b5cf6',
-    WiFi: '#f59e0b'
-  };
-  return colors[band] || '#6b7280';
-}
-
-function getEquipmentColor(status: string): string {
-  const colors: Record<string, string> = {
-    // Deployment statuses
-    deployed: '#10b981',
-    inventory: '#3b82f6',
-    rma: '#f59e0b',
-    retired: '#6b7280',
-    lost: '#ef4444',
-    // Monitoring statuses (for devices in monitor module)
-    online: '#10b981',      // Green - device is online
-    offline: '#ef4444',     // Red - device is offline
-    unknown: '#6b7280',     // Gray - unknown/unmonitored status (initial state for devices from deploy)
-    active: '#10b981',      // Green - active/healthy
-    inactive: '#ef4444'     // Red - inactive/down
-  };
-  return colors[status] || colors.deployed;
-}
-
-function getBackhaulColor(type: string): string {
-  const colors: Record<string, string> = {
-    fiber: '#3b82f6',
-    'fixed-wireless-licensed': '#10b981',
-    'fixed-wireless-unlicensed': '#f97316'
-  };
-
-  return colors[type] || '#6366f1';
-}
-
-function getPlanDraftColor(type: string): string {
-  const colors: Record<string, string> = {
-    plan: '#6366f1',
-    site: '#38bdf8',
-    tower: '#3b82f6',
-    sector: '#8b5cf6',
-    cpe: '#10b981',
-    backhaul: '#f97316',
-    warehouse: '#f59e0b',
-    noc: '#ef4444',
-    equipment: '#0ea5e9'
-  };
-  return colors[type] || '#6366f1';
-}
-
-function hexToRgb(hex: string): [number, number, number] {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? [
-        parseInt(result[1], 16),
-        parseInt(result[2], 16),
-        parseInt(result[3], 16)
-      ]
-    : [0, 0, 0];
-}
-
-function createBackhaulPopupContent(feature: any): string {
-  const attrs = feature.graphic.attributes;
-  let typeIcon = '🌐';
-  let typeName = 'Fiber';
-
-  if (attrs.backhaulType === 'fixed-wireless-licensed') {
-    typeIcon = '📡';
-    typeName = 'Licensed Wireless';
-  } else if (attrs.backhaulType === 'fixed-wireless-unlicensed') {
-    typeIcon = '📻';
-    typeName = 'Unlicensed Wireless';
-  }
-
-  return `
-    <div class="popup-content">
-      <p><strong>Type:</strong> ${typeIcon} ${typeName}</p>
-      <p><strong>From:</strong> ${attrs.fromSite}</p>
-      <p><strong>To:</strong> ${attrs.toSite}</p>
-      <p><strong>Capacity:</strong> ${attrs.capacity} Mbps</p>
-      <p><strong>Status:</strong> ${attrs.status}</p>
-    </div>
-  `;
-}
-
-function normalizePlanGeometry(geometry: any): any {
-  if (!geometry) return undefined;
-
-  const type = (geometry.type || '').toLowerCase();
-
-  if (typeof geometry.longitude === 'number' && typeof geometry.latitude === 'number') {
-    return {
-      type: 'Point',
-      coordinates: [geometry.longitude, geometry.latitude]
-    };
-  }
-
-  switch (type) {
-    case 'point':
-      if (Array.isArray(geometry.coordinates)) {
-        return {
-          type: 'Point',
-          coordinates: geometry.coordinates
-        };
-      }
-      return geometry;
-    case 'linestring':
-      return {
-        type: 'LineString',
-        coordinates: geometry.coordinates ?? []
-      };
-    case 'polyline':
-      if (Array.isArray(geometry.paths)) {
-        return {
-          type: 'LineString',
-          coordinates: geometry.paths[0] ?? []
-        };
-      }
-      return geometry;
-    case 'polygon':
-      return {
-        type: 'Polygon',
-        coordinates: geometry.coordinates ?? geometry.rings ?? []
-      };
-    default:
-      return geometry;
-  }
-}
 
