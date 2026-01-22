@@ -16,6 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for diff comparison
+    
     - name: Check changed files
       uses: dorny/paths-filter@v2
       id: changes
@@ -26,11 +31,9 @@ jobs:
     
     - name: Skip if no functions changes
       if: steps.changes.outputs.functions == 'false'
-      run: echo "No functions changes detected, skipping deployment"
-    
-    - name: Checkout code
-      if: steps.changes.outputs.functions == 'true'
-      uses: actions/checkout@v4
+      run: |
+        echo "No functions changes detected, skipping deployment"
+        exit 0
       
     - name: Setup Node.js
       if: steps.changes.outputs.functions == 'true'
@@ -132,6 +135,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for diff comparison
+    
     - name: Check changed files
       uses: dorny/paths-filter@v2
       id: changes
@@ -143,11 +151,9 @@ jobs:
     
     - name: Skip if no rules changes
       if: steps.changes.outputs.rules == 'false'
-      run: echo "No rules changes detected, skipping deployment"
-    
-    - name: Checkout code
-      if: steps.changes.outputs.rules == 'true'
-      uses: actions/checkout@v4
+      run: |
+        echo "No rules changes detected, skipping deployment"
+        exit 0
       
     - name: Install Firebase CLI
       if: steps.changes.outputs.rules == 'true'
