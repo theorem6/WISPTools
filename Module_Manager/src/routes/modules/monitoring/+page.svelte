@@ -908,6 +908,10 @@
             <line x1="12" y1="17" x2="12.01" y2="17"></line>
           </svg>
         </button>
+        <button class="module-control-btn" onclick={() => showSetupWizard = true} title="Monitoring Setup Wizard">
+          <span class="control-icon">🚀</span>
+          <span class="control-label">Setup</span>
+        </button>
         <button class="module-control-btn" onclick={() => showSNMPConfig = true} title="Configuration">
           <span class="control-icon">🔧</span>
           <span class="control-label">Config</span>
