@@ -13,6 +13,10 @@ on:
       - 'firebase.json'
   workflow_dispatch: # Allow manual trigger from GitHub Actions UI
 
+permissions:
+  contents: read
+  pull-requests: read
+
 env:
   FIREBASE_PROJECT_ID: wisptools-production
   NODE_VERSION: '20'
