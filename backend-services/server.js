@@ -135,6 +135,7 @@ app.use('/api/epc', require('./routes/epc-commands')); // Remote command managem
 app.use('/api/epc', require('./routes/epc-logs')); // EPC logs
 app.use('/api/epc/snmp', require('./routes/epc-snmp')); // EPC SNMP discovery
 app.use('/api/mikrotik', require('./routes/mikrotik'));
+app.use('/api/tr069', require('./routes/tr069'));
 app.use('/api/snmp', require('./routes/snmp'));
 app.use('/api/mme', require('./routes/mme-status')); // MME subscriber status reporting
 

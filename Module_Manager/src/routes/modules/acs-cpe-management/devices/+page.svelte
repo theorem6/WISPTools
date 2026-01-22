@@ -3,6 +3,7 @@
   import MainMenu from '../components/MainMenu.svelte';
   import CPEDeviceRow from '../components/CPEDeviceRow.svelte';
   import TR069Actions from '../components/TR069Actions.svelte';
+  import ParameterEditorModal from '../components/ParameterEditorModal.svelte';
   import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
 
   let devices: CPEDevice[] = [];
@@ -12,6 +13,8 @@
   let expandedDeviceId: string | null = null;
   let actionDevice: CPEDevice | null = null;
   let showActionsModal = false;
+  let showParameterEditor = false;
+  let editDevice: CPEDevice | null = null;
 
   onMount(async () => {
     await loadDevices();
@@ -74,7 +77,8 @@
   function handleEdit(event: CustomEvent) {
     const device = event.detail;
     console.log('Edit device:', device.id);
-    // TODO: Open parameter editor
+    editDevice = device;
+    showParameterEditor = true;
   }
 
   function handleMonitoring(event: CustomEvent) {
@@ -238,6 +242,19 @@
     device={actionDevice}
     show={showActionsModal}
     on:close={() => { showActionsModal = false; actionDevice = null; }}
+  />
+{/if}
+
+{#if showParameterEditor && editDevice}
+  <ParameterEditorModal
+    show={showParameterEditor}
+    device={editDevice}
+    on:close={() => { showParameterEditor = false; editDevice = null; }}
+    on:saved={() => {
+      showParameterEditor = false;
+      editDevice = null;
+      loadDevices();
+    }}
   />
 {/if}
 
