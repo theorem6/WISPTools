@@ -13,6 +13,7 @@
     formatUptime,
     type TR069CellularMetrics 
   } from '../lib/tr069MetricsService';
+  import { currentTenant } from '$lib/stores/tenantStore';
   
   export let device: any = null;
   export let show: boolean = false;
@@ -27,9 +28,27 @@
   }
 
   async function loadDeviceMetrics() {
-    // TODO: Replace with real API call to /api/tr069/device-metrics?deviceId={device.id}
-    // Query GenieACS database for historical values of cellular parameters
-    deviceMetrics = generateTR069MetricsHistory(6, device.id);
+    if ($currentTenant?.id) {
+      try {
+        const response = await fetch(`/api/tr069/device-metrics?deviceId=${device.id}&hours=6`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': $currentTenant.id
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data?.metrics) {
+          deviceMetrics = data.metrics;
+        } else {
+          deviceMetrics = generateTR069MetricsHistory(6, device.id);
+        }
+      } catch (error) {
+        console.error('Failed to load device metrics:', error);
+        deviceMetrics = generateTR069MetricsHistory(6, device.id);
+      }
+    } else {
+      deviceMetrics = generateTR069MetricsHistory(6, device.id);
+    }
     
     // Get current signal values (last metric)
     if (deviceMetrics.length > 0) {

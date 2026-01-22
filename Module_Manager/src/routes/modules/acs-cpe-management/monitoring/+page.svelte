@@ -12,6 +12,7 @@
   import { generateTR069MetricsHistory, type TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { getCurrentLTEKPIs, type LTEKPIs } from '../lib/lteMetricsService';
   import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
+  import { currentTenant } from '$lib/stores/tenantStore';
 
   let metrics: TR069CellularMetrics[] = [];
   let kpis: LTEKPIs;
@@ -53,12 +54,25 @@
     isLoading = true;
     
     try {
-      // TODO: Replace with real API call to /api/tr069/metrics?deviceId={selectedDeviceId}&hours={hours}
-      // This would query GenieACS/MongoDB for historical parameter values for specific device
       console.log(`Loading TR-069 metrics for device: ${selectedDeviceId}`);
       
       const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 168;
-      metrics = generateTR069MetricsHistory(hours, selectedDeviceId);
+      if ($currentTenant?.id) {
+        const response = await fetch(`/api/tr069/metrics?deviceId=${selectedDeviceId}&hours=${hours}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': $currentTenant.id
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data?.metrics) {
+          metrics = data.metrics;
+        } else {
+          metrics = generateTR069MetricsHistory(hours, selectedDeviceId);
+        }
+      } else {
+        metrics = generateTR069MetricsHistory(hours, selectedDeviceId);
+      }
       kpis = getCurrentLTEKPIs();
       lastUpdate = new Date();
       

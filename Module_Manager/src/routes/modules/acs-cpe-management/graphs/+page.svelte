@@ -10,6 +10,7 @@
   import LTESignalChart from '../components/LTESignalChart.svelte';
   import { generateTR069MetricsHistory, type TR069CellularMetrics } from '../lib/tr069MetricsService';
   import { loadCPEDevices, type CPEDevice } from '../lib/cpeDataService';
+  import { currentTenant } from '$lib/stores/tenantStore';
 
   let cpeDevices: CPEDevice[] = [];
   let selectedDevices: string[] = [];
@@ -46,7 +47,19 @@
       const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 168;
       
       for (const deviceId of selectedDevices) {
-        // TODO: Replace with API call /api/tr069/metrics?deviceId={deviceId}&hours={hours}
+        if ($currentTenant?.id) {
+          const response = await fetch(`/api/tr069/metrics?deviceId=${deviceId}&hours=${hours}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': $currentTenant.id
+            }
+          });
+          const data = await response.json();
+          if (response.ok && data?.metrics) {
+            metricsMap.set(deviceId, data.metrics);
+            continue;
+          }
+        }
         const metrics = generateTR069MetricsHistory(hours, deviceId);
         metricsMap.set(deviceId, metrics);
       }
