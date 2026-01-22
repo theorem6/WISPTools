@@ -6,6 +6,10 @@ on:
     # Always run on push to main/master - let jobs decide what to deploy based on changed files
   workflow_dispatch:  # Allow manual triggers from GitHub Actions UI
 
+permissions:
+  contents: read
+  pull-requests: read
+
 env:
   FIREBASE_PROJECT_ID: wisptools-production
   NODE_VERSION: '20'
@@ -14,6 +18,10 @@ jobs:
   deploy-functions:
     name: Deploy Cloud Functions
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: read
     
     steps:
     - name: Checkout code
@@ -133,6 +141,10 @@ jobs:
   deploy-rules:
     name: Deploy Firestore Rules
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: read
     
     steps:
     - name: Checkout code
